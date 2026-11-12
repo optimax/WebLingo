@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>weblingo</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../WebLingo.Compiler/WebLingo.Compiler.csproj" />
+    <ProjectReference Include="../WebLingo.VM/WebLingo.VM.csproj" />
+    <ProjectReference Include="../WebLingo.Platform.DotNet/WebLingo.Platform.DotNet.csproj" />
+    <ProjectReference Include="../WebLingo.Templates/WebLingo.Templates.csproj" />
+  </ItemGroup>
+</Project>

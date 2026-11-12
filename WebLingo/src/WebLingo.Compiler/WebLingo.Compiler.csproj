@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Library</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../WebLingo.Core/WebLingo.Core.csproj" />
+    <ProjectReference Include="../WebLingo.Language/WebLingo.Language.csproj" />
+    <ProjectReference Include="../WebLingo.Bytecode/WebLingo.Bytecode.csproj" />
+  </ItemGroup>
+</Project>
