@@ -42,4 +42,4 @@ See [`Documents/weblingo-architecture.md`](../Documents/weblingo-architecture.md
 ## Verification status
 
 - **Windows** (12 November 2026, .NET SDK 10.0.404): `dotnet restore`, the Release build (no warnings), and `dotnet test` succeed, and `weblingo run samples/Arithmetic/arithmetic.ws` prints `30`.
-- **Linux:** not verified yet. The CI workflow (`.github/workflows/build.yml` at the repository root) builds and tests on Linux and Windows; it runs on a push, and has not run yet.
+- **Linux and Windows in CI:** the CI workflow (`.github/workflows/build.yml` at the repository root) restores, builds and tests on `ubuntu-latest` and `windows-latest` on every push; its first run passed on both (CI run 1, 12 November 2026, commit `5229806`).

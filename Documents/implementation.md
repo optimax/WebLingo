@@ -236,9 +236,11 @@ The open-source release needs an inventory of every dependency, with its version
 
 # 11. Known Traps
 
-### CI Has Not Run Yet
+### CI Runs Only on a Push
 
-Until 2026-11-12 the workflow was in the solution folder, where GitHub Actions does not look (it reads `.github/workflows` at the repository root only), so it never ran. It is at the root now, but it runs on a push, and nothing has been pushed since: until CI has run, nothing has been built or tested on Linux. Keep the workflow at the root and its `working-directory` pointing at the solution folder.
+CI is the only place Linux is tried, and it runs on a push or a pull request, which needs the user's go-ahead: work not yet pushed has been tried on Windows only. Until 2026-11-12 the workflow was in the solution folder, where GitHub Actions does not look (it reads `.github/workflows` at the repository root only), so it never ran; its first run, from the root, passed on both platforms (CI run 1, 12 November 2026, commit `5229806`). Keep the workflow at the root and its `working-directory` pointing at the solution folder.
+
+The run logs need a signed-in GitHub account; the run's page and its result do not.
 
 ### Warnings Are Errors
 

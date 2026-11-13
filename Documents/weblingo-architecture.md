@@ -2,7 +2,7 @@
 
 **Document:** `weblingo-architecture.md`  
 **Status:** Consolidated architectural baseline through M0.6, including approved WS-T001–WS-T008 template composition and the WebLingo project name (12 November 2026)  
-**Implementation status:** M0.6.1 solution scaffold generated (22 October 2026); renamed to WebLingo on 12 November 2026; M0.6.2–M0.6.7 implemented on 12 November 2026, a working compiler and register VM for the M0.6 subset, built and tested on Windows, Linux pending (§14, §15).  
+**Implementation status:** M0.6.1 solution scaffold generated (22 October 2026); renamed to WebLingo on 12 November 2026; M0.6.2–M0.6.7 implemented on 12 November 2026, a working compiler and register VM for the M0.6 subset, built and tested on Windows and Linux (§14, §15).  
 **Convention:** **Approved** means explicitly accepted by the project owner. **Proposed** means an implementation recommendation requiring confirmation or validation. **Provisional** means deliberately undecided.
 
 ## 1. Executive overview
@@ -776,11 +776,11 @@ Proposed central props:
 | M0.3 | WBC bytecode and VM architecture | Drafted; VM comparison and several encoding choices open |
 | M0.4 | Hosting ABI and runtime lifecycle | **Four explicit architectural decisions approved** |
 | M0.5 | Platform abstraction and portability | **Four explicit architectural decisions approved** |
-| M0.6 | Solution scaffolding and implementation contracts | **Approved; M0.6.1–M0.6.7 implemented and verified on Windows, Linux verification pending (§15)** |
+| M0.6 | Solution scaffolding and implementation contracts | **Approved; M0.6.1–M0.6.7 implemented and verified on Windows and Linux (§15)** |
 | M0.7 | Conformance suite expansion | Planned |
-| M0.8 | Windows/Linux CI and portability validation | Started (12 November 2026): the CI workflow builds and tests on Windows and Linux (not run yet); tests check the portable core's assemblies against the dependency rules (§8.3) and the portability inventory (WS-P016) |
+| M0.8 | Windows/Linux CI and portability validation | Started (12 November 2026): the CI workflow builds and tests on Windows and Linux (first run passed: CI run 1, 12 November 2026, commit `5229806`); tests check the portable core's assemblies against the dependency rules (§8.3) and the portability inventory (WS-P016) |
 
-**Immediate next activity:** M0.6's increments are implemented and pass their tests on Windows (12 November 2026, §15); their Linux validation waits for the CI workflow's first run. The owner's decisions on the choices proposed in §15.2 come next, then M0.7. The compiler and VM cover the M0.6 subset only (§8.4).
+**Immediate next activity:** M0.6's increments are implemented and pass their tests on Windows and Linux (12 November 2026, §15). The owner's decisions on the choices proposed in §15.2 come next, then M0.7. The compiler and VM cover the M0.6 subset only (§8.4).
 
 ---
 
@@ -991,13 +991,13 @@ Rendering must support asynchronous output and backpressure without mandatory fu
 
 ## 14. M0.6.1 solution scaffold — implementation status (22 October 2026)
 
-**Status: generated; built and tested on Windows, Linux pending.** This is an implementation milestone, not a change to previously approved language semantics.
+**Status: generated; built and tested on Windows and Linux.** This is an implementation milestone, not a change to previously approved language semantics.
 
 - Created `WebLingo.slnx`, .NET 10 project files, centralized package versions, solution-wide build settings, and GitHub Actions build/test workflow for Windows and Linux (moved on 12 November 2026 to `.github/workflows/` at the repository root, where GitHub Actions reads it).
 - Created portable Core, Language, Bytecode, Compiler, Runtime, VM, Platform.Abstractions, Templates, Hosting.Abstractions, StdLib project boundaries; .NET platform, ASP.NET Core host adapter, and CLI projects.
 - Added a minimal lexer seed and unit tests, public scaffolding interfaces, template-composition contract placeholders, examples, and a Native C# portability inventory.
 - The CLI supports `--version` only; `run` and `check` explicitly report that execution is not implemented. No compiler, VM execution, or template rendering is claimed.
-- **Verification:** On Windows (12 November 2026, .NET SDK 10.0.404, a fresh clone), `dotnet restore WebLingo.slnx`, `dotnet build WebLingo.slnx -c Release` (no warnings) and `dotnet test WebLingo.slnx -c Release` (5 tests) succeed, and `weblingo --version` answers. (An earlier static validation, with .NET SDK 10.0.401, could not restore.) Linux is not verified yet: the CI workflow builds and tests there on a push, and has not run yet.
+- **Verification:** On Windows (12 November 2026, .NET SDK 10.0.404, a fresh clone), `dotnet restore WebLingo.slnx`, `dotnet build WebLingo.slnx -c Release` (no warnings) and `dotnet test WebLingo.slnx -c Release` (5 tests) succeed, and `weblingo --version` answers. (An earlier static validation, with .NET SDK 10.0.401, could not restore.) On Linux, the CI workflow's first run (CI run 1, 12 November 2026, commit `5229806`) built and tested the solution, by then M0.6.7's.
 - The initial `WsSourceSpan` and lexer positions use .NET string indices in this scaffold; production source-map byte offsets remain specified as UTF-8 and require explicit conversion.
 - Register-based execution remains provisional (WS-BC002); both stack and register execution must eventually be benchmarked.
 - All three approved template composition features (includes, layouts, parameterized components) remain mandatory together in the first `.wsp`-capable implementation.
@@ -1010,22 +1010,22 @@ This section records the state of the M0.6 increments after M0.6.1 (§8.7), and 
 
 | Increment | Status |
 |---|---|
-| M0.6.2 lexer and tokenization tests | Implemented (12 November 2026); built and tested on Windows, Linux pending |
-| M0.6.3 parser, AST and diagnostics | Implemented (12 November 2026); built and tested on Windows, Linux pending |
-| M0.6.4 binder and lowered IR | Implemented (12 November 2026); built and tested on Windows, Linux pending |
-| M0.6.5 minimal bytecode generator and verifier | Implemented (12 November 2026); built and tested on Windows, Linux pending |
-| M0.6.6 minimal register VM, arithmetic, locals and `print` | Implemented (12 November 2026): `weblingo run` runs §8.4's example and prints `30`; built and tested on Windows, Linux pending |
-| M0.6.7 end-to-end conformance on Windows and Linux | Implemented (12 November 2026): every program of §8.6 runs through the CLI with its expected output, diagnostic and exit code; passes on Windows; Linux waits for the CI workflow's first run |
+| M0.6.2 lexer and tokenization tests | Implemented (12 November 2026); built and tested on Windows and Linux |
+| M0.6.3 parser, AST and diagnostics | Implemented (12 November 2026); built and tested on Windows and Linux |
+| M0.6.4 binder and lowered IR | Implemented (12 November 2026); built and tested on Windows and Linux |
+| M0.6.5 minimal bytecode generator and verifier | Implemented (12 November 2026); built and tested on Windows and Linux |
+| M0.6.6 minimal register VM, arithmetic, locals and `print` | Implemented (12 November 2026): `weblingo run` runs §8.4's example and prints `30`; built and tested on Windows and Linux |
+| M0.6.7 end-to-end conformance on Windows and Linux | Implemented (12 November 2026): every program of §8.6 runs through the CLI with its expected output, diagnostic and exit code; passes on Windows and Linux (CI run 1, 12 November 2026, commit `5229806`) |
 
 M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 
 | Criterion | Status |
 |---|---|
-| Builds cleanly on Windows and Linux | Windows: no warnings (warnings are errors). Linux: pending, the CI workflow has not run yet |
+| Builds cleanly on Windows and Linux | Yes, with no warnings (warnings are errors): locally on Windows, and in CI on `ubuntu-latest` and `windows-latest` (CI run 1, 12 November 2026, commit `5229806`) |
 | Dependency rules enforced | By the project references, and by a test of the built assemblies' references (`WebLingo.Architecture.Tests`, `DependencyTests`) |
 | CLI compiles and runs simple `.ws` programs | Yes: `weblingo run` and `weblingo check` (`WebLingo.Conformance.Tests`) |
 | Lexer, parser, binder, generator, verifier and VM are separate components | Yes: `WsLexer`, `WsParser`, `WsBinder` and `WsLowerer`, `WsCodeGenerator`, `WsBytecodeVerifier`, `WsVirtualMachine` |
-| Tests pass; malformed inputs fail safely | Yes on Windows (294 tests); fuzz tests give random source to the compiler, and mutated bytecode to the VM, and find diagnostics, never a crash |
+| Tests pass; malformed inputs fail safely | Yes, on Windows and Linux (294 tests at M0.6.7, 305 with M0.8's checks); fuzz tests give random source to the compiler, and mutated bytecode to the VM, and find diagnostics, never a crash |
 | Portability inventory exists | Yes, `eng/portability/NativeCompatibility.md`, with what M0.6 uses |
 | Portable core has no ASP.NET Core or ADO.NET dependency | Yes, checked by `DependencyTests` |
 | Compiler IR is not tied to a permanent VM choice | Yes: the lowered IR is a tree; only the code generator is register-specific |
@@ -1045,7 +1045,7 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Literal suffixes | Digits followed directly by a letter, digit or `_` are one invalid literal (WS1004), which keeps room for the decimal suffix `m` (§3.2) | Proposed |
 | Not yet lexed | String, binary64 and decimal literals: their characters are invalid (WS1003) until their syntax is specified | Proposed |
 | Statements | Variable declarations and expression statements, each ended by `;`; a lone `;` (an empty statement) is an error (WS1001); blocks come later | Proposed |
-| Operators | Unary `-`; binary `* /` above `+ -`, both left-associative; no unary `+` (WS1001) | Proposed |
+| Operators | Unary `-`; binary `* /` above `+ -`, both left-associative; unary `+` also accepted (WS1001) | Proposed |
 | Assignment | An expression, right-associative (`a = b = 3`), whose value is the value assigned; only a variable's name may be assigned (WS1007), not even a parenthesized one | Proposed |
 | Calls | `callee(argument, …)`, no trailing comma; the callee is any expression, checked when bound | Proposed |
 | `let` | Reported as not a WebLingo keyword (WS1001), with a hint to use `var` or `const`, and parsed as `var` to recover | Proposed |
@@ -1054,7 +1054,7 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Nesting limits | Parsing recurses at most 256 levels (parentheses, unary minus, assignments, arguments), and an expression is at most 1000 operations deep, so that a recursive compiler stage cannot overflow its stack; deeper source is an error (WS1008) | Proposed |
 | Compilation stages | Binding runs only on a source without syntax errors, and lowering only on one that binds without errors: a source reports the errors of its first failing stage | Proposed |
 | Host built-ins | The host declares its built-ins (name and arity) to the compiler; they live in a scope around the program's, so a declaration may shadow one (`var print = 1;`) | Proposed |
-| Functions as values | Not yet: a built-in can only be called; naming it otherwise is an error (WS3001), and so is calling anything but a built-in (WS3001), or calling one with the wrong number of arguments (WS3001) | Proposed |
+| Functions as values | Not yet: a built-in can only be called; naming it otherwise is an error (WS3001), and so is calling anything but a built-in (WS3001), or calling one with the wrong number of arguments (WS3001). But make sure this is supported later. | Proposed |
 | Use before declaration | A block's declarations are known from its start (§3.1), so a name used before its declaration refers to that declaration, not to an outer one | Proposed |
 | Temporal dead zone at run time | Reading a variable before its declaration has run, or a `var` declared without a value before it is assigned, is a runtime error, WS2004 (§8.6, `var x; print(x);`); so is assigning a variable before its declaration has run; it is not reported at compile time | Proposed |
 | Checks | The compiler keeps a runtime check only where a variable may not have a value yet; in M0.6's straight-line programs that is exactly where the check fails | Proposed |
