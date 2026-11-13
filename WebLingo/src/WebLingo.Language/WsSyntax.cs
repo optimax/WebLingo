@@ -47,6 +47,15 @@ public sealed record WsForSyntax(
     WsStatementSyntax? Init, WsExpressionSyntax? Condition, WsExpressionSyntax? Step, WsStatementSyntax Body, WsSourceSpan Span)
     : WsStatementSyntax(Span);
 
+/// <summary>
+/// <c>foreach (var item in collection) body</c>, or <c>foreach (var (key, value) in map) body</c>, whose
+/// <paramref name="ValueName"/> is then the value's (specification, sections 3.5 and 3.6).
+/// </summary>
+public sealed record WsForEachSyntax(
+    string ItemName, WsSourceSpan ItemSpan, string? ValueName, WsSourceSpan ValueSpan, WsExpressionSyntax Collection,
+    WsStatementSyntax Body, WsSourceSpan Span)
+    : WsStatementSyntax(Span);
+
 public sealed record WsBreakSyntax(WsSourceSpan Span) : WsStatementSyntax(Span);
 
 public sealed record WsContinueSyntax(WsSourceSpan Span) : WsStatementSyntax(Span);

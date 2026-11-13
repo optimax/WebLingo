@@ -76,6 +76,7 @@ public sealed class WsParser : IWsParser
         if (Current.Kind == WsTokenKind.While) return ParseWhile(start);
         if (Current.Kind == WsTokenKind.Do) return ParseDoWhile(start);
         if (Current.Kind == WsTokenKind.For) return ParseFor(start);
+        if (Current.Kind == WsTokenKind.Foreach) return ParseForEach(start);
         if (Current.Kind == WsTokenKind.Function && Peek(1).Kind == WsTokenKind.Identifier) return ParseFunctionDeclaration(start);
         if (Current.Kind == WsTokenKind.Return)
         {
@@ -167,6 +168,64 @@ public sealed class WsParser : IWsParser
         var condition = ParseCondition();
         ExpectSemicolon();
         return new WsDoWhileSyntax(body, condition, SpanFrom(start));
+    }
+
+    /// <summary>
+    /// <c>foreach (var item in collection) body</c> or <c>foreach (var (key, value) in map) body</c>; the variables are
+    /// declared with <c>var</c> only, and <c>in</c> is a keyword only there (sections 3.5 and 3.6).
+    /// </summary>
+    private WsStatementSyntax ParseForEach(int start)
+    {
+        Advance();
+        _statementHasError = false;
+        Expect(WsTokenKind.OpenParen, "'('");
+        if (Current.Kind != WsTokenKind.Var && !_statementHasError) ReportUnexpected("'var'");
+        if (Current.Kind is WsTokenKind.Var or WsTokenKind.Const or WsTokenKind.Let) Advance(); // 'const' read as 'var' to recover.
+        string? valueName = null;
+        var valueSpan = default(WsSourceSpan);
+        (string Name, WsSourceSpan Span) item;
+        if (Current.Kind == WsTokenKind.OpenParen)
+        {
+            Advance();
+            item = ExpectName();
+            Expect(WsTokenKind.Comma, "','");
+            (valueName, valueSpan) = ExpectName();
+            Expect(WsTokenKind.CloseParen, "')'");
+        }
+        else if (IsIn(Current) && !IsIn(Peek(1)))
+        {
+            // 'foreach (var in …)': the name is missing, and 'in' is where it should be.
+            ReportUnexpected("a name");
+            item = ("", new WsSourceSpan(Current.Span.Start, 0));
+        }
+        else
+        {
+            item = ExpectName();
+        }
+        if (Current.Kind == WsTokenKind.Identifier && !IsIn(Current) && !_statementHasError) ReportUnexpected("'in'");
+        if (Current.Kind == WsTokenKind.Identifier) Advance(); // Another name, such as 'of', read as 'in' to recover.
+        else if (!_statementHasError) ReportUnexpected("'in'");
+        var collection = ParseExpression();
+        Expect(WsTokenKind.CloseParen, "')'");
+        var body = ParseNested();
+        return body is null
+            ? new WsExpressionStatementSyntax(collection, SpanFrom(start))
+            : new WsForEachSyntax(item.Name, item.Span, valueName, valueSpan, collection, body, SpanFrom(start));
+    }
+
+    private static bool IsIn(WsToken token) => token.Kind == WsTokenKind.Identifier && token.Text == "in";
+
+    /// <summary>A name being declared; an empty one, reported, if there is none.</summary>
+    private (string Name, WsSourceSpan Span) ExpectName()
+    {
+        var token = Current;
+        if (token.Kind == WsTokenKind.Identifier)
+        {
+            Advance();
+            return (token.Text, token.Span);
+        }
+        if (!_statementHasError) ReportUnexpected("a name");
+        return ("", new WsSourceSpan(token.Span.Start, 0));
     }
 
     private WsStatementSyntax ParseFor(int start)
@@ -689,6 +748,7 @@ public sealed class WsParser : IWsParser
             if (statement is WsWhileSyntax whileLoop) statements.Push(whileLoop.Body);
             if (statement is WsFunctionDeclarationSyntax function) statements.Push(function.Body);
             if (statement is WsDoWhileSyntax doLoop) statements.Push(doLoop.Body);
+            if (statement is WsForEachSyntax forEachLoop) statements.Push(forEachLoop.Body);
             if (statement is WsForSyntax forLoop)
             {
                 // Its parts, as statements of their own, so that each expression's depth is checked.
@@ -705,6 +765,7 @@ public sealed class WsParser : IWsParser
                 WsIfSyntax ifStatement => ifStatement.Condition,
                 WsWhileSyntax whileStatement => whileStatement.Condition,
                 WsDoWhileSyntax doStatement => doStatement.Condition,
+                WsForEachSyntax forEachStatement => forEachStatement.Collection,
                 WsReturnSyntax { Value: { } returned } => returned,
                 _ => null
             };

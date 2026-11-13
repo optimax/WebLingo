@@ -298,6 +298,24 @@ public sealed class VerifierTests
         AssertRejected(With(module, code, 1, I(WsOpCode.LoadConstant, 0, 0)), 2, "reads register 1");
     }
 
+    [Fact]
+    public void ForEachWritesItsItemsOnlyOnTheWayIntoTheLoop()
+    {
+        // 0: r0 = 1; 1: r1 = 1; 2: next of r0 into r2, or go to 4; 3: go to 2; 4: return r2, which the way out has not written.
+        var module = new WsCompiledModule("loop", [WsConstant.Int64(1)], [],
+            new WsFunction("main", 3, 0, [
+                I(WsOpCode.LoadConstant, 0, 0), I(WsOpCode.LoadConstant, 1, 0), I(WsOpCode.ForEachNext, 4, 0, 1),
+                I(WsOpCode.Jump, 2), I(WsOpCode.ReturnValue, 2)
+            ]));
+        AssertRejected(module, 4, "reads register 2");
+        var code = module.EntryPoint.Code.ToArray();
+        code[4] = I(WsOpCode.ReturnValue, 1); // The position is written on both ways.
+        Assert.Equal(Valid, Verify(module with { EntryPoint = module.EntryPoint with { Code = code } }));
+        AssertRejected(With(module, code, 2, I(WsOpCode.ForEachNext, 4, 0, 3)), 2, "not 1 or 2");
+        AssertRejected(With(module, code, 2, I(WsOpCode.ForEachNext, 4, 0, 2)), 2, "registers, 0 to 3");
+        AssertRejected(With(module, code, 2, I(WsOpCode.ForEachNext, 9, 0, 1)), 2, "target instruction 9");
+    }
+
     private static WsCompiledModule With(WsCompiledModule module, WsInstruction[] code, int at, WsInstruction instruction)
     {
         var changed = (WsInstruction[])code.Clone();

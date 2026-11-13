@@ -125,6 +125,7 @@ public sealed class WsLexer(string source) : IWsLexer
             "else" => WsTokenKind.Else,
             "while" => WsTokenKind.While,
             "for" => WsTokenKind.For,
+            "foreach" => WsTokenKind.Foreach,
             "do" => WsTokenKind.Do,
             "break" => WsTokenKind.Break,
             "continue" => WsTokenKind.Continue,

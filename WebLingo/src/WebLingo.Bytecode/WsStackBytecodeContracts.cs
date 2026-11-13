@@ -107,6 +107,13 @@ public enum WsStackOpCode : byte
     /// A = entry count; pops that many key-value pairs, each key below its value, and pushes a new map of them.
     /// </summary>
     NewMap,
+    /// <summary>
+    /// A = the instruction to go to when there is nothing more, B = the local holding the collection, with the loop's
+    /// position (an int64, from 0) in the next one; writes the next item into the local after that (section 3.6).
+    /// </summary>
+    ForEachNext,
+    /// <summary>As <see cref="ForEachNext"/>, writing the next entry's key and value into the two locals after the position.</summary>
+    ForEachNextEntry,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);

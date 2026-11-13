@@ -104,6 +104,9 @@ public sealed class WsCodeGenerator
             case WsIrLoop loop:
                 EmitLoop(loop);
                 break;
+            case WsIrForEach forEach:
+                EmitForEach(forEach);
+                break;
             case WsIrBreak breakStatement:
                 _loops.Peek().Breaks.Add(EmitJump(WsOpCode.Jump, 0, breakStatement.Span));
                 break;
@@ -523,6 +526,29 @@ public sealed class WsCodeGenerator
             Emit(new WsInstruction(WsOpCode.Jump, top), loop.Span);
         }
         if (exit is { } exitJump) PatchJump(exitJump);
+        foreach (var at in jumps.Breaks) PatchJump(at);
+        _loops.Pop();
+    }
+
+    /// <summary>
+    /// <c>foreach</c>: the collection into its local, the position 0 into the next; then <c>ForEachNext</c>, which
+    /// leaves the loop when there is nothing more, or writes the next item and goes on to the body.
+    /// </summary>
+    private void EmitForEach(WsIrForEach loop)
+    {
+        var collection = loop.FirstLocal;
+        EmitExpression(loop.Collection, collection);
+        _nextRegister = _locals;
+        Emit(new WsInstruction(WsOpCode.LoadConstant, collection + 1, Int64Constant(0)), loop.Span);
+        var jumps = new LoopJumps();
+        _loops.Push(jumps);
+        var top = _code.Count;
+        Emit(new WsInstruction(WsOpCode.ForEachNext, 0, collection, loop.ItemCount), loop.Collection.Span);
+        foreach (var item in loop.CapturedItems) Emit(new WsInstruction(WsOpCode.BoxRegister, item), loop.Span);
+        EmitStatement(loop.Body);
+        foreach (var at in jumps.Continues) PatchJump(at);
+        Emit(new WsInstruction(WsOpCode.Jump, top), loop.Span);
+        _code[top] = _code[top] with { A = _code.Count };
         foreach (var at in jumps.Breaks) PatchJump(at);
         _loops.Pop();
     }

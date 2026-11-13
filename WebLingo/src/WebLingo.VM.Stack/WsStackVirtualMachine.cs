@@ -474,6 +474,19 @@ public sealed class WsStackVirtualMachine
                             pc++;
                             continue;
                         }
+                        case WsStackOpCode.ForEachNext:
+                        case WsStackOpCode.ForEachNextEntry:
+                        {
+                            var items = ins.OpCode == WsStackOpCode.ForEachNextEntry ? 2 : 1;
+                            if (!WsMembers.TryNext(slots[ins.B], slots[ins.B + 1], items, slots, ins.B + 2, heap,
+                                    out var next, out var done, out error))
+                            {
+                                break;
+                            }
+                            slots[ins.B + 1] = next;
+                            pc = done ? ins.A : pc + 1;
+                            continue;
+                        }
                         case WsStackOpCode.GetIndex:
                         {
                             if (!WsMembers.TryGetIndex(slots[sp - 2], slots[sp - 1], heap, out var element, out error)) break;

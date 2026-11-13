@@ -101,6 +101,12 @@ public enum WsOpCode : byte
     /// registers from B on, each key before its value.
     /// </summary>
     NewMap,
+    /// <summary>
+    /// A = the instruction to go to when there is nothing more, B = the register holding the collection, with the
+    /// loop's position (an int64, from 0) in the next one, and the items it writes in the C after that, C = 1 for an
+    /// item, 2 for a key and a value (specification, section 3.6).
+    /// </summary>
+    ForEachNext,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);

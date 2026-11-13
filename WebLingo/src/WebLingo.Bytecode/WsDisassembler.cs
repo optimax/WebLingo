@@ -69,6 +69,8 @@ public static class WsDisassembler
                                    $"({Arguments(function, c + 1, d)})",
             WsOpCode.NewArray => $"NewArray {Register(function, a)}, [{Arguments(function, b, c)}]",
             WsOpCode.NewMap => $"NewMap {Register(function, a)}, {{{Arguments(function, b, 2 * c)}}}",
+            WsOpCode.ForEachNext => $"ForEachNext {Register(function, b)}, {Register(function, b + 1)}, " +
+                                    $"{Arguments(function, b + 2, c)} else {a:D2}",
             WsOpCode.GetIndex => $"GetIndex {Register(function, a)}, {Register(function, b)}[{Register(function, c)}]",
             WsOpCode.SetIndex => $"SetIndex {Register(function, a)}[{Register(function, b)}], {Register(function, c)}",
             _ => $"?{(int)instruction.OpCode} {a}, {b}, {c}, {d}"

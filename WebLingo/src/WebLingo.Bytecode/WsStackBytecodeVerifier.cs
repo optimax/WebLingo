@@ -146,6 +146,15 @@ public sealed class WsStackBytecodeVerifier
                 return Name(module, a) ?? (b is < 0 or > WsFunction.MaxRegisters
                     ? $"its argument count, {b}, is not 0 to {WsFunction.MaxRegisters}."
                     : null);
+            case WsStackOpCode.ForEachNext:
+            case WsStackOpCode.ForEachNextEntry:
+            {
+                if (Index(a, function.Code.Count, "target instruction") is { } targetError) return targetError;
+                var last = (long)b + 1 + ItemCount(instruction.OpCode);
+                return b >= 0 && last < function.LocalCount
+                    ? null
+                    : $"its locals, {b} to {last}, are not all in the function's {function.LocalCount}.";
+            }
             case WsStackOpCode.NewMap:
                 return (a is < 0 or > WsFunction.MaxRegisters / 2
                     ? $"its entry count, {a}, is not 0 to {WsFunction.MaxRegisters / 2}."
@@ -241,6 +250,21 @@ public sealed class WsStackBytecodeVerifier
                     return Fail($"Instruction {index} ({instruction.OpCode}) leaves {depth} values on a stack of at most " +
                                 $"{function.MaxStack}.", index);
                 }
+                if (instruction.OpCode is WsStackOpCode.ForEachNext or WsStackOpCode.ForEachNextEntry)
+                {
+                    // The position is written on both paths; the items only on the one that goes on into the loop.
+                    Set(written, instruction.B + 1);
+                    var doneError = Flow(instruction.A, depth, written, atBlockStart, pending);
+                    if (doneError is not null) return Fail(doneError, index);
+                    for (var item = 0; item < ItemCount(instruction.OpCode); item++) Set(written, instruction.B + 2 + item);
+                    index++;
+                    if (isBlockStart[index])
+                    {
+                        if (Flow(index, depth, written, atBlockStart, pending) is { } nextError) return Fail(nextError, index);
+                        break;
+                    }
+                    continue;
+                }
                 if (Writes(instruction) is int local) Set(written, local);
 
                 if (instruction.OpCode is WsStackOpCode.Return or WsStackOpCode.ReturnValue) break;
@@ -317,6 +341,10 @@ public sealed class WsStackBytecodeVerifier
     {
         switch (instruction.OpCode)
         {
+            case WsStackOpCode.ForEachNext:
+            case WsStackOpCode.ForEachNextEntry:
+                if (!IsSet(written, instruction.B)) return instruction.B;
+                return IsSet(written, instruction.B + 1) ? -1 : instruction.B + 1;
             case WsStackOpCode.LoadLocal:
             case WsStackOpCode.BoxLocal:
             case WsStackOpCode.CopyCell:
@@ -343,7 +371,10 @@ public sealed class WsStackBytecodeVerifier
     };
 
     private static bool IsJump(WsStackOpCode opCode) =>
-        opCode is WsStackOpCode.Jump or WsStackOpCode.JumpIfFalse or WsStackOpCode.JumpIfTrue;
+        opCode is WsStackOpCode.Jump or WsStackOpCode.JumpIfFalse or WsStackOpCode.JumpIfTrue or WsStackOpCode.ForEachNext
+            or WsStackOpCode.ForEachNextEntry;
+
+    private static int ItemCount(WsStackOpCode opCode) => opCode == WsStackOpCode.ForEachNextEntry ? 2 : 1;
 
     private static bool EndsPath(WsStackOpCode opCode) =>
         opCode is WsStackOpCode.Return or WsStackOpCode.ReturnValue or WsStackOpCode.Jump;

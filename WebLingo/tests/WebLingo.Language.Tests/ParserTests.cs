@@ -197,6 +197,11 @@ public sealed class ParserTests
     [InlineData("a[;")]
     [InlineData("a[1;")]
     [InlineData("];")]
+    [InlineData("foreach (const x in a) {}")]
+    [InlineData("foreach (var x of a) {}")]
+    [InlineData("foreach (var (a b) in m) {}")]
+    [InlineData("foreach x in a {}")]
+    [InlineData("foreach (var in a) {}")]
     public void MalformedStatementsGiveOneDiagnosticEach(string source)
     {
         var diagnostic = Assert.Single(Parse(source).Diagnostics);

@@ -61,6 +61,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var m = {a 1};", "WS1001", 1, 12)]
     [InlineData("var m = {a: 1,};", "WS1001", 1, 15)]
     [InlineData("var m = {a: {1: 2}, b: 3}; writeLn(1);", "WS1001", 1, 14)]
+    [InlineData("foreach (const x in [1]) writeLn(x);", "WS1001", 1, 10)]
+    [InlineData("foreach (var x of [1]) writeLn(x);", "WS1001", 1, 16)]
+    [InlineData("foreach (var (k, k) in {}) writeLn(k);", "WS2002", 1, 18)]
+    [InlineData("foreach (var x in [1]) {} writeLn(x);", "WS2001", 1, 35)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -154,6 +158,18 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var m = {x: 1}; var n = m; n[\"x\"] = 2; writeLn(m[\"x\"]); writeLn(m == n); writeLn({x: 1} == {x: 1});", "2\ntrue\nfalse")]
     [InlineData("var m = {}; m[\"self\"] = m; writeLn(m); var a = [m]; writeLn(a);", "{\"self\": {…}}\n[{\"self\": {…}}]")]
     [InlineData("var i = 0; var m = {a: i = 1, b: i}; writeLn(m[\"b\"]); writeLn(i);", "1\n1")]
+    [InlineData("var s = 0; foreach (var x in [1, 2, 3]) s = s + x; writeLn(s);", "6")]
+    [InlineData("foreach (var c in \"a\U0001F600b\") write(c + \"|\"); writeLn(null);", "a|\U0001F600|b|null")]
+    [InlineData("var m = {a: 1, bb: 2, ccc: 3}; var t = 0; var k = 0; foreach (var (key, value) in m) { t = t + value; k = k + key.length; } writeLn(t); writeLn(k);", "6\n6")]
+    [InlineData("var a = [1, 2]; foreach (var x in a) { if (x < 4) a.push(x + 2); write(x); } writeLn(null);", "12345null")]
+    [InlineData("var fs = []; foreach (var x in [1, 2, 3]) fs.push(function () { return x; }); foreach (var f in fs) write(f()); writeLn(null);", "123null")]
+    [InlineData("foreach (var x in [1, 2, 3, 4]) { if (x == 2) continue; if (x == 4) break; write(x); } writeLn(null);", "13null")]
+    [InlineData("var x = [7]; foreach (var x in x) writeLn(x); writeLn(x);", "7\n[7]")]
+    [InlineData("foreach (var x in []) writeLn(x); foreach (var (k, v) in {}) writeLn(k); foreach (var c in \"\") writeLn(c); writeLn(\"done\");", "done")]
+    [InlineData("foreach (var a in [[1, 2], [3]]) foreach (var b in a) write(b); writeLn(null);", "123null")]
+    [InlineData("function first(a) { foreach (var x in a) return x; return null; } writeLn(first([5, 6])); writeLn(first([]));", "5\nnull")]
+    [InlineData("var m = {a: 1, b: 2, c: 3}; var n = 0; foreach (var (k, v) in m) { m.remove(k); n = n + 1; } writeLn(n < 4); writeLn(m.length < 3);", "true\ntrue")]
+    [InlineData("var m = {x: 1}; foreach (var (k, v) in m) { var g = function () { return [k, v]; }; writeLn(g()); }", "[\"x\", 1]")]
     [InlineData("var m = {}; for (var i = 0; i < 100; i = i + 1) m[i] = i * i; for (var i = 0; i < 100; i = i + 2) m.remove(i); writeLn(m.length); writeLn(m[99]);", "50\n9801")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
@@ -234,6 +250,11 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var m = {a: 1}; writeLn(m.has());", "WS2006")]
     [InlineData("var m = {a: 1}; writeLn(m.length());", "WS2005")]
     [InlineData("var m = {a: 1}; m.push(1);", "WS3006")]
+    [InlineData("foreach (var x in {a: 1}) writeLn(x);", "WS3001")]
+    [InlineData("foreach (var (k, v) in [1]) writeLn(k);", "WS3001")]
+    [InlineData("foreach (var (k, v) in \"ab\") writeLn(k);", "WS3001")]
+    [InlineData("foreach (var x in 5) writeLn(x);", "WS3001")]
+    [InlineData("foreach (var x in null) writeLn(x);", "WS3001")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

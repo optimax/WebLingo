@@ -53,6 +53,15 @@ public sealed record WsBoundLoop(
     public IReadOnlyList<WsLocalSymbol> PerIterationLocals { get; init; } = [];
 }
 
+/// <summary>
+/// <c>foreach</c>: the collection's value goes into a hidden local, and the loop's position into the next; the item (or
+/// the key, then the value) are the locals after them, so that the four are consecutive (specification, section 3.6).
+/// </summary>
+public sealed record WsBoundForEach(
+    WsLocalSymbol Collection, WsLocalSymbol Position, WsLocalSymbol Item, WsLocalSymbol? Value,
+    WsBoundExpression CollectionValue, WsBoundStatement Body, WsSourceSpan Span)
+    : WsBoundStatement(Span);
+
 public sealed record WsBoundBreak(WsSourceSpan Span) : WsBoundStatement(Span);
 
 public sealed record WsBoundContinue(WsSourceSpan Span) : WsBoundStatement(Span);

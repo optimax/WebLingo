@@ -439,6 +439,17 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             pc++;
                             continue;
                         }
+                        case WsOpCode.ForEachNext:
+                        {
+                            if (!WsMembers.TryNext(registers[ins.B], registers[ins.B + 1], ins.C, registers, ins.B + 2, heap,
+                                    out var next, out var done, out error))
+                            {
+                                break;
+                            }
+                            registers[ins.B + 1] = next;
+                            pc = done ? ins.A : pc + 1;
+                            continue;
+                        }
                         case WsOpCode.GetIndex:
                         {
                             if (!WsMembers.TryGetIndex(registers[ins.B], registers[ins.C], heap, out var element, out error)) break;

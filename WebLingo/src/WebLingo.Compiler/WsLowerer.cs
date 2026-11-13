@@ -108,6 +108,14 @@ public sealed class WsLowerer
                     PerIteration = copies.Count == 0 ? null : new WsIrCopyCells(copies, loop.Span)
                 };
             }
+            case WsBoundForEach forEach:
+            {
+                var captured = new List<int>();
+                if (forEach.Item.IsCaptured) captured.Add(forEach.Item.Index);
+                if (forEach.Value is { IsCaptured: true } value) captured.Add(value.Index);
+                return new WsIrForEach(forEach.Collection.Index, LowerExpression(forEach.CollectionValue),
+                    forEach.Value is null ? 1 : 2, captured, LowerStatement(forEach.Body), forEach.Span);
+            }
             case WsBoundBreak breakStatement:
                 return new WsIrBreak(breakStatement.Span);
             case WsBoundContinue continueStatement:

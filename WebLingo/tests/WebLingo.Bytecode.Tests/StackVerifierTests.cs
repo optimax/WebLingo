@@ -116,6 +116,24 @@ public sealed class StackVerifierTests
     }
 
     [Fact]
+    public void ForEachWritesItsItemsOnlyOnTheWayIntoTheLoop()
+    {
+        // Locals: 0 the collection, 1 the position, 2 the item. 0-3: both set; 4: next, or go to 6; 5: go to 4;
+        // 6: return local 2, which the way out has not written.
+        var module = new WsStackModule("loop", [WsConstant.Int64(1)], [],
+            new WsStackFunction("main", 3, 1, [
+                I(WsStackOpCode.LoadConstant, 0), I(WsStackOpCode.StoreLocal, 0), I(WsStackOpCode.LoadConstant, 0),
+                I(WsStackOpCode.StoreLocal, 1), I(WsStackOpCode.ForEachNext, 6, 0), I(WsStackOpCode.Jump, 4),
+                I(WsStackOpCode.LoadLocal, 2), I(WsStackOpCode.ReturnValue)
+            ]));
+        AssertRejected(module, 6, "reads local 2");
+        AssertRejected(module with { EntryPoint = module.EntryPoint with { Code = Changed(module, 4, I(WsStackOpCode.ForEachNextEntry, 6, 0)) } },
+            4, "locals, 0 to 3");
+        var fine = Changed(module, 6, I(WsStackOpCode.LoadLocal, 1));
+        Assert.Equal(WsVerificationResult.Valid, Verify(module with { EntryPoint = module.EntryPoint with { Code = fine } }));
+    }
+
+    [Fact]
     public void TooManySlotsAreRejected()
     {
         AssertRejected(Module(locals: 65_000, maxStack: 1_000, I(WsStackOpCode.Return)), -1, "65535 slots");

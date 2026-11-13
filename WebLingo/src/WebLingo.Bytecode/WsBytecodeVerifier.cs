@@ -209,6 +209,14 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                     return $"its keys and values, registers {b} to {(long)b + 2 * c - 1}, are not all in the function's {function.RegisterCount}.";
                 }
                 return Unused(d);
+            case WsOpCode.ForEachNext:
+                if (Index(a, function.Code.Count, "target instruction") is { } targetError) return targetError;
+                if (c is not (1 or 2)) return $"its item count is {c}, not 1 or 2.";
+                if (b < 0 || b > function.RegisterCount - 2 - c)
+                {
+                    return $"its registers, {b} to {(long)b + 1 + c}, are not all in the function's {function.RegisterCount}.";
+                }
+                return Unused(d);
             case WsOpCode.GetIndex:
                 return Register(function, a, "destination") ?? Register(function, b, "target")
                     ?? Register(function, c, "index") ?? Unused(d);
@@ -275,7 +283,17 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                         $"Instruction {index} ({instruction.OpCode}) reads register {unwritten}, not written on every path to it.",
                         index);
                 }
-                if (Writes(instruction) is int target && target >= locals) Set(state, target - locals);
+                if (instruction.OpCode == WsOpCode.ForEachNext)
+                {
+                    // The position is written on both paths; the items only on the one that goes on into the loop.
+                    Set(state, instruction.B + 1 - locals);
+                    Flow(instruction.A, state, atBlockStart, pending);
+                    for (var item = 0; item < instruction.C; item++) Set(state, instruction.B + 2 + item - locals);
+                }
+                else if (Writes(instruction) is int target && target >= locals)
+                {
+                    Set(state, target - locals);
+                }
 
                 if (instruction.OpCode is WsOpCode.Return or WsOpCode.ReturnValue) break;
                 if (instruction.OpCode == WsOpCode.Jump)
@@ -300,7 +318,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
 
     private static int? JumpTarget(WsInstruction instruction) => instruction.OpCode switch
     {
-        WsOpCode.Jump => instruction.A,
+        WsOpCode.Jump or WsOpCode.ForEachNext => instruction.A,
         WsOpCode.JumpIfFalse or WsOpCode.JumpIfTrue => instruction.B,
         _ => null
     };
@@ -392,6 +410,11 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return -1;
             case WsOpCode.GetMember:
                 return Unwritten(instruction.B, state, locals);
+            case WsOpCode.ForEachNext:
+            {
+                var collection = Unwritten(instruction.B, state, locals);
+                return collection >= 0 ? collection : Unwritten(instruction.B + 1, state, locals);
+            }
             case WsOpCode.NewMap:
                 for (var i = 0; i < 2 * instruction.C; i++)
                 {

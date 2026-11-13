@@ -61,6 +61,17 @@ public sealed record WsIrLoop(WsIrExpression? Condition, WsIrStatement Body, WsI
     public WsIrCopyCells? PerIteration { get; init; }
 }
 
+/// <summary>
+/// <c>foreach</c>: the collection's value into local <paramref name="FirstLocal"/>, the position, from 0, into the next,
+/// and on each iteration the next item (<paramref name="ItemCount"/> 1), or key and value (2), into the locals after
+/// them, those that closures capture each given a new cell, then the body; a <c>continue</c> goes on to the next
+/// item, a <c>break</c> past the end.
+/// </summary>
+public sealed record WsIrForEach(
+    int FirstLocal, WsIrExpression Collection, int ItemCount, IReadOnlyList<int> CapturedItems, WsIrStatement Body,
+    WsSourceSpan Span)
+    : WsIrStatement(Span);
+
 /// <summary>Leaves the innermost loop.</summary>
 public sealed record WsIrBreak(WsSourceSpan Span) : WsIrStatement(Span);
 

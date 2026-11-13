@@ -73,7 +73,8 @@ public sealed class WsRegisterEngine : IWsBenchmarkEngine
                 or WsOpCode.NotEqual or WsOpCode.Less or WsOpCode.LessOrEqual or WsOpCode.Greater
                 or WsOpCode.GreaterOrEqual => 3,
             WsOpCode.CallBuiltin or WsOpCode.Call or WsOpCode.CallMethod => 4,
-            WsOpCode.GetMember or WsOpCode.GetIndex or WsOpCode.SetIndex or WsOpCode.NewArray or WsOpCode.NewMap => 3,
+            WsOpCode.GetMember or WsOpCode.GetIndex or WsOpCode.SetIndex or WsOpCode.NewArray or WsOpCode.NewMap
+                or WsOpCode.ForEachNext => 3,
             _ => 2
         };
     }
@@ -122,7 +123,8 @@ public sealed class WsStackEngine : IWsBenchmarkEngine
                 or WsStackOpCode.LoadCapture or WsStackOpCode.StoreCapture or WsStackOpCode.MakeClosure
                 or WsStackOpCode.LoadBuiltin or WsStackOpCode.Call or WsStackOpCode.GetMember
                 or WsStackOpCode.StoreIndex or WsStackOpCode.NewArray or WsStackOpCode.NewMap => 1,
-            WsStackOpCode.CallBuiltin or WsStackOpCode.CallMethod => 2,
+            WsStackOpCode.CallBuiltin or WsStackOpCode.CallMethod or WsStackOpCode.ForEachNext
+                or WsStackOpCode.ForEachNextEntry => 2,
             _ => 0
         };
     }

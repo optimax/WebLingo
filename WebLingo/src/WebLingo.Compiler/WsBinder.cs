@@ -111,6 +111,24 @@ public sealed class WsBinder
                 var loop = new WsBoundLoop(condition, body, step, true, forLoop.Span) { PerIterationLocals = perIteration };
                 return new WsBoundBlock(init is null ? [loop] : [init, loop], forLoop.Span);
             }
+            case WsForEachSyntax forEach:
+            {
+                // The collection is bound first: the loop's variables do not exist in it yet. They are the loop's,
+                // with a binding of their own on each iteration (sections 3.5 and 3.6).
+                var collectionValue = BindExpression(forEach.Collection);
+                _scope = new Scope(_scope, _function);
+                var collection = DeclareHidden("foreach collection", forEach.Span);
+                var position = DeclareHidden("foreach position", forEach.Span);
+                var item = Declare(forEach.ItemName, WsDeclarationKind.Var, forEach.ItemSpan, null)
+                    ?? DeclareHidden(forEach.ItemName, forEach.ItemSpan);
+                var value = forEach.ValueName is null
+                    ? null
+                    : Declare(forEach.ValueName, WsDeclarationKind.Var, forEach.ValueSpan, null)
+                      ?? DeclareHidden(forEach.ValueName, forEach.ValueSpan);
+                var body = BindLoopBody(forEach.Body);
+                _scope = _scope.Parent!;
+                return new WsBoundForEach(collection, position, item, value, collectionValue, body, forEach.Span);
+            }
             case WsBreakSyntax or WsContinueSyntax:
             {
                 var isBreak = statement is WsBreakSyntax;
@@ -189,6 +207,14 @@ public sealed class WsBinder
         var local = new WsLocalSymbol(name, kind, _function.Locals.Count, span, _function) { FunctionArity = arity };
         _function.Locals.Add(local);
         _scope.Locals.Add(name, local);
+        return local;
+    }
+
+    /// <summary>A local of the function that no name refers to: a loop's own state.</summary>
+    private WsLocalSymbol DeclareHidden(string name, WsSourceSpan span)
+    {
+        var local = new WsLocalSymbol(name, WsDeclarationKind.Var, _function.Locals.Count, span, _function);
+        _function.Locals.Add(local);
         return local;
     }
 

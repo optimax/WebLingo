@@ -159,6 +159,66 @@ public static class WsMembers
         return false;
     }
 
+    /// <summary>
+    /// The next step of <c>foreach</c> (section 3.6): from <paramref name="position"/> (an int64, from 0), the next
+    /// element of an array, or Unicode scalar value of a string (as a string of one), into
+    /// <paramref name="values"/>[<paramref name="first"/>], or the next entry of a map, its key and its value, into it
+    /// and the one after, with the position after it; <paramref name="done"/> when there is nothing more. A map is
+    /// looped over with a key and a value, anything else with one item, and anything else again not at all (WS3001).
+    /// </summary>
+    public static bool TryNext(WsValue collection, WsValue position, int items, WsValue[] values, int first, WsHeap heap,
+        out WsValue next, out bool done, out WsRuntimeError? error)
+    {
+        next = position;
+        done = false;
+        error = null;
+        if (position.Kind != WsValueKind.Int64) throw new InvalidOperationException("A loop's position is not an integer.");
+        var at = position.AsInt64;
+        switch (collection.Kind)
+        {
+            case WsValueKind.Array when items == 1:
+            {
+                var elements = heap.GetArray(collection);
+                done = at >= elements.Count;
+                if (done) return true;
+                values[first] = elements[(int)at];
+                next = WsValue.FromInt64(at + 1);
+                return true;
+            }
+            case WsValueKind.Map when items == 2:
+            {
+                done = at >= heap.MapCount(collection);
+                if (done) return true;
+                (values[first], values[first + 1]) = heap.MapEntryAt(collection, (int)at);
+                next = WsValue.FromInt64(at + 1);
+                return true;
+            }
+            case WsValueKind.String when items == 1:
+            {
+                var text = heap.GetString(collection);
+                done = at >= text.Length;
+                if (done) return true;
+                var start = (int)at;
+                var length = start + 1 < text.Length && char.IsSurrogatePair(text[start], text[start + 1]) ? 2 : 1;
+                if (!heap.TryAllocateString(text.Substring(start, length), out values[first], out error)) return false;
+                next = WsValue.FromInt64(at + length);
+                return true;
+            }
+            case WsValueKind.Map:
+                error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                    "A map's loop takes a key and a value: 'foreach (var (key, value) in map)'.");
+                return false;
+            case WsValueKind.Array or WsValueKind.String:
+                error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                    $"Only a map's loop takes a key and a value, not {WsValueFormatter.Describe(collection)}'s.");
+                return false;
+            default:
+                error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                    $"{Capitalized(WsValueFormatter.Describe(collection))} cannot be looped over with 'foreach'.");
+                return false;
+        }
+    }
+
     /// <summary>The number of Unicode scalar values in a string: a surrogate pair counts once.</summary>
     public static long ScalarCount(string text)
     {
