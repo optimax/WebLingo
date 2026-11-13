@@ -219,3 +219,29 @@ Q3: The new diagnostic code is WS4002 (program too large for the bytecode). May 
 A3: Yes.
 
 Done (Claude, 2026-11-12): the specification's section 15.2 marks the instruction model, the registers, the operations and the verification as Approved, as is WS4002 in section 8.4. It also names the constants that hold the verifier's bounds and the register limit (`MaxStateWords`, `MaxSteps`, `MaxRegisters`), which already existed, so the code did not change. Nothing to build; Linux not tried.
+
+## [DONE] Runtime and CLI Choices (M0.6.6)
+
+Where the specification is silent, the M0.6.6 runtime, VM and CLI made choices of their own, recorded as Proposed in the specification's section 15.2 (rows "Runtime values" to "Diagnostic codes").
+
+Q1: Arithmetic: an int64 meeting a binary64 becomes a binary64 (`10 / 4 + 1` is 3.5), and binary64 results follow IEEE 754, so `1 / 0` is `Infinity` and `0 / 0` is `NaN`, with no error; only integer overflow is an error. Or should mixing need an explicit conversion, or division by zero be an error?
+
+A1: Mixing allowed within reason. Division by zero `Infinity` (1/0) or `NaN` (0/0). There need to be literals that mean `Infinity` and `NaN`.
+
+Q2: The text of a number (what `write` writes): an int64 in digits; a binary64 as the shortest decimal that reads back as the same number, always with a point or an exponent (`5.0`, `0.1`, `-0.0`, `1E+21`), and `NaN`, `Infinity`, `-Infinity`. Is that the format you want (JavaScript would write `5`, `1e+21`)?
+
+A2: Yes.
+
+Q3: It is .NET's invariant `double.ToString("R")` that gives that text, so the Native C# runtime must give exactly the same, an obligation now in the portability inventory (`Documents/NativeCompatibility.md`, "Planned"). Is it acceptable for the core to rely on it until then?
+
+A3: Yes.
+
+Q4: The CLI's exit codes: 0 success, 1 compilation errors, 2 a usage error or an unreadable file, 3 a runtime error (M0.6.1's 3 meant "not implemented"); diagnostics as `file(line,column): error CODE: message`; `write`'s lines end in LF on every platform; `--version` says `WebLingo M0.6 (pre-alpha)`. Agreed?
+
+A4: 2 seems to mean two different things. Separate them to make interpretation of the codes easier. Also note the change: `print` --> `write`.
+
+Q5: The new diagnostic codes are WS3002 (integer overflow), WS3003 (budget exceeded) and WS3004 (cancelled). May they keep these codes? And a reading before initialization at run time keeps WS2004, from the compile-time 2xxx range: is that right, or should it have a runtime code of its own?
+
+A5: Yes.
+
+Done (Claude, 2026-11-12): the specification's section 15.2 marks the arithmetic, the binary64 results, the text of a value, the invalid operands (with your comment that `+` will also concatenate strings), the CLI and the diagnostic codes as Approved, as are WS3002 to WS3004 in section 8.4. The inventory records that relying on `double.ToString("R")` is approved until Native C#. Exit code 2 now means a usage error only; a file that cannot be read exits with 4 (`WsCommandLine.FileUnreadable`; the number is my guess), with tests and the README updated. The literals for `Infinity` and `NaN` need their spelling decided: that is the new question "Literals for `Infinity` and `NaN`". Build and 307 tests pass on Windows, and the CLI was run (missing file: 4, bad usage: 2, `samples/Arithmetic`: 30); Linux not tried.

@@ -33,7 +33,7 @@ dotnet run --project src/WebLingo.Cli -- check samples/Arithmetic/arithmetic.ws
 dotnet run --project src/WebLingo.Cli -- --version
 ```
 
-`weblingo run <file>` compiles a script and runs it; `weblingo check <file>` compiles it and reports its errors without running it. Errors go to standard error as `file(line,column): error CODE: message`. The exit code is 0 on success, 1 for compilation errors, 2 for a usage error or a file that cannot be read, and 3 for a runtime error.
+`weblingo run <file>` compiles a script and runs it; `weblingo check <file>` compiles it and reports its errors without running it. Errors go to standard error as `file(line,column): error CODE: message`. The exit code is 0 on success, 1 for compilation errors, 2 for a usage error, 3 for a runtime error, and 4 for a file that cannot be read.
 
 ## Architecture
 

@@ -9,8 +9,8 @@ namespace WebLingo.Cli;
 /// The <c>weblingo</c> command line (specification, section 8.4, "CLI"): <c>run</c>, <c>check</c> and
 /// <c>--version</c>. It is the host: it registers <c>write</c> and <c>writeLn</c>, writing to standard output, compiles a file, and runs
 /// it in the VM. Diagnostics go to standard error as <c>file(line,column): error CODE: message</c>. Exit codes
-/// (proposed, section 15.2): 0 success, 1 compilation errors, 2 a usage error or a file that cannot be read, 3 a
-/// runtime error.
+/// (section 15.2): 0 success, 1 compilation errors, 2 a usage error, 3 a runtime error, 4 a file that cannot be
+/// read.
 /// </summary>
 public static class WsCommandLine
 {
@@ -18,6 +18,7 @@ public static class WsCommandLine
     public const int CompilationFailed = 1;
     public const int UsageError = 2;
     public const int RuntimeFailed = 3;
+    public const int FileUnreadable = 4;
 
     public const string Version = "WebLingo M0.6 (pre-alpha)";
 
@@ -47,7 +48,7 @@ public static class WsCommandLine
                                               or NotSupportedException)
         {
             error.WriteLine($"{path}: cannot read the file: {exception.Message}");
-            return UsageError;
+            return FileUnreadable;
         }
 
         var text = new WsSourceText(source, path);

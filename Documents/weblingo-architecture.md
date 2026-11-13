@@ -53,7 +53,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WS-S001–S016 | M0.6 solution scaffolding and initial implementation contracts | Approved |
 | M0.6 implementation default | Register VM first; stack comparison later | Adopted M0.6 default; VM architecture still provisional |
 | M0.6 testing default | xUnit on .NET 10 | Adopted M0.6 default |
-| M0.6 implementation choices | Lexical, syntax, runtime and CLI choices made where this specification is silent, while implementing M0.6.2 onward (§15.2) | Each row of §15.2 has its own status; the lexical and syntax ones, and the binding ones but "Compilation stages", and the bytecode ones but "Compiler output", approved 12 November 2026 |
+| M0.6 implementation choices | Lexical, syntax, runtime and CLI choices made where this specification is silent, while implementing M0.6.2 onward (§15.2) | Each row of §15.2 has its own status; the lexical and syntax ones, and the binding ones but "Compilation stages", the bytecode ones but "Compiler output", and the runtime and CLI ones asked about, approved 12 November 2026; the rest are Proposed |
 | Repository documents | One copy of this specification, `Documents/weblingo-architecture.md`; documents in the repository's root `Documents/` folder; a shallow folder structure, with no `docs/architecture/` folder; the whole repository may become public (§8.2) | Approved (12 November 2026) |
 
 **Approval boundary:** M0.6 was approved as a specification. This does not imply the repository or implementation already exists. Detailed M0.3 encoding choices were recommended but not separately approved; the architectural decision between stack and register VMs remains open.
@@ -665,9 +665,9 @@ Codes added while implementing M0.6 (§15.2):
 | WS1008 | Source nested too deeply | Approved (12 November 2026) |
 | WS2005 | Not a function (a call of something that cannot be called) | Approved (12 November 2026) |
 | WS2006 | Wrong number of arguments in a call | Approved (12 November 2026) |
-| WS3002 | Integer overflow (a result outside int64) | Proposed |
-| WS3003 | Execution budget exceeded (instructions or registers) | Proposed |
-| WS3004 | Execution cancelled by the host | Proposed |
+| WS3002 | Integer overflow (a result outside int64) | Approved (12 November 2026) |
+| WS3003 | Execution budget exceeded (instructions or registers) | Approved (12 November 2026) |
+| WS3004 | Execution cancelled by the host | Approved (12 November 2026) |
 | WS4002 | Program too large for the bytecode (more registers than a function may have) | Approved (12 November 2026) |
 
 **Lexer:** identifiers, keywords (`var`, `const`), literals, operators, punctuation, source spans and malformed-input diagnostics.
@@ -1062,14 +1062,14 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Verification | Besides §5.5: unused operands must be 0; no path may run off the end of the code; every register, local or temporary, must be written before it is read on every path, which is what keeps a variable from being read before it has a value (§3.1); a function whose check needs more than 16 million words of state or 100 million steps is rejected rather than verified slowly. The bounds are arbitrary, and are constants that are easy to change (`WsBytecodeVerifier.MaxStateWords`, `WsBytecodeVerifier.MaxSteps`), as is the register limit (`WsFunction.MaxRegisters`) | Approved (12 November 2026) |
 | Compiler output | The compiler verifies what it generates, and reports a module that fails as an internal error (WS4001), with no module | Proposed |
 | Runtime values | `WsValue`, a kind and a 64-bit payload, 16 bytes (§4.1's target, met): null, Boolean, int64 and binary64 (§8.4); the language has no `null`, `true` or `false` literals yet, so scripts produce only numbers | Proposed |
-| Mixed arithmetic | An int64 meeting a binary64 is converted to binary64 (`1 + 0.5`, and `10 / 4 + 1` is 3.5) | Proposed |
-| Binary64 results | IEEE 754 throughout: `1 / 0` is `Infinity`, `-1 / 0` is `-Infinity`, `0 / 0` is `NaN`; only integer arithmetic raises an error (WS3002) | Proposed |
-| Invalid operands | Arithmetic on anything but numbers is WS3001. String concatenation with + is allowed though. | Proposed |
+| Mixed arithmetic | An int64 meeting a binary64 is converted to binary64 (`1 + 0.5`, and `10 / 4 + 1` is 3.5) | Approved (12 November 2026) |
+| Binary64 results | IEEE 754 throughout: `1 / 0` is `Infinity`, `-1 / 0` is `-Infinity`, `0 / 0` is `NaN`; only integer arithmetic raises an error (WS3002). `Infinity` and `NaN` are to have literals of their own, whose spelling is not yet decided | Approved (12 November 2026) |
+| Invalid operands | Arithmetic on anything but numbers is WS3001; once strings exist, `+` also concatenates them | Approved (12 November 2026) |
 | `write` | `write(value)` writes the value as text, with no line break; `writeLn(value)` writes it and a line break (LF); each takes one argument and gives `null`; the host (the CLI) registers them, and they are implemented once in `WebLingo.StdLib`. A line break can also be written as text, once string literals exist | Approved (12 November 2026) |
-| Text of a value | `null`, `true`, `false`; an int64 in decimal digits; a binary64 as the shortest decimal that reads back as the same number, always with a decimal point or an exponent (`5.0`, `3.5`, `0.1`, `-0.0`, `1E+21`), or `NaN`, `Infinity`, `-Infinity`; never culture-dependent (`WsValueFormatter`) | Proposed |
+| Text of a value | `null`, `true`, `false`; an int64 in decimal digits; a binary64 as the shortest decimal that reads back as the same number, always with a decimal point or an exponent (`5.0`, `3.5`, `0.1`, `-0.0`, `1E+21`), or `NaN`, `Infinity`, `-Infinity`; never culture-dependent (`WsValueFormatter`) | Approved (12 November 2026) |
 | Linking | The VM verifies a module, then links its imports to the host's built-ins by name and arity; a missing one stops the module before it runs (WS2001) | Proposed |
 | Runtime errors | The first runtime error stops the execution, and is reported with the source span of the instruction that raised it; output printed before it stays | Proposed |
 | Budgets and cancellation | An execution has an instruction budget (exceeded: WS3003) and a register budget (a module needing more is not run: WS3003); the VM looks at the host's cancellation signal every 1024 instructions (WS3004); a WebLingo-owned signal, not .NET's `CancellationToken` (WS-P007) | Proposed |
 | Built-in failures | A built-in that fails, even by throwing, is a runtime error (WS3001) | Proposed |
-| CLI | `weblingo run <file>` compiles and runs; `weblingo check <file>` compiles and reports, without running; `weblingo --version` prints `WebLingo M0.6 (pre-alpha)`. Diagnostics go to standard error as `file(line,column): error CODE: message`. Exit codes: 0 success, 1 compilation errors, 2 a usage error or an unreadable file, 3 a runtime error (M0.6.1's 3, "not implemented", is gone). `write`'s lines end in LF on every platform | Proposed |
-| Diagnostic codes | WS1003 to WS1008, WS3002 to WS3004, and WS4002 (§8.4); WS2005 and WS2006 for invalid calls, and WS3001 at compile time too, for a built-in named other than to call it; WS2004 is not reported, since no variable can be read before it has a value (§3.1) | Proposed |
+| CLI | `weblingo run <file>` compiles and runs; `weblingo check <file>` compiles and reports, without running; `weblingo --version` prints `WebLingo M0.6 (pre-alpha)`. Diagnostics go to standard error as `file(line,column): error CODE: message`. Exit codes, each with one meaning: 0 success, 1 compilation errors, 2 a usage error, 3 a runtime error, 4 a file that cannot be read. `write`'s lines end in LF on every platform | Approved (12 November 2026) |
+| Diagnostic codes | WS1003 to WS1008, WS3002 to WS3004, and WS4002 (§8.4); WS2005 and WS2006 for invalid calls, and WS3001 at compile time too, for a built-in named other than to call it; WS2004 is not reported, since no variable can be read before it has a value (§3.1) | Approved (12 November 2026) |

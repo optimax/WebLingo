@@ -75,6 +75,26 @@ public sealed class ConformanceTests : IDisposable
             Weblingo("run", "var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);\n"));
     }
 
+    [Theory]
+    [InlineData("run")]
+    [InlineData("--unknown")]
+    [InlineData("run", "a.ws", "b.ws")]
+    public void AUsageErrorExitsWith2(params string[] args)
+    {
+        var output = new StringWriter();
+        Assert.Equal(WsCommandLine.UsageError, WsCommandLine.Run(args, output, new StringWriter()));
+        Assert.StartsWith("Usage: weblingo", output.ToString());
+    }
+
+    [Fact]
+    public void AFileThatCannotBeReadExitsWith4()
+    {
+        var error = new StringWriter();
+        var missing = Path.Combine(_folder, "missing.ws");
+        Assert.Equal(WsCommandLine.FileUnreadable, WsCommandLine.Run(["run", missing], new StringWriter(), error));
+        Assert.Contains("cannot read the file", error.ToString());
+    }
+
     [Fact]
     public void TheArithmeticSamplePrints30()
     {
