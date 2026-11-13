@@ -44,6 +44,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("if (true) var y = 1; writeLn(y);", "WS2001", 1, 30)]
     [InlineData("if true) writeLn(1);", "WS1001", 1, 4)]
     [InlineData("else writeLn(1);", "WS1001", 1, 1)]
+    [InlineData("break;", "WS2007", 1, 1)]
+    [InlineData("if (true) { continue; }", "WS2007", 1, 13)]
+    [InlineData("for (var i = 0; i < 1; i = i + 1) {} writeLn(i);", "WS2001", 1, 46)]
+    [InlineData("do writeLn(1) while (true);", "WS1002", 1, 14)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -84,6 +88,19 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var x = 1; if (true) { var x = 2; writeLn(x); } writeLn(x);", "2\n1")]
     [InlineData("var x = 1; if (true) var x = 2; writeLn(x);", "1")]
     [InlineData("var n = 0; if (true) { n = n + 1; } else { n = n + 10; } writeLn(n);", "1")]
+    [InlineData("var i = 0; while (i < 3) { write(i); i = i + 1; } writeLn(null);", "012null")]
+    [InlineData("while (false) writeLn(1); writeLn(2);", "2")]
+    [InlineData("var i = 0; do { write(i); i = i + 1; } while (i < 3); writeLn(null);", "012null")]
+    [InlineData("do writeLn(1); while (false);", "1")]
+    [InlineData("for (var i = 0; i < 3; i = i + 1) write(i); writeLn(null);", "012null")]
+    [InlineData("var i = 10; for (i = 0; i < 2; i = i + 1) {} writeLn(i);", "2")]
+    [InlineData("var n = 0; for (;;) { n = n + 1; if (n == 5) break; } writeLn(n);", "5")]
+    [InlineData("for (var i = 0; i < 6; i = i + 1) { if (i == 1 || i == 3) continue; write(i); } writeLn(null);", "0245null")]
+    [InlineData("var i = 0; while (true) { i = i + 1; if (i < 3) continue; break; } writeLn(i);", "3")]
+    [InlineData("var i = 0; do { i = i + 1; if (i == 2) continue; write(i); } while (i < 4); writeLn(null);", "134null")]
+    [InlineData("for (var i = 0; i < 2; i = i + 1) for (var j = 0; j < 3; j = j + 1) { if (j == 1) break; write(i * 10 + j); } writeLn(null);", "010null")]
+    [InlineData("var s = 0; for (var n = 1; n <= 1000; n = n + 1) s = s + n; writeLn(s);", "500500")]
+    [InlineData("var i = 1; for (var i = 5; i < 6; i = i + 1) write(i); writeLn(i);", "51")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -98,6 +115,9 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(null >= 0);")]
     [InlineData("if (1) writeLn(1);")]
     [InlineData("if (null) writeLn(1); else writeLn(2);")]
+    [InlineData("while (1) writeLn(1);")]
+    [InlineData("do writeLn(1); while (0);")]
+    [InlineData("for (; 1; ) writeLn(1);")]
     public void BooleansAndNumbersDoNotMix(string source)
     {
         var (exit, _, error) = Weblingo("run", source);

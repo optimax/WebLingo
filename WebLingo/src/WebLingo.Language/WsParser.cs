@@ -73,6 +73,15 @@ public sealed class WsParser : IWsParser
         if (Current.Kind is WsTokenKind.Var or WsTokenKind.Const or WsTokenKind.Let) return ParseVariableDeclaration(start);
         if (Current.Kind == WsTokenKind.OpenBrace) return ParseBlock(start);
         if (Current.Kind == WsTokenKind.If) return ParseIf(start);
+        if (Current.Kind == WsTokenKind.While) return ParseWhile(start);
+        if (Current.Kind == WsTokenKind.Do) return ParseDoWhile(start);
+        if (Current.Kind == WsTokenKind.For) return ParseFor(start);
+        if (Current.Kind is WsTokenKind.Break or WsTokenKind.Continue)
+        {
+            var keyword = Advance();
+            ExpectSemicolon();
+            return keyword.Kind == WsTokenKind.Break ? new WsBreakSyntax(SpanFrom(start)) : new WsContinueSyntax(SpanFrom(start));
+        }
         var expression = ParseExpression();
         ExpectSemicolon();
         return new WsExpressionStatementSyntax(expression, SpanFrom(start));
@@ -124,6 +133,71 @@ public sealed class WsParser : IWsParser
                 otherwise = ParseStatement();
             }
             return new WsIfSyntax(condition, then, otherwise, SpanFrom(start));
+        }
+        finally
+        {
+            _recursionDepth--;
+        }
+    }
+
+    private WsStatementSyntax ParseWhile(int start)
+    {
+        Advance();
+        var condition = ParseCondition();
+        var body = ParseNested();
+        return body is null ? new WsExpressionStatementSyntax(condition, SpanFrom(start))
+            : new WsWhileSyntax(condition, body, SpanFrom(start));
+    }
+
+    private WsStatementSyntax ParseDoWhile(int start)
+    {
+        Advance();
+        var body = ParseNested();
+        if (body is null) return new WsBlockSyntax([], SpanFrom(start));
+        _statementHasError = false;
+        Expect(WsTokenKind.While, "'while'");
+        var condition = ParseCondition();
+        ExpectSemicolon();
+        return new WsDoWhileSyntax(body, condition, SpanFrom(start));
+    }
+
+    private WsStatementSyntax ParseFor(int start)
+    {
+        Advance();
+        _statementHasError = false;
+        Expect(WsTokenKind.OpenParen, "'('");
+        WsStatementSyntax? init = null;
+        if (Current.Kind is WsTokenKind.Var or WsTokenKind.Const or WsTokenKind.Let)
+        {
+            init = ParseVariableDeclaration(Current.Span.Start); // Ends with its ';'.
+        }
+        else if (Current.Kind == WsTokenKind.Semicolon)
+        {
+            Advance();
+        }
+        else
+        {
+            var initStart = Current.Span.Start;
+            var expression = ParseExpression();
+            init = new WsExpressionStatementSyntax(expression, SpanFrom(initStart));
+            Expect(WsTokenKind.Semicolon, "';'");
+        }
+        WsExpressionSyntax? condition = Current.Kind == WsTokenKind.Semicolon ? null : ParseExpression();
+        Expect(WsTokenKind.Semicolon, "';'");
+        WsExpressionSyntax? step = Current.Kind == WsTokenKind.CloseParen ? null : ParseExpression();
+        Expect(WsTokenKind.CloseParen, "')'");
+        var body = ParseNested();
+        return body is null ? new WsBlockSyntax([], SpanFrom(start))
+            : new WsForSyntax(init, condition, step, body, SpanFrom(start));
+    }
+
+    /// <summary>A statement nested in another, within the parser's recursion limit; null beyond it.</summary>
+    private WsStatementSyntax? ParseNested()
+    {
+        if (!EnterRecursion()) return null;
+        try
+        {
+            return ParseStatement();
         }
         finally
         {
@@ -452,11 +526,24 @@ public sealed class WsParser : IWsParser
                 if (conditional.Else is { } otherwise) statements.Push(otherwise);
                 statements.Push(conditional.Then);
             }
+            if (statement is WsWhileSyntax whileLoop) statements.Push(whileLoop.Body);
+            if (statement is WsDoWhileSyntax doLoop) statements.Push(doLoop.Body);
+            if (statement is WsForSyntax forLoop)
+            {
+                // Its parts, as statements of their own, so that each expression's depth is checked.
+                statements.Push(forLoop.Body);
+                if (forLoop.Step is { } step) statements.Push(new WsExpressionStatementSyntax(step, step.Span));
+                if (forLoop.Condition is { } test) statements.Push(new WsExpressionStatementSyntax(test, test.Span));
+                if (forLoop.Init is { } init) statements.Push(init);
+                continue;
+            }
             var top = statement switch
             {
                 WsVariableDeclarationSyntax { Initializer: { } initializer } => initializer,
                 WsExpressionStatementSyntax expressionStatement => expressionStatement.Expression,
                 WsIfSyntax ifStatement => ifStatement.Condition,
+                WsWhileSyntax whileStatement => whileStatement.Condition,
+                WsDoWhileSyntax doStatement => doStatement.Condition,
                 _ => null
             };
             if (top is null) continue;

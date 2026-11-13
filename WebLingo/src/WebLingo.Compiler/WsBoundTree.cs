@@ -21,6 +21,18 @@ public sealed record WsBoundBlock(IReadOnlyList<WsBoundStatement> Statements, Ws
 public sealed record WsBoundIf(WsBoundExpression Condition, WsBoundStatement Then, WsBoundStatement? Else, WsSourceSpan Span)
     : WsBoundStatement(Span);
 
+/// <summary>
+/// A loop: <c>while</c> and <c>for</c> test first (<paramref name="TestFirst"/>), <c>do … while</c> last; a missing
+/// condition is true. <paramref name="Step"/> runs after the body and after each <c>continue</c>.
+/// </summary>
+public sealed record WsBoundLoop(
+    WsBoundExpression? Condition, WsBoundStatement Body, WsBoundExpression? Step, bool TestFirst, WsSourceSpan Span)
+    : WsBoundStatement(Span);
+
+public sealed record WsBoundBreak(WsSourceSpan Span) : WsBoundStatement(Span);
+
+public sealed record WsBoundContinue(WsSourceSpan Span) : WsBoundStatement(Span);
+
 public abstract record WsBoundExpression(WsSourceSpan Span);
 
 public sealed record WsBoundIntegerLiteral(long Value, WsSourceSpan Span) : WsBoundExpression(Span);

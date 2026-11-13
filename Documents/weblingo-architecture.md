@@ -683,6 +683,7 @@ Codes added while implementing M0.6 (§15.2):
 | WS1008 | Source nested too deeply | Approved (12 November 2026) |
 | WS2005 | Not a function (a call of something that cannot be called) | Approved (12 November 2026) |
 | WS2006 | Wrong number of arguments in a call | Approved (12 November 2026) |
+| WS2007 | `break` or `continue` outside a loop | Proposed |
 | WS3002 | Integer overflow (a result outside int64) | Approved (12 November 2026) |
 | WS3003 | Execution budget exceeded (instructions or registers) | Approved (12 November 2026) |
 | WS3004 | Execution cancelled by the host | Approved (12 November 2026) |
@@ -802,7 +803,7 @@ Proposed central props:
 1. **M0.7.1:** blocks and nested scopes. Implemented (12 November 2026); a missing `}` is WS1001, at its `{`.
 2. **M0.7.2:** `true`, `false` and `null`; `==`, `!=`, `<`, `<=`, `>`, `>=`; `!`, `&&`, `||`. Implemented (12 November 2026).
 3. **M0.7.3:** `if` and `else`. Implemented (12 November 2026); a branch that is not a block still has a scope of its own, so `if (c) var y = 1;` declares `y` for that branch only (proposed).
-4. **M0.7.4:** `while`, `for` and `do … while`, with `break` and `continue`.
+4. **M0.7.4:** `while`, `for` and `do … while`, with `break` and `continue`. Implemented (12 November 2026); `break` or `continue` outside a loop is WS2007 (proposed), and a `for`'s per-iteration bindings (§3.5) become observable, and are implemented, with closures in M0.7.6.
 5. **M0.7.5:** string literals and concatenation.
 6. **M0.7.6:** functions, function values and closures.
 

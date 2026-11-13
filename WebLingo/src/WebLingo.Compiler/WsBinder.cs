@@ -17,6 +17,7 @@ public sealed class WsBinder
     private readonly List<WsLocalSymbol> _locals = [];
     private readonly List<WsDiagnostic> _diagnostics = [];
     private Scope _scope = new(null);
+    private int _loopDepth;
 
     public WsBinder(WsCompilerOptions options)
     {
@@ -60,6 +61,38 @@ public sealed class WsBinder
                 var otherwise = conditional.Else is null ? null : BindInOwnScope(conditional.Else);
                 return new WsBoundIf(condition, then, otherwise, conditional.Span);
             }
+            case WsWhileSyntax whileLoop:
+            {
+                var condition = BindExpression(whileLoop.Condition);
+                return new WsBoundLoop(condition, BindLoopBody(whileLoop.Body), null, true, whileLoop.Span);
+            }
+            case WsDoWhileSyntax doLoop:
+            {
+                var body = BindLoopBody(doLoop.Body);
+                return new WsBoundLoop(BindExpression(doLoop.Condition), body, null, false, doLoop.Span);
+            }
+            case WsForSyntax forLoop:
+            {
+                // The loop's own scope holds what its init declares.
+                _scope = new Scope(_scope);
+                var init = forLoop.Init is null ? null : BindStatement(forLoop.Init);
+                var condition = forLoop.Condition is null ? null : BindExpression(forLoop.Condition);
+                var step = forLoop.Step is null ? null : BindExpression(forLoop.Step);
+                var body = BindLoopBody(forLoop.Body);
+                _scope = _scope.Parent!;
+                var loop = new WsBoundLoop(condition, body, step, true, forLoop.Span);
+                return init is null ? loop : new WsBoundBlock([init, loop], forLoop.Span);
+            }
+            case WsBreakSyntax or WsContinueSyntax:
+            {
+                var isBreak = statement is WsBreakSyntax;
+                if (_loopDepth == 0)
+                {
+                    Report(WsDiagnosticCodes.NotInLoop, $"'{(isBreak ? "break" : "continue")}' is only allowed in a loop.",
+                        statement.Span);
+                }
+                return isBreak ? new WsBoundBreak(statement.Span) : new WsBoundContinue(statement.Span);
+            }
             case WsBlockSyntax block:
             {
                 _scope = new Scope(_scope);
@@ -71,6 +104,14 @@ public sealed class WsBinder
             default:
                 throw new InvalidOperationException($"Unknown statement {statement.GetType().Name}.");
         }
+    }
+
+    private WsBoundStatement BindLoopBody(WsStatementSyntax body)
+    {
+        _loopDepth++;
+        var bound = BindInOwnScope(body);
+        _loopDepth--;
+        return bound;
     }
 
     /// <summary>A branch or a loop's body: a declaration in it, without braces, is in scope only there.</summary>

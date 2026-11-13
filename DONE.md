@@ -299,3 +299,9 @@ A3: (b), but I'd rather have `foreach` loops over collections. `for`-`of` is uni
 BTW: Thank you for thoughtfully inserting `An:` placeholders for my answers.
 
 Done (Claude, 2026-11-12): Q1 and Q2 are recorded as approved in the specification, section 3.5 ("`for`", "`do … while`"). Q3, a `foreach` over collections, is the new question "Syntax of `foreach`". Nothing to build.
+
+## [DONE] M0.7.4: Loops, `break` and `continue`
+
+`while`, `for` and `do … while`, with `break` and `continue` (specification, section 3.5). Added by Claude, 2026-11-12.
+
+Done (Claude, 2026-11-12): `while`, `for` (any part may be empty, and a missing condition is true) and `do … while`, all lowered to one loop form (`WsBoundLoop`, `WsIrLoop`). `continue` goes to the step or the test, and `break` goes past the end. `break` or `continue` outside a loop is the new WS2007, which I picked and the specification lists as proposed. A `for`'s init is in a scope of the loop's own. Per-iteration bindings only become observable with closures, so they come with M0.7.6. Build and 408 tests pass on Windows, and the CLI ran a loop sample (a 100,000-iteration sum: 5000050000); Linux not tried.

@@ -32,6 +32,24 @@ public sealed record WsBlockSyntax(IReadOnlyList<WsStatementSyntax> Statements, 
 public sealed record WsIfSyntax(WsExpressionSyntax Condition, WsStatementSyntax Then, WsStatementSyntax? Else, WsSourceSpan Span)
     : WsStatementSyntax(Span);
 
+public sealed record WsWhileSyntax(WsExpressionSyntax Condition, WsStatementSyntax Body, WsSourceSpan Span)
+    : WsStatementSyntax(Span);
+
+public sealed record WsDoWhileSyntax(WsStatementSyntax Body, WsExpressionSyntax Condition, WsSourceSpan Span)
+    : WsStatementSyntax(Span);
+
+/// <summary>
+/// <c>for (init; condition; step) body</c>; each part may be missing. <paramref name="Init"/> is a declaration or an
+/// expression statement.
+/// </summary>
+public sealed record WsForSyntax(
+    WsStatementSyntax? Init, WsExpressionSyntax? Condition, WsExpressionSyntax? Step, WsStatementSyntax Body, WsSourceSpan Span)
+    : WsStatementSyntax(Span);
+
+public sealed record WsBreakSyntax(WsSourceSpan Span) : WsStatementSyntax(Span);
+
+public sealed record WsContinueSyntax(WsSourceSpan Span) : WsStatementSyntax(Span);
+
 public abstract record WsExpressionSyntax(WsSourceSpan Span) : WsSyntaxNode(Span);
 
 public sealed record WsIntegerLiteralSyntax(long Value, WsSourceSpan Span) : WsExpressionSyntax(Span);

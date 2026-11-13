@@ -19,6 +19,7 @@ public sealed class WsCodeGenerator
     private readonly List<WsConstant> _constants = [];
     private readonly Dictionary<long, int> _int64Constants = [];
     private readonly Dictionary<long, int> _binary64Constants = []; // By IEEE bits, so that 0.0 and -0.0 stay apart.
+    private readonly Stack<LoopJumps> _loops = new();
     private int _nextRegister;
     private int _registerCount;
 
@@ -64,6 +65,15 @@ public sealed class WsCodeGenerator
                 break;
             case WsIrBlock block:
                 foreach (var inner in block.Statements) EmitStatement(inner);
+                break;
+            case WsIrLoop loop:
+                EmitLoop(loop);
+                break;
+            case WsIrBreak breakStatement:
+                _loops.Peek().Breaks.Add(EmitJump(WsOpCode.Jump, 0, breakStatement.Span));
+                break;
+            case WsIrContinue continueStatement:
+                _loops.Peek().Continues.Add(EmitJump(WsOpCode.Jump, 0, continueStatement.Span));
                 break;
             case WsIrIf conditional:
             {
@@ -253,6 +263,50 @@ public sealed class WsCodeGenerator
         _constants.Add(WsConstant.Int64(value));
         _int64Constants.Add(value, index);
         return index;
+    }
+
+    /// <summary>
+    /// <c>while</c> and <c>for</c>: test, body, step, back to the test. <c>do … while</c>: body, then the test, which
+    /// jumps back if true. A <c>continue</c> goes to the step (or the test), a <c>break</c> past the end.
+    /// </summary>
+    private void EmitLoop(WsIrLoop loop)
+    {
+        var jumps = new LoopJumps();
+        _loops.Push(jumps);
+        var top = _code.Count;
+        int? exit = null;
+        if (loop.TestFirst && loop.Condition is { } test)
+        {
+            var condition = EmitExpression(test, null);
+            exit = EmitJump(WsOpCode.JumpIfFalse, condition, test.Span);
+            _nextRegister = _locals;
+        }
+        EmitStatement(loop.Body);
+        foreach (var at in jumps.Continues) PatchJump(at);
+        if (loop.Step is { } step)
+        {
+            EmitExpression(step, null);
+            _nextRegister = _locals;
+        }
+        if (!loop.TestFirst && loop.Condition is { } last)
+        {
+            var condition = EmitExpression(last, null);
+            Emit(new WsInstruction(WsOpCode.JumpIfTrue, condition, top), last.Span);
+            _nextRegister = _locals;
+        }
+        else
+        {
+            Emit(new WsInstruction(WsOpCode.Jump, top), loop.Span);
+        }
+        if (exit is { } exitJump) PatchJump(exitJump);
+        foreach (var at in jumps.Breaks) PatchJump(at);
+        _loops.Pop();
+    }
+
+    private sealed class LoopJumps
+    {
+        public List<int> Breaks { get; } = [];
+        public List<int> Continues { get; } = [];
     }
 
     /// <summary>Emits a jump whose target <see cref="PatchJump"/> fills in later, and returns where it is.</summary>

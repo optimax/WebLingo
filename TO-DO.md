@@ -54,19 +54,15 @@ The owner's answer to "Syntax of `for` and `do … while`", Q3: design a loop ov
 
 **Q1: Which form? (a) `foreach (var item in items) statement`, as in C#; (b) `foreach (var item of items) statement`; (c) `foreach (var item : items) statement`, as in Java.**
 
-A1:
+A1: (a)
 
 **Q2: May the loop variable be declared `const` as well as `var` (`foreach (const item in items)`)? Like `for`'s, it gets a new binding on each iteration.**
 
-A2:
+A2: No. Why would it even make sense? `const` means it cannot be assigned to.
 
 **Q3: Over a map, `foreach` gives each entry as a key and a value: `foreach (var (key, value) in map)`. Agreed, with the destructuring syntax decided when maps are?**
 
 A3:
-
-## M0.7.4: Loops, `break` and `continue`
-
-`while`, `for` and `do … while`, with `break` and `continue` (specification, section 3.5). Added by Claude, 2026-11-12.
 
 ## M0.7.5: String Literals and Concatenation
 

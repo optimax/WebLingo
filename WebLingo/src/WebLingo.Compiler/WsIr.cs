@@ -26,6 +26,16 @@ public sealed record WsIrBlock(IReadOnlyList<WsIrStatement> Statements, WsSource
 public sealed record WsIrIf(WsIrExpression Condition, WsIrStatement Then, WsIrStatement? Else, WsSourceSpan Span)
     : WsIrStatement(Span);
 
+/// <summary>A loop; see <c>WsBoundLoop</c>. A missing condition is true.</summary>
+public sealed record WsIrLoop(WsIrExpression? Condition, WsIrStatement Body, WsIrExpression? Step, bool TestFirst, WsSourceSpan Span)
+    : WsIrStatement(Span);
+
+/// <summary>Leaves the innermost loop.</summary>
+public sealed record WsIrBreak(WsSourceSpan Span) : WsIrStatement(Span);
+
+/// <summary>Goes on to the innermost loop's step, then its condition.</summary>
+public sealed record WsIrContinue(WsSourceSpan Span) : WsIrStatement(Span);
+
 public abstract record WsIrExpression(WsSourceSpan Span);
 
 public sealed record WsIrInt64Constant(long Value, WsSourceSpan Span) : WsIrExpression(Span);

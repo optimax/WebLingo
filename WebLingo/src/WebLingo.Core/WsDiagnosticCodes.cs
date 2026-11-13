@@ -35,6 +35,8 @@ public static class WsDiagnosticCodes
     public const string NotAFunction = "WS2005";
     /// <summary>A call with the wrong number of arguments.</summary>
     public const string WrongArgumentCount = "WS2006";
+    /// <summary>A <c>break</c> or <c>continue</c> outside a loop (proposed).</summary>
+    public const string NotInLoop = "WS2007";
 
     /// <summary>Invalid operation.</summary>
     public const string InvalidOperation = "WS3001";

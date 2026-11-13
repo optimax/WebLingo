@@ -27,6 +27,13 @@ public static class WsLowerer
             case WsBoundIf conditional:
                 return new WsIrIf(LowerExpression(conditional.Condition), LowerStatement(conditional.Then),
                     conditional.Else is null ? null : LowerStatement(conditional.Else), conditional.Span);
+            case WsBoundLoop loop:
+                return new WsIrLoop(loop.Condition is null ? null : LowerExpression(loop.Condition), LowerStatement(loop.Body),
+                    loop.Step is null ? null : LowerExpression(loop.Step), loop.TestFirst, loop.Span);
+            case WsBoundBreak breakStatement:
+                return new WsIrBreak(breakStatement.Span);
+            case WsBoundContinue continueStatement:
+                return new WsIrContinue(continueStatement.Span);
             case WsBoundBlock block:
             {
                 var statements = new List<WsIrStatement>();
