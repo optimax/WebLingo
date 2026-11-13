@@ -20,4 +20,19 @@ public interface IWsLexer
     IReadOnlyList<WsDiagnostic> Diagnostics { get; }
 }
 public interface IWsParser { WsSyntaxTree ParseCompilationUnit(); }
-public sealed record WsSyntaxTree(IReadOnlyList<WsDiagnostic> Diagnostics);
+
+/// <summary>A parsed source text: its tree, and the lexer's and the parser's diagnostics in source order.</summary>
+public sealed record WsSyntaxTree(WsSourceText Source, WsCompilationUnitSyntax Root, IReadOnlyList<WsDiagnostic> Diagnostics)
+{
+    public bool HasErrors
+    {
+        get
+        {
+            foreach (var diagnostic in Diagnostics)
+            {
+                if (diagnostic.Severity == WsDiagnosticSeverity.Error) return true;
+            }
+            return false;
+        }
+    }
+}

@@ -16,6 +16,12 @@ public static class WsDiagnosticCodes
     public const string InvalidNumericLiteral = "WS1004";
     /// <summary>A <c>/*</c> comment without its <c>*/</c> (proposed).</summary>
     public const string UnterminatedComment = "WS1005";
+    /// <summary>A <c>const</c> declaration without an initializer (proposed).</summary>
+    public const string MissingConstantInitializer = "WS1006";
+    /// <summary>The left side of <c>=</c> is not a variable (proposed).</summary>
+    public const string InvalidAssignmentTarget = "WS1007";
+    /// <summary>Source nested too deeply to compile safely (proposed).</summary>
+    public const string NestingTooDeep = "WS1008";
 
     /// <summary>Undefined identifier.</summary>
     public const string UndefinedIdentifier = "WS2001";

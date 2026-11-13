@@ -664,6 +664,9 @@ Codes added while implementing M0.6, all **proposed** (§15.2):
 | WS1003 | Invalid character |
 | WS1004 | Invalid numeric literal (malformed, or out of range) |
 | WS1005 | Unterminated comment |
+| WS1006 | `const` declaration without an initializer |
+| WS1007 | Invalid assignment target |
+| WS1008 | Source nested too deeply |
 
 **Lexer:** identifiers, keywords (`var`, `const`), literals, operators, punctuation, source spans and malformed-input diagnostics.
 
@@ -1004,6 +1007,7 @@ This section records the state of the M0.6 increments after M0.6.1 (§8.7), and 
 | Increment | Status |
 |---|---|
 | M0.6.2 lexer and tokenization tests | Implemented (12 November 2026); built and tested on Windows, Linux pending |
+| M0.6.3 parser, AST and diagnostics | Implemented (12 November 2026); built and tested on Windows, Linux pending |
 
 ### 15.2 Proposed choices
 
@@ -1018,4 +1022,12 @@ This section records the state of the M0.6 increments after M0.6.1 (§8.7), and 
 | Integer literals | Decimal digits only; leading zeros allowed and still decimal (`007` is 7); at most 9223372036854775807, larger is an error (WS1004) | Proposed |
 | Literal suffixes | Digits followed directly by a letter, digit or `_` are one invalid literal (WS1004), which keeps room for the decimal suffix `m` (§3.2) | Proposed |
 | Not yet lexed | String, binary64 and decimal literals: their characters are invalid (WS1003) until their syntax is specified | Proposed |
-| Diagnostic codes | WS1003, WS1004, and WS1005 (§8.4) | Proposed |
+| Statements | Variable declarations and expression statements, each ended by `;`; a lone `;` (an empty statement) is an error (WS1001); blocks come later | Proposed |
+| Operators | Unary `-`; binary `* /` above `+ -`, both left-associative; no unary `+` (WS1001) | Proposed |
+| Assignment | An expression, right-associative (`a = b = 3`), whose value is the value assigned; only a variable's name may be assigned (WS1007), not even a parenthesized one | Proposed |
+| Calls | `callee(argument, …)`, no trailing comma; the callee is any expression, checked when bound | Proposed |
+| `let` | Reported as not a WebLingo keyword (WS1001), with a hint to use `var` or `const`, and parsed as `var` to recover | Proposed |
+| `const` without a value | `const x;` is a syntax error (WS1006) | Proposed |
+| Error recovery | After an error, parsing resumes at the next `;` or declaration keyword; a token the lexer reported is not reported again, and a statement gets at most one diagnostic for what follows its first error | Proposed |
+| Nesting limits | Parsing recurses at most 256 levels (parentheses, unary minus, assignments, arguments), and an expression is at most 1000 operations deep, so that a recursive compiler stage cannot overflow its stack; deeper source is an error (WS1008) | Proposed |
+| Diagnostic codes | WS1003 to WS1008 (§8.4) | Proposed |
