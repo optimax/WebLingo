@@ -346,9 +346,11 @@ public sealed class WsParser : IWsParser
         var value = ParseExpression();
         var span = Between(left.Span, value.Span);
         if (left is WsNameSyntax target) return new WsAssignmentExpressionSyntax(target, value, span);
+        if (left is WsIndexExpressionSyntax element) return new WsIndexAssignmentSyntax(element, value, span);
         if (left is not WsErrorExpressionSyntax)
         {
-            Report(WsDiagnosticCodes.InvalidAssignmentTarget, "Only a variable can be assigned a value with '='.",
+            Report(WsDiagnosticCodes.InvalidAssignmentTarget,
+                "Only a variable, or an element or entry ('x[i]'), can be assigned a value with '='.",
                 left.Span.Length > 0 ? left.Span : equals.Span);
         }
         return new WsErrorExpressionSyntax(span);
@@ -438,26 +440,55 @@ public sealed class WsParser : IWsParser
         }
     }
 
+    /// <summary>A primary expression followed by any calls, <c>(…)</c>, members, <c>.name</c>, and indexes, <c>[…]</c>.</summary>
     private WsExpressionSyntax ParseCall()
     {
         var expression = ParsePrimary();
-        while (Current.Kind == WsTokenKind.OpenParen)
+        while (true)
         {
-            Advance();
-            var arguments = new List<WsExpressionSyntax>();
-            if (Current.Kind != WsTokenKind.CloseParen)
+            switch (Current.Kind)
             {
-                arguments.Add(ParseExpression());
-                while (Current.Kind == WsTokenKind.Comma)
+                case WsTokenKind.OpenParen:
                 {
                     Advance();
-                    arguments.Add(ParseExpression());
+                    var arguments = new List<WsExpressionSyntax>();
+                    if (Current.Kind != WsTokenKind.CloseParen)
+                    {
+                        arguments.Add(ParseExpression());
+                        while (Current.Kind == WsTokenKind.Comma)
+                        {
+                            Advance();
+                            arguments.Add(ParseExpression());
+                        }
+                    }
+                    Expect(WsTokenKind.CloseParen, "')'");
+                    expression = new WsCallExpressionSyntax(expression, arguments, SpanFrom(expression.Span.Start));
+                    continue;
                 }
+                case WsTokenKind.Dot:
+                {
+                    Advance();
+                    if (Current.Kind != WsTokenKind.Identifier)
+                    {
+                        ReportUnexpected("a member's name");
+                        return new WsErrorExpressionSyntax(SpanFrom(expression.Span.Start));
+                    }
+                    var name = Advance();
+                    expression = new WsMemberAccessSyntax(expression, name.Text, name.Span, SpanFrom(expression.Span.Start));
+                    continue;
+                }
+                case WsTokenKind.OpenBracket:
+                {
+                    Advance();
+                    var index = ParseExpression();
+                    Expect(WsTokenKind.CloseBracket, "']'");
+                    expression = new WsIndexExpressionSyntax(expression, index, SpanFrom(expression.Span.Start));
+                    continue;
+                }
+                default:
+                    return expression;
             }
-            Expect(WsTokenKind.CloseParen, "')'");
-            expression = new WsCallExpressionSyntax(expression, arguments, SpanFrom(expression.Span.Start));
         }
-        return expression;
     }
 
     private WsExpressionSyntax ParsePrimary()
@@ -642,6 +673,15 @@ public sealed class WsParser : IWsParser
                     case WsCallExpressionSyntax call:
                         pending.Push((call.Callee, depth + 1));
                         foreach (var argument in call.Arguments) pending.Push((argument, depth + 1));
+                        break;
+                    case WsIndexExpressionSyntax index:
+                        pending.Push((index.Target, depth + 1));
+                        pending.Push((index.Index, depth + 1));
+                        break;
+                    case WsMemberAccessSyntax member: pending.Push((member.Target, depth + 1)); break;
+                    case WsIndexAssignmentSyntax element:
+                        pending.Push((element.Target, depth + 1));
+                        pending.Push((element.Value, depth + 1));
                         break;
                 }
             }

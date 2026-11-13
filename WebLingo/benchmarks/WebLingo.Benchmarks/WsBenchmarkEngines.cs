@@ -72,7 +72,8 @@ public sealed class WsRegisterEngine : IWsBenchmarkEngine
             WsOpCode.Add or WsOpCode.Subtract or WsOpCode.Multiply or WsOpCode.Divide or WsOpCode.Equal
                 or WsOpCode.NotEqual or WsOpCode.Less or WsOpCode.LessOrEqual or WsOpCode.Greater
                 or WsOpCode.GreaterOrEqual => 3,
-            WsOpCode.CallBuiltin or WsOpCode.Call => 4,
+            WsOpCode.CallBuiltin or WsOpCode.Call or WsOpCode.CallMethod => 4,
+            WsOpCode.GetMember or WsOpCode.GetIndex or WsOpCode.SetIndex => 3,
             _ => 2
         };
     }
@@ -119,8 +120,9 @@ public sealed class WsStackEngine : IWsBenchmarkEngine
                 or WsStackOpCode.Jump or WsStackOpCode.JumpIfFalse or WsStackOpCode.JumpIfTrue or WsStackOpCode.NewCell
                 or WsStackOpCode.BoxLocal or WsStackOpCode.CopyCell or WsStackOpCode.LoadCell or WsStackOpCode.StoreCell
                 or WsStackOpCode.LoadCapture or WsStackOpCode.StoreCapture or WsStackOpCode.MakeClosure
-                or WsStackOpCode.LoadBuiltin or WsStackOpCode.Call => 1,
-            WsStackOpCode.CallBuiltin => 2,
+                or WsStackOpCode.LoadBuiltin or WsStackOpCode.Call or WsStackOpCode.GetMember
+                or WsStackOpCode.StoreIndex => 1,
+            WsStackOpCode.CallBuiltin or WsStackOpCode.CallMethod => 2,
             _ => 0
         };
     }

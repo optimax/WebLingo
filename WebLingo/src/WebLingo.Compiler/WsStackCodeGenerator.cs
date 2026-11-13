@@ -157,6 +157,12 @@ public sealed class WsStackCodeGenerator
                 EmitValue(store.Value);
                 Emit(WsStackOpCode.StoreCapture, store.Span, store.Capture);
                 return;
+            case WsIrStoreIndex store:
+                EmitValue(store.Target);
+                EmitValue(store.Index);
+                EmitValue(store.Value);
+                Emit(WsStackOpCode.StoreIndex, store.Span);
+                return;
             default:
                 EmitValue(expression);
                 Emit(WsStackOpCode.Pop, expression.Span);
@@ -245,6 +251,26 @@ public sealed class WsStackCodeGenerator
                 EmitValue(call.Callee);
                 foreach (var argument in call.Arguments) EmitValue(argument);
                 Emit(WsStackOpCode.Call, call.Span, call.Arguments.Count);
+                return;
+            case WsIrIndex index:
+                EmitValue(index.Target);
+                EmitValue(index.Index);
+                Emit(WsStackOpCode.GetIndex, index.Span);
+                return;
+            case WsIrStoreIndex store:
+                EmitValue(store.Target);
+                EmitValue(store.Index);
+                EmitValue(store.Value);
+                Emit(WsStackOpCode.StoreIndex, store.Span, 1);
+                return;
+            case WsIrMember member:
+                EmitValue(member.Target);
+                Emit(WsStackOpCode.GetMember, member.Span, StringConstant(member.Name));
+                return;
+            case WsIrCallMethod call:
+                EmitValue(call.Target);
+                foreach (var argument in call.Arguments) EmitValue(argument);
+                Emit(WsStackOpCode.CallMethod, call.Span, StringConstant(call.Name), call.Arguments.Count);
                 return;
             case WsIrCallBuiltin call:
                 foreach (var argument in call.Arguments) EmitValue(argument);
@@ -364,6 +390,10 @@ public sealed class WsStackCodeGenerator
                 or WsStackOpCode.Greater or WsStackOpCode.GreaterOrEqual => (2, 1),
             WsStackOpCode.Call => (a + 1, 1),
             WsStackOpCode.CallBuiltin => (b, 1),
+            WsStackOpCode.GetMember => (1, 1),
+            WsStackOpCode.CallMethod => (b + 1, 1),
+            WsStackOpCode.GetIndex => (2, 1),
+            WsStackOpCode.StoreIndex => (3, a),
             WsStackOpCode.Negate or WsStackOpCode.Plus or WsStackOpCode.Not or WsStackOpCode.CheckBoolean => (1, 1),
             _ => (0, 0)
         };

@@ -310,6 +310,56 @@ public sealed class WsCodeGenerator
                 Emit(new WsInstruction(OpCodeOf(binary.Operator), destination, left, right), binary.Span);
                 return destination;
             }
+            case WsIrIndex index:
+            {
+                var mark = _nextRegister;
+                var subject = KeptIfAssigned(EmitExpression(index.Target, null), index.Target.Span, index.Index);
+                var key = EmitExpression(index.Index, null);
+                _nextRegister = mark; // The operation reads its operands before it writes its destination.
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.GetIndex, destination, subject, key), index.Span);
+                return destination;
+            }
+            case WsIrStoreIndex store:
+            {
+                var mark = _nextRegister;
+                var subject = KeptIfAssigned(EmitExpression(store.Target, null), store.Target.Span, store.Index, store.Value);
+                var key = KeptIfAssigned(EmitExpression(store.Index, null), store.Index.Span, store.Value);
+                var value = EmitExpression(store.Value, null);
+                Emit(new WsInstruction(WsOpCode.SetIndex, subject, key, value), store.Span);
+                if (target is { } destination)
+                {
+                    if (destination != value) Emit(new WsInstruction(WsOpCode.Move, destination, value), store.Span);
+                    _nextRegister = mark;
+                    return destination;
+                }
+                // The value is the result: a temporary of its own stays allocated, a local is read where it is.
+                _nextRegister = value >= _locals ? Math.Max(mark, value + 1) : mark;
+                return value;
+            }
+            case WsIrMember member:
+            {
+                var mark = _nextRegister;
+                var subject = EmitExpression(member.Target, null);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.GetMember, destination, subject, StringConstant(member.Name)), member.Span);
+                return destination;
+            }
+            case WsIrCallMethod call:
+            {
+                // The target, then the arguments, in consecutive registers.
+                var mark = _nextRegister;
+                var first = _nextRegister;
+                for (var i = 0; i <= call.Arguments.Count; i++) Allocate();
+                EmitExpression(call.Target, first);
+                for (var i = 0; i < call.Arguments.Count; i++) EmitExpression(call.Arguments[i], first + 1 + i);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.CallMethod, destination, StringConstant(call.Name), first, call.Arguments.Count),
+                    call.Span);
+                return destination;
+            }
             case WsIrCallBuiltin call:
             {
                 var mark = _nextRegister;
@@ -338,8 +388,24 @@ public sealed class WsCodeGenerator
         WsIrCall call => Assigns(call.Callee, local) || AnyAssigns(call.Arguments, local),
         WsIrStoreCell store => Assigns(store.Value, local),
         WsIrStoreCapture store => Assigns(store.Value, local),
+        WsIrIndex index => Assigns(index.Target, local) || Assigns(index.Index, local),
+        WsIrStoreIndex store => Assigns(store.Target, local) || Assigns(store.Index, local) || Assigns(store.Value, local),
+        WsIrMember member => Assigns(member.Target, local),
+        WsIrCallMethod call => Assigns(call.Target, local) || AnyAssigns(call.Arguments, local),
         _ => false
     };
+
+    /// <summary>
+    /// A register an operand was evaluated into, copied first if it is a local that a later operand of the same
+    /// operation assigns: the operation must see the value read, not the one assigned (section 15.2).
+    /// </summary>
+    private int KeptIfAssigned(int register, WsSourceSpan span, params WsIrExpression[] later)
+    {
+        if (register >= _locals || !AnyAssigns(later, register)) return register;
+        var copy = Allocate();
+        Emit(new WsInstruction(WsOpCode.Move, copy, register), span);
+        return copy;
+    }
 
     private static bool AnyAssigns(IReadOnlyList<WsIrExpression> expressions, int local)
     {

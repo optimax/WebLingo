@@ -24,6 +24,7 @@ public sealed class StackVmTests
         nameof(ConformanceTests.ResultsAreTheSpecifiedOnes),
         nameof(ConformanceTests.BooleansAndNumbersDoNotMix),
         nameof(ConformanceTests.CallsAreCheckedAtRunTime),
+        nameof(ConformanceTests.MembersAndIndexesAreCheckedAtRunTime),
     ];
 
     public static TheoryData<string> ConformancePrograms
@@ -62,13 +63,13 @@ public sealed class StackVmTests
         [
             "var", "x", "y", "f", "writeLn", "write", "=", "+", "-", "*", "/", "(", ")", ";", ",", "{", "}", "0", "1", "2.5",
             "NaN", "\"s\"", "true", "null", "==", "<", "&&", "||", "!", "if", "else", "while", "for", "break", "continue",
-            "function", "return", "9223372036854775807",
+            "function", "return", "9223372036854775807", "[", "]", ".", "length", "size", "\"ab\"",
         ];
         var random = new Random(5_6);
         var compared = 0;
-        for (var round = 0; round < 5_000; round++)
+        for (var round = 0; round < 20_000; round++)
         {
-            var words = Enumerable.Range(0, random.Next(1, 30)).Select(_ => fragments[random.Next(fragments.Length)] + " ");
+            var words = Enumerable.Range(0, random.Next(1, 12)).Select(_ => fragments[random.Next(fragments.Length)] + " ");
             var source = string.Concat(words);
             var register = RunOnRegisterVm(source, 100_000);
             var stack = RunOnStackVm(source, 100_000);
@@ -81,7 +82,7 @@ public sealed class StackVmTests
             Assert.Equal(register, stack);
             if (register.Diagnostics.Length == 0) compared++;
         }
-        Assert.InRange(compared, 1, 5_000);
+        Assert.InRange(compared, 1, 20_000);
     }
 
     [Fact]

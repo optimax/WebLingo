@@ -15,6 +15,7 @@
 | `ref readonly` locals and `in` parameters | Planned | The VMs read their instructions where they are, without copying them |
 | `Math.BigMul(long, long, out long)` | Planned | The VMs' int64 multiplication, whose 128-bit product shows an overflow |
 | `Array.Resize`, `Array.Clear` | Planned | The VMs' stacks of frames, and the registers or slots a returning call clears |
+| `char.IsSurrogatePair`, `string.Substring` | Planned | A string's `length` and indexing count Unicode scalar values (`WsMembers`), over the UTF-16 text a string is kept as |
 | `[MethodImpl(MethodImplOptions.AggressiveInlining)]` | Planned | A hint to .NET's JIT on the VMs' arithmetic and comparisons; a compiler that ignores it still compiles the code correctly |
 | .NET Task / ValueTask | Adapted only | Not permitted as WebLingo core async contract |
 | .NET `CancellationToken` | Not used | The VM's cancellation is WebLingo's own `WsCancellationSignal` (WS-P007) |

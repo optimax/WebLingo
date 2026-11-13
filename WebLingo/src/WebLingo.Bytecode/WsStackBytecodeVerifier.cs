@@ -140,6 +140,15 @@ public sealed class WsStackBytecodeVerifier
                 var import = module.Imports[a];
                 return b == import.Arity ? null : $"'{import.Name}' takes {import.Arity} arguments, not {b}.";
             }
+            case WsStackOpCode.GetMember:
+                return Name(module, a) ?? Unused(b);
+            case WsStackOpCode.CallMethod:
+                return Name(module, a) ?? (b is < 0 or > WsFunction.MaxRegisters
+                    ? $"its argument count, {b}, is not 0 to {WsFunction.MaxRegisters}."
+                    : null);
+            case WsStackOpCode.StoreIndex:
+                return (a is 0 or 1 ? null : $"its A is {a}, not 0 or 1.") ?? Unused(b);
+            case WsStackOpCode.GetIndex:
             case WsStackOpCode.LoadNull:
             case WsStackOpCode.Duplicate:
             case WsStackOpCode.Pop:
@@ -260,6 +269,10 @@ public sealed class WsStackBytecodeVerifier
             or WsStackOpCode.Greater or WsStackOpCode.GreaterOrEqual => (2, 1),
         WsStackOpCode.Call => (instruction.A + 1, 1),
         WsStackOpCode.CallBuiltin => (instruction.B, 1),
+        WsStackOpCode.GetMember => (1, 1),
+        WsStackOpCode.CallMethod => (instruction.B + 1, 1),
+        WsStackOpCode.GetIndex => (2, 1),
+        WsStackOpCode.StoreIndex => (3, instruction.A),
         _ => (0, 0) // Jump, NewCell, BoxLocal, CopyCell and Return.
     };
 
@@ -329,6 +342,11 @@ public sealed class WsStackBytecodeVerifier
     private static bool IsSet(ulong[] state, int local) => (state[local >> 6] & (1UL << (local & 63))) != 0;
 
     private static void Set(ulong[] state, int local) => state[local >> 6] |= 1UL << (local & 63);
+
+    /// <summary>A member's name, which must be a string constant.</summary>
+    private static string? Name(WsStackModule module, int constant) =>
+        Index(constant, module.Constants.Count, "constant")
+        ?? (module.Constants[constant].Kind == WsConstantKind.String ? null : $"constant {constant} is not a name.");
 
     private static string? Index(int value, int count, string what) =>
         value >= 0 && value < count ? null : $"{what} {value} does not exist (there are {count}).";

@@ -159,14 +159,29 @@ public sealed class LexerTests
     }
 
     [Theory]
-    [InlineData("1.", new[] { WsTokenKind.IntegerLiteral, WsTokenKind.Bad })]
-    [InlineData(".5", new[] { WsTokenKind.Bad, WsTokenKind.IntegerLiteral })]
-    [InlineData("1.e5", new[] { WsTokenKind.IntegerLiteral, WsTokenKind.Bad, WsTokenKind.Identifier })]
+    [InlineData("1.", new[] { WsTokenKind.IntegerLiteral, WsTokenKind.Dot })]
+    [InlineData(".5", new[] { WsTokenKind.Dot, WsTokenKind.IntegerLiteral })]
+    [InlineData("1.e5", new[] { WsTokenKind.IntegerLiteral, WsTokenKind.Dot, WsTokenKind.Identifier })]
     public void APointNeedsDigitsOnBothSides(string text, WsTokenKind[] kinds)
     {
+        // Without digits on both sides, a point is not part of a number but a member access's (section 3.6).
         var tokens = WsLexer.Tokenize(text, out var diagnostics);
         Assert.Equal(kinds.Append(WsTokenKind.EndOfFile), tokens.Select(t => t.Kind));
-        Assert.Equal(WsDiagnosticCodes.InvalidCharacter, Assert.Single(diagnostics).Code);
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void MembersAndIndexesHaveTheirTokens()
+    {
+        var tokens = WsLexer.Tokenize("a.length[0]", out var diagnostics);
+        Assert.Equal(
+            new[]
+            {
+                WsTokenKind.Identifier, WsTokenKind.Dot, WsTokenKind.Identifier, WsTokenKind.OpenBracket,
+                WsTokenKind.IntegerLiteral, WsTokenKind.CloseBracket, WsTokenKind.EndOfFile
+            },
+            tokens.Select(t => t.Kind));
+        Assert.Empty(diagnostics);
     }
 
     [Theory]
@@ -293,7 +308,7 @@ public sealed class LexerTests
 
     [Theory]
     [InlineData("@")]
-    [InlineData(".")]
+    [InlineData("~")]
     [InlineData("é")]
     [InlineData(" ")]
     [InlineData("\u0001")]

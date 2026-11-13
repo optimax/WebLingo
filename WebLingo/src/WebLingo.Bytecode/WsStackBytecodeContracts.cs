@@ -90,6 +90,17 @@ public enum WsStackOpCode : byte
     ReturnValue,
     /// <summary>Ends the function, giving <c>null</c>.</summary>
     Return,
+    /// <summary>A = constant index of the member's name, a string; pops the target, pushes its member.</summary>
+    GetMember,
+    /// <summary>
+    /// A = constant index of the method's name, a string, B = argument count; pops the arguments, then the target
+    /// below them, and pushes the method's result.
+    /// </summary>
+    CallMethod,
+    /// <summary>Pops the index, then the target; pushes the target's element at the index.</summary>
+    GetIndex,
+    /// <summary>A = 1 to push the value back, 0 not to; pops the value, the index, then the target, and stores it.</summary>
+    StoreIndex,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);

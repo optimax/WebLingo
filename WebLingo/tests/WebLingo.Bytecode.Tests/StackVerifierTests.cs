@@ -83,6 +83,39 @@ public sealed class StackVerifierTests
     }
 
     [Fact]
+    public void MembersAndIndexesHaveTheirStackEffects()
+    {
+        // "abc".length; "abc"[0]; "abc"[0] = "abc", keeping it; "abc".length("abc").
+        var module = new WsStackModule("members", [WsConstant.String("abc"), WsConstant.String("length"), WsConstant.Int64(0)],
+            [], new WsStackFunction("main", 0, 3, [
+                I(WsStackOpCode.LoadConstant, 0), I(WsStackOpCode.GetMember, 1), I(WsStackOpCode.Pop),
+                I(WsStackOpCode.LoadConstant, 0), I(WsStackOpCode.LoadConstant, 2), I(WsStackOpCode.GetIndex), I(WsStackOpCode.Pop),
+                I(WsStackOpCode.LoadConstant, 0), I(WsStackOpCode.LoadConstant, 2), I(WsStackOpCode.LoadConstant, 0),
+                I(WsStackOpCode.StoreIndex, 1), I(WsStackOpCode.Pop),
+                I(WsStackOpCode.LoadConstant, 0), I(WsStackOpCode.LoadConstant, 0), I(WsStackOpCode.CallMethod, 1, 1),
+                I(WsStackOpCode.Pop), I(WsStackOpCode.Return)
+            ]));
+        Assert.Equal(WsVerificationResult.Valid, Verify(module));
+
+        AssertRejected(module with { EntryPoint = module.EntryPoint with { Code = Changed(module, 1, I(WsStackOpCode.GetMember, 2)) } },
+            1, "constant 2 is not a name");
+        AssertRejected(module with { EntryPoint = module.EntryPoint with { Code = Changed(module, 10, I(WsStackOpCode.StoreIndex, 2)) } },
+            10, "not 0 or 1");
+        // Keeping no value leaves nothing for the Pop after it.
+        AssertRejected(module with { EntryPoint = module.EntryPoint with { Code = Changed(module, 10, I(WsStackOpCode.StoreIndex)) } },
+            11, "pops 1 values from a stack of 0");
+        AssertRejected(module with { EntryPoint = module.EntryPoint with { Code = Changed(module, 14, I(WsStackOpCode.CallMethod, 1, 2)) } },
+            14, "pops 3 values from a stack of 2");
+    }
+
+    private static WsStackInstruction[] Changed(WsStackModule module, int at, WsStackInstruction instruction)
+    {
+        var code = module.EntryPoint.Code.ToArray();
+        code[at] = instruction;
+        return code;
+    }
+
+    [Fact]
     public void TooManySlotsAreRejected()
     {
         AssertRejected(Module(locals: 65_000, maxStack: 1_000, I(WsStackOpCode.Return)), -1, "65535 slots");

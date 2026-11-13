@@ -165,6 +165,15 @@ public sealed class WsLowerer
                 return new WsIrCallBuiltin(call.Builtin.Index, LowerArguments(call.Arguments), call.Span);
             case WsBoundCall call:
                 return new WsIrCall(LowerExpression(call.Callee), LowerArguments(call.Arguments), call.Span);
+            case WsBoundIndex index:
+                return new WsIrIndex(LowerExpression(index.Target), LowerExpression(index.Index), index.Span);
+            case WsBoundIndexAssignment element:
+                return new WsIrStoreIndex(LowerExpression(element.Target), LowerExpression(element.Index),
+                    LowerExpression(element.Value), element.Span);
+            case WsBoundMember member:
+                return new WsIrMember(LowerExpression(member.Target), member.Name, member.Span);
+            case WsBoundMethodCall call:
+                return new WsIrCallMethod(LowerExpression(call.Target), call.Name, LowerArguments(call.Arguments), call.Span);
             default:
                 throw new InvalidOperationException($"Cannot lower {expression.GetType().Name}: binding had errors.");
         }

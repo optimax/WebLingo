@@ -61,7 +61,8 @@ public sealed class WsLexer(string source) : IWsLexer
             '*' => WsTokenKind.Star, '/' => WsTokenKind.Slash,
             '=' => WsTokenKind.Equals, ';' => WsTokenKind.Semicolon,
             '(' => WsTokenKind.OpenParen, ')' => WsTokenKind.CloseParen,
-            ',' => WsTokenKind.Comma,
+            ',' => WsTokenKind.Comma, '.' => WsTokenKind.Dot, '[' => WsTokenKind.OpenBracket,
+            ']' => WsTokenKind.CloseBracket,
             _ => WsTokenKind.Bad
         };
         if (kind == WsTokenKind.Bad) return ReadInvalidCharacter(start);

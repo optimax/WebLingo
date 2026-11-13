@@ -52,6 +52,12 @@ public static class WsDiagnosticCodes
     public const string BudgetExceeded = "WS3003";
     /// <summary>An execution stopped because its host cancelled it (proposed).</summary>
     public const string Cancelled = "WS3004";
+    /// <summary>An index outside an array or a string (approved, section 3.6).</summary>
+    public const string IndexOutOfRange = "WS3005";
+    /// <summary>A member a value does not have (approved, section 3.6).</summary>
+    public const string NoSuchMember = "WS3006";
+    /// <summary>A key a map does not have (approved, section 3.6).</summary>
+    public const string NoSuchKey = "WS3007";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WS4001";

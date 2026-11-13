@@ -874,6 +874,15 @@ Proposed central props:
 5. **M0.7.5:** string literals and concatenation. Implemented (12 November 2026), with the first heap objects (§15.2, "Heap").
 6. **M0.7.6:** functions, function values and closures. Implemented (12 November 2026).
 
+**M0.9 parts** (13 November 2026), each landing on its own with its conformance tests, on both VMs (§5.6, "Both VMs, for now"):
+
+1. **M0.9.1:** member access (`x.name`, `x.name(…)`) and indexing (`x[i]`, `x[i] = v`), with strings' `length` and indexing (§3.6). Implemented (13 November 2026), on both VMs.
+2. **M0.9.2:** arrays: literals, indexing, `length`, `push` and `pop`, identity and text.
+3. **M0.9.3:** maps: literals, entries, `has`, `remove`, `length`, keys and text.
+4. **M0.9.4:** `foreach` over arrays, strings and maps, and a benchmark workload of collections.
+5. **M0.9.5:** sets, once how a set is made is decided.
+6. **M0.9.6:** optional access, `x?[k]`, once its details are decided.
+
 **After M0.8** (order approved by the owner, 13 November 2026): M0.9, then M0.10, M0.11 and M0.12, as the table gives them. Each needs syntax, or a format, that this specification does not give yet, which is decided feature by feature before it is built; and each is built on both VMs (§5.6, "Both VMs, for now").
 
 **Immediate next activity:** M0.9's syntax, for the owner's decision, then M0.9. The compiler and both VMs cover M0.6's subset and the language of §3.5, but for `foreach`.
@@ -1153,6 +1162,8 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Host built-ins | The host declares its built-ins (name and arity) to the compiler; they live in a scope around the program's and are not privileged in any way, so a declaration may shadow one (`var write = 1;`) | Approved (12 November 2026) |
 | Functions as values | Functions are values (M0.7.6, §3.5), and so are the host's built-ins (`var w = writeLn;`). Calling a literal is WS2005 at compile time, and calling a built-in or a declared function by its name with the wrong number of arguments is WS2006 at compile time; any other call is checked when it runs, with the same codes. Naming a built-in to assign it is WS3001 | Approved (12 November 2026) |
 | Functions and calls | A function declaration is in scope throughout its block, and its name is a constant (WS2003). A variable a closure captures lives in a cell, which its block makes when it begins and its declaration initializes, so that every closure of it shares it; a `for`'s captured variable gets a new cell, holding the last value, before each step, so that each iteration's closures see their own. A hoisted function that reads such a variable before its declaration has run is WS2004 at run time (approved 13 November 2026, §3.5). `return` outside a function is WS2008. A call pushes a frame onto the VM's own stack, at most 10,000 deep (`WsResourceBudget.MaxCallDepth`, WS3003). A function is written as `function`, and functions are equal only to themselves | Proposed |
+| Members and indexing | From M0.9.1 (§3.6): a point without digits on both sides is a member access's, so `1.` and `.5` are a number and a point, and `5.length` is the integer's member (WS3006). A member is never assigned (`x.length = 1` is WS1007 at compile time) until classes have fields. Calling a member that is not a method (`s.length()`) is WS2005. A method call's target is evaluated before its arguments, and an element assignment's target, then its index, then its value | Proposed |
+| Members and indexing in the bytecode | Register: `GetMember`, `CallMethod` (its target and its arguments in consecutive registers), `GetIndex` and `SetIndex`; stack: `GetMember`, `CallMethod`, `GetIndex` and `StoreIndex`, which may push the value back. A member's name is a string constant, which each VM resolves to a member once, when it loads the module; the semantics are `WsMembers`' (`WebLingo.Runtime`), the same for both VMs | Proposed |
 | Use before declaration | A name used before its declaration, or in its own initializer, means the outer declaration, or is undefined (WS2001, at compile time) if there is none (§3.1) | Approved |
 | Evaluation order | Left to right: operands, then arguments; an assignment evaluates its value before it stores it | Approved (12 November 2026) |
 | Instruction model | An in-memory register instruction model, not WBC (§5.3, §8.4): an operation and up to four integer operands A to D, unused ones 0 (`WsBytecodeContracts.cs`); a module holds its constants (int64 and binary64, kept as IEEE bits), the built-ins it imports by name and arity, and one function, with a source span per instruction and the names of its locals for runtime messages | Approved (12 November 2026) |

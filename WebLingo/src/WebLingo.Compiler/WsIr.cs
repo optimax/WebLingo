@@ -113,6 +113,20 @@ public sealed record WsIrMakeClosure(int Function, WsSourceSpan Span) : WsIrExpr
 
 public sealed record WsIrLoadBuiltin(int Builtin, WsSourceSpan Span) : WsIrExpression(Span);
 
+/// <summary><c>target[index]</c> (specification, section 3.6).</summary>
+public sealed record WsIrIndex(WsIrExpression Target, WsIrExpression Index, WsSourceSpan Span) : WsIrExpression(Span);
+
+/// <summary><c>target[index] = value</c>: the target, the index, then the value, evaluated; its value is the value.</summary>
+public sealed record WsIrStoreIndex(WsIrExpression Target, WsIrExpression Index, WsIrExpression Value, WsSourceSpan Span)
+    : WsIrExpression(Span);
+
+/// <summary><c>target.name</c>, a member read.</summary>
+public sealed record WsIrMember(WsIrExpression Target, string Name, WsSourceSpan Span) : WsIrExpression(Span);
+
+/// <summary><c>target.name(arguments)</c>: the target, then the arguments, evaluated, and the method called.</summary>
+public sealed record WsIrCallMethod(WsIrExpression Target, string Name, IReadOnlyList<WsIrExpression> Arguments, WsSourceSpan Span)
+    : WsIrExpression(Span);
+
 /// <summary>Calls the callee's value, which must be a function taking as many arguments as are given.</summary>
 public sealed record WsIrCall(WsIrExpression Callee, IReadOnlyList<WsIrExpression> Arguments, WsSourceSpan Span)
     : WsIrExpression(Span);

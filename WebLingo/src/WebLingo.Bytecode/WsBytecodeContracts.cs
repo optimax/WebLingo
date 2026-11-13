@@ -83,6 +83,17 @@ public enum WsOpCode : byte
     Jump,
     /// <summary>Ends the function, giving <c>null</c>.</summary>
     Return,
+    /// <summary>A = destination register, B = target register, C = constant index of the member's name, a string.</summary>
+    GetMember,
+    /// <summary>
+    /// A = destination register, B = constant index of the method's name, a string, C = the target's register, with
+    /// the D arguments in the registers after it, D = argument count.
+    /// </summary>
+    CallMethod,
+    /// <summary>A = destination register, B = target register, C = index register.</summary>
+    GetIndex,
+    /// <summary>A = target register, B = index register, C = value register; nothing is written.</summary>
+    SetIndex,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);

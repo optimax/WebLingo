@@ -219,6 +219,13 @@ public sealed class WsBinder
                 return BindAssignment(assignment);
             case WsCallExpressionSyntax call:
                 return BindCall(call);
+            case WsIndexExpressionSyntax index:
+                return new WsBoundIndex(BindExpression(index.Target), BindExpression(index.Index), index.Span);
+            case WsIndexAssignmentSyntax element:
+                return new WsBoundIndexAssignment(BindExpression(element.Target.Target), BindExpression(element.Target.Index),
+                    BindExpression(element.Value), element.Span);
+            case WsMemberAccessSyntax member:
+                return new WsBoundMember(BindExpression(member.Target), member.Name, member.Span);
             case WsFunctionExpressionSyntax function:
                 return new WsBoundFunctionExpression(BindFunction("", function.Parameters, function.Body, function.Span),
                     function.Span);
@@ -296,6 +303,11 @@ public sealed class WsBinder
         var calleeSyntax = call.Callee;
         while (calleeSyntax is WsParenthesizedExpressionSyntax parenthesized) calleeSyntax = parenthesized.Expression;
         if (calleeSyntax is WsErrorExpressionSyntax) return new WsBoundError(call.Span);
+        if (calleeSyntax is WsMemberAccessSyntax member)
+        {
+            // A method, called on its target (specification, section 3.6).
+            return new WsBoundMethodCall(BindExpression(member.Target), member.Name, arguments, call.Span);
+        }
         if (calleeSyntax is WsIntegerLiteralSyntax or WsBinary64LiteralSyntax or WsBooleanLiteralSyntax
             or WsNullLiteralSyntax or WsStringLiteralSyntax)
         {

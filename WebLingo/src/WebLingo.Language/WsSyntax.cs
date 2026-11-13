@@ -109,6 +109,18 @@ public sealed record WsParenthesizedExpressionSyntax(WsExpressionSyntax Expressi
 public sealed record WsAssignmentExpressionSyntax(WsNameSyntax Target, WsExpressionSyntax Value, WsSourceSpan Span)
     : WsExpressionSyntax(Span);
 
+/// <summary><c>target[index]</c>: an element of an array, an entry of a map, or a character of a string (section 3.6).</summary>
+public sealed record WsIndexExpressionSyntax(WsExpressionSyntax Target, WsExpressionSyntax Index, WsSourceSpan Span)
+    : WsExpressionSyntax(Span);
+
+/// <summary><c>target.name</c>: a member of a value (section 3.6); called, <c>target.name(…)</c>, a method.</summary>
+public sealed record WsMemberAccessSyntax(WsExpressionSyntax Target, string Name, WsSourceSpan NameSpan, WsSourceSpan Span)
+    : WsExpressionSyntax(Span);
+
+/// <summary><c>target[index] = value</c>: an element or an entry assigned (section 3.6).</summary>
+public sealed record WsIndexAssignmentSyntax(WsIndexExpressionSyntax Target, WsExpressionSyntax Value, WsSourceSpan Span)
+    : WsExpressionSyntax(Span);
+
 public sealed record WsCallExpressionSyntax(
     WsExpressionSyntax Callee, IReadOnlyList<WsExpressionSyntax> Arguments, WsSourceSpan Span)
     : WsExpressionSyntax(Span);

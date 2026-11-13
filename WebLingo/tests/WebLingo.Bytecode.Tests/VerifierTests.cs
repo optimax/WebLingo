@@ -278,6 +278,33 @@ public sealed class VerifierTests
         AssertRejected(Module(WsFunction.MaxRegisters, 0, code), -1, "too large");
     }
 
+    [Fact]
+    public void MembersAndIndexesAreChecked()
+    {
+        // 0: r0 = "length"; 1: r1 = r0.length; 2: r1 = r0[r1]; 3: r0[r1] = r1; 4: r1 = r0.length(); 5: return.
+        var module = new WsCompiledModule("members", [WsConstant.String("length"), WsConstant.Int64(1)], [],
+            new WsFunction("main", 2, 0, [
+                I(WsOpCode.LoadConstant, 0, 0), I(WsOpCode.GetMember, 1, 0, 0), I(WsOpCode.GetIndex, 1, 0, 1),
+                I(WsOpCode.SetIndex, 0, 1, 1), I(WsOpCode.CallMethod, 1, 0, 0, 0), I(WsOpCode.Return)
+            ]));
+        Assert.Equal(Valid, Verify(module));
+        var code = module.EntryPoint.Code.ToArray();
+
+        AssertRejected(With(module, code, 1, I(WsOpCode.GetMember, 1, 0, 1)), 1, "constant 1 is not a name");
+        AssertRejected(With(module, code, 4, I(WsOpCode.CallMethod, 1, 0, 1, 1)), 4, "registers 1 to 2");
+        AssertRejected(With(module, code, 2, I(WsOpCode.GetIndex, 1, 0, 2)), 2, "index register 2");
+        AssertRejected(With(module, code, 3, I(WsOpCode.SetIndex, 0, 1, 1, 1)), 3, "not 0");
+        // r1 read before it is written: the member read that wrote it is gone.
+        AssertRejected(With(module, code, 1, I(WsOpCode.LoadConstant, 0, 0)), 2, "reads register 1");
+    }
+
+    private static WsCompiledModule With(WsCompiledModule module, WsInstruction[] code, int at, WsInstruction instruction)
+    {
+        var changed = (WsInstruction[])code.Clone();
+        changed[at] = instruction;
+        return module with { EntryPoint = module.EntryPoint with { Code = changed } };
+    }
+
     private static int Operand(Random random) => random.Next(3) switch
     {
         0 => 0,

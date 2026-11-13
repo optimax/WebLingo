@@ -98,6 +98,22 @@ public sealed record WsBoundBuiltinReference(WsBuiltinSymbol Builtin, WsSourceSp
 
 public sealed record WsBoundFunctionExpression(WsBoundFunction Function, WsSourceSpan Span) : WsBoundExpression(Span);
 
+/// <summary><c>target[index]</c>, checked when it runs (specification, section 3.6).</summary>
+public sealed record WsBoundIndex(WsBoundExpression Target, WsBoundExpression Index, WsSourceSpan Span) : WsBoundExpression(Span);
+
+/// <summary><c>target[index] = value</c>, whose value is the value assigned.</summary>
+public sealed record WsBoundIndexAssignment(
+    WsBoundExpression Target, WsBoundExpression Index, WsBoundExpression Value, WsSourceSpan Span)
+    : WsBoundExpression(Span);
+
+/// <summary><c>target.name</c>, a member read, checked when it runs.</summary>
+public sealed record WsBoundMember(WsBoundExpression Target, string Name, WsSourceSpan Span) : WsBoundExpression(Span);
+
+/// <summary><c>target.name(arguments)</c>, a method called, checked when it runs.</summary>
+public sealed record WsBoundMethodCall(
+    WsBoundExpression Target, string Name, IReadOnlyList<WsBoundExpression> Arguments, WsSourceSpan Span)
+    : WsBoundExpression(Span);
+
 /// <summary>A call of any value, checked to be a function, with the right number of arguments, at run time.</summary>
 public sealed record WsBoundCall(WsBoundExpression Callee, IReadOnlyList<WsBoundExpression> Arguments, WsSourceSpan Span)
     : WsBoundExpression(Span);

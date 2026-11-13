@@ -64,6 +64,11 @@ public static class WsDisassembler
             WsOpCode.CallBuiltin => $"CallBuiltin {Register(function, a)}, {Import(module, b)}({Arguments(function, c, d)})",
             WsOpCode.Jump => $"Jump {a}",
             WsOpCode.Return => "Return",
+            WsOpCode.GetMember => $"GetMember {Register(function, a)}, {Register(function, b)}.{Constant(module, c)}",
+            WsOpCode.CallMethod => $"CallMethod {Register(function, a)}, {Register(function, c)}.{Constant(module, b)}" +
+                                   $"({Arguments(function, c + 1, d)})",
+            WsOpCode.GetIndex => $"GetIndex {Register(function, a)}, {Register(function, b)}[{Register(function, c)}]",
+            WsOpCode.SetIndex => $"SetIndex {Register(function, a)}[{Register(function, b)}], {Register(function, c)}",
             _ => $"?{(int)instruction.OpCode} {a}, {b}, {c}, {d}"
         };
     }

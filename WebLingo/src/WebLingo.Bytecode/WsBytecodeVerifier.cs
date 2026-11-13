@@ -179,6 +179,24 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return null;
             case WsOpCode.Return:
                 return Unused(a, b, c, d);
+            case WsOpCode.GetMember:
+                return Register(function, a, "destination") ?? Register(function, b, "target") ?? Name(module, c)
+                    ?? Unused(d);
+            case WsOpCode.CallMethod:
+                if ((Register(function, a, "destination") ?? Name(module, b)) is { } methodError) return methodError;
+                if (d < 0) return $"its argument count, {d}, is negative.";
+                if (c < 0 || c > function.RegisterCount - 1 - d)
+                {
+                    return $"its target and arguments, registers {c} to {(long)c + d}, " +
+                           $"are not all in the function's {function.RegisterCount}.";
+                }
+                return null;
+            case WsOpCode.GetIndex:
+                return Register(function, a, "destination") ?? Register(function, b, "target")
+                    ?? Register(function, c, "index") ?? Unused(d);
+            case WsOpCode.SetIndex:
+                return Register(function, a, "target") ?? Register(function, b, "index") ?? Register(function, c, "value")
+                    ?? Unused(d);
             default:
                 return $"the operation {(int)instruction.OpCode} is unknown.";
         }
@@ -354,6 +372,27 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                     if (argument >= 0) return argument;
                 }
                 return -1;
+            case WsOpCode.GetMember:
+                return Unwritten(instruction.B, state, locals);
+            case WsOpCode.CallMethod:
+                for (var i = 0; i <= instruction.D; i++)
+                {
+                    var operand = Unwritten(instruction.C + i, state, locals);
+                    if (operand >= 0) return operand;
+                }
+                return -1;
+            case WsOpCode.GetIndex:
+            {
+                var target = Unwritten(instruction.B, state, locals);
+                return target >= 0 ? target : Unwritten(instruction.C, state, locals);
+            }
+            case WsOpCode.SetIndex:
+            {
+                var target = Unwritten(instruction.A, state, locals);
+                if (target >= 0) return target;
+                var index = Unwritten(instruction.B, state, locals);
+                return index >= 0 ? index : Unwritten(instruction.C, state, locals);
+            }
             default:
                 return -1;
         }
@@ -375,7 +414,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             or WsOpCode.Not or WsOpCode.Equal or WsOpCode.NotEqual or WsOpCode.Less or WsOpCode.LessOrEqual
             or WsOpCode.Greater or WsOpCode.GreaterOrEqual or WsOpCode.NewCell or WsOpCode.BoxRegister or WsOpCode.CopyCell
             or WsOpCode.LoadCell or WsOpCode.LoadCapture or WsOpCode.MakeClosure or WsOpCode.LoadBuiltin
-            or WsOpCode.Call => instruction.A,
+            or WsOpCode.Call or WsOpCode.GetMember or WsOpCode.CallMethod or WsOpCode.GetIndex => instruction.A,
         _ => null
     };
 
@@ -385,6 +424,11 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         register >= 0 && register < function.RegisterCount
             ? null
             : $"its {role} register {register} is not one of the function's {function.RegisterCount}.";
+
+    /// <summary>A member's name, which must be a string constant.</summary>
+    private static string? Name(WsCompiledModule module, int constant) =>
+        Index(constant, module.Constants.Count, "constant")
+        ?? (module.Constants[constant].Kind == WsConstantKind.String ? null : $"constant {constant} is not a name.");
 
     private static string? Index(int value, int count, string what) =>
         value >= 0 && value < count ? null : $"{what} {value} does not exist (there are {count}).";

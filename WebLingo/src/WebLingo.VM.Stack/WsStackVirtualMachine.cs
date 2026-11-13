@@ -63,12 +63,14 @@ public sealed class WsStackVirtualMachine
         // The execution's own heap (worker-local, section 4.3), whose roots are the constants and the frames.
         var heap = new WsHeap(context.Resources.MaxHeapUnits);
         var constants = new WsValue[module.Constants.Count];
+        var names = new WsMemberName[module.Constants.Count]; // Each string constant as a member's name.
         heap.AddRoots(constants);
         for (var i = 0; i < constants.Length; i++)
         {
             var constant = module.Constants[i];
             if (constant.Kind == WsConstantKind.String)
             {
+                names[i] = new WsMemberName(WsMembers.Find(constant.Text!), constant.Text!);
                 if (!heap.TryAllocateString(constant.Text!, out constants[i], out var error))
                 {
                     return Failure(error!.Code, error.Message, new WsSourceSpan(0, 0));
@@ -83,7 +85,7 @@ public sealed class WsStackVirtualMachine
         var codes = new WsStackInstruction[module.Functions.Count][];
         for (var i = 0; i < codes.Length; i++) codes[i] = ToArray(module.Functions[i].Code);
 
-        return new Execution(module, ToArray(module.EntryPoint.Code), codes, constants, builtins, context, heap).Run();
+        return new Execution(module, ToArray(module.EntryPoint.Code), codes, constants, names, builtins, context, heap).Run();
     }
 
     /// <summary>A copy of the code, without LINQ, which the portable core does not use.</summary>
@@ -114,7 +116,7 @@ public sealed class WsStackVirtualMachine
     }
 
     private sealed class Execution(WsStackModule module, WsStackInstruction[] entryCode, WsStackInstruction[][] codes,
-        WsValue[] constants, IWsBuiltinFunction[] builtins, WsExecutionContext context, WsHeap heap)
+        WsValue[] constants, WsMemberName[] names, IWsBuiltinFunction[] builtins, WsExecutionContext context, WsHeap heap)
     {
         public WsExecutionResult Run()
         {
@@ -430,6 +432,45 @@ public sealed class WsStackVirtualMachine
                             cells = closureCells;
                             sp = function.LocalCount;
                             pc = 0;
+                            continue;
+                        }
+                        case WsStackOpCode.GetMember:
+                        {
+                            var name = names[ins.A];
+                            if (!WsMembers.TryGet(slots[sp - 1], name.Member, name.Text, heap, out var member, out error)) break;
+                            slots[sp - 1] = member;
+                            pc++;
+                            continue;
+                        }
+                        case WsStackOpCode.CallMethod:
+                        {
+                            var name = names[ins.A];
+                            var first = sp - ins.B;
+                            if (!WsMembers.TryCall(slots[first - 1], name.Member, name.Text, slots, first, ins.B, heap,
+                                    out var result, out error))
+                            {
+                                break;
+                            }
+                            sp = first;
+                            slots[sp - 1] = result;
+                            pc++;
+                            continue;
+                        }
+                        case WsStackOpCode.GetIndex:
+                        {
+                            if (!WsMembers.TryGetIndex(slots[sp - 2], slots[sp - 1], heap, out var element, out error)) break;
+                            sp--;
+                            slots[sp - 1] = element;
+                            pc++;
+                            continue;
+                        }
+                        case WsStackOpCode.StoreIndex:
+                        {
+                            var value = slots[sp - 1];
+                            if (!WsMembers.TrySetIndex(slots[sp - 3], slots[sp - 2], value, heap, out error)) break;
+                            sp -= 3;
+                            if (ins.A == 1) slots[sp++] = value;
+                            pc++;
                             continue;
                         }
                         case WsStackOpCode.Return:

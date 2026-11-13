@@ -67,12 +67,14 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         // The execution's own heap (worker-local, section 4.3), whose roots are the constants and the frames.
         var heap = new WsHeap(context.Resources.MaxHeapUnits);
         var constants = new WsValue[module.Constants.Count];
+        var names = new WsMemberName[module.Constants.Count]; // Each string constant as a member's name.
         heap.AddRoots(constants);
         for (var i = 0; i < constants.Length; i++)
         {
             var constant = module.Constants[i];
             if (constant.Kind == WsConstantKind.String)
             {
+                names[i] = new WsMemberName(WsMembers.Find(constant.Text!), constant.Text!);
                 if (!heap.TryAllocateString(constant.Text!, out constants[i], out var error))
                 {
                     return Failure(error!.Code, error.Message, new WsSourceSpan(0, 0));
@@ -88,7 +90,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         var codes = new WsInstruction[module.Functions.Count][];
         for (var i = 0; i < codes.Length; i++) codes[i] = ToArray(module.Functions[i].Code);
 
-        return new Execution(module, ToArray(module.EntryPoint.Code), codes, constants, builtins, context, heap).Run();
+        return new Execution(module, ToArray(module.EntryPoint.Code), codes, constants, names, builtins, context, heap).Run();
     }
 
     /// <summary>A copy of the code, without LINQ, which the portable core does not use.</summary>
@@ -118,7 +120,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
     }
 
     private sealed class Execution(WsCompiledModule module, WsInstruction[] entryCode, WsInstruction[][] codes,
-        WsValue[] constants, IWsBuiltinFunction[] builtins, WsExecutionContext context, WsHeap heap)
+        WsValue[] constants, WsMemberName[] names, IWsBuiltinFunction[] builtins, WsExecutionContext context, WsHeap heap)
     {
         public WsExecutionResult Run()
         {
@@ -403,6 +405,37 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             pc = 0;
                             continue;
                         }
+                        case WsOpCode.GetMember:
+                        {
+                            var name = names[ins.C];
+                            if (!WsMembers.TryGet(registers[ins.B], name.Member, name.Text, heap, out var member, out error)) break;
+                            registers[ins.A] = member;
+                            pc++;
+                            continue;
+                        }
+                        case WsOpCode.CallMethod:
+                        {
+                            var name = names[ins.B];
+                            if (!WsMembers.TryCall(registers[ins.C], name.Member, name.Text, registers, ins.C + 1, ins.D, heap,
+                                    out var result, out error))
+                            {
+                                break;
+                            }
+                            registers[ins.A] = result;
+                            pc++;
+                            continue;
+                        }
+                        case WsOpCode.GetIndex:
+                        {
+                            if (!WsMembers.TryGetIndex(registers[ins.B], registers[ins.C], heap, out var element, out error)) break;
+                            registers[ins.A] = element;
+                            pc++;
+                            continue;
+                        }
+                        case WsOpCode.SetIndex:
+                            if (!WsMembers.TrySetIndex(registers[ins.A], registers[ins.B], registers[ins.C], heap, out error)) break;
+                            pc++;
+                            continue;
                         case WsOpCode.Return:
                         case WsOpCode.ReturnValue:
                         {

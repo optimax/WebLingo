@@ -44,6 +44,12 @@ public sealed class ParserTests
     [InlineData("a <= b >= c > d", "(((a <= b) >= c) > d)")]
     [InlineData("- +a", "(-(+a))")]
     [InlineData("1 + +2", "(1 + (+2))")]
+    [InlineData("-a.b", "(-a.b)")]
+    [InlineData("!a[0]", "(!a[0])")]
+    [InlineData("a.b[c](d).e", "a.b[c](d).e")]
+    [InlineData("a[i + 1] * 2", "(a[(i + 1)] * 2)")]
+    [InlineData("x[i] = y = 2", "(x[i] = (y = 2))")]
+    [InlineData("s.length + 1", "(s.length + 1)")]
     public void OperatorsHaveTheirPrecedenceAndAssociativity(string expression, string expected)
     {
         var tree = Parse(expression + ";");
@@ -167,6 +173,8 @@ public sealed class ParserTests
     [InlineData("(a) = 2;", 0, 3)]
     [InlineData("a + b = 2;", 0, 5)]
     [InlineData("f() = 2;", 0, 3)]
+    [InlineData("a.b = 2;", 0, 3)]
+    [InlineData("(a[0]) = 2;", 0, 6)]
     public void OnlyAVariableCanBeAssigned(string source, int start, int length)
     {
         var diagnostic = Assert.Single(Parse(source).Diagnostics);
@@ -183,6 +191,12 @@ public sealed class ParserTests
     [InlineData("(1 + 2;")]
     [InlineData("1 +;")]
     [InlineData("var x = 1 2;")]
+    [InlineData("a.;")]
+    [InlineData("a.1;")]
+    [InlineData("a.if;")]
+    [InlineData("a[;")]
+    [InlineData("a[1;")]
+    [InlineData("];")]
     public void MalformedStatementsGiveOneDiagnosticEach(string source)
     {
         var diagnostic = Assert.Single(Parse(source).Diagnostics);
@@ -280,6 +294,9 @@ public sealed class ParserTests
         WsParenthesizedExpressionSyntax parenthesized => $"[{Show(parenthesized.Expression)}]",
         WsAssignmentExpressionSyntax assignment => $"({assignment.Target.Name} = {Show(assignment.Value)})",
         WsCallExpressionSyntax call => $"{Show(call.Callee)}({string.Join(", ", call.Arguments.Select(Show))})",
+        WsMemberAccessSyntax member => $"{Show(member.Target)}.{member.Name}",
+        WsIndexExpressionSyntax index => $"{Show(index.Target)}[{Show(index.Index)}]",
+        WsIndexAssignmentSyntax element => $"({Show(element.Target)} = {Show(element.Value)})",
         _ => "?"
     };
 
