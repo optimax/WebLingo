@@ -20,11 +20,25 @@ public sealed class WsBinder
     private FunctionContext _function;
     private Scope _scope;
 
+    /// <summary>The program's function, and a scope around the program's, which holds <c>Object</c> once it is used.</summary>
+    private readonly FunctionContext _main;
+    private readonly Scope _prelude;
+
+    /// <summary>The built-in class <c>Object</c>, bound once a program needs it (section 3.7).</summary>
+    private WsBoundClassDeclaration? _object;
+
+    /// <summary>
+    /// <c>Object</c>, which every class without <c>extends</c> extends: its one method, <c>equal(other)</c>, gives
+    /// <c>this == other</c>, and any class may override it (section 3.7).
+    /// </summary>
+    private const string ObjectSource = "class Object { equal(other) { return this == other; } }";
+
     public WsBinder(WsCompilerOptions options)
     {
         foreach (var builtin in options.Builtins) _hostBuiltins[builtin.Name] = builtin;
-        _function = new FunctionContext(null, "main");
-        _scope = new Scope(null, _function);
+        _function = _main = new FunctionContext(null, "main");
+        _prelude = new Scope(null, _function);
+        _scope = new Scope(_prelude, _function);
     }
 
     private ClassContext? _class;
@@ -40,6 +54,7 @@ public sealed class WsBinder
     public WsBoundProgram Bind(WsCompilationUnitSyntax unit)
     {
         var statements = BindStatements(unit.Statements);
+        if (_object is not null) statements.Insert(0, _object); // Made first, before the program's own classes.
         return new WsBoundProgram(statements, _function.Locals, _builtinsInOrder);
     }
 
@@ -60,10 +75,12 @@ public sealed class WsBinder
         }
         // A class is made when its block begins, so its base is bound there too: it may name the block's classes and
         // functions, and what is declared around the block, but not the block's variables, which have no value yet.
+        // A class without 'extends' extends Object (section 3.7), whatever the name 'Object' means where it is.
         var bases = new Dictionary<WsClassDeclarationSyntax, WsBoundExpression>();
         foreach (var statement in syntax)
         {
-            if (statement is WsClassDeclarationSyntax { Base: { } baseSyntax } derived) bases.Add(derived, BindExpression(baseSyntax));
+            if (statement is not WsClassDeclarationSyntax derived) continue;
+            bases.Add(derived, derived.Base is { } baseSyntax ? BindExpression(baseSyntax) : Reference(UseObject(), derived.NameSpan));
         }
         // A class's static fields are set when it is made, so their values are bound where the block begins too, where
         // 'this' is not the class's (WS2009).
@@ -323,7 +340,8 @@ public sealed class WsBinder
                 continue;
             }
             var isConstructor = method.Name == "constructor";
-            if (isConstructor && hasBase && !method.CallsSuper)
+            // Object's constructor does nothing, so a class that extends it without saying so does not run it.
+            if (isConstructor && declaration.Base is not null && !method.CallsSuper)
             {
                 var span = new WsSourceSpan(method.Body.Span.Start, 0);
                 var superCall = new WsExpressionStatementSyntax(new WsCallExpressionSyntax(new WsSuperSyntax(span), [], span), span);
@@ -653,7 +671,25 @@ public sealed class WsBinder
         {
             if (scope.Locals.TryGetValue(name, out var local)) return local;
         }
-        return null;
+        return name == "Object" ? UseObject() : null;
+    }
+
+    /// <summary>
+    /// The built-in class <c>Object</c>: a local of the program, in a scope around the program's, so that a program may
+    /// declare a name <c>Object</c> of its own; bound, and made where the program begins, once something uses it.
+    /// </summary>
+    private WsLocalSymbol UseObject()
+    {
+        if (_object is not null) return _object.Local;
+        var local = new WsLocalSymbol("Object", WsDeclarationKind.Class, _main.Locals.Count, default, _main);
+        _main.Locals.Add(local);
+        _prelude.Locals.Add("Object", local);
+        var syntax = (WsClassDeclarationSyntax)new WsParser(ObjectSource, "Object").ParseCompilationUnit().Root.Statements[0];
+        var (outerScope, outerFunction, outerClass) = (_scope, _function, _class);
+        (_scope, _function) = (_prelude, _main);
+        _object = new WsBoundClassDeclaration(local, BindClass(syntax, local, null, []), default);
+        (_scope, _function, _class) = (outerScope, outerFunction, outerClass);
+        return local;
     }
 
     private void Report(string code, string message, WsSourceSpan span) =>
