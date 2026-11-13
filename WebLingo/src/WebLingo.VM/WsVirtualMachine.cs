@@ -123,6 +123,42 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                 case WsOpCode.Jump:
                     pc = instruction.A;
                     continue;
+                case WsOpCode.LoadNull:
+                    registers[instruction.A] = WsValue.Null;
+                    break;
+                case WsOpCode.LoadBoolean:
+                    registers[instruction.A] = WsValue.FromBoolean(instruction.B != 0);
+                    break;
+                case WsOpCode.Not:
+                    if (WsOperators.TryNot(registers[instruction.B], out var not, out error)) registers[instruction.A] = not;
+                    break;
+                case WsOpCode.Equal:
+                case WsOpCode.NotEqual:
+                case WsOpCode.Less:
+                case WsOpCode.LessOrEqual:
+                case WsOpCode.Greater:
+                case WsOpCode.GreaterOrEqual:
+                    if (WsOperators.TryCompare(ComparisonOf(instruction.OpCode), registers[instruction.B],
+                            registers[instruction.C], out var compared, out error))
+                    {
+                        registers[instruction.A] = compared;
+                    }
+                    break;
+                case WsOpCode.JumpIfFalse:
+                case WsOpCode.JumpIfTrue:
+                {
+                    var condition = registers[instruction.A];
+                    error = WsOperators.CheckBoolean(condition, "A condition");
+                    if (error is null && condition.AsBoolean == (instruction.OpCode == WsOpCode.JumpIfTrue))
+                    {
+                        pc = instruction.B;
+                        continue;
+                    }
+                    break;
+                }
+                case WsOpCode.CheckBoolean:
+                    error = WsOperators.CheckBoolean(registers[instruction.A], "'&&' and '||' need Booleans:");
+                    break;
                 case WsOpCode.Return:
                     return WsExecutionResult.Success;
                 default:
@@ -165,6 +201,16 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         WsOpCode.Subtract => WsArithmeticOperator.Subtract,
         WsOpCode.Multiply => WsArithmeticOperator.Multiply,
         _ => WsArithmeticOperator.Divide
+    };
+
+    private static WsComparisonOperator ComparisonOf(WsOpCode opCode) => opCode switch
+    {
+        WsOpCode.Equal => WsComparisonOperator.Equal,
+        WsOpCode.NotEqual => WsComparisonOperator.NotEqual,
+        WsOpCode.Less => WsComparisonOperator.Less,
+        WsOpCode.LessOrEqual => WsComparisonOperator.LessOrEqual,
+        WsOpCode.Greater => WsComparisonOperator.Greater,
+        _ => WsComparisonOperator.GreaterOrEqual
     };
 
     private static WsSourceSpan SpanOf(WsFunction function, int pc) =>

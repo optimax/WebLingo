@@ -3,6 +3,8 @@ namespace WebLingo.Runtime;
 
 public enum WsArithmeticOperator { Add, Subtract, Multiply, Divide }
 
+public enum WsComparisonOperator { Equal, NotEqual, Less, LessOrEqual, Greater, GreaterOrEqual }
+
 /// <summary>
 /// The arithmetic of runtime values, the same for every VM and every host. Integer arithmetic is checked: a result
 /// outside int64 is an error (WS3002), never a wrap (section 3.2). <c>/</c> gives a binary64 even for two integers
@@ -43,6 +45,99 @@ public static class WsOperators
         });
         return true;
     }
+
+    /// <summary>
+    /// <c>==</c> and <c>!=</c> never fail and never convert, except that an int64 and a binary64 compare as numbers,
+    /// exactly; <c>&lt; &lt;= &gt; &gt;=</c> take numbers only (specification, section 3.5). NaN is unordered, and
+    /// unequal even to itself.
+    /// </summary>
+    public static bool TryCompare(WsComparisonOperator op, WsValue left, WsValue right, out WsValue result,
+        out WsRuntimeError? error)
+    {
+        error = null;
+        if (op is WsComparisonOperator.Equal or WsComparisonOperator.NotEqual)
+        {
+            var equal = AreEqual(left, right);
+            result = WsValue.FromBoolean(op == WsComparisonOperator.Equal ? equal : !equal);
+            return true;
+        }
+        result = WsValue.Null;
+        if (!IsNumber(left) || !IsNumber(right))
+        {
+            var bad = IsNumber(left) ? right : left;
+            error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                $"'{Symbol(op)}' compares numbers, not {WsValueFormatter.Describe(bad)}.");
+            return false;
+        }
+        var order = Compare(left, right);
+        result = WsValue.FromBoolean(order is { } o && op switch
+        {
+            WsComparisonOperator.Less => o < 0,
+            WsComparisonOperator.LessOrEqual => o <= 0,
+            WsComparisonOperator.Greater => o > 0,
+            _ => o >= 0
+        });
+        return true;
+    }
+
+    /// <summary><c>!</c>: the opposite of a Boolean; anything else is an error.</summary>
+    public static bool TryNot(WsValue operand, out WsValue result, out WsRuntimeError? error)
+    {
+        error = CheckBoolean(operand, "'!'");
+        result = error is null ? WsValue.FromBoolean(!operand.AsBoolean) : WsValue.Null;
+        return error is null;
+    }
+
+    /// <summary>An error unless the value is a Boolean: conditions and logical operands have no truthiness.</summary>
+    public static WsRuntimeError? CheckBoolean(WsValue value, string what) =>
+        value.Kind == WsValueKind.Boolean
+            ? null
+            : new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                $"{what} needs a Boolean, not {WsValueFormatter.Describe(value)}.");
+
+    private static bool AreEqual(WsValue left, WsValue right)
+    {
+        if (IsNumber(left) && IsNumber(right)) return Compare(left, right) == 0;
+        return left.Kind == right.Kind && (left.Kind == WsValueKind.Null || left.AsBoolean == right.AsBoolean);
+    }
+
+    private static bool IsNumber(WsValue value) => value.Kind is WsValueKind.Int64 or WsValueKind.Binary64;
+
+    /// <summary>The order of two numbers, exact even between an int64 and a binary64; null if either is NaN.</summary>
+    private static int? Compare(WsValue left, WsValue right)
+    {
+        if (left.Kind == WsValueKind.Int64 && right.Kind == WsValueKind.Int64) return left.AsInt64.CompareTo(right.AsInt64);
+        if (left.Kind == WsValueKind.Binary64 && right.Kind == WsValueKind.Binary64)
+        {
+            var (x, y) = (left.AsBinary64, right.AsBinary64);
+            if (double.IsNaN(x) || double.IsNaN(y)) return null;
+            return x < y ? -1 : x > y ? 1 : 0;
+        }
+        return left.Kind == WsValueKind.Int64
+            ? CompareInt64WithBinary64(left.AsInt64, right.AsBinary64)
+            : -CompareInt64WithBinary64(right.AsInt64, left.AsBinary64);
+    }
+
+    private static int? CompareInt64WithBinary64(long a, double b)
+    {
+        if (double.IsNaN(b)) return null;
+        if (b >= 9223372036854775808.0) return -1; // 2^63: above every int64.
+        if (b < -9223372036854775808.0) return 1;
+        var whole = Math.Truncate(b);
+        var integral = (long)whole;
+        if (a != integral) return a < integral ? -1 : 1;
+        return b > whole ? -1 : b < whole ? 1 : 0;
+    }
+
+    private static string Symbol(WsComparisonOperator op) => op switch
+    {
+        WsComparisonOperator.Equal => "==",
+        WsComparisonOperator.NotEqual => "!=",
+        WsComparisonOperator.Less => "<",
+        WsComparisonOperator.LessOrEqual => "<=",
+        WsComparisonOperator.Greater => ">",
+        _ => ">="
+    };
 
     /// <summary>Unary <c>+</c>: the operand itself, which must be a number.</summary>
     public static bool TryPlus(WsValue operand, out WsValue result, out WsRuntimeError? error)

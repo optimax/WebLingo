@@ -28,6 +28,17 @@ public sealed record WsIrInt64Constant(long Value, WsSourceSpan Span) : WsIrExpr
 
 public sealed record WsIrBinary64Constant(double Value, WsSourceSpan Span) : WsIrExpression(Span);
 
+public sealed record WsIrBooleanConstant(bool Value, WsSourceSpan Span) : WsIrExpression(Span);
+
+public sealed record WsIrNullConstant(WsSourceSpan Span) : WsIrExpression(Span);
+
+/// <summary>
+/// <c>&amp;&amp;</c> (<paramref name="IsAnd"/>) or <c>||</c>: the left operand, which must be a Boolean, and only if it
+/// does not decide the result, the right one, which must be a Boolean too.
+/// </summary>
+public sealed record WsIrLogical(bool IsAnd, WsIrExpression Left, WsIrExpression Right, WsSourceSpan Span)
+    : WsIrExpression(Span);
+
 /// <summary>Reads a local.</summary>
 public sealed record WsIrLoadLocal(int Local, WsSourceSpan Span) : WsIrExpression(Span);
 

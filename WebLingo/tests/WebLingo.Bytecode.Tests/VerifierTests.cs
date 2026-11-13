@@ -138,6 +138,30 @@ public sealed class VerifierTests
     }
 
     [Fact]
+    public void ATemporaryWrittenOnlyWhenAConditionHoldsIsRejected()
+    {
+        // 0: r0 = true; 1: if !r0 goto 3; 2: r1 = c0; 3: r2 = -r1; 4: return.
+        AssertRejected(Module(registers: 3, locals: 0,
+            I(WsOpCode.LoadBoolean, 0, 1), I(WsOpCode.JumpIfFalse, 0, 3), I(WsOpCode.LoadConstant, 1, 0),
+            I(WsOpCode.Negate, 2, 1), I(WsOpCode.Return)), 3, "every path");
+    }
+
+    [Fact]
+    public void AConditionMustBeWrittenBeforeItIsTested()
+    {
+        AssertRejected(Module(registers: 1, locals: 0, I(WsOpCode.JumpIfTrue, 0, 1), I(WsOpCode.Return)), 0, "register 0");
+    }
+
+    [Theory]
+    [InlineData(WsOpCode.JumpIfFalse, 0, 2)]
+    [InlineData(WsOpCode.JumpIfTrue, 0, -1)]
+    [InlineData(WsOpCode.LoadBoolean, 0, 2)]
+    public void BadConditionalOperandsAreRejected(WsOpCode opCode, int a, int b)
+    {
+        AssertRejected(Module(registers: 1, locals: 0, I(opCode, a, b), I(WsOpCode.Return)), 0, "");
+    }
+
+    [Fact]
     public void ALoopTerminatesVerification()
     {
         // 0: r1 = c0; 1: r1 = -r1; 2: jump 1. An endless loop, but a valid one.

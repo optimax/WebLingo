@@ -1,3 +1,4 @@
+using WebLingo.Language;
 namespace WebLingo.Compiler;
 
 /// <summary>
@@ -42,6 +43,13 @@ public static class WsLowerer
                 return new WsIrInt64Constant(literal.Value, literal.Span);
             case WsBoundBinary64Literal literal:
                 return new WsIrBinary64Constant(literal.Value, literal.Span);
+            case WsBoundBooleanLiteral literal:
+                return new WsIrBooleanConstant(literal.Value, literal.Span);
+            case WsBoundNullLiteral literal:
+                return new WsIrNullConstant(literal.Span);
+            case WsBoundBinary { Operator: WsBinaryOperator.And or WsBinaryOperator.Or } logical:
+                return new WsIrLogical(logical.Operator == WsBinaryOperator.And, LowerExpression(logical.Left),
+                    LowerExpression(logical.Right), logical.Span);
             case WsBoundLocalReference reference:
                 return new WsIrLoadLocal(reference.Local.Index, reference.Span);
             case WsBoundUnary unary:

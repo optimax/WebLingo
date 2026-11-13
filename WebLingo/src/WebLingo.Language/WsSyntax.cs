@@ -35,14 +35,26 @@ public sealed record WsIntegerLiteralSyntax(long Value, WsSourceSpan Span) : WsE
 /// <summary>A binary64 literal: <c>1.5</c>, <c>1e21</c>, or the keyword <c>Infinity</c> or <c>NaN</c>.</summary>
 public sealed record WsBinary64LiteralSyntax(double Value, WsSourceSpan Span) : WsExpressionSyntax(Span);
 
+/// <summary><c>true</c> or <c>false</c>.</summary>
+public sealed record WsBooleanLiteralSyntax(bool Value, WsSourceSpan Span) : WsExpressionSyntax(Span);
+
+public sealed record WsNullLiteralSyntax(WsSourceSpan Span) : WsExpressionSyntax(Span);
+
 public sealed record WsNameSyntax(string Name, WsSourceSpan Span) : WsExpressionSyntax(Span);
 
-public enum WsUnaryOperator { Negate, Plus }
+public enum WsUnaryOperator { Negate, Plus, Not }
 
 public sealed record WsUnaryExpressionSyntax(WsUnaryOperator Operator, WsExpressionSyntax Operand, WsSourceSpan Span)
     : WsExpressionSyntax(Span);
 
-public enum WsBinaryOperator { Add, Subtract, Multiply, Divide }
+public enum WsBinaryOperator
+{
+    Add, Subtract, Multiply, Divide, Equal, NotEqual, Less, LessOrEqual, Greater, GreaterOrEqual,
+    /// <summary><c>&amp;&amp;</c>, which evaluates its right operand only when the left one is true.</summary>
+    And,
+    /// <summary><c>||</c>, which evaluates its right operand only when the left one is false.</summary>
+    Or
+}
 
 public sealed record WsBinaryExpressionSyntax(
     WsBinaryOperator Operator, WsExpressionSyntax Left, WsExpressionSyntax Right, WsSourceSpan OperatorSpan,

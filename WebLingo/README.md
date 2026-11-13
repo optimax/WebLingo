@@ -6,7 +6,7 @@ The intended project domain is `weblingo.dev`.
 
 ## What runs
 
-M0.6 compiles and runs `.ws` scripts made of `var` and `const` declarations, integer and binary64 literals (`10`, `1.5`, `1e21`, and the keywords `Infinity` and `NaN`), `+ - * /` (where `/` gives a binary64: `10 / 2` is `5.0`), parentheses, assignment, unary `+` and `-`, and the built-ins `write` (the value as text) and `writeLn` (the same, then a line break):
+M0.6 compiles and runs `.ws` scripts made of `var` and `const` declarations, integer and binary64 literals (`10`, `1.5`, `1e21`, and the keywords `Infinity` and `NaN`), `+ - * /` (where `/` gives a binary64: `10 / 2` is `5.0`), parentheses, assignment, unary `+`, `-` and `!`, `true`, `false` and `null`, the comparisons `== != < <= > >=`, `&&` and `||`, blocks `{ … }`, and the built-ins `write` (the value as text) and `writeLn` (the same, then a line break):
 
 ```javascript
 var a = 10;

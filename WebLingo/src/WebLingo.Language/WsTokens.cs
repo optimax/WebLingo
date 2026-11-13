@@ -4,7 +4,8 @@ namespace WebLingo.Language;
 public enum WsTokenKind
 {
     EndOfFile, Bad, Identifier, IntegerLiteral, Binary64Literal, StringLiteral,
-    Var, Const, Let, Infinity, NaN, Plus, Minus, Star, Slash, Equals, Semicolon,
+    Var, Const, Let, Infinity, NaN, True, False, Null, Plus, Minus, Star, Slash, Equals, Semicolon,
+    EqualEqual, BangEqual, Less, LessEqual, Greater, GreaterEqual, Bang, AmpAmp, PipePipe,
     OpenParen, CloseParen, OpenBrace, CloseBrace, Comma
 }
 

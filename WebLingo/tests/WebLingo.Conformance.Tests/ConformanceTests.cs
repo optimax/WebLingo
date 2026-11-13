@@ -59,9 +59,36 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var x = 1; { x = 3; } writeLn(x);", "3")]
     [InlineData("{ var y = 4; { writeLn(y * y); } }", "16")]
     [InlineData("{} { { } }", "")]
+    [InlineData("writeLn(true); writeLn(false); writeLn(null);", "true\nfalse\nnull")]
+    [InlineData("writeLn(1 == 1.0); writeLn(1 != 1); writeLn(NaN == NaN); writeLn(NaN != NaN);", "true\nfalse\nfalse\ntrue")]
+    [InlineData("writeLn(null == null); writeLn(null == false); writeLn(0 == false); writeLn(true == true);", "true\nfalse\nfalse\ntrue")]
+    [InlineData("writeLn(1 < 2); writeLn(2 <= 2); writeLn(3 > 4); writeLn(4 >= 4.5); writeLn(1 < NaN);", "true\ntrue\nfalse\nfalse\nfalse")]
+    [InlineData("writeLn(9007199254740993 == 9007199254740992.0);", "false")]
+    [InlineData("writeLn(9007199254740993 > 9007199254740992.0);", "true")]
+    [InlineData("writeLn(9223372036854775807 < 9223372036854775808.0);", "true")]
+    [InlineData("writeLn(!true); writeLn(!(1 > 2));", "false\ntrue")]
+    [InlineData("writeLn(true && false); writeLn(true || false); writeLn(false || false && true);", "false\ntrue\nfalse")]
+    [InlineData("writeLn(1 + 2 == 3 && 2 * 2 > 3);", "true")]
+    [InlineData("var hit = 0; writeLn(false && (hit = 1) == 1); writeLn(true || (hit = 2) == 2); writeLn(hit);", "false\ntrue\n0")]
+    [InlineData("var x = true; var y = false; x = y && x; writeLn(x);", "false")]
+    [InlineData("var x = false; x = true || x; writeLn(x);", "true")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
+    }
+
+    [Theory]
+    [InlineData("writeLn(1 && true);")]
+    [InlineData("writeLn(true && 1);")]
+    [InlineData("writeLn(false || null);")]
+    [InlineData("writeLn(!0);")]
+    [InlineData("writeLn(1 < true);")]
+    [InlineData("writeLn(null >= 0);")]
+    public void BooleansAndNumbersDoNotMix(string source)
+    {
+        var (exit, _, error) = Weblingo("run", source);
+        Assert.Equal(WsCommandLine.RuntimeFailed, exit);
+        Assert.Contains("error WS3001:", error);
     }
 
     [Fact]

@@ -34,6 +34,14 @@ public sealed class ParserTests
     [InlineData("f(1)(2)", "f(1)(2)")]
     [InlineData("-f(1)", "(-f(1))")]
     [InlineData("+2 * 3", "((+2) * 3)")]
+    [InlineData("a || b && c", "(a || (b && c))")]
+    [InlineData("a && b || c", "((a && b) || c)")]
+    [InlineData("a == b < c", "(a == (b < c))")]
+    [InlineData("a < b + 1", "(a < (b + 1))")]
+    [InlineData("a != b == c", "((a != b) == c)")]
+    [InlineData("x = a || b", "(x = (a || b))")]
+    [InlineData("!a && !b", "((!a) && (!b))")]
+    [InlineData("a <= b >= c > d", "(((a <= b) >= c) > d)")]
     [InlineData("- +a", "(-(+a))")]
     [InlineData("1 + +2", "(1 + (+2))")]
     public void OperatorsHaveTheirPrecedenceAndAssociativity(string expression, string expected)
@@ -256,7 +264,7 @@ public sealed class ParserTests
     {
         WsIntegerLiteralSyntax literal => literal.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
         WsNameSyntax name => name.Name,
-        WsUnaryExpressionSyntax unary => $"({(unary.Operator == WsUnaryOperator.Negate ? "-" : "+")}{Show(unary.Operand)})",
+        WsUnaryExpressionSyntax unary => $"({UnarySymbol(unary.Operator)}{Show(unary.Operand)})",
         WsBinaryExpressionSyntax binary => $"({Show(binary.Left)} {Symbol(binary.Operator)} {Show(binary.Right)})",
         WsParenthesizedExpressionSyntax parenthesized => $"[{Show(parenthesized.Expression)}]",
         WsAssignmentExpressionSyntax assignment => $"({assignment.Target.Name} = {Show(assignment.Value)})",
@@ -264,11 +272,26 @@ public sealed class ParserTests
         _ => "?"
     };
 
+    private static string UnarySymbol(WsUnaryOperator op) => op switch
+    {
+        WsUnaryOperator.Negate => "-",
+        WsUnaryOperator.Plus => "+",
+        _ => "!"
+    };
+
     private static string Symbol(WsBinaryOperator op) => op switch
     {
         WsBinaryOperator.Add => "+",
         WsBinaryOperator.Subtract => "-",
         WsBinaryOperator.Multiply => "*",
-        _ => "/"
+        WsBinaryOperator.Divide => "/",
+        WsBinaryOperator.Equal => "==",
+        WsBinaryOperator.NotEqual => "!=",
+        WsBinaryOperator.Less => "<",
+        WsBinaryOperator.LessOrEqual => "<=",
+        WsBinaryOperator.Greater => ">",
+        WsBinaryOperator.GreaterOrEqual => ">=",
+        WsBinaryOperator.And => "&&",
+        _ => "||"
     };
 }

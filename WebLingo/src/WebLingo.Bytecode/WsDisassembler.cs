@@ -32,6 +32,14 @@ public static class WsDisassembler
             WsOpCode.Move => $"Move {Register(function, a)}, {Register(function, b)}",
             WsOpCode.Negate => $"Negate {Register(function, a)}, {Register(function, b)}",
             WsOpCode.Plus => $"Plus {Register(function, a)}, {Register(function, b)}",
+            WsOpCode.Not => $"Not {Register(function, a)}, {Register(function, b)}",
+            WsOpCode.LoadNull => $"LoadNull {Register(function, a)}",
+            WsOpCode.LoadBoolean => $"LoadBoolean {Register(function, a)}, {(b == 0 ? "false" : "true")}",
+            WsOpCode.Equal or WsOpCode.NotEqual or WsOpCode.Less or WsOpCode.LessOrEqual or WsOpCode.Greater
+                or WsOpCode.GreaterOrEqual =>
+                $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
+            WsOpCode.JumpIfFalse or WsOpCode.JumpIfTrue => $"{instruction.OpCode} {Register(function, a)}, {b:D2}",
+            WsOpCode.CheckBoolean => $"CheckBoolean {Register(function, a)}",
             WsOpCode.Add or WsOpCode.Subtract or WsOpCode.Multiply or WsOpCode.Divide =>
                 $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
             WsOpCode.CallBuiltin => $"CallBuiltin {Register(function, a)}, {Import(module, b)}({Arguments(function, c, d)})",

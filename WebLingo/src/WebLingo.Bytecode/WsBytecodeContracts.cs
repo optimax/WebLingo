@@ -30,6 +30,30 @@ public enum WsOpCode : byte
     Divide,
     /// <summary>A = destination register, B = import index, C = first argument register, D = argument count.</summary>
     CallBuiltin,
+    /// <summary>A = destination register; null.</summary>
+    LoadNull,
+    /// <summary>A = destination register, B = 0 for false or 1 for true.</summary>
+    LoadBoolean,
+    /// <summary>A = destination register, B = operand register, which must be a Boolean.</summary>
+    Not,
+    /// <summary>A = destination register, B = left register, C = right register; a Boolean, never an error.</summary>
+    Equal,
+    /// <summary>A = destination register, B = left register, C = right register; a Boolean, never an error.</summary>
+    NotEqual,
+    /// <summary>A = destination register, B = left register, C = right register, both numbers; a Boolean.</summary>
+    Less,
+    /// <summary>A = destination register, B = left register, C = right register, both numbers; a Boolean.</summary>
+    LessOrEqual,
+    /// <summary>A = destination register, B = left register, C = right register, both numbers; a Boolean.</summary>
+    Greater,
+    /// <summary>A = destination register, B = left register, C = right register, both numbers; a Boolean.</summary>
+    GreaterOrEqual,
+    /// <summary>A = condition register, which must be a Boolean, B = target instruction, taken if it is false.</summary>
+    JumpIfFalse,
+    /// <summary>A = condition register, which must be a Boolean, B = target instruction, taken if it is true.</summary>
+    JumpIfTrue,
+    /// <summary>A = register, which must be a Boolean; nothing is written.</summary>
+    CheckBoolean,
     /// <summary>A = the index of the instruction to go to.</summary>
     Jump,
     /// <summary>Ends the function.</summary>

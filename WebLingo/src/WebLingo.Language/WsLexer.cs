@@ -41,8 +41,21 @@ public sealed class WsLexer(string source) : IWsLexer
         var c = source[start];
         if (IsIdentifierStart(c)) return ReadIdentifierOrKeyword(start);
         if (IsDigit(c)) return ReadNumericLiteral(start);
+        var pair = (c, start + 1 < source.Length ? source[start + 1] : '\0') switch
+        {
+            ('=', '=') => WsTokenKind.EqualEqual, ('!', '=') => WsTokenKind.BangEqual,
+            ('<', '=') => WsTokenKind.LessEqual, ('>', '=') => WsTokenKind.GreaterEqual,
+            ('&', '&') => WsTokenKind.AmpAmp, ('|', '|') => WsTokenKind.PipePipe,
+            _ => WsTokenKind.Bad
+        };
+        if (pair != WsTokenKind.Bad)
+        {
+            _position += 2;
+            return Token(pair, start);
+        }
         var kind = c switch
         {
+            '<' => WsTokenKind.Less, '>' => WsTokenKind.Greater, '!' => WsTokenKind.Bang,
             '{' => WsTokenKind.OpenBrace, '}' => WsTokenKind.CloseBrace, '+' => WsTokenKind.Plus, '-' => WsTokenKind.Minus,
             '*' => WsTokenKind.Star, '/' => WsTokenKind.Slash,
             '=' => WsTokenKind.Equals, ';' => WsTokenKind.Semicolon,
@@ -103,6 +116,9 @@ public sealed class WsLexer(string source) : IWsLexer
             "let" => WsTokenKind.Let, // Reserved: never a declaration keyword (WS-002.3).
             "Infinity" => WsTokenKind.Infinity,
             "NaN" => WsTokenKind.NaN,
+            "true" => WsTokenKind.True,
+            "false" => WsTokenKind.False,
+            "null" => WsTokenKind.Null,
             _ => WsTokenKind.Identifier
         };
         return new WsToken(kind, text, new WsSourceSpan(start, _position - start));

@@ -38,6 +38,29 @@ public sealed class LexerTests
     }
 
     [Fact]
+    public void RecognizesComparisonAndLogicalOperators()
+    {
+        Assert.Equal(
+            new[] {
+                WsTokenKind.EqualEqual, WsTokenKind.BangEqual, WsTokenKind.Less, WsTokenKind.LessEqual, WsTokenKind.Greater,
+                WsTokenKind.GreaterEqual, WsTokenKind.Bang, WsTokenKind.AmpAmp, WsTokenKind.PipePipe, WsTokenKind.Equals,
+                WsTokenKind.True, WsTokenKind.False, WsTokenKind.Null, WsTokenKind.EndOfFile
+            },
+            Kinds("== != < <= > >= ! && || = true false null", out var diagnostics));
+        Assert.Empty(diagnostics);
+        Assert.Equal(new[] { WsTokenKind.EqualEqual, WsTokenKind.Equals, WsTokenKind.EndOfFile }, Kinds("===", out _));
+    }
+
+    [Theory]
+    [InlineData("&")]
+    [InlineData("|")]
+    public void ASingleAmpersandOrBarIsInvalid(string text)
+    {
+        Assert.Equal(new[] { WsTokenKind.Bad, WsTokenKind.EndOfFile }, Kinds(text, out var diagnostics));
+        Assert.Equal(WsDiagnosticCodes.InvalidCharacter, Assert.Single(diagnostics).Code);
+    }
+
+    [Fact]
     public void TokensNeedNoSpaceBetweenThem()
     {
         Assert.Equal(

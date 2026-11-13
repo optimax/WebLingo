@@ -185,7 +185,7 @@ public sealed class WsParser : IWsParser
 
     private WsExpressionSyntax ParseAssignment()
     {
-        var left = ParseAdditive();
+        var left = ParseOr();
         if (Current.Kind != WsTokenKind.Equals) return left;
         var equals = Advance();
         var value = ParseExpression();
@@ -198,6 +198,42 @@ public sealed class WsParser : IWsParser
         }
         return new WsErrorExpressionSyntax(span);
     }
+
+    private WsExpressionSyntax ParseOr() => ParseLeftAssociative(ParseAnd, WsTokenKind.PipePipe);
+
+    private WsExpressionSyntax ParseAnd() => ParseLeftAssociative(ParseEquality, WsTokenKind.AmpAmp);
+
+    private WsExpressionSyntax ParseEquality() =>
+        ParseLeftAssociative(ParseRelational, WsTokenKind.EqualEqual, WsTokenKind.BangEqual);
+
+    private WsExpressionSyntax ParseRelational() =>
+        ParseLeftAssociative(ParseAdditive, WsTokenKind.Less, WsTokenKind.LessEqual, WsTokenKind.Greater,
+            WsTokenKind.GreaterEqual);
+
+    /// <summary>One level of left-associative binary operators (specification, section 3.5, "Precedence").</summary>
+    private WsExpressionSyntax ParseLeftAssociative(Func<WsExpressionSyntax> operand, params WsTokenKind[] operators)
+    {
+        var left = operand();
+        while (Array.IndexOf(operators, Current.Kind) >= 0)
+        {
+            var op = Advance();
+            var right = operand();
+            left = new WsBinaryExpressionSyntax(BinaryOperatorOf(op.Kind), left, right, op.Span, Between(left.Span, right.Span));
+        }
+        return left;
+    }
+
+    private static WsBinaryOperator BinaryOperatorOf(WsTokenKind kind) => kind switch
+    {
+        WsTokenKind.PipePipe => WsBinaryOperator.Or,
+        WsTokenKind.AmpAmp => WsBinaryOperator.And,
+        WsTokenKind.EqualEqual => WsBinaryOperator.Equal,
+        WsTokenKind.BangEqual => WsBinaryOperator.NotEqual,
+        WsTokenKind.Less => WsBinaryOperator.Less,
+        WsTokenKind.LessEqual => WsBinaryOperator.LessOrEqual,
+        WsTokenKind.Greater => WsBinaryOperator.Greater,
+        _ => WsBinaryOperator.GreaterOrEqual
+    };
 
     private WsExpressionSyntax ParseAdditive()
     {
@@ -227,13 +263,18 @@ public sealed class WsParser : IWsParser
 
     private WsExpressionSyntax ParseUnary()
     {
-        if (Current.Kind is not (WsTokenKind.Minus or WsTokenKind.Plus)) return ParseCall();
+        if (Current.Kind is not (WsTokenKind.Minus or WsTokenKind.Plus or WsTokenKind.Bang)) return ParseCall();
         if (!EnterRecursion()) return new WsErrorExpressionSyntax(new WsSourceSpan(Current.Span.Start, 0));
         try
         {
             var sign = Advance();
             var operand = ParseUnary();
-            var kind = sign.Kind == WsTokenKind.Minus ? WsUnaryOperator.Negate : WsUnaryOperator.Plus;
+            var kind = sign.Kind switch
+            {
+                WsTokenKind.Minus => WsUnaryOperator.Negate,
+                WsTokenKind.Plus => WsUnaryOperator.Plus,
+                _ => WsUnaryOperator.Not
+            };
             return new WsUnaryExpressionSyntax(kind, operand, Between(sign.Span, operand.Span));
         }
         finally
@@ -275,6 +316,12 @@ public sealed class WsParser : IWsParser
             case WsTokenKind.Binary64Literal:
                 Advance();
                 return new WsBinary64LiteralSyntax(token.Binary64Value, token.Span);
+            case WsTokenKind.True or WsTokenKind.False:
+                Advance();
+                return new WsBooleanLiteralSyntax(token.Kind == WsTokenKind.True, token.Span);
+            case WsTokenKind.Null:
+                Advance();
+                return new WsNullLiteralSyntax(token.Span);
             case WsTokenKind.Infinity:
                 Advance();
                 return new WsBinary64LiteralSyntax(double.PositiveInfinity, token.Span);

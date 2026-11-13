@@ -95,6 +95,27 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return null;
             case WsOpCode.Jump:
                 return Index(a, function.Code.Count, "target instruction") ?? Unused(b, c, d);
+            case WsOpCode.LoadNull:
+                return Register(function, a, "destination") ?? Unused(b, c, d);
+            case WsOpCode.LoadBoolean:
+                return Register(function, a, "destination") ?? (b is 0 or 1 ? null : $"its value is {b}, not 0 or 1.")
+                    ?? Unused(c, d);
+            case WsOpCode.Not:
+                return Register(function, a, "destination") ?? Register(function, b, "operand") ?? Unused(c, d);
+            case WsOpCode.Equal:
+            case WsOpCode.NotEqual:
+            case WsOpCode.Less:
+            case WsOpCode.LessOrEqual:
+            case WsOpCode.Greater:
+            case WsOpCode.GreaterOrEqual:
+                return Register(function, a, "destination") ?? Register(function, b, "left")
+                    ?? Register(function, c, "right") ?? Unused(d);
+            case WsOpCode.JumpIfFalse:
+            case WsOpCode.JumpIfTrue:
+                return Register(function, a, "condition") ?? Index(b, function.Code.Count, "target instruction")
+                    ?? Unused(c, d);
+            case WsOpCode.CheckBoolean:
+                return Register(function, a, "operand") ?? Unused(b, c, d);
             case WsOpCode.Return:
                 return Unused(a, b, c, d);
             default:
@@ -125,9 +146,9 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         var blockCount = 1L;
         foreach (var instruction in code)
         {
-            if (instruction.OpCode == WsOpCode.Jump && !isBlockStart[instruction.A])
+            if (JumpTarget(instruction) is int target && !isBlockStart[target])
             {
-                isBlockStart[instruction.A] = true;
+                isBlockStart[target] = true;
                 blockCount++;
             }
         }
@@ -163,6 +184,10 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                     Flow(instruction.A, state, atBlockStart, pending);
                     break;
                 }
+                if (instruction.OpCode is WsOpCode.JumpIfFalse or WsOpCode.JumpIfTrue)
+                {
+                    Flow(instruction.B, state, atBlockStart, pending); // And on to the next instruction.
+                }
                 index++;
                 if (isBlockStart[index])
                 {
@@ -173,6 +198,13 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         }
         return WsVerificationResult.Valid;
     }
+
+    private static int? JumpTarget(WsInstruction instruction) => instruction.OpCode switch
+    {
+        WsOpCode.Jump => instruction.A,
+        WsOpCode.JumpIfFalse or WsOpCode.JumpIfTrue => instruction.B,
+        _ => null
+    };
 
     private static void Flow(int target, ulong[] state, Dictionary<int, ulong[]> atBlockStart, Stack<int> pending)
     {
@@ -203,11 +235,22 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             case WsOpCode.Move:
             case WsOpCode.Negate:
             case WsOpCode.Plus:
+            case WsOpCode.Not:
                 return Unwritten(instruction.B, state, locals);
+            case WsOpCode.JumpIfFalse:
+            case WsOpCode.JumpIfTrue:
+            case WsOpCode.CheckBoolean:
+                return Unwritten(instruction.A, state, locals);
             case WsOpCode.Add:
             case WsOpCode.Subtract:
             case WsOpCode.Multiply:
             case WsOpCode.Divide:
+            case WsOpCode.Equal:
+            case WsOpCode.NotEqual:
+            case WsOpCode.Less:
+            case WsOpCode.LessOrEqual:
+            case WsOpCode.Greater:
+            case WsOpCode.GreaterOrEqual:
                 var left = Unwritten(instruction.B, state, locals);
                 return left >= 0 ? left : Unwritten(instruction.C, state, locals);
             case WsOpCode.CallBuiltin:
@@ -234,7 +277,9 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
     private static int? Writes(WsInstruction instruction) => instruction.OpCode switch
     {
         WsOpCode.LoadConstant or WsOpCode.Move or WsOpCode.Negate or WsOpCode.Plus or WsOpCode.Add or WsOpCode.Subtract
-            or WsOpCode.Multiply or WsOpCode.Divide or WsOpCode.CallBuiltin => instruction.A,
+            or WsOpCode.Multiply or WsOpCode.Divide or WsOpCode.CallBuiltin or WsOpCode.LoadNull or WsOpCode.LoadBoolean
+            or WsOpCode.Not or WsOpCode.Equal or WsOpCode.NotEqual or WsOpCode.Less or WsOpCode.LessOrEqual
+            or WsOpCode.Greater or WsOpCode.GreaterOrEqual => instruction.A,
         _ => null
     };
 

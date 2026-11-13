@@ -91,6 +91,39 @@ public sealed class WsCodeGenerator
                 Emit(new WsInstruction(WsOpCode.LoadConstant, destination, Binary64Constant(constant.Value)), constant.Span);
                 return destination;
             }
+            case WsIrBooleanConstant constant:
+            {
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.LoadBoolean, destination, constant.Value ? 1 : 0), constant.Span);
+                return destination;
+            }
+            case WsIrNullConstant constant:
+            {
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.LoadNull, destination), constant.Span);
+                return destination;
+            }
+            case WsIrLogical logical:
+            {
+                // The result goes to a temporary of its own, then to the target: the right operand may read the
+                // target, which must still hold its old value then.
+                var mark = _nextRegister;
+                var result = Allocate();
+                EmitExpression(logical.Left, result);
+                var jump = _code.Count;
+                Emit(new WsInstruction(logical.IsAnd ? WsOpCode.JumpIfFalse : WsOpCode.JumpIfTrue, result), logical.Span);
+                EmitExpression(logical.Right, result);
+                Emit(new WsInstruction(WsOpCode.CheckBoolean, result), logical.Right.Span);
+                _code[jump] = _code[jump] with { B = _code.Count };
+                if (target is not { } destination)
+                {
+                    _nextRegister = mark + 1;
+                    return result;
+                }
+                Emit(new WsInstruction(WsOpCode.Move, destination, result), logical.Span);
+                _nextRegister = mark;
+                return destination;
+            }
             case WsIrLoadLocal load:
             {
                 if (target is not { } destination || destination == load.Local) return load.Local;
@@ -111,7 +144,12 @@ public sealed class WsCodeGenerator
                 var operand = EmitExpression(unary.Operand, null);
                 _nextRegister = mark;
                 var destination = target ?? Allocate();
-                var opCode = unary.Operator == WsUnaryOperator.Negate ? WsOpCode.Negate : WsOpCode.Plus;
+                var opCode = unary.Operator switch
+                {
+                    WsUnaryOperator.Negate => WsOpCode.Negate,
+                    WsUnaryOperator.Plus => WsOpCode.Plus,
+                    _ => WsOpCode.Not
+                };
                 Emit(new WsInstruction(opCode, destination, operand), unary.Span);
                 return destination;
             }
@@ -155,6 +193,7 @@ public sealed class WsCodeGenerator
         WsIrStoreLocal store => store.Local == local || Assigns(store.Value, local),
         WsIrUnary unary => Assigns(unary.Operand, local),
         WsIrBinary binary => Assigns(binary.Left, local) || Assigns(binary.Right, local),
+        WsIrLogical logical => Assigns(logical.Left, local) || Assigns(logical.Right, local),
         WsIrCallBuiltin call => AnyAssigns(call.Arguments, local),
         _ => false
     };
@@ -174,6 +213,12 @@ public sealed class WsCodeGenerator
         WsBinaryOperator.Subtract => WsOpCode.Subtract,
         WsBinaryOperator.Multiply => WsOpCode.Multiply,
         WsBinaryOperator.Divide => WsOpCode.Divide,
+        WsBinaryOperator.Equal => WsOpCode.Equal,
+        WsBinaryOperator.NotEqual => WsOpCode.NotEqual,
+        WsBinaryOperator.Less => WsOpCode.Less,
+        WsBinaryOperator.LessOrEqual => WsOpCode.LessOrEqual,
+        WsBinaryOperator.Greater => WsOpCode.Greater,
+        WsBinaryOperator.GreaterOrEqual => WsOpCode.GreaterOrEqual,
         _ => throw new InvalidOperationException($"Unknown operator {op}.")
     };
 

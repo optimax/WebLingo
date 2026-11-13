@@ -797,7 +797,7 @@ Proposed central props:
 **M0.7 parts** (12 November 2026), each landing on its own with its conformance tests, which `WebLingo.Conformance.Tests` runs beside §8.6's:
 
 1. **M0.7.1:** blocks and nested scopes. Implemented (12 November 2026); a missing `}` is WS1001, at its `{`.
-2. **M0.7.2:** `true`, `false` and `null`; `==`, `!=`, `<`, `<=`, `>`, `>=`; `!`, `&&`, `||`.
+2. **M0.7.2:** `true`, `false` and `null`; `==`, `!=`, `<`, `<=`, `>`, `>=`; `!`, `&&`, `||`. Implemented (12 November 2026).
 3. **M0.7.3:** `if` and `else`.
 4. **M0.7.4:** `while`, `for` and `do … while`, with `break` and `continue`.
 5. **M0.7.5:** string literals and concatenation.
@@ -1083,10 +1083,10 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Evaluation order | Left to right: operands, then arguments; an assignment evaluates its value before it stores it | Approved (12 November 2026) |
 | Instruction model | An in-memory register instruction model, not WBC (§5.3, §8.4): an operation and up to four integer operands A to D, unused ones 0 (`WsBytecodeContracts.cs`); a module holds its constants (int64 and binary64, kept as IEEE bits), the built-ins it imports by name and arity, and one function, with a source span per instruction and the names of its locals for runtime messages | Approved (12 November 2026) |
 | Registers | A function's locals take registers 0 to n − 1 and its temporaries the registers above; at most 65535 registers (§5.3), more is a compile-time error (WS4002) | Approved (12 November 2026) |
-| Operations | `LoadConstant`, `Move`, `Negate`, `Plus`, `Add`, `Subtract`, `Multiply`, `Divide`, `CallBuiltin` (arguments in consecutive registers, §5.4), `Jump`, `Return`; the compiler emits no `Jump` yet | Approved (12 November 2026) |
+| Operations | `LoadConstant`, `Move`, `Negate`, `Plus`, `Add`, `Subtract`, `Multiply`, `Divide`, `CallBuiltin` (arguments in consecutive registers, §5.4), `Jump`, `Return`; from M0.7.2, `LoadNull`, `LoadBoolean`, `Not`, `Equal`, `NotEqual`, `Less`, `LessOrEqual`, `Greater`, `GreaterOrEqual`, `JumpIfFalse` and `JumpIfTrue` (whose condition must be a Boolean, WS3001), and `CheckBoolean` (the right operand of `&&` and `||`) | Approved (12 November 2026) |
 | Verification | Besides §5.5: unused operands must be 0; no path may run off the end of the code; every register, local or temporary, must be written before it is read on every path, which is what keeps a variable from being read before it has a value (§3.1); a function whose check needs more than 16 million words of state or 100 million steps is rejected rather than verified slowly. The bounds are arbitrary, and are constants that are easy to change (`WsBytecodeVerifier.MaxStateWords`, `WsBytecodeVerifier.MaxSteps`), as is the register limit (`WsFunction.MaxRegisters`) | Approved (12 November 2026) |
 | Compiler output | The compiler verifies what it generates, and reports a module that fails as an internal error (WS4001), with no module | Proposed |
-| Runtime values | `WsValue`, a kind and a 64-bit payload, 16 bytes (§4.1's target, met): null, Boolean, int64 and binary64 (§8.4); the language has no `null`, `true` or `false` literals yet, so scripts produce only numbers | Proposed |
+| Runtime values | `WsValue`, a kind and a 64-bit payload, 16 bytes (§4.1's target, met): null, Boolean, int64 and binary64 (§8.4); scripts write `null`, `true` and `false` from M0.7.2 | Proposed |
 | Mixed arithmetic | An int64 meeting a binary64 is converted to binary64 (`1 + 0.5`, and `10 / 4 + 1` is 3.5) | Approved (12 November 2026) |
 | Binary64 results | IEEE 754 throughout: `1 / 0` is `Infinity`, `-1 / 0` is `-Infinity`, `0 / 0` is `NaN`; only integer arithmetic raises an error (WS3002). `Infinity` and `NaN` are written as keywords (see "Binary64 literals") | Approved (12 November 2026) |
 | Invalid operands | Arithmetic on anything but numbers is WS3001; once strings exist, `+` also concatenates them | Approved (12 November 2026) |

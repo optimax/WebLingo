@@ -48,10 +48,6 @@ Done (Claude, 2026-11-12): the answers are recorded as approved in the specifica
 
 2026-11-12: waits for its parts, M0.7.1 to M0.7.6.
 
-## M0.7.2: Booleans, `null`, Comparisons and Logic
-
-The keywords `true`, `false` and `null`; `==`, `!=`, `<`, `<=`, `>`, `>=`; `!`, `&&` and `||`, short-circuiting, Booleans only (specification, section 3.5). Added by Claude, 2026-11-12.
-
 ## M0.7.3: `if` and `else`
 
 `if (condition) statement`, with an optional `else`, and a strict Boolean condition (specification, section 3.5). Added by Claude, 2026-11-12.
@@ -62,21 +58,21 @@ The owner put `for` and `do … while` in M0.7 ("What M0.7 Covers", A4), but the
 
 **Q1: `for (init; condition; step) statement`, as in C: `init` is a declaration or an expression, or empty; `condition` is a Boolean expression, or empty, meaning `true`; `step` is an expression, or empty. A `var` declared in `init` is scoped to the loop and gets a new binding on each iteration, so that closures capture each one (section 3.1). Agreed?**
 
-A1: 
+A1: Yes.
 
 **Q2: `do statement while (condition);`, ending with a `;`, as in C. Agreed?**
 
-A2:
+A2: Yes;
 
 **Q3: Should a `for … of` loop over collections wait until arrays exist? (a) yes, later; (b) design it now.**
 
-A3:
+A3: (b), but I'd rather have `foreach` loops over collections. `for`-`of` is unintuitive for me.
 
-BTW: Thank you for thoughtfully inserting `An:` placeholders for me.
+BTW: Thank you for thoughtfully inserting `An:` placeholders for my answers.
 
 ## M0.7.4: Loops, `break` and `continue`
 
-`while`, `for` and `do … while`, with `break` and `continuewant `foreach`.` (specification, section 3.5). `while` comes first; `for` and `do … while` wait for "Syntax of `for` and `do … while`". Added by Claude, 2026-11-12.
+`while`, `for` and `do … while`, with `break` and `continue` (specification, section 3.5). `while` comes first; `for` and `do … while` wait for "Syntax of `for` and `do … while`". Added by Claude, 2026-11-12.
 
 ## M0.7.5: String Literals and Concatenation
 
