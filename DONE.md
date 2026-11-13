@@ -58,3 +58,15 @@ Done (Claude, 2026-11-12, `70081d4`):
 - **`print(...)`** parses as an ordinary call; binding decides what `print` is (M0.6.4).
 - **The choices** where the specification is silent are in its section 15.2, as Proposed, and asked about in "Syntax Choices (M0.6.3)".
 - Tests: 47 new parser tests, all passing on Windows; Linux not tried.
+
+## [DONE] M0.6.4: Binder and Lowered IR
+
+The binder and the lowered IR of the specification, section 8.4 ("Binder/IR"): lexical symbols and the temporal dead zone resolved, a bound tree, and a lowered IR independent of the choice between a register VM and a stack VM (WS-BC002).
+
+Done (Claude, 2026-11-12, `6228d5a`):
+
+- **`WsBinder`** resolves names lexically into a bound tree. A block's declarations are known from its start, so a name used before its declaration refers to it (and the temporal dead zone makes that a runtime error). The host's built-ins come in through `WsCompilerOptions`, in a scope around the program's. Errors: WS2001 undefined, WS2002 duplicate (at the later name), WS2003 assignment to a constant, and WS3001 for an invalid call or a built-in used as a value; binding goes on after an error.
+- **`WsLowerer`** gives the lowered IR, a tree that is neither register- nor stack-shaped. It follows each variable from its dead zone to declared-without-value to assigned, and keeps a runtime check only where a read or store is not known to be safe.
+- **`WsCompilation`** runs parse, bind and lower, and stops at the first stage that reports an error.
+- **`WebLingo.Compiler.Tests`**, a new test project: 32 tests, all passing on Windows; Linux not tried.
+- **The choices** where the specification is silent are in its section 15.2, as Proposed, and asked about in "Binding Choices (M0.6.4)".
