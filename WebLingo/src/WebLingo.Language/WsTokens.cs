@@ -5,7 +5,7 @@ public enum WsTokenKind
 {
     EndOfFile, Bad, Identifier, IntegerLiteral, Binary64Literal, StringLiteral,
     Var, Const, Let, Infinity, NaN, Plus, Minus, Star, Slash, Equals, Semicolon,
-    OpenParen, CloseParen, Comma
+    OpenParen, CloseParen, OpenBrace, CloseBrace, Comma
 }
 
 /// <summary>

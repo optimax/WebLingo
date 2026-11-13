@@ -16,7 +16,7 @@ public sealed class WsBinder
     private readonly List<WsBuiltinSymbol> _builtinsInOrder = [];
     private readonly List<WsLocalSymbol> _locals = [];
     private readonly List<WsDiagnostic> _diagnostics = [];
-    private readonly Scope _scope = new(null);
+    private Scope _scope = new(null);
 
     public WsBinder(WsCompilerOptions options)
     {
@@ -53,6 +53,14 @@ public sealed class WsBinder
                 return new WsBoundVariableDeclaration(local, initializer, declaration.Span);
             case WsExpressionStatementSyntax expressionStatement:
                 return new WsBoundExpressionStatement(BindExpression(expressionStatement.Expression), statement.Span);
+            case WsBlockSyntax block:
+            {
+                _scope = new Scope(_scope);
+                var statements = new List<WsBoundStatement>();
+                foreach (var inner in block.Statements) statements.Add(BindStatement(inner));
+                _scope = _scope.Parent!;
+                return new WsBoundBlock(statements, block.Span);
+            }
             default:
                 throw new InvalidOperationException($"Unknown statement {statement.GetType().Name}.");
         }
@@ -182,7 +190,7 @@ public sealed class WsBinder
     private void Report(string code, string message, WsSourceSpan span) =>
         _diagnostics.Add(new WsDiagnostic(code, WsDiagnosticSeverity.Error, message, span));
 
-    /// <summary>A block's scope. M0.6 has one block, the program; nested blocks will chain through Parent.</summary>
+    /// <summary>A block's scope: the program's, or a nested block's, chained through Parent.</summary>
     private sealed class Scope(Scope? parent)
     {
         public Scope? Parent { get; } = parent;

@@ -19,6 +19,9 @@ public sealed record WsIrEvaluate(WsIrExpression Expression, WsSourceSpan Span) 
 /// <summary><c>var x = e;</c> or <c>const x = e;</c>: the local gets its first value.</summary>
 public sealed record WsIrInitializeLocal(int Local, WsIrExpression Value, WsSourceSpan Span) : WsIrStatement(Span);
 
+/// <summary>Statements in order. Scopes are resolved already: a block only groups its statements.</summary>
+public sealed record WsIrBlock(IReadOnlyList<WsIrStatement> Statements, WsSourceSpan Span) : WsIrStatement(Span);
+
 public abstract record WsIrExpression(WsSourceSpan Span);
 
 public sealed record WsIrInt64Constant(long Value, WsSourceSpan Span) : WsIrExpression(Span);

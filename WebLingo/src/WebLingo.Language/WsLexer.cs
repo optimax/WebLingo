@@ -43,7 +43,7 @@ public sealed class WsLexer(string source) : IWsLexer
         if (IsDigit(c)) return ReadNumericLiteral(start);
         var kind = c switch
         {
-            '+' => WsTokenKind.Plus, '-' => WsTokenKind.Minus,
+            '{' => WsTokenKind.OpenBrace, '}' => WsTokenKind.CloseBrace, '+' => WsTokenKind.Plus, '-' => WsTokenKind.Minus,
             '*' => WsTokenKind.Star, '/' => WsTokenKind.Slash,
             '=' => WsTokenKind.Equals, ';' => WsTokenKind.Semicolon,
             '(' => WsTokenKind.OpenParen, ')' => WsTokenKind.CloseParen,

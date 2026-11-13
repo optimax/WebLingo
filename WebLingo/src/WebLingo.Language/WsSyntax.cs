@@ -25,6 +25,9 @@ public sealed record WsVariableDeclarationSyntax(
 public sealed record WsExpressionStatementSyntax(WsExpressionSyntax Expression, WsSourceSpan Span)
     : WsStatementSyntax(Span);
 
+/// <summary>A block, <c>{ statements }</c>, which opens a scope (specification, section 3.5).</summary>
+public sealed record WsBlockSyntax(IReadOnlyList<WsStatementSyntax> Statements, WsSourceSpan Span) : WsStatementSyntax(Span);
+
 public abstract record WsExpressionSyntax(WsSourceSpan Span) : WsSyntaxNode(Span);
 
 public sealed record WsIntegerLiteralSyntax(long Value, WsSourceSpan Span) : WsExpressionSyntax(Span);

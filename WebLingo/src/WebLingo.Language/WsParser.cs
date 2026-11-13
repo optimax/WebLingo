@@ -71,9 +71,41 @@ public sealed class WsParser : IWsParser
         _statementHasError = false;
         var start = Current.Span.Start;
         if (Current.Kind is WsTokenKind.Var or WsTokenKind.Const or WsTokenKind.Let) return ParseVariableDeclaration(start);
+        if (Current.Kind == WsTokenKind.OpenBrace) return ParseBlock(start);
         var expression = ParseExpression();
         ExpectSemicolon();
         return new WsExpressionStatementSyntax(expression, SpanFrom(start));
+    }
+
+    /// <summary>A block; the statements in it recover as at the top level, and a missing '}' is reported at the end.</summary>
+    private WsStatementSyntax ParseBlock(int start)
+    {
+        var open = Advance();
+        var statements = new List<WsStatementSyntax>();
+        if (!EnterRecursion()) return new WsBlockSyntax(statements, SpanFrom(start));
+        try
+        {
+            while (Current.Kind is not (WsTokenKind.CloseBrace or WsTokenKind.EndOfFile))
+            {
+                var before = _index;
+                statements.Add(ParseStatement());
+                if (_index == before) Advance(); // Never loop without consuming a token.
+            }
+        }
+        finally
+        {
+            _recursionDepth--;
+        }
+        if (Current.Kind == WsTokenKind.CloseBrace)
+        {
+            Advance();
+        }
+        else
+        {
+            _statementHasError = false;
+            Report(WsDiagnosticCodes.UnexpectedToken, "This '{' has no matching '}'.", open.Span);
+        }
+        return new WsBlockSyntax(statements, SpanFrom(start));
     }
 
     private WsVariableDeclarationSyntax ParseVariableDeclaration(int start)
@@ -128,7 +160,7 @@ public sealed class WsParser : IWsParser
         {
             // This statement already has an error: skip to where the next one should start, reporting nothing more.
             while (Current.Kind is not (WsTokenKind.EndOfFile or WsTokenKind.Semicolon or WsTokenKind.Var
-                   or WsTokenKind.Const or WsTokenKind.Let))
+                   or WsTokenKind.Const or WsTokenKind.Let or WsTokenKind.OpenBrace or WsTokenKind.CloseBrace))
             {
                 Advance();
             }
@@ -266,7 +298,7 @@ public sealed class WsParser : IWsParser
                 ReportUnexpected("an expression");
                 // Consume the token unless the statement's recovery needs it to find where the next one starts.
                 if (token.Kind is not (WsTokenKind.EndOfFile or WsTokenKind.Semicolon or WsTokenKind.Var
-                    or WsTokenKind.Const or WsTokenKind.Let))
+                    or WsTokenKind.Const or WsTokenKind.Let or WsTokenKind.OpenBrace or WsTokenKind.CloseBrace))
                 {
                     Advance();
                 }
@@ -311,7 +343,7 @@ public sealed class WsParser : IWsParser
             }
             // Skip the rest of the statement, so that unwinding does not report every level it leaves.
             _statementHasError = true;
-            while (Current.Kind is not (WsTokenKind.EndOfFile or WsTokenKind.Semicolon)) Advance();
+            while (Current.Kind is not (WsTokenKind.EndOfFile or WsTokenKind.Semicolon or WsTokenKind.CloseBrace)) Advance();
             return false;
         }
         _recursionDepth++;
@@ -325,8 +357,16 @@ public sealed class WsParser : IWsParser
     private void CheckDepth(WsCompilationUnitSyntax root)
     {
         var pending = new Stack<(WsExpressionSyntax Expression, int Depth)>();
-        foreach (var statement in root.Statements)
+        var statements = new Stack<WsStatementSyntax>();
+        for (var i = root.Statements.Count - 1; i >= 0; i--) statements.Push(root.Statements[i]);
+        while (statements.Count > 0)
         {
+            var statement = statements.Pop();
+            if (statement is WsBlockSyntax block)
+            {
+                for (var i = block.Statements.Count - 1; i >= 0; i--) statements.Push(block.Statements[i]);
+                continue;
+            }
             var top = statement switch
             {
                 WsVariableDeclarationSyntax { Initializer: { } initializer } => initializer,

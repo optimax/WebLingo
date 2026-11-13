@@ -261,3 +261,9 @@ Q: How are they spelled? My proposal: two keywords, `Infinity` and `NaN`, spelle
 A: Yes, and yes.
 
 Done (Claude, 2026-11-12): `Infinity` and `NaN` are keywords, and binary64 literals are lexed: `1.5`, `1e21`, `2.5E-3`, with digits needed on both sides of a point. I guessed two details, recorded in the specification (section 15.2, "Binary64 literals"): a literal too large for a binary64 is WS1004, and one too small becomes 0. They go through the lexer, parser, binder, IR and code generator (`WsBinary64LiteralSyntax`, `WsIrBinary64Constant`; constants are kept apart by their bits, so `0.0` and `-0.0` differ). The inventory gains a row for `double.Parse`. Tests cover lexing, errors and running. Build and 327 tests pass on Windows, and the CLI runs `writeLn(1.5 * 2); writeLn(Infinity - Infinity); writeLn(2.5E-3);` as `3.0`, `NaN`, `0.0025`. Linux not tried.
+
+## [DONE] M0.7.1: Blocks and Nested Scopes
+
+`{ statements }` as a statement, opening a scope, with shadowing (specification, sections 3.1 and 3.5). Added by Claude, 2026-11-12.
+
+Done (Claude, 2026-11-12): `{ … }` is a statement through every stage (`WsBlockSyntax`, `WsBoundBlock`, `WsIrBlock`), and opens a scope in the binder. Error recovery stops at a brace, so an error inside a block does not swallow its `}`. A missing `}` is WS1001, reported at its `{` (my guess). Blocks count toward the parser's nesting limit. Each local still gets its own register, and inner blocks do not reuse them. Tests cover parsing, recovery, scope ends, shadowing and running. Build and 338 tests pass on Windows; Linux not tried.

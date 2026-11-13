@@ -81,6 +81,50 @@ public sealed class ParserTests
     }
 
     [Fact]
+    public void ABlockHoldsStatementsAndNests()
+    {
+        var tree = Parse("{ var a = 1; { a; } {} }");
+        Assert.Empty(tree.Diagnostics);
+        var block = Assert.IsType<WsBlockSyntax>(Assert.Single(tree.Root.Statements));
+        Assert.Equal(new WsSourceSpan(0, 24), block.Span);
+        Assert.Equal(3, block.Statements.Count);
+        Assert.IsType<WsExpressionStatementSyntax>(Assert.Single(Assert.IsType<WsBlockSyntax>(block.Statements[1]).Statements));
+        Assert.Empty(Assert.IsType<WsBlockSyntax>(block.Statements[2]).Statements);
+    }
+
+    [Fact]
+    public void AnUnclosedBlockIsReportedAtItsBrace()
+    {
+        var tree = Parse("var a = 1;\n{ a;");
+        var diagnostic = Assert.Single(tree.Diagnostics);
+        Assert.Equal((WsDiagnosticCodes.UnexpectedToken, new WsSourceSpan(11, 1)), (diagnostic.Code, diagnostic.Span));
+    }
+
+    [Fact]
+    public void AnErrorInABlockDoesNotSwallowItsBrace()
+    {
+        var tree = Parse("{ var a = ; } var b = 2;");
+        Assert.Equal(WsDiagnosticCodes.UnexpectedToken, Assert.Single(tree.Diagnostics).Code);
+        Assert.Equal(2, tree.Root.Statements.Count);
+        Assert.Equal("b", Assert.IsType<WsVariableDeclarationSyntax>(tree.Root.Statements[1]).Name);
+    }
+
+    [Fact]
+    public void AStrayClosingBraceIsAnError()
+    {
+        var tree = Parse("var a = 1; } var b = 2;");
+        Assert.Equal(WsDiagnosticCodes.UnexpectedToken, Assert.Single(tree.Diagnostics).Code);
+        Assert.Equal("b", Assert.IsType<WsVariableDeclarationSyntax>(tree.Root.Statements[^1]).Name);
+    }
+
+    [Fact]
+    public void BlocksNestOnlySoDeep()
+    {
+        var source = new string('{', WsParser.MaxRecursionDepth + 1) + new string('}', WsParser.MaxRecursionDepth + 1);
+        Assert.Contains(Parse(source).Diagnostics, d => d.Code == WsDiagnosticCodes.NestingTooDeep);
+    }
+
+    [Fact]
     public void SeveralErrorsAreReportedInOnePass()
     {
         var tree = Parse("var a = ;\nvar b = 1\nconst c;\nvar d = 4;");

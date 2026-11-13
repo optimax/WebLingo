@@ -62,6 +62,9 @@ public sealed class WsCodeGenerator
             case WsIrEvaluate evaluate:
                 EmitExpression(evaluate.Expression, null);
                 break;
+            case WsIrBlock block:
+                foreach (var inner in block.Statements) EmitStatement(inner);
+                break;
             default:
                 throw new InvalidOperationException($"Unknown statement {statement.GetType().Name}.");
         }

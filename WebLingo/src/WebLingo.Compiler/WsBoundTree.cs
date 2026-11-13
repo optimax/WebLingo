@@ -16,6 +16,8 @@ public sealed record WsBoundVariableDeclaration(WsLocalSymbol Local, WsBoundExpr
 
 public sealed record WsBoundExpressionStatement(WsBoundExpression Expression, WsSourceSpan Span) : WsBoundStatement(Span);
 
+public sealed record WsBoundBlock(IReadOnlyList<WsBoundStatement> Statements, WsSourceSpan Span) : WsBoundStatement(Span);
+
 public abstract record WsBoundExpression(WsSourceSpan Span);
 
 public sealed record WsBoundIntegerLiteral(long Value, WsSourceSpan Span) : WsBoundExpression(Span);

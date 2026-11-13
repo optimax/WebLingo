@@ -39,6 +39,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var x = 10", "WS1002", 1, 11)]
     [InlineData("var x = 1; var x = 2;", "WS2002", 1, 16)]
     [InlineData("x = 10;", "WS2001", 1, 1)]
+    [InlineData("{ var y = 1; } writeLn(y);", "WS2001", 1, 24)]
+    [InlineData("{ var y = 1; var y = 2; }", "WS2002", 1, 18)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -53,9 +55,13 @@ public sealed class ConformanceTests : IDisposable
     [Theory]
     [InlineData("var x = 10 + 20; writeLn(x);", "30")]
     [InlineData("var x = 10 / 2; writeLn(x);", "5.0")]
+    [InlineData("var x = 1; { var x = 2; writeLn(x); } writeLn(x);", "2\n1")]
+    [InlineData("var x = 1; { x = 3; } writeLn(x);", "3")]
+    [InlineData("{ var y = 4; { writeLn(y * y); } }", "16")]
+    [InlineData("{} { { } }", "")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
-        Assert.Equal((WsCommandLine.Success, printed + "\n", ""), Weblingo("run", source));
+        Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
     }
 
     [Fact]

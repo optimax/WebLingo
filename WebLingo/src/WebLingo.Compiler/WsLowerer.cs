@@ -9,24 +9,29 @@ public static class WsLowerer
     public static WsIrProgram Lower(WsBoundProgram program)
     {
         var statements = new List<WsIrStatement>();
-        foreach (var statement in program.Statements)
-        {
-            switch (statement)
-            {
-                case WsBoundVariableDeclaration declaration:
-                    statements.Add(new WsIrInitializeLocal(declaration.Local.Index, LowerExpression(declaration.Initializer),
-                        declaration.Span));
-                    break;
-                case WsBoundExpressionStatement expressionStatement:
-                    statements.Add(new WsIrEvaluate(LowerExpression(expressionStatement.Expression), statement.Span));
-                    break;
-                default:
-                    throw new InvalidOperationException($"Unknown statement {statement.GetType().Name}.");
-            }
-        }
+        foreach (var statement in program.Statements) statements.Add(LowerStatement(statement));
         var names = new string[program.Locals.Count];
         foreach (var local in program.Locals) names[local.Index] = local.Name;
         return new WsIrProgram(statements, names, program.Builtins);
+    }
+
+    private static WsIrStatement LowerStatement(WsBoundStatement statement)
+    {
+        switch (statement)
+        {
+            case WsBoundVariableDeclaration declaration:
+                return new WsIrInitializeLocal(declaration.Local.Index, LowerExpression(declaration.Initializer), declaration.Span);
+            case WsBoundExpressionStatement expressionStatement:
+                return new WsIrEvaluate(LowerExpression(expressionStatement.Expression), statement.Span);
+            case WsBoundBlock block:
+            {
+                var statements = new List<WsIrStatement>();
+                foreach (var inner in block.Statements) statements.Add(LowerStatement(inner));
+                return new WsIrBlock(statements, block.Span);
+            }
+            default:
+                throw new InvalidOperationException($"Unknown statement {statement.GetType().Name}.");
+        }
     }
 
     private static WsIrExpression LowerExpression(WsBoundExpression expression)

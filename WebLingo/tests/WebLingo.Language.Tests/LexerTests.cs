@@ -30,10 +30,10 @@ public sealed class LexerTests
         Assert.Equal(
             new[] {
                 WsTokenKind.Plus, WsTokenKind.Minus, WsTokenKind.Star, WsTokenKind.Slash, WsTokenKind.Equals,
-                WsTokenKind.Semicolon, WsTokenKind.OpenParen, WsTokenKind.CloseParen, WsTokenKind.Comma,
-                WsTokenKind.EndOfFile
+                WsTokenKind.Semicolon, WsTokenKind.OpenParen, WsTokenKind.CloseParen, WsTokenKind.OpenBrace,
+                WsTokenKind.CloseBrace, WsTokenKind.Comma, WsTokenKind.EndOfFile
             },
-            Kinds("+ - * / = ; ( ) ,", out var diagnostics));
+            Kinds("+ - * / = ; ( ) { } ,", out var diagnostics));
         Assert.Empty(diagnostics);
     }
 
