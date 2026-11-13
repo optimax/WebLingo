@@ -405,3 +405,9 @@ A1: (a).
 Until you answer, M0.7.6 does (a), which is the easiest to change: it touches only the variables that functions capture.
 
 Done (Claude, 2026-11-13, `50f7dc2`): recorded as approved in the specification, section 3.5 ("Functions"), in its decision register, in its section 8.6's note, and in section 15.2 ("Functions and calls"). The code already does (a), and its tests cover it, so nothing changes in it.
+
+## [DONE] Stack VM Comparison 1: The Benchmark
+
+`WebLingo.Benchmarks`, a console project with no new package, timing a VM with `Stopwatch` over fixed workloads (loops, calls, closures, strings), and reporting time, instructions run, bytecode size and allocation (specification, section 5.6, part 1). It runs the register VM as it is, for the baseline that part 2 is measured against. Added by Claude, 2026-11-13.
+
+Done (Claude, 2026-11-13, `97c3a06`): `WebLingo.Benchmarks`, in the solution's new `benchmarks/` folder, with four workloads (`loops`, `calls`, `closures`, `strings`), each a `.ws` file that `weblingo run` runs too, and the output every VM must give. It reports each workload's median and fastest time, the instructions a run executes, what it allocates, and its code's size. The register VM now reports the instructions an execution ran (`WsExecutionResult.Instructions`), which the instruction budget counts. The baseline is recorded in the specification, section 5.6. Guesses of mine: the `benchmarks/` folder; code size counted as a byte per operation and each operand it uses in LEB128, since WBC's encoding is not decided. Build and 507 tests pass on Windows; Linux not tried.
