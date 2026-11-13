@@ -62,6 +62,9 @@ public sealed record WsBooleanLiteralSyntax(bool Value, WsSourceSpan Span) : WsE
 
 public sealed record WsNullLiteralSyntax(WsSourceSpan Span) : WsExpressionSyntax(Span);
 
+/// <summary>A string literal; <paramref name="Value"/> is its text, its escapes decoded.</summary>
+public sealed record WsStringLiteralSyntax(string Value, WsSourceSpan Span) : WsExpressionSyntax(Span);
+
 public sealed record WsNameSyntax(string Name, WsSourceSpan Span) : WsExpressionSyntax(Span);
 
 public enum WsUnaryOperator { Negate, Plus, Not }

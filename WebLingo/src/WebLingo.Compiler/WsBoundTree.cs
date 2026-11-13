@@ -43,6 +43,8 @@ public sealed record WsBoundBooleanLiteral(bool Value, WsSourceSpan Span) : WsBo
 
 public sealed record WsBoundNullLiteral(WsSourceSpan Span) : WsBoundExpression(Span);
 
+public sealed record WsBoundStringLiteral(string Value, WsSourceSpan Span) : WsBoundExpression(Span);
+
 public sealed record WsBoundLocalReference(WsLocalSymbol Local, WsSourceSpan Span) : WsBoundExpression(Span);
 
 public sealed record WsBoundUnary(WsUnaryOperator Operator, WsBoundExpression Operand, WsSourceSpan Span)

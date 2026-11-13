@@ -71,6 +71,78 @@ public sealed class ValueTests
     }
 }
 
+public sealed class HeapTests
+{
+    [Fact]
+    public void AStringKeepsItsTextAndIsWrittenAsIt()
+    {
+        var heap = new WsHeap();
+        Assert.True(heap.TryAllocateString("héllo", out var value, out _));
+        Assert.Equal(WsValueKind.String, value.Kind);
+        Assert.Equal("héllo", heap.GetString(value));
+        Assert.Equal("héllo", WsValueFormatter.Format(value, heap));
+        Assert.Equal("a string", WsValueFormatter.Describe(value));
+    }
+
+    [Fact]
+    public void ACollectionFreesWhatNoRootReachesAndKeepsTheRest()
+    {
+        var heap = new WsHeap();
+        var roots = new WsValue[1];
+        heap.AddRoots(roots);
+        Assert.True(heap.TryAllocateString("kept", out roots[0], out _));
+        Assert.True(heap.TryAllocateString("garbage", out _, out _));
+        Assert.Equal(2, heap.ObjectCount);
+        heap.Collect();
+        Assert.Equal(1, heap.ObjectCount);
+        Assert.Equal("kept", heap.GetString(roots[0]));
+        Assert.Equal(4 + WsHeap.ObjectOverhead, heap.Units);
+    }
+
+    [Fact]
+    public void GarbageIsCollectedBeforeTheBudgetRunsOut()
+    {
+        var heap = new WsHeap(maxUnits: 10_000);
+        var roots = new WsValue[1];
+        heap.AddRoots(roots);
+        for (var i = 0; i < 10_000; i++) Assert.True(heap.TryAllocateString("0123456789", out roots[0], out _));
+        Assert.True(heap.CollectionCount > 0);
+        Assert.InRange(heap.Units, 0, 10_000);
+    }
+
+    [Fact]
+    public void AStringBeyondTheBudgetIsAnError()
+    {
+        var heap = new WsHeap(maxUnits: 100);
+        Assert.False(heap.TryAllocateString(new string('x', 100), out _, out var error));
+        Assert.Equal(WsDiagnosticCodes.BudgetExceeded, error!.Code);
+    }
+
+    [Fact]
+    public void PlusJoinsTwoStringsAndNothingElse()
+    {
+        var heap = new WsHeap();
+        heap.TryAllocateString("ab", out var a, out _);
+        heap.TryAllocateString("cd", out var c, out _);
+        Assert.True(WsOperators.TryBinary(WsArithmeticOperator.Add, a, c, heap, out var joined, out _));
+        Assert.Equal("abcd", heap.GetString(joined));
+        Assert.False(WsOperators.TryBinary(WsArithmeticOperator.Add, a, WsValue.FromInt64(1), heap, out _, out var error));
+        Assert.Equal(WsDiagnosticCodes.InvalidOperation, error!.Code);
+        Assert.False(WsOperators.TryBinary(WsArithmeticOperator.Multiply, a, c, heap, out _, out _));
+    }
+
+    [Fact]
+    public void StringsAreEqualByTheirText()
+    {
+        var heap = new WsHeap();
+        heap.TryAllocateString("x", out var first, out _);
+        heap.TryAllocateString("x", out var second, out _);
+        Assert.True(WsOperators.TryCompare(WsComparisonOperator.Equal, first, second, heap, out var equal, out _));
+        Assert.True(equal.AsBoolean);
+        Assert.False(WsOperators.TryCompare(WsComparisonOperator.Less, first, second, heap, out _, out _));
+    }
+}
+
 public sealed class OperatorTests
 {
     [Theory]
@@ -180,8 +252,8 @@ public sealed class WriteTests
         var output = new WsCollectedOutput();
         var write = new WsWriteFunction(output);
         Assert.Equal(("write", 1), (write.Name, write.Arity));
-        Assert.True(write.TryInvoke([WsValue.FromBinary64(5.0)], out var result, out _));
-        Assert.True(write.TryInvoke([WsValue.FromInt64(6)], out _, out _));
+        Assert.True(write.TryInvoke([WsValue.FromBinary64(5.0)], new WsHeap(), out var result, out _));
+        Assert.True(write.TryInvoke([WsValue.FromInt64(6)], new WsHeap(), out _, out _));
         Assert.Equal(WsValue.Null, result);
         Assert.Equal("5.06", output.Text);
     }
@@ -192,8 +264,8 @@ public sealed class WriteTests
         var output = new WsCollectedOutput();
         var writeLn = new WsWriteLnFunction(output);
         Assert.Equal(("writeLn", 1), (writeLn.Name, writeLn.Arity));
-        Assert.True(writeLn.TryInvoke([WsValue.FromInt64(1)], out var result, out _));
-        Assert.True(writeLn.TryInvoke([WsValue.Null], out _, out _));
+        Assert.True(writeLn.TryInvoke([WsValue.FromInt64(1)], new WsHeap(), out var result, out _));
+        Assert.True(writeLn.TryInvoke([WsValue.Null], new WsHeap(), out _, out _));
         Assert.Equal(WsValue.Null, result);
         Assert.Equal("1\nnull\n", output.Text);
         Assert.Equal(new[] { "1", "null" }, output.Lines);

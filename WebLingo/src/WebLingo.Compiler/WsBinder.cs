@@ -135,6 +135,8 @@ public sealed class WsBinder
                 return new WsBoundBooleanLiteral(literal.Value, literal.Span);
             case WsNullLiteralSyntax literal:
                 return new WsBoundNullLiteral(literal.Span);
+            case WsStringLiteralSyntax literal:
+                return new WsBoundStringLiteral(literal.Value, literal.Span);
             case WsNameSyntax name:
                 return BindName(name);
             case WsParenthesizedExpressionSyntax parenthesized:

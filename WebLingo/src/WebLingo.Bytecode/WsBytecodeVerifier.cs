@@ -17,9 +17,14 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
 
         for (var i = 0; i < module.Constants.Count; i++)
         {
-            if (module.Constants[i].Kind is not (WsConstantKind.Int64 or WsConstantKind.Binary64))
+            var constant = module.Constants[i];
+            if (constant.Kind is not (WsConstantKind.Int64 or WsConstantKind.Binary64 or WsConstantKind.String))
             {
-                return Fail($"Constant {i} has the unknown kind {(int)module.Constants[i].Kind}.");
+                return Fail($"Constant {i} has the unknown kind {(int)constant.Kind}.");
+            }
+            if ((constant.Kind == WsConstantKind.String) != (constant.Text is not null))
+            {
+                return Fail($"Constant {i} has text if and only if it is not a string.");
             }
         }
         for (var i = 0; i < module.Imports.Count; i++)

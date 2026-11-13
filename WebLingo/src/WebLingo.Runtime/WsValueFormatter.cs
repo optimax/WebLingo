@@ -9,9 +9,14 @@ namespace WebLingo.Runtime;
 /// </summary>
 public static class WsValueFormatter
 {
+    /// <summary>The text of a value; a string is its own text, which only its heap knows.</summary>
+    public static string Format(WsValue value, WsHeap? heap) =>
+        value.Kind == WsValueKind.String && heap is not null ? heap.GetString(value) : Format(value);
+
     public static string Format(WsValue value) => value.Kind switch
     {
         WsValueKind.Null => "null",
+        WsValueKind.String => $"string#{value.Handle}",
         WsValueKind.Boolean => value.AsBoolean ? "true" : "false",
         WsValueKind.Int64 => value.AsInt64.ToString(CultureInfo.InvariantCulture),
         _ => FormatBinary64(value.AsBinary64)
@@ -23,6 +28,7 @@ public static class WsValueFormatter
         WsValueKind.Null => "null",
         WsValueKind.Boolean => $"the Boolean {Format(value)}",
         WsValueKind.Int64 => $"the integer {Format(value)}",
+        WsValueKind.String => "a string",
         _ => $"the number {Format(value)}"
     };
 

@@ -41,6 +41,7 @@ public sealed class WsLexer(string source) : IWsLexer
         var c = source[start];
         if (IsIdentifierStart(c)) return ReadIdentifierOrKeyword(start);
         if (IsDigit(c)) return ReadNumericLiteral(start);
+        if (c is '"' or '\'') return ReadStringLiteral(start);
         var pair = (c, start + 1 < source.Length ? source[start + 1] : '\0') switch
         {
             ('=', '=') => WsTokenKind.EqualEqual, ('!', '=') => WsTokenKind.BangEqual,
@@ -192,6 +193,102 @@ public sealed class WsLexer(string source) : IWsLexer
         }
         return new WsToken(WsTokenKind.Binary64Literal, text, span, BitConverter.DoubleToInt64Bits(value));
     }
+
+    /// <summary>
+    /// A string literal in either quote, on one line (specification, section 3.5). An invalid escape (WS1009) is
+    /// reported and the literal read on; a literal not closed on its line is WS1010. Either makes it a bad token.
+    /// </summary>
+    private WsToken ReadStringLiteral(int start)
+    {
+        var quote = source[start];
+        _position++;
+        var text = new System.Text.StringBuilder();
+        var valid = true;
+        while (true)
+        {
+            if (_position >= source.Length || source[_position] is '\r' or '\n')
+            {
+                Report(WsDiagnosticCodes.UnterminatedString, $"This string has no closing {quote} on its line.",
+                    new WsSourceSpan(start, _position - start));
+                return Token(WsTokenKind.Bad, start);
+            }
+            var c = source[_position];
+            if (c == quote)
+            {
+                _position++;
+                break;
+            }
+            if (c != '\\')
+            {
+                text.Append(c);
+                _position++;
+                continue;
+            }
+            var escapeStart = _position;
+            _position++;
+            var next = _position < source.Length ? source[_position] : '\0';
+            var simple = next switch
+            {
+                'n' => "\n", 'r' => "\r", 't' => "\t", '0' => "\0", '\\' => "\\", '\'' => "'", '"' => "\"",
+                _ => null
+            };
+            if (simple is not null)
+            {
+                text.Append(simple);
+                _position++;
+                continue;
+            }
+            if (next == 'u' && ReadUnicodeEscape(text)) continue;
+            if (next is not ('\r' or '\n') && _position < source.Length) _position++;
+            Report(WsDiagnosticCodes.InvalidEscape,
+                "This escape is not valid: use \\n, \\r, \\t, \\0, \\\\, \\', \\\" or \\u{…} with a Unicode scalar value.",
+                new WsSourceSpan(escapeStart, _position - escapeStart));
+            valid = false;
+        }
+        if (!valid) return Token(WsTokenKind.Bad, start);
+        return new WsToken(WsTokenKind.StringLiteral, source[start.._position], new WsSourceSpan(start, _position - start),
+            StringValue: text.ToString());
+    }
+
+    /// <summary>
+    /// <c>\u{…}</c>, at the <c>u</c>: one to six hex digits naming a Unicode scalar value (not a surrogate). On
+    /// success it appends the character and moves past the <c>}</c>; otherwise it moves nothing.
+    /// </summary>
+    private bool ReadUnicodeEscape(System.Text.StringBuilder text)
+    {
+        var at = _position + 1;
+        if (at >= source.Length || source[at] != '{') return false;
+        at++;
+        var value = 0;
+        var digits = 0;
+        while (at < source.Length && digits < 7 && HexValue(source[at]) is int digit)
+        {
+            value = value * 16 + digit;
+            digits++;
+            at++;
+        }
+        if (digits is 0 or > 6 || at >= source.Length || source[at] != '}') return false;
+        if (value > 0x10FFFF || value is >= 0xD800 and <= 0xDFFF) return false;
+        if (value < 0x10000)
+        {
+            text.Append((char)value);
+        }
+        else
+        {
+            text.Append((char)(0xD800 + ((value - 0x10000) >> 10)));
+            text.Append((char)(0xDC00 + ((value - 0x10000) & 0x3FF)));
+        }
+        _position = at + 1;
+        return true;
+    }
+
+    private static int? HexValue(char c) => c switch
+    {
+        >= '0' and <= '9' => c - '0',
+        >= 'a' and <= 'f' => c - 'a' + 10,
+        >= 'A' and <= 'F' => c - 'A' + 10,
+        _ => null
+    };
 
     private void SkipDigits()
     {

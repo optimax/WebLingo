@@ -22,6 +22,10 @@ public static class WsDiagnosticCodes
     public const string InvalidAssignmentTarget = "WS1007";
     /// <summary>Source nested too deeply to compile safely (proposed).</summary>
     public const string NestingTooDeep = "WS1008";
+    /// <summary>An invalid escape in a string literal.</summary>
+    public const string InvalidEscape = "WS1009";
+    /// <summary>A string literal not closed on its line.</summary>
+    public const string UnterminatedString = "WS1010";
 
     /// <summary>Undefined identifier.</summary>
     public const string UndefinedIdentifier = "WS2001";

@@ -681,6 +681,8 @@ Codes added while implementing M0.6 (§15.2):
 | WS1006 | Declaration without an initializer | Approved (12 November 2026) |
 | WS1007 | Invalid assignment target | Approved (12 November 2026) |
 | WS1008 | Source nested too deeply | Approved (12 November 2026) |
+| WS1009 | Invalid escape in a string literal | Approved (12 November 2026) |
+| WS1010 | String literal not closed on its line | Approved (12 November 2026) |
 | WS2005 | Not a function (a call of something that cannot be called) | Approved (12 November 2026) |
 | WS2006 | Wrong number of arguments in a call | Approved (12 November 2026) |
 | WS2007 | `break` or `continue` outside a loop | Proposed |
@@ -804,7 +806,7 @@ Proposed central props:
 2. **M0.7.2:** `true`, `false` and `null`; `==`, `!=`, `<`, `<=`, `>`, `>=`; `!`, `&&`, `||`. Implemented (12 November 2026).
 3. **M0.7.3:** `if` and `else`. Implemented (12 November 2026); a branch that is not a block still has a scope of its own, so `if (c) var y = 1;` declares `y` for that branch only (proposed).
 4. **M0.7.4:** `while`, `for` and `do … while`, with `break` and `continue`. Implemented (12 November 2026); `break` or `continue` outside a loop is WS2007 (proposed), and a `for`'s per-iteration bindings (§3.5) become observable, and are implemented, with closures in M0.7.6.
-5. **M0.7.5:** string literals and concatenation.
+5. **M0.7.5:** string literals and concatenation. Implemented (12 November 2026), with the first heap objects (§15.2, "Heap").
 6. **M0.7.6:** functions, function values and closures.
 
 **Immediate next activity:** M0.6's increments are implemented and pass their tests on Windows and Linux (12 November 2026, §15). The owner's decisions on the choices proposed in §15.2 come next, then M0.7. The compiler and VM cover the M0.6 subset only (§8.4).
@@ -1071,7 +1073,7 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Integer literals | Decimal digits only; leading zeros allowed and still decimal (`007` is 7); at most 9223372036854775807, larger is an error (WS1004) | Approved (12 November 2026) |
 | Binary64 literals | Digits, then a fraction (`.` and digits, at least one on each side of the point: `1.` and `.5` are not literals), an exponent (`e` or `E`, an optional sign, and digits), or both: `1.5`, `0.1`, `1e21`, `2.5E-3`. The value is the nearest binary64; one too large for a binary64 is an error (WS1004), and one too small becomes 0. `Infinity` and `NaN` are keywords for those values, and `-Infinity` is unary minus applied to `Infinity` | Approved (12 November 2026) |
 | Literal suffixes | Digits followed directly by a letter, digit or `_` are one invalid literal (WS1004), which keeps room for the decimal suffix `m` (§3.2) | Approved (12 November 2026) |
-| Not yet lexed | String and decimal literals: their characters are invalid (WS1003) until their syntax is specified | Approved (12 November 2026) |
+| Not yet lexed | Decimal literals: their characters are invalid (WS1003) until their syntax is specified | Approved (12 November 2026) |
 | Statements | Variable declarations and expression statements, each ended by `;`; a lone `;` (an empty statement) is an error (WS1001); blocks, `{ … }`, from M0.7.1 (§3.5) | Approved (12 November 2026) |
 | Operators | Unary `-` and `+` (`+` gives the number itself; on anything but a number either is WS3001); binary `* /` above `+ -`, both left-associative | Approved (12 November 2026) |
 | Assignment | An expression, right-associative (`a = b = 3`), whose value is the value assigned; only a variable's name may be assigned (WS1007), not even a parenthesized one | Approved (12 November 2026) |
@@ -1091,6 +1093,8 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Verification | Besides §5.5: unused operands must be 0; no path may run off the end of the code; every register, local or temporary, must be written before it is read on every path, which is what keeps a variable from being read before it has a value (§3.1); a function whose check needs more than 16 million words of state or 100 million steps is rejected rather than verified slowly. The bounds are arbitrary, and are constants that are easy to change (`WsBytecodeVerifier.MaxStateWords`, `WsBytecodeVerifier.MaxSteps`), as is the register limit (`WsFunction.MaxRegisters`) | Approved (12 November 2026) |
 | Compiler output | The compiler verifies what it generates, and reports a module that fails as an internal error (WS4001), with no module | Proposed |
 | Runtime values | `WsValue`, a kind and a 64-bit payload, 16 bytes (§4.1's target, met): null, Boolean, int64 and binary64 (§8.4); scripts write `null`, `true` and `false` from M0.7.2 | Proposed |
+| Heap | Strings are the first objects: a value of kind String holds a handle into its execution's heap (`WsHeap`), never a .NET reference (§4.1); the heap is the execution's own (§4.3), and is collected by WebLingo's nonmoving mark-and-sweep (§4.2) from its roots, the VM's registers and constants. A string's text is kept as a .NET string for now (UTF-16; §3.3's UTF-8 representation is still proposed). Its size is counted in units (a string's UTF-16 length, plus 16 per object): a collection runs at twice what was live after the last one, at least 1M units, and the budget is 64M units (`WsResourceBudget.MaxHeapUnits`), beyond which an allocation is WS3003; all of these are constants that are easy to change | Proposed |
+| String operations | `+` of two strings concatenates them; `==` and `!=` compare their texts, code unit by code unit; a string is written as its own text | Approved (12 November 2026, §3.5), but for the comparison, which is proposed |
 | Mixed arithmetic | An int64 meeting a binary64 is converted to binary64 (`1 + 0.5`, and `10 / 4 + 1` is 3.5) | Approved (12 November 2026) |
 | Binary64 results | IEEE 754 throughout: `1 / 0` is `Infinity`, `-1 / 0` is `-Infinity`, `0 / 0` is `NaN`; only integer arithmetic raises an error (WS3002). `Infinity` and `NaN` are written as keywords (see "Binary64 literals") | Approved (12 November 2026) |
 | Invalid operands | Arithmetic on anything but numbers is WS3001; once strings exist, `+` also concatenates them | Approved (12 November 2026) |

@@ -3,7 +3,7 @@ namespace WebLingo.Runtime;
 /// <summary>
 /// The kinds of runtime value.
 /// </summary>
-public enum WsValueKind : byte { Null, Boolean, Int64, Binary64 }
+public enum WsValueKind : byte { Null, Boolean, Int64, Binary64, String }
 
 /// <summary>
 /// A runtime value (specification, section 4.1): a kind and a 64-bit payload, 16 bytes in all. M0.6 has null,
@@ -29,10 +29,14 @@ public readonly struct WsValue : IEquatable<WsValue>
     public static WsValue FromInt64(long value) => new(WsValueKind.Int64, value);
     public static WsValue FromBinary64(double value) => new(WsValueKind.Binary64, BitConverter.DoubleToInt64Bits(value));
     public static WsValue FromBinary64Bits(long bits) => new(WsValueKind.Binary64, bits);
+    /// <summary>A value referring to an object of a <see cref="WsHeap"/> by its handle.</summary>
+    public static WsValue FromHandle(WsValueKind kind, int handle) => new(kind, handle);
 
     public bool AsBoolean => _bits != 0;
     public long AsInt64 => _bits;
     public double AsBinary64 => BitConverter.Int64BitsToDouble(_bits);
+    /// <summary>The heap handle of a string.</summary>
+    public int Handle => (int)_bits;
 
     public bool Equals(WsValue other) => Kind == other.Kind && _bits == other._bits;
     public override bool Equals(object? obj) => obj is WsValue other && Equals(other);

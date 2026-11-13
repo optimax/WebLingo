@@ -429,6 +429,9 @@ public sealed class WsParser : IWsParser
             case WsTokenKind.Null:
                 Advance();
                 return new WsNullLiteralSyntax(token.Span);
+            case WsTokenKind.StringLiteral:
+                Advance();
+                return new WsStringLiteralSyntax(token.StringValue!, token.Span);
             case WsTokenKind.Infinity:
                 Advance();
                 return new WsBinary64LiteralSyntax(double.PositiveInfinity, token.Span);

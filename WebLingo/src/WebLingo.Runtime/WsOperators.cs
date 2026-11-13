@@ -14,9 +14,27 @@ public enum WsComparisonOperator { Equal, NotEqual, Less, LessOrEqual, Greater, 
 public static class WsOperators
 {
     public static bool TryBinary(WsArithmeticOperator op, WsValue left, WsValue right, out WsValue result,
+        out WsRuntimeError? error) => TryBinary(op, left, right, null, out result, out error);
+
+    /// <summary>
+    /// As the other overload; <c>+</c> of two strings also concatenates them, into <paramref name="heap"/>
+    /// (specification, section 3.5). A string and anything else are not joined: nothing converts implicitly.
+    /// </summary>
+    public static bool TryBinary(WsArithmeticOperator op, WsValue left, WsValue right, WsHeap? heap, out WsValue result,
         out WsRuntimeError? error)
     {
         result = WsValue.Null;
+        if (op == WsArithmeticOperator.Add && left.Kind == WsValueKind.String && right.Kind == WsValueKind.String
+            && heap is not null)
+        {
+            return heap.TryAllocateString(heap.GetString(left) + heap.GetString(right), out result, out error);
+        }
+        if (op == WsArithmeticOperator.Add && (left.Kind == WsValueKind.String || right.Kind == WsValueKind.String))
+        {
+            error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                $"'+' joins two strings or adds two numbers, not {WsValueFormatter.Describe(left)} and {WsValueFormatter.Describe(right)}.");
+            return false;
+        }
         error = CheckOperand(left, op) ?? CheckOperand(right, op);
         if (error is not null) return false;
 
@@ -52,12 +70,16 @@ public static class WsOperators
     /// unequal even to itself.
     /// </summary>
     public static bool TryCompare(WsComparisonOperator op, WsValue left, WsValue right, out WsValue result,
+        out WsRuntimeError? error) => TryCompare(op, left, right, null, out result, out error);
+
+    /// <summary>As the other overload; two strings are equal when their texts are, which their heap knows.</summary>
+    public static bool TryCompare(WsComparisonOperator op, WsValue left, WsValue right, WsHeap? heap, out WsValue result,
         out WsRuntimeError? error)
     {
         error = null;
         if (op is WsComparisonOperator.Equal or WsComparisonOperator.NotEqual)
         {
-            var equal = AreEqual(left, right);
+            var equal = AreEqual(left, right, heap);
             result = WsValue.FromBoolean(op == WsComparisonOperator.Equal ? equal : !equal);
             return true;
         }
@@ -95,9 +117,15 @@ public static class WsOperators
             : new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
                 $"{what} needs a Boolean, not {WsValueFormatter.Describe(value)}.");
 
-    private static bool AreEqual(WsValue left, WsValue right)
+    private static bool AreEqual(WsValue left, WsValue right, WsHeap? heap)
     {
         if (IsNumber(left) && IsNumber(right)) return Compare(left, right) == 0;
+        if (left.Kind == WsValueKind.String && right.Kind == WsValueKind.String)
+        {
+            return heap is null
+                ? left.Handle == right.Handle
+                : string.Equals(heap.GetString(left), heap.GetString(right), StringComparison.Ordinal);
+        }
         return left.Kind == right.Kind && (left.Kind == WsValueKind.Null || left.AsBoolean == right.AsBoolean);
     }
 
@@ -171,8 +199,9 @@ public static class WsOperators
     {
         if (value.Kind is WsValueKind.Int64 or WsValueKind.Binary64) return null;
         var what = op is { } binary ? $"'{Symbol(binary)}'" : $"'{unary}'";
+        var needs = op == WsArithmeticOperator.Add ? "two numbers or two strings" : "numbers";
         return new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
-            $"{what} needs numbers, not {WsValueFormatter.Describe(value)}.");
+            $"{what} needs {needs}, not {WsValueFormatter.Describe(value)}.");
     }
 
     private static double ToBinary64(WsValue value) => value.Kind == WsValueKind.Int64 ? value.AsInt64 : value.AsBinary64;

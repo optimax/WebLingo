@@ -45,6 +45,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("if true) writeLn(1);", "WS1001", 1, 4)]
     [InlineData("else writeLn(1);", "WS1001", 1, 1)]
     [InlineData("break;", "WS2007", 1, 1)]
+    [InlineData("writeLn(\"a\\qb\");", "WS1009", 1, 11)]
+    [InlineData("writeLn(\"open);", "WS1010", 1, 9)]
     [InlineData("if (true) { continue; }", "WS2007", 1, 13)]
     [InlineData("for (var i = 0; i < 1; i = i + 1) {} writeLn(i);", "WS2001", 1, 46)]
     [InlineData("do writeLn(1) while (true);", "WS1002", 1, 14)]
@@ -101,6 +103,11 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("for (var i = 0; i < 2; i = i + 1) for (var j = 0; j < 3; j = j + 1) { if (j == 1) break; write(i * 10 + j); } writeLn(null);", "010null")]
     [InlineData("var s = 0; for (var n = 1; n <= 1000; n = n + 1) s = s + n; writeLn(s);", "500500")]
     [InlineData("var i = 1; for (var i = 5; i < 6; i = i + 1) write(i); writeLn(i);", "51")]
+    [InlineData("writeLn(\"Hello\" + \", \" + 'world');", "Hello, world")]
+    [InlineData("write('a\\n'); write(\"b\\tc\\n\");", "a\nb\tc")]
+    [InlineData("writeLn(\"x\" == 'x'); writeLn(\"x\" != \"y\"); writeLn(\"1\" == 1); writeLn(\"\" == null);", "true\ntrue\nfalse\nfalse")]
+    [InlineData("var s = \"\"; for (var i = 0; i < 3; i = i + 1) s = s + \"ab\"; writeLn(s);", "ababab")]
+    [InlineData("writeLn(\"\\u{1F600}\");", "\U0001F600")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -118,6 +125,11 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("while (1) writeLn(1);")]
     [InlineData("do writeLn(1); while (0);")]
     [InlineData("for (; 1; ) writeLn(1);")]
+    [InlineData("writeLn(\"a\" + 1);")]
+    [InlineData("writeLn(1 + \"a\");")]
+    [InlineData("writeLn(\"a\" < \"b\");")]
+    [InlineData("writeLn(-\"a\");")]
+    [InlineData("if (\"true\") writeLn(1);")]
     public void BooleansAndNumbersDoNotMix(string source)
     {
         var (exit, _, error) = Weblingo("run", source);
@@ -163,6 +175,15 @@ public sealed class ConformanceTests : IDisposable
     }
 
     [Fact]
+    public void TheHelloWorldSampleGreets()
+    {
+        var sample = Path.Combine(SolutionFolder(), "samples", "HelloWorld", "hello.ws");
+        var output = new StringWriter();
+        Assert.Equal(WsCommandLine.Success, WsCommandLine.Run(["run", sample], output, new StringWriter()));
+        Assert.Equal("Hello from WebLingo!\n", output.ToString());
+    }
+
+    [Fact]
     public void TheArithmeticSamplePrints30()
     {
         var sample = Path.Combine(SolutionFolder(), "samples", "Arithmetic", "arithmetic.ws");
@@ -189,7 +210,7 @@ public sealed class ConformanceTests : IDisposable
     {
         string[] fragments =
         [
-            "var", "const", "let", "x", "y", "writeLn", "=", "+", "-", "*", "/", "(", ")", ";", ",", "10", "0", "1.5", "1e309", "Infinity", "NaN",
+            "var", "const", "let", "x", "y", "writeLn", "=", "+", "-", "*", "/", "(", ")", ";", ",", "10", "0", "1.5", "1e309", "Infinity", "NaN", "\"s\"", "'t'", "\"\\q\"", "\"", "true", "null", "==", "&&", "{", "}", "if", "while",
             "9223372036854775807", "9223372036854775808", "1x", "@", "\"", ".", "/*", "*/", "//", "\n", "\r\n", " ", "é",
         ];
         var random = new Random(8_6);

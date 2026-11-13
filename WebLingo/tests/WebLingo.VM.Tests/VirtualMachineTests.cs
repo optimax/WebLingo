@@ -91,6 +91,33 @@ public sealed class VirtualMachineTests
     }
 
     [Fact]
+    public void GarbageStringsAreCollectedAsTheProgramRuns()
+    {
+        var output = new WsCollectedOutput();
+        var compiled = new WsCompiler(WithWrite).Compile(
+            "var t = \"\"; for (var i = 0; i < 20000; i = i + 1) { t = \"abcdefghij\" + \"klmnopqrst\"; } writeLn(t);",
+            "test.ws");
+        var context = new WsExecutionContext(new WsWorkerId(0))
+        {
+            Services = new WsBuiltinRegistry(WsStandardBuiltins.Create(output)),
+            Resources = new WsResourceBudget(65535, MaxHeapUnits: 10_000)
+        };
+        var result = new WsVirtualMachine().Execute(compiled.Module!, context);
+        Assert.True(result.Succeeded, result.Error?.Message);
+        Assert.Equal(new[] { "abcdefghijklmnopqrst" }, output.Lines);
+    }
+
+    [Fact]
+    public void AStringGrowingPastTheBudgetStopsTheProgram()
+    {
+        var compiled = new WsCompiler(WithWrite).Compile(
+            "var t = \"x\"; while (true) t = t + t;", "test.ws");
+        var context = new WsExecutionContext(new WsWorkerId(0)) { Resources = new WsResourceBudget(65535, MaxHeapUnits: 100_000) };
+        var result = new WsVirtualMachine().Execute(compiled.Module!, context);
+        Assert.Equal(WsDiagnosticCodes.BudgetExceeded, result.Error!.Code);
+    }
+
+    [Fact]
     public void AModuleThatFailsVerificationIsNotRun()
     {
         var module = new WsCompiledModule("bad", [], [new WsImport("writeLn", 1)],
@@ -146,7 +173,7 @@ public sealed class VirtualMachineTests
     {
         public string Name => "writeLn";
         public int Arity => 1;
-        public bool TryInvoke(WsValue[] arguments, out WsValue result, out WsRuntimeError? error) =>
+        public bool TryInvoke(WsValue[] arguments, WsHeap heap, out WsValue result, out WsRuntimeError? error) =>
             throw new InvalidOperationException("broken output");
     }
 

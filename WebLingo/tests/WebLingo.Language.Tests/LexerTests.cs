@@ -169,6 +169,53 @@ public sealed class LexerTests
         Assert.Equal(WsDiagnosticCodes.InvalidCharacter, Assert.Single(diagnostics).Code);
     }
 
+    [Theory]
+    [InlineData("\"abc\"", "abc")]
+    [InlineData("'abc'", "abc")]
+    [InlineData("\"\"", "")]
+    [InlineData("'it\\'s'", "it's")]
+    [InlineData("\"say \\\"hi\\\"\"", "say \"hi\"")]
+    [InlineData("\"'\"", "'")]
+    [InlineData("'\"'", "\"")]
+    [InlineData("\"\\n\\r\\t\\0\\\\\"", "\n\r\t\0\\")]
+    [InlineData("\"\\u{41}\\u{e9}\\u{1F600}\"", "A\u00e9\U0001F600")]
+    [InlineData("\"\\u{10FFFF}\"", "\U0010FFFF")]
+    [InlineData("\"é ✓\"", "é ✓")]
+    public void StringLiteralsDecodeTheirEscapes(string text, string value)
+    {
+        var tokens = WsLexer.Tokenize(text, out var diagnostics);
+        Assert.Empty(diagnostics);
+        Assert.Equal((WsTokenKind.StringLiteral, value, text), (tokens[0].Kind, tokens[0].StringValue, tokens[0].Text));
+    }
+
+    [Theory]
+    [InlineData("\"a\\qb\"", 2, 2)]
+    [InlineData("\"\\u{D800}\"", 1, 2)]
+    [InlineData("\"\\u{110000}\"", 1, 2)]
+    [InlineData("\"\\u{}\"", 1, 2)]
+    [InlineData("\"\\u{1234567}\"", 1, 2)]
+    [InlineData("\"\\u41\"", 1, 2)]
+    [InlineData("\"\\x41\"", 1, 2)]
+    public void AnInvalidEscapeIsReportedWhereItIs(string text, int start, int length)
+    {
+        var tokens = WsLexer.Tokenize(text, out var diagnostics);
+        Assert.Equal(new[] { WsTokenKind.Bad, WsTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal((WsDiagnosticCodes.InvalidEscape, new WsSourceSpan(start, length)), (diagnostic.Code, diagnostic.Span));
+    }
+
+    [Theory]
+    [InlineData("\"abc", 4)]
+    [InlineData("'abc\nx'", 4)]
+    [InlineData("\"abc\\", 5)]
+    public void AStringNotClosedOnItsLineIsReported(string text, int length)
+    {
+        var tokens = WsLexer.Tokenize(text, out var diagnostics);
+        Assert.Equal(WsTokenKind.Bad, tokens[0].Kind);
+        var unterminated = diagnostics.First(d => d.Code == WsDiagnosticCodes.UnterminatedString);
+        Assert.Equal(new WsSourceSpan(0, length), unterminated.Span);
+    }
+
     [Fact]
     public void InfinityAndNaNAreKeywords()
     {
@@ -247,7 +294,6 @@ public sealed class LexerTests
     [Theory]
     [InlineData("@")]
     [InlineData(".")]
-    [InlineData("\"")]
     [InlineData("é")]
     [InlineData(" ")]
     [InlineData("\u0001")]

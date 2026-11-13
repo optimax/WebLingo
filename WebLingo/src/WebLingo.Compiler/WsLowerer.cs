@@ -57,6 +57,8 @@ public static class WsLowerer
                 return new WsIrBooleanConstant(literal.Value, literal.Span);
             case WsBoundNullLiteral literal:
                 return new WsIrNullConstant(literal.Span);
+            case WsBoundStringLiteral literal:
+                return new WsIrStringConstant(literal.Value, literal.Span);
             case WsBoundBinary { Operator: WsBinaryOperator.And or WsBinaryOperator.Or } logical:
                 return new WsIrLogical(logical.Operator == WsBinaryOperator.And, LowerExpression(logical.Left),
                     LowerExpression(logical.Right), logical.Span);

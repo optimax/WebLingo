@@ -19,8 +19,11 @@ public sealed record WsExecutionContext(WsWorkerId OwnerWorkerId)
     public WsResourceBudget Resources { get; init; } = WsResourceBudget.Default;
 }
 
-/// <summary>The resources an execution may take; a module that needs more is not run (WS3003).</summary>
-public sealed record WsResourceBudget(int MaxRegisters)
+/// <summary>
+/// The resources an execution may take: registers (a module that needs more is not run, WS3003), and its heap's
+/// units (<see cref="WsHeap"/>; an allocation beyond them is WS3003).
+/// </summary>
+public sealed record WsResourceBudget(int MaxRegisters, long MaxHeapUnits = WsHeap.DefaultMaxUnits)
 {
     public static WsResourceBudget Default { get; } = new(65535);
 }
@@ -42,8 +45,11 @@ public interface IWsBuiltinFunction
 {
     string Name { get; }
     int Arity { get; }
-    /// <summary>Calls the function with exactly <see cref="Arity"/> script values.</summary>
-    bool TryInvoke(WsValue[] arguments, out WsValue result, out WsRuntimeError? error);
+    /// <summary>
+    /// Calls the function with exactly <see cref="Arity"/> script values, whose objects are in <paramref name="heap"/>,
+    /// where any it makes go too.
+    /// </summary>
+    bool TryInvoke(WsValue[] arguments, WsHeap heap, out WsValue result, out WsRuntimeError? error);
 }
 
 /// <summary>The runtime services a host gives an execution; M0.6 has its built-ins.</summary>

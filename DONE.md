@@ -305,3 +305,9 @@ Done (Claude, 2026-11-12): Q1 and Q2 are recorded as approved in the specificati
 `while`, `for` and `do … while`, with `break` and `continue` (specification, section 3.5). Added by Claude, 2026-11-12.
 
 Done (Claude, 2026-11-12): `while`, `for` (any part may be empty, and a missing condition is true) and `do … while`, all lowered to one loop form (`WsBoundLoop`, `WsIrLoop`). `continue` goes to the step or the test, and `break` goes past the end. `break` or `continue` outside a loop is the new WS2007, which I picked and the specification lists as proposed. A `for`'s init is in a scope of the loop's own. Per-iteration bindings only become observable with closures, so they come with M0.7.6. Build and 408 tests pass on Windows, and the CLI ran a loop sample (a 100,000-iteration sum: 5000050000); Linux not tried.
+
+## [DONE] M0.7.5: String Literals and Concatenation
+
+String values, literals in either quote with their escapes (WS1009, WS1010), `+` of two strings, and their text when written (specification, sections 3.3 and 3.5). Strings are the first values the runtime keeps outside a `WsValue`'s payload, so this part also needs the runtime's first heap objects (section 4). Added by Claude, 2026-11-12.
+
+Done (Claude, 2026-11-12): string literals in either quote, with the approved escapes (WS1009, WS1010). Strings are `+`-concatenated, compared by text with `==` and `!=`, and written as their text; nothing is converted implicitly. Strings are the first heap objects: `WsHeap` is the execution's own, values refer to it by handle, and WebLingo's own mark-and-sweep collects it from the VM's registers and constants, within a budget (WS3003). Its numbers are constants, recorded in the specification's section 15.2 ("Heap") as proposed. Built-ins now receive the heap (`IWsBuiltinFunction.TryInvoke`). `samples/HelloWorld` runs. Build and 449 tests pass on Windows; Linux not tried.

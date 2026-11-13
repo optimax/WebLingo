@@ -11,9 +11,9 @@ public sealed class WsWriteFunction(IWsTextOutput output) : IWsBuiltinFunction
     public string Name => "write";
     public int Arity => 1;
 
-    public bool TryInvoke(WsValue[] arguments, out WsValue result, out WsRuntimeError? error)
+    public bool TryInvoke(WsValue[] arguments, WsHeap heap, out WsValue result, out WsRuntimeError? error)
     {
-        output.Write(WsValueFormatter.Format(arguments[0]));
+        output.Write(WsValueFormatter.Format(arguments[0], heap));
         result = WsValue.Null;
         error = null;
         return true;
@@ -26,9 +26,9 @@ public sealed class WsWriteLnFunction(IWsTextOutput output) : IWsBuiltinFunction
     public string Name => "writeLn";
     public int Arity => 1;
 
-    public bool TryInvoke(WsValue[] arguments, out WsValue result, out WsRuntimeError? error)
+    public bool TryInvoke(WsValue[] arguments, WsHeap heap, out WsValue result, out WsRuntimeError? error)
     {
-        output.Write(WsValueFormatter.Format(arguments[0]) + "\n");
+        output.Write(WsValueFormatter.Format(arguments[0], heap) + "\n");
         result = WsValue.Null;
         error = null;
         return true;

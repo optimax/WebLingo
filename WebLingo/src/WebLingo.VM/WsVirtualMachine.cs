@@ -50,22 +50,34 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             builtins[i] = builtin;
         }
 
+        // The execution's own heap (worker-local, section 4.3), whose roots are the constants and the registers.
+        var heap = new WsHeap(context.Resources.MaxHeapUnits);
         var constants = new WsValue[module.Constants.Count];
+        heap.AddRoots(constants);
         for (var i = 0; i < constants.Length; i++)
         {
             var constant = module.Constants[i];
+            if (constant.Kind == WsConstantKind.String)
+            {
+                if (!heap.TryAllocateString(constant.Text!, out constants[i], out var error))
+                {
+                    return Failure(error!.Code, error.Message, new WsSourceSpan(0, 0));
+                }
+                continue;
+            }
             constants[i] = constant.Kind == WsConstantKind.Int64
                 ? WsValue.FromInt64(constant.Bits)
                 : WsValue.FromBinary64Bits(constant.Bits);
         }
 
-        return Run(function, constants, builtins, context);
+        return Run(function, constants, builtins, context, heap);
     }
 
     private static WsExecutionResult Run(WsFunction function, WsValue[] constants, IWsBuiltinFunction[] builtins,
-        WsExecutionContext context)
+        WsExecutionContext context, WsHeap heap)
     {
         var registers = new WsValue[function.RegisterCount];
+        heap.AddRoots(registers);
         var code = function.Code;
         var budget = context.InstructionBudget;
         var cancellation = context.Cancellation;
@@ -112,13 +124,13 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                 case WsOpCode.Multiply:
                 case WsOpCode.Divide:
                     if (WsOperators.TryBinary(ArithmeticOf(instruction.OpCode), registers[instruction.B],
-                            registers[instruction.C], out var value, out error))
+                            registers[instruction.C], heap, out var value, out error))
                     {
                         registers[instruction.A] = value;
                     }
                     break;
                 case WsOpCode.CallBuiltin:
-                    error = Call(builtins[instruction.B], registers, instruction);
+                    error = Call(builtins[instruction.B], registers, instruction, heap);
                     break;
                 case WsOpCode.Jump:
                     pc = instruction.A;
@@ -139,7 +151,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                 case WsOpCode.Greater:
                 case WsOpCode.GreaterOrEqual:
                     if (WsOperators.TryCompare(ComparisonOf(instruction.OpCode), registers[instruction.B],
-                            registers[instruction.C], out var compared, out error))
+                            registers[instruction.C], heap, out var compared, out error))
                     {
                         registers[instruction.A] = compared;
                     }
@@ -176,13 +188,14 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
     /// Calls a built-in with its arguments copied out of the registers, so that its result may overwrite them.
     /// Its failure, even an exception, is a runtime error.
     /// </summary>
-    private static WsRuntimeError? Call(IWsBuiltinFunction builtin, WsValue[] registers, WsInstruction instruction)
+    private static WsRuntimeError? Call(IWsBuiltinFunction builtin, WsValue[] registers, WsInstruction instruction,
+        WsHeap heap)
     {
         var arguments = new WsValue[instruction.D];
         for (var i = 0; i < arguments.Length; i++) arguments[i] = registers[instruction.C + i];
         try
         {
-            if (!builtin.TryInvoke(arguments, out var result, out var error))
+            if (!builtin.TryInvoke(arguments, heap, out var result, out var error))
             {
                 return error ?? new WsRuntimeError(WsDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed.");
             }

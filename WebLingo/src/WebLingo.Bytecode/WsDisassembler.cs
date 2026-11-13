@@ -59,9 +59,12 @@ public static class WsDisassembler
     {
         if (index < 0 || index >= module.Constants.Count) return $"#{index}?";
         var constant = module.Constants[index];
-        return constant.Kind == WsConstantKind.Int64
-            ? constant.Bits.ToString(System.Globalization.CultureInfo.InvariantCulture)
-            : BitConverter.Int64BitsToDouble(constant.Bits).ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "d";
+        return constant.Kind switch
+        {
+            WsConstantKind.Int64 => constant.Bits.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            WsConstantKind.String => "\"" + constant.Text + "\"",
+            _ => BitConverter.Int64BitsToDouble(constant.Bits).ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "d"
+        };
     }
 
     private static string Import(WsCompiledModule module, int index) =>

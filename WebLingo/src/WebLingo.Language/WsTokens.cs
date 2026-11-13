@@ -12,9 +12,11 @@ public enum WsTokenKind
 /// <summary>
 /// A token. <paramref name="IntegerValue"/> is the value of an <see cref="WsTokenKind.IntegerLiteral"/>, which the
 /// lexer has checked to be in range, or the IEEE 754 bits of a <see cref="WsTokenKind.Binary64Literal"/>, which it has
-/// checked to be finite; it is 0 for every other kind.
+/// checked to be finite; it is 0 for every other kind. <paramref name="StringValue"/> is the text a
+/// <see cref="WsTokenKind.StringLiteral"/> means, its escapes decoded.
 /// </summary>
-public readonly record struct WsToken(WsTokenKind Kind, string Text, WsSourceSpan Span, long IntegerValue = 0)
+public readonly record struct WsToken(
+    WsTokenKind Kind, string Text, WsSourceSpan Span, long IntegerValue = 0, string? StringValue = null)
 {
     public double Binary64Value => BitConverter.Int64BitsToDouble(IntegerValue);
 }

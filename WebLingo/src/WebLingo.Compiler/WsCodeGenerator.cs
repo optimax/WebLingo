@@ -19,6 +19,7 @@ public sealed class WsCodeGenerator
     private readonly List<WsConstant> _constants = [];
     private readonly Dictionary<long, int> _int64Constants = [];
     private readonly Dictionary<long, int> _binary64Constants = []; // By IEEE bits, so that 0.0 and -0.0 stay apart.
+    private readonly Dictionary<string, int> _stringConstants = new(StringComparer.Ordinal);
     private readonly Stack<LoopJumps> _loops = new();
     private int _nextRegister;
     private int _registerCount;
@@ -122,6 +123,12 @@ public sealed class WsCodeGenerator
             {
                 var destination = target ?? Allocate();
                 Emit(new WsInstruction(WsOpCode.LoadBoolean, destination, constant.Value ? 1 : 0), constant.Span);
+                return destination;
+            }
+            case WsIrStringConstant constant:
+            {
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.LoadConstant, destination, StringConstant(constant.Value)), constant.Span);
                 return destination;
             }
             case WsIrNullConstant constant:
@@ -322,6 +329,15 @@ public sealed class WsCodeGenerator
     {
         var jump = _code[at];
         _code[at] = jump.OpCode == WsOpCode.Jump ? jump with { A = _code.Count } : jump with { B = _code.Count };
+    }
+
+    private int StringConstant(string value)
+    {
+        if (_stringConstants.TryGetValue(value, out var index)) return index;
+        index = _constants.Count;
+        _constants.Add(WsConstant.String(value));
+        _stringConstants.Add(value, index);
+        return index;
     }
 
     private int Binary64Constant(double value)

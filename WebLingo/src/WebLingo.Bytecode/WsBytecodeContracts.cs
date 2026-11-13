@@ -62,11 +62,15 @@ public enum WsOpCode : byte
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
 
-public enum WsConstantKind : byte { Int64, Binary64 }
+public enum WsConstantKind : byte { Int64, Binary64, String }
 
-/// <summary>A constant; a binary64 is kept as its IEEE 754 bits, so that constants compare and copy exactly.</summary>
-public readonly record struct WsConstant(WsConstantKind Kind, long Bits)
+/// <summary>
+/// A constant; a binary64 is kept as its IEEE 754 bits, so that constants compare and copy exactly, and a string as
+/// its <paramref name="Text"/>, which only a string has.
+/// </summary>
+public readonly record struct WsConstant(WsConstantKind Kind, long Bits, string? Text = null)
 {
+    public static WsConstant String(string text) => new(WsConstantKind.String, 0, text);
     public static WsConstant Int64(long value) => new(WsConstantKind.Int64, value);
     public static WsConstant Binary64(double value) => new(WsConstantKind.Binary64, BitConverter.DoubleToInt64Bits(value));
 }

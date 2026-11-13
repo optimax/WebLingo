@@ -46,6 +46,8 @@ public sealed record WsIrBooleanConstant(bool Value, WsSourceSpan Span) : WsIrEx
 
 public sealed record WsIrNullConstant(WsSourceSpan Span) : WsIrExpression(Span);
 
+public sealed record WsIrStringConstant(string Value, WsSourceSpan Span) : WsIrExpression(Span);
+
 /// <summary>
 /// <c>&amp;&amp;</c> (<paramref name="IsAnd"/>) or <c>||</c>: the left operand, which must be a Boolean, and only if it
 /// does not decide the result, the right one, which must be a Boolean too.

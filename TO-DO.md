@@ -48,7 +48,7 @@ Done (Claude, 2026-11-12): the answers are recorded as approved in the specifica
 
 2026-11-12: waits for its parts, M0.7.1 to M0.7.6.
 
-## [QUESTION] Syntax of `foreach`
+## Syntax of `foreach`
 
 The owner's answer to "Syntax of `for` and `do … while`", Q3: design a loop over collections now, as `foreach` rather than `for … of`. It is implemented when collections exist (specification, section 3.2: arrays, maps, sets). Added by Claude, 2026-11-12.
 
@@ -62,11 +62,7 @@ A2: No. Why would it even make sense? `const` means it cannot be assigned to.
 
 **Q3: Over a map, `foreach` gives each entry as a key and a value: `foreach (var (key, value) in map)`. Agreed, with the destructuring syntax decided when maps are?**
 
-A3:
-
-## M0.7.5: String Literals and Concatenation
-
-String values, literals in either quote with their escapes (WS1009, WS1010), `+` of two strings, and their text when written (specification, sections 3.3 and 3.5). Strings are the first values the runtime keeps outside a `WsValue`'s payload, so this part also needs the runtime's first heap objects (section 4). Added by Claude, 2026-11-12.
+A3: Yes.
 
 ## M0.7.6: Functions, Function Values and Closures
 
