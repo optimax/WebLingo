@@ -5,9 +5,15 @@ on:
 jobs:
   test:
     strategy:
+      # Report every platform's result, rather than cancel the others when one fails.
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        # The solution is in the repository's WebLingo/ folder.
+        working-directory: WebLingo
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

@@ -37,11 +37,12 @@ Before changing source, read the specification's decision register (section 1.1)
 
 # 3. Repository Layout and Projects
 
-The repository root holds the files for agents and for planning (`AGENTS.md`, `CLAUDE.md`, `TO-DO.md`, `TO-DO-INSTRUCTIONS.md`, `DONE.md`, `HANDOFF.md`), the `.gitignore` for the whole repository, and `Documents/`, the project's documents. The solution is in the `WebLingo/` folder:
+The repository root holds the files for agents and for planning (`AGENTS.md`, `CLAUDE.md`, `TO-DO.md`, `TO-DO-INSTRUCTIONS.md`, `DONE.md`, `HANDOFF.md`), the `.gitignore` for the whole repository, `.github/workflows/` for CI, and `Documents/`, the project's documents. The solution is in the `WebLingo/` folder:
 
 ```text
 WebLingo/                      the repository
 ├── AGENTS.md, CLAUDE.md, TO-DO.md, ...
+├── .github/workflows/
 ├── Documents/
 └── WebLingo/                  the solution
     ├── WebLingo.slnx
@@ -105,7 +106,7 @@ Add projects (FastCGI, database providers, native adapters, `WebLingo.Hosting.St
 - Tests: xUnit v2 (2.9.3) through `Microsoft.NET.Test.Sdk` and `xunit.runner.visualstudio`, run with `dotnet test` (section 8)
 - Solution format: `.slnx`
 - No IDE is required: the `dotnet` command line builds, tests and runs everything. Visual Studio 2026 or another IDE may be used, but nothing may depend on one.
-- CI: GitHub Actions, building and testing on `ubuntu-latest` and `windows-latest` (but see section 11)
+- CI: GitHub Actions, `.github/workflows/build.yml` at the repository root, which restores, builds in Release and tests the solution from its folder on `ubuntu-latest` and `windows-latest`, on every push and pull request, and reports both platforms even when one fails (but see section 11)
 - Repository: GitHub, `optimax/WebLingo`, branch `main`
 
 The version-sensitive technologies here are .NET 10, C# at `LangVersion` latest, xUnit v2, ASP.NET Core 10, and the GitHub Actions in the workflow.
@@ -221,9 +222,9 @@ The open-source release needs an inventory of every dependency, with its version
 
 # 11. Known Traps
 
-### The CI Workflow Does Not Run
+### CI Has Not Run Yet
 
-The workflow `WebLingo/.github/workflows/build.yml` is in the solution folder, but GitHub Actions reads workflows only from `.github/workflows` at the repository root, and the workflow's commands expect `WebLingo.slnx` at the root. Until the workflow is moved and its commands pointed at the solution folder, CI has built and tested nothing, on Linux or on Windows.
+Until 2026-11-12 the workflow was in the solution folder, where GitHub Actions does not look (it reads `.github/workflows` at the repository root only), so it never ran. It is at the root now, but it runs on a push, and nothing has been pushed since: until CI has run, nothing has been built or tested on Linux. Keep the workflow at the root and its `working-directory` pointing at the solution folder.
 
 ### Warnings Are Errors
 
