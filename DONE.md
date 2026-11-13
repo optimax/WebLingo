@@ -455,3 +455,13 @@ A3: (b)
 2026-11-13: the answers are recorded as approved in the specification, section 5.6 ("The comparison's parts"), and in its decision register. That section splits the work into four parts, each a task below: "Stack VM Comparison 1: The Benchmark", "Stack VM Comparison 2: The Register VM's Dispatch, Tuned", "Stack VM Comparison 3: The Stack VM" and "Stack VM Comparison 4: The Comparison". Waits for them.
 
 Done (Claude, 2026-11-13): all four parts have landed (`97c3a06`, `12e52c4`, `817f242`, `5ef0107`): the benchmark, the register VM tuned, the stack VM, and the comparison, recorded in the specification, section 5.6. The choice between the VMs is the question "Register VM or Stack VM (WS-BC002)".
+
+## [DONE] Register VM or Stack VM (WS-BC002)
+
+The comparison is done (specification, section 5.6, "The comparison"). On the four workloads (loops, calls, closures, strings), the register VM is 1.10 to 1.65 times as fast as the stack VM, and runs 1.29 to 1.75 times fewer instructions. The stack bytecode is 3 to 35 percent smaller in bytes, and its code generator is simpler. Both allocate the same. Not measured yet, because the language does not have them: property access, async suspension, template output, I/O-bound workloads, startup and latency. Added by Claude, 2026-11-13.
+
+Q1: Which VM does WebLingo keep? (a) the register VM: WS-BC002 is approved, and the stack VM is removed; (b) the register VM: WS-BC002 is approved, and the stack VM stays as it is, for comparisons later; (c) both, for now: WS-BC002 stays provisional until the workloads not measured yet can be, and every new feature is built on both VMs; (d) the stack VM.
+
+A1: (c)
+
+Done (Claude, 2026-11-13): recorded as approved in the specification: its decision register, section 5.2, section 5.6 ("Both VMs, for now") and open question 1. `Documents/implementation.md`, section 6, now has the rule that every feature reaching the bytecode is built on both VMs in the same change, and that property access, async suspension, template output and I/O each get a benchmark workload when the language can express them. No code changed.
