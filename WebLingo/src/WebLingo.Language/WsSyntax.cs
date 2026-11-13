@@ -29,6 +29,9 @@ public abstract record WsExpressionSyntax(WsSourceSpan Span) : WsSyntaxNode(Span
 
 public sealed record WsIntegerLiteralSyntax(long Value, WsSourceSpan Span) : WsExpressionSyntax(Span);
 
+/// <summary>A binary64 literal: <c>1.5</c>, <c>1e21</c>, or the keyword <c>Infinity</c> or <c>NaN</c>.</summary>
+public sealed record WsBinary64LiteralSyntax(double Value, WsSourceSpan Span) : WsExpressionSyntax(Span);
+
 public sealed record WsNameSyntax(string Name, WsSourceSpan Span) : WsExpressionSyntax(Span);
 
 public enum WsUnaryOperator { Negate, Plus }

@@ -18,6 +18,7 @@ public sealed class WsCodeGenerator
     private readonly List<WsSourceSpan> _spans = [];
     private readonly List<WsConstant> _constants = [];
     private readonly Dictionary<long, int> _int64Constants = [];
+    private readonly Dictionary<long, int> _binary64Constants = []; // By IEEE bits, so that 0.0 and -0.0 stay apart.
     private int _nextRegister;
     private int _registerCount;
 
@@ -79,6 +80,12 @@ public sealed class WsCodeGenerator
             {
                 var destination = target ?? Allocate();
                 Emit(new WsInstruction(WsOpCode.LoadConstant, destination, Int64Constant(constant.Value)), constant.Span);
+                return destination;
+            }
+            case WsIrBinary64Constant constant:
+            {
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.LoadConstant, destination, Binary64Constant(constant.Value)), constant.Span);
                 return destination;
             }
             case WsIrLoadLocal load:
@@ -180,6 +187,16 @@ public sealed class WsCodeGenerator
         index = _constants.Count;
         _constants.Add(WsConstant.Int64(value));
         _int64Constants.Add(value, index);
+        return index;
+    }
+
+    private int Binary64Constant(double value)
+    {
+        var bits = BitConverter.DoubleToInt64Bits(value);
+        if (_binary64Constants.TryGetValue(bits, out var index)) return index;
+        index = _constants.Count;
+        _constants.Add(WsConstant.Binary64(value));
+        _binary64Constants.Add(bits, index);
         return index;
     }
 

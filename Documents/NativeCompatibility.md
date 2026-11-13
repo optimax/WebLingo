@@ -9,6 +9,7 @@
 | System.Linq | Not used | Kept out of the portable core's source (tests use it) |
 | `BitConverter.DoubleToInt64Bits` / `Int64BitsToDouble` | Portable target | binary64 values and constants are kept as their IEEE 754 bits |
 | Invariant number formatting (`long.ToString`, `double.ToString("R")` with `CultureInfo.InvariantCulture`) | Planned | The text `write` writes for a number (`WsValueFormatter`). The Native C# runtime must give the same text, exactly: the shortest decimal that reads back as the same binary64, in .NET's exponent style (`1E+21`, `1.5E-07`). Relying on .NET for it until then is approved (12 November 2026) |
+| Invariant number parsing (`double.Parse` with `NumberStyles.Float` and `CultureInfo.InvariantCulture`) | Planned | The lexer's binary64 literals (`WsLexer`). The Native C# runtime must give the same value: the binary64 nearest to the decimal, as IEEE 754 rounds it |
 | `System.Text.StringBuilder` | Planned | The disassembler, and `WsCollectedOutput` (`WebLingo.StdLib`), which collects a script's output for tests and hosts |
 | `volatile` fields | Planned | `WsCancellationSignal`, set by the host, read by the VM |
 | .NET Task / ValueTask | Adapted only | Not permitted as WebLingo core async contract |

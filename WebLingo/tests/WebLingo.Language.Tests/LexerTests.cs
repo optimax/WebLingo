@@ -109,9 +109,59 @@ public sealed class LexerTests
     }
 
     [Theory]
+    [InlineData("1.5", 1.5)]
+    [InlineData("0.1", 0.1)]
+    [InlineData("007.50", 7.5)]
+    [InlineData("1e21", 1e21)]
+    [InlineData("1E21", 1e21)]
+    [InlineData("2.5e-3", 0.0025)]
+    [InlineData("2.5E+3", 2500.0)]
+    [InlineData("1.7976931348623157e308", double.MaxValue)]
+    [InlineData("1e-400", 0.0)]
+    public void Binary64LiteralsCarryTheNearestValue(string text, double value)
+    {
+        var tokens = WsLexer.Tokenize(text, out var diagnostics);
+        Assert.Empty(diagnostics);
+        Assert.Equal((WsTokenKind.Binary64Literal, value, text), (tokens[0].Kind, tokens[0].Binary64Value, tokens[0].Text));
+        Assert.Equal(WsTokenKind.EndOfFile, tokens[1].Kind);
+    }
+
+    [Fact]
+    public void ABinary64LiteralTooLargeIsReported()
+    {
+        var tokens = WsLexer.Tokenize("1e309;", out var diagnostics);
+        Assert.Equal(new[] { WsTokenKind.Bad, WsTokenKind.Semicolon, WsTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal((WsDiagnosticCodes.InvalidNumericLiteral, new WsSourceSpan(0, 5)), (diagnostic.Code, diagnostic.Span));
+    }
+
+    [Theory]
+    [InlineData("1.", new[] { WsTokenKind.IntegerLiteral, WsTokenKind.Bad })]
+    [InlineData(".5", new[] { WsTokenKind.Bad, WsTokenKind.IntegerLiteral })]
+    [InlineData("1.e5", new[] { WsTokenKind.IntegerLiteral, WsTokenKind.Bad, WsTokenKind.Identifier })]
+    public void APointNeedsDigitsOnBothSides(string text, WsTokenKind[] kinds)
+    {
+        var tokens = WsLexer.Tokenize(text, out var diagnostics);
+        Assert.Equal(kinds.Append(WsTokenKind.EndOfFile), tokens.Select(t => t.Kind));
+        Assert.Equal(WsDiagnosticCodes.InvalidCharacter, Assert.Single(diagnostics).Code);
+    }
+
+    [Fact]
+    public void InfinityAndNaNAreKeywords()
+    {
+        Assert.Equal(new[] { WsTokenKind.Infinity, WsTokenKind.NaN, WsTokenKind.Identifier, WsTokenKind.Identifier,
+                WsTokenKind.EndOfFile },
+            Kinds("Infinity NaN infinity nan", out var diagnostics));
+        Assert.Empty(diagnostics);
+    }
+
+    [Theory]
     [InlineData("10abc")]
     [InlineData("10m")]
     [InlineData("1_000")]
+    [InlineData("1.5m")]
+    [InlineData("1e")]
+    [InlineData("2.5e3x")]
     public void DigitsRunningIntoLettersAreOneInvalidLiteral(string text)
     {
         var tokens = WsLexer.Tokenize(text, out var diagnostics);

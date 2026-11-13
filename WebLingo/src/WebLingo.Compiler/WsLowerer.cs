@@ -35,6 +35,8 @@ public static class WsLowerer
         {
             case WsBoundIntegerLiteral literal:
                 return new WsIrInt64Constant(literal.Value, literal.Span);
+            case WsBoundBinary64Literal literal:
+                return new WsIrBinary64Constant(literal.Value, literal.Span);
             case WsBoundLocalReference reference:
                 return new WsIrLoadLocal(reference.Local.Index, reference.Span);
             case WsBoundUnary unary:

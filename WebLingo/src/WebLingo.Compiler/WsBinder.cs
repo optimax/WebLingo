@@ -64,6 +64,8 @@ public sealed class WsBinder
         {
             case WsIntegerLiteralSyntax literal:
                 return new WsBoundIntegerLiteral(literal.Value, literal.Span);
+            case WsBinary64LiteralSyntax literal:
+                return new WsBoundBinary64Literal(literal.Value, literal.Span);
             case WsNameSyntax name:
                 return BindName(name);
             case WsParenthesizedExpressionSyntax parenthesized:

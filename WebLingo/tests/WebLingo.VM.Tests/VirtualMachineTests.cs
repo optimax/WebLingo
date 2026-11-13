@@ -30,6 +30,10 @@ public sealed class VirtualMachineTests
     [InlineData("writeLn(writeLn(1));", "1\nnull")]
     [InlineData("writeLn(9223372036854775807);", "9223372036854775807")]
     [InlineData("writeLn(+(1 - 4) + +2);", "-1")]
+    [InlineData("writeLn(1.5 + 1);", "2.5")]
+    [InlineData("writeLn(1e21);", "1E+21")]
+    [InlineData("writeLn(-0.0);", "-0.0")]
+    [InlineData("writeLn(Infinity); writeLn(-Infinity); writeLn(NaN);", "Infinity\n-Infinity\nNaN")]
     [InlineData("write(1); write(2); writeLn(3); write(4);", "123\n4")]
     public void ComputesWhatTheProgramSays(string source, string expected)
     {

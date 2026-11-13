@@ -240,6 +240,15 @@ public sealed class WsParser : IWsParser
             case WsTokenKind.IntegerLiteral:
                 Advance();
                 return new WsIntegerLiteralSyntax(token.IntegerValue, token.Span);
+            case WsTokenKind.Binary64Literal:
+                Advance();
+                return new WsBinary64LiteralSyntax(token.Binary64Value, token.Span);
+            case WsTokenKind.Infinity:
+                Advance();
+                return new WsBinary64LiteralSyntax(double.PositiveInfinity, token.Span);
+            case WsTokenKind.NaN:
+                Advance();
+                return new WsBinary64LiteralSyntax(double.NaN, token.Span);
             case WsTokenKind.Identifier:
                 Advance();
                 return new WsNameSyntax(token.Text, token.Span);

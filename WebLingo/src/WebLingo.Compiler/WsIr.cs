@@ -23,6 +23,8 @@ public abstract record WsIrExpression(WsSourceSpan Span);
 
 public sealed record WsIrInt64Constant(long Value, WsSourceSpan Span) : WsIrExpression(Span);
 
+public sealed record WsIrBinary64Constant(double Value, WsSourceSpan Span) : WsIrExpression(Span);
+
 /// <summary>Reads a local.</summary>
 public sealed record WsIrLoadLocal(int Local, WsSourceSpan Span) : WsIrExpression(Span);
 

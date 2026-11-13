@@ -3,7 +3,8 @@ namespace WebLingo.Language;
 
 /// <summary>
 /// The M0.6 lexer (specification, section 8.4, "Lexer"; its choices are in section 15.2). It reads identifiers,
-/// the keywords <c>var</c> and <c>const</c> and the reserved <c>let</c>, decimal integer literals, operators, and
+/// the keywords <c>var</c>, <c>const</c>, <c>Infinity</c> and <c>NaN</c> and the reserved <c>let</c>, decimal integer
+/// and binary64 literals (<c>1.5</c>, <c>1e21</c>, <c>2.5E-3</c>), operators, and
 /// punctuation, and skips whitespace and comments. Malformed input gives a <see cref="WsTokenKind.Bad"/> token
 /// and a diagnostic, and lexing goes on, so that one pass reports every lexical error.
 /// </summary>
@@ -39,7 +40,7 @@ public sealed class WsLexer(string source) : IWsLexer
         if (start >= source.Length) return new WsToken(WsTokenKind.EndOfFile, "", new WsSourceSpan(source.Length, 0));
         var c = source[start];
         if (IsIdentifierStart(c)) return ReadIdentifierOrKeyword(start);
-        if (IsDigit(c)) return ReadIntegerLiteral(start);
+        if (IsDigit(c)) return ReadNumericLiteral(start);
         var kind = c switch
         {
             '+' => WsTokenKind.Plus, '-' => WsTokenKind.Minus,
@@ -100,14 +101,33 @@ public sealed class WsLexer(string source) : IWsLexer
             "var" => WsTokenKind.Var,
             "const" => WsTokenKind.Const,
             "let" => WsTokenKind.Let, // Reserved: never a declaration keyword (WS-002.3).
+            "Infinity" => WsTokenKind.Infinity,
+            "NaN" => WsTokenKind.NaN,
             _ => WsTokenKind.Identifier
         };
         return new WsToken(kind, text, new WsSourceSpan(start, _position - start));
     }
 
-    private WsToken ReadIntegerLiteral(int start)
+    /// <summary>
+    /// Digits, then optionally a fraction (<c>.</c> and digits) and an exponent (<c>e</c> or <c>E</c>, an optional sign,
+    /// and digits). With either, the literal is a binary64, rounded to the nearest; otherwise an int64.
+    /// </summary>
+    private WsToken ReadNumericLiteral(int start)
     {
-        while (_position < source.Length && IsDigit(source[_position])) _position++;
+        SkipDigits();
+        var isBinary64 = false;
+        if (At(0) == '.' && IsDigit(At(1)))
+        {
+            _position++;
+            SkipDigits();
+            isBinary64 = true;
+        }
+        if (At(0) is 'e' or 'E' && (IsDigit(At(1)) || (At(1) is '+' or '-' && IsDigit(At(2)))))
+        {
+            _position += IsDigit(At(1)) ? 1 : 2;
+            SkipDigits();
+            isBinary64 = true;
+        }
         if (_position < source.Length && IsIdentifierPart(source[_position]))
         {
             // Digits run into letters (10abc, or the decimal suffix of 10m, which M0.6 does not read yet).
@@ -117,6 +137,7 @@ public sealed class WsLexer(string source) : IWsLexer
                 new WsSourceSpan(start, _position - start));
             return Token(WsTokenKind.Bad, start);
         }
+        if (isBinary64) return ReadBinary64(start);
 
         long value = 0;
         for (var i = start; i < _position; i++)
@@ -134,6 +155,27 @@ public sealed class WsLexer(string source) : IWsLexer
         return new WsToken(WsTokenKind.IntegerLiteral, source[start.._position], new WsSourceSpan(start, _position - start),
             value);
     }
+
+    private WsToken ReadBinary64(int start)
+    {
+        var text = source[start.._position];
+        var value = double.Parse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
+        var span = new WsSourceSpan(start, _position - start);
+        if (double.IsInfinity(value))
+        {
+            Report(WsDiagnosticCodes.InvalidNumericLiteral,
+                $"The number {text} is too large for a binary64; write Infinity for infinity.", span);
+            return Token(WsTokenKind.Bad, start);
+        }
+        return new WsToken(WsTokenKind.Binary64Literal, text, span, BitConverter.DoubleToInt64Bits(value));
+    }
+
+    private void SkipDigits()
+    {
+        while (_position < source.Length && IsDigit(source[_position])) _position++;
+    }
+
+    private char At(int offset) => _position + offset < source.Length ? source[_position + offset] : '\0';
 
     private WsToken ReadInvalidCharacter(int start)
     {

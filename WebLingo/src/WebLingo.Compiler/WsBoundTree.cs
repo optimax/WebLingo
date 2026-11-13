@@ -20,6 +20,8 @@ public abstract record WsBoundExpression(WsSourceSpan Span);
 
 public sealed record WsBoundIntegerLiteral(long Value, WsSourceSpan Span) : WsBoundExpression(Span);
 
+public sealed record WsBoundBinary64Literal(double Value, WsSourceSpan Span) : WsBoundExpression(Span);
+
 public sealed record WsBoundLocalReference(WsLocalSymbol Local, WsSourceSpan Span) : WsBoundExpression(Span);
 
 public sealed record WsBoundUnary(WsUnaryOperator Operator, WsBoundExpression Operand, WsSourceSpan Span)

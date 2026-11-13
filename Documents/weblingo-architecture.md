@@ -1039,10 +1039,11 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Whitespace | Space, tab, CR, and LF only; any other character, Unicode spaces included, is invalid (WS1003) | Approved (12 November 2026) |
 | Comments | `//` to the end of the line; `/* … */`, not nested; an unterminated `/*` is an error (WS1005) | Approved (12 November 2026) |
 | Identifiers | ASCII letters, digits and `_`, not starting with a digit; case-sensitive | Approved (12 November 2026) |
-| Keywords | `var` and `const`; `let` reserved and reported (WS-002.3); no other reserved words yet | Approved (12 November 2026) |
+| Keywords | `var` and `const`; `Infinity` and `NaN`, binary64 literals, which therefore cannot be declared or shadowed; `let` reserved and reported (WS-002.3); no other reserved words yet | Approved (12 November 2026) |
 | Integer literals | Decimal digits only; leading zeros allowed and still decimal (`007` is 7); at most 9223372036854775807, larger is an error (WS1004) | Approved (12 November 2026) |
+| Binary64 literals | Digits, then a fraction (`.` and digits, at least one on each side of the point: `1.` and `.5` are not literals), an exponent (`e` or `E`, an optional sign, and digits), or both: `1.5`, `0.1`, `1e21`, `2.5E-3`. The value is the nearest binary64; one too large for a binary64 is an error (WS1004), and one too small becomes 0. `Infinity` and `NaN` are keywords for those values, and `-Infinity` is unary minus applied to `Infinity` | Approved (12 November 2026) |
 | Literal suffixes | Digits followed directly by a letter, digit or `_` are one invalid literal (WS1004), which keeps room for the decimal suffix `m` (§3.2) | Approved (12 November 2026) |
-| Not yet lexed | String, binary64 and decimal literals: their characters are invalid (WS1003) until their syntax is specified | Approved (12 November 2026) |
+| Not yet lexed | String and decimal literals: their characters are invalid (WS1003) until their syntax is specified | Approved (12 November 2026) |
 | Statements | Variable declarations and expression statements, each ended by `;`; a lone `;` (an empty statement) is an error (WS1001); blocks come later | Approved (12 November 2026) |
 | Operators | Unary `-` and `+` (`+` gives the number itself; on anything but a number either is WS3001); binary `* /` above `+ -`, both left-associative | Approved (12 November 2026) |
 | Assignment | An expression, right-associative (`a = b = 3`), whose value is the value assigned; only a variable's name may be assigned (WS1007), not even a parenthesized one | Approved (12 November 2026) |
@@ -1063,7 +1064,7 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Compiler output | The compiler verifies what it generates, and reports a module that fails as an internal error (WS4001), with no module | Proposed |
 | Runtime values | `WsValue`, a kind and a 64-bit payload, 16 bytes (§4.1's target, met): null, Boolean, int64 and binary64 (§8.4); the language has no `null`, `true` or `false` literals yet, so scripts produce only numbers | Proposed |
 | Mixed arithmetic | An int64 meeting a binary64 is converted to binary64 (`1 + 0.5`, and `10 / 4 + 1` is 3.5) | Approved (12 November 2026) |
-| Binary64 results | IEEE 754 throughout: `1 / 0` is `Infinity`, `-1 / 0` is `-Infinity`, `0 / 0` is `NaN`; only integer arithmetic raises an error (WS3002). `Infinity` and `NaN` are to have literals of their own, whose spelling is not yet decided | Approved (12 November 2026) |
+| Binary64 results | IEEE 754 throughout: `1 / 0` is `Infinity`, `-1 / 0` is `-Infinity`, `0 / 0` is `NaN`; only integer arithmetic raises an error (WS3002). `Infinity` and `NaN` are written as keywords (see "Binary64 literals") | Approved (12 November 2026) |
 | Invalid operands | Arithmetic on anything but numbers is WS3001; once strings exist, `+` also concatenates them | Approved (12 November 2026) |
 | `write` | `write(value)` writes the value as text, with no line break; `writeLn(value)` writes it and a line break (LF); each takes one argument and gives `null`; the host (the CLI) registers them, and they are implemented once in `WebLingo.StdLib`. A line break can also be written as text, once string literals exist | Approved (12 November 2026) |
 | Text of a value | `null`, `true`, `false`; an int64 in decimal digits; a binary64 as the shortest decimal that reads back as the same number, always with a decimal point or an exponent (`5.0`, `3.5`, `0.1`, `-0.0`, `1E+21`), or `NaN`, `Infinity`, `-Infinity`; never culture-dependent (`WsValueFormatter`) | Approved (12 November 2026) |

@@ -122,7 +122,7 @@ public sealed class ConformanceTests : IDisposable
     {
         string[] fragments =
         [
-            "var", "const", "let", "x", "y", "writeLn", "=", "+", "-", "*", "/", "(", ")", ";", ",", "10", "0",
+            "var", "const", "let", "x", "y", "writeLn", "=", "+", "-", "*", "/", "(", ")", ";", ",", "10", "0", "1.5", "1e309", "Infinity", "NaN",
             "9223372036854775807", "9223372036854775808", "1x", "@", "\"", ".", "/*", "*/", "//", "\n", "\r\n", " ", "é",
         ];
         var random = new Random(8_6);
