@@ -34,9 +34,16 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             if (import.Arity < 0) return Fail($"Import {i} ('{import.Name}') has a negative arity.");
         }
         if (module.Functions is null) return Fail("The module has no function table.");
-        if (module.EntryPoint is { } main && (main.ParameterCount != 0 || main.Captures is not { Count: 0 }))
+        if (module.EntryPoint is { } main && (main.ParameterCount != 0 || main.Captures is not { Count: 0 } || main.HasThis))
         {
             return Fail("The entry point takes no parameters and captures nothing.");
+        }
+        var methods = new List<WsFunction?>();
+        foreach (var function in module.Functions) methods.Add(function);
+        if (WsClassTables.Check(module.Classes, index => index >= 0 && index < methods.Count && methods[index] is { HasThis: true })
+            is { } classError)
+        {
+            return Fail(classError);
         }
         var result = VerifyFunction(module, module.EntryPoint);
         for (var i = 0; i < module.Functions.Count && result.IsValid; i++)
@@ -151,6 +158,36 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return Index(a, function.Captures.Count, "capture") ?? Register(function, b, "source") ?? Unused(c, d);
             case WsOpCode.LoadBuiltin:
                 return Register(function, a, "destination") ?? Index(b, module.Imports.Count, "import") ?? Unused(c, d);
+            case WsOpCode.MakeClass:
+            {
+                if ((Register(function, a, "destination") ?? Index(b, module.Classes.Count, "class") ?? Unused(c, d))
+                    is { } classError)
+                {
+                    return classError;
+                }
+                foreach (var member in WsClassTables.Functions(module.Classes[b]))
+                {
+                    foreach (var capture in module.Functions[member].Captures)
+                    {
+                        var error = capture.FromLocal
+                            ? Register(function, capture.Index, "captured")
+                            : Index(capture.Index, function.Captures.Count, "capture");
+                        if (error is not null) return $"function {member}'s capture: {error}";
+                    }
+                }
+                return null;
+            }
+            case WsOpCode.New:
+                if ((Register(function, a, "destination") ?? Register(function, b, "class")) is { } newError) return newError;
+                if (d < 0) return $"its argument count, {d}, is negative.";
+                if (d == 0) return Unused(c);
+                if (c < 0 || c > function.RegisterCount - d)
+                {
+                    return $"its arguments, registers {c} to {(long)c + d - 1}, are not all in the function's {function.RegisterCount}.";
+                }
+                return null;
+            case WsOpCode.SetMember:
+                return Register(function, a, "target") ?? Name(module, b) ?? Register(function, c, "value") ?? Unused(d);
             case WsOpCode.MakeClosure:
             {
                 if ((Register(function, a, "destination") ?? Index(b, module.Functions.Count, "function") ?? Unused(c, d))
@@ -159,6 +196,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                     return closureError;
                 }
                 if (module.Functions[b] is not { Captures: { } captures }) return $"function {b} is missing.";
+                if (module.Functions[b].HasThis) return $"function {b} is a method, which only its class makes.";
                 foreach (var capture in captures)
                 {
                     var error = capture.FromLocal
@@ -181,7 +219,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return Unused(a, b, c, d);
             case WsOpCode.GetMember:
                 return Register(function, a, "destination") ?? Register(function, b, "target") ?? Name(module, c)
-                    ?? Unused(d);
+                    ?? (d is 0 or 1 ? null : $"its D is {d}, not 0 or 1.");
             case WsOpCode.CallMethod:
                 if ((Register(function, a, "destination") ?? Name(module, b)) is { } methodError) return methodError;
                 if (d < 0) return $"its argument count, {d}, is negative.";
@@ -411,6 +449,33 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return -1;
             case WsOpCode.GetMember:
                 return Unwritten(instruction.B, state, locals);
+            case WsOpCode.SetMember:
+            {
+                var target = Unwritten(instruction.A, state, locals);
+                return target >= 0 ? target : Unwritten(instruction.C, state, locals);
+            }
+            case WsOpCode.New:
+            {
+                var target = Unwritten(instruction.B, state, locals);
+                if (target >= 0) return target;
+                for (var i = 0; i < instruction.D; i++)
+                {
+                    var argument = Unwritten(instruction.C + i, state, locals);
+                    if (argument >= 0) return argument;
+                }
+                return -1;
+            }
+            case WsOpCode.MakeClass:
+                foreach (var member in WsClassTables.Functions(module.Classes[instruction.B]))
+                {
+                    foreach (var capture in module.Functions[member].Captures)
+                    {
+                        if (!capture.FromLocal) continue;
+                        var captured = Unwritten(capture.Index, state, locals);
+                        if (captured >= 0) return captured;
+                    }
+                }
+                return -1;
             case WsOpCode.ForEachNext:
             {
                 var collection = Unwritten(instruction.B, state, locals);
@@ -472,7 +537,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             or WsOpCode.Greater or WsOpCode.GreaterOrEqual or WsOpCode.NewCell or WsOpCode.BoxRegister or WsOpCode.CopyCell
             or WsOpCode.LoadCell or WsOpCode.LoadCapture or WsOpCode.MakeClosure or WsOpCode.LoadBuiltin
             or WsOpCode.Call or WsOpCode.GetMember or WsOpCode.CallMethod or WsOpCode.GetIndex
-            or WsOpCode.NewArray or WsOpCode.NewMap or WsOpCode.NewSet => instruction.A,
+            or WsOpCode.NewArray or WsOpCode.NewMap or WsOpCode.NewSet or WsOpCode.MakeClass or WsOpCode.New => instruction.A,
         _ => null
     };
 

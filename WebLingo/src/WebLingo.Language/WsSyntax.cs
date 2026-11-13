@@ -12,7 +12,7 @@ public sealed record WsCompilationUnitSyntax(IReadOnlyList<WsStatementSyntax> St
 public abstract record WsStatementSyntax(WsSourceSpan Span) : WsSyntaxNode(Span);
 
 /// <summary>What declares a name: <c>var</c>, <c>const</c>, a function declaration, or a function's parameter.</summary>
-public enum WsDeclarationKind { Var, Const, Function, Parameter }
+public enum WsDeclarationKind { Var, Const, Function, Parameter, Class }
 
 /// <summary>
 /// <c>var x = 1;</c> or <c>const x = 1;</c>; the span includes the semicolon. <paramref name="Initializer"/> is null
@@ -66,6 +66,16 @@ public sealed record WsParameterSyntax(string Name, WsSourceSpan Span) : WsSynta
 /// <summary><c>function name(parameters) { body }</c>, in scope throughout its block (specification, section 3.5).</summary>
 public sealed record WsFunctionDeclarationSyntax(
     string Name, WsSourceSpan NameSpan, IReadOnlyList<WsParameterSyntax> Parameters, WsBlockSyntax Body, WsSourceSpan Span)
+    : WsStatementSyntax(Span);
+
+/// <summary>A method of a class, or its <c>constructor</c>: a name, parameters and a body (section 3.7).</summary>
+public sealed record WsMethodSyntax(
+    string Name, WsSourceSpan NameSpan, IReadOnlyList<WsParameterSyntax> Parameters, WsBlockSyntax Body, WsSourceSpan Span)
+    : WsSyntaxNode(Span);
+
+/// <summary><c>class Name { members }</c>, in scope throughout its block, as a function is (section 3.7).</summary>
+public sealed record WsClassDeclarationSyntax(
+    string Name, WsSourceSpan NameSpan, IReadOnlyList<WsMethodSyntax> Methods, WsSourceSpan Span)
     : WsStatementSyntax(Span);
 
 /// <summary><c>return value;</c>, or <c>return;</c>, which gives <c>null</c>.</summary>
@@ -140,7 +150,22 @@ public sealed record WsIndexExpressionSyntax(WsExpressionSyntax Target, WsExpres
 
 /// <summary><c>target.name</c>: a member of a value (section 3.6); called, <c>target.name(…)</c>, a method.</summary>
 public sealed record WsMemberAccessSyntax(WsExpressionSyntax Target, string Name, WsSourceSpan NameSpan, WsSourceSpan Span)
+    : WsExpressionSyntax(Span)
+{
+    /// <summary><c>target?.name</c>, which gives <c>null</c> for a <c>null</c> target or a missing member (section 3.7).</summary>
+    public bool IsOptional { get; init; }
+}
+
+/// <summary><c>target.name = value</c>: a field assigned (section 3.7).</summary>
+public sealed record WsMemberAssignmentSyntax(WsMemberAccessSyntax Target, WsExpressionSyntax Value, WsSourceSpan Span)
     : WsExpressionSyntax(Span);
+
+/// <summary><c>new Class(arguments)</c> (section 3.7).</summary>
+public sealed record WsNewExpressionSyntax(WsExpressionSyntax Class, IReadOnlyList<WsExpressionSyntax> Arguments, WsSourceSpan Span)
+    : WsExpressionSyntax(Span);
+
+/// <summary><c>this</c>, the instance a method runs on (section 3.7).</summary>
+public sealed record WsThisSyntax(WsSourceSpan Span) : WsExpressionSyntax(Span);
 
 /// <summary><c>target[index] = value</c>: an element or an entry assigned (section 3.6).</summary>
 public sealed record WsIndexAssignmentSyntax(WsIndexExpressionSyntax Target, WsExpressionSyntax Value, WsSourceSpan Span)

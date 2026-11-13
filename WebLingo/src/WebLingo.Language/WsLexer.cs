@@ -47,7 +47,7 @@ public sealed class WsLexer(string source) : IWsLexer
             ('=', '=') => WsTokenKind.EqualEqual, ('!', '=') => WsTokenKind.BangEqual,
             ('<', '=') => WsTokenKind.LessEqual, ('>', '=') => WsTokenKind.GreaterEqual,
             ('&', '&') => WsTokenKind.AmpAmp, ('|', '|') => WsTokenKind.PipePipe, ('#', '{') => WsTokenKind.HashBrace,
-            ('?', '[') => WsTokenKind.QuestionBracket,
+            ('?', '[') => WsTokenKind.QuestionBracket, ('?', '.') => WsTokenKind.QuestionDot,
             _ => WsTokenKind.Bad
         };
         if (pair != WsTokenKind.Bad)
@@ -131,6 +131,9 @@ public sealed class WsLexer(string source) : IWsLexer
             "break" => WsTokenKind.Break,
             "continue" => WsTokenKind.Continue,
             "function" => WsTokenKind.Function,
+            "class" => WsTokenKind.Class,
+            "new" => WsTokenKind.New,
+            "this" => WsTokenKind.This,
             "return" => WsTokenKind.Return,
             _ => WsTokenKind.Identifier
         };

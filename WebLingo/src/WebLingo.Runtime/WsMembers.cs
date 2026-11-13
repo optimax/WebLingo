@@ -30,10 +30,32 @@ public static class WsMembers
         _ => WsMember.Unknown
     };
 
-    /// <summary>Reads a member that is not called: <c>x.name</c>.</summary>
-    public static bool TryGet(WsValue target, WsMember member, string name, WsHeap heap, out WsValue result,
+    /// <summary>
+    /// Reads a member that is not called: <c>x.name</c>, or with <paramref name="optional"/> <c>x?.name</c>, which gives
+    /// <c>null</c> for a <c>null</c> target or a member it does not have (section 3.7). An instance's field is its
+    /// value, and its method a function bound to it.
+    /// </summary>
+    public static bool TryGet(WsValue target, WsMember member, string name, WsHeap heap, bool optional, out WsValue result,
         out WsRuntimeError? error)
     {
+        if (optional && target.Kind == WsValueKind.Null)
+        {
+            result = WsValue.Null;
+            error = null;
+            return true;
+        }
+        if (target.Kind == WsValueKind.Instance)
+        {
+            error = null;
+            if (heap.TryGetField(target, name, out result)) return true;
+            if (heap.TryGetMethod(heap.ClassOf(target), name, out var method))
+            {
+                return heap.TryAllocateBoundMethod(target, method, out result, out error);
+            }
+            if (optional) return true;
+            error = NoSuchMember(target, name, heap);
+            return false;
+        }
         if (target.Kind == WsValueKind.String && member == WsMember.Length)
         {
             result = WsValue.FromInt64(ScalarCount(heap.GetString(target)));
@@ -59,10 +81,50 @@ public static class WsMembers
             return true;
         }
         result = WsValue.Null;
-        error = IsMethod(target, member)
-            ? new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
-                $"'{name}' is a method of {WsValueFormatter.Describe(target)}, and can only be called.")
-            : NoSuchMember(target, name);
+        if (IsMethod(target, member))
+        {
+            error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                $"'{name}' is a method of {WsValueFormatter.Describe(target)}, and can only be called.");
+            return false;
+        }
+        error = optional ? null : NoSuchMember(target, name, heap);
+        return optional;
+    }
+
+    /// <summary>
+    /// Assigns a field of an instance, <c>x.name = v</c>, which exists from then on (section 3.7). A method's name is not
+    /// a field's, and nothing else has fields to assign (WS3001).
+    /// </summary>
+    public static bool TrySet(WsValue target, string name, WsValue value, WsHeap heap, out WsRuntimeError? error)
+    {
+        if (target.Kind != WsValueKind.Instance)
+        {
+            error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                $"Only an instance's fields can be assigned, not a member of {WsValueFormatter.Describe(target, heap)}.");
+            return false;
+        }
+        if (heap.TryGetMethod(heap.ClassOf(target), name, out _))
+        {
+            error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                $"'{name}' is a method of {WsValueFormatter.Describe(target, heap)}, and cannot be assigned.");
+            return false;
+        }
+        return heap.TrySetField(target, name, value, out error);
+    }
+
+    /// <summary>
+    /// What <c>x.name(…)</c> calls when <c>x</c> is an instance: a field's value, as any function value is called, or
+    /// a method, which runs on the instance (<paramref name="isMethod"/>); WS3006 if it has neither.
+    /// </summary>
+    public static bool TryFindCallee(WsValue instance, string name, WsHeap heap, out WsValue callee, out bool isMethod,
+        out WsRuntimeError? error)
+    {
+        error = null;
+        isMethod = false;
+        if (heap.TryGetField(instance, name, out callee)) return true;
+        isMethod = heap.TryGetMethod(heap.ClassOf(instance), name, out callee);
+        if (isMethod) return true;
+        error = NoSuchMember(instance, name, heap);
         return false;
     }
 
@@ -129,7 +191,7 @@ public static class WsMembers
                 && member == WsMember.Length
             ? new WsRuntimeError(WsDiagnosticCodes.NotAFunction,
                 $"'{name}' of {WsValueFormatter.Describe(target)} is not a method, and cannot be called.")
-            : NoSuchMember(target, name);
+            : NoSuchMember(target, name, heap);
         return false;
     }
 
@@ -322,8 +384,8 @@ public static class WsMembers
     private static WsRuntimeError CannotBeIndexed(WsValue target) =>
         new(WsDiagnosticCodes.InvalidOperation, $"{Capitalized(WsValueFormatter.Describe(target))} cannot be indexed.");
 
-    private static WsRuntimeError NoSuchMember(WsValue target, string name) =>
-        new(WsDiagnosticCodes.NoSuchMember, $"{Capitalized(WsValueFormatter.Describe(target))} has no member '{name}'.");
+    private static WsRuntimeError NoSuchMember(WsValue target, string name, WsHeap heap) =>
+        new(WsDiagnosticCodes.NoSuchMember, $"{Capitalized(WsValueFormatter.Describe(target, heap))} has no member '{name}'.");
 
     private static string Invariant(long value) => value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 

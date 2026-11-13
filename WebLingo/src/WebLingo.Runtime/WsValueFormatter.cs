@@ -20,7 +20,8 @@ public static class WsValueFormatter
         return value.Kind switch
         {
             WsValueKind.String => heap.GetString(value),
-            WsValueKind.Array or WsValueKind.Map or WsValueKind.Set => FormatCollection(value, heap),
+            WsValueKind.Array or WsValueKind.Map or WsValueKind.Set or WsValueKind.Instance => FormatCollection(value, heap),
+            WsValueKind.Class => "class " + heap.ClassName(value),
             _ => Format(value)
         };
     }
@@ -34,6 +35,9 @@ public static class WsValueFormatter
         WsValueKind.Array => $"array#{value.Handle}",
         WsValueKind.Map => $"map#{value.Handle}",
         WsValueKind.Set => $"set#{value.Handle}",
+        WsValueKind.Class => $"class#{value.Handle}",
+        WsValueKind.Instance => $"instance#{value.Handle}",
+        WsValueKind.BoundMethod => "function",
         WsValueKind.Boolean => value.AsBoolean ? "true" : "false",
         WsValueKind.Int64 => value.AsInt64.ToString(CultureInfo.InvariantCulture),
         _ => FormatBinary64(value.AsBinary64)
@@ -46,11 +50,21 @@ public static class WsValueFormatter
         WsValueKind.Boolean => $"the Boolean {Format(value)}",
         WsValueKind.Int64 => $"the integer {Format(value)}",
         WsValueKind.String => "a string",
-        WsValueKind.Function or WsValueKind.Builtin => "a function",
+        WsValueKind.Function or WsValueKind.Builtin or WsValueKind.BoundMethod => "a function",
         WsValueKind.Array => "an array",
+        WsValueKind.Class => "a class",
+        WsValueKind.Instance => "an instance",
         WsValueKind.Map => "a map",
         WsValueKind.Set => "a set",
         _ => $"the number {Format(value)}"
+    };
+
+    /// <summary>A value described in a message, an instance and a class with their class's name.</summary>
+    public static string Describe(WsValue value, WsHeap heap) => value.Kind switch
+    {
+        WsValueKind.Instance => $"an instance of {heap.ClassName(heap.ClassOf(value))}",
+        WsValueKind.Class => $"the class {heap.ClassName(value)}",
+        _ => Describe(value)
     };
 
     /// <summary>
@@ -96,7 +110,7 @@ public static class WsValueFormatter
         var text = new StringBuilder();
         var open = new HashSet<int>();
         var pending = new Stack<(WsValue Collection, int Next)>();
-        Open(root, text, open, pending);
+        Open(root, text, open, pending, heap);
         while (pending.Count > 0)
         {
             var (collection, next) = pending.Pop();
@@ -105,6 +119,7 @@ public static class WsValueFormatter
             {
                 WsValueKind.Map => heap.MapCount(collection),
                 WsValueKind.Set => heap.SetCount(collection),
+                WsValueKind.Instance => heap.FieldCount(collection),
                 _ => heap.GetArray(collection).Count
             };
             if (next >= count)
@@ -122,18 +137,30 @@ public static class WsValueFormatter
                 text.Append(Scalar(key, heap)).Append(": ");
                 item = value;
             }
+            else if (collection.Kind == WsValueKind.Instance)
+            {
+                var (name, value) = heap.FieldAt(collection, next);
+                text.Append(name).Append(": ");
+                item = value;
+            }
             else
             {
                 item = collection.Kind == WsValueKind.Set ? heap.SetValueAt(collection, next) : heap.GetArray(collection)[next];
             }
-            if (item.Kind is WsValueKind.Array or WsValueKind.Map or WsValueKind.Set)
+            if (item.Kind is WsValueKind.Array or WsValueKind.Map or WsValueKind.Set or WsValueKind.Instance)
             {
                 if (open.Contains(item.Handle))
                 {
-                    text.Append(item.Kind switch { WsValueKind.Map => "{…}", WsValueKind.Set => "#{…}", _ => "[…]" });
+                    text.Append(item.Kind switch
+                    {
+                        WsValueKind.Map => "{…}",
+                        WsValueKind.Set => "#{…}",
+                        WsValueKind.Instance => heap.ClassName(heap.ClassOf(item)) + " {…}",
+                        _ => "[…]"
+                    });
                     continue;
                 }
-                Open(item, text, open, pending);
+                Open(item, text, open, pending, heap);
                 continue;
             }
             text.Append(Scalar(item, heap));
@@ -141,16 +168,23 @@ public static class WsValueFormatter
         return text.ToString();
     }
 
-    private static void Open(WsValue collection, StringBuilder text, HashSet<int> open, Stack<(WsValue, int)> pending)
+    private static void Open(WsValue collection, StringBuilder text, HashSet<int> open, Stack<(WsValue, int)> pending,
+        WsHeap heap)
     {
-        text.Append(collection.Kind switch { WsValueKind.Map => "{", WsValueKind.Set => "#{", _ => "[" });
+        text.Append(collection.Kind switch
+        {
+            WsValueKind.Map => "{",
+            WsValueKind.Set => "#{",
+            WsValueKind.Instance => heap.ClassName(heap.ClassOf(collection)) + " {",
+            _ => "["
+        });
         open.Add(collection.Handle);
         pending.Push((collection, 0));
     }
 
     /// <summary>A value in a collection that is not a collection itself: a string quoted, anything else as written.</summary>
     private static string Scalar(WsValue value, WsHeap heap) =>
-        value.Kind == WsValueKind.String ? Quote(heap.GetString(value)) : Format(value);
+        value.Kind == WsValueKind.String ? Quote(heap.GetString(value)) : Format(value, heap);
 
     private static string FormatBinary64(double value)
     {

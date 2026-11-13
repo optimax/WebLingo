@@ -90,7 +90,9 @@ public enum WsStackOpCode : byte
     ReturnValue,
     /// <summary>Ends the function, giving <c>null</c>.</summary>
     Return,
-    /// <summary>A = constant index of the member's name, a string; pops the target, pushes its member.</summary>
+    /// <summary>
+    /// A = constant index of the member's name, a string, B = 1 for <c>?.</c>, else 0; pops the target, pushes its member.
+    /// </summary>
     GetMember,
     /// <summary>
     /// A = constant index of the method's name, a string, B = argument count; pops the arguments, then the target
@@ -119,6 +121,18 @@ public enum WsStackOpCode : byte
     ForEachNextEntry,
     /// <summary>A = value count; pops that many values and pushes a new set of them.</summary>
     NewSet,
+    /// <summary>A = class index; pushes a class value, its methods' closures made as their captures say.</summary>
+    MakeClass,
+    /// <summary>
+    /// A = argument count; pops the arguments, then the class below them (WS2005 if it is not one), and pushes a new
+    /// instance, its constructor run with the arguments (section 3.7).
+    /// </summary>
+    New,
+    /// <summary>
+    /// A = constant index of the field's name, a string, B = 1 to push the value back, 0 not to; pops the value, then
+    /// the target, and assigns the field.
+    /// </summary>
+    SetMember,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);
@@ -139,6 +153,8 @@ public sealed record WsStackFunction(
     public IReadOnlyList<WsCapture> Captures { get; init; } = [];
     /// <summary>The slots its frame needs: its locals and its operand stack.</summary>
     public int SlotCount => LocalCount + MaxStack;
+    /// <summary>A method's or a constructor's: its first parameter is <c>this</c>, which its caller gives (section 3.7).</summary>
+    public bool HasThis { get; init; }
 }
 
 /// <summary>A stack bytecode module: its constants, its imports, the function it runs, and its other functions.</summary>
@@ -147,4 +163,6 @@ public sealed record WsStackModule(
 {
     /// <summary>The functions the module declares, besides its entry point, which closures are made of by index.</summary>
     public IReadOnlyList<WsStackFunction> Functions { get; init; } = [];
+    /// <summary>The classes the module declares, which <see cref="WsStackOpCode.MakeClass"/> refers to by index.</summary>
+    public IReadOnlyList<WsClassInfo> Classes { get; init; } = [];
 }

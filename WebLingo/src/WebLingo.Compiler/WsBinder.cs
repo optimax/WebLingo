@@ -38,14 +38,17 @@ public sealed class WsBinder
     /// <summary>A block's statements, in the current scope, its function declarations declared first.</summary>
     private List<WsBoundStatement> BindStatements(IReadOnlyList<WsStatementSyntax> syntax)
     {
-        var declared = new Dictionary<WsFunctionDeclarationSyntax, WsLocalSymbol>();
+        var declared = new Dictionary<WsStatementSyntax, WsLocalSymbol>();
         foreach (var statement in syntax)
         {
-            if (statement is not WsFunctionDeclarationSyntax function) continue;
-            if (Declare(function.Name, WsDeclarationKind.Function, function.NameSpan, function.Parameters.Count) is { } local)
+            var local = statement switch
             {
-                declared.Add(function, local);
-            }
+                WsFunctionDeclarationSyntax function =>
+                    Declare(function.Name, WsDeclarationKind.Function, function.NameSpan, function.Parameters.Count),
+                WsClassDeclarationSyntax declaration => Declare(declaration.Name, WsDeclarationKind.Class, declaration.NameSpan, null),
+                _ => null
+            };
+            if (local is not null) declared.Add(statement, local);
         }
         var statements = new List<WsBoundStatement>();
         foreach (var statement in syntax)
@@ -56,6 +59,15 @@ public sealed class WsBinder
                 if (declared.TryGetValue(function, out var local))
                 {
                     statements.Add(new WsBoundFunctionDeclaration(local, bound, function.Span));
+                }
+                continue;
+            }
+            if (statement is WsClassDeclarationSyntax declaration)
+            {
+                var bound = BindClass(declaration);
+                if (declared.TryGetValue(declaration, out var local))
+                {
+                    statements.Add(new WsBoundClassDeclaration(local, bound, declaration.Span));
                 }
                 continue;
             }
@@ -158,6 +170,8 @@ public sealed class WsBinder
             case WsFunctionDeclarationSyntax function:
                 // A function declared on its own, as a branch or a loop's body: a block of one.
                 return new WsBoundBlock(BindStatements([function]), function.Span);
+            case WsClassDeclarationSyntax declaration:
+                return new WsBoundBlock(BindStatements([declaration]), declaration.Span);
             default:
                 throw new InvalidOperationException($"Unknown statement {statement.GetType().Name}.");
         }
@@ -180,18 +194,51 @@ public sealed class WsBinder
         return new WsBoundBlock(bound, statement.Span);
     }
 
-    /// <summary>A function's body, in a function context of its own, its parameters its first locals.</summary>
+    /// <summary>
+    /// A class: its constructor and its methods, each a function whose first parameter is <c>this</c>; a name declared
+    /// twice in it is WS2002 (section 3.7).
+    /// </summary>
+    private WsBoundClass BindClass(WsClassDeclarationSyntax declaration)
+    {
+        WsBoundFunction? constructor = null;
+        var methods = new List<(string, WsBoundFunction)>();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var method in declaration.Methods)
+        {
+            var isConstructor = method.Name == "constructor";
+            var function = BindFunction(isConstructor ? declaration.Name : method.Name, method.Parameters, method.Body,
+                method.Span, isMethod: true);
+            if (!names.Add(method.Name))
+            {
+                Report(WsDiagnosticCodes.DuplicateDeclaration, $"'{method.Name}' is already declared in this class.", method.NameSpan);
+                continue;
+            }
+            if (isConstructor) constructor = function;
+            else methods.Add((method.Name, function));
+        }
+        return new WsBoundClass(declaration.Name, constructor, methods, declaration.Span);
+    }
+
+    /// <summary>
+    /// A function's body, in a function context of its own, its parameters its first locals; a method's first is
+    /// <c>this</c>, which only a method declares (section 3.7).
+    /// </summary>
     private WsBoundFunction BindFunction(string name, IReadOnlyList<WsParameterSyntax> parameters, WsBlockSyntax body,
-        WsSourceSpan span)
+        WsSourceSpan span, bool isMethod = false)
     {
         var outerFunction = _function;
         var outerScope = _scope;
         _function = new FunctionContext(outerFunction, name);
         _scope = new Scope(outerScope, _function);
+        if (isMethod) Declare("this", WsDeclarationKind.Parameter, span, null);
         foreach (var parameter in parameters) Declare(parameter.Name, WsDeclarationKind.Parameter, parameter.Span, null);
         _scope = new Scope(_scope, _function); // The body may declare a name its parameters have, shadowing it.
         var statements = BindStatements(body.Statements);
-        var bound = new WsBoundFunction(name, parameters.Count, _function.Locals, _function.Captures, statements, span);
+        var bound = new WsBoundFunction(name, parameters.Count + (isMethod ? 1 : 0), _function.Locals, _function.Captures,
+            statements, span)
+        {
+            HasThis = isMethod
+        };
         _function = outerFunction;
         _scope = outerScope;
         return bound;
@@ -272,7 +319,23 @@ public sealed class WsBinder
                 return new WsBoundIndexAssignment(BindExpression(element.Target.Target), BindExpression(element.Target.Index),
                     BindExpression(element.Value), element.Span);
             case WsMemberAccessSyntax member:
-                return new WsBoundMember(BindExpression(member.Target), member.Name, member.Span);
+                return new WsBoundMember(BindExpression(member.Target), member.Name, member.Span) { IsOptional = member.IsOptional };
+            case WsMemberAssignmentSyntax field:
+                return new WsBoundMemberAssignment(BindExpression(field.Target.Target), field.Target.Name, BindExpression(field.Value),
+                    field.Span);
+            case WsNewExpressionSyntax created:
+            {
+                var target = BindExpression(created.Class);
+                var arguments = new List<WsBoundExpression>();
+                foreach (var argument in created.Arguments) arguments.Add(BindExpression(argument));
+                return new WsBoundNew(target, arguments, created.Span);
+            }
+            case WsThisSyntax self:
+            {
+                if (LookupLocal("this") is { } local) return Reference(local, self.Span);
+                Report(WsDiagnosticCodes.ThisOutsideMethod, "'this' is only allowed in a method or a constructor.", self.Span);
+                return new WsBoundError(self.Span);
+            }
             case WsFunctionExpressionSyntax function:
                 return new WsBoundFunctionExpression(BindFunction("", function.Parameters, function.Body, function.Span),
                     function.Span);
@@ -359,6 +422,12 @@ public sealed class WsBinder
             or WsNullLiteralSyntax or WsStringLiteralSyntax)
         {
             Report(WsDiagnosticCodes.NotAFunction, "A literal is not a function, and cannot be called.", calleeSyntax.Span);
+            return new WsBoundError(call.Span);
+        }
+        if (calleeSyntax is WsNameSyntax className && LookupLocal(className.Name) is { Kind: WsDeclarationKind.Class })
+        {
+            Report(WsDiagnosticCodes.NotAFunction, $"'{className.Name}' is a class: make an instance with 'new {className.Name}(…)'.",
+                calleeSyntax.Span);
             return new WsBoundError(call.Span);
         }
         if (calleeSyntax is WsNameSyntax name && LookupLocal(name.Name) is null

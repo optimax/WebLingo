@@ -13,6 +13,7 @@ namespace WebLingo.Compiler;
 public sealed class WsLowerer
 {
     private readonly List<WsIrFunction?> _functions = [];
+    private readonly List<WsIrClass> _classes = [];
 
     private WsLowerer() { }
 
@@ -20,7 +21,11 @@ public sealed class WsLowerer
     {
         var lowerer = new WsLowerer();
         var statements = lowerer.LowerBlock(program.Statements);
-        return new WsIrProgram(statements, Names(program.Locals), program.Builtins) { Functions = lowerer._functions! };
+        return new WsIrProgram(statements, Names(program.Locals), program.Builtins)
+        {
+            Functions = lowerer._functions!,
+            Classes = lowerer._classes
+        };
     }
 
     private static string[] Names(IReadOnlyList<WsLocalSymbol> locals)
@@ -40,6 +45,7 @@ public sealed class WsLowerer
             {
                 WsBoundVariableDeclaration declaration => declaration.Local,
                 WsBoundFunctionDeclaration function => function.Local,
+                WsBoundClassDeclaration declaration => declaration.Local,
                 _ => null
             };
             if (local is { IsCaptured: true }) lowered.Add(new WsIrNewCell(local.Index, statement.Span));
@@ -51,10 +57,15 @@ public sealed class WsLowerer
                 lowered.Add(Initialize(function.Local, new WsIrMakeClosure(LowerFunction(function.Function), function.Span),
                     function.Span));
             }
+            if (statement is WsBoundClassDeclaration declaration)
+            {
+                lowered.Add(Initialize(declaration.Local, new WsIrMakeClass(LowerClass(declaration.Class), declaration.Span),
+                    declaration.Span));
+            }
         }
         foreach (var statement in block)
         {
-            if (statement is not WsBoundFunctionDeclaration) lowered.Add(LowerStatement(statement));
+            if (statement is not (WsBoundFunctionDeclaration or WsBoundClassDeclaration)) lowered.Add(LowerStatement(statement));
         }
         return lowered;
     }
@@ -63,6 +74,15 @@ public sealed class WsLowerer
         local.IsCaptured
             ? new WsIrEvaluate(new WsIrStoreCell(local.Index, value, span), span)
             : new WsIrInitializeLocal(local.Index, value, span);
+
+    private int LowerClass(WsBoundClass declaration)
+    {
+        var constructor = declaration.Constructor is null ? -1 : LowerFunction(declaration.Constructor);
+        var methods = new List<(string, int)>();
+        foreach (var (name, function) in declaration.Methods) methods.Add((name, LowerFunction(function)));
+        _classes.Add(new WsIrClass(declaration.Name, constructor, methods));
+        return _classes.Count - 1;
+    }
 
     private int LowerFunction(WsBoundFunction function)
     {
@@ -80,7 +100,10 @@ public sealed class WsLowerer
         var captures = new List<WsIrCapture>();
         foreach (var capture in function.Captures) captures.Add(new WsIrCapture(capture.FromLocal, capture.Index));
         _functions[index] = new WsIrFunction(function.Name, function.ParameterCount, Names(function.Locals), captures, body,
-            function.Span);
+            function.Span)
+        {
+            HasThis = function.HasThis
+        };
         return index;
     }
 
@@ -192,7 +215,11 @@ public sealed class WsLowerer
                 return new WsIrStoreIndex(LowerExpression(element.Target), LowerExpression(element.Index),
                     LowerExpression(element.Value), element.Span);
             case WsBoundMember member:
-                return new WsIrMember(LowerExpression(member.Target), member.Name, member.Span);
+                return new WsIrMember(LowerExpression(member.Target), member.Name, member.Span) { IsOptional = member.IsOptional };
+            case WsBoundMemberAssignment field:
+                return new WsIrStoreMember(LowerExpression(field.Target), field.Name, LowerExpression(field.Value), field.Span);
+            case WsBoundNew created:
+                return new WsIrNew(LowerExpression(created.Class), LowerArguments(created.Arguments), created.Span);
             case WsBoundMethodCall call:
                 return new WsIrCallMethod(LowerExpression(call.Target), call.Name, LowerArguments(call.Arguments), call.Span);
             default:

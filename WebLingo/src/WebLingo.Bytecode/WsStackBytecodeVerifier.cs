@@ -41,9 +41,16 @@ public sealed class WsStackBytecodeVerifier
             if (import.Arity < 0) return Fail($"Import {i} ('{import.Name}') has a negative arity.");
         }
         if (module.Functions is null) return Fail("The module has no function table.");
-        if (module.EntryPoint is { } main && (main.ParameterCount != 0 || main.Captures is not { Count: 0 }))
+        if (module.EntryPoint is { } main && (main.ParameterCount != 0 || main.Captures is not { Count: 0 } || main.HasThis))
         {
             return Fail("The entry point takes no parameters and captures nothing.");
+        }
+        var methods = new List<WsStackFunction?>();
+        foreach (var function in module.Functions) methods.Add(function);
+        if (WsClassTables.Check(module.Classes, index => index >= 0 && index < methods.Count && methods[index] is { HasThis: true })
+            is { } classError)
+        {
+            return Fail(classError);
         }
         var result = VerifyFunction(module, module.EntryPoint);
         for (var i = 0; i < module.Functions.Count && result.IsValid; i++)
@@ -117,10 +124,32 @@ public sealed class WsStackBytecodeVerifier
                 return Index(a, function.Code.Count, "target instruction") ?? Unused(b);
             case WsStackOpCode.LoadBuiltin:
                 return Index(a, module.Imports.Count, "import") ?? Unused(b);
+            case WsStackOpCode.MakeClass:
+            {
+                if ((Index(a, module.Classes.Count, "class") ?? Unused(b)) is { } classError) return classError;
+                foreach (var member in WsClassTables.Functions(module.Classes[a]))
+                {
+                    foreach (var capture in module.Functions[member].Captures)
+                    {
+                        var error = capture.FromLocal
+                            ? Index(capture.Index, function.LocalCount, "captured local")
+                            : Index(capture.Index, function.Captures.Count, "capture");
+                        if (error is not null) return $"function {member}'s capture: {error}";
+                    }
+                }
+                return null;
+            }
+            case WsStackOpCode.New:
+                return a is < 0 or > WsFunction.MaxRegisters
+                    ? $"its argument count, {a}, is not 0 to {WsFunction.MaxRegisters}."
+                    : Unused(b);
+            case WsStackOpCode.SetMember:
+                return Name(module, a) ?? (b is 0 or 1 ? null : $"its B is {b}, not 0 or 1.");
             case WsStackOpCode.MakeClosure:
             {
                 if ((Index(a, module.Functions.Count, "function") ?? Unused(b)) is { } closureError) return closureError;
                 if (module.Functions[a] is not { Captures: { } captures }) return $"function {a} is missing.";
+                if (module.Functions[a].HasThis) return $"function {a} is a method, which only its class makes.";
                 foreach (var capture in captures)
                 {
                     var error = capture.FromLocal
@@ -141,7 +170,7 @@ public sealed class WsStackBytecodeVerifier
                 return b == import.Arity ? null : $"'{import.Name}' takes {import.Arity} arguments, not {b}.";
             }
             case WsStackOpCode.GetMember:
-                return Name(module, a) ?? Unused(b);
+                return Name(module, a) ?? (b is 0 or 1 ? null : $"its B is {b}, not 0 or 1.");
             case WsStackOpCode.CallMethod:
                 return Name(module, a) ?? (b is < 0 or > WsFunction.MaxRegisters
                     ? $"its argument count, {b}, is not 0 to {WsFunction.MaxRegisters}."
@@ -303,6 +332,9 @@ public sealed class WsStackBytecodeVerifier
         WsStackOpCode.Call => (instruction.A + 1, 1),
         WsStackOpCode.CallBuiltin => (instruction.B, 1),
         WsStackOpCode.GetMember => (1, 1),
+        WsStackOpCode.MakeClass => (0, 1),
+        WsStackOpCode.New => (instruction.A + 1, 1),
+        WsStackOpCode.SetMember => (2, instruction.B),
         WsStackOpCode.NewArray or WsStackOpCode.NewSet => (instruction.A, 1),
         WsStackOpCode.NewMap => (2 * instruction.A, 1),
         WsStackOpCode.CallMethod => (instruction.B + 1, 1),
@@ -353,6 +385,15 @@ public sealed class WsStackBytecodeVerifier
             case WsStackOpCode.LoadCell:
             case WsStackOpCode.StoreCell:
                 return IsSet(written, instruction.A) ? -1 : instruction.A;
+            case WsStackOpCode.MakeClass:
+                foreach (var member in WsClassTables.Functions(module.Classes[instruction.A]))
+                {
+                    foreach (var capture in module.Functions[member].Captures)
+                    {
+                        if (capture.FromLocal && !IsSet(written, capture.Index)) return capture.Index;
+                    }
+                }
+                return -1;
             case WsStackOpCode.MakeClosure:
                 foreach (var capture in module.Functions[instruction.A].Captures)
                 {

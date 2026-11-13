@@ -63,7 +63,7 @@ public sealed class StackVmTests
         [
             "var", "x", "y", "f", "writeLn", "write", "=", "+", "-", "*", "/", "(", ")", ";", ",", "{", "}", "0", "1", "2.5",
             "NaN", "\"s\"", "true", "null", "==", "<", "&&", "||", "!", "if", "else", "while", "for", "break", "continue",
-            "function", "return", "9223372036854775807", "[", "]", ".", "length", "size", "\"ab\"",
+            "function", "return", "class", "new", "this", "C", "?.", "9223372036854775807", "[", "]", ".", "length", "size", "\"ab\"",
         ];
         var random = new Random(5_6);
         var compared = 0;

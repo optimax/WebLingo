@@ -1,10 +1,11 @@
 namespace WebLingo.Runtime;
 
 /// <summary>
-/// The kinds of runtime value. A String, a Function (a closure), a Cell, an Array, a Map and a Set refer to an object of a heap by
+/// The kinds of runtime value. A String, a Function (a closure), a Cell, an Array, a Map, a Set, a Class, an Instance and
+/// a BoundMethod (a method and the instance it runs on) refer to an object of a heap by
 /// handle; a Builtin is a host built-in, by its import index; a Cell is never a script's value, only a frame's.
 /// </summary>
-public enum WsValueKind : byte { Null, Boolean, Int64, Binary64, String, Function, Builtin, Cell, Array, Map, Set }
+public enum WsValueKind : byte { Null, Boolean, Int64, Binary64, String, Function, Builtin, Cell, Array, Map, Set, Class, Instance, BoundMethod }
 
 /// <summary>
 /// A runtime value (specification, section 4.1): a kind and a 64-bit payload, 16 bytes in all. M0.6 has null,

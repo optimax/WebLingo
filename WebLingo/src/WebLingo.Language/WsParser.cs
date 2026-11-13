@@ -77,6 +77,7 @@ public sealed class WsParser : IWsParser
         if (Current.Kind == WsTokenKind.Do) return ParseDoWhile(start);
         if (Current.Kind == WsTokenKind.For) return ParseFor(start);
         if (Current.Kind == WsTokenKind.Foreach) return ParseForEach(start);
+        if (Current.Kind == WsTokenKind.Class) return ParseClass(start);
         if (Current.Kind == WsTokenKind.Function && Peek(1).Kind == WsTokenKind.Identifier) return ParseFunctionDeclaration(start);
         if (Current.Kind == WsTokenKind.Return)
         {
@@ -214,6 +215,42 @@ public sealed class WsParser : IWsParser
     }
 
     private static bool IsIn(WsToken token) => token.Kind == WsTokenKind.Identifier && token.Text == "in";
+
+    /// <summary>
+    /// <c>class Name { members }</c>, each member a method, or the <c>constructor</c>: a name, with or without
+    /// <c>function</c> before it, its parameters and its body (section 3.7).
+    /// </summary>
+    private WsStatementSyntax ParseClass(int start)
+    {
+        Advance();
+        var (name, nameSpan) = ExpectName();
+        Expect(WsTokenKind.OpenBrace, "'{'");
+        var methods = new List<WsMethodSyntax>();
+        while (Current.Kind is not (WsTokenKind.CloseBrace or WsTokenKind.EndOfFile))
+        {
+            var memberStart = Current.Span.Start;
+            if (Current.Kind == WsTokenKind.Function) Advance();
+            if (Current.Kind != WsTokenKind.Identifier)
+            {
+                if (!_statementHasError) ReportUnexpected("a method");
+                SkipToClosingBrace();
+                return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start));
+            }
+            var methodName = Advance();
+            if (!EnterRecursion()) return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start));
+            try
+            {
+                var (parameters, body) = ParseFunctionRest();
+                methods.Add(new WsMethodSyntax(methodName.Text, methodName.Span, parameters, body, SpanFrom(memberStart)));
+            }
+            finally
+            {
+                _recursionDepth--;
+            }
+        }
+        Expect(WsTokenKind.CloseBrace, "'}'");
+        return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start));
+    }
 
     /// <summary>A name being declared; an empty one, reported, if there is none.</summary>
     private (string Name, WsSourceSpan Span) ExpectName()
@@ -406,10 +443,11 @@ public sealed class WsParser : IWsParser
         var span = Between(left.Span, value.Span);
         if (left is WsNameSyntax target) return new WsAssignmentExpressionSyntax(target, value, span);
         if (left is WsIndexExpressionSyntax { IsOptional: false } element) return new WsIndexAssignmentSyntax(element, value, span);
+        if (left is WsMemberAccessSyntax { IsOptional: false } member) return new WsMemberAssignmentSyntax(member, value, span);
         if (left is not WsErrorExpressionSyntax)
         {
             Report(WsDiagnosticCodes.InvalidAssignmentTarget,
-                "Only a variable, or an element or entry ('x[i]'), can be assigned a value with '='.",
+                "Only a variable, an element or entry ('x[i]'), or a field ('x.name') can be assigned a value with '='.",
                 left.Span.Length > 0 ? left.Span : equals.Span);
         }
         return new WsErrorExpressionSyntax(span);
@@ -524,16 +562,19 @@ public sealed class WsParser : IWsParser
                     expression = new WsCallExpressionSyntax(expression, arguments, SpanFrom(expression.Span.Start));
                     continue;
                 }
-                case WsTokenKind.Dot:
+                case WsTokenKind.Dot or WsTokenKind.QuestionDot:
                 {
-                    Advance();
+                    var isOptional = Advance().Kind == WsTokenKind.QuestionDot;
                     if (Current.Kind != WsTokenKind.Identifier)
                     {
                         ReportUnexpected("a member's name");
                         return new WsErrorExpressionSyntax(SpanFrom(expression.Span.Start));
                     }
                     var name = Advance();
-                    expression = new WsMemberAccessSyntax(expression, name.Text, name.Span, SpanFrom(expression.Span.Start));
+                    expression = new WsMemberAccessSyntax(expression, name.Text, name.Span, SpanFrom(expression.Span.Start))
+                    {
+                        IsOptional = isOptional
+                    };
                     continue;
                 }
                 case WsTokenKind.OpenBracket or WsTokenKind.QuestionBracket:
@@ -637,6 +678,29 @@ public sealed class WsParser : IWsParser
                 }
                 Expect(WsTokenKind.CloseBrace, "'}'");
                 return new WsMapLiteralSyntax(entries, SpanFrom(token.Span.Start));
+            }
+            case WsTokenKind.This:
+                Advance();
+                return new WsThisSyntax(token.Span);
+            case WsTokenKind.New:
+            {
+                // new Class(arguments): the class a name, or a member of one, then its arguments (section 3.7).
+                Advance();
+                var target = ParsePrimary();
+                while (Current.Kind == WsTokenKind.Dot && Peek(1).Kind == WsTokenKind.Identifier)
+                {
+                    Advance();
+                    var name = Advance();
+                    target = new WsMemberAccessSyntax(target, name.Text, name.Span, SpanFrom(target.Span.Start));
+                }
+                if (Current.Kind != WsTokenKind.OpenParen)
+                {
+                    Expect(WsTokenKind.OpenParen, "'('");
+                    return new WsNewExpressionSyntax(target, [], SpanFrom(token.Span.Start));
+                }
+                Advance();
+                var arguments = ParseElements(WsTokenKind.CloseParen, "')'");
+                return new WsNewExpressionSyntax(target, arguments, SpanFrom(token.Span.Start));
             }
             case WsTokenKind.OpenParen:
                 Advance();
@@ -766,6 +830,10 @@ public sealed class WsParser : IWsParser
             if (statement is WsFunctionDeclarationSyntax function) statements.Push(function.Body);
             if (statement is WsDoWhileSyntax doLoop) statements.Push(doLoop.Body);
             if (statement is WsForEachSyntax forEachLoop) statements.Push(forEachLoop.Body);
+            if (statement is WsClassDeclarationSyntax classDeclaration)
+            {
+                foreach (var method in classDeclaration.Methods) statements.Push(method.Body);
+            }
             if (statement is WsForSyntax forLoop)
             {
                 // Its parts, as statements of their own, so that each expression's depth is checked.
@@ -829,6 +897,14 @@ public sealed class WsParser : IWsParser
                         break;
                     case WsMapLiteralSyntax map:
                         foreach (var entry in map.Entries) pending.Push((entry.Value, depth + 1));
+                        break;
+                    case WsMemberAssignmentSyntax field:
+                        pending.Push((field.Target, depth + 1));
+                        pending.Push((field.Value, depth + 1));
+                        break;
+                    case WsNewExpressionSyntax created:
+                        pending.Push((created.Class, depth + 1));
+                        foreach (var argument in created.Arguments) pending.Push((argument, depth + 1));
                         break;
                     case WsIndexAssignmentSyntax element:
                         pending.Push((element.Target, depth + 1));

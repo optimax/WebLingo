@@ -21,7 +21,11 @@ public sealed record WsBoundCapture(bool FromLocal, int Index, WsLocalSymbol Loc
 /// </summary>
 public sealed record WsBoundFunction(
     string Name, int ParameterCount, IReadOnlyList<WsLocalSymbol> Locals, IReadOnlyList<WsBoundCapture> Captures,
-    IReadOnlyList<WsBoundStatement> Body, WsSourceSpan Span);
+    IReadOnlyList<WsBoundStatement> Body, WsSourceSpan Span)
+{
+    /// <summary>A method's or a constructor's: its first parameter is <c>this</c>, which its caller gives (section 3.7).</summary>
+    public bool HasThis { get; init; }
+}
 
 public abstract record WsBoundStatement(WsSourceSpan Span);
 
@@ -37,6 +41,16 @@ public sealed record WsBoundFunctionDeclaration(WsLocalSymbol Local, WsBoundFunc
     : WsBoundStatement(Span);
 
 public sealed record WsBoundReturn(WsBoundExpression? Value, WsSourceSpan Span) : WsBoundStatement(Span);
+
+/// <summary>
+/// A class: its constructor, if it declares one, and its methods, each a function whose first parameter is
+/// <c>this</c> (specification, section 3.7).
+/// </summary>
+public sealed record WsBoundClass(
+    string Name, WsBoundFunction? Constructor, IReadOnlyList<(string Name, WsBoundFunction Function)> Methods, WsSourceSpan Span);
+
+/// <summary>A class declaration; the class is made when its block begins, since it is in scope throughout.</summary>
+public sealed record WsBoundClassDeclaration(WsLocalSymbol Local, WsBoundClass Class, WsSourceSpan Span) : WsBoundStatement(Span);
 
 public sealed record WsBoundIf(WsBoundExpression Condition, WsBoundStatement Then, WsBoundStatement? Else, WsSourceSpan Span)
     : WsBoundStatement(Span);
@@ -130,7 +144,19 @@ public sealed record WsBoundIndexAssignment(
     : WsBoundExpression(Span);
 
 /// <summary><c>target.name</c>, a member read, checked when it runs.</summary>
-public sealed record WsBoundMember(WsBoundExpression Target, string Name, WsSourceSpan Span) : WsBoundExpression(Span);
+public sealed record WsBoundMember(WsBoundExpression Target, string Name, WsSourceSpan Span) : WsBoundExpression(Span)
+{
+    /// <summary><c>target?.name</c> (section 3.7).</summary>
+    public bool IsOptional { get; init; }
+}
+
+/// <summary><c>target.name = value</c>, a field assigned, checked when it runs.</summary>
+public sealed record WsBoundMemberAssignment(WsBoundExpression Target, string Name, WsBoundExpression Value, WsSourceSpan Span)
+    : WsBoundExpression(Span);
+
+/// <summary><c>new Class(arguments)</c>, checked when it runs.</summary>
+public sealed record WsBoundNew(WsBoundExpression Class, IReadOnlyList<WsBoundExpression> Arguments, WsSourceSpan Span)
+    : WsBoundExpression(Span);
 
 /// <summary><c>target.name(arguments)</c>, a method called, checked when it runs.</summary>
 public sealed record WsBoundMethodCall(

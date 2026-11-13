@@ -4,7 +4,8 @@ namespace WebLingo.Benchmarks;
 public sealed record WsWorkload(string Name, string Exercises, string Source, string ExpectedOutput);
 
 /// <summary>
-/// The benchmark's workloads (specification, section 5.6): loops, calls, closures, strings and collections. Each is a
+/// The benchmark's workloads (specification, section 5.6): loops, calls, closures, strings, collections and objects (property
+/// access). Each is a
 /// <c>.ws</c> file in <c>Workloads/</c>, embedded in the assembly, that <c>weblingo run</c> also runs, and each writes
 /// one result, which every VM must give.
 /// </summary>
@@ -17,6 +18,7 @@ public static class WsWorkloads
         Load("closures", "closures made and called, sharing captured cells", "3300000\n"),
         Load("strings", "string concatenation and comparison, the heap and its collector", "20000\n"),
         Load("collections", "arrays and maps: elements and entries read, written and visited with foreach", "200124998\n"),
+        Load("objects", "instances made, their fields read and written, their methods called", "1666691666750000\n"),
     ];
 
     private static WsWorkload Load(string name, string exercises, string expectedOutput)

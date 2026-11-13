@@ -34,7 +34,7 @@ public sealed class WsLocalSymbol(string name, WsDeclarationKind kind, int index
     public bool IsCaptured { get; internal set; }
     /// <summary>A declared function's parameter count, which a direct call is checked against.</summary>
     public int? FunctionArity { get; init; }
-    public bool IsConstant => Kind is WsDeclarationKind.Const or WsDeclarationKind.Function;
+    public bool IsConstant => Kind is WsDeclarationKind.Const or WsDeclarationKind.Function or WsDeclarationKind.Class;
 }
 
 /// <summary>A host built-in function the script calls; <see cref="Index"/> numbers the built-ins it uses from 0.</summary>

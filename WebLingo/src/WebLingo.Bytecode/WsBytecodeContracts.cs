@@ -83,7 +83,10 @@ public enum WsOpCode : byte
     Jump,
     /// <summary>Ends the function, giving <c>null</c>.</summary>
     Return,
-    /// <summary>A = destination register, B = target register, C = constant index of the member's name, a string.</summary>
+    /// <summary>
+    /// A = destination register, B = target register, C = constant index of the member's name, a string, D = 1 for
+    /// <c>?.</c>, which gives <c>null</c> for a <c>null</c> target or a missing member, else 0.
+    /// </summary>
     GetMember,
     /// <summary>
     /// A = destination register, B = constant index of the method's name, a string, C = the target's register, with
@@ -112,6 +115,15 @@ public enum WsOpCode : byte
     ForEachNext,
     /// <summary>A = destination register, B = first value register, C = value count; a new set of them.</summary>
     NewSet,
+    /// <summary>A = destination register, B = class index; a class value, its methods' closures made as their captures say.</summary>
+    MakeClass,
+    /// <summary>
+    /// A = destination register, B = register holding a class (WS2005 otherwise), C = first argument register, D =
+    /// argument count; a new instance, its constructor run with the arguments (section 3.7).
+    /// </summary>
+    New,
+    /// <summary>A = target register, B = constant index of the field's name, a string, C = value register; assigns the field.</summary>
+    SetMember,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
@@ -148,7 +160,15 @@ public sealed record WsFunction(
     public int ParameterCount { get; init; }
     /// <summary>The cells a closure of it captures, from the function that makes the closure.</summary>
     public IReadOnlyList<WsCapture> Captures { get; init; } = [];
+    /// <summary>A method's or a constructor's: its first parameter is <c>this</c>, which its caller gives (section 3.7).</summary>
+    public bool HasThis { get; init; }
 }
+
+/// <summary>A class of a module: its name, its constructor's function, or -1 if it has none, and its methods' (section 3.7).</summary>
+public sealed record WsClassInfo(string Name, int Constructor, IReadOnlyList<WsClassMethod> Methods);
+
+/// <summary>A method of a class: its name, and the module's function that is its body.</summary>
+public readonly record struct WsClassMethod(string Name, int Function);
 
 /// <summary>
 /// Where a closure's capture comes from when <see cref="WsOpCode.MakeClosure"/> makes it: the cell in a register of
@@ -162,6 +182,8 @@ public sealed record WsCompiledModule(
 {
     /// <summary>The functions the module declares, besides its entry point, which closures are made of by index.</summary>
     public IReadOnlyList<WsFunction> Functions { get; init; } = [];
+    /// <summary>The classes the module declares, which <see cref="WsOpCode.MakeClass"/> refers to by index.</summary>
+    public IReadOnlyList<WsClassInfo> Classes { get; init; } = [];
 
     /// <summary>The smallest valid module: it returns at once.</summary>
     public static WsCompiledModule Empty(string name) =>

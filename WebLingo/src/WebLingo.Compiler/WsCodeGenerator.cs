@@ -49,13 +49,17 @@ public sealed class WsCodeGenerator
             var name = function.Name.Length == 0 ? "function" : function.Name;
             var generated = GenerateFunction(module, name, function.ParameterCount, function.LocalNames, captures, function.Body,
                 diagnostics);
-            if (generated is not null) functions.Add(generated);
+            if (generated is not null) functions.Add(generated with { HasThis = function.HasThis });
         }
         if (main is null || functions.Count != program.Functions.Count) return null;
 
         var imports = new WsImport[program.Builtins.Count];
         foreach (var builtin in program.Builtins) imports[builtin.Index] = new WsImport(builtin.Name, builtin.Arity);
-        return new WsCompiledModule(moduleName, module.Constants, imports, main) { Functions = functions };
+        return new WsCompiledModule(moduleName, module.Constants, imports, main)
+        {
+            Functions = functions,
+            Classes = WsClassTable.Of(program)
+        };
     }
 
     private static WsFunction? GenerateFunction(ModuleState module, string name, int parameterCount,
@@ -389,7 +393,42 @@ public sealed class WsCodeGenerator
                 var subject = EmitExpression(member.Target, null);
                 _nextRegister = mark;
                 var destination = target ?? Allocate();
-                Emit(new WsInstruction(WsOpCode.GetMember, destination, subject, StringConstant(member.Name)), member.Span);
+                Emit(new WsInstruction(WsOpCode.GetMember, destination, subject, StringConstant(member.Name), member.IsOptional ? 1 : 0),
+                    member.Span);
+                return destination;
+            }
+            case WsIrStoreMember store:
+            {
+                var mark = _nextRegister;
+                var subject = KeptIfAssigned(EmitExpression(store.Target, null), store.Target.Span, store.Value);
+                var value = EmitExpression(store.Value, null);
+                Emit(new WsInstruction(WsOpCode.SetMember, subject, StringConstant(store.Name), value), store.Span);
+                if (target is { } destination)
+                {
+                    if (destination != value) Emit(new WsInstruction(WsOpCode.Move, destination, value), store.Span);
+                    _nextRegister = mark;
+                    return destination;
+                }
+                _nextRegister = value >= _locals ? Math.Max(mark, value + 1) : mark;
+                return value;
+            }
+            case WsIrMakeClass made:
+            {
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.MakeClass, destination, made.Class), made.Span);
+                return destination;
+            }
+            case WsIrNew created:
+            {
+                var mark = _nextRegister;
+                var subject = KeptIfAssigned(EmitExpression(created.Class, null), created.Class.Span, ToArray(created.Arguments));
+                var first = _nextRegister;
+                for (var i = 0; i < created.Arguments.Count; i++) Allocate();
+                for (var i = 0; i < created.Arguments.Count; i++) EmitExpression(created.Arguments[i], first + i);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.New, destination, subject, created.Arguments.Count == 0 ? 0 : first,
+                    created.Arguments.Count), created.Span);
                 return destination;
             }
             case WsIrCallMethod call:
@@ -441,6 +480,8 @@ public sealed class WsCodeGenerator
         WsIrStoreIndex store => Assigns(store.Target, local) || Assigns(store.Index, local) || Assigns(store.Value, local),
         WsIrMember member => Assigns(member.Target, local),
         WsIrCallMethod call => Assigns(call.Target, local) || AnyAssigns(call.Arguments, local),
+        WsIrStoreMember store => Assigns(store.Target, local) || Assigns(store.Value, local),
+        WsIrNew created => Assigns(created.Class, local) || AnyAssigns(created.Arguments, local),
         _ => false
     };
 
@@ -454,6 +495,14 @@ public sealed class WsCodeGenerator
         var copy = Allocate();
         Emit(new WsInstruction(WsOpCode.Move, copy, register), span);
         return copy;
+    }
+
+    /// <summary>A copy of the expressions, without LINQ, which the portable core does not use.</summary>
+    private static WsIrExpression[] ToArray(IReadOnlyList<WsIrExpression> expressions)
+    {
+        var array = new WsIrExpression[expressions.Count];
+        for (var i = 0; i < array.Length; i++) array[i] = expressions[i];
+        return array;
     }
 
     private static bool AnyEntryAssigns(IReadOnlyList<WsIrMapEntry> entries, int local)

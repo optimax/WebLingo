@@ -16,7 +16,12 @@ public sealed record WsIrProgram(
     IReadOnlyList<WsIrStatement> Statements, IReadOnlyList<string> LocalNames, IReadOnlyList<WsBuiltinSymbol> Builtins)
 {
     public IReadOnlyList<WsIrFunction> Functions { get; init; } = [];
+    /// <summary>Every class the program declares, at any depth, which <see cref="WsIrMakeClass"/> refers to by index.</summary>
+    public IReadOnlyList<WsIrClass> Classes { get; init; } = [];
 }
+
+/// <summary>A class: its constructor's function, or -1 if it has none, and its methods' (section 3.7).</summary>
+public sealed record WsIrClass(string Name, int Constructor, IReadOnlyList<(string Name, int Function)> Methods);
 
 /// <summary>Where a closure's capture comes from: a local of the function making it, or one of that one's captures.</summary>
 public sealed record WsIrCapture(bool FromLocal, int Index);
@@ -24,7 +29,11 @@ public sealed record WsIrCapture(bool FromLocal, int Index);
 /// <summary>A function: its parameters (its first locals), its locals' names, its captures, and its body.</summary>
 public sealed record WsIrFunction(
     string Name, int ParameterCount, IReadOnlyList<string> LocalNames, IReadOnlyList<WsIrCapture> Captures,
-    IReadOnlyList<WsIrStatement> Body, WsSourceSpan Span);
+    IReadOnlyList<WsIrStatement> Body, WsSourceSpan Span)
+{
+    /// <summary>A method's or a constructor's, whose first parameter is <c>this</c>.</summary>
+    public bool HasThis { get; init; }
+}
 
 /// <summary>Gives the local a new cell, without a value until it is initialized.</summary>
 public sealed record WsIrNewCell(int Local, WsSourceSpan Span) : WsIrStatement(Span);
@@ -154,7 +163,22 @@ public sealed record WsIrStoreIndex(WsIrExpression Target, WsIrExpression Index,
     : WsIrExpression(Span);
 
 /// <summary><c>target.name</c>, a member read.</summary>
-public sealed record WsIrMember(WsIrExpression Target, string Name, WsSourceSpan Span) : WsIrExpression(Span);
+public sealed record WsIrMember(WsIrExpression Target, string Name, WsSourceSpan Span) : WsIrExpression(Span)
+{
+    /// <summary><c>target?.name</c>: <c>null</c> for a <c>null</c> target or a missing member (section 3.7).</summary>
+    public bool IsOptional { get; init; }
+}
+
+/// <summary><c>target.name = value</c>: the target, then the value, evaluated; its value is the value.</summary>
+public sealed record WsIrStoreMember(WsIrExpression Target, string Name, WsIrExpression Value, WsSourceSpan Span)
+    : WsIrExpression(Span);
+
+/// <summary>A new class value of the program's class <paramref name="Class"/>, its methods closures made now.</summary>
+public sealed record WsIrMakeClass(int Class, WsSourceSpan Span) : WsIrExpression(Span);
+
+/// <summary><c>new Class(arguments)</c>: the class, then the arguments, evaluated; an instance, its constructor run.</summary>
+public sealed record WsIrNew(WsIrExpression Class, IReadOnlyList<WsIrExpression> Arguments, WsSourceSpan Span)
+    : WsIrExpression(Span);
 
 /// <summary><c>target.name(arguments)</c>: the target, then the arguments, evaluated, and the method called.</summary>
 public sealed record WsIrCallMethod(WsIrExpression Target, string Name, IReadOnlyList<WsIrExpression> Arguments, WsSourceSpan Span)

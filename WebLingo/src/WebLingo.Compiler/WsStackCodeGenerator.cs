@@ -38,13 +38,17 @@ public sealed class WsStackCodeGenerator
             var name = function.Name.Length == 0 ? "function" : function.Name;
             var generated = GenerateFunction(module, name, function.ParameterCount, function.LocalNames, captures, function.Body,
                 diagnostics);
-            if (generated is not null) functions.Add(generated);
+            if (generated is not null) functions.Add(generated with { HasThis = function.HasThis });
         }
         if (main is null || functions.Count != program.Functions.Count) return null;
 
         var imports = new WsImport[program.Builtins.Count];
         foreach (var builtin in program.Builtins) imports[builtin.Index] = new WsImport(builtin.Name, builtin.Arity);
-        return new WsStackModule(moduleName, module.Constants, imports, main) { Functions = functions };
+        return new WsStackModule(moduleName, module.Constants, imports, main)
+        {
+            Functions = functions,
+            Classes = WsClassTable.Of(program)
+        };
     }
 
     private static WsStackFunction? GenerateFunction(ModuleState module, string name, int parameterCount,
@@ -166,6 +170,11 @@ public sealed class WsStackCodeGenerator
                 EmitValue(store.Value);
                 Emit(WsStackOpCode.StoreIndex, store.Span);
                 return;
+            case WsIrStoreMember field:
+                EmitValue(field.Target);
+                EmitValue(field.Value);
+                Emit(WsStackOpCode.SetMember, field.Span, StringConstant(field.Name));
+                return;
             default:
                 EmitValue(expression);
                 Emit(WsStackOpCode.Pop, expression.Span);
@@ -284,7 +293,20 @@ public sealed class WsStackCodeGenerator
                 return;
             case WsIrMember member:
                 EmitValue(member.Target);
-                Emit(WsStackOpCode.GetMember, member.Span, StringConstant(member.Name));
+                Emit(WsStackOpCode.GetMember, member.Span, StringConstant(member.Name), member.IsOptional ? 1 : 0);
+                return;
+            case WsIrStoreMember field:
+                EmitValue(field.Target);
+                EmitValue(field.Value);
+                Emit(WsStackOpCode.SetMember, field.Span, StringConstant(field.Name), 1);
+                return;
+            case WsIrMakeClass made:
+                Emit(WsStackOpCode.MakeClass, made.Span, made.Class);
+                return;
+            case WsIrNew created:
+                EmitValue(created.Class);
+                foreach (var argument in created.Arguments) EmitValue(argument);
+                Emit(WsStackOpCode.New, created.Span, created.Arguments.Count);
                 return;
             case WsIrCallMethod call:
                 EmitValue(call.Target);
@@ -436,6 +458,9 @@ public sealed class WsStackCodeGenerator
             WsStackOpCode.Call => (a + 1, 1),
             WsStackOpCode.CallBuiltin => (b, 1),
             WsStackOpCode.GetMember => (1, 1),
+            WsStackOpCode.MakeClass => (0, 1),
+            WsStackOpCode.New => (a + 1, 1),
+            WsStackOpCode.SetMember => (2, b),
             WsStackOpCode.NewArray => (a, 1),
             WsStackOpCode.NewMap => (2 * a, 1),
             WsStackOpCode.NewSet => (a, 1),

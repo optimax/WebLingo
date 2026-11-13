@@ -74,9 +74,11 @@ Classes, with single inheritance and no exposed prototype chain (specification, 
 
 
 
-## M0.10.1: Classes
+## [WORKING] M0.10.1: Classes
 
 Class declarations, `new`, fields, methods, `this`, methods as values, `x?.name`, and an instance's text (specification, section 3.7), on both VMs, with their conformance tests. Added by Claude, 2026-11-13.
+
+Done (Claude, 2026-11-13): classes on both VMs: declarations (a method with or without `function`, A1), hoisted as functions are; `new`, running the constructor; fields made by assignment; methods, with `this`, which closures inside them see; methods as bound values; `x?.name`; and an instance's text, `Point {x: 1, y: 2}`. WS2009 is reported for `this` outside a method. Both VMs' calls now share one path for functions, built-ins, bound methods, methods and constructors. The benchmark gets an `objects` workload, property access: 81 ms on the register VM, 86 to 93 ms on the stack VM (specification, section 5.6). Choices of mine, in section 15.2 as proposed: the keywords and `?.`; a field cannot take a method's name; a bound method is made on each read; a constructor's result is dropped; an instance's fields are written in the order first assigned. Two tests changed, since `x.name = v` is now a field's assignment, not WS1007. Every new conformance case gives the same result on both VMs. Build and 1,000 tests pass on Windows; Linux not tried.
 
 ## M0.10.2: Inheritance
 

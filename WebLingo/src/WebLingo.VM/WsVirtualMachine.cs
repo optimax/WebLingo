@@ -117,6 +117,8 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         public int Pc;
         /// <summary>The caller's register that the call's result goes to.</summary>
         public int ResultRegister;
+        /// <summary>For a constructor run by <c>new</c>: the instance, which is the call's result (section 3.7).</summary>
+        public WsValue Constructed;
     }
 
     private sealed class Execution(WsCompiledModule module, WsInstruction[] entryCode, WsInstruction[][] codes,
@@ -144,6 +146,16 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             var executed = 0L;
             var dueAt = 0L; // The count of instructions at which the budget and the cancellation signal are looked at.
             WsRuntimeError? error = null;
+            // A call being made, which the operations that call set up, and the code after their switch carries out: the
+            // value called, the instance a method runs on, where the arguments are, where the result goes, and, for
+            // new, the instance made.
+            var callee = WsValue.Null;
+            var self = WsValue.Null;
+            var arguments = registers;
+            var firstArgument = 0;
+            var argumentCount = 0;
+            var resultRegister = 0;
+            var constructed = WsValue.Null;
             try
             {
                 while (true)
@@ -320,17 +332,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             continue;
                         case WsOpCode.MakeClosure:
                         {
-                            var captures = module.Functions[ins.B].Captures;
-                            var captured = new WsValue[captures.Count];
-                            for (var i = 0; i < captured.Length; i++)
-                            {
-                                captured[i] = captures[i].FromLocal ? registers[captures[i].Index] : cells[captures[i].Index];
-                                if (captured[i].Kind != WsValueKind.Cell)
-                                {
-                                    throw new InvalidOperationException("A capture is not a cell.");
-                                }
-                            }
-                            if (!heap.TryAllocateClosure(ins.B, captured, out var closure, out error)) break;
+                            if (!TryMakeClosure(ins.B, registers, cells, out var closure, out error)) break;
                             registers[ins.A] = closure;
                             pc++;
                             continue;
@@ -345,78 +347,49 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             pc++;
                             continue;
                         case WsOpCode.Call:
-                        {
-                            // Register B must hold a function taking D arguments: a built-in is called at once, a closure
-                            // in a new frame, its arguments in its first registers. The compiler checks what it can, and
-                            // this the rest (WS2005, WS2006).
-                            var callee = registers[ins.B];
-                            if (callee.Kind == WsValueKind.Builtin)
-                            {
-                                var builtin = builtins[callee.Handle];
-                                error = builtin.Arity != ins.D
-                                    ? WrongArgumentCount(builtin.Name, builtin.Arity, ins.D)
-                                    : CallBuiltin(builtin, registers, ins);
-                                if (error is not null) break;
-                                pc++;
-                                continue;
-                            }
-                            if (callee.Kind != WsValueKind.Function)
-                            {
-                                var what = Capitalized(WsValueFormatter.Describe(callee));
-                                error = new WsRuntimeError(WsDiagnosticCodes.NotAFunction,
-                                    $"{what} is not a function, and cannot be called.");
-                                break;
-                            }
-                            var (index, closureCells) = heap.GetClosure(callee);
-                            var function = module.Functions[index];
-                            if (function.ParameterCount != ins.D)
-                            {
-                                error = WrongArgumentCount(function.Name, function.ParameterCount, ins.D);
-                                break;
-                            }
-                            if (depth + 1 >= maxCallDepth)
-                            {
-                                error = new WsRuntimeError(WsDiagnosticCodes.BudgetExceeded,
-                                    $"The calls nest more than {maxCallDepth} deep, which this execution allows.");
-                                break;
-                            }
-
-                            frame.Pc = pc + 1;
-                            if (++depth == frames.Length) Array.Resize(ref frames, frames.Length * 2);
-                            var called = frames[depth] ??= new Frame();
-                            if (called.Registers.Length < function.RegisterCount)
-                            {
-                                called.Registers = new WsValue[function.RegisterCount];
-                            }
-                            var calledRegisters = called.Registers;
-                            for (var i = 0; i < ins.D; i++) calledRegisters[i] = registers[ins.C + i];
-                            called.Function = function;
-                            called.Code = codes[index];
-                            called.Cells = closureCells;
-                            called.Closure[0] = callee;
-                            called.ResultRegister = ins.A;
-                            heap.AddRoots(calledRegisters);
-                            heap.AddRoots(called.Closure);
-
-                            frame = called;
-                            code = called.Code;
-                            registers = calledRegisters;
-                            cells = closureCells;
-                            pc = 0;
-                            continue;
-                        }
+                            // Register B must hold a function taking D arguments; the compiler checks what it can, and
+                            // the call, after this switch, the rest (WS2005, WS2006).
+                            callee = registers[ins.B];
+                            self = WsValue.Null;
+                            arguments = registers;
+                            firstArgument = ins.C;
+                            argumentCount = ins.D;
+                            resultRegister = ins.A;
+                            constructed = WsValue.Null;
+                            goto call;
                         case WsOpCode.GetMember:
                         {
                             var name = names[ins.C];
-                            if (!WsMembers.TryGet(registers[ins.B], name.Member, name.Text, heap, out var member, out error)) break;
+                            if (!WsMembers.TryGet(registers[ins.B], name.Member, name.Text, heap, ins.D != 0, out var member,
+                                    out error))
+                            {
+                                break;
+                            }
                             registers[ins.A] = member;
                             pc++;
                             continue;
                         }
+                        case WsOpCode.SetMember:
+                            if (!WsMembers.TrySet(registers[ins.A], names[ins.B].Text, registers[ins.C], heap, out error)) break;
+                            pc++;
+                            continue;
                         case WsOpCode.CallMethod:
                         {
                             var name = names[ins.B];
-                            if (!WsMembers.TryCall(registers[ins.C], name.Member, name.Text, registers, ins.C + 1, ins.D, heap,
+                            var target = registers[ins.C];
+                            if (target.Kind == WsValueKind.Instance)
+                            {
+                                // A field's function is called as any function is; a method runs on the instance.
+                                if (!WsMembers.TryFindCallee(target, name.Text, heap, out callee, out var isMethod, out error)) break;
+                                self = isMethod ? target : WsValue.Null;
+                                arguments = registers;
+                                firstArgument = ins.C + 1;
+                                argumentCount = ins.D;
+                                resultRegister = ins.A;
+                                constructed = WsValue.Null;
+                                goto call;
+                            }
+                            if (!WsMembers.TryCall(target, name.Member, name.Text, registers, ins.C + 1, ins.D, heap,
                                     out var result, out error))
                             {
                                 break;
@@ -424,6 +397,45 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             registers[ins.A] = result;
                             pc++;
                             continue;
+                        }
+                        case WsOpCode.MakeClass:
+                        {
+                            if (!TryMakeClass(module.Classes[ins.B], registers, cells, out var made, out error)) break;
+                            registers[ins.A] = made;
+                            pc++;
+                            continue;
+                        }
+                        case WsOpCode.New:
+                        {
+                            // A new instance; its constructor, if its class has one, runs on it as a call, whose result
+                            // is the instance (section 3.7).
+                            var classValue = registers[ins.B];
+                            if (classValue.Kind != WsValueKind.Class)
+                            {
+                                error = new WsRuntimeError(WsDiagnosticCodes.NotAFunction,
+                                    $"{Capitalized(WsValueFormatter.Describe(classValue, heap))} is not a class, and cannot be made with 'new'.");
+                                break;
+                            }
+                            if (!heap.TryAllocateInstance(classValue, out var instance, out error)) break;
+                            callee = heap.ClassConstructor(classValue);
+                            if (callee.Kind == WsValueKind.Null)
+                            {
+                                if (ins.D != 0)
+                                {
+                                    error = WrongArgumentCount(heap.ClassName(classValue), 0, ins.D);
+                                    break;
+                                }
+                                registers[ins.A] = instance;
+                                pc++;
+                                continue;
+                            }
+                            self = instance;
+                            constructed = instance;
+                            arguments = registers;
+                            firstArgument = ins.C;
+                            argumentCount = ins.D;
+                            resultRegister = ins.A;
+                            goto call;
                         }
                         case WsOpCode.NewArray:
                         {
@@ -481,14 +493,16 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             heap.RemoveLastRoots(registers);
                             Array.Clear(registers, 0, frame.Function.RegisterCount); // So that nothing stays reachable.
                             frame.Closure[0] = WsValue.Null;
-                            var resultRegister = frame.ResultRegister;
+                            if (frame.Constructed.Kind == WsValueKind.Instance) result = frame.Constructed;
+                            frame.Constructed = WsValue.Null;
+                            var returnTo = frame.ResultRegister;
 
                             frame = frames[--depth];
                             code = frame.Code;
                             registers = frame.Registers;
                             cells = frame.Cells;
                             pc = frame.Pc;
-                            registers[resultRegister] = result;
+                            registers[returnTo] = result;
                             continue;
                         }
                         default:
@@ -497,6 +511,76 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                                 $"The operation {(int)ins.OpCode} is unknown.");
                             break;
                     }
+                    goto failed;
+
+                call:
+                    // The call the operations above set up: a built-in at once, a closure in a new frame, its arguments
+                    // in its first registers, after the instance it runs on if it is a method (section 3.7).
+                    if (callee.Kind == WsValueKind.BoundMethod) (self, callee) = heap.GetBoundMethod(callee);
+                    if (callee.Kind == WsValueKind.Builtin)
+                    {
+                        var builtin = builtins[callee.Handle];
+                        var builtinResult = WsValue.Null;
+                        error = builtin.Arity != argumentCount
+                            ? WrongArgumentCount(builtin.Name, builtin.Arity, argumentCount)
+                            : CallBuiltin(builtin, arguments, firstArgument, argumentCount, out builtinResult);
+                        if (error is not null) goto failed;
+                        registers[resultRegister] = builtinResult;
+                        pc++;
+                        continue;
+                    }
+                    if (callee.Kind != WsValueKind.Function)
+                    {
+                        var what = Capitalized(WsValueFormatter.Describe(callee, heap));
+                        error = new WsRuntimeError(WsDiagnosticCodes.NotAFunction, callee.Kind == WsValueKind.Class
+                            ? $"{what} is not a function: make an instance with 'new'."
+                            : $"{what} is not a function, and cannot be called.");
+                        goto failed;
+                    }
+                    {
+                        var (index, closureCells) = heap.GetClosure(callee);
+                        var function = module.Functions[index];
+                        var withThis = function.HasThis ? 1 : 0;
+                        if (function.ParameterCount != argumentCount + withThis)
+                        {
+                            error = WrongArgumentCount(function.Name, function.ParameterCount - withThis, argumentCount);
+                            goto failed;
+                        }
+                        if (depth + 1 >= maxCallDepth)
+                        {
+                            error = new WsRuntimeError(WsDiagnosticCodes.BudgetExceeded,
+                                $"The calls nest more than {maxCallDepth} deep, which this execution allows.");
+                            goto failed;
+                        }
+
+                        frame.Pc = pc + 1;
+                        if (++depth == frames.Length) Array.Resize(ref frames, frames.Length * 2);
+                        var called = frames[depth] ??= new Frame();
+                        if (called.Registers.Length < function.RegisterCount)
+                        {
+                            called.Registers = new WsValue[function.RegisterCount];
+                        }
+                        var calledRegisters = called.Registers;
+                        if (withThis == 1) calledRegisters[0] = self;
+                        for (var i = 0; i < argumentCount; i++) calledRegisters[withThis + i] = arguments[firstArgument + i];
+                        called.Function = function;
+                        called.Code = codes[index];
+                        called.Cells = closureCells;
+                        called.Closure[0] = callee;
+                        called.ResultRegister = resultRegister;
+                        called.Constructed = constructed;
+                        heap.AddRoots(calledRegisters);
+                        heap.AddRoots(called.Closure);
+
+                        frame = called;
+                        code = called.Code;
+                        registers = calledRegisters;
+                        cells = closureCells;
+                        pc = 0;
+                        continue;
+                    }
+
+                failed:
                     return Failure(error!.Code, error.Message, SpanOf(frame.Function, pc)) with { Instructions = executed };
                 }
             }
@@ -622,6 +706,71 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                 $"'{name}' takes {arity} {(arity == 1 ? "argument" : "arguments")}, not {count}.");
 
         private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
+
+        /// <summary>
+        /// A closure of the module's function, its captures taken from the making function's registers or its own
+        /// captures, as the function's capture table says.
+        /// </summary>
+        private bool TryMakeClosure(int function, WsValue[] registers, WsValue[] cells, out WsValue closure, out WsRuntimeError? error)
+        {
+            var captures = module.Functions[function].Captures;
+            var captured = new WsValue[captures.Count];
+            for (var i = 0; i < captured.Length; i++)
+            {
+                captured[i] = captures[i].FromLocal ? registers[captures[i].Index] : cells[captures[i].Index];
+                if (captured[i].Kind != WsValueKind.Cell) throw new InvalidOperationException("A capture is not a cell.");
+            }
+            return heap.TryAllocateClosure(function, captured, out closure, out error);
+        }
+
+        /// <summary>
+        /// A class value: its constructor's and its methods' closures made now, kept as roots until the class holds
+        /// them, since making each may collect (section 3.7).
+        /// </summary>
+        private bool TryMakeClass(WsClassInfo info, WsValue[] registers, WsValue[] cells, out WsValue made, out WsRuntimeError? error)
+        {
+            made = WsValue.Null;
+            var closures = new WsValue[info.Methods.Count + 1];
+            heap.AddRoots(closures);
+            try
+            {
+                if (info.Constructor != -1 && !TryMakeClosure(info.Constructor, registers, cells, out closures[0], out error)) return false;
+                var methods = new Dictionary<string, WsValue>(StringComparer.Ordinal);
+                for (var i = 0; i < info.Methods.Count; i++)
+                {
+                    if (!TryMakeClosure(info.Methods[i].Function, registers, cells, out closures[i + 1], out error)) return false;
+                    methods.Add(info.Methods[i].Name, closures[i + 1]);
+                }
+                return heap.TryAllocateClass(info.Name, closures[0], methods, out made, out error);
+            }
+            finally
+            {
+                heap.RemoveLastRoots(closures);
+            }
+        }
+
+        /// <summary>
+        /// Calls a built-in with the <paramref name="count"/> arguments from <paramref name="first"/> on, copied out, so
+        /// that its result may overwrite them. Its failure, even an exception, is a runtime error.
+        /// </summary>
+        private WsRuntimeError? CallBuiltin(IWsBuiltinFunction builtin, WsValue[] values, int first, int count, out WsValue result)
+        {
+            result = WsValue.Null;
+            var arguments = new WsValue[count];
+            for (var i = 0; i < arguments.Length; i++) arguments[i] = values[first + i];
+            try
+            {
+                if (!builtin.TryInvoke(arguments, heap, out result, out var error))
+                {
+                    return error ?? new WsRuntimeError(WsDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed.");
+                }
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return new WsRuntimeError(WsDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed: {exception.Message}");
+            }
+        }
 
         /// <summary>
         /// Calls a built-in with its arguments copied out of the registers, so that its result may overwrite them.

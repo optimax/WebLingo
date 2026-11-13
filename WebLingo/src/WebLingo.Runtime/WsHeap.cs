@@ -7,7 +7,8 @@ namespace WebLingo.Runtime;
 /// collection marks what the roots (the arrays its owner registers, such as the VM's registers and constants) refer
 /// to, through every object that refers to others, and frees the rest, whose handles are reused. Its objects are
 /// strings, closures (a function and the cells it captures), cells (one variable that closures share, which has no
-/// value until it is initialized), arrays, maps and sets (section 3.6).
+/// value until it is initialized), arrays, maps and sets (section 3.6), and classes, instances and bound methods
+/// (section 3.7).
 /// <para>
 /// Its size is counted in units: a string's length in UTF-16 code units, a closure's capture count, an array's
 /// element count and a map's or a set's entry count (which grow and shrink with them), each plus
@@ -133,6 +134,64 @@ public sealed class WsHeap
             entries.Set(key, values[first + 2 * i], values[first + 2 * i + 1]);
         }
         return TryAllocate(entries, WsValueKind.Map, entries.Count, out map, out error);
+    }
+
+    /// <summary>
+    /// A class: its name, its constructor's closure (<c>null</c> if it has none), and its methods' closures by name,
+    /// each a function whose first parameter is <c>this</c> (section 3.7).
+    /// </summary>
+    public bool TryAllocateClass(string name, WsValue constructor, Dictionary<string, WsValue> methods, out WsValue value,
+        out WsRuntimeError? error) =>
+        TryAllocate(new ClassObject(name, constructor, methods), WsValueKind.Class, methods.Count + 1, out value, out error);
+
+    public string ClassName(WsValue value) => Get<ClassObject>(value, WsValueKind.Class).Name;
+
+    /// <summary>A class's constructor's closure, or <c>null</c> if it has none.</summary>
+    public WsValue ClassConstructor(WsValue value) => Get<ClassObject>(value, WsValueKind.Class).Constructor;
+
+    /// <summary>A method's closure, by its name, from a class.</summary>
+    public bool TryGetMethod(WsValue value, string name, out WsValue closure) =>
+        Get<ClassObject>(value, WsValueKind.Class).Methods.TryGetValue(name, out closure);
+
+    /// <summary>A new instance of a class, without fields yet.</summary>
+    public bool TryAllocateInstance(WsValue classValue, out WsValue instance, out WsRuntimeError? error) =>
+        TryAllocate(new InstanceObject(classValue), WsValueKind.Instance, 0, out instance, out error);
+
+    public WsValue ClassOf(WsValue instance) => Get<InstanceObject>(instance, WsValueKind.Instance).Class;
+
+    public bool TryGetField(WsValue instance, string name, out WsValue value) =>
+        Get<InstanceObject>(instance, WsValueKind.Instance).TryGet(name, out value);
+
+    /// <summary>Assigns a field, which exists from then on: a new one is one more unit, within the budget (WS3003).</summary>
+    public bool TrySetField(WsValue instance, string name, WsValue value, out WsRuntimeError? error)
+    {
+        var fields = Get<InstanceObject>(instance, WsValueKind.Instance);
+        error = null;
+        if (fields.TryGet(name, out _))
+        {
+            fields.Set(name, value);
+            return true;
+        }
+        if (!TryReserve(1, out error)) return false;
+        fields.Set(name, value);
+        Units++;
+        return true;
+    }
+
+    public int FieldCount(WsValue instance) => Get<InstanceObject>(instance, WsValueKind.Instance).Count;
+
+    /// <summary>An instance's field at a position from 0 to its count − 1, in no defined order.</summary>
+    public (string Name, WsValue Value) FieldAt(WsValue instance, int position) =>
+        Get<InstanceObject>(instance, WsValueKind.Instance).At(position);
+
+    /// <summary>A method bound to an instance: a function that runs the method on it (section 3.7).</summary>
+    public bool TryAllocateBoundMethod(WsValue instance, WsValue closure, out WsValue bound, out WsRuntimeError? error) =>
+        TryAllocate(new BoundMethodObject(instance, closure), WsValueKind.BoundMethod, 2, out bound, out error);
+
+    public (WsValue Instance, WsValue Closure) GetBoundMethod(WsValue bound)
+    {
+        var target = Get<BoundMethodObject>(bound, WsValueKind.BoundMethod);
+        return (target.Instance, target.Closure);
     }
 
     /// <summary>A new set of the <paramref name="count"/> values from <paramref name="values"/>[<paramref name="first"/>] on.</summary>
@@ -288,6 +347,18 @@ public sealed class WsHeap
                 case ArrayObject array:
                     foreach (var element in array.Elements) Mark(element, marked, pending);
                     break;
+                case ClassObject classObject:
+                    Mark(classObject.Constructor, marked, pending);
+                    foreach (var method in classObject.Methods.Values) Mark(method, marked, pending);
+                    break;
+                case InstanceObject instance:
+                    Mark(instance.Class, marked, pending);
+                    for (var i = 0; i < instance.Count; i++) Mark(instance.At(i).Value, marked, pending);
+                    break;
+                case BoundMethodObject bound:
+                    Mark(bound.Instance, marked, pending);
+                    Mark(bound.Closure, marked, pending);
+                    break;
                 case MapObject map: // A set's too, whose values are its keys.
                     for (var i = 0; i < map.Count; i++)
                     {
@@ -312,7 +383,7 @@ public sealed class WsHeap
     private static void Mark(WsValue value, bool[] marked, Stack<int> pending)
     {
         if (value.Kind is not (WsValueKind.String or WsValueKind.Function or WsValueKind.Cell or WsValueKind.Array
-            or WsValueKind.Map or WsValueKind.Set))
+            or WsValueKind.Map or WsValueKind.Set or WsValueKind.Class or WsValueKind.Instance or WsValueKind.BoundMethod))
         {
             return;
         }
@@ -327,6 +398,9 @@ public sealed class WsHeap
         Closure closure => closure.Cells.Length,
         ArrayObject array => array.Elements.Count,
         MapObject map => map.Count,
+        ClassObject classObject => classObject.Methods.Count + 1,
+        InstanceObject instance => instance.Count,
+        BoundMethodObject => 2,
         _ => 0
     };
 
@@ -388,6 +462,44 @@ public sealed class WsHeap
     private sealed record Closure(int Function, WsValue[] Cells);
 
     private sealed record ArrayObject(List<WsValue> Elements);
+
+    private sealed record ClassObject(string Name, WsValue Constructor, Dictionary<string, WsValue> Methods);
+
+    private sealed record BoundMethodObject(WsValue Instance, WsValue Closure);
+
+    /// <summary>An instance: its class, and its fields, by name, in no defined order.</summary>
+    private sealed class InstanceObject(WsValue classValue)
+    {
+        private readonly Dictionary<string, int> _positions = new(StringComparer.Ordinal);
+        private readonly List<(string Name, WsValue Value)> _fields = [];
+
+        public WsValue Class { get; } = classValue;
+        public int Count => _fields.Count;
+
+        public bool TryGet(string name, out WsValue value)
+        {
+            if (_positions.TryGetValue(name, out var position))
+            {
+                value = _fields[position].Value;
+                return true;
+            }
+            value = WsValue.Null;
+            return false;
+        }
+
+        public void Set(string name, WsValue value)
+        {
+            if (_positions.TryGetValue(name, out var position))
+            {
+                _fields[position] = (name, value);
+                return;
+            }
+            _positions.Add(name, _fields.Count);
+            _fields.Add((name, value));
+        }
+
+        public (string Name, WsValue Value) At(int position) => _fields[position];
+    }
 
     /// <summary>A map's key as the map compares it: a string by its text, anything else by its kind and payload.</summary>
     private readonly record struct MapKey(WsValueKind Kind, long Bits, string? Text);

@@ -174,7 +174,7 @@ public sealed class ParserTests
     [InlineData("(a) = 2;", 0, 3)]
     [InlineData("a + b = 2;", 0, 5)]
     [InlineData("f() = 2;", 0, 3)]
-    [InlineData("a.b = 2;", 0, 3)]
+    [InlineData("a?.b = 2;", 0, 4)]
     [InlineData("(a[0]) = 2;", 0, 6)]
     public void OnlyAVariableCanBeAssigned(string source, int start, int length)
     {
@@ -202,6 +202,10 @@ public sealed class ParserTests
     [InlineData("foreach (var x of a) {}")]
     [InlineData("foreach (var (a b) in m) {}")]
     [InlineData("foreach x in a {}")]
+    [InlineData("class { m() {} }")]
+    [InlineData("class A { 5 }")]
+    [InlineData("class A { m( {} }")]
+    [InlineData("var a = new A;")]
     [InlineData("foreach (var in a) {}")]
     public void MalformedStatementsGiveOneDiagnosticEach(string source)
     {
