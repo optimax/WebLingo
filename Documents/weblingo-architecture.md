@@ -58,6 +58,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | M0.6 testing default | xUnit on .NET 10 | Adopted M0.6 default |
 | M0.6 implementation choices | Lexical, syntax, runtime and CLI choices made where this specification is silent, while implementing M0.6.2 onward (§15.2) | Each row of §15.2 has its own status; the lexical and syntax ones, and the binding ones but "Compilation stages", the bytecode ones but "Compiler output", and the runtime and CLI ones asked about, approved 12 November 2026; the rest are Proposed |
 | Repository documents | One copy of this specification, `Documents/weblingo-architecture.md`; documents in the repository's root `Documents/` folder; a shallow folder structure, with no `docs/architecture/` folder; the whole repository may become public (§8.2) | Approved (12 November 2026) |
+| Milestones after M0.8 | M0.9 collections, M0.10 classes and disposal, M0.11 `.wsp` templates, M0.12 WBC, in that order (§9) | Approved (13 November 2026) |
 
 **Approval boundary:** M0.6 was approved as a specification. This does not imply the repository or implementation already exists. Detailed M0.3 encoding choices were recommended but not separately approved; the architectural decision between stack and register VMs remains open.
 
@@ -836,6 +837,10 @@ Proposed central props:
 | M0.6 | Solution scaffolding and implementation contracts | **Approved; M0.6.1–M0.6.7 implemented and verified on Windows and Linux (§15)** |
 | M0.7 | Conformance suite expansion: the language of §3.5, in parts M0.7.1 to M0.7.6 (below), each with its conformance tests | Implemented (12 November 2026), on Windows; `foreach` waits for collections |
 | M0.8 | Windows/Linux CI and portability validation | Started (12 November 2026): the CI workflow builds and tests on Windows and Linux (first run passed: CI run 1, 12 November 2026, commit `5229806`); tests check the portable core's assemblies against the dependency rules (§8.3) and the portability inventory (WS-P016) |
+| M0.9 | Collections: arrays, maps and sets (§3.2), with indexing, `length` and member access (§3.3), and `foreach` (§3.5) | Next (order approved 13 November 2026); its syntax is to be decided first |
+| M0.10 | Classes, `dispose()` and `using` (§3.2, §3.4, WS-L011) | After M0.9 |
+| M0.11 | `.wsp` templates: includes, layouts and parameterized components, together (§13, WS-T001 to WS-T008) | After M0.10 |
+| M0.12 | WBC, the bytecode's binary format (§5.1, §5.3) | After M0.11 |
 
 **M0.7 parts** (12 November 2026), each landing on its own with its conformance tests, which `WebLingo.Conformance.Tests` runs beside §8.6's:
 
@@ -846,7 +851,9 @@ Proposed central props:
 5. **M0.7.5:** string literals and concatenation. Implemented (12 November 2026), with the first heap objects (§15.2, "Heap").
 6. **M0.7.6:** functions, function values and closures. Implemented (12 November 2026).
 
-**Immediate next activity:** M0.6's increments are implemented and pass their tests on Windows and Linux (12 November 2026, §15). The owner's decisions on the choices proposed in §15.2 come next, then M0.7. The compiler and VM cover the M0.6 subset only (§8.4).
+**After M0.8** (order approved by the owner, 13 November 2026): M0.9, then M0.10, M0.11 and M0.12, as the table gives them. Each needs syntax, or a format, that this specification does not give yet, which is decided feature by feature before it is built; and each is built on both VMs (§5.6, "Both VMs, for now").
+
+**Immediate next activity:** M0.9's syntax, for the owner's decision, then M0.9. The compiler and both VMs cover M0.6's subset and the language of §3.5, but for `foreach`.
 
 ---
 
