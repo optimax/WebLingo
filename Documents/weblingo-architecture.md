@@ -53,7 +53,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WS-S001–S016 | M0.6 solution scaffolding and initial implementation contracts | Approved |
 | M0.6 implementation default | Register VM first; stack comparison later | Adopted M0.6 default; VM architecture still provisional |
 | M0.6 testing default | xUnit on .NET 10 | Adopted M0.6 default |
-| M0.6 implementation choices | Lexical, syntax, runtime and CLI choices made where this specification is silent, while implementing M0.6.2 onward (§15.2) | Each row of §15.2 has its own status; the lexical and syntax ones, and the binding ones but "Compilation stages", approved 12 November 2026 |
+| M0.6 implementation choices | Lexical, syntax, runtime and CLI choices made where this specification is silent, while implementing M0.6.2 onward (§15.2) | Each row of §15.2 has its own status; the lexical and syntax ones, and the binding ones but "Compilation stages", and the bytecode ones but "Compiler output", approved 12 November 2026 |
 | Repository documents | One copy of this specification, `Documents/weblingo-architecture.md`; documents in the repository's root `Documents/` folder; a shallow folder structure, with no `docs/architecture/` folder; the whole repository may become public (§8.2) | Approved (12 November 2026) |
 
 **Approval boundary:** M0.6 was approved as a specification. This does not imply the repository or implementation already exists. Detailed M0.3 encoding choices were recommended but not separately approved; the architectural decision between stack and register VMs remains open.
@@ -668,7 +668,7 @@ Codes added while implementing M0.6 (§15.2):
 | WS3002 | Integer overflow (a result outside int64) | Proposed |
 | WS3003 | Execution budget exceeded (instructions or registers) | Proposed |
 | WS3004 | Execution cancelled by the host | Proposed |
-| WS4002 | Program too large for the bytecode (more registers than a function may have) | Proposed |
+| WS4002 | Program too large for the bytecode (more registers than a function may have) | Approved (12 November 2026) |
 
 **Lexer:** identifiers, keywords (`var`, `const`), literals, operators, punctuation, source spans and malformed-input diagnostics.
 
@@ -1056,10 +1056,10 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Functions as values | Not yet, but they will be: until then a built-in can only be called, and naming it otherwise is an error (WS3001); calling anything but a built-in is WS2005, and calling one with the wrong number of arguments is WS2006, both at compile time | Approved (12 November 2026); functions as values are still to come |
 | Use before declaration | A name used before its declaration, or in its own initializer, means the outer declaration, or is undefined (WS2001, at compile time) if there is none (§3.1) | Approved |
 | Evaluation order | Left to right: operands, then arguments; an assignment evaluates its value before it stores it | Approved (12 November 2026) |
-| Instruction model | An in-memory register instruction model, not WBC (§5.3, §8.4): an operation and up to four integer operands A to D, unused ones 0 (`WsBytecodeContracts.cs`); a module holds its constants (int64 and binary64, kept as IEEE bits), the built-ins it imports by name and arity, and one function, with a source span per instruction and the names of its locals for runtime messages | Proposed |
-| Registers | A function's locals take registers 0 to n − 1 and its temporaries the registers above; at most 65535 registers (§5.3), more is a compile-time error (WS4002) | Proposed |
-| Operations | `LoadConstant`, `Move`, `Negate`, `Plus`, `Add`, `Subtract`, `Multiply`, `Divide`, `CallBuiltin` (arguments in consecutive registers, §5.4), `Jump`, `Return`; the compiler emits no `Jump` yet | Proposed |
-| Verification | Besides §5.5: unused operands must be 0; no path may run off the end of the code; every register, local or temporary, must be written before it is read on every path, which is what keeps a variable from being read before it has a value (§3.1); a function whose check needs more than 16 million words of state or 100 million steps is rejected rather than verified slowly | Proposed |
+| Instruction model | An in-memory register instruction model, not WBC (§5.3, §8.4): an operation and up to four integer operands A to D, unused ones 0 (`WsBytecodeContracts.cs`); a module holds its constants (int64 and binary64, kept as IEEE bits), the built-ins it imports by name and arity, and one function, with a source span per instruction and the names of its locals for runtime messages | Approved (12 November 2026) |
+| Registers | A function's locals take registers 0 to n − 1 and its temporaries the registers above; at most 65535 registers (§5.3), more is a compile-time error (WS4002) | Approved (12 November 2026) |
+| Operations | `LoadConstant`, `Move`, `Negate`, `Plus`, `Add`, `Subtract`, `Multiply`, `Divide`, `CallBuiltin` (arguments in consecutive registers, §5.4), `Jump`, `Return`; the compiler emits no `Jump` yet | Approved (12 November 2026) |
+| Verification | Besides §5.5: unused operands must be 0; no path may run off the end of the code; every register, local or temporary, must be written before it is read on every path, which is what keeps a variable from being read before it has a value (§3.1); a function whose check needs more than 16 million words of state or 100 million steps is rejected rather than verified slowly. The bounds are arbitrary, and are constants that are easy to change (`WsBytecodeVerifier.MaxStateWords`, `WsBytecodeVerifier.MaxSteps`), as is the register limit (`WsFunction.MaxRegisters`) | Approved (12 November 2026) |
 | Compiler output | The compiler verifies what it generates, and reports a module that fails as an internal error (WS4001), with no module | Proposed |
 | Runtime values | `WsValue`, a kind and a 64-bit payload, 16 bytes (§4.1's target, met): null, Boolean, int64 and binary64 (§8.4); the language has no `null`, `true` or `false` literals yet, so scripts produce only numbers | Proposed |
 | Mixed arithmetic | An int64 meeting a binary64 is converted to binary64 (`1 + 0.5`, and `10 / 4 + 1` is 3.5) | Proposed |

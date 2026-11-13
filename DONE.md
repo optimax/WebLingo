@@ -201,3 +201,21 @@ Q4: Evaluation is left to right, and an assignment evaluates its value before it
 A4: Yes.
 
 Done (Claude, 2026-11-12): Q1 as recorded above. Q2: `print` is now `write`, with no line break, and `writeLn` writes a line break after the value (`WsWriteFunction`, `WsWriteLnFunction`). The output contract writes text as it comes (`IWsTextOutput.Write`). Samples, tests and documents use them. I guessed that `writeLn` takes one argument, like `write`. Built-ins stay unprivileged, and may be shadowed. Q3: calling what is not a function is WS2005, and calling with the wrong number of arguments is WS2006. Naming a built-in other than to call it stays WS3001 until functions are values, which is the new task "Functions as Values". Q4: approved. The "Checks" row is gone, per the comment on it. The specification's section 15.2 marks these rows Approved, and section 8.4 lists WS2005 and WS2006. `samples/Arithmetic` prints 30. `samples/HelloWorld` needs string literals, so it still does not compile. Build and 303 tests pass on Windows; Linux not tried.
+
+## [DONE] Bytecode Choices (M0.6.5)
+
+Where the specification is silent or only proposes, the M0.6.5 bytecode made choices of its own, recorded as Proposed in the specification's section 15.2 (rows "Instruction model" to "Diagnostic codes"). The bytecode is an in-memory model, not WBC, so none of them freezes a format.
+
+Q1: The instruction set is 13 operations with up to four integer operands each, locals in the low registers and temporaries above them, and at most 65535 registers per function (section 5.3's proposed limit, enforced as WS4002). Does that suit you as M0.6's model, until the WBC encoding is decided?
+
+A1: Yes.
+
+Q2: Besides what section 5.5 asks, the verifier rejects nonzero unused operands, code that can run off its end, and a function whose check would need more than 16 million words of state or 100 million steps (rejected, rather than verified slowly). Are these bounds right?
+
+A2: Sure, but make them adjustable via constants, as they too are arbitrary.
+
+Q3: The new diagnostic code is WS4002 (program too large for the bytecode). May it keep this code?
+
+A3: Yes.
+
+Done (Claude, 2026-11-12): the specification's section 15.2 marks the instruction model, the registers, the operations and the verification as Approved, as is WS4002 in section 8.4. It also names the constants that hold the verifier's bounds and the register limit (`MaxStateWords`, `MaxSteps`, `MaxRegisters`), which already existed, so the code did not change. Nothing to build; Linux not tried.
