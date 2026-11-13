@@ -2,7 +2,7 @@
 
 **Document:** `weblingo-architecture.md`  
 **Status:** Consolidated architectural baseline through M0.6, including approved WS-T001–WS-T008 template composition and the WebLingo project name (12 November 2026)  
-**Implementation status:** M0.6.1 solution scaffold generated (22 October 2026); renamed to WebLingo on 12 November 2026. Build and tests remain pending.  
+**Implementation status:** M0.6.1 solution scaffold generated (22 October 2026); renamed to WebLingo on 12 November 2026; built and tested on Windows on 12 November 2026, Linux pending (§14).  
 **Convention:** **Approved** means explicitly accepted by the project owner. **Proposed** means an implementation recommendation requiring confirmation or validation. **Provisional** means deliberately undecided.
 
 ## 1. Executive overview
@@ -760,11 +760,11 @@ Proposed central props:
 | M0.3 | WBC bytecode and VM architecture | Drafted; VM comparison and several encoding choices open |
 | M0.4 | Hosting ABI and runtime lifecycle | **Four explicit architectural decisions approved** |
 | M0.5 | Platform abstraction and portability | **Four explicit architectural decisions approved** |
-| M0.6 | Solution scaffolding and implementation contracts | **Approved; M0.6.1 scaffold generated, build verification pending** |
+| M0.6 | Solution scaffolding and implementation contracts | **Approved; M0.6.1 scaffold generated and verified on Windows, Linux verification pending** |
 | M0.7 | Conformance suite expansion | Planned |
 | M0.8 | Windows/Linux CI and portability validation | Planned |
 
-**Immediate next activity:** Validate M0.6.1 with `dotnet restore`, `dotnet build`, and `dotnet test` on Windows/Linux; then implement M0.6.2 lexer and M0.6.3 parser. The scaffold is not a functioning compiler/VM.
+**Immediate next activity:** M0.6.1 builds and passes its tests on Windows (12 November 2026); its Linux validation waits for the CI workflow's first run. Implement the M0.6.2 lexer and the M0.6.3 parser. The scaffold is not a functioning compiler/VM.
 
 ---
 
@@ -975,13 +975,13 @@ Rendering must support asynchronous output and backpressure without mandatory fu
 
 ## 14. M0.6.1 solution scaffold — implementation status (22 October 2026)
 
-**Status: generated; compilation and test execution pending.** This is an implementation milestone, not a change to previously approved language semantics.
+**Status: generated; built and tested on Windows, Linux pending.** This is an implementation milestone, not a change to previously approved language semantics.
 
-- Created `WebLingo.slnx`, .NET 10 project files, centralized package versions, solution-wide build settings, and GitHub Actions build/test workflow for Windows and Linux.
+- Created `WebLingo.slnx`, .NET 10 project files, centralized package versions, solution-wide build settings, and GitHub Actions build/test workflow for Windows and Linux (moved on 12 November 2026 to `.github/workflows/` at the repository root, where GitHub Actions reads it).
 - Created portable Core, Language, Bytecode, Compiler, Runtime, VM, Platform.Abstractions, Templates, Hosting.Abstractions, StdLib project boundaries; .NET platform, ASP.NET Core host adapter, and CLI projects.
 - Added a minimal lexer seed and unit tests, public scaffolding interfaces, template-composition contract placeholders, examples, and a Native C# portability inventory.
 - The CLI supports `--version` only; `run` and `check` explicitly report that execution is not implemented. No compiler, VM execution, or template rendering is claimed.
-- **Verification:** The renamed scaffold was statically validated on Windows with .NET SDK 10.0.401. NuGet configuration initialization failed during restore, so compilation and tests remain pending. Run `dotnet restore WebLingo.slnx`, `dotnet build WebLingo.slnx -c Release`, and `dotnet test WebLingo.slnx -c Release`.
+- **Verification:** On Windows (12 November 2026, .NET SDK 10.0.404, a fresh clone), `dotnet restore WebLingo.slnx`, `dotnet build WebLingo.slnx -c Release` (no warnings) and `dotnet test WebLingo.slnx -c Release` (5 tests) succeed, and `weblingo --version` answers. (An earlier static validation, with .NET SDK 10.0.401, could not restore.) Linux is not verified yet: the CI workflow builds and tests there on a push, and has not run yet.
 - The initial `WsSourceSpan` and lexer positions use .NET string indices in this scaffold; production source-map byte offsets remain specified as UTF-8 and require explicit conversion.
 - Register-based execution remains provisional (WS-BC002); both stack and register execution must eventually be benchmarked.
 - All three approved template composition features (includes, layouts, parameterized components) remain mandatory together in the first `.wsp`-capable implementation.

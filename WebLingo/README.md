@@ -26,4 +26,5 @@ See [`Documents/weblingo-architecture.md`](../Documents/weblingo-architecture.md
 
 ## Verification status
 
-The renamed scaffold was statically validated on Windows with .NET SDK 10.0.401. NuGet configuration initialization failed during restore, so compilation and tests remain pending.
+- **Windows** (12 November 2026, .NET SDK 10.0.404, a fresh clone): `dotnet restore`, the Release build (no warnings), and `dotnet test` (5 tests) succeed, and `weblingo --version` answers.
+- **Linux:** not verified yet. The CI workflow (`.github/workflows/build.yml` at the repository root) builds and tests on Linux and Windows; it runs on a push, and has not run yet.
