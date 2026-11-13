@@ -48,22 +48,6 @@ Done (Claude, 2026-11-12): the answers are recorded as approved in the specifica
 
 2026-11-12: waits for its parts, M0.7.1 to M0.7.6.
 
-## Syntax of `foreach`
-
-The owner's answer to "Syntax of `for` and `do … while`", Q3: design a loop over collections now, as `foreach` rather than `for … of`. It is implemented when collections exist (specification, section 3.2: arrays, maps, sets). Added by Claude, 2026-11-12.
-
-**Q1: Which form? (a) `foreach (var item in items) statement`, as in C#; (b) `foreach (var item of items) statement`; (c) `foreach (var item : items) statement`, as in Java.**
-
-A1: (a)
-
-**Q2: May the loop variable be declared `const` as well as `var` (`foreach (const item in items)`)? Like `for`'s, it gets a new binding on each iteration.**
-
-A2: No. Why would it even make sense? `const` means it cannot be assigned to.
-
-**Q3: Over a map, `foreach` gives each entry as a key and a value: `foreach (var (key, value) in map)`. Agreed, with the destructuring syntax decided when maps are?**
-
-A3: Yes.
-
 ## M0.7.6: Functions, Function Values and Closures
 
 Function declarations and expressions, `return`, function values, and closures capturing binding cells (specification, section 3.5). It takes over "Functions as Values", and needs calls in the bytecode and the VM (sections 5.4 and 5.5). Added by Claude, 2026-11-12.
