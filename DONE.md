@@ -551,3 +551,9 @@ Q17, writing a collection as text: (a) `write` writes an array as `[1, "a", null
 A17: (a) with whatever we decide for literal sets.
 
 Done (Claude, 2026-11-13, `57ee846`): recorded as approved in the specification, a new section 3.6 ("Collections"), its decision register, and its section 8.4, with the codes WS3005 to WS3007 (WS3008 is not needed, after A13). A14's question is answered in "M0.9 Syntax: Optional Access and Set Literals", where how a set is made, and so written (A17), is decided.
+
+## [DONE] M0.9.1: Member Access and Indexing
+
+`x.name`, `x.name(…)`, `x[i]` and `x[i] = v`, with strings' `length` and indexing (specification, section 3.6), on both VMs, with their conformance tests. Added by Claude, 2026-11-13.
+
+Done (Claude, 2026-11-13, `7af3c9a`): members (`x.name`, `x.name(…)`) and indexes (`x[i]`, `x[i] = v`) are parsed, bound, lowered, and generated for both VMs, whose new operations share their semantics in `WsMembers` (`WebLingo.Runtime`). Strings have `length` (in Unicode scalar values) and `s[i]` (a string of one); `s[i] = v` is WS3001. WS3005 and WS3006 are raised as section 3.6 says. Every new conformance case runs on both VMs, with the same results. Choices of mine, recorded in the specification's section 15.2 as proposed: `.` is now a token, so `1.` and `.5` are a number and a point (two lexer tests changed accordingly); a member is never assigned (WS1007) until classes have fields; calling a member that is not a method is WS2005; the new operations' shapes. Build and 727 tests pass on Windows; Linux not tried.

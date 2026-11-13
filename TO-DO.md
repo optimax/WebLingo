@@ -38,13 +38,7 @@ Arrays, maps and sets, with indexing, `length`, member access and `foreach` (spe
 
 2026-11-13: the syntax is approved but for sets and optional access (specification, section 3.6). M0.9 is split into the parts the specification defines in section 9 ("M0.9 parts"), each a task below, M0.9.1 to M0.9.6. Waits for them.
 
-## [WORKING] M0.9.1: Member Access and Indexing
-
-`x.name`, `x.name(…)`, `x[i]` and `x[i] = v`, with strings' `length` and indexing (specification, section 3.6), on both VMs, with their conformance tests. Added by Claude, 2026-11-13.
-
-Done (Claude, 2026-11-13): members (`x.name`, `x.name(…)`) and indexes (`x[i]`, `x[i] = v`) are parsed, bound, lowered, and generated for both VMs, whose new operations share their semantics in `WsMembers` (`WebLingo.Runtime`). Strings have `length` (in Unicode scalar values) and `s[i]` (a string of one); `s[i] = v` is WS3001. WS3005 and WS3006 are raised as section 3.6 says. Every new conformance case runs on both VMs, with the same results. Choices of mine, recorded in the specification's section 15.2 as proposed: `.` is now a token, so `1.` and `.5` are a number and a point (two lexer tests changed accordingly); a member is never assigned (WS1007) until classes have fields; calling a member that is not a method is WS2005; the new operations' shapes. Build and 727 tests pass on Windows; Linux not tried.
-
-## M0.9.2: Arrays
+## [WORKING] M0.9.2: Arrays
 
 Array literals, indexing, `length`, `push` and `pop`, identity and text (specification, section 3.6), on both VMs, with their conformance tests. Added by Claude, 2026-11-13.
 
