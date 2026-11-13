@@ -133,6 +133,17 @@ public sealed class ParserTests
     }
 
     [Fact]
+    public void AnElseBelongsToTheNearestIf()
+    {
+        var tree = Parse("if (a) if (b) x; else y;");
+        Assert.Empty(tree.Diagnostics);
+        var outer = Assert.IsType<WsIfSyntax>(Assert.Single(tree.Root.Statements));
+        Assert.Null(outer.Else);
+        Assert.NotNull(Assert.IsType<WsIfSyntax>(outer.Then).Else);
+        Assert.Equal(new WsSourceSpan(0, 24), outer.Span);
+    }
+
+    [Fact]
     public void SeveralErrorsAreReportedInOnePass()
     {
         var tree = Parse("var a = ;\nvar b = 1\nconst c;\nvar d = 4;");

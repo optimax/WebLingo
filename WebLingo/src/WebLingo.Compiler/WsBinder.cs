@@ -53,6 +53,13 @@ public sealed class WsBinder
                 return new WsBoundVariableDeclaration(local, initializer, declaration.Span);
             case WsExpressionStatementSyntax expressionStatement:
                 return new WsBoundExpressionStatement(BindExpression(expressionStatement.Expression), statement.Span);
+            case WsIfSyntax conditional:
+            {
+                var condition = BindExpression(conditional.Condition);
+                var then = BindInOwnScope(conditional.Then);
+                var otherwise = conditional.Else is null ? null : BindInOwnScope(conditional.Else);
+                return new WsBoundIf(condition, then, otherwise, conditional.Span);
+            }
             case WsBlockSyntax block:
             {
                 _scope = new Scope(_scope);
@@ -64,6 +71,15 @@ public sealed class WsBinder
             default:
                 throw new InvalidOperationException($"Unknown statement {statement.GetType().Name}.");
         }
+    }
+
+    /// <summary>A branch or a loop's body: a declaration in it, without braces, is in scope only there.</summary>
+    private WsBoundStatement BindInOwnScope(WsStatementSyntax statement)
+    {
+        _scope = new Scope(_scope);
+        var bound = BindStatement(statement);
+        _scope = _scope.Parent!;
+        return bound;
     }
 
     private WsBoundExpression BindExpression(WsExpressionSyntax expression)

@@ -28,6 +28,10 @@ public sealed record WsExpressionStatementSyntax(WsExpressionSyntax Expression, 
 /// <summary>A block, <c>{ statements }</c>, which opens a scope (specification, section 3.5).</summary>
 public sealed record WsBlockSyntax(IReadOnlyList<WsStatementSyntax> Statements, WsSourceSpan Span) : WsStatementSyntax(Span);
 
+/// <summary><c>if (condition) then</c>, with an optional <c>else</c> (specification, section 3.5).</summary>
+public sealed record WsIfSyntax(WsExpressionSyntax Condition, WsStatementSyntax Then, WsStatementSyntax? Else, WsSourceSpan Span)
+    : WsStatementSyntax(Span);
+
 public abstract record WsExpressionSyntax(WsSourceSpan Span) : WsSyntaxNode(Span);
 
 public sealed record WsIntegerLiteralSyntax(long Value, WsSourceSpan Span) : WsExpressionSyntax(Span);

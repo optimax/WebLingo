@@ -119,6 +119,8 @@ public sealed class WsLexer(string source) : IWsLexer
             "true" => WsTokenKind.True,
             "false" => WsTokenKind.False,
             "null" => WsTokenKind.Null,
+            "if" => WsTokenKind.If,
+            "else" => WsTokenKind.Else,
             _ => WsTokenKind.Identifier
         };
         return new WsToken(kind, text, new WsSourceSpan(start, _position - start));

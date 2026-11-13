@@ -18,6 +18,9 @@ public sealed record WsBoundExpressionStatement(WsBoundExpression Expression, Ws
 
 public sealed record WsBoundBlock(IReadOnlyList<WsBoundStatement> Statements, WsSourceSpan Span) : WsBoundStatement(Span);
 
+public sealed record WsBoundIf(WsBoundExpression Condition, WsBoundStatement Then, WsBoundStatement? Else, WsSourceSpan Span)
+    : WsBoundStatement(Span);
+
 public abstract record WsBoundExpression(WsSourceSpan Span);
 
 public sealed record WsBoundIntegerLiteral(long Value, WsSourceSpan Span) : WsBoundExpression(Span);

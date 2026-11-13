@@ -72,6 +72,7 @@ public sealed class WsParser : IWsParser
         var start = Current.Span.Start;
         if (Current.Kind is WsTokenKind.Var or WsTokenKind.Const or WsTokenKind.Let) return ParseVariableDeclaration(start);
         if (Current.Kind == WsTokenKind.OpenBrace) return ParseBlock(start);
+        if (Current.Kind == WsTokenKind.If) return ParseIf(start);
         var expression = ParseExpression();
         ExpectSemicolon();
         return new WsExpressionStatementSyntax(expression, SpanFrom(start));
@@ -106,6 +107,38 @@ public sealed class WsParser : IWsParser
             Report(WsDiagnosticCodes.UnexpectedToken, "This '{' has no matching '}'.", open.Span);
         }
         return new WsBlockSyntax(statements, SpanFrom(start));
+    }
+
+    private WsStatementSyntax ParseIf(int start)
+    {
+        Advance();
+        var condition = ParseCondition();
+        if (!EnterRecursion()) return new WsExpressionStatementSyntax(condition, SpanFrom(start));
+        try
+        {
+            var then = ParseStatement();
+            WsStatementSyntax? otherwise = null;
+            if (Current.Kind == WsTokenKind.Else)
+            {
+                Advance();
+                otherwise = ParseStatement();
+            }
+            return new WsIfSyntax(condition, then, otherwise, SpanFrom(start));
+        }
+        finally
+        {
+            _recursionDepth--;
+        }
+    }
+
+    /// <summary>A parenthesized condition, as <c>if</c> and the loops take it.</summary>
+    private WsExpressionSyntax ParseCondition()
+    {
+        _statementHasError = false;
+        Expect(WsTokenKind.OpenParen, "'('");
+        var condition = ParseExpression();
+        Expect(WsTokenKind.CloseParen, "')'");
+        return condition;
     }
 
     private WsVariableDeclarationSyntax ParseVariableDeclaration(int start)
@@ -414,10 +447,16 @@ public sealed class WsParser : IWsParser
                 for (var i = block.Statements.Count - 1; i >= 0; i--) statements.Push(block.Statements[i]);
                 continue;
             }
+            if (statement is WsIfSyntax conditional)
+            {
+                if (conditional.Else is { } otherwise) statements.Push(otherwise);
+                statements.Push(conditional.Then);
+            }
             var top = statement switch
             {
                 WsVariableDeclarationSyntax { Initializer: { } initializer } => initializer,
                 WsExpressionStatementSyntax expressionStatement => expressionStatement.Expression,
+                WsIfSyntax ifStatement => ifStatement.Condition,
                 _ => null
             };
             if (top is null) continue;

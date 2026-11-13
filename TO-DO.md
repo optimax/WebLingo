@@ -48,11 +48,7 @@ Done (Claude, 2026-11-12): the answers are recorded as approved in the specifica
 
 2026-11-12: waits for its parts, M0.7.1 to M0.7.6.
 
-## M0.7.3: `if` and `else`
-
-`if (condition) statement`, with an optional `else`, and a strict Boolean condition (specification, section 3.5). Added by Claude, 2026-11-12.
-
-## [QUESTION] Syntax of `for` and `do … while`
+## Syntax of `for` and `do … while`
 
 The owner put `for` and `do … while` in M0.7 ("What M0.7 Covers", A4), but their syntax was not proposed. Added by Claude, 2026-11-12.
 

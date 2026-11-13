@@ -65,6 +65,23 @@ public sealed class WsCodeGenerator
             case WsIrBlock block:
                 foreach (var inner in block.Statements) EmitStatement(inner);
                 break;
+            case WsIrIf conditional:
+            {
+                var condition = EmitExpression(conditional.Condition, null);
+                var skipThen = EmitJump(WsOpCode.JumpIfFalse, condition, conditional.Condition.Span);
+                _nextRegister = _locals;
+                EmitStatement(conditional.Then);
+                if (conditional.Else is null)
+                {
+                    PatchJump(skipThen);
+                    break;
+                }
+                var skipElse = EmitJump(WsOpCode.Jump, 0, conditional.Span);
+                PatchJump(skipThen);
+                EmitStatement(conditional.Else);
+                PatchJump(skipElse);
+                break;
+            }
             default:
                 throw new InvalidOperationException($"Unknown statement {statement.GetType().Name}.");
         }
@@ -236,6 +253,21 @@ public sealed class WsCodeGenerator
         _constants.Add(WsConstant.Int64(value));
         _int64Constants.Add(value, index);
         return index;
+    }
+
+    /// <summary>Emits a jump whose target <see cref="PatchJump"/> fills in later, and returns where it is.</summary>
+    private int EmitJump(WsOpCode opCode, int condition, WsSourceSpan span)
+    {
+        var at = _code.Count;
+        Emit(opCode == WsOpCode.Jump ? new WsInstruction(opCode) : new WsInstruction(opCode, condition), span);
+        return at;
+    }
+
+    /// <summary>Points the jump at <paramref name="at"/> to the next instruction to be emitted.</summary>
+    private void PatchJump(int at)
+    {
+        var jump = _code[at];
+        _code[at] = jump.OpCode == WsOpCode.Jump ? jump with { A = _code.Count } : jump with { B = _code.Count };
     }
 
     private int Binary64Constant(double value)

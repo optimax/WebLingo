@@ -41,6 +41,9 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("x = 10;", "WS2001", 1, 1)]
     [InlineData("{ var y = 1; } writeLn(y);", "WS2001", 1, 24)]
     [InlineData("{ var y = 1; var y = 2; }", "WS2002", 1, 18)]
+    [InlineData("if (true) var y = 1; writeLn(y);", "WS2001", 1, 30)]
+    [InlineData("if true) writeLn(1);", "WS1001", 1, 4)]
+    [InlineData("else writeLn(1);", "WS1001", 1, 1)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -72,6 +75,15 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var hit = 0; writeLn(false && (hit = 1) == 1); writeLn(true || (hit = 2) == 2); writeLn(hit);", "false\ntrue\n0")]
     [InlineData("var x = true; var y = false; x = y && x; writeLn(x);", "false")]
     [InlineData("var x = false; x = true || x; writeLn(x);", "true")]
+    [InlineData("if (1 < 2) writeLn(1); else writeLn(2);", "1")]
+    [InlineData("if (1 > 2) writeLn(1); else writeLn(2);", "2")]
+    [InlineData("if (false) writeLn(1); writeLn(3);", "3")]
+    [InlineData("var x = 5; if (x < 3) writeLn(1); else if (x == 5) writeLn(2); else writeLn(3);", "2")]
+    [InlineData("if (true) if (false) writeLn(1); else writeLn(2);", "2")]
+    [InlineData("if (false) if (true) writeLn(1); else writeLn(2); writeLn(3);", "3")]
+    [InlineData("var x = 1; if (true) { var x = 2; writeLn(x); } writeLn(x);", "2\n1")]
+    [InlineData("var x = 1; if (true) var x = 2; writeLn(x);", "1")]
+    [InlineData("var n = 0; if (true) { n = n + 1; } else { n = n + 10; } writeLn(n);", "1")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -84,6 +96,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(!0);")]
     [InlineData("writeLn(1 < true);")]
     [InlineData("writeLn(null >= 0);")]
+    [InlineData("if (1) writeLn(1);")]
+    [InlineData("if (null) writeLn(1); else writeLn(2);")]
     public void BooleansAndNumbersDoNotMix(string source)
     {
         var (exit, _, error) = Weblingo("run", source);

@@ -24,6 +24,9 @@ public static class WsLowerer
                 return new WsIrInitializeLocal(declaration.Local.Index, LowerExpression(declaration.Initializer), declaration.Span);
             case WsBoundExpressionStatement expressionStatement:
                 return new WsIrEvaluate(LowerExpression(expressionStatement.Expression), statement.Span);
+            case WsBoundIf conditional:
+                return new WsIrIf(LowerExpression(conditional.Condition), LowerStatement(conditional.Then),
+                    conditional.Else is null ? null : LowerStatement(conditional.Else), conditional.Span);
             case WsBoundBlock block:
             {
                 var statements = new List<WsIrStatement>();

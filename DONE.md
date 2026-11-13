@@ -273,3 +273,9 @@ Done (Claude, 2026-11-12): `{ … }` is a statement through every stage (`WsBloc
 The keywords `true`, `false` and `null`; `==`, `!=`, `<`, `<=`, `>`, `>=`; `!`, `&&` and `||`, short-circuiting, Booleans only (specification, section 3.5). Added by Claude, 2026-11-12.
 
 Done (Claude, 2026-11-12): `true`, `false` and `null`, `== != < <= > >=`, `!`, and short-circuit `&&` and `||` at the approved precedence. Comparing an int64 with a binary64 is exact: `9007199254740993 == 9007199254740992.0` is false. New operations cover these, including the first conditional jumps (`JumpIfFalse` and `JumpIfTrue`, whose condition must be a Boolean), and the verifier follows both of their paths. The right operand of `&&` and `||` is checked to be a Boolean too (`CheckBoolean`). The result goes through a temporary, so `x = y && x` reads the old `x`. Build and 373 tests pass on Windows; Linux not tried.
+
+## [DONE] M0.7.3: `if` and `else`
+
+`if (condition) statement`, with an optional `else`, and a strict Boolean condition (specification, section 3.5). Added by Claude, 2026-11-12.
+
+Done (Claude, 2026-11-12): `if (condition) statement`, with an optional `else`. The `else` binds to the nearest `if`, and the condition must be a Boolean at run time (WS3001). The code generator patches forward jumps (`EmitJump`, `PatchJump`), which the loops will use too. I guessed one thing, recorded in the specification as proposed: a branch that is not a block still has a scope of its own, so a declaration in it ends with the branch. Build and 388 tests pass on Windows; Linux not tried.

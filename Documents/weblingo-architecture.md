@@ -798,7 +798,7 @@ Proposed central props:
 
 1. **M0.7.1:** blocks and nested scopes. Implemented (12 November 2026); a missing `}` is WS1001, at its `{`.
 2. **M0.7.2:** `true`, `false` and `null`; `==`, `!=`, `<`, `<=`, `>`, `>=`; `!`, `&&`, `||`. Implemented (12 November 2026).
-3. **M0.7.3:** `if` and `else`.
+3. **M0.7.3:** `if` and `else`. Implemented (12 November 2026); a branch that is not a block still has a scope of its own, so `if (c) var y = 1;` declares `y` for that branch only (proposed).
 4. **M0.7.4:** `while`, `for` and `do … while`, with `break` and `continue`.
 5. **M0.7.5:** string literals and concatenation.
 6. **M0.7.6:** functions, function values and closures.
