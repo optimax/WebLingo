@@ -2,7 +2,7 @@
 
 **Document:** `weblingo-architecture.md`  
 **Status:** Consolidated architectural baseline through M0.6, including approved WS-T001–WS-T008 template composition and the WebLingo project name (12 November 2026)  
-**Implementation status:** M0.6.1 solution scaffold generated (22 October 2026); renamed to WebLingo on 12 November 2026; built and tested on Windows on 12 November 2026, Linux pending (§14).  
+**Implementation status:** M0.6.1 solution scaffold generated (22 October 2026); renamed to WebLingo on 12 November 2026; M0.6.2–M0.6.7 implemented on 12 November 2026, a working compiler and register VM for the M0.6 subset, built and tested on Windows, Linux pending (§14, §15).  
 **Convention:** **Approved** means explicitly accepted by the project owner. **Proposed** means an implementation recommendation requiring confirmation or validation. **Provisional** means deliberately undecided.
 
 ## 1. Executive overview
@@ -776,11 +776,11 @@ Proposed central props:
 | M0.3 | WBC bytecode and VM architecture | Drafted; VM comparison and several encoding choices open |
 | M0.4 | Hosting ABI and runtime lifecycle | **Four explicit architectural decisions approved** |
 | M0.5 | Platform abstraction and portability | **Four explicit architectural decisions approved** |
-| M0.6 | Solution scaffolding and implementation contracts | **Approved; M0.6.1 scaffold generated and verified on Windows, Linux verification pending** |
+| M0.6 | Solution scaffolding and implementation contracts | **Approved; M0.6.1–M0.6.7 implemented and verified on Windows, Linux verification pending (§15)** |
 | M0.7 | Conformance suite expansion | Planned |
 | M0.8 | Windows/Linux CI and portability validation | Planned |
 
-**Immediate next activity:** M0.6.1 builds and passes its tests on Windows (12 November 2026); its Linux validation waits for the CI workflow's first run. Implement the M0.6.2 lexer and the M0.6.3 parser. The scaffold is not a functioning compiler/VM.
+**Immediate next activity:** M0.6's increments are implemented and pass their tests on Windows (12 November 2026, §15); their Linux validation waits for the CI workflow's first run. The owner's decisions on the choices proposed in §15.2 come next, then M0.7. The compiler and VM cover the M0.6 subset only (§8.4).
 
 ---
 
@@ -1015,6 +1015,21 @@ This section records the state of the M0.6 increments after M0.6.1 (§8.7), and 
 | M0.6.4 binder and lowered IR | Implemented (12 November 2026); built and tested on Windows, Linux pending |
 | M0.6.5 minimal bytecode generator and verifier | Implemented (12 November 2026); built and tested on Windows, Linux pending |
 | M0.6.6 minimal register VM, arithmetic, locals and `print` | Implemented (12 November 2026): `weblingo run` runs §8.4's example and prints `30`; built and tested on Windows, Linux pending |
+| M0.6.7 end-to-end conformance on Windows and Linux | Implemented (12 November 2026): every program of §8.6 runs through the CLI with its expected output, diagnostic and exit code; passes on Windows; Linux waits for the CI workflow's first run |
+
+M0.6's acceptance criteria (§8.8), as of 12 November 2026:
+
+| Criterion | Status |
+|---|---|
+| Builds cleanly on Windows and Linux | Windows: no warnings (warnings are errors). Linux: pending, the CI workflow has not run yet |
+| Dependency rules enforced | By the project references, and by a test of the built assemblies' references (`WebLingo.Architecture.Tests`, `DependencyTests`) |
+| CLI compiles and runs simple `.ws` programs | Yes: `weblingo run` and `weblingo check` (`WebLingo.Conformance.Tests`) |
+| Lexer, parser, binder, generator, verifier and VM are separate components | Yes: `WsLexer`, `WsParser`, `WsBinder` and `WsLowerer`, `WsCodeGenerator`, `WsBytecodeVerifier`, `WsVirtualMachine` |
+| Tests pass; malformed inputs fail safely | Yes on Windows (294 tests); fuzz tests give random source to the compiler, and mutated bytecode to the VM, and find diagnostics, never a crash |
+| Portability inventory exists | Yes, `eng/portability/NativeCompatibility.md`, with what M0.6 uses |
+| Portable core has no ASP.NET Core or ADO.NET dependency | Yes, checked by `DependencyTests` |
+| Compiler IR is not tied to a permanent VM choice | Yes: the lowered IR is a tree; only the code generator is register-specific |
+| Build and test instructions are documented | Yes, the solution's `README.md` |
 
 ### 15.2 Proposed choices
 

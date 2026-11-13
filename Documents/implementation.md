@@ -76,7 +76,7 @@ WebLingo.202611121500.zip
 - **The portable core:** `WebLingo.Core`, `WebLingo.Language`, `WebLingo.Bytecode`, `WebLingo.Compiler`, `WebLingo.Runtime`, `WebLingo.VM`, `WebLingo.Templates`, `WebLingo.StdLib`, `WebLingo.Platform.Abstractions`, and `WebLingo.Hosting.Abstractions`.
 - **The adapters to .NET:** `WebLingo.Platform.DotNet` (the .NET implementation of the platform abstraction layer, the PAL) and `WebLingo.Hosting.AspNetCore` (the host for IIS).
 - **The command line:** `WebLingo.Cli`, which builds `weblingo`.
-- **The tests:** `WebLingo.Language.Tests` (lexer, parser, source text), `WebLingo.Compiler.Tests` (binder, lowering, code generation), `WebLingo.Bytecode.Tests` (the verifier, with a fuzz test), `WebLingo.Runtime.Tests` (values, arithmetic, formatting, `print`), `WebLingo.VM.Tests` (execution, runtime errors, budgets), and `WebLingo.Architecture.Tests`.
+- **The tests:** `WebLingo.Language.Tests` (lexer, parser, source text), `WebLingo.Compiler.Tests` (binder, lowering, code generation), `WebLingo.Bytecode.Tests` (the verifier, with a fuzz test), `WebLingo.Runtime.Tests` (values, arithmetic, formatting, `print`), `WebLingo.VM.Tests` (execution, runtime errors, budgets), `WebLingo.Conformance.Tests` (the specification's section 8.6, end to end through the CLI, and fuzz tests of malformed source and bytecode), and `WebLingo.Architecture.Tests` (contracts, and the dependency rules checked on the built assemblies).
 
 ## The Pipeline
 
@@ -192,7 +192,8 @@ dotnet run --project src/WebLingo.Cli -c Release --no-build -- run samples/Arith
 ```
 
 - The solution is small: build all of it rather than one project, and run the complete test suite after a change, which today takes seconds. When the suite grows, run targeted test classes during active development and the complete suite before a task is done.
-- Each behavior in the specification's conformance table (section 8.6) gets a test when it is implemented. Conformance tests go into `WebLingo.Conformance.Tests` and template tests into `WebLingo.Templates.Tests` once those projects exist (specification, sections 8.2 and 13).
+- Each behavior in the specification's conformance table (section 8.6) has a test in `WebLingo.Conformance.Tests`, which runs programs through the CLI as files; a new conformance case goes there too. Template tests go into `WebLingo.Templates.Tests` once that project exists (specification, section 13).
+- A new portable project gets its row of allowed references in `DependencyTests` (`WebLingo.Architecture.Tests`), from the specification's section 8.3.
 - A test of malformed input checks the diagnostic's code and span, not only that compilation failed.
 - Tests must pass on Windows and on Linux: no hard-coded `\` or `\r\n`, drive letters, absolute paths, or culture-dependent formatting and parsing.
 - A test of language semantics is changed only after the new behavior was approved (section 5).

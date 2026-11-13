@@ -17,5 +17,6 @@
   <Project Path="tests/WebLingo.Bytecode.Tests/WebLingo.Bytecode.Tests.csproj" />
   <Project Path="tests/WebLingo.Runtime.Tests/WebLingo.Runtime.Tests.csproj" />
   <Project Path="tests/WebLingo.VM.Tests/WebLingo.VM.Tests.csproj" />
+  <Project Path="tests/WebLingo.Conformance.Tests/WebLingo.Conformance.Tests.csproj" />
   <Project Path="tests/WebLingo.Architecture.Tests/WebLingo.Architecture.Tests.csproj" />
 </Solution>
