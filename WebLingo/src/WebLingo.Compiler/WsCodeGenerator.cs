@@ -414,8 +414,21 @@ public sealed class WsCodeGenerator
             }
             case WsIrMakeClass made:
             {
+                var mark = _nextRegister;
+                var baseClass = made.Base is null ? 0 : EmitExpression(made.Base, null);
+                _nextRegister = mark;
                 var destination = target ?? Allocate();
-                Emit(new WsInstruction(WsOpCode.MakeClass, destination, made.Class), made.Span);
+                Emit(new WsInstruction(WsOpCode.MakeClass, destination, made.Class, baseClass, made.Base is null ? 0 : 1), made.Span);
+                return destination;
+            }
+            case WsIrGetSuper super:
+            {
+                var mark = _nextRegister;
+                var classValue = EmitExpression(super.Class, null);
+                var self = EmitExpression(super.This, null);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.GetSuper, destination, classValue, self, StringConstant(super.Name)), super.Span);
                 return destination;
             }
             case WsIrNew created:
@@ -482,6 +495,7 @@ public sealed class WsCodeGenerator
         WsIrCallMethod call => Assigns(call.Target, local) || AnyAssigns(call.Arguments, local),
         WsIrStoreMember store => Assigns(store.Target, local) || Assigns(store.Value, local),
         WsIrNew created => Assigns(created.Class, local) || AnyAssigns(created.Arguments, local),
+        WsIrMakeClass { Base: { } baseClass } => Assigns(baseClass, local),
         _ => false
     };
 

@@ -126,7 +126,10 @@ public sealed class WsStackBytecodeVerifier
                 return Index(a, module.Imports.Count, "import") ?? Unused(b);
             case WsStackOpCode.MakeClass:
             {
-                if ((Index(a, module.Classes.Count, "class") ?? Unused(b)) is { } classError) return classError;
+                if ((Index(a, module.Classes.Count, "class") ?? (b is 0 or 1 ? null : $"its B is {b}, not 0 or 1.")) is { } classError)
+                {
+                    return classError;
+                }
                 foreach (var member in WsClassTables.Functions(module.Classes[a]))
                 {
                     foreach (var capture in module.Functions[member].Captures)
@@ -145,6 +148,8 @@ public sealed class WsStackBytecodeVerifier
                     : Unused(b);
             case WsStackOpCode.SetMember:
                 return Name(module, a) ?? (b is 0 or 1 ? null : $"its B is {b}, not 0 or 1.");
+            case WsStackOpCode.GetSuper:
+                return Name(module, a) ?? Unused(b);
             case WsStackOpCode.MakeClosure:
             {
                 if ((Index(a, module.Functions.Count, "function") ?? Unused(b)) is { } closureError) return closureError;
@@ -332,7 +337,8 @@ public sealed class WsStackBytecodeVerifier
         WsStackOpCode.Call => (instruction.A + 1, 1),
         WsStackOpCode.CallBuiltin => (instruction.B, 1),
         WsStackOpCode.GetMember => (1, 1),
-        WsStackOpCode.MakeClass => (0, 1),
+        WsStackOpCode.MakeClass => (instruction.B, 1),
+        WsStackOpCode.GetSuper => (2, 1),
         WsStackOpCode.New => (instruction.A + 1, 1),
         WsStackOpCode.SetMember => (2, instruction.B),
         WsStackOpCode.NewArray or WsStackOpCode.NewSet => (instruction.A, 1),

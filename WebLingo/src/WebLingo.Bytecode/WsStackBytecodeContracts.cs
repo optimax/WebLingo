@@ -121,7 +121,10 @@ public enum WsStackOpCode : byte
     ForEachNextEntry,
     /// <summary>A = value count; pops that many values and pushes a new set of them.</summary>
     NewSet,
-    /// <summary>A = class index; pushes a class value, its methods' closures made as their captures say.</summary>
+    /// <summary>
+    /// A = class index, B = 1 to pop the class it extends, else 0; pushes a class value, its methods' closures made as
+    /// their captures say.
+    /// </summary>
     MakeClass,
     /// <summary>
     /// A = argument count; pops the arguments, then the class below them (WS2005 if it is not one), and pushes a new
@@ -133,6 +136,11 @@ public enum WsStackOpCode : byte
     /// the target, and assigns the field.
     /// </summary>
     SetMember,
+    /// <summary>
+    /// A = constant index of a name, a string; pops <c>this</c>, then a class, and pushes the class's base's method of
+    /// that name, or its constructor for <c>constructor</c>, bound to <c>this</c> (section 3.7).
+    /// </summary>
+    GetSuper,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);

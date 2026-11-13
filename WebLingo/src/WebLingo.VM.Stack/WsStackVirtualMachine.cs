@@ -425,8 +425,21 @@ public sealed class WsStackVirtualMachine
                         }
                         case WsStackOpCode.MakeClass:
                         {
-                            if (!TryMakeClass(module.Classes[ins.A], slots, cells, out var made, out error)) break;
+                            var baseClass = ins.B == 1 ? slots[sp - 1] : WsValue.Null;
+                            if (!TryMakeClass(module.Classes[ins.A], baseClass, slots, cells, out var made, out error)) break;
+                            sp -= ins.B;
                             slots[sp++] = made;
+                            pc++;
+                            continue;
+                        }
+                        case WsStackOpCode.GetSuper:
+                        {
+                            if (!WsMembers.TryGetSuper(slots[sp - 2], slots[sp - 1], names[ins.A].Text, heap, out var bound, out error))
+                            {
+                                break;
+                            }
+                            sp--;
+                            slots[sp - 1] = bound;
                             pc++;
                             continue;
                         }
@@ -768,7 +781,8 @@ public sealed class WsStackVirtualMachine
         /// A class value: its constructor's and its methods' closures made now, kept as roots until the class holds
         /// them, since making each may collect (section 3.7).
         /// </summary>
-        private bool TryMakeClass(WsClassInfo info, WsValue[] slots, WsValue[] cells, out WsValue made, out WsRuntimeError? error)
+        private bool TryMakeClass(WsClassInfo info, WsValue baseClass, WsValue[] slots, WsValue[] cells, out WsValue made,
+            out WsRuntimeError? error)
         {
             made = WsValue.Null;
             var closures = new WsValue[info.Methods.Count + 1];
@@ -782,7 +796,7 @@ public sealed class WsStackVirtualMachine
                     if (!TryMakeClosure(info.Methods[i].Function, slots, cells, out closures[i + 1], out error)) return false;
                     methods.Add(info.Methods[i].Name, closures[i + 1]);
                 }
-                return heap.TryAllocateClass(info.Name, closures[0], methods, out made, out error);
+                return heap.TryAllocateClass(info.Name, closures[0], methods, baseClass, out made, out error);
             }
             finally
             {

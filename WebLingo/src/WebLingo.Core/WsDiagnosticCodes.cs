@@ -47,6 +47,8 @@ public static class WsDiagnosticCodes
     public const string ThisOutsideMethod = "WS2009";
     /// <summary>A class declaring both <c>dispose()</c> and <c>destructor()</c> (approved, section 3.7).</summary>
     public const string DisposeAndDestructor = "WS2011";
+    /// <summary>A class that extends itself, directly or through others (proposed).</summary>
+    public const string ClassExtendsItself = "WS2013";
 
     /// <summary>Invalid operation.</summary>
     public const string InvalidOperation = "WS3001";

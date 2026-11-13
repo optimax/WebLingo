@@ -142,7 +142,34 @@ public sealed class WsHeap
     /// </summary>
     public bool TryAllocateClass(string name, WsValue constructor, Dictionary<string, WsValue> methods, out WsValue value,
         out WsRuntimeError? error) =>
-        TryAllocate(new ClassObject(name, constructor, methods), WsValueKind.Class, methods.Count + 1, out value, out error);
+        TryAllocateClass(name, constructor, methods, WsValue.Null, out value, out error);
+
+    /// <summary>
+    /// A class that extends <paramref name="baseClass"/> (<c>null</c> for none): its methods are the base's, with its
+    /// own in place of those it declares again (section 3.7). A base that is not a class is WS3001.
+    /// </summary>
+    public bool TryAllocateClass(string name, WsValue constructor, Dictionary<string, WsValue> methods, WsValue baseClass,
+        out WsValue value, out WsRuntimeError? error)
+    {
+        value = WsValue.Null;
+        var all = methods;
+        if (baseClass.Kind != WsValueKind.Null)
+        {
+            if (baseClass.Kind != WsValueKind.Class)
+            {
+                error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                    $"{Capitalized(WsValueFormatter.Describe(baseClass, this))} cannot be extended: only a class can.");
+                return false;
+            }
+            all = new Dictionary<string, WsValue>(Get<ClassObject>(baseClass, WsValueKind.Class).Methods, StringComparer.Ordinal);
+            foreach (var (methodName, closure) in methods) all[methodName] = closure;
+        }
+        return TryAllocate(new ClassObject(name, constructor, all) { Base = baseClass }, WsValueKind.Class, all.Count + 1,
+            out value, out error);
+    }
+
+    /// <summary>The class a class extends, or <c>null</c>.</summary>
+    public WsValue ClassBase(WsValue value) => Get<ClassObject>(value, WsValueKind.Class).Base;
 
     public string ClassName(WsValue value) => Get<ClassObject>(value, WsValueKind.Class).Name;
 
@@ -348,6 +375,7 @@ public sealed class WsHeap
                     foreach (var element in array.Elements) Mark(element, marked, pending);
                     break;
                 case ClassObject classObject:
+                    Mark(classObject.Base, marked, pending);
                     Mark(classObject.Constructor, marked, pending);
                     foreach (var method in classObject.Methods.Values) Mark(method, marked, pending);
                     break;
@@ -463,7 +491,10 @@ public sealed class WsHeap
 
     private sealed record ArrayObject(List<WsValue> Elements);
 
-    private sealed record ClassObject(string Name, WsValue Constructor, Dictionary<string, WsValue> Methods);
+    private sealed record ClassObject(string Name, WsValue Constructor, Dictionary<string, WsValue> Methods)
+    {
+        public WsValue Base { get; init; }
+    }
 
     private sealed record BoundMethodObject(WsValue Instance, WsValue Closure);
 

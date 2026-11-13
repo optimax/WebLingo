@@ -59,8 +59,11 @@ public sealed class WsLowerer
             }
             if (statement is WsBoundClassDeclaration declaration)
             {
-                lowered.Add(Initialize(declaration.Local, new WsIrMakeClass(LowerClass(declaration.Class), declaration.Span),
-                    declaration.Span));
+                var made = new WsIrMakeClass(LowerClass(declaration.Class), declaration.Span)
+                {
+                    Base = declaration.Class.Base is null ? null : LowerExpression(declaration.Class.Base)
+                };
+                lowered.Add(Initialize(declaration.Local, made, declaration.Span));
             }
         }
         foreach (var statement in block)
@@ -218,6 +221,8 @@ public sealed class WsLowerer
                 return new WsIrMember(LowerExpression(member.Target), member.Name, member.Span) { IsOptional = member.IsOptional };
             case WsBoundMemberAssignment field:
                 return new WsIrStoreMember(LowerExpression(field.Target), field.Name, LowerExpression(field.Value), field.Span);
+            case WsBoundSuper super:
+                return new WsIrGetSuper(LowerExpression(super.Class), LowerExpression(super.This), super.Name, super.Span);
             case WsBoundNew created:
                 return new WsIrNew(LowerExpression(created.Class), LowerArguments(created.Arguments), created.Span);
             case WsBoundMethodCall call:

@@ -160,7 +160,8 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return Register(function, a, "destination") ?? Index(b, module.Imports.Count, "import") ?? Unused(c, d);
             case WsOpCode.MakeClass:
             {
-                if ((Register(function, a, "destination") ?? Index(b, module.Classes.Count, "class") ?? Unused(c, d))
+                if ((Register(function, a, "destination") ?? Index(b, module.Classes.Count, "class")
+                     ?? (d is 0 or 1 ? null : $"its D is {d}, not 0 or 1.") ?? (d == 1 ? Register(function, c, "base") : Unused(c)))
                     is { } classError)
                 {
                     return classError;
@@ -188,6 +189,9 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return null;
             case WsOpCode.SetMember:
                 return Register(function, a, "target") ?? Name(module, b) ?? Register(function, c, "value") ?? Unused(d);
+            case WsOpCode.GetSuper:
+                return Register(function, a, "destination") ?? Register(function, b, "class") ?? Register(function, c, "this")
+                    ?? Name(module, d);
             case WsOpCode.MakeClosure:
             {
                 if ((Register(function, a, "destination") ?? Index(b, module.Functions.Count, "function") ?? Unused(c, d))
@@ -465,7 +469,13 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 }
                 return -1;
             }
+            case WsOpCode.GetSuper:
+            {
+                var classValue = Unwritten(instruction.B, state, locals);
+                return classValue >= 0 ? classValue : Unwritten(instruction.C, state, locals);
+            }
             case WsOpCode.MakeClass:
+                if (instruction.D == 1 && Unwritten(instruction.C, state, locals) is var baseValue and >= 0) return baseValue;
                 foreach (var member in WsClassTables.Functions(module.Classes[instruction.B]))
                 {
                     foreach (var capture in module.Functions[member].Captures)
@@ -537,7 +547,8 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             or WsOpCode.Greater or WsOpCode.GreaterOrEqual or WsOpCode.NewCell or WsOpCode.BoxRegister or WsOpCode.CopyCell
             or WsOpCode.LoadCell or WsOpCode.LoadCapture or WsOpCode.MakeClosure or WsOpCode.LoadBuiltin
             or WsOpCode.Call or WsOpCode.GetMember or WsOpCode.CallMethod or WsOpCode.GetIndex
-            or WsOpCode.NewArray or WsOpCode.NewMap or WsOpCode.NewSet or WsOpCode.MakeClass or WsOpCode.New => instruction.A,
+            or WsOpCode.NewArray or WsOpCode.NewMap or WsOpCode.NewSet or WsOpCode.MakeClass or WsOpCode.New
+            or WsOpCode.GetSuper => instruction.A,
         _ => null
     };
 

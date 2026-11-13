@@ -71,12 +71,20 @@ public sealed record WsFunctionDeclarationSyntax(
 /// <summary>A method of a class, or its <c>constructor</c>: a name, parameters and a body (section 3.7).</summary>
 public sealed record WsMethodSyntax(
     string Name, WsSourceSpan NameSpan, IReadOnlyList<WsParameterSyntax> Parameters, WsBlockSyntax Body, WsSourceSpan Span)
-    : WsSyntaxNode(Span);
+    : WsSyntaxNode(Span)
+{
+    /// <summary>Whether its body calls <c>super(…)</c> anywhere, a function inside it included.</summary>
+    public bool CallsSuper { get; init; }
+}
 
 /// <summary><c>class Name { members }</c>, in scope throughout its block, as a function is (section 3.7).</summary>
 public sealed record WsClassDeclarationSyntax(
     string Name, WsSourceSpan NameSpan, IReadOnlyList<WsMethodSyntax> Methods, WsSourceSpan Span)
-    : WsStatementSyntax(Span);
+    : WsStatementSyntax(Span)
+{
+    /// <summary>The class it extends, <c>extends Base</c>, or null (section 3.7).</summary>
+    public WsExpressionSyntax? Base { get; init; }
+}
 
 /// <summary><c>return value;</c>, or <c>return;</c>, which gives <c>null</c>.</summary>
 public sealed record WsReturnSyntax(WsExpressionSyntax? Value, WsSourceSpan Span) : WsStatementSyntax(Span);
@@ -163,6 +171,9 @@ public sealed record WsMemberAssignmentSyntax(WsMemberAccessSyntax Target, WsExp
 /// <summary><c>new Class(arguments)</c> (section 3.7).</summary>
 public sealed record WsNewExpressionSyntax(WsExpressionSyntax Class, IReadOnlyList<WsExpressionSyntax> Arguments, WsSourceSpan Span)
     : WsExpressionSyntax(Span);
+
+/// <summary><c>super</c>, called, <c>super(…)</c>, or naming a member, <c>super.name</c> (section 3.7).</summary>
+public sealed record WsSuperSyntax(WsSourceSpan Span) : WsExpressionSyntax(Span);
 
 /// <summary><c>this</c>, the instance a method runs on (section 3.7).</summary>
 public sealed record WsThisSyntax(WsSourceSpan Span) : WsExpressionSyntax(Span);

@@ -174,7 +174,14 @@ public sealed record WsIrStoreMember(WsIrExpression Target, string Name, WsIrExp
     : WsIrExpression(Span);
 
 /// <summary>A new class value of the program's class <paramref name="Class"/>, its methods closures made now.</summary>
-public sealed record WsIrMakeClass(int Class, WsSourceSpan Span) : WsIrExpression(Span);
+public sealed record WsIrMakeClass(int Class, WsSourceSpan Span) : WsIrExpression(Span)
+{
+    /// <summary>The class it extends, evaluated now, or null.</summary>
+    public WsIrExpression? Base { get; init; }
+}
+
+/// <summary>The base's constructor or method, of the class value given, bound to <c>this</c> (section 3.7).</summary>
+public sealed record WsIrGetSuper(WsIrExpression Class, WsIrExpression This, string Name, WsSourceSpan Span) : WsIrExpression(Span);
 
 /// <summary><c>new Class(arguments)</c>: the class, then the arguments, evaluated; an instance, its constructor run.</summary>
 public sealed record WsIrNew(WsIrExpression Class, IReadOnlyList<WsIrExpression> Arguments, WsSourceSpan Span)

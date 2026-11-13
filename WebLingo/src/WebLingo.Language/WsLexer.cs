@@ -134,6 +134,8 @@ public sealed class WsLexer(string source) : IWsLexer
             "class" => WsTokenKind.Class,
             "new" => WsTokenKind.New,
             "this" => WsTokenKind.This,
+            "extends" => WsTokenKind.Extends,
+            "super" => WsTokenKind.Super,
             "return" => WsTokenKind.Return,
             _ => WsTokenKind.Identifier
         };

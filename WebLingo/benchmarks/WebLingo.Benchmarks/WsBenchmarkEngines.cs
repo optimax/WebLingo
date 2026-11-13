@@ -61,7 +61,11 @@ public sealed class WsRegisterEngine : IWsBenchmarkEngine
         {
             int[] operands = [instruction.A, instruction.B, instruction.C, instruction.D];
             // GetIndex uses its D only for ?[.
-            var count = instruction is { OpCode: WsOpCode.GetIndex or WsOpCode.GetMember, D: not 0 } ? 4 : OperandCount(instruction.OpCode);
+            var count = instruction switch
+            {
+                { OpCode: WsOpCode.GetIndex or WsOpCode.GetMember or WsOpCode.MakeClass, D: not 0 } => 4,
+                _ => OperandCount(instruction.OpCode)
+            };
             return 1 + operands.Take(count).Sum(WsEncoding.Leb128Size);
         }
 
@@ -74,7 +78,7 @@ public sealed class WsRegisterEngine : IWsBenchmarkEngine
             WsOpCode.Add or WsOpCode.Subtract or WsOpCode.Multiply or WsOpCode.Divide or WsOpCode.Equal
                 or WsOpCode.NotEqual or WsOpCode.Less or WsOpCode.LessOrEqual or WsOpCode.Greater
                 or WsOpCode.GreaterOrEqual => 3,
-            WsOpCode.CallBuiltin or WsOpCode.Call or WsOpCode.CallMethod or WsOpCode.New => 4,
+            WsOpCode.CallBuiltin or WsOpCode.Call or WsOpCode.CallMethod or WsOpCode.New or WsOpCode.GetSuper => 4,
             WsOpCode.SetMember => 3,
             WsOpCode.GetMember or WsOpCode.GetIndex or WsOpCode.SetIndex or WsOpCode.NewArray or WsOpCode.NewMap or WsOpCode.NewSet
                 or WsOpCode.ForEachNext => 3,
@@ -118,7 +122,7 @@ public sealed class WsStackEngine : IWsBenchmarkEngine
             var count = instruction switch
             {
                 { OpCode: WsStackOpCode.GetIndex, A: not 0 } => 1,
-                { OpCode: WsStackOpCode.GetMember, B: not 0 } => 2,
+                { OpCode: WsStackOpCode.GetMember or WsStackOpCode.MakeClass, B: not 0 } => 2,
                 _ => OperandCount(instruction.OpCode)
             };
             return 1 + operands.Take(count).Sum(WsEncoding.Leb128Size);
@@ -133,7 +137,7 @@ public sealed class WsStackEngine : IWsBenchmarkEngine
                 or WsStackOpCode.LoadCapture or WsStackOpCode.StoreCapture or WsStackOpCode.MakeClosure
                 or WsStackOpCode.LoadBuiltin or WsStackOpCode.Call or WsStackOpCode.GetMember
                 or WsStackOpCode.StoreIndex or WsStackOpCode.NewArray or WsStackOpCode.NewMap
-                or WsStackOpCode.NewSet or WsStackOpCode.MakeClass or WsStackOpCode.New => 1,
+                or WsStackOpCode.NewSet or WsStackOpCode.MakeClass or WsStackOpCode.New or WsStackOpCode.GetSuper => 1,
             WsStackOpCode.CallBuiltin or WsStackOpCode.CallMethod or WsStackOpCode.ForEachNext or WsStackOpCode.SetMember
                 or WsStackOpCode.ForEachNextEntry => 2,
             _ => 0

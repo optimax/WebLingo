@@ -301,7 +301,13 @@ public sealed class WsStackCodeGenerator
                 Emit(WsStackOpCode.SetMember, field.Span, StringConstant(field.Name), 1);
                 return;
             case WsIrMakeClass made:
-                Emit(WsStackOpCode.MakeClass, made.Span, made.Class);
+                if (made.Base is not null) EmitValue(made.Base);
+                Emit(WsStackOpCode.MakeClass, made.Span, made.Class, made.Base is null ? 0 : 1);
+                return;
+            case WsIrGetSuper super:
+                EmitValue(super.Class);
+                EmitValue(super.This);
+                Emit(WsStackOpCode.GetSuper, super.Span, StringConstant(super.Name));
                 return;
             case WsIrNew created:
                 EmitValue(created.Class);
@@ -458,7 +464,8 @@ public sealed class WsStackCodeGenerator
             WsStackOpCode.Call => (a + 1, 1),
             WsStackOpCode.CallBuiltin => (b, 1),
             WsStackOpCode.GetMember => (1, 1),
-            WsStackOpCode.MakeClass => (0, 1),
+            WsStackOpCode.MakeClass => (b, 1),
+            WsStackOpCode.GetSuper => (2, 1),
             WsStackOpCode.New => (a + 1, 1),
             WsStackOpCode.SetMember => (2, b),
             WsStackOpCode.NewArray => (a, 1),

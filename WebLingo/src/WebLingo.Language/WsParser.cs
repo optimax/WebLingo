@@ -22,6 +22,7 @@ public sealed class WsParser : IWsParser
     private int _previousEnd;
     private int _recursionDepth;
     private bool _statementHasError;
+    private int _superCalls; // How many super(…) calls have been parsed: whether a constructor calls its base's.
 
     public WsParser(string source, string name = "") : this(new WsSourceText(source, name)) { }
 
@@ -224,6 +225,19 @@ public sealed class WsParser : IWsParser
     {
         Advance();
         var (name, nameSpan) = ExpectName();
+        WsExpressionSyntax? baseClass = null;
+        if (Current.Kind == WsTokenKind.Extends)
+        {
+            // extends Name, or a member of one (section 3.7).
+            Advance();
+            baseClass = ParsePrimary();
+            while (Current.Kind == WsTokenKind.Dot && Peek(1).Kind == WsTokenKind.Identifier)
+            {
+                Advance();
+                var member = Advance();
+                baseClass = new WsMemberAccessSyntax(baseClass, member.Text, member.Span, SpanFrom(baseClass.Span.Start));
+            }
+        }
         Expect(WsTokenKind.OpenBrace, "'{'");
         var methods = new List<WsMethodSyntax>();
         while (Current.Kind is not (WsTokenKind.CloseBrace or WsTokenKind.EndOfFile))
@@ -234,14 +248,18 @@ public sealed class WsParser : IWsParser
             {
                 if (!_statementHasError) ReportUnexpected("a method");
                 SkipToClosingBrace();
-                return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start));
+                return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start)) { Base = baseClass };
             }
             var methodName = Advance();
-            if (!EnterRecursion()) return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start));
+            if (!EnterRecursion()) return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start)) { Base = baseClass };
             try
             {
+                var superCalls = _superCalls;
                 var (parameters, body) = ParseFunctionRest();
-                methods.Add(new WsMethodSyntax(methodName.Text, methodName.Span, parameters, body, SpanFrom(memberStart)));
+                methods.Add(new WsMethodSyntax(methodName.Text, methodName.Span, parameters, body, SpanFrom(memberStart))
+                {
+                    CallsSuper = _superCalls != superCalls
+                });
             }
             finally
             {
@@ -249,7 +267,7 @@ public sealed class WsParser : IWsParser
             }
         }
         Expect(WsTokenKind.CloseBrace, "'}'");
-        return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start));
+        return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start)) { Base = baseClass };
     }
 
     /// <summary>A name being declared; an empty one, reported, if there is none.</summary>
@@ -559,6 +577,7 @@ public sealed class WsParser : IWsParser
                         }
                     }
                     Expect(WsTokenKind.CloseParen, "')'");
+                    if (expression is WsSuperSyntax) _superCalls++;
                     expression = new WsCallExpressionSyntax(expression, arguments, SpanFrom(expression.Span.Start));
                     continue;
                 }
@@ -682,6 +701,9 @@ public sealed class WsParser : IWsParser
             case WsTokenKind.This:
                 Advance();
                 return new WsThisSyntax(token.Span);
+            case WsTokenKind.Super:
+                Advance();
+                return new WsSuperSyntax(token.Span);
             case WsTokenKind.New:
             {
                 // new Class(arguments): the class a name, or a member of one, then its arguments (section 3.7).

@@ -115,7 +115,10 @@ public enum WsOpCode : byte
     ForEachNext,
     /// <summary>A = destination register, B = first value register, C = value count; a new set of them.</summary>
     NewSet,
-    /// <summary>A = destination register, B = class index; a class value, its methods' closures made as their captures say.</summary>
+    /// <summary>
+    /// A = destination register, B = class index, C = register holding the class it extends if D is 1, else 0; a class
+    /// value, its methods' closures made as their captures say.
+    /// </summary>
     MakeClass,
     /// <summary>
     /// A = destination register, B = register holding a class (WS2005 otherwise), C = first argument register, D =
@@ -124,6 +127,12 @@ public enum WsOpCode : byte
     New,
     /// <summary>A = target register, B = constant index of the field's name, a string, C = value register; assigns the field.</summary>
     SetMember,
+    /// <summary>
+    /// A = destination register, B = register holding a class, C = register holding <c>this</c>, D = constant index of
+    /// a name, a string; the class's base's method of that name, or its constructor for <c>constructor</c>, bound to
+    /// <c>this</c>: what <c>super</c> calls (section 3.7).
+    /// </summary>
+    GetSuper,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);

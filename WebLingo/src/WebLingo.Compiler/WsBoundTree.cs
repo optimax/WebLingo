@@ -47,7 +47,11 @@ public sealed record WsBoundReturn(WsBoundExpression? Value, WsSourceSpan Span) 
 /// <c>this</c> (specification, section 3.7).
 /// </summary>
 public sealed record WsBoundClass(
-    string Name, WsBoundFunction? Constructor, IReadOnlyList<(string Name, WsBoundFunction Function)> Methods, WsSourceSpan Span);
+    string Name, WsBoundFunction? Constructor, IReadOnlyList<(string Name, WsBoundFunction Function)> Methods, WsSourceSpan Span)
+{
+    /// <summary>The class it extends, evaluated when it is made, or null.</summary>
+    public WsBoundExpression? Base { get; init; }
+}
 
 /// <summary>A class declaration; the class is made when its block begins, since it is in scope throughout.</summary>
 public sealed record WsBoundClassDeclaration(WsLocalSymbol Local, WsBoundClass Class, WsSourceSpan Span) : WsBoundStatement(Span);
@@ -152,6 +156,13 @@ public sealed record WsBoundMember(WsBoundExpression Target, string Name, WsSour
 
 /// <summary><c>target.name = value</c>, a field assigned, checked when it runs.</summary>
 public sealed record WsBoundMemberAssignment(WsBoundExpression Target, string Name, WsBoundExpression Value, WsSourceSpan Span)
+    : WsBoundExpression(Span);
+
+/// <summary>
+/// The base's constructor (<paramref name="Name"/> <c>constructor</c>) or method, of the class a method belongs to,
+/// bound to <c>this</c>: what <c>super(…)</c> and <c>super.name</c> call and read (section 3.7).
+/// </summary>
+public sealed record WsBoundSuper(WsBoundExpression Class, WsBoundExpression This, string Name, WsSourceSpan Span)
     : WsBoundExpression(Span);
 
 /// <summary><c>new Class(arguments)</c>, checked when it runs.</summary>

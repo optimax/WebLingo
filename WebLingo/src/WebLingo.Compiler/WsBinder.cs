@@ -27,6 +27,8 @@ public sealed class WsBinder
         _scope = new Scope(null, _function);
     }
 
+    private ClassContext? _class;
+
     public IReadOnlyList<WsDiagnostic> Diagnostics => _diagnostics;
 
     public WsBoundProgram Bind(WsCompilationUnitSyntax unit)
@@ -50,6 +52,13 @@ public sealed class WsBinder
             };
             if (local is not null) declared.Add(statement, local);
         }
+        // A class is made when its block begins, so its base is bound there too: it may name the block's classes and
+        // functions, and what is declared around the block, but not the block's variables, which have no value yet.
+        var bases = new Dictionary<WsClassDeclarationSyntax, WsBoundExpression>();
+        foreach (var statement in syntax)
+        {
+            if (statement is WsClassDeclarationSyntax { Base: { } baseSyntax } derived) bases.Add(derived, BindExpression(baseSyntax));
+        }
         var statements = new List<WsBoundStatement>();
         foreach (var statement in syntax)
         {
@@ -64,16 +73,60 @@ public sealed class WsBinder
             }
             if (statement is WsClassDeclarationSyntax declaration)
             {
-                var bound = BindClass(declaration);
-                if (declared.TryGetValue(declaration, out var local))
-                {
-                    statements.Add(new WsBoundClassDeclaration(local, bound, declaration.Span));
-                }
+                declared.TryGetValue(declaration, out var local);
+                var bound = BindClass(declaration, local, bases.GetValueOrDefault(declaration));
+                if (local is not null) statements.Add(new WsBoundClassDeclaration(local, bound, declaration.Span));
                 continue;
             }
             statements.Add(BindStatement(statement));
         }
+        OrderClasses(statements);
         return statements;
+    }
+
+    /// <summary>
+    /// Puts a block's classes in the order they can be made at its start: a base declared in the same block before the
+    /// classes that extend it. A class that extends itself, directly or through others, is WS2013.
+    /// </summary>
+    private void OrderClasses(List<WsBoundStatement> statements)
+    {
+        var positions = new List<int>();
+        var classes = new List<WsBoundClassDeclaration>();
+        for (var i = 0; i < statements.Count; i++)
+        {
+            if (statements[i] is not WsBoundClassDeclaration declaration) continue;
+            positions.Add(i);
+            classes.Add(declaration);
+        }
+        if (classes.Count < 2) return;
+        var ordered = new List<WsBoundClassDeclaration>();
+        var state = new Dictionary<WsBoundClassDeclaration, int>(); // 1 being placed, 2 placed.
+        foreach (var declaration in classes) Place(declaration, classes, ordered, state);
+        for (var i = 0; i < positions.Count; i++) statements[positions[i]] = ordered[i];
+    }
+
+    private void Place(WsBoundClassDeclaration declaration, List<WsBoundClassDeclaration> classes,
+        List<WsBoundClassDeclaration> ordered, Dictionary<WsBoundClassDeclaration, int> state)
+    {
+        if (state.TryGetValue(declaration, out var seen))
+        {
+            if (seen == 1)
+            {
+                Report(WsDiagnosticCodes.ClassExtendsItself, $"'{declaration.Local.Name}' extends itself.", declaration.Span);
+            }
+            return;
+        }
+        state[declaration] = 1;
+        var baseLocal = declaration.Class.Base switch
+        {
+            WsBoundLocalReference reference => reference.Local,
+            WsBoundCaptureReference capture => capture.Local,
+            _ => null
+        };
+        var baseDeclaration = classes.Find(other => other.Local == baseLocal);
+        if (baseDeclaration is not null) Place(baseDeclaration, classes, ordered, state);
+        state[declaration] = 2;
+        ordered.Add(declaration);
     }
 
     private WsBoundStatement BindStatement(WsStatementSyntax statement)
@@ -195,19 +248,38 @@ public sealed class WsBinder
     }
 
     /// <summary>
-    /// A class: its constructor and its methods, each a function whose first parameter is <c>this</c>; a name declared
-    /// twice in it is WS2002 (section 3.7).
+    /// A class: its base, bound where the class is, then its constructor and its methods, each a function whose first
+    /// parameter is <c>this</c>; a name declared twice in it is WS2002 (section 3.7). A class without a constructor gets
+    /// one that does nothing but run its base's; a constructor of a derived class that does not call <c>super(…)</c>
+    /// runs its base's first, with no arguments.
     /// </summary>
-    private WsBoundClass BindClass(WsClassDeclarationSyntax declaration)
+    private WsBoundClass BindClass(WsClassDeclarationSyntax declaration, WsLocalSymbol? local, WsBoundExpression? baseClass)
     {
+        var hasBase = baseClass is not null;
         WsBoundFunction? constructor = null;
         var methods = new List<(string, WsBoundFunction)>();
         var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var method in declaration.Methods)
+        var members = new List<WsMethodSyntax>(declaration.Methods);
+        if (!members.Exists(member => member.Name == "constructor"))
         {
+            var span = new WsSourceSpan(declaration.Span.Start, 0);
+            members.Insert(0, new WsMethodSyntax("constructor", span, [], new WsBlockSyntax([], span), span));
+        }
+        var outerClass = _class;
+        foreach (var syntax in members)
+        {
+            var method = syntax;
             var isConstructor = method.Name == "constructor";
+            if (isConstructor && hasBase && !method.CallsSuper)
+            {
+                var span = new WsSourceSpan(method.Body.Span.Start, 0);
+                var superCall = new WsExpressionStatementSyntax(new WsCallExpressionSyntax(new WsSuperSyntax(span), [], span), span);
+                method = method with { Body = method.Body with { Statements = [superCall, .. method.Body.Statements] } };
+            }
+            _class = new ClassContext(local, hasBase, isConstructor);
             var function = BindFunction(isConstructor ? declaration.Name : method.Name, method.Parameters, method.Body,
                 method.Span, isMethod: true);
+            _class = outerClass;
             if (!names.Add(method.Name))
             {
                 Report(WsDiagnosticCodes.DuplicateDeclaration, $"'{method.Name}' is already declared in this class.", method.NameSpan);
@@ -216,7 +288,7 @@ public sealed class WsBinder
             if (isConstructor) constructor = function;
             else methods.Add((method.Name, function));
         }
-        return new WsBoundClass(declaration.Name, constructor, methods, declaration.Span);
+        return new WsBoundClass(declaration.Name, constructor, methods, declaration.Span) { Base = baseClass };
     }
 
     /// <summary>
@@ -255,6 +327,21 @@ public sealed class WsBinder
         _function.Locals.Add(local);
         _scope.Locals.Add(name, local);
         return local;
+    }
+
+    /// <summary>
+    /// The base's constructor or method, bound to <c>this</c>, in a method of a class that extends another; anywhere
+    /// else <c>super</c> is WS2009 (section 3.7).
+    /// </summary>
+    private WsBoundExpression BindSuper(string name, WsSourceSpan span)
+    {
+        if (_class is not { HasBase: true, Local: { } classLocal } || LookupLocal("this") is not { } self)
+        {
+            Report(WsDiagnosticCodes.ThisOutsideMethod,
+                "'super' is only allowed in a method or a constructor of a class that extends another.", span);
+            return new WsBoundError(span);
+        }
+        return new WsBoundSuper(Reference(classLocal, span), Reference(self, span), name, span);
     }
 
     /// <summary>A local of the function that no name refers to: a loop's own state.</summary>
@@ -318,6 +405,8 @@ public sealed class WsBinder
             case WsIndexAssignmentSyntax element:
                 return new WsBoundIndexAssignment(BindExpression(element.Target.Target), BindExpression(element.Target.Index),
                     BindExpression(element.Value), element.Span);
+            case WsMemberAccessSyntax { Target: WsSuperSyntax } superMember:
+                return BindSuper(superMember.Name, superMember.Span);
             case WsMemberAccessSyntax member:
                 return new WsBoundMember(BindExpression(member.Target), member.Name, member.Span) { IsOptional = member.IsOptional };
             case WsMemberAssignmentSyntax field:
@@ -330,6 +419,10 @@ public sealed class WsBinder
                 foreach (var argument in created.Arguments) arguments.Add(BindExpression(argument));
                 return new WsBoundNew(target, arguments, created.Span);
             }
+            case WsSuperSyntax:
+                Report(WsDiagnosticCodes.ThisOutsideMethod,
+                    "'super' is either called, 'super(…)', or names a member of the base class, 'super.name'.", expression.Span);
+                return new WsBoundError(expression.Span);
             case WsThisSyntax self:
             {
                 if (LookupLocal("this") is { } local) return Reference(local, self.Span);
@@ -413,6 +506,19 @@ public sealed class WsBinder
         var calleeSyntax = call.Callee;
         while (calleeSyntax is WsParenthesizedExpressionSyntax parenthesized) calleeSyntax = parenthesized.Expression;
         if (calleeSyntax is WsErrorExpressionSyntax) return new WsBoundError(call.Span);
+        if (calleeSyntax is WsSuperSyntax)
+        {
+            if (_class is { InConstructor: false })
+            {
+                Report(WsDiagnosticCodes.ThisOutsideMethod, "'super(…)' is only allowed in a constructor.", calleeSyntax.Span);
+                return new WsBoundError(call.Span);
+            }
+            return new WsBoundCall(BindSuper("constructor", calleeSyntax.Span), arguments, call.Span);
+        }
+        if (calleeSyntax is WsMemberAccessSyntax { Target: WsSuperSyntax } superMember)
+        {
+            return new WsBoundCall(BindSuper(superMember.Name, superMember.Span), arguments, call.Span);
+        }
         if (calleeSyntax is WsMemberAccessSyntax member)
         {
             // A method, called on its target (specification, section 3.6).
@@ -484,6 +590,9 @@ public sealed class WsBinder
     }
 
     /// <summary>A function being bound: the program, or one nested in it.</summary>
+    /// <summary>A class whose methods are being bound: its local, whether it extends another, and whether in its constructor.</summary>
+    private sealed record ClassContext(WsLocalSymbol? Local, bool HasBase, bool InConstructor);
+
     private sealed class FunctionContext(FunctionContext? parent, string name)
     {
         public FunctionContext? Parent { get; } = parent;

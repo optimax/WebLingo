@@ -113,6 +113,32 @@ public static class WsMembers
     }
 
     /// <summary>
+    /// What <c>super</c> names, in a method of <paramref name="classValue"/>: its base's method <paramref name="name"/>, or
+    /// its constructor for <c>constructor</c>, bound to <paramref name="self"/> (section 3.7); a method the base does not
+    /// have is WS3006.
+    /// </summary>
+    public static bool TryGetSuper(WsValue classValue, WsValue self, string name, WsHeap heap, out WsValue bound,
+        out WsRuntimeError? error)
+    {
+        bound = WsValue.Null;
+        var baseClass = heap.ClassBase(classValue);
+        if (baseClass.Kind != WsValueKind.Class) throw new InvalidOperationException("The class extends no other.");
+        WsValue closure;
+        if (name == "constructor")
+        {
+            closure = heap.ClassConstructor(baseClass);
+            if (closure.Kind == WsValueKind.Null) throw new InvalidOperationException("The base class has no constructor.");
+        }
+        else if (!heap.TryGetMethod(baseClass, name, out closure))
+        {
+            error = new WsRuntimeError(WsDiagnosticCodes.NoSuchMember,
+                $"{Capitalized(WsValueFormatter.Describe(baseClass, heap))} has no method '{name}'.");
+            return false;
+        }
+        return heap.TryAllocateBoundMethod(self, closure, out bound, out error);
+    }
+
+    /// <summary>
     /// What <c>x.name(…)</c> calls when <c>x</c> is an instance: a field's value, as any function value is called, or
     /// a method, which runs on the instance (<paramref name="isMethod"/>); WS3006 if it has neither.
     /// </summary>
