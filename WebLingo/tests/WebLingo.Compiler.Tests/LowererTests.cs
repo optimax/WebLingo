@@ -1,0 +1,107 @@
+using WebLingo.Compiler;
+using WebLingo.Language;
+using Xunit;
+namespace WebLingo.Compiler.Tests;
+
+public sealed class LowererTests
+{
+    [Fact]
+    public void LowersTheSpecificationsExampleWithoutChecks()
+    {
+        var program = Lower("var a = 10;\nvar b = 20;\nvar result = a + b;\nprint(result);");
+        Assert.Equal(
+            new[] {
+                "init 0 = 10", "init 1 = 20", "init 2 = (load 0 + load 1)", "eval print#0(load 2)"
+            },
+            program.Statements.Select(Show));
+        Assert.Equal(new[] { "a", "b", "result" }, program.LocalNames);
+    }
+
+    [Fact]
+    public void ReadingADeclaredVariableWithoutAValueIsChecked()
+    {
+        Assert.Equal(new[] { "declare 0", "eval print#0(load? 0)" }, Lower("var x; print(x);").Statements.Select(Show));
+    }
+
+    [Fact]
+    public void ReadingBeforeTheDeclarationIsChecked()
+    {
+        Assert.Equal(new[] { "eval print#0(load? 0)", "init 0 = 1" }, Lower("print(x); var x = 1;").Statements.Select(Show));
+    }
+
+    [Fact]
+    public void AVariableIsInItsDeadZoneInItsOwnInitializer()
+    {
+        Assert.Equal(new[] { "init 0 = (load? 0 + 1)" }, Lower("var x = x + 1;").Statements.Select(Show));
+    }
+
+    [Fact]
+    public void AssigningBeforeTheDeclarationIsChecked()
+    {
+        Assert.Equal(new[] { "eval (store! 0 = 5)", "declare 0" }, Lower("x = 5; var x;").Statements.Select(Show));
+    }
+
+    [Fact]
+    public void AnAssignmentGivesTheVariableItsValue()
+    {
+        Assert.Equal(
+            new[] { "declare 0", "eval (store 0 = 5)", "eval print#0(load 0)" },
+            Lower("var x; x = 5; print(x);").Statements.Select(Show));
+    }
+
+    [Fact]
+    public void AnAssignmentsValueIsLoweredBeforeItsStore()
+    {
+        Assert.Equal(
+            new[] { "declare 0", "eval (store 0 = (load? 0 + 1))" },
+            Lower("var x; x = x + 1;").Statements.Select(Show));
+    }
+
+    [Fact]
+    public void OperandsAreLoweredLeftToRight()
+    {
+        Assert.Equal(
+            new[] { "declare 0", "eval ((store 0 = 1) + load 0)" },
+            Lower("var x; (x = 1) + x;").Statements.Select(Show));
+    }
+
+    [Fact]
+    public void ParenthesesDisappearAndOperatorsRemain()
+    {
+        Assert.Equal(new[] { "init 0 = (-((1 + 2) * 3) / 4)" }, Lower("var v = -((1 + 2) * 3) / 4;").Statements.Select(Show));
+    }
+
+    private static WsIrProgram Lower(string source)
+    {
+        var compilation = BinderTests.Compile(source);
+        Assert.Empty(compilation.Diagnostics);
+        return compilation.LoweredProgram!;
+    }
+
+    private static string Show(WsIrStatement statement) => statement switch
+    {
+        WsIrDeclareUnassigned declare => $"declare {declare.Local}",
+        WsIrInitializeLocal init => $"init {init.Local} = {Show(init.Value)}",
+        WsIrEvaluate evaluate => $"eval {Show(evaluate.Expression)}",
+        _ => "?"
+    };
+
+    private static string Show(WsIrExpression expression) => expression switch
+    {
+        WsIrInt64Constant constant => constant.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        WsIrLoadLocal load => (load.CheckInitialized ? "load? " : "load ") + load.Local,
+        WsIrStoreLocal store => $"(store{(store.CheckDeclared ? "!" : "")} {store.Local} = {Show(store.Value)})",
+        WsIrUnary unary => $"-{Show(unary.Operand)}",
+        WsIrBinary binary => $"({Show(binary.Left)} {Symbol(binary.Operator)} {Show(binary.Right)})",
+        WsIrCallBuiltin call => $"print#{call.Builtin}({string.Join(", ", call.Arguments.Select(Show))})",
+        _ => "?"
+    };
+
+    private static string Symbol(WsBinaryOperator op) => op switch
+    {
+        WsBinaryOperator.Add => "+",
+        WsBinaryOperator.Subtract => "-",
+        WsBinaryOperator.Multiply => "*",
+        _ => "/"
+    };
+}

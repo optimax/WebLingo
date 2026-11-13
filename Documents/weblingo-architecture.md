@@ -1008,6 +1008,7 @@ This section records the state of the M0.6 increments after M0.6.1 (§8.7), and 
 |---|---|
 | M0.6.2 lexer and tokenization tests | Implemented (12 November 2026); built and tested on Windows, Linux pending |
 | M0.6.3 parser, AST and diagnostics | Implemented (12 November 2026); built and tested on Windows, Linux pending |
+| M0.6.4 binder and lowered IR | Implemented (12 November 2026); built and tested on Windows, Linux pending |
 
 ### 15.2 Proposed choices
 
@@ -1030,4 +1031,11 @@ This section records the state of the M0.6 increments after M0.6.1 (§8.7), and 
 | `const` without a value | `const x;` is a syntax error (WS1006) | Proposed |
 | Error recovery | After an error, parsing resumes at the next `;` or declaration keyword; a token the lexer reported is not reported again, and a statement gets at most one diagnostic for what follows its first error | Proposed |
 | Nesting limits | Parsing recurses at most 256 levels (parentheses, unary minus, assignments, arguments), and an expression is at most 1000 operations deep, so that a recursive compiler stage cannot overflow its stack; deeper source is an error (WS1008) | Proposed |
-| Diagnostic codes | WS1003 to WS1008 (§8.4) | Proposed |
+| Compilation stages | Binding runs only on a source without syntax errors, and lowering only on one that binds without errors: a source reports the errors of its first failing stage | Proposed |
+| Host built-ins | The host declares its built-ins (name and arity) to the compiler; they live in a scope around the program's, so a declaration may shadow one (`var print = 1;`) | Proposed |
+| Functions as values | Not yet: a built-in can only be called; naming it otherwise is an error (WS3001), and so is calling anything but a built-in (WS3001), or calling one with the wrong number of arguments (WS3001) | Proposed |
+| Use before declaration | A block's declarations are known from its start (§3.1), so a name used before its declaration refers to that declaration, not to an outer one | Proposed |
+| Temporal dead zone at run time | Reading a variable before its declaration has run, or a `var` declared without a value before it is assigned, is a runtime error, WS2004 (§8.6, `var x; print(x);`); so is assigning a variable before its declaration has run; it is not reported at compile time | Proposed |
+| Checks | The compiler keeps a runtime check only where a variable may not have a value yet; in M0.6's straight-line programs that is exactly where the check fails | Proposed |
+| Evaluation order | Left to right: operands, then arguments; an assignment evaluates its value before it stores it | Proposed |
+| Diagnostic codes | WS1003 to WS1008 (§8.4); WS3001 is used at compile time too, for invalid calls | Proposed |
