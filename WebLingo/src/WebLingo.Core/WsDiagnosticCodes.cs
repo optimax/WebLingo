@@ -45,8 +45,12 @@ public static class WsDiagnosticCodes
     public const string ReturnOutsideFunction = "WS2008";
     /// <summary><c>this</c> outside a method or a constructor (approved, section 3.7).</summary>
     public const string ThisOutsideMethod = "WS2009";
+    /// <summary><c>throw;</c> alone outside a <c>catch</c> block (proposed, section 3.7).</summary>
+    public const string ThrowOutsideCatch = "WS2010";
     /// <summary>A class declaring both <c>dispose()</c> and <c>destructor()</c> (approved, section 3.7).</summary>
     public const string DisposeAndDestructor = "WS2011";
+    /// <summary>A <c>break</c>, <c>continue</c> or <c>return</c> that would leave a <c>finally</c> block (approved, section 3.7).</summary>
+    public const string JumpOutOfFinally = "WS2012";
     /// <summary>A class that extends itself, directly or through others (proposed).</summary>
     public const string ClassExtendsItself = "WS2013";
 
@@ -64,6 +68,8 @@ public static class WsDiagnosticCodes
     public const string NoSuchMember = "WS3006";
     /// <summary>A key a map does not have (approved, section 3.6).</summary>
     public const string NoSuchKey = "WS3007";
+    /// <summary>An exception a program threw, which nothing caught (approved, section 3.7).</summary>
+    public const string UncaughtException = "WS3008";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WS4001";

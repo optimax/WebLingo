@@ -58,7 +58,8 @@ public sealed class WsCodeGenerator
         return new WsCompiledModule(moduleName, module.Constants, imports, main)
         {
             Functions = functions,
-            Classes = WsClassTable.Of(program)
+            Classes = WsClassTable.Of(program),
+            ErrorClass = program.ErrorClass
         };
     }
 
@@ -79,7 +80,8 @@ public sealed class WsCodeGenerator
         return new WsFunction(name, generator._registerCount, generator._locals, generator._code, generator._spans, localNames)
         {
             ParameterCount = parameterCount,
-            Captures = captures
+            Captures = captures,
+            Handlers = generator._handlers
         };
     }
 
@@ -112,19 +114,39 @@ public sealed class WsCodeGenerator
                 EmitForEach(forEach);
                 break;
             case WsIrBreak breakStatement:
-                EmitCleanups(_loops.Peek().Cleanups, breakStatement.Span);
+                LeaveGuards(_loops.Peek().Guards);
                 _loops.Peek().Breaks.Add(EmitJump(WsOpCode.Jump, 0, breakStatement.Span));
+                ReopenGuards(_loops.Peek().Guards);
                 break;
             case WsIrContinue continueStatement:
-                EmitCleanups(_loops.Peek().Cleanups, continueStatement.Span);
+                LeaveGuards(_loops.Peek().Guards);
                 _loops.Peek().Continues.Add(EmitJump(WsOpCode.Jump, 0, continueStatement.Span));
+                ReopenGuards(_loops.Peek().Guards);
                 break;
             case WsIrUsing usingStatement:
+            {
+                // Its body inside a guard that disposes on each way out; its handler disposes, then throws again.
                 foreach (var initialize in usingStatement.Initialize) EmitStatement(initialize);
-                _cleanups.Add(usingStatement.Resource);
+                var guard = OpenGuard(usingStatement.Span, disposes: usingStatement.Resource);
                 EmitStatement(usingStatement.Body);
-                _cleanups.RemoveAt(_cleanups.Count - 1);
+                EndGuard(guard);
                 EmitDispose(usingStatement.Resource, usingStatement.Span);
+                if (guard.Ranges.Count == 0) break;
+                var skip = EmitJump(WsOpCode.Jump, 0, usingStatement.Span);
+                AddHandlers(guard, usingStatement.Value, usingStatement.Origin);
+                EmitDispose(usingStatement.Resource, usingStatement.Span);
+                EmitRethrow(usingStatement.Value, usingStatement.Origin, usingStatement.Span);
+                PatchJump(skip);
+                break;
+            }
+            case WsIrTry tryStatement:
+                EmitTry(tryStatement);
+                break;
+            case WsIrThrow throwStatement:
+                Emit(new WsInstruction(WsOpCode.Throw, EmitExpression(throwStatement.Value, null)), throwStatement.Span);
+                break;
+            case WsIrRethrow rethrow:
+                EmitRethrow(rethrow.Value, rethrow.Origin, rethrow.Span);
                 break;
             case WsIrNewCell cell:
                 Emit(new WsInstruction(WsOpCode.NewCell, cell.Local), cell.Span);
@@ -138,20 +160,22 @@ public sealed class WsCodeGenerator
             case WsIrReturn returnStatement:
                 if (returnStatement.Value is null)
                 {
-                    EmitCleanups(0, returnStatement.Span);
+                    LeaveGuards(0);
                     Emit(new WsInstruction(WsOpCode.Return), returnStatement.Span);
+                    ReopenGuards(0);
                     break;
                 }
-                if (_cleanups.Count == 0)
+                if (_guards.Count == 0)
                 {
                     Emit(new WsInstruction(WsOpCode.ReturnValue, EmitExpression(returnStatement.Value, null)), returnStatement.Span);
                     break;
                 }
                 {
-                    // The value, in a register of its own, before the open using statements' resources are disposed.
+                    // The value, in a register of its own, before the guards' cleanups run.
                     var value = EmitExpression(returnStatement.Value, Allocate());
-                    EmitCleanups(0, returnStatement.Span);
+                    LeaveGuards(0);
                     Emit(new WsInstruction(WsOpCode.ReturnValue, value), returnStatement.Span);
+                    ReopenGuards(0);
                 }
                 break;
             case WsIrIf conditional:
@@ -594,7 +618,7 @@ public sealed class WsCodeGenerator
     /// </summary>
     private void EmitLoop(WsIrLoop loop)
     {
-        var jumps = new LoopJumps { Cleanups = _cleanups.Count };
+        var jumps = new LoopJumps { Guards = _guards.Count };
         _loops.Push(jumps);
         var top = _code.Count;
         int? exit = null;
@@ -637,7 +661,7 @@ public sealed class WsCodeGenerator
         EmitExpression(loop.Collection, collection);
         _nextRegister = _locals;
         Emit(new WsInstruction(WsOpCode.LoadConstant, collection + 1, Int64Constant(0)), loop.Span);
-        var jumps = new LoopJumps { Cleanups = _cleanups.Count };
+        var jumps = new LoopJumps { Guards = _guards.Count };
         _loops.Push(jumps);
         var top = _code.Count;
         Emit(new WsInstruction(WsOpCode.ForEachNext, 0, collection, loop.ItemCount), loop.Collection.Span);
@@ -654,18 +678,112 @@ public sealed class WsCodeGenerator
     {
         public List<int> Breaks { get; } = [];
         public List<int> Continues { get; } = [];
-        /// <summary>How many <c>using</c> statements were open where the loop began: a jump out of it disposes the rest.</summary>
-        public int Cleanups { get; init; }
+        /// <summary>How many guards were open where the loop began: a jump out of it leaves the rest.</summary>
+        public int Guards { get; init; }
     }
 
-    /// <summary>The resources of the open <c>using</c> statements, innermost last.</summary>
-    private readonly List<WsIrExpression> _cleanups = [];
-
-    /// <summary>Disposes the open <c>using</c> statements' resources down to <paramref name="depth"/>, innermost first.</summary>
-    private void EmitCleanups(int depth, WsSourceSpan span)
+    /// <summary>
+    /// A protected region being generated, a <c>try</c>'s, its <c>catch</c>'s or a <c>using</c>'s (section 3.7): where it
+    /// was last opened, or -1 while it is closed; the ranges of code it has covered; and what a jump out of it runs, a
+    /// <c>finally</c>'s body or a <c>using</c>'s disposal, if anything.
+    /// </summary>
+    private sealed class Guard
     {
-        for (var i = _cleanups.Count - 1; i >= depth; i--) EmitDispose(_cleanups[i], span);
+        public int OpenedAt;
+        public List<(int Start, int End)> Ranges { get; } = [];
+        public WsIrStatement? Finally { get; init; }
+        public WsIrExpression? Disposes { get; init; }
+        public WsSourceSpan Span { get; init; }
     }
+
+    /// <summary>The open guards, innermost last.</summary>
+    private readonly List<Guard> _guards = [];
+
+    /// <summary>The function's handlers, innermost first, as each guard's handler is generated.</summary>
+    private readonly List<WsHandler> _handlers = [];
+
+    private Guard OpenGuard(WsSourceSpan span, WsIrStatement? cleanup = null, WsIrExpression? disposes = null)
+    {
+        var guard = new Guard { OpenedAt = _code.Count, Finally = cleanup, Disposes = disposes, Span = span  };
+        _guards.Add(guard);
+        return guard;
+    }
+
+    private void CloseGuard(Guard guard)
+    {
+        if (guard.OpenedAt >= 0 && guard.OpenedAt < _code.Count) guard.Ranges.Add((guard.OpenedAt, _code.Count));
+        guard.OpenedAt = -1;
+    }
+
+    /// <summary>Ends the innermost guard, whose handler comes next.</summary>
+    private void EndGuard(Guard guard)
+    {
+        CloseGuard(guard);
+        _guards.RemoveAt(_guards.Count - 1);
+    }
+
+    /// <summary>The ranges of an ended guard become handlers that go to here, with the exception and its origin in these locals.</summary>
+    private void AddHandlers(Guard guard, int value, int origin)
+    {
+        foreach (var (start, end) in guard.Ranges) _handlers.Add(new WsHandler(start, end, _code.Count, value, origin));
+    }
+
+    /// <summary>
+    /// Leaves the guards from the innermost down to <paramref name="depth"/>, as a jump out of them does: each one's
+    /// cleanup runs outside it, but inside those around it, so that a <c>finally</c> or a disposal that throws there is
+    /// caught by them and not by its own handler. <see cref="ReopenGuards"/> opens them again after the jump.
+    /// </summary>
+    private void LeaveGuards(int depth)
+    {
+        for (var i = _guards.Count - 1; i >= depth; i--)
+        {
+            var guard = _guards[i];
+            CloseGuard(guard);
+            if (guard.Finally is null && guard.Disposes is null) continue;
+            var inner = _guards.GetRange(i, _guards.Count - i);
+            _guards.RemoveRange(i, inner.Count);
+            if (guard.Disposes is { } resource) EmitDispose(resource, guard.Span);
+            else EmitStatement(guard.Finally!);
+            _guards.AddRange(inner);
+        }
+    }
+
+    private void ReopenGuards(int depth)
+    {
+        for (var i = depth; i < _guards.Count; i++) _guards[i].OpenedAt = _code.Count;
+    }
+
+    /// <summary>
+    /// <c>try</c>: its body inside its guards, the <c>catch</c>'s inner; the catch's handler after it, inside the
+    /// finally's guard; then the finally's body on the way out, and its handler, which runs it and throws again.
+    /// </summary>
+    private void EmitTry(WsIrTry statement)
+    {
+        var finallyGuard = statement.Finally is { } cleanup ? OpenGuard(statement.Span, cleanup.Body) : null;
+        var catchGuard = statement.Catch is not null ? OpenGuard(statement.Span) : null;
+        EmitStatement(statement.Body);
+        if (statement.Catch is { } handler)
+        {
+            EndGuard(catchGuard!);
+            var skip = EmitJump(WsOpCode.Jump, 0, statement.Span);
+            AddHandlers(catchGuard!, handler.Value, handler.Origin);
+            foreach (var inner in handler.Body) EmitStatement(inner);
+            PatchJump(skip);
+        }
+        if (statement.Finally is { } final)
+        {
+            EndGuard(finallyGuard!);
+            EmitStatement(final.Body);
+            var skip = EmitJump(WsOpCode.Jump, 0, statement.Span);
+            AddHandlers(finallyGuard!, final.Value, final.Origin);
+            EmitStatement(final.Body);
+            EmitRethrow(final.Value, final.Origin, statement.Span);
+            PatchJump(skip);
+        }
+    }
+
+    private void EmitRethrow(int value, int origin, WsSourceSpan span) =>
+        Emit(new WsInstruction(WsOpCode.Rethrow, value, origin), span);
 
     /// <summary>Disposes a resource, unless it is <c>null</c> (section 3.7).</summary>
     private void EmitDispose(WsIrExpression resource, WsSourceSpan span)

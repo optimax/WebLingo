@@ -80,6 +80,14 @@ public sealed class WsParser : IWsParser
         if (Current.Kind == WsTokenKind.Foreach) return ParseForEach(start);
         if (Current.Kind == WsTokenKind.Class) return ParseClass(start);
         if (Current.Kind == WsTokenKind.Using) return ParseUsing(start);
+        if (Current.Kind == WsTokenKind.Try) return ParseTry(start);
+        if (Current.Kind == WsTokenKind.Throw)
+        {
+            Advance();
+            var thrown = Current.Kind == WsTokenKind.Semicolon ? null : ParseExpression();
+            ExpectSemicolon();
+            return new WsThrowSyntax(thrown, SpanFrom(start));
+        }
         if (Current.Kind == WsTokenKind.Function && Peek(1).Kind == WsTokenKind.Identifier) return ParseFunctionDeclaration(start);
         if (Current.Kind == WsTokenKind.Return)
         {
@@ -313,6 +321,55 @@ public sealed class WsParser : IWsParser
         }
         ExpectSemicolon();
         return value is null || name.Length == 0 ? null : new WsStaticFieldSyntax(name, nameSpan, value, SpanFrom(start));
+    }
+
+    /// <summary>
+    /// <c>try { … } catch (name) { … }</c>, with <c>finally { … }</c> after its <c>catch</c> or in its place (section 3.7):
+    /// each part a block.
+    /// </summary>
+    private WsStatementSyntax ParseTry(int start)
+    {
+        Advance();
+        var body = ParseRequiredBlock("'{', which begins the 'try' block");
+        if (body is null) return new WsBlockSyntax([], SpanFrom(start));
+        _statementHasError = false;
+        string? catchName = null;
+        var catchNameSpan = new WsSourceSpan(Current.Span.Start, 0);
+        WsBlockSyntax? catchBody = null;
+        if (Current.Kind == WsTokenKind.Catch)
+        {
+            Advance();
+            Expect(WsTokenKind.OpenParen, "'('");
+            (catchName, catchNameSpan) = ExpectName();
+            Expect(WsTokenKind.CloseParen, "')'");
+            catchBody = ParseRequiredBlock("'{', which begins the 'catch' block");
+            if (catchBody is null) return body;
+            _statementHasError = false;
+        }
+        WsBlockSyntax? finallyBody = null;
+        if (Current.Kind == WsTokenKind.Finally)
+        {
+            Advance();
+            finallyBody = ParseRequiredBlock("'{', which begins the 'finally' block");
+            if (finallyBody is null) return body;
+        }
+        if (catchBody is null && finallyBody is null)
+        {
+            ReportUnexpected("'catch' or 'finally'");
+            return body;
+        }
+        return new WsTrySyntax(body, catchName, catchNameSpan, catchBody, finallyBody, SpanFrom(start));
+    }
+
+    /// <summary>A block that a statement needs, which must begin here; null, reported, if it does not.</summary>
+    private WsBlockSyntax? ParseRequiredBlock(string expected)
+    {
+        if (Current.Kind != WsTokenKind.OpenBrace)
+        {
+            if (!_statementHasError) ReportUnexpected(expected);
+            return null;
+        }
+        return ParseBlock(Current.Span.Start) as WsBlockSyntax;
     }
 
     /// <summary><c>using (var name = value) body</c>, one resource, declared with <c>var</c> (section 3.7).</summary>
@@ -916,6 +973,12 @@ public sealed class WsParser : IWsParser
             if (statement is WsDoWhileSyntax doLoop) statements.Push(doLoop.Body);
             if (statement is WsForEachSyntax forEachLoop) statements.Push(forEachLoop.Body);
             if (statement is WsUsingSyntax usingStatement) statements.Push(usingStatement.Body);
+            if (statement is WsTrySyntax tryStatement)
+            {
+                statements.Push(tryStatement.Body);
+                if (tryStatement.Catch is { } catchBlock) statements.Push(catchBlock);
+                if (tryStatement.Finally is { } finallyBlock) statements.Push(finallyBlock);
+            }
             if (statement is WsClassDeclarationSyntax classDeclaration)
             {
                 foreach (var method in classDeclaration.Methods) statements.Push(method.Body);
@@ -942,6 +1005,7 @@ public sealed class WsParser : IWsParser
                 WsDoWhileSyntax doStatement => doStatement.Condition,
                 WsForEachSyntax forEachStatement => forEachStatement.Collection,
                 WsUsingSyntax usingResource => usingResource.Value,
+                WsThrowSyntax { Value: { } thrown } => thrown,
                 WsReturnSyntax { Value: { } returned } => returned,
                 _ => null
             };

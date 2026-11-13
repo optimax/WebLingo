@@ -18,6 +18,8 @@ public sealed record WsIrProgram(
     public IReadOnlyList<WsIrFunction> Functions { get; init; } = [];
     /// <summary>Every class the program declares, at any depth, which <see cref="WsIrMakeClass"/> refers to by index.</summary>
     public IReadOnlyList<WsIrClass> Classes { get; init; } = [];
+    /// <summary>The class of <see cref="Classes"/> that is <c>Error</c>, or -1 (section 3.7).</summary>
+    public int ErrorClass { get; init; } = -1;
 }
 
 /// <summary>A class: its constructor's function, or -1 if it has none, and its methods' (section 3.7).</summary>
@@ -92,8 +94,28 @@ public sealed record WsIrForEach(
 /// <c>using</c>: the local's initialization, then the body; the resource, read by <paramref name="Resource"/>, is disposed
 /// on every way out of the body, its end, <c>break</c>, <c>continue</c> and <c>return</c>, unless it is <c>null</c>.
 /// </summary>
-public sealed record WsIrUsing(IReadOnlyList<WsIrStatement> Initialize, WsIrExpression Resource, WsIrStatement Body, WsSourceSpan Span)
+public sealed record WsIrUsing(
+    IReadOnlyList<WsIrStatement> Initialize, WsIrExpression Resource, WsIrStatement Body, int Value, int Origin, WsSourceSpan Span)
     : WsIrStatement(Span);
+
+/// <summary>
+/// <c>try</c>: its body, protected by its <c>catch</c>'s handler, and both by its <c>finally</c>'s (section 3.7). The
+/// finally's body runs on each way out; on an exception's, its handler keeps the exception in its locals while it runs
+/// it, then throws it again.
+/// </summary>
+public sealed record WsIrTry(WsIrStatement Body, WsIrCatch? Catch, WsIrFinally? Finally, WsSourceSpan Span) : WsIrStatement(Span);
+
+/// <summary>A <c>catch</c>: the locals its handler receives the exception and its origin in, and its body, which begins by setting its variable.</summary>
+public sealed record WsIrCatch(int Value, int Origin, IReadOnlyList<WsIrStatement> Body);
+
+/// <summary>A <c>finally</c>: its body, and the locals its handler keeps an exception and its origin in.</summary>
+public sealed record WsIrFinally(int Value, int Origin, WsIrStatement Body);
+
+/// <summary><c>throw value;</c> (section 3.7).</summary>
+public sealed record WsIrThrow(WsIrExpression Value, WsSourceSpan Span) : WsIrStatement(Span);
+
+/// <summary>Throws the exception in local <paramref name="Value"/> again, from where local <paramref name="Origin"/> says.</summary>
+public sealed record WsIrRethrow(int Value, int Origin, WsSourceSpan Span) : WsIrStatement(Span);
 
 /// <summary>Leaves the innermost loop.</summary>
 public sealed record WsIrBreak(WsSourceSpan Span) : WsIrStatement(Span);

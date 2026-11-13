@@ -53,6 +53,10 @@ public sealed class WsStackBytecodeVerifier
         {
             return Fail(classError);
         }
+        if (module.ErrorClass < -1 || module.ErrorClass >= module.Classes.Count)
+        {
+            return Fail($"The module's Error class, {module.ErrorClass}, is not -1 or one of its classes.");
+        }
         var result = VerifyFunction(module, module.EntryPoint);
         for (var i = 0; i < module.Functions.Count && result.IsValid; i++)
         {
@@ -85,6 +89,22 @@ public sealed class WsStackBytecodeVerifier
             return Fail($"The function has {function.ParameterCount} parameters in {function.LocalCount} locals.");
         }
         if (function.Captures is null) return Fail("The function has no capture table.");
+        if (function.Handlers is null) return Fail("The function has no handler table.");
+        for (var i = 0; i < function.Handlers.Count; i++)
+        {
+            var handler = function.Handlers[i];
+            var error = handler.Start < 0 || handler.Start >= handler.End || handler.End > function.Code.Count
+                ? $"its region, {handler.Start} to {handler.End}, is not within the code."
+                : handler.Target < 0 || handler.Target >= function.Code.Count
+                    ? $"its target instruction {handler.Target} does not exist."
+                    : handler.Value < 0 || handler.Value >= function.LocalCount || handler.Origin < 0
+                      || handler.Origin >= function.LocalCount || handler.Value == handler.Origin
+                        ? $"its exception and origin, locals {handler.Value} and {handler.Origin}, are not two of its locals."
+                        : handler.Depth < 0 || handler.Depth > function.MaxStack
+                            ? $"its stack depth, {handler.Depth}, is not 0 to {function.MaxStack}."
+                            : null;
+            if (error is not null) return Fail($"Handler {i}: {error}");
+        }
 
         var code = function.Code;
         for (var i = 0; i < code.Count; i++)
@@ -201,6 +221,8 @@ public sealed class WsStackBytecodeVerifier
             case WsStackOpCode.StoreIndex:
                 return (a is 0 or 1 ? null : $"its A is {a}, not 0 or 1.") ?? Unused(b);
             case WsStackOpCode.Dispose:
+            case WsStackOpCode.Throw:
+            case WsStackOpCode.Rethrow:
                 return Unused(a, b);
             case WsStackOpCode.GetIndex:
                 return (a is 0 or 1 ? null : $"its A is {a}, not 0 or 1.") ?? Unused(b);
@@ -251,6 +273,14 @@ public sealed class WsStackBytecodeVerifier
                 blockCount++;
             }
         }
+        foreach (var handler in function.Handlers)
+        {
+            if (isBlockStart[handler.Target]) continue;
+            isBlockStart[handler.Target] = true;
+            blockCount++;
+        }
+        var handlerAt = WsBytecodeVerifier.HandlerAt(code.Count, function.Handlers, out var coverSteps);
+        if (coverSteps > MaxSteps) return Fail("The function's handlers are too many to verify in the steps allowed.");
         if (blockCount * Math.Max(words, 1) > MaxStateWords)
         {
             return Fail($"The function is too large to verify: {blockCount} blocks of {function.LocalCount} locals.");
@@ -271,6 +301,23 @@ public sealed class WsStackBytecodeVerifier
             {
                 if (++steps > MaxSteps) return Fail("The function is too complex to verify in the steps allowed.");
                 var instruction = code[index];
+                if (handlerAt[index] >= 0)
+                {
+                    // An exception raised here goes to the handler, the stack cut to its depth, with what is written so far.
+                    var handler = function.Handlers[handlerAt[index]];
+                    if (depth < handler.Depth)
+                    {
+                        return Fail($"Instruction {index} ({instruction.OpCode}) has a stack of {depth}, below its handler's, " +
+                                    $"{handler.Depth}.", index);
+                    }
+                    var caught = (ulong[])written.Clone();
+                    Set(caught, handler.Value);
+                    Set(caught, handler.Origin);
+                    if (Flow(handler.Target, handler.Depth, caught, atBlockStart, pending) is { } handlerError)
+                    {
+                        return Fail(handlerError, index);
+                    }
+                }
                 var unwritten = FirstUnwrittenRead(module, instruction, written);
                 if (unwritten >= 0)
                 {
@@ -306,7 +353,11 @@ public sealed class WsStackBytecodeVerifier
                 }
                 if (Writes(instruction) is int local) Set(written, local);
 
-                if (instruction.OpCode is WsStackOpCode.Return or WsStackOpCode.ReturnValue) break;
+                if (instruction.OpCode is WsStackOpCode.Return or WsStackOpCode.ReturnValue or WsStackOpCode.Throw
+                    or WsStackOpCode.Rethrow)
+                {
+                    break;
+                }
                 if (IsJump(instruction.OpCode))
                 {
                     var jumpError = Flow(instruction.A, depth, written, atBlockStart, pending);
@@ -343,6 +394,8 @@ public sealed class WsStackBytecodeVerifier
         WsStackOpCode.MakeClass => (instruction.B, 1),
         WsStackOpCode.GetSuper => (2, 1),
         WsStackOpCode.Dispose => (1, 0),
+        WsStackOpCode.Throw => (1, 0),
+        WsStackOpCode.Rethrow => (2, 0),
         WsStackOpCode.New => (instruction.A + 1, 1),
         WsStackOpCode.SetMember => (2, instruction.B),
         WsStackOpCode.NewArray or WsStackOpCode.NewSet => (instruction.A, 1),
@@ -430,7 +483,8 @@ public sealed class WsStackBytecodeVerifier
     private static int ItemCount(WsStackOpCode opCode) => opCode == WsStackOpCode.ForEachNextEntry ? 2 : 1;
 
     private static bool EndsPath(WsStackOpCode opCode) =>
-        opCode is WsStackOpCode.Return or WsStackOpCode.ReturnValue or WsStackOpCode.Jump;
+        opCode is WsStackOpCode.Return or WsStackOpCode.ReturnValue or WsStackOpCode.Jump or WsStackOpCode.Throw
+            or WsStackOpCode.Rethrow;
 
     private static bool IsSet(ulong[] state, int local) => (state[local >> 6] & (1UL << (local & 63))) != 0;
 

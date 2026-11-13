@@ -143,6 +143,10 @@ public enum WsStackOpCode : byte
     GetSuper,
     /// <summary>Pops a resource and disposes it, unless it is <c>null</c>, as the register bytecode's <c>Dispose</c> does.</summary>
     Dispose,
+    /// <summary>Pops a value and throws it (section 3.7).</summary>
+    Throw,
+    /// <summary>Pops where an exception was first thrown, then the exception, and throws it again from there.</summary>
+    Rethrow,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);
@@ -165,7 +169,15 @@ public sealed record WsStackFunction(
     public int SlotCount => LocalCount + MaxStack;
     /// <summary>A method's or a constructor's: its first parameter is <c>this</c>, which its caller gives (section 3.7).</summary>
     public bool HasThis { get; init; }
+    /// <summary>Its protected regions, innermost first, as the register bytecode's (section 3.7).</summary>
+    public IReadOnlyList<WsStackHandler> Handlers { get; init; } = [];
 }
+
+/// <summary>
+/// A protected region, as <see cref="WsHandler"/> is: the exception goes to local <paramref name="Value"/>, where it
+/// was first raised to local <paramref name="Origin"/>, and the operand stack is cut to <paramref name="Depth"/>.
+/// </summary>
+public readonly record struct WsStackHandler(int Start, int End, int Target, int Value, int Origin, int Depth);
 
 /// <summary>A stack bytecode module: its constants, its imports, the function it runs, and its other functions.</summary>
 public sealed record WsStackModule(
@@ -175,4 +187,6 @@ public sealed record WsStackModule(
     public IReadOnlyList<WsStackFunction> Functions { get; init; } = [];
     /// <summary>The classes the module declares, which <see cref="WsStackOpCode.MakeClass"/> refers to by index.</summary>
     public IReadOnlyList<WsClassInfo> Classes { get; init; } = [];
+    /// <summary>The class of <see cref="Classes"/> that is <c>Error</c>, or -1 (section 3.7).</summary>
+    public int ErrorClass { get; init; } = -1;
 }

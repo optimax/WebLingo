@@ -7,7 +7,11 @@ namespace WebLingo.Compiler;
 
 /// <summary>A bound program: its statements, its locals in declaration order, and the built-ins it calls.</summary>
 public sealed record WsBoundProgram(
-    IReadOnlyList<WsBoundStatement> Statements, IReadOnlyList<WsLocalSymbol> Locals, IReadOnlyList<WsBuiltinSymbol> Builtins);
+    IReadOnlyList<WsBoundStatement> Statements, IReadOnlyList<WsLocalSymbol> Locals, IReadOnlyList<WsBuiltinSymbol> Builtins)
+{
+    /// <summary>The built-in class <c>Error</c>, among the program's classes if it uses it, or null (section 3.7).</summary>
+    public WsBoundClass? ErrorClass { get; init; }
+}
 
 /// <summary>
 /// Where a function's capture comes from when its closure is made: a local of the function that makes it
@@ -88,7 +92,28 @@ public sealed record WsBoundForEach(
 
 /// <summary><c>using (var name = value) body</c>: the local disposed when the body ends, by any way out (section 3.7).</summary>
 public sealed record WsBoundUsing(WsLocalSymbol Local, WsBoundExpression Value, WsBoundStatement Body, WsSourceSpan Span)
+    : WsBoundStatement(Span)
+{
+    /// <summary>The hidden locals its handler keeps an exception in, and where it was thrown, while it disposes.</summary>
+    public required WsLocalSymbol ExceptionValue { get; init; }
+    public required WsLocalSymbol ExceptionOrigin { get; init; }
+}
+
+/// <summary>A <c>catch</c>: its variable, the hidden locals its handler receives the exception and where it was thrown in, and its body.</summary>
+public sealed record WsBoundCatch(WsLocalSymbol Variable, WsLocalSymbol Value, WsLocalSymbol Origin, WsBoundStatement Body);
+
+/// <summary>A <c>finally</c>: its body, and the hidden locals its handler keeps an exception in while it runs it.</summary>
+public sealed record WsBoundFinally(WsLocalSymbol Value, WsLocalSymbol Origin, WsBoundStatement Body);
+
+/// <summary><c>try</c>, with a <c>catch</c>, a <c>finally</c>, or both (section 3.7).</summary>
+public sealed record WsBoundTry(WsBoundStatement Body, WsBoundCatch? Catch, WsBoundFinally? Finally, WsSourceSpan Span)
     : WsBoundStatement(Span);
+
+/// <summary><c>throw value;</c> (section 3.7).</summary>
+public sealed record WsBoundThrow(WsBoundExpression Value, WsSourceSpan Span) : WsBoundStatement(Span);
+
+/// <summary><c>throw;</c>: the exception of the <c>catch</c> it is in, thrown again from where it was first thrown.</summary>
+public sealed record WsBoundRethrow(WsLocalSymbol Value, WsLocalSymbol Origin, WsSourceSpan Span) : WsBoundStatement(Span);
 
 public sealed record WsBoundBreak(WsSourceSpan Span) : WsBoundStatement(Span);
 

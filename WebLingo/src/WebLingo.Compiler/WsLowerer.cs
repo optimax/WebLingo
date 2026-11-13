@@ -14,17 +14,20 @@ public sealed class WsLowerer
 {
     private readonly List<WsIrFunction?> _functions = [];
     private readonly List<WsIrClass> _classes = [];
+    private WsBoundClass? _errorBound;
+    private int _errorClass = -1;
 
     private WsLowerer() { }
 
     public static WsIrProgram Lower(WsBoundProgram program)
     {
-        var lowerer = new WsLowerer();
+        var lowerer = new WsLowerer { _errorBound = program.ErrorClass };
         var statements = lowerer.LowerBlock(program.Statements);
         return new WsIrProgram(statements, Names(program.Locals), program.Builtins)
         {
             Functions = lowerer._functions!,
-            Classes = lowerer._classes
+            Classes = lowerer._classes,
+            ErrorClass = lowerer._errorClass
         };
     }
 
@@ -59,7 +62,9 @@ public sealed class WsLowerer
             }
             if (statement is WsBoundClassDeclaration declaration)
             {
-                var made = new WsIrMakeClass(LowerClass(declaration.Class), declaration.Span)
+                var index = LowerClass(declaration.Class);
+                if (ReferenceEquals(declaration.Class, _errorBound)) _errorClass = index;
+                var made = new WsIrMakeClass(index, declaration.Span)
                 {
                     Base = declaration.Class.Base is null ? null : LowerExpression(declaration.Class.Base)
                 };
@@ -166,8 +171,31 @@ public sealed class WsLowerer
                 WsIrExpression resource = local.IsCaptured
                     ? new WsIrLoadCell(local.Index, usingStatement.Span)
                     : new WsIrLoadLocal(local.Index, usingStatement.Span);
-                return new WsIrUsing(initialize, resource, LowerStatement(usingStatement.Body), usingStatement.Span);
+                return new WsIrUsing(initialize, resource, LowerStatement(usingStatement.Body), usingStatement.ExceptionValue.Index,
+                    usingStatement.ExceptionOrigin.Index, usingStatement.Span);
             }
+            case WsBoundTry tryStatement:
+            {
+                WsIrCatch? handler = null;
+                if (tryStatement.Catch is { } catchPart)
+                {
+                    var variable = catchPart.Variable;
+                    var span = variable.DeclarationSpan;
+                    var body = new List<WsIrStatement>();
+                    if (variable.IsCaptured) body.Add(new WsIrNewCell(variable.Index, span));
+                    body.Add(Initialize(variable, new WsIrLoadLocal(catchPart.Value.Index, span), span));
+                    body.Add(LowerStatement(catchPart.Body));
+                    handler = new WsIrCatch(catchPart.Value.Index, catchPart.Origin.Index, body);
+                }
+                var cleanup = tryStatement.Finally is { } finallyPart
+                    ? new WsIrFinally(finallyPart.Value.Index, finallyPart.Origin.Index, LowerStatement(finallyPart.Body))
+                    : null;
+                return new WsIrTry(LowerStatement(tryStatement.Body), handler, cleanup, tryStatement.Span);
+            }
+            case WsBoundThrow throwStatement:
+                return new WsIrThrow(LowerExpression(throwStatement.Value), throwStatement.Span);
+            case WsBoundRethrow rethrow:
+                return new WsIrRethrow(rethrow.Value.Index, rethrow.Origin.Index, rethrow.Span);
             case WsBoundBreak breakStatement:
                 return new WsIrBreak(breakStatement.Span);
             case WsBoundContinue continueStatement:

@@ -138,6 +138,13 @@ public enum WsOpCode : byte
     /// at most once (WS3006 for a value with nothing to dispose; section 3.7).
     /// </summary>
     Dispose,
+    /// <summary>A = register holding a value; throws it (section 3.7).</summary>
+    Throw,
+    /// <summary>
+    /// A = register holding an exception, B = register holding where it was first thrown, as a handler gives them;
+    /// throws it again from there (<c>throw;</c>, and the end of a <c>finally</c>'s handler; section 3.7).
+    /// </summary>
+    Rethrow,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
@@ -176,7 +183,20 @@ public sealed record WsFunction(
     public IReadOnlyList<WsCapture> Captures { get; init; } = [];
     /// <summary>A method's or a constructor's: its first parameter is <c>this</c>, which its caller gives (section 3.7).</summary>
     public bool HasThis { get; init; }
+    /// <summary>
+    /// Its protected regions, innermost first, which an exception raised in it, or in a call it makes, looks through for
+    /// the first that holds the instruction it was raised at (section 3.7; section 5.4's table-driven regions).
+    /// </summary>
+    public IReadOnlyList<WsHandler> Handlers { get; init; } = [];
 }
+
+/// <summary>
+/// A protected region: an exception raised by an instruction from <paramref name="Start"/> to
+/// <paramref name="End"/> − 1, or in a call one of them makes, jumps to <paramref name="Target"/>, the exception in
+/// register <paramref name="Value"/> and where it was first raised, which <see cref="WsOpCode.Rethrow"/> takes, in
+/// register <paramref name="Origin"/>.
+/// </summary>
+public readonly record struct WsHandler(int Start, int End, int Target, int Value, int Origin);
 
 /// <summary>A class of a module: its name, its constructor's function, or -1 if it has none, and its methods' (section 3.7).</summary>
 public sealed record WsClassInfo(string Name, int Constructor, IReadOnlyList<WsClassMethod> Methods)
@@ -205,6 +225,11 @@ public sealed record WsCompiledModule(
     public IReadOnlyList<WsFunction> Functions { get; init; } = [];
     /// <summary>The classes the module declares, which <see cref="WsOpCode.MakeClass"/> refers to by index.</summary>
     public IReadOnlyList<WsClassInfo> Classes { get; init; } = [];
+    /// <summary>
+    /// The class of <see cref="Classes"/> that is <c>Error</c>, whose instances a runtime error a handler catches
+    /// becomes (section 3.7), or -1 if the module has none.
+    /// </summary>
+    public int ErrorClass { get; init; } = -1;
 
     /// <summary>The smallest valid module: it returns at once.</summary>
     public static WsCompiledModule Empty(string name) =>

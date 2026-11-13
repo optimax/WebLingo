@@ -46,6 +46,10 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         {
             return Fail(classError);
         }
+        if (module.ErrorClass < -1 || module.ErrorClass >= module.Classes.Count)
+        {
+            return Fail($"The module's Error class, {module.ErrorClass}, is not -1 or one of its classes.");
+        }
         var result = VerifyFunction(module, module.EntryPoint);
         for (var i = 0; i < module.Functions.Count && result.IsValid; i++)
         {
@@ -80,6 +84,17 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             return Fail($"The function has {function.ParameterCount} parameters in {function.LocalCount} locals.");
         }
         if (function.Captures is null) return Fail("The function has no capture table.");
+        if (function.Handlers is null) return Fail("The function has no handler table.");
+        for (var i = 0; i < function.Handlers.Count; i++)
+        {
+            var handler = function.Handlers[i];
+            var error = handler.Start < 0 || handler.Start >= handler.End || handler.End > function.Code.Count
+                ? $"its region, {handler.Start} to {handler.End}, is not within the code."
+                : Index(handler.Target, function.Code.Count, "target instruction") ?? Register(function, handler.Value, "exception")
+                  ?? Register(function, handler.Origin, "origin")
+                  ?? (handler.Value == handler.Origin ? "its exception and its origin share a register." : null);
+            if (error is not null) return Fail($"Handler {i}: {error}");
+        }
 
         var code = function.Code;
         for (var i = 0; i < code.Count; i++)
@@ -145,6 +160,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                     ?? Unused(c, d);
             case WsOpCode.CheckBoolean:
             case WsOpCode.Dispose:
+            case WsOpCode.Throw:
             case WsOpCode.NewCell:
             case WsOpCode.BoxRegister:
             case WsOpCode.CopyCell:
@@ -152,6 +168,8 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return Register(function, a, "operand") ?? Unused(b, c, d);
             case WsOpCode.LoadCell:
                 return Register(function, a, "destination") ?? Register(function, b, "cell") ?? Unused(c, d);
+            case WsOpCode.Rethrow:
+                return Register(function, a, "exception") ?? Register(function, b, "origin") ?? Unused(c, d);
             case WsOpCode.StoreCell:
                 return Register(function, a, "cell") ?? Register(function, b, "source") ?? Unused(c, d);
             case WsOpCode.LoadCapture:
@@ -280,9 +298,11 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
 
     /// <summary>
     /// Follows every path from the first instruction, keeping the set of registers certainly written (the
-    /// intersection over the paths that reach it) at the start of each block, where a path can arrive by a jump,
-    /// until nothing changes. A set only shrinks, so this ends; its memory and its steps are bounded, and a module
-    /// beyond either bound is rejected rather than verified slowly.
+    /// intersection over the paths that reach it) at the start of each block, where a path can arrive by a jump, or
+    /// by an exception: every instruction in a protected region leads to its handler, with the registers written
+    /// before it, and the handler's exception and origin (section 3.7). This goes on until nothing changes. A set only
+    /// shrinks, so this ends; its memory and its steps are bounded, and a module beyond either bound is rejected
+    /// rather than verified slowly.
     /// </summary>
     private static WsVerificationResult CheckRegistersAreWrittenBeforeRead(WsCompiledModule module, WsFunction function)
     {
@@ -290,7 +310,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         const int locals = 0; // Every register, locals included, must be written before it is read.
         var words = (function.RegisterCount - locals + 63) / 64;
 
-        // Blocks start at the first instruction and at every jump target.
+        // Blocks start at the first instruction, at every jump target, and at every handler.
         var isBlockStart = new bool[code.Count];
         isBlockStart[0] = true;
         var blockCount = 1L;
@@ -302,6 +322,14 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 blockCount++;
             }
         }
+        foreach (var handler in function.Handlers)
+        {
+            if (isBlockStart[handler.Target]) continue;
+            isBlockStart[handler.Target] = true;
+            blockCount++;
+        }
+        var handlerAt = HandlerAt(code.Count, function.Handlers, out var coverSteps);
+        if (coverSteps > MaxSteps) return Fail("The function's handlers are too many to verify in the steps allowed.");
         if (blockCount * Math.Max(words, 1) > MaxStateWords)
         {
             return Fail($"The function is too large to verify: {blockCount} blocks of {function.RegisterCount} registers.");
@@ -321,6 +349,15 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             {
                 if (++steps > MaxSteps) return Fail("The function is too complex to verify in the steps allowed.");
                 var instruction = code[index];
+                if (handlerAt[index] >= 0)
+                {
+                    // An exception raised here goes to the handler, with what is written so far.
+                    var handler = function.Handlers[handlerAt[index]];
+                    var caught = (ulong[])state.Clone();
+                    Set(caught, handler.Value - locals);
+                    Set(caught, handler.Origin - locals);
+                    Flow(handler.Target, caught, atBlockStart, pending);
+                }
                 var unwritten = FirstUnwrittenRead(module, instruction, state, locals);
                 if (unwritten >= 0)
                 {
@@ -340,7 +377,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                     Set(state, target - locals);
                 }
 
-                if (instruction.OpCode is WsOpCode.Return or WsOpCode.ReturnValue) break;
+                if (instruction.OpCode is WsOpCode.Return or WsOpCode.ReturnValue or WsOpCode.Throw or WsOpCode.Rethrow) break;
                 if (instruction.OpCode == WsOpCode.Jump)
                 {
                     Flow(instruction.A, state, atBlockStart, pending);
@@ -359,6 +396,31 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             }
         }
         return WsVerificationResult.Valid;
+    }
+
+    /// <summary>
+    /// For each instruction, the first handler whose region holds it, which an exception raised there goes to, or -1;
+    /// <paramref name="steps"/> is the work done, which a module of many handlers could make large.
+    /// </summary>
+    internal static int[] HandlerAt<THandler>(int count, IReadOnlyList<THandler> handlers, out long steps)
+        where THandler : struct
+    {
+        var at = new int[count];
+        for (var index = 0; index < count; index++) at[index] = -1;
+        steps = 0;
+        for (var i = handlers.Count - 1; i >= 0; i--)
+        {
+            var (start, end) = handlers[i] switch
+            {
+                WsHandler handler => (handler.Start, handler.End),
+                WsStackHandler handler => (handler.Start, handler.End),
+                _ => (0, 0)
+            };
+            steps += end - start;
+            if (steps > MaxSteps) return at;
+            for (var index = start; index < end; index++) at[index] = i;
+        }
+        return at;
     }
 
     private static int? JumpTarget(WsInstruction instruction) => instruction.OpCode switch
@@ -434,7 +496,13 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             case WsOpCode.JumpIfTrue:
             case WsOpCode.CheckBoolean:
             case WsOpCode.Dispose:
+            case WsOpCode.Throw:
                 return Unwritten(instruction.A, state, locals);
+            case WsOpCode.Rethrow:
+            {
+                var exception = Unwritten(instruction.A, state, locals);
+                return exception >= 0 ? exception : Unwritten(instruction.B, state, locals);
+            }
             case WsOpCode.Add:
             case WsOpCode.Subtract:
             case WsOpCode.Multiply:
@@ -555,7 +623,8 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         _ => null
     };
 
-    private static bool EndsPath(WsOpCode opCode) => opCode is WsOpCode.Return or WsOpCode.ReturnValue or WsOpCode.Jump;
+    private static bool EndsPath(WsOpCode opCode) =>
+        opCode is WsOpCode.Return or WsOpCode.ReturnValue or WsOpCode.Jump or WsOpCode.Throw or WsOpCode.Rethrow;
 
     private static string? Register(WsFunction function, int register, string role) =>
         register >= 0 && register < function.RegisterCount

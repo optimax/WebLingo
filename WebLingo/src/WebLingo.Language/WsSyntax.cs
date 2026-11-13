@@ -63,6 +63,16 @@ public sealed record WsForEachSyntax(
 public sealed record WsUsingSyntax(string Name, WsSourceSpan NameSpan, WsExpressionSyntax Value, WsStatementSyntax Body, WsSourceSpan Span)
     : WsStatementSyntax(Span);
 
+/// <summary>
+/// <c>try { body } catch (name) { … } finally { … }</c>, with a <c>catch</c>, a <c>finally</c>, or both (section 3.7).
+/// </summary>
+public sealed record WsTrySyntax(
+    WsBlockSyntax Body, string? CatchName, WsSourceSpan CatchNameSpan, WsBlockSyntax? Catch, WsBlockSyntax? Finally,
+    WsSourceSpan Span) : WsStatementSyntax(Span);
+
+/// <summary><c>throw value;</c>, or <c>throw;</c>, which throws the exception its <c>catch</c> caught again (section 3.7).</summary>
+public sealed record WsThrowSyntax(WsExpressionSyntax? Value, WsSourceSpan Span) : WsStatementSyntax(Span);
+
 public sealed record WsBreakSyntax(WsSourceSpan Span) : WsStatementSyntax(Span);
 
 public sealed record WsContinueSyntax(WsSourceSpan Span) : WsStatementSyntax(Span);

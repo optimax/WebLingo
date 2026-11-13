@@ -33,6 +33,16 @@ public sealed class WsBinder
     /// </summary>
     private const string ObjectSource = "class Object { equal(other) { return this == other; } }";
 
+    /// <summary>The built-in class <c>Error</c>, bound once a program needs it (section 3.7).</summary>
+    private WsBoundClassDeclaration? _error;
+
+    /// <summary>
+    /// <c>Error</c>, which extends <c>Object</c>: <c>new Error(message)</c>, with the fields <c>message</c> and
+    /// <c>code</c>, <c>null</c> for one a program throws; a runtime error a handler catches becomes one, its code set
+    /// (section 3.7).
+    /// </summary>
+    private const string ErrorSource = "class Error { constructor(message) { this.message = message; this.code = null; } }";
+
     public WsBinder(WsCompilerOptions options)
     {
         foreach (var builtin in options.Builtins) _hostBuiltins[builtin.Name] = builtin;
@@ -54,8 +64,9 @@ public sealed class WsBinder
     public WsBoundProgram Bind(WsCompilationUnitSyntax unit)
     {
         var statements = BindStatements(unit.Statements);
+        if (_error is not null) statements.Insert(0, _error);
         if (_object is not null) statements.Insert(0, _object); // Made first, before the program's own classes.
-        return new WsBoundProgram(statements, _function.Locals, _builtinsInOrder);
+        return new WsBoundProgram(statements, _function.Locals, _builtinsInOrder) { ErrorClass = _error?.Class };
     }
 
     /// <summary>A block's statements, in the current scope, its function declarations declared first.</summary>
@@ -238,9 +249,16 @@ public sealed class WsBinder
                 _scope = new Scope(_scope, _function);
                 var local = Declare(usingStatement.Name, WsDeclarationKind.Var, usingStatement.NameSpan, null)
                     ?? DeclareHidden(usingStatement.Name, usingStatement.NameSpan);
+                var exception = DeclareHidden("using exception", usingStatement.Span);
+                var exceptionOrigin = DeclareHidden("using origin", usingStatement.Span);
+                UseError(); // A runtime error its handler catches becomes an Error.
                 var body = BindInOwnScope(usingStatement.Body);
                 _scope = _scope.Parent!;
-                return new WsBoundUsing(local, value, body, usingStatement.Span);
+                return new WsBoundUsing(local, value, body, usingStatement.Span)
+                {
+                    ExceptionValue = exception,
+                    ExceptionOrigin = exceptionOrigin
+                };
             }
             case WsBreakSyntax or WsContinueSyntax:
             {
@@ -248,6 +266,12 @@ public sealed class WsBinder
                 if (_function.LoopDepth == 0)
                 {
                     Report(WsDiagnosticCodes.NotInLoop, $"'{(isBreak ? "break" : "continue")}' is only allowed in a loop.",
+                        statement.Span);
+                }
+                else if (_function.Finallys.Count > 0 && _function.LoopDepth == _function.Finallys[^1])
+                {
+                    Report(WsDiagnosticCodes.JumpOutOfFinally,
+                        $"'{(isBreak ? "break" : "continue")}' would leave a 'finally' block, which nothing may leave early.",
                         statement.Span);
                 }
                 return isBreak ? new WsBoundBreak(statement.Span) : new WsBoundContinue(statement.Span);
@@ -259,7 +283,55 @@ public sealed class WsBinder
                 {
                     Report(WsDiagnosticCodes.ReturnOutsideFunction, "'return' is only allowed in a function.", statement.Span);
                 }
+                else if (_function.Finallys.Count > 0)
+                {
+                    Report(WsDiagnosticCodes.JumpOutOfFinally,
+                        "'return' would leave a 'finally' block, which nothing may leave early.", statement.Span);
+                }
                 return new WsBoundReturn(value, statement.Span);
+            }
+            case WsTrySyntax tryStatement:
+            {
+                UseError(); // A runtime error its handlers catch becomes an Error.
+                var body = BindStatement(tryStatement.Body);
+                WsBoundCatch? handler = null;
+                if (tryStatement.Catch is { } catchBlock)
+                {
+                    _scope = new Scope(_scope, _function);
+                    var value = DeclareHidden("catch exception", tryStatement.CatchNameSpan);
+                    var origin = DeclareHidden("catch origin", tryStatement.CatchNameSpan);
+                    var name = tryStatement.CatchName ?? "";
+                    var variable = Declare(name, WsDeclarationKind.Var, tryStatement.CatchNameSpan, null)
+                        ?? DeclareHidden(name, tryStatement.CatchNameSpan);
+                    _function.Catches.Add((value, origin));
+                    var statements = BindStatements(catchBlock.Statements);
+                    _function.Catches.RemoveAt(_function.Catches.Count - 1);
+                    _scope = _scope.Parent!;
+                    handler = new WsBoundCatch(variable, value, origin, new WsBoundBlock(statements, catchBlock.Span));
+                }
+                WsBoundFinally? cleanup = null;
+                if (tryStatement.Finally is { } finallyBlock)
+                {
+                    var value = DeclareHidden("finally exception", finallyBlock.Span);
+                    var origin = DeclareHidden("finally origin", finallyBlock.Span);
+                    _function.Finallys.Add(_function.LoopDepth);
+                    var statements = BindStatement(finallyBlock);
+                    _function.Finallys.RemoveAt(_function.Finallys.Count - 1);
+                    cleanup = new WsBoundFinally(value, origin, statements);
+                }
+                return new WsBoundTry(body, handler, cleanup, tryStatement.Span);
+            }
+            case WsThrowSyntax throwStatement:
+            {
+                if (throwStatement.Value is { } thrown) return new WsBoundThrow(BindExpression(thrown), throwStatement.Span);
+                if (_function.Catches.Count == 0)
+                {
+                    Report(WsDiagnosticCodes.ThrowOutsideCatch,
+                        "'throw;' alone is only allowed in a 'catch' block, where it throws its exception again.", throwStatement.Span);
+                    return new WsBoundBlock([], throwStatement.Span);
+                }
+                var (caught, where) = _function.Catches[^1];
+                return new WsBoundRethrow(caught, where, throwStatement.Span);
             }
             case WsBlockSyntax block:
             {
@@ -671,7 +743,31 @@ public sealed class WsBinder
         {
             if (scope.Locals.TryGetValue(name, out var local)) return local;
         }
-        return name == "Object" ? UseObject() : null;
+        return name switch
+        {
+            "Object" => UseObject(),
+            "Error" => UseError(),
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// The built-in class <c>Error</c>, beside <c>Object</c>, which it extends: bound, and made where the program begins,
+    /// once something uses it, a <c>try</c> or a <c>using</c>, whose handlers may catch a runtime error, included.
+    /// </summary>
+    private WsLocalSymbol UseError()
+    {
+        if (_error is not null) return _error.Local;
+        var objectLocal = UseObject();
+        var local = new WsLocalSymbol("Error", WsDeclarationKind.Class, _main.Locals.Count, default, _main);
+        _main.Locals.Add(local);
+        _prelude.Locals.Add("Error", local);
+        var syntax = (WsClassDeclarationSyntax)new WsParser(ErrorSource, "Error").ParseCompilationUnit().Root.Statements[0];
+        var (outerScope, outerFunction, outerClass) = (_scope, _function, _class);
+        (_scope, _function) = (_prelude, _main);
+        _error = new WsBoundClassDeclaration(local, BindClass(syntax, local, Reference(objectLocal, default), []), default);
+        (_scope, _function, _class) = (outerScope, outerFunction, outerClass);
+        return local;
     }
 
     /// <summary>
@@ -716,5 +812,9 @@ public sealed class WsBinder
         public List<WsBoundCapture> Captures { get; } = [];
         public Dictionary<WsLocalSymbol, int> CaptureIndexes { get; } = [];
         public int LoopDepth { get; set; }
+        /// <summary>The hidden locals of the <c>catch</c> blocks being bound, innermost last, which <c>throw;</c> throws from.</summary>
+        public List<(WsLocalSymbol Value, WsLocalSymbol Origin)> Catches { get; } = [];
+        /// <summary>The loop depth where each <c>finally</c> block being bound begins, innermost last (WS2012).</summary>
+        public List<int> Finallys { get; } = [];
     }
 }
