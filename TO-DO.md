@@ -48,9 +48,15 @@ Where the specification is silent, the M0.6.4 binder and lowering made choices o
 
 **Q4: Evaluation is left to right, and an assignment evaluates its value before it stores it. Agreed?**
 
-## M0.6.5: Minimal Bytecode Generator and Verifier
+## [QUESTION] Bytecode Choices (M0.6.5)
 
-The bytecode generator and the verifier of the specification, section 8.4: an executable in-memory module (serialization waits until the WBC encoding is decided), and a verifier that rejects invalid opcodes, operands, branches, constants and uninitialized temporaries.
+Where the specification is silent or only proposes, the M0.6.5 bytecode made choices of its own, recorded as Proposed in the specification's section 15.2 (rows "Instruction model" to "Diagnostic codes"). The bytecode is an in-memory model, not WBC, so none of them freezes a format.
+
+**Q1: The instruction set is 13 operations with up to four integer operands each, locals in the low registers and temporaries above them, and at most 65535 registers per function (section 5.3's proposed limit, enforced as WS4002). Does that suit you as M0.6's model, until the WBC encoding is decided?**
+
+**Q2: Besides what section 5.5 asks, the verifier rejects nonzero unused operands, code that can run off its end, and a function whose check would need more than 16 million words of state or 100 million steps (rejected, rather than verified slowly). Are these bounds right?**
+
+**Q3: The new diagnostic code is WS4002 (program too large for the bytecode). May it keep this code?**
 
 ## M0.6.6: Minimal Register VM, Arithmetic, Locals and `print`
 
