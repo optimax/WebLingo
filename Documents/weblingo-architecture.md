@@ -189,6 +189,21 @@ using (var writer = new FileWriter("output.txt")) {
 
 **Open implementation contract:** define async disposal policy and interaction between cancellation, outstanding I/O and cleanup. Synchronous `using` is the initial approved mechanism.
 
+### 3.5 Statements, operators and literals — approved 12 November 2026
+
+The syntax M0.7 implements (§9, "M0.7 parts"). Everything here was approved by the owner on 12 November 2026, except where a point says it is still open.
+
+- **Blocks.** `{ statements }` is a statement, with no `;` after its `}`. A block opens a scope (§3.1): a declaration inside it is in scope from where it stands to the block's `}`, and may shadow an outer name. An empty block `{}` is allowed; a lone `;` is not a statement.
+- **Literals.** `true`, `false` and `null` are keywords, as are `Infinity` and `NaN` (§15.2, "Binary64 literals").
+- **Equality.** `==` and `!=` give a Boolean and never convert, except that an int64 and a binary64 compare as numbers (`1 == 1.0` is true; `NaN == NaN` is false, as IEEE 754 says). `null == null` is true. Values of different kinds are unequal, which is not an error. There is no `===`.
+- **Ordering.** `< <= > >=` take numbers (int64 and binary64 compare as numbers), and give a Boolean; anything else is an error (WS3001). Strings may be added to them later.
+- **Logic.** `!`, `&&` and `||` take Booleans only, with no truthiness (WS3001 otherwise); `&&` and `||` short-circuit.
+- **Precedence**, loosest first: assignment (right-associative), `||`, `&&`, `== !=`, `< <= > >=`, `+ -`, `* /`, unary `- + !`; binary operators are left-associative.
+- **`if`.** `if (condition) statement`, with an optional `else statement`; a branch is any statement, and an `else` belongs to the nearest `if` without one. The condition must be a Boolean at run time (WS3001 otherwise).
+- **Loops.** `while (condition) statement`, `for` and `do … while`, each with a strict Boolean condition; `break;` and `continue;` act on the innermost loop, and are a compile-time error outside one. A loop is bounded only by the execution's instruction budget (WS3003). The exact syntax of `for` and `do … while` is still open (`TO-DO.md`).
+- **Strings.** Literals in double or single quotes (`"a"`, `'a'`), alike in meaning, each on one line. Escapes: `\n`, `\r`, `\t`, `\0`, `\\`, `\'`, `\"`, and `\u{…}`, which names a Unicode scalar value in at most six hex digits (no surrogates). Any other escape is WS1009, an unterminated string WS1010. `+` concatenates two strings; a string and a number are not joined, and nothing converts implicitly (WS3001). `length` and indexing (§3.3) come with member access, later.
+- **Functions.** `function name(a, b) { … }` declares a function, in scope throughout its block, so that functions can call each other in any order (unlike `var` and `const`, §3.1). `return value;` ends it, and `return;` gives `null`. Parameters are like `var`s. A function is a value (`var f = name;`), and `function (a) { … }` is a function expression. Closures capture variables (binding cells), not copies.
+
 ---
 
 ## 4. Runtime values, objects and garbage collection (WS-R001–WS-R010)
@@ -776,8 +791,17 @@ Proposed central props:
 | M0.4 | Hosting ABI and runtime lifecycle | **Four explicit architectural decisions approved** |
 | M0.5 | Platform abstraction and portability | **Four explicit architectural decisions approved** |
 | M0.6 | Solution scaffolding and implementation contracts | **Approved; M0.6.1–M0.6.7 implemented and verified on Windows and Linux (§15)** |
-| M0.7 | Conformance suite expansion | Planned |
+| M0.7 | Conformance suite expansion: the language of §3.5, in parts M0.7.1 to M0.7.6 (below), each with its conformance tests | Started (12 November 2026) |
 | M0.8 | Windows/Linux CI and portability validation | Started (12 November 2026): the CI workflow builds and tests on Windows and Linux (first run passed: CI run 1, 12 November 2026, commit `5229806`); tests check the portable core's assemblies against the dependency rules (§8.3) and the portability inventory (WS-P016) |
+
+**M0.7 parts** (12 November 2026), each landing on its own with its conformance tests (§8.6's table grows with them):
+
+1. **M0.7.1:** blocks and nested scopes.
+2. **M0.7.2:** `true`, `false` and `null`; `==`, `!=`, `<`, `<=`, `>`, `>=`; `!`, `&&`, `||`.
+3. **M0.7.3:** `if` and `else`.
+4. **M0.7.4:** `while`, `for` and `do … while`, with `break` and `continue`.
+5. **M0.7.5:** string literals and concatenation.
+6. **M0.7.6:** functions, function values and closures.
 
 **Immediate next activity:** M0.6's increments are implemented and pass their tests on Windows and Linux (12 November 2026, §15). The owner's decisions on the choices proposed in §15.2 come next, then M0.7. The compiler and VM cover the M0.6 subset only (§8.4).
 
