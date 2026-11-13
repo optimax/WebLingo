@@ -96,6 +96,11 @@ public enum WsOpCode : byte
     SetIndex,
     /// <summary>A = destination register, B = first element register, C = element count; a new array of them.</summary>
     NewArray,
+    /// <summary>
+    /// A = destination register, B = first register, C = entry count; a new map of the C key-value pairs in the 2 × C
+    /// registers from B on, each key before its value.
+    /// </summary>
+    NewMap,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);

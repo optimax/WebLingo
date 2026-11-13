@@ -256,6 +256,14 @@ public sealed class WsStackCodeGenerator
                 foreach (var element in array.Elements) EmitValue(element);
                 Emit(WsStackOpCode.NewArray, array.Span, array.Elements.Count);
                 return;
+            case WsIrNewMap map:
+                foreach (var entry in map.Entries)
+                {
+                    Emit(WsStackOpCode.LoadConstant, map.Span, StringConstant(entry.Key));
+                    EmitValue(entry.Value);
+                }
+                Emit(WsStackOpCode.NewMap, map.Span, map.Entries.Count);
+                return;
             case WsIrIndex index:
                 EmitValue(index.Target);
                 EmitValue(index.Index);
@@ -396,6 +404,7 @@ public sealed class WsStackCodeGenerator
             WsStackOpCode.CallBuiltin => (b, 1),
             WsStackOpCode.GetMember => (1, 1),
             WsStackOpCode.NewArray => (a, 1),
+            WsStackOpCode.NewMap => (2 * a, 1),
             WsStackOpCode.CallMethod => (b + 1, 1),
             WsStackOpCode.GetIndex => (2, 1),
             WsStackOpCode.StoreIndex => (3, a),

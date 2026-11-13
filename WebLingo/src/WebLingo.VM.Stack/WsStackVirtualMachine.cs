@@ -465,6 +465,15 @@ public sealed class WsStackVirtualMachine
                             pc++;
                             continue;
                         }
+                        case WsStackOpCode.NewMap:
+                        {
+                            var first = sp - 2 * ins.A;
+                            if (!heap.TryAllocateMap(slots, first, ins.A, out var map, out error)) break;
+                            sp = first;
+                            slots[sp++] = map;
+                            pc++;
+                            continue;
+                        }
                         case WsStackOpCode.GetIndex:
                         {
                             if (!WsMembers.TryGetIndex(slots[sp - 2], slots[sp - 1], heap, out var element, out error)) break;

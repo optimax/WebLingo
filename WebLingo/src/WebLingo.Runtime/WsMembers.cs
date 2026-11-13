@@ -46,6 +46,12 @@ public static class WsMembers
             error = null;
             return true;
         }
+        if (target.Kind == WsValueKind.Map && member == WsMember.Length)
+        {
+            result = WsValue.FromInt64(heap.MapCount(target));
+            error = null;
+            return true;
+        }
         result = WsValue.Null;
         error = IsMethod(target, member)
             ? new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
@@ -54,9 +60,10 @@ public static class WsMembers
         return false;
     }
 
-    /// <summary>Whether the member is a method of the value: an array's <c>push</c> and <c>pop</c>.</summary>
+    /// <summary>Whether the member is a method of the value: an array's <c>push</c> and <c>pop</c>, a map's <c>has</c> and <c>remove</c>.</summary>
     private static bool IsMethod(WsValue target, WsMember member) =>
-        target.Kind == WsValueKind.Array && member is WsMember.Push or WsMember.Pop;
+        (target.Kind == WsValueKind.Array && member is WsMember.Push or WsMember.Pop)
+        || (target.Kind == WsValueKind.Map && member is WsMember.Has or WsMember.Remove);
 
     /// <summary>
     /// Calls a method, <c>x.name(…)</c>, with the <paramref name="count"/> arguments from
@@ -84,7 +91,21 @@ public static class WsMembers
             error = null;
             return true;
         }
-        error = target.Kind is WsValueKind.String or WsValueKind.Array && member == WsMember.Length
+        if (target.Kind == WsValueKind.Map && member == WsMember.Has)
+        {
+            if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+            if (!heap.TryFindInMap(target, values[first], out _, out var found, out error)) return false;
+            result = WsValue.FromBoolean(found);
+            return true;
+        }
+        if (target.Kind == WsValueKind.Map && member == WsMember.Remove)
+        {
+            if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+            if (!heap.TryRemoveFromMap(target, values[first], out var removed, out error)) return false;
+            result = WsValue.FromBoolean(removed);
+            return true;
+        }
+        error = target.Kind is WsValueKind.String or WsValueKind.Array or WsValueKind.Map && member == WsMember.Length
             ? new WsRuntimeError(WsDiagnosticCodes.NotAFunction,
                 $"'{name}' of {WsValueFormatter.Describe(target)} is not a method, and cannot be called.")
             : NoSuchMember(target, name);
@@ -101,6 +122,13 @@ public static class WsMembers
             if (!TryIndex(index, elements.Count, out var at, out error)) return false;
             result = elements[(int)at];
             return true;
+        }
+        if (target.Kind == WsValueKind.Map)
+        {
+            if (!heap.TryFindInMap(target, index, out result, out var found, out error)) return false;
+            if (found) return true;
+            error = new WsRuntimeError(WsDiagnosticCodes.NoSuchKey, $"The map has no key {KeyText(index, heap)}.");
+            return false;
         }
         if (target.Kind != WsValueKind.String)
         {
@@ -124,6 +152,7 @@ public static class WsMembers
             elements[(int)at] = value;
             return true;
         }
+        if (target.Kind == WsValueKind.Map) return heap.TrySetInMap(target, index, value, out error);
         error = target.Kind == WsValueKind.String
             ? new WsRuntimeError(WsDiagnosticCodes.InvalidOperation, "A string cannot be changed: strings are immutable.")
             : CannotBeIndexed(target);
@@ -181,6 +210,10 @@ public static class WsMembers
             $"'{name}' takes {arity} {(arity == 1 ? "argument" : "arguments")}, not {count}.");
         return false;
     }
+
+    /// <summary>A key as a message shows it: a string quoted, anything else as <c>write</c> writes it.</summary>
+    private static string KeyText(WsValue key, WsHeap heap) =>
+        key.Kind == WsValueKind.String ? WsValueFormatter.Quote(heap.GetString(key)) : WsValueFormatter.Format(key);
 
     private static WsRuntimeError CannotBeIndexed(WsValue target) =>
         new(WsDiagnosticCodes.InvalidOperation, $"{Capitalized(WsValueFormatter.Describe(target))} cannot be indexed.");

@@ -116,6 +116,15 @@ public sealed record WsIrLoadBuiltin(int Builtin, WsSourceSpan Span) : WsIrExpre
 /// <summary>A new array of the elements' values, evaluated in order (specification, section 3.6).</summary>
 public sealed record WsIrNewArray(IReadOnlyList<WsIrExpression> Elements, WsSourceSpan Span) : WsIrExpression(Span);
 
+/// <summary>One entry of a new map: its key, a string, and its value.</summary>
+public sealed record WsIrMapEntry(string Key, WsIrExpression Value);
+
+/// <summary>
+/// A new map of the entries, their values evaluated in order, a later key replacing an earlier equal one
+/// (specification, section 3.6).
+/// </summary>
+public sealed record WsIrNewMap(IReadOnlyList<WsIrMapEntry> Entries, WsSourceSpan Span) : WsIrExpression(Span);
+
 /// <summary><c>target[index]</c> (specification, section 3.6).</summary>
 public sealed record WsIrIndex(WsIrExpression Target, WsIrExpression Index, WsSourceSpan Span) : WsIrExpression(Span);
 

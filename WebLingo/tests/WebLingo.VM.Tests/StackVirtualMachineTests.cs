@@ -113,6 +113,23 @@ public sealed class StackVirtualMachineTests
     }
 
     [Fact]
+    public void GarbageMapsAreCollectedAndAGrowingOneIsBoundedOnBothVms()
+    {
+        const string garbage = "var t = {}; for (var i = 0; i < 20000; i = i + 1) { t = {a: i, b: [i]}; } writeLn(t[\"a\"]);";
+        const string growing = "var m = {}; var i = 0; while (true) { m[i] = i; i = i + 1; }";
+        foreach (var run in BothVms)
+        {
+            var output = new WsCollectedOutput();
+            var result = run(garbage, Context(output) with { Resources = new WsResourceBudget(65535, MaxHeapUnits: 10_000) });
+            Assert.True(result.Succeeded, result.Error?.Message);
+            Assert.Equal(new[] { "19999" }, output.Lines);
+
+            var bounded = run(growing, Context(output) with { Resources = new WsResourceBudget(65535, MaxHeapUnits: 100_000) });
+            Assert.Equal(WsDiagnosticCodes.BudgetExceeded, bounded.Error!.Code);
+        }
+    }
+
+    [Fact]
     public void ADeeplyNestedArrayIsWrittenWithoutOverflowingTheStack()
     {
         const string source = "var a = []; for (var i = 0; i < 100000; i = i + 1) { a = [a]; } write(a);";

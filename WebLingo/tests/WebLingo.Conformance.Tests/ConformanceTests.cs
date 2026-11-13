@@ -57,6 +57,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(\"abc\"[0);", "WS1001", 1, 16)]
     [InlineData("writeLn([1,]);", "WS1001", 1, 12)]
     [InlineData("var a = [1 2];", "WS1001", 1, 12)]
+    [InlineData("var m = {1: 2};", "WS1001", 1, 10)]
+    [InlineData("var m = {a 1};", "WS1001", 1, 12)]
+    [InlineData("var m = {a: 1,};", "WS1001", 1, 15)]
+    [InlineData("var m = {a: {1: 2}, b: 3}; writeLn(1);", "WS1001", 1, 14)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -142,6 +146,15 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var a = [writeLn]; a[0](\"called\"); var b = [function (x) { return x * 2; }]; writeLn(b[0](21));", "called\n42")]
     [InlineData("var i = 0; var a = [i = 1, i, i = 2]; writeLn(a); var b = [0, 0]; b[i = 1] = i; writeLn(b);", "[1, 1, 2]\n[0, 1]")]
     [InlineData("var m = [[1, 2], [3, 4]]; m[1][0] = 30; writeLn(m[0][1] + m[1][0]); writeLn(m);", "32\n[[1, 2], [30, 4]]")]
+    [InlineData("var m = { active: true, \"n a\": 1 }; writeLn(m[\"active\"]); writeLn(m[\"n a\"]); writeLn(m.length);", "true\n1\n2")]
+    [InlineData("var m = {}; m[1] = \"one\"; m[true] = 2; m[null] = 3; m[\"1\"] = 4; writeLn(m.length); writeLn(m[1]); writeLn(m[\"1\"] + m[true]);", "4\none\n6")]
+    [InlineData("var m = {a: 1}; writeLn(m.has(\"a\")); writeLn(m.has(\"b\")); writeLn(m.remove(\"a\")); writeLn(m.remove(\"a\")); writeLn(m);", "true\nfalse\ntrue\nfalse\n{}")]
+    [InlineData("var m = {a: 1, a: 2}; writeLn(m); m[\"a\"] = 3; writeLn(m.length); writeLn(m[\"a\"]);", "{\"a\": 2}\n1\n3")]
+    [InlineData("writeLn({a: {b: [\"c\", {}]}}); writeLn({\"q\\\"\": null});", "{\"a\": {\"b\": [\"c\", {}]}}\n{\"q\\\"\": null}")]
+    [InlineData("var m = {x: 1}; var n = m; n[\"x\"] = 2; writeLn(m[\"x\"]); writeLn(m == n); writeLn({x: 1} == {x: 1});", "2\ntrue\nfalse")]
+    [InlineData("var m = {}; m[\"self\"] = m; writeLn(m); var a = [m]; writeLn(a);", "{\"self\": {…}}\n[{\"self\": {…}}]")]
+    [InlineData("var i = 0; var m = {a: i = 1, b: i}; writeLn(m[\"b\"]); writeLn(i);", "1\n1")]
+    [InlineData("var m = {}; for (var i = 0; i < 100; i = i + 1) m[i] = i * i; for (var i = 0; i < 100; i = i + 2) m.remove(i); writeLn(m.length); writeLn(m[99]);", "50\n9801")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -210,6 +223,17 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn([1].length());", "WS2005")]
     [InlineData("writeLn([1] + [2]);", "WS3001")]
     [InlineData("writeLn([1] < [2]);", "WS3001")]
+    [InlineData("var m = {a: 1}; writeLn(m[\"b\"]);", "WS3007")]
+    [InlineData("var m = {a: 1}; writeLn(m[1]);", "WS3007")]
+    [InlineData("var m = {}; m[1.5] = 2;", "WS3001")]
+    [InlineData("var m = {}; m[[1]] = 2;", "WS3001")]
+    [InlineData("var m = {}; m[m] = 2;", "WS3001")]
+    [InlineData("var m = {}; writeLn(m.has(NaN));", "WS3001")]
+    [InlineData("var m = {a: 1}; writeLn(m.a);", "WS3006")]
+    [InlineData("var m = {a: 1}; writeLn(m.has);", "WS3001")]
+    [InlineData("var m = {a: 1}; writeLn(m.has());", "WS2006")]
+    [InlineData("var m = {a: 1}; writeLn(m.length());", "WS2005")]
+    [InlineData("var m = {a: 1}; m.push(1);", "WS3006")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

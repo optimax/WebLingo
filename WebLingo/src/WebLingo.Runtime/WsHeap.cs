@@ -7,10 +7,10 @@ namespace WebLingo.Runtime;
 /// collection marks what the roots (the arrays its owner registers, such as the VM's registers and constants) refer
 /// to, through every object that refers to others, and frees the rest, whose handles are reused. Its objects are
 /// strings, closures (a function and the cells it captures), cells (one variable that closures share, which has no
-/// value until it is initialized), and arrays (section 3.6).
+/// value until it is initialized), arrays and maps (section 3.6).
 /// <para>
 /// Its size is counted in units: a string's length in UTF-16 code units, a closure's capture count, an array's
-/// element count (which grows and shrinks with it), each plus
+/// element count and a map's entry count (which grow and shrink with them), each plus
 /// <see cref="ObjectOverhead"/>. A collection runs when an allocation would pass the next threshold, which is twice
 /// what was live after the last collection, and at least <see cref="FirstCollectionAt"/>; an allocation that does
 /// not fit in the budget even after a collection is an error (WS3003). These numbers are arbitrary, and are
@@ -116,6 +116,99 @@ public sealed class WsHeap
         return last;
     }
 
+    /// <summary>
+    /// A new map of the <paramref name="count"/> key-value pairs from <paramref name="values"/>[<paramref name="first"/>]
+    /// on, a later key replacing an earlier equal one; a value that cannot be a key is WS3001 (section 3.6).
+    /// </summary>
+    public bool TryAllocateMap(WsValue[] values, int first, int count, out WsValue map, out WsRuntimeError? error)
+    {
+        var entries = new MapObject();
+        for (var i = 0; i < count; i++)
+        {
+            if (!TryKey(values[first + 2 * i], out var key, out error))
+            {
+                map = WsValue.Null;
+                return false;
+            }
+            entries.Set(key, values[first + 2 * i], values[first + 2 * i + 1]);
+        }
+        return TryAllocate(entries, WsValueKind.Map, entries.Count, out map, out error);
+    }
+
+    /// <summary>The map's value for the key: false if it has none; WS3001 if the value cannot be a key.</summary>
+    public bool TryFindInMap(WsValue map, WsValue key, out WsValue value, out bool found, out WsRuntimeError? error)
+    {
+        value = WsValue.Null;
+        found = false;
+        if (!TryKey(key, out var mapKey, out error)) return false;
+        found = Get<MapObject>(map, WsValueKind.Map).TryGet(mapKey, out value);
+        return true;
+    }
+
+    /// <summary>Adds or replaces the key's value: a new entry is one more unit, within the budget (WS3003).</summary>
+    public bool TrySetInMap(WsValue map, WsValue key, WsValue value, out WsRuntimeError? error)
+    {
+        var entries = Get<MapObject>(map, WsValueKind.Map);
+        if (!TryKey(key, out var mapKey, out error)) return false;
+        if (entries.TryGet(mapKey, out _))
+        {
+            entries.Set(mapKey, key, value);
+            return true;
+        }
+        if (!TryReserve(1, out error)) return false;
+        entries.Set(mapKey, key, value);
+        Units++;
+        return true;
+    }
+
+    /// <summary>Removes the key's entry, giving whether there was one.</summary>
+    public bool TryRemoveFromMap(WsValue map, WsValue key, out bool removed, out WsRuntimeError? error)
+    {
+        removed = false;
+        if (!TryKey(key, out var mapKey, out error)) return false;
+        removed = Get<MapObject>(map, WsValueKind.Map).Remove(mapKey);
+        if (removed) Units--;
+        return true;
+    }
+
+    /// <summary>How many entries the map has.</summary>
+    public int MapCount(WsValue map) => Get<MapObject>(map, WsValueKind.Map).Count;
+
+    /// <summary>The map's entry at a position from 0 to its count − 1, in no defined order (section 3.6).</summary>
+    public (WsValue Key, WsValue Value) MapEntryAt(WsValue map, int position) => Get<MapObject>(map, WsValueKind.Map).At(position);
+
+    /// <summary>
+    /// The key a value is: strings, int64s, Booleans and null may be keys, compared as <c>==</c> compares them; any
+    /// other value is WS3001 (section 3.6).
+    /// </summary>
+    private bool TryKey(WsValue value, out MapKey key, out WsRuntimeError? error)
+    {
+        switch (value.Kind)
+        {
+            case WsValueKind.String:
+                key = new MapKey(WsValueKind.String, 0, GetString(value));
+                break;
+            case WsValueKind.Int64:
+                key = new MapKey(WsValueKind.Int64, value.AsInt64, null);
+                break;
+            case WsValueKind.Boolean:
+                key = new MapKey(WsValueKind.Boolean, value.AsBoolean ? 1 : 0, null);
+                break;
+            case WsValueKind.Null:
+                key = new MapKey(WsValueKind.Null, 0, null);
+                break;
+            default:
+                key = default;
+                error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                    $"{Capitalized(WsValueFormatter.Describe(value))} cannot be a key: keys are strings, integers, Booleans and null.");
+                return false;
+        }
+        error = null;
+        return true;
+    }
+
+    private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
+
     /// <summary>Marks what the roots refer to, through every object, and frees every other object.</summary>
     public void Collect()
     {
@@ -138,6 +231,14 @@ public sealed class WsHeap
                 case ArrayObject array:
                     foreach (var element in array.Elements) Mark(element, marked, pending);
                     break;
+                case MapObject map:
+                    for (var i = 0; i < map.Count; i++)
+                    {
+                        var (key, value) = map.At(i);
+                        Mark(key, marked, pending);
+                        Mark(value, marked, pending);
+                    }
+                    break;
             }
         }
         for (var handle = 0; handle < _objects.Count; handle++)
@@ -153,7 +254,11 @@ public sealed class WsHeap
 
     private static void Mark(WsValue value, bool[] marked, Stack<int> pending)
     {
-        if (value.Kind is not (WsValueKind.String or WsValueKind.Function or WsValueKind.Cell or WsValueKind.Array)) return;
+        if (value.Kind is not (WsValueKind.String or WsValueKind.Function or WsValueKind.Cell or WsValueKind.Array
+            or WsValueKind.Map))
+        {
+            return;
+        }
         if (marked[value.Handle]) return;
         marked[value.Handle] = true;
         pending.Push(value.Handle);
@@ -164,6 +269,7 @@ public sealed class WsHeap
         string text => text.Length,
         Closure closure => closure.Cells.Length,
         ArrayObject array => array.Elements.Count,
+        MapObject map => map.Count,
         _ => 0
     };
 
@@ -225,4 +331,56 @@ public sealed class WsHeap
     private sealed record Closure(int Function, WsValue[] Cells);
 
     private sealed record ArrayObject(List<WsValue> Elements);
+
+    /// <summary>A map's key as the map compares it: a string by its text, anything else by its kind and payload.</summary>
+    private readonly record struct MapKey(WsValueKind Kind, long Bits, string? Text);
+
+    /// <summary>
+    /// A hash table, its entries kept in a list that a removal fills from its end, so that an entry is found by its key
+    /// and visited by its position, in no defined order (section 3.6).
+    /// </summary>
+    private sealed class MapObject
+    {
+        private readonly Dictionary<MapKey, int> _positions = [];
+        private readonly List<(MapKey Key, WsValue KeyValue, WsValue Value)> _entries = [];
+
+        public int Count => _entries.Count;
+
+        public bool TryGet(MapKey key, out WsValue value)
+        {
+            if (_positions.TryGetValue(key, out var position))
+            {
+                value = _entries[position].Value;
+                return true;
+            }
+            value = WsValue.Null;
+            return false;
+        }
+
+        public void Set(MapKey key, WsValue keyValue, WsValue value)
+        {
+            if (_positions.TryGetValue(key, out var position))
+            {
+                _entries[position] = (key, _entries[position].KeyValue, value);
+                return;
+            }
+            _positions.Add(key, _entries.Count);
+            _entries.Add((key, keyValue, value));
+        }
+
+        public bool Remove(MapKey key)
+        {
+            if (!_positions.Remove(key, out var position)) return false;
+            var last = _entries.Count - 1;
+            if (position != last)
+            {
+                _entries[position] = _entries[last];
+                _positions[_entries[position].Key] = position;
+            }
+            _entries.RemoveAt(last);
+            return true;
+        }
+
+        public (WsValue Key, WsValue Value) At(int position) => (_entries[position].KeyValue, _entries[position].Value);
+    }
 }

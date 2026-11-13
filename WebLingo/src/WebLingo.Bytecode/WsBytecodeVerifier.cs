@@ -200,6 +200,15 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                     return $"its elements, registers {b} to {(long)b + c - 1}, are not all in the function's {function.RegisterCount}.";
                 }
                 return Unused(d);
+            case WsOpCode.NewMap:
+                if (Register(function, a, "destination") is { } mapError) return mapError;
+                if (c < 0 || c > WsFunction.MaxRegisters) return $"its entry count, {c}, is not 0 to {WsFunction.MaxRegisters}.";
+                if (c == 0) return Unused(b, d);
+                if (b < 0 || b > function.RegisterCount - 2 * c)
+                {
+                    return $"its keys and values, registers {b} to {(long)b + 2 * c - 1}, are not all in the function's {function.RegisterCount}.";
+                }
+                return Unused(d);
             case WsOpCode.GetIndex:
                 return Register(function, a, "destination") ?? Register(function, b, "target")
                     ?? Register(function, c, "index") ?? Unused(d);
@@ -383,6 +392,13 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return -1;
             case WsOpCode.GetMember:
                 return Unwritten(instruction.B, state, locals);
+            case WsOpCode.NewMap:
+                for (var i = 0; i < 2 * instruction.C; i++)
+                {
+                    var entry = Unwritten(instruction.B + i, state, locals);
+                    if (entry >= 0) return entry;
+                }
+                return -1;
             case WsOpCode.NewArray:
                 for (var i = 0; i < instruction.C; i++)
                 {
@@ -431,7 +447,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             or WsOpCode.Greater or WsOpCode.GreaterOrEqual or WsOpCode.NewCell or WsOpCode.BoxRegister or WsOpCode.CopyCell
             or WsOpCode.LoadCell or WsOpCode.LoadCapture or WsOpCode.MakeClosure or WsOpCode.LoadBuiltin
             or WsOpCode.Call or WsOpCode.GetMember or WsOpCode.CallMethod or WsOpCode.GetIndex
-            or WsOpCode.NewArray => instruction.A,
+            or WsOpCode.NewArray or WsOpCode.NewMap => instruction.A,
         _ => null
     };
 

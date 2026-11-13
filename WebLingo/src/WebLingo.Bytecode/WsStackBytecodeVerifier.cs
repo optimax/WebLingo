@@ -146,6 +146,10 @@ public sealed class WsStackBytecodeVerifier
                 return Name(module, a) ?? (b is < 0 or > WsFunction.MaxRegisters
                     ? $"its argument count, {b}, is not 0 to {WsFunction.MaxRegisters}."
                     : null);
+            case WsStackOpCode.NewMap:
+                return (a is < 0 or > WsFunction.MaxRegisters / 2
+                    ? $"its entry count, {a}, is not 0 to {WsFunction.MaxRegisters / 2}."
+                    : null) ?? Unused(b);
             case WsStackOpCode.NewArray:
                 return (a is < 0 or > WsFunction.MaxRegisters ? $"its element count, {a}, is not 0 to {WsFunction.MaxRegisters}." : null)
                     ?? Unused(b);
@@ -274,6 +278,7 @@ public sealed class WsStackBytecodeVerifier
         WsStackOpCode.CallBuiltin => (instruction.B, 1),
         WsStackOpCode.GetMember => (1, 1),
         WsStackOpCode.NewArray => (instruction.A, 1),
+        WsStackOpCode.NewMap => (2 * instruction.A, 1),
         WsStackOpCode.CallMethod => (instruction.B + 1, 1),
         WsStackOpCode.GetIndex => (2, 1),
         WsStackOpCode.StoreIndex => (3, instruction.A),

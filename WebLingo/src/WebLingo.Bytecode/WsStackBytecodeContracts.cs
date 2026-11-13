@@ -103,6 +103,10 @@ public enum WsStackOpCode : byte
     StoreIndex,
     /// <summary>A = element count; pops that many values, the last one on top, and pushes a new array of them.</summary>
     NewArray,
+    /// <summary>
+    /// A = entry count; pops that many key-value pairs, each key below its value, and pushes a new map of them.
+    /// </summary>
+    NewMap,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);

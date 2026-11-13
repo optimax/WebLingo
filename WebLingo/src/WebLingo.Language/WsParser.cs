@@ -551,6 +551,34 @@ public sealed class WsParser : IWsParser
                 Expect(WsTokenKind.CloseBracket, "']'");
                 return new WsArrayLiteralSyntax(elements, SpanFrom(token.Span.Start));
             }
+            case WsTokenKind.OpenBrace:
+            {
+                // { key: value, … }, or {}, a key written as a name or as a string literal (section 3.6).
+                Advance();
+                var entries = new List<WsMapEntrySyntax>();
+                if (Current.Kind != WsTokenKind.CloseBrace)
+                {
+                    while (true)
+                    {
+                        var key = Current;
+                        if (key.Kind is not (WsTokenKind.Identifier or WsTokenKind.StringLiteral))
+                        {
+                            ReportUnexpected("a key: a name or a string");
+                            SkipToClosingBrace();
+                            return new WsErrorExpressionSyntax(SpanFrom(token.Span.Start));
+                        }
+                        Advance();
+                        Expect(WsTokenKind.Colon, "':'");
+                        var value = ParseExpression();
+                        entries.Add(new WsMapEntrySyntax(key.Kind == WsTokenKind.Identifier ? key.Text : key.StringValue!,
+                            key.Span, value));
+                        if (Current.Kind != WsTokenKind.Comma) break;
+                        Advance();
+                    }
+                }
+                Expect(WsTokenKind.CloseBrace, "'}'");
+                return new WsMapLiteralSyntax(entries, SpanFrom(token.Span.Start));
+            }
             case WsTokenKind.OpenParen:
                 Advance();
                 var inner = ParseExpression();
@@ -570,6 +598,25 @@ public sealed class WsParser : IWsParser
                     Advance();
                 }
                 return new WsErrorExpressionSyntax(new WsSourceSpan(token.Span.Start, 0));
+        }
+    }
+
+    /// <summary>
+    /// Skips the rest of a map literal after an error in it: to its closing brace, which it consumes, or to the end of
+    /// the statement, so that what is left of it is not reported again.
+    /// </summary>
+    private void SkipToClosingBrace()
+    {
+        var depth = 0;
+        while (Current.Kind is not (WsTokenKind.EndOfFile or WsTokenKind.Semicolon))
+        {
+            if (Current.Kind == WsTokenKind.OpenBrace) depth++;
+            if (Current.Kind == WsTokenKind.CloseBrace && depth-- == 0)
+            {
+                Advance();
+                return;
+            }
+            Advance();
         }
     }
 
@@ -698,6 +745,9 @@ public sealed class WsParser : IWsParser
                     case WsMemberAccessSyntax member: pending.Push((member.Target, depth + 1)); break;
                     case WsArrayLiteralSyntax array:
                         foreach (var element in array.Elements) pending.Push((element, depth + 1));
+                        break;
+                    case WsMapLiteralSyntax map:
+                        foreach (var entry in map.Entries) pending.Push((entry.Value, depth + 1));
                         break;
                     case WsIndexAssignmentSyntax element:
                         pending.Push((element.Target, depth + 1));

@@ -167,6 +167,12 @@ public sealed class WsLowerer
                 return new WsIrCall(LowerExpression(call.Callee), LowerArguments(call.Arguments), call.Span);
             case WsBoundArrayLiteral array:
                 return new WsIrNewArray(LowerArguments(array.Elements), array.Span);
+            case WsBoundMapLiteral map:
+            {
+                var entries = new List<WsIrMapEntry>();
+                foreach (var (key, value) in map.Entries) entries.Add(new WsIrMapEntry(key, LowerExpression(value)));
+                return new WsIrNewMap(entries, map.Span);
+            }
             case WsBoundIndex index:
                 return new WsIrIndex(LowerExpression(index.Target), LowerExpression(index.Index), index.Span);
             case WsBoundIndexAssignment element:

@@ -6,8 +6,9 @@ namespace WebLingo.Runtime;
 /// How a value is shown as text (what <c>write</c> writes; proposed, section 15.2): <c>null</c>, <c>true</c>,
 /// <c>false</c>, an int64 in decimal digits, and a binary64 as the shortest decimal that reads back as the same
 /// number, always with a decimal point or an exponent so that it is not mistaken for an integer (<c>5.0</c>,
-/// <c>3.5</c>, <c>1E+21</c>), or <c>NaN</c>, <c>Infinity</c>, <c>-Infinity</c>. A string is its own text, and an array
-/// <c>[1, "a", null]</c>, its strings quoted, with their escapes (section 3.6). It never depends on the culture.
+/// <c>3.5</c>, <c>1E+21</c>), or <c>NaN</c>, <c>Infinity</c>, <c>-Infinity</c>. A string is its own text, an array
+/// <c>[1, "a", null]</c> and a map <c>{"active": true}</c>, their strings quoted, with their escapes (section 3.6). It
+/// never depends on the culture.
 /// </summary>
 public static class WsValueFormatter
 {
@@ -18,7 +19,7 @@ public static class WsValueFormatter
         return value.Kind switch
         {
             WsValueKind.String => heap.GetString(value),
-            WsValueKind.Array => FormatCollection(value, heap),
+            WsValueKind.Array or WsValueKind.Map => FormatCollection(value, heap),
             _ => Format(value)
         };
     }
@@ -30,6 +31,7 @@ public static class WsValueFormatter
         WsValueKind.Function or WsValueKind.Builtin => "function",
         WsValueKind.Cell => "cell",
         WsValueKind.Array => $"array#{value.Handle}",
+        WsValueKind.Map => $"map#{value.Handle}",
         WsValueKind.Boolean => value.AsBoolean ? "true" : "false",
         WsValueKind.Int64 => value.AsInt64.ToString(CultureInfo.InvariantCulture),
         _ => FormatBinary64(value.AsBinary64)
@@ -44,6 +46,7 @@ public static class WsValueFormatter
         WsValueKind.String => "a string",
         WsValueKind.Function or WsValueKind.Builtin => "a function",
         WsValueKind.Array => "an array",
+        WsValueKind.Map => "a map",
         _ => $"the number {Format(value)}"
     };
 
@@ -81,43 +84,65 @@ public static class WsValueFormatter
     }
 
     /// <summary>
-    /// A collection as text, its collections written the same way, and one it is already writing as <c>[…]</c>. It
-    /// keeps a stack of its own, not .NET's, so that a deeply nested collection cannot overflow the thread's stack.
+    /// A collection as text: an array <c>[1, "a"]</c>, a map <c>{"k": 1}</c>, its collections written the same way,
+    /// and one it is already writing as <c>[…]</c> or <c>{…}</c>. It keeps a stack of its own, not .NET's, so that a
+    /// deeply nested collection cannot overflow the thread's stack.
     /// </summary>
     private static string FormatCollection(WsValue root, WsHeap heap)
     {
-        var text = new StringBuilder("[");
-        var open = new HashSet<int> { root.Handle };
-        var pending = new Stack<(WsValue Array, int Next)>();
-        pending.Push((root, 0));
+        var text = new StringBuilder();
+        var open = new HashSet<int>();
+        var pending = new Stack<(WsValue Collection, int Next)>();
+        Open(root, text, open, pending);
         while (pending.Count > 0)
         {
-            var (array, next) = pending.Pop();
-            var elements = heap.GetArray(array);
-            if (next >= elements.Count)
+            var (collection, next) = pending.Pop();
+            var isMap = collection.Kind == WsValueKind.Map;
+            var count = isMap ? heap.MapCount(collection) : heap.GetArray(collection).Count;
+            if (next >= count)
             {
-                text.Append(']');
-                open.Remove(array.Handle);
+                text.Append(isMap ? '}' : ']');
+                open.Remove(collection.Handle);
                 continue;
             }
             if (next > 0) text.Append(", ");
-            pending.Push((array, next + 1));
-            var element = elements[next];
-            if (element.Kind == WsValueKind.Array)
+            pending.Push((collection, next + 1));
+            WsValue item;
+            if (isMap)
             {
-                if (!open.Add(element.Handle))
+                var (key, value) = heap.MapEntryAt(collection, next);
+                text.Append(Scalar(key, heap)).Append(": ");
+                item = value;
+            }
+            else
+            {
+                item = heap.GetArray(collection)[next];
+            }
+            if (item.Kind is WsValueKind.Array or WsValueKind.Map)
+            {
+                if (open.Contains(item.Handle))
                 {
-                    text.Append("[…]");
+                    text.Append(item.Kind == WsValueKind.Map ? "{…}" : "[…]");
                     continue;
                 }
-                text.Append('[');
-                pending.Push((element, 0));
+                Open(item, text, open, pending);
                 continue;
             }
-            text.Append(element.Kind == WsValueKind.String ? Quote(heap.GetString(element)) : Format(element));
+            text.Append(Scalar(item, heap));
         }
         return text.ToString();
     }
+
+    private static void Open(WsValue collection, StringBuilder text, HashSet<int> open, Stack<(WsValue, int)> pending)
+    {
+        text.Append(collection.Kind == WsValueKind.Map ? '{' : '[');
+        open.Add(collection.Handle);
+        pending.Push((collection, 0));
+    }
+
+    /// <summary>A value in a collection that is not a collection itself: a string quoted, anything else as written.</summary>
+    private static string Scalar(WsValue value, WsHeap heap) =>
+        value.Kind == WsValueKind.String ? Quote(heap.GetString(value)) : Format(value);
 
     private static string FormatBinary64(double value)
     {

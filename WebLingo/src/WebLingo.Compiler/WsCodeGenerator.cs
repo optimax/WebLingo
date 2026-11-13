@@ -323,6 +323,23 @@ public sealed class WsCodeGenerator
                     array.Span);
                 return destination;
             }
+            case WsIrNewMap map:
+            {
+                // Each key, then its value, in consecutive registers.
+                var mark = _nextRegister;
+                var first = _nextRegister;
+                for (var i = 0; i < 2 * map.Entries.Count; i++) Allocate();
+                for (var i = 0; i < map.Entries.Count; i++)
+                {
+                    Emit(new WsInstruction(WsOpCode.LoadConstant, first + 2 * i, StringConstant(map.Entries[i].Key)), map.Span);
+                    EmitExpression(map.Entries[i].Value, first + 2 * i + 1);
+                }
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.NewMap, destination, map.Entries.Count == 0 ? 0 : first, map.Entries.Count),
+                    map.Span);
+                return destination;
+            }
             case WsIrIndex index:
             {
                 var mark = _nextRegister;
@@ -403,6 +420,7 @@ public sealed class WsCodeGenerator
         WsIrStoreCapture store => Assigns(store.Value, local),
         WsIrIndex index => Assigns(index.Target, local) || Assigns(index.Index, local),
         WsIrNewArray array => AnyAssigns(array.Elements, local),
+        WsIrNewMap map => AnyEntryAssigns(map.Entries, local),
         WsIrStoreIndex store => Assigns(store.Target, local) || Assigns(store.Index, local) || Assigns(store.Value, local),
         WsIrMember member => Assigns(member.Target, local),
         WsIrCallMethod call => Assigns(call.Target, local) || AnyAssigns(call.Arguments, local),
@@ -419,6 +437,15 @@ public sealed class WsCodeGenerator
         var copy = Allocate();
         Emit(new WsInstruction(WsOpCode.Move, copy, register), span);
         return copy;
+    }
+
+    private static bool AnyEntryAssigns(IReadOnlyList<WsIrMapEntry> entries, int local)
+    {
+        foreach (var entry in entries)
+        {
+            if (Assigns(entry.Value, local)) return true;
+        }
+        return false;
     }
 
     private static bool AnyAssigns(IReadOnlyList<WsIrExpression> expressions, int local)
