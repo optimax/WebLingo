@@ -794,9 +794,9 @@ Proposed central props:
 | M0.7 | Conformance suite expansion: the language of §3.5, in parts M0.7.1 to M0.7.6 (below), each with its conformance tests | Started (12 November 2026) |
 | M0.8 | Windows/Linux CI and portability validation | Started (12 November 2026): the CI workflow builds and tests on Windows and Linux (first run passed: CI run 1, 12 November 2026, commit `5229806`); tests check the portable core's assemblies against the dependency rules (§8.3) and the portability inventory (WS-P016) |
 
-**M0.7 parts** (12 November 2026), each landing on its own with its conformance tests (§8.6's table grows with them):
+**M0.7 parts** (12 November 2026), each landing on its own with its conformance tests, which `WebLingo.Conformance.Tests` runs beside §8.6's:
 
-1. **M0.7.1:** blocks and nested scopes.
+1. **M0.7.1:** blocks and nested scopes. Implemented (12 November 2026); a missing `}` is WS1001, at its `{`.
 2. **M0.7.2:** `true`, `false` and `null`; `==`, `!=`, `<`, `<=`, `>`, `>=`; `!`, `&&`, `||`.
 3. **M0.7.3:** `if` and `else`.
 4. **M0.7.4:** `while`, `for` and `do … while`, with `break` and `continue`.
@@ -1068,7 +1068,7 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Binary64 literals | Digits, then a fraction (`.` and digits, at least one on each side of the point: `1.` and `.5` are not literals), an exponent (`e` or `E`, an optional sign, and digits), or both: `1.5`, `0.1`, `1e21`, `2.5E-3`. The value is the nearest binary64; one too large for a binary64 is an error (WS1004), and one too small becomes 0. `Infinity` and `NaN` are keywords for those values, and `-Infinity` is unary minus applied to `Infinity` | Approved (12 November 2026) |
 | Literal suffixes | Digits followed directly by a letter, digit or `_` are one invalid literal (WS1004), which keeps room for the decimal suffix `m` (§3.2) | Approved (12 November 2026) |
 | Not yet lexed | String and decimal literals: their characters are invalid (WS1003) until their syntax is specified | Approved (12 November 2026) |
-| Statements | Variable declarations and expression statements, each ended by `;`; a lone `;` (an empty statement) is an error (WS1001); blocks come later | Approved (12 November 2026) |
+| Statements | Variable declarations and expression statements, each ended by `;`; a lone `;` (an empty statement) is an error (WS1001); blocks, `{ … }`, from M0.7.1 (§3.5) | Approved (12 November 2026) |
 | Operators | Unary `-` and `+` (`+` gives the number itself; on anything but a number either is WS3001); binary `* /` above `+ -`, both left-associative | Approved (12 November 2026) |
 | Assignment | An expression, right-associative (`a = b = 3`), whose value is the value assigned; only a variable's name may be assigned (WS1007), not even a parenthesized one | Approved (12 November 2026) |
 | Calls | `callee(argument, …)`, no trailing comma; the callee is any expression, checked when bound | Approved (12 November 2026) |

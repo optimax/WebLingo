@@ -76,7 +76,7 @@ BTW: Thank you for thoughtfully inserting `An:` placeholders for me.
 
 ## M0.7.4: Loops, `break` and `continue`
 
-`while`, `for` and `do … while`, with `break` and `continue` (specification, section 3.5). `while` comes first; `for` and `do … while` wait for "Syntax of `for` and `do … while`". Added by Claude, 2026-11-12.
+`while`, `for` and `do … while`, with `break` and `continuewant `foreach`.` (specification, section 3.5). `while` comes first; `for` and `do … while` wait for "Syntax of `for` and `do … while`". Added by Claude, 2026-11-12.
 
 ## M0.7.5: String Literals and Concatenation
 
