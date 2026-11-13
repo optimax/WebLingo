@@ -217,7 +217,7 @@ A small change in one stage of the pipeline can change the behavior of every lat
 - source spans and the line and column numbers of diagnostics,
 - diagnostic codes, messages, and the order diagnostics are reported in,
 - token kinds and keywords (`let` is reserved and never a declaration keyword),
-- the approved semantics: block-scoped `var` and `const` with the temporal dead zone, mandatory semicolons, the numeric categories, int64 overflow as a runtime error, string length in Unicode scalar values,
+- the approved semantics: block-scoped `var` and `const`, each in scope from its declaration on and always initialized, mandatory semicolons, the numeric categories, int64 overflow as a runtime error, string length in Unicode scalar values,
 - bytecode verification, and the VM's behavior on bad input,
 - the CLI's commands, output, and exit codes,
 - the project dependency graph and the portability inventory.

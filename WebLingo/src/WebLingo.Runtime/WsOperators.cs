@@ -67,10 +67,6 @@ public static class WsOperators
     private static WsRuntimeError? CheckOperand(WsValue value, WsArithmeticOperator? op)
     {
         if (value.Kind is WsValueKind.Int64 or WsValueKind.Binary64) return null;
-        if (!value.IsScriptValue)
-        {
-            return new WsRuntimeError(WsDiagnosticCodes.ReadBeforeInitialization, "A variable is read before it has a value.");
-        }
         var what = op is { } binary ? $"'{Symbol(binary)}'" : "'-'";
         return new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
             $"{what} needs numbers, not {WsValueFormatter.Describe(value)}.");

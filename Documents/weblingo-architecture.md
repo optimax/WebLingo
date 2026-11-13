@@ -28,7 +28,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WS-G001 | Free and open-source project direction; release timing, scope, and MIT licensing proposal | Direction confirmed; release and licensing details proposed |
 | Implementation | C#/.NET 10 initially, later Native C# compilation | Approved |
 | WS-017 | Native C# portability contract and replaceable adapters | Approved |
-| WS-002.3 | `var` mutable, `const` immutable; both block-scoped with TDZ; no `let` declaration keyword | Approved |
+| WS-002.3 | `var` mutable, `const` immutable; both block-scoped, in scope from their declaration to the end of the block; no `let` declaration keyword | Approved |
 | M0.1 | Mandatory semicolons; no automatic semicolon insertion | Approved |
 | M0.1 | Numeric categories int64, IEEE binary64, decimal128 | Approved |
 | M0.1 | String indexing and `length` count Unicode scalar values | Approved |
@@ -107,12 +107,12 @@ const limit = 10;   // immutable lexical binding
 - `var` has **modern JavaScript `let`-style block scope**, not historical JavaScript function scope.
 - `const` has the same lexical scope but disallows reassignment.
 - `let` is **not** a WebLingo declaration keyword.
-- A temporal dead zone (TDZ) applies before initialization.
+- A declaration takes effect where it stands, after its initializer: from there to the end of the block, the name means the declared variable; before it, and within the initializer, the name means what it means outside the block (an outer declaration, or nothing, which is an error). There is no temporal dead zone.
 - Redeclaration in the same scope is an error; nested shadowing is allowed.
 - Implicit global creation is prohibited.
 - Per-iteration bindings are correctly captured by closures.
-- `var x;` is legal, but reading `x` before assignment throws `ReferenceError` (there is no `undefined`).
-- `const` requires an initializer; it does not deeply freeze referenced objects.
+- Every declaration, `var` and `const` alike, requires an initializer: `var x;` is a syntax error. A variable therefore always has a value (there is no `undefined`).
+- `const` does not deeply freeze referenced objects.
 - Simple statements require semicolons; there is **no ASI**.
 
 ### 3.2 Value categories and operations
@@ -664,7 +664,7 @@ Codes added while implementing M0.6, all **proposed** (§15.2):
 | WS1003 | Invalid character |
 | WS1004 | Invalid numeric literal (malformed, or out of range) |
 | WS1005 | Unterminated comment |
-| WS1006 | `const` declaration without an initializer |
+| WS1006 | Declaration without an initializer |
 | WS1007 | Invalid assignment target |
 | WS1008 | Source nested too deeply |
 | WS3002 | Integer overflow (a result outside int64) |
@@ -676,7 +676,7 @@ Codes added while implementing M0.6, all **proposed** (§15.2):
 
 **Parser:** initial subset of variable declarations, integer literals, identifiers, arithmetic, parentheses and mandatory semicolons; preserve source spans and recover sufficiently to report multiple errors.
 
-**Binder/IR:** resolve lexical symbols and TDZ rules; produce bound tree and lowered IR independent of register/stack VM choice.
+**Binder/IR:** resolve lexical symbols, each from its declaration on (§3.1); produce bound tree and lowered IR independent of register/stack VM choice.
 
 **Bytecode generator:** produce an executable in-memory module; serialization deferred until WBC encoding finalized.
 
@@ -734,14 +734,15 @@ Proposed central props:
 | `var x = 10` | Missing-semicolon compile error |
 | `var x = 1; var x = 2;` | Duplicate declaration error |
 | `x = 10;` | Undefined identifier error |
-| `var x; print(x);` | Uninitialized read at runtime |
+| `var x;` | Compile error |
+| `print(x); var x = 1;` | Undefined identifier error |
 | `var x = 10 + 20;` | Result 30 |
 | `var x = 10 / 2;` | Result 5.0 |
 | Signed int64 overflow | Runtime error |
 | Malformed source | Diagnostic, not compiler crash |
 | Malformed bytecode | Verification failure, not VM crash |
 
-**Note:** `var x;` is syntactically legal; the uninitialized read is a runtime error, not necessarily a compile-time error. Static analysis may optionally warn when it can prove an uninitialized read.
+**Note:** every declaration has an initializer and a name means nothing before its declaration (§3.1), so no variable can be read before it has a value, and no runtime check for it is needed.
 
 ### 8.7 Implementation increments (WS-S016)
 
@@ -1049,31 +1050,29 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Assignment | An expression, right-associative (`a = b = 3`), whose value is the value assigned; only a variable's name may be assigned (WS1007), not even a parenthesized one | Proposed |
 | Calls | `callee(argument, …)`, no trailing comma; the callee is any expression, checked when bound | Proposed |
 | `let` | Reported as not a WebLingo keyword (WS1001), with a hint to use `var` or `const`, and parsed as `var` to recover | Proposed |
-| `const` without a value | `const x;` is a syntax error (WS1006) | Proposed |
+| Declaration without a value | `var x;` and `const x;` are syntax errors (WS1006, §3.1) | Approved |
 | Error recovery | After an error, parsing resumes at the next `;` or declaration keyword; a token the lexer reported is not reported again, and a statement gets at most one diagnostic for what follows its first error | Proposed |
 | Nesting limits | Parsing recurses at most 256 levels (parentheses, unary minus, assignments, arguments), and an expression is at most 1000 operations deep, so that a recursive compiler stage cannot overflow its stack; deeper source is an error (WS1008) | Proposed |
 | Compilation stages | Binding runs only on a source without syntax errors, and lowering only on one that binds without errors: a source reports the errors of its first failing stage | Proposed |
 | Host built-ins | The host declares its built-ins (name and arity) to the compiler; they live in a scope around the program's, so a declaration may shadow one (`var print = 1;`) | Proposed |
 | Functions as values | Not yet: a built-in can only be called; naming it otherwise is an error (WS3001), and so is calling anything but a built-in (WS3001), or calling one with the wrong number of arguments (WS3001). But make sure this is supported later. | Proposed |
-| Use before declaration | A block's declarations are known from its start (§3.1), so a name used before its declaration refers to that declaration, not to an outer one | Proposed |
-| Temporal dead zone at run time | Reading a variable before its declaration has run, or a `var` declared without a value before it is assigned, is a runtime error, WS2004 (§8.6, `var x; print(x);`); so is assigning a variable before its declaration has run; it is not reported at compile time | Proposed |
-| Checks | The compiler keeps a runtime check only where a variable may not have a value yet; in M0.6's straight-line programs that is exactly where the check fails | Proposed |
+| Use before declaration | A name used before its declaration, or in its own initializer, means the outer declaration, or is undefined (WS2001, at compile time) if there is none (§3.1) | Approved |
+| Checks | The compiler keeps a runtime check only where a variable may not have a value yet; in M0.6's straight-line programs that is exactly where the check fails. A variable cannot NOT have a value though. | Proposed |
 | Evaluation order | Left to right: operands, then arguments; an assignment evaluates its value before it stores it | Proposed |
 | Instruction model | An in-memory register instruction model, not WBC (§5.3, §8.4): an operation and up to four integer operands A to D, unused ones 0 (`WsBytecodeContracts.cs`); a module holds its constants (int64 and binary64, kept as IEEE bits), the built-ins it imports by name and arity, and one function, with a source span per instruction and the names of its locals for runtime messages | Proposed |
 | Registers | A function's locals take registers 0 to n − 1 and its temporaries the registers above; at most 65535 registers (§5.3), more is a compile-time error (WS4002) | Proposed |
-| Operations | `LoadConstant`, `Move`, `Negate`, `Add`, `Subtract`, `Multiply`, `Divide`, `CheckInitialized`, `CheckDeclared`, `DeclareUnassigned`, `CallBuiltin` (arguments in consecutive registers, §5.4), `Jump`, `Return`; the compiler emits no `Jump` yet | Proposed |
-| Dead zone in the VM | The VM starts every local in its temporal dead zone; the check operations guard locals, and the verifier guards temporaries | Proposed |
-| Verification | Besides §5.5: unused operands must be 0; no path may run off the end of the code; a temporary must be written before it is read on every path; a function whose check needs more than 16 million words of state or 100 million steps is rejected rather than verified slowly | Proposed |
+| Operations | `LoadConstant`, `Move`, `Negate`, `Add`, `Subtract`, `Multiply`, `Divide`, `CallBuiltin` (arguments in consecutive registers, §5.4), `Jump`, `Return`; the compiler emits no `Jump` yet | Proposed |
+| Verification | Besides §5.5: unused operands must be 0; no path may run off the end of the code; every register, local or temporary, must be written before it is read on every path, which is what keeps a variable from being read before it has a value (§3.1); a function whose check needs more than 16 million words of state or 100 million steps is rejected rather than verified slowly | Proposed |
 | Compiler output | The compiler verifies what it generates, and reports a module that fails as an internal error (WS4001), with no module | Proposed |
 | Runtime values | `WsValue`, a kind and a 64-bit payload, 16 bytes (§4.1's target, met): null, Boolean, int64 and binary64 (§8.4); the language has no `null`, `true` or `false` literals yet, so scripts produce only numbers | Proposed |
 | Mixed arithmetic | An int64 meeting a binary64 is converted to binary64 (`1 + 0.5`, and `10 / 4 + 1` is 3.5) | Proposed |
 | Binary64 results | IEEE 754 throughout: `1 / 0` is `Infinity`, `-1 / 0` is `-Infinity`, `0 / 0` is `NaN`; only integer arithmetic raises an error (WS3002) | Proposed |
-| Invalid operands | Arithmetic on anything but numbers is WS3001 | Proposed |
-| `print` | One argument; writes the value as text and a line break, and gives `null`; registered by the host (the CLI), implemented once in `WebLingo.StdLib` | Proposed |
+| Invalid operands | Arithmetic on anything but numbers is WS3001. String concatenation with + is allowed though. | Proposed |
+| `write` | One argument; writes the value as text ~~and a line break~~, and gives `null`; registered by the host (the CLI), implemented once in `WebLingo.StdLib`. No line break. `writeLn`, or `write('\n')` outputs line break. | Proposed |
 | Text of a value | `null`, `true`, `false`; an int64 in decimal digits; a binary64 as the shortest decimal that reads back as the same number, always with a decimal point or an exponent (`5.0`, `3.5`, `0.1`, `-0.0`, `1E+21`), or `NaN`, `Infinity`, `-Infinity`; never culture-dependent (`WsValueFormatter`) | Proposed |
 | Linking | The VM verifies a module, then links its imports to the host's built-ins by name and arity; a missing one stops the module before it runs (WS2001) | Proposed |
 | Runtime errors | The first runtime error stops the execution, and is reported with the source span of the instruction that raised it; output printed before it stays | Proposed |
 | Budgets and cancellation | An execution has an instruction budget (exceeded: WS3003) and a register budget (a module needing more is not run: WS3003); the VM looks at the host's cancellation signal every 1024 instructions (WS3004); a WebLingo-owned signal, not .NET's `CancellationToken` (WS-P007) | Proposed |
-| Built-in failures | A built-in that fails, even by throwing, is a runtime error (WS3001); a built-in never receives a variable without a value (WS2004) | Proposed |
-| CLI | `weblingo run <file>` compiles and runs; `weblingo check <file>` compiles and reports, without running; `weblingo --version` prints `WebLingo M0.6 (pre-alpha)`. Diagnostics go to standard error as `file(line,column): error CODE: message`. Exit codes: 0 success, 1 compilation errors, 2 a usage error or an unreadable file, 3 a runtime error (M0.6.1's 3, "not implemented", is gone). `print`'s lines end in LF on every platform | Proposed |
-| Diagnostic codes | WS1003 to WS1008, WS3002 to WS3004, and WS4002 (§8.4); WS3001 is used at compile time too, for invalid calls; WS2004 is a runtime error | Proposed |
+| Built-in failures | A built-in that fails, even by throwing, is a runtime error (WS3001) | Proposed |
+| CLI | `weblingo run <file>` compiles and runs; `weblingo check <file>` compiles and reports, without running; `weblingo --version` prints `WebLingo M0.6 (pre-alpha)`. Diagnostics go to standard error as `file(line,column): error CODE: message`. Exit codes: 0 success, 1 compilation errors, 2 a usage error or an unreadable file, 3 a runtime error (M0.6.1's 3, "not implemented", is gone). `write`'s lines end in LF on every platform | Proposed |
+| Diagnostic codes | WS1003 to WS1008, WS3002 to WS3004, and WS4002 (§8.4); WS3001 is used at compile time too, for invalid calls; WS2004 is not reported, since no variable can be read before it has a value (§3.1) | Proposed |

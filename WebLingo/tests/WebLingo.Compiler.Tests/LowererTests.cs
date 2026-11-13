@@ -6,7 +6,7 @@ namespace WebLingo.Compiler.Tests;
 public sealed class LowererTests
 {
     [Fact]
-    public void LowersTheSpecificationsExampleWithoutChecks()
+    public void LowersTheSpecificationsExample()
     {
         var program = Lower("var a = 10;\nvar b = 20;\nvar result = a + b;\nprint(result);");
         Assert.Equal(
@@ -18,51 +18,27 @@ public sealed class LowererTests
     }
 
     [Fact]
-    public void ReadingADeclaredVariableWithoutAValueIsChecked()
-    {
-        Assert.Equal(new[] { "declare 0", "eval print#0(load? 0)" }, Lower("var x; print(x);").Statements.Select(Show));
-    }
-
-    [Fact]
-    public void ReadingBeforeTheDeclarationIsChecked()
-    {
-        Assert.Equal(new[] { "eval print#0(load? 0)", "init 0 = 1" }, Lower("print(x); var x = 1;").Statements.Select(Show));
-    }
-
-    [Fact]
-    public void AVariableIsInItsDeadZoneInItsOwnInitializer()
-    {
-        Assert.Equal(new[] { "init 0 = (load? 0 + 1)" }, Lower("var x = x + 1;").Statements.Select(Show));
-    }
-
-    [Fact]
-    public void AssigningBeforeTheDeclarationIsChecked()
-    {
-        Assert.Equal(new[] { "eval (store! 0 = 5)", "declare 0" }, Lower("x = 5; var x;").Statements.Select(Show));
-    }
-
-    [Fact]
-    public void AnAssignmentGivesTheVariableItsValue()
+    public void AnAssignmentStoresAndYieldsItsValue()
     {
         Assert.Equal(
-            new[] { "declare 0", "eval (store 0 = 5)", "eval print#0(load 0)" },
-            Lower("var x; x = 5; print(x);").Statements.Select(Show));
+            new[] { "init 0 = 1", "eval (store 0 = 5)", "eval print#0(load 0)" },
+            Lower("var x = 1; x = 5; print(x);").Statements.Select(Show));
     }
 
     [Fact]
     public void AnAssignmentsValueIsLoweredBeforeItsStore()
     {
         Assert.Equal(
-            new[] { "declare 0", "eval (store 0 = (load? 0 + 1))" },
-            Lower("var x; x = x + 1;").Statements.Select(Show));
+            new[] { "init 0 = 1", "eval (store 0 = (load 0 + 1))" },
+            Lower("var x = 1; x = x + 1;").Statements.Select(Show));
     }
 
     [Fact]
     public void OperandsAreLoweredLeftToRight()
     {
         Assert.Equal(
-            new[] { "declare 0", "eval ((store 0 = 1) + load 0)" },
-            Lower("var x; (x = 1) + x;").Statements.Select(Show));
+            new[] { "init 0 = 0", "eval ((store 0 = 1) + load 0)" },
+            Lower("var x = 0; (x = 1) + x;").Statements.Select(Show));
     }
 
     [Fact]
@@ -80,7 +56,6 @@ public sealed class LowererTests
 
     private static string Show(WsIrStatement statement) => statement switch
     {
-        WsIrDeclareUnassigned declare => $"declare {declare.Local}",
         WsIrInitializeLocal init => $"init {init.Local} = {Show(init.Value)}",
         WsIrEvaluate evaluate => $"eval {Show(evaluate.Expression)}",
         _ => "?"
@@ -89,8 +64,8 @@ public sealed class LowererTests
     private static string Show(WsIrExpression expression) => expression switch
     {
         WsIrInt64Constant constant => constant.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        WsIrLoadLocal load => (load.CheckInitialized ? "load? " : "load ") + load.Local,
-        WsIrStoreLocal store => $"(store{(store.CheckDeclared ? "!" : "")} {store.Local} = {Show(store.Value)})",
+        WsIrLoadLocal load => "load " + load.Local,
+        WsIrStoreLocal store => $"(store {store.Local} = {Show(store.Value)})",
         WsIrUnary unary => $"-{Show(unary.Operand)}",
         WsIrBinary binary => $"({Show(binary.Left)} {Symbol(binary.Operator)} {Show(binary.Right)})",
         WsIrCallBuiltin call => $"print#{call.Builtin}({string.Join(", ", call.Arguments.Select(Show))})",

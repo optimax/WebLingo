@@ -33,8 +33,6 @@ public static class WsDisassembler
             WsOpCode.Negate => $"Negate {Register(function, a)}, {Register(function, b)}",
             WsOpCode.Add or WsOpCode.Subtract or WsOpCode.Multiply or WsOpCode.Divide =>
                 $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
-            WsOpCode.CheckInitialized or WsOpCode.CheckDeclared or WsOpCode.DeclareUnassigned =>
-                $"{instruction.OpCode} {Register(function, a)}",
             WsOpCode.CallBuiltin => $"CallBuiltin {Register(function, a)}, {Import(module, b)}({Arguments(function, c, d)})",
             WsOpCode.Jump => $"Jump {a}",
             WsOpCode.Return => "Return",

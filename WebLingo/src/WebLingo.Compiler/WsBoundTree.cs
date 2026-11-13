@@ -11,7 +11,7 @@ public sealed record WsBoundProgram(
 
 public abstract record WsBoundStatement(WsSourceSpan Span);
 
-public sealed record WsBoundVariableDeclaration(WsLocalSymbol Local, WsBoundExpression? Initializer, WsSourceSpan Span)
+public sealed record WsBoundVariableDeclaration(WsLocalSymbol Local, WsBoundExpression Initializer, WsSourceSpan Span)
     : WsBoundStatement(Span);
 
 public sealed record WsBoundExpressionStatement(WsBoundExpression Expression, WsSourceSpan Span) : WsBoundStatement(Span);

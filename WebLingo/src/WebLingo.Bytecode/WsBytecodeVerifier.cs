@@ -4,8 +4,7 @@ namespace WebLingo.Bytecode;
 /// The bytecode verifier (specification, sections 5.5 and 8.4). A module must pass it before it runs. It checks the
 /// module's structure, every instruction's operation and operands (registers, constants, imports and their arity,
 /// branch targets, and that unused operands are 0), that no path runs off the end of the code, and, following every
-/// path, that no temporary register is read before it is written. Locals need no such check: the VM starts them in
-/// their temporal dead zone, which the check instructions guard. It never throws on malformed input.
+/// path, that no register, local or temporary, is read before it is written. It never throws on malformed input.
 /// </summary>
 public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
 {
@@ -63,7 +62,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return Fail($"Instruction {i} ({code[i].OpCode}) is the last one, and the code would run off its end.", i);
             }
         }
-        return CheckTemporariesAreWrittenBeforeRead(function);
+        return CheckRegistersAreWrittenBeforeRead(function);
     }
 
     private static string? CheckOperands(WsCompiledModule module, WsFunction function, WsInstruction instruction)
@@ -82,10 +81,6 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             case WsOpCode.Divide:
                 return Register(function, a, "destination") ?? Register(function, b, "left")
                     ?? Register(function, c, "right") ?? Unused(d);
-            case WsOpCode.CheckInitialized:
-            case WsOpCode.CheckDeclared:
-            case WsOpCode.DeclareUnassigned:
-                return Index(a, function.LocalCount, "local") ?? Unused(b, c, d);
             case WsOpCode.CallBuiltin:
                 if (Register(function, a, "destination") is { } destination) return destination;
                 if (Index(b, module.Imports.Count, "import") is { } importError) return importError;
@@ -112,15 +107,15 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
     public const long MaxSteps = 100_000_000;
 
     /// <summary>
-    /// Follows every path from the first instruction, keeping the set of temporaries certainly written (the
+    /// Follows every path from the first instruction, keeping the set of registers certainly written (the
     /// intersection over the paths that reach it) at the start of each block, where a path can arrive by a jump,
     /// until nothing changes. A set only shrinks, so this ends; its memory and its steps are bounded, and a module
     /// beyond either bound is rejected rather than verified slowly.
     /// </summary>
-    private static WsVerificationResult CheckTemporariesAreWrittenBeforeRead(WsFunction function)
+    private static WsVerificationResult CheckRegistersAreWrittenBeforeRead(WsFunction function)
     {
         var code = function.Code;
-        var locals = function.LocalCount;
+        const int locals = 0; // Every register, locals included, must be written before it is read.
         var words = (function.RegisterCount - locals + 63) / 64;
 
         // Blocks start at the first instruction and at every jump target.
@@ -137,7 +132,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         }
         if (blockCount * Math.Max(words, 1) > MaxStateWords)
         {
-            return Fail($"The function is too large to verify: {blockCount} blocks of {function.RegisterCount - locals} temporaries.");
+            return Fail($"The function is too large to verify: {blockCount} blocks of {function.RegisterCount} registers.");
         }
 
         var atBlockStart = new Dictionary<int, ulong[]> { [0] = new ulong[words] };
@@ -156,7 +151,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 if (unwritten >= 0)
                 {
                     return Fail(
-                        $"Instruction {index} ({instruction.OpCode}) reads register {unwritten}, a temporary not written on every path to it.",
+                        $"Instruction {index} ({instruction.OpCode}) reads register {unwritten}, not written on every path to it.",
                         index);
                 }
                 if (Writes(instruction) is int target && target >= locals) Set(state, target - locals);
@@ -199,7 +194,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         if (changed) pending.Push(target);
     }
 
-    /// <summary>The first temporary the instruction reads that is not certainly written, or -1.</summary>
+    /// <summary>The first register the instruction reads that is not certainly written, or -1.</summary>
     private static int FirstUnwrittenRead(WsInstruction instruction, ulong[] state, int locals)
     {
         switch (instruction.OpCode)

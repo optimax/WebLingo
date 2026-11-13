@@ -26,12 +26,6 @@ public enum WsOpCode : byte
     Multiply,
     /// <summary>A = destination register, B = left register, C = right register.</summary>
     Divide,
-    /// <summary>A = local: fails (WS2004) if the local is in its temporal dead zone or has no value yet.</summary>
-    CheckInitialized,
-    /// <summary>A = local: fails (WS2004) if the local is in its temporal dead zone.</summary>
-    CheckDeclared,
-    /// <summary>A = local: the local leaves its temporal dead zone, declared but without a value.</summary>
-    DeclareUnassigned,
     /// <summary>A = destination register, B = import index, C = first argument register, D = argument count.</summary>
     CallBuiltin,
     /// <summary>A = the index of the instruction to go to.</summary>

@@ -41,13 +41,6 @@ public sealed class ParserTests
     }
 
     [Fact]
-    public void DeclarationsMayHaveNoInitializer()
-    {
-        var declaration = Assert.IsType<WsVariableDeclarationSyntax>(Assert.Single(Parse("var x;").Root.Statements));
-        Assert.Null(declaration.Initializer);
-    }
-
-    [Fact]
     public void ConstantsAreDeclaredWithConst()
     {
         var tree = Parse("const limit = 10;");
@@ -57,11 +50,15 @@ public sealed class ParserTests
             (declaration.Kind, declaration.Name, declaration.NameSpan));
     }
 
-    [Fact]
-    public void AConstantWithoutAValueIsAnError()
+    [Theory]
+    [InlineData("const x;", 6)]
+    [InlineData("var x;", 4)]
+    public void ADeclarationWithoutAValueIsAnError(string source, int nameStart)
     {
-        var diagnostic = Assert.Single(Parse("const x;").Diagnostics);
-        Assert.Equal((WsDiagnosticCodes.MissingConstantInitializer, new WsSourceSpan(6, 1)), (diagnostic.Code, diagnostic.Span));
+        var tree = Parse(source);
+        var diagnostic = Assert.Single(tree.Diagnostics);
+        Assert.Equal((WsDiagnosticCodes.MissingInitializer, new WsSourceSpan(nameStart, 1)), (diagnostic.Code, diagnostic.Span));
+        Assert.Null(Assert.IsType<WsVariableDeclarationSyntax>(Assert.Single(tree.Root.Statements)).Initializer);
     }
 
     [Fact]
@@ -85,7 +82,7 @@ public sealed class ParserTests
     {
         var tree = Parse("var a = ;\nvar b = 1\nconst c;\nvar d = 4;");
         Assert.Equal(
-            new[] { WsDiagnosticCodes.UnexpectedToken, WsDiagnosticCodes.MissingSemicolon, WsDiagnosticCodes.MissingConstantInitializer },
+            new[] { WsDiagnosticCodes.UnexpectedToken, WsDiagnosticCodes.MissingSemicolon, WsDiagnosticCodes.MissingInitializer },
             tree.Diagnostics.Select(d => d.Code));
         Assert.Equal(4, tree.Root.Statements.Count);
         Assert.Equal("d", Assert.IsType<WsVariableDeclarationSyntax>(tree.Root.Statements[3]).Name);

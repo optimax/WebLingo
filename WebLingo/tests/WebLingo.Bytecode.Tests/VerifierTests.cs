@@ -28,11 +28,11 @@ public sealed class VerifierTests
     }
 
     [Fact]
-    public void LocalsMayBeReadWithoutBeingWritten()
+    public void ALocalReadBeforeItIsWrittenIsRejected()
     {
-        // The VM starts locals in their dead zone; the check instructions guard them.
-        Assert.Equal(Valid, Verify(Module(registers: 2, locals: 1,
-            I(WsOpCode.CheckInitialized, 0), I(WsOpCode.Negate, 1, 0), I(WsOpCode.Return))));
+        // A local has a value from its declaration on (specification, section 3.1), so like a temporary it is
+        // written before it is read.
+        AssertRejected(Module(registers: 2, locals: 1, I(WsOpCode.Negate, 1, 0), I(WsOpCode.Return)), 0, "register 0");
     }
 
     [Fact]
@@ -86,12 +86,6 @@ public sealed class VerifierTests
         AssertRejected(Module(registers: 3, locals: 3, I(WsOpCode.CallBuiltin, 0, 0, 3, 1), I(WsOpCode.Return)), 0, "arguments");
     }
 
-    [Fact]
-    public void ACheckOnATemporaryIsRejected()
-    {
-        AssertRejected(Module(registers: 2, locals: 1, I(WsOpCode.CheckInitialized, 1), I(WsOpCode.Return)), 0, "local 1");
-    }
-
     [Theory]
     [InlineData(3)]
     [InlineData(-1)]
@@ -121,7 +115,8 @@ public sealed class VerifierTests
     [Fact]
     public void ATemporaryReadBeforeItIsWrittenIsRejected()
     {
-        AssertRejected(Module(registers: 3, locals: 1, I(WsOpCode.Add, 2, 0, 1), I(WsOpCode.Return)), 0, "register 1");
+        AssertRejected(Module(registers: 3, locals: 1, I(WsOpCode.LoadConstant, 0, 0), I(WsOpCode.Add, 2, 0, 1),
+            I(WsOpCode.Return)), 1, "register 1");
     }
 
     [Fact]

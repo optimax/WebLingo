@@ -55,9 +55,6 @@ public sealed class WsCodeGenerator
     {
         switch (statement)
         {
-            case WsIrDeclareUnassigned declare:
-                Emit(new WsInstruction(WsOpCode.DeclareUnassigned, declare.Local), declare.Span);
-                break;
             case WsIrInitializeLocal initialize:
                 EmitExpression(initialize.Value, initialize.Local);
                 break;
@@ -86,27 +83,14 @@ public sealed class WsCodeGenerator
             }
             case WsIrLoadLocal load:
             {
-                if (load.CheckInitialized) Emit(new WsInstruction(WsOpCode.CheckInitialized, load.Local), load.Span);
                 if (target is not { } destination || destination == load.Local) return load.Local;
                 Emit(new WsInstruction(WsOpCode.Move, destination, load.Local), load.Span);
                 return destination;
             }
             case WsIrStoreLocal store:
             {
-                if (store.CheckDeclared)
-                {
-                    // Compute into a temporary: writing the local first would take it out of its dead zone unchecked.
-                    var mark = _nextRegister;
-                    var value = EmitExpression(store.Value, null);
-                    Emit(new WsInstruction(WsOpCode.CheckDeclared, store.Local), store.Span);
-                    Emit(new WsInstruction(WsOpCode.Move, store.Local, value), store.Span);
-                    _nextRegister = mark;
-                }
-                else
-                {
-                    var value = EmitExpression(store.Value, store.Local);
-                    if (value != store.Local) Emit(new WsInstruction(WsOpCode.Move, store.Local, value), store.Span);
-                }
+                var value = EmitExpression(store.Value, store.Local);
+                if (value != store.Local) Emit(new WsInstruction(WsOpCode.Move, store.Local, value), store.Span);
                 if (target is not { } destination || destination == store.Local) return store.Local;
                 Emit(new WsInstruction(WsOpCode.Move, destination, store.Local), store.Span);
                 return destination;

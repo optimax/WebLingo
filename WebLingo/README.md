@@ -15,7 +15,7 @@ var result = a + b;
 print(result);   // 30
 ```
 
-Integer overflow, and reading a variable before it has a value, are runtime errors. String literals, functions, control flow and `.wsp` templates come later, so `samples/HelloWorld` and `samples/SimpleWebsite` do not run yet; `samples/Arithmetic` does.
+Every variable is initialized where it is declared, and a name means nothing before its declaration (both are compile-time errors); integer overflow is a runtime error. String literals, functions, control flow and `.wsp` templates come later, so `samples/HelloWorld` and `samples/SimpleWebsite` do not run yet; `samples/Arithmetic` does.
 
 ## Prerequisites
 

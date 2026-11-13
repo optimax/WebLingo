@@ -23,15 +23,6 @@ public sealed class ValueTests
         Assert.Equal(WsValueKind.Null, default(WsValue).Kind);
     }
 
-    [Fact]
-    public void TheVmsMarkersAreNotScriptValues()
-    {
-        Assert.False(WsValue.DeadZone.IsScriptValue);
-        Assert.False(WsValue.Unassigned.IsScriptValue);
-        Assert.True(WsValue.Null.IsScriptValue);
-        Assert.True(WsValue.FromBinary64(1).IsScriptValue);
-    }
-
     [Theory]
     [InlineData(30L, "30")]
     [InlineData(-7L, "-7")]
@@ -164,13 +155,6 @@ public sealed class OperatorTests
         Assert.Equal(WsDiagnosticCodes.InvalidOperation, nullError!.Code);
         Assert.False(WsOperators.TryNegate(WsValue.True, out _, out var booleanError));
         Assert.Equal(WsDiagnosticCodes.InvalidOperation, booleanError!.Code);
-    }
-
-    [Fact]
-    public void AMarkerReachingArithmeticIsAReadBeforeInitialization()
-    {
-        Assert.False(WsOperators.TryBinary(WsArithmeticOperator.Add, WsValue.DeadZone, Int(1), out _, out var error));
-        Assert.Equal(WsDiagnosticCodes.ReadBeforeInitialization, error!.Code);
     }
 
     private static WsValue Int(long value) => WsValue.FromInt64(value);

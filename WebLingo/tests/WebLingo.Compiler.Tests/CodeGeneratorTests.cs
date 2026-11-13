@@ -26,21 +26,11 @@ public sealed class CodeGeneratorTests
     }
 
     [Fact]
-    public void ChecksAreEmittedWhereTheIrKeepsThem()
-    {
-        Assert.Equal(
-            new[] { "DeclareUnassigned r0(x)", "CheckInitialized r0(x)", "Move r1, r0(x)", "CallBuiltin r1, print(r1)" },
-            Instructions("var x; print(x);").Take(4));
-        var store = Instructions("x = 5; var x;");
-        Assert.Equal(new[] { "LoadConstant r1, 5", "CheckDeclared r0(x)", "Move r0(x), r1" }, store.Take(3));
-    }
-
-    [Fact]
     public void AnAssignmentWritesItsLocalDirectly()
     {
         Assert.Equal(
-            new[] { "DeclareUnassigned r0(x)", "LoadConstant r0(x), 5", "Multiply r0(x), r0(x), r0(x)", "Return" },
-            Instructions("var x; x = 5; x = x * x;"));
+            new[] { "LoadConstant r0(x), 1", "LoadConstant r0(x), 5", "Multiply r0(x), r0(x), r0(x)", "Return" },
+            Instructions("var x = 1; x = 5; x = x * x;"));
     }
 
     [Fact]
@@ -79,10 +69,9 @@ public sealed class CodeGeneratorTests
 
     [Theory]
     [InlineData("var a = 10; var b = 20; var result = a + b; print(result);")]
-    [InlineData("var x; x = (x = 1) + (x = 2) * -x; print(x);")]
+    [InlineData("var x = 0; x = (x = 1) + (x = 2) * -x; print(x);")]
     [InlineData("var a = 1; var b = a; a = b = a + b; print(a - b / 2);")]
-    [InlineData("print(x); var x = 1;")]
-    [InlineData("var x = x;")]
+    [InlineData("print(1); var print = 2;")]
     [InlineData("")]
     public void WhatTheCompilerGeneratesVerifies(string source)
     {

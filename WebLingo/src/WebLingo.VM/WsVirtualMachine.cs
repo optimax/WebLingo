@@ -66,7 +66,6 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         WsExecutionContext context)
     {
         var registers = new WsValue[function.RegisterCount];
-        for (var i = 0; i < function.LocalCount; i++) registers[i] = WsValue.DeadZone;
         var code = function.Code;
         var budget = context.InstructionBudget;
         var cancellation = context.Cancellation;
@@ -112,29 +111,6 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         registers[instruction.A] = value;
                     }
                     break;
-                case WsOpCode.CheckInitialized:
-                    var kind = registers[instruction.A].Kind;
-                    if (kind == WsValueKind.DeadZone)
-                    {
-                        error = new WsRuntimeError(WsDiagnosticCodes.ReadBeforeInitialization,
-                            $"{NameOf(function, instruction.A)} is used before its declaration has run.");
-                    }
-                    else if (kind == WsValueKind.Unassigned)
-                    {
-                        error = new WsRuntimeError(WsDiagnosticCodes.ReadBeforeInitialization,
-                            $"{NameOf(function, instruction.A)} is read before it has been given a value.");
-                    }
-                    break;
-                case WsOpCode.CheckDeclared:
-                    if (registers[instruction.A].Kind == WsValueKind.DeadZone)
-                    {
-                        error = new WsRuntimeError(WsDiagnosticCodes.ReadBeforeInitialization,
-                            $"{NameOf(function, instruction.A)} is assigned before its declaration has run.");
-                    }
-                    break;
-                case WsOpCode.DeclareUnassigned:
-                    registers[instruction.A] = WsValue.Unassigned;
-                    break;
                 case WsOpCode.CallBuiltin:
                     error = Call(builtins[instruction.B], registers, instruction);
                     break;
@@ -156,27 +132,19 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
 
     /// <summary>
     /// Calls a built-in with its arguments copied out of the registers, so that its result may overwrite them.
-    /// A built-in never sees one of the VM's markers, and its failure, even an exception, is a runtime error.
+    /// Its failure, even an exception, is a runtime error.
     /// </summary>
     private static WsRuntimeError? Call(IWsBuiltinFunction builtin, WsValue[] registers, WsInstruction instruction)
     {
         var arguments = new WsValue[instruction.D];
-        for (var i = 0; i < arguments.Length; i++)
-        {
-            arguments[i] = registers[instruction.C + i];
-            if (!arguments[i].IsScriptValue)
-            {
-                return new WsRuntimeError(WsDiagnosticCodes.ReadBeforeInitialization,
-                    $"An argument of '{builtin.Name}' is a variable without a value.");
-            }
-        }
+        for (var i = 0; i < arguments.Length; i++) arguments[i] = registers[instruction.C + i];
         try
         {
             if (!builtin.TryInvoke(arguments, out var result, out var error))
             {
                 return error ?? new WsRuntimeError(WsDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed.");
             }
-            registers[instruction.A] = result.IsScriptValue ? result : WsValue.Null;
+            registers[instruction.A] = result;
             return null;
         }
         catch (Exception exception)
@@ -192,9 +160,6 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         WsOpCode.Multiply => WsArithmeticOperator.Multiply,
         _ => WsArithmeticOperator.Divide
     };
-
-    private static string NameOf(WsFunction function, int local) =>
-        function.LocalNames is { } names ? $"'{names[local]}'" : $"Local {local}";
 
     private static WsSourceSpan SpanOf(WsFunction function, int pc) =>
         function.Spans is { } spans ? spans[pc] : new WsSourceSpan(0, 0);

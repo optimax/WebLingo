@@ -37,7 +37,7 @@ public sealed class BinderTests
     [Theory]
     [InlineData("var x = 1; var x = 2;")]
     [InlineData("var x = 1; const x = 2;")]
-    [InlineData("const x = 1; var x;")]
+    [InlineData("const x = 1; var x = 3;")]
     public void ADuplicateDeclarationIsReportedAtTheLaterName(string source)
     {
         var diagnostic = Assert.Single(Compile(source).Diagnostics);
@@ -96,23 +96,33 @@ public sealed class BinderTests
         Assert.Equal(WsDiagnosticCodes.InvalidOperation, Assert.Single(Compile("var print = 1; print(2);").Diagnostics).Code);
     }
 
-    [Fact]
-    public void ANameUsedBeforeItsDeclarationResolvesToIt()
+    [Theory]
+    [InlineData("print(x); var x = 1;", 6)]
+    [InlineData("x = 2; var x = 1;", 0)]
+    [InlineData("var x = x + 1;", 8)]
+    public void ANameDoesNotExistBeforeItsDeclaration(string source, int start)
     {
-        var compilation = Compile("print(x); var x = 1;");
+        var diagnostic = Assert.Single(Compile(source).Diagnostics);
+        Assert.Equal((WsDiagnosticCodes.UndefinedIdentifier, new WsSourceSpan(start, 1)), (diagnostic.Code, diagnostic.Span));
+    }
+
+    [Fact]
+    public void BeforeItsDeclarationANameMeansWhatItMeansOutside()
+    {
+        // The host's print is outside the program's scope: it is print until the program declares its own.
+        var compilation = Compile("print(1); var print = 2;");
         Assert.Empty(compilation.Diagnostics);
-        var call = (WsBoundBuiltinCall)((WsBoundExpressionStatement)compilation.BoundProgram!.Statements[0]).Expression;
-        Assert.Same(compilation.BoundProgram.Locals[0], ((WsBoundLocalReference)call.Arguments[0]).Local);
+        Assert.IsType<WsBoundBuiltinCall>(((WsBoundExpressionStatement)compilation.BoundProgram!.Statements[0]).Expression);
     }
 
     [Fact]
     public void EveryBindingErrorIsReported()
     {
-        var compilation = Compile("a = 1;\nconst c = 2;\nc = 3;\nvar c;\nprint(b);");
+        var compilation = Compile("a = 1;\nconst c = 2;\nc = 3;\nvar c = 4;\nprint(b);");
         Assert.Equal(
             new[] {
-                WsDiagnosticCodes.DuplicateDeclaration, WsDiagnosticCodes.UndefinedIdentifier,
-                WsDiagnosticCodes.AssignmentToConstant, WsDiagnosticCodes.UndefinedIdentifier
+                WsDiagnosticCodes.UndefinedIdentifier, WsDiagnosticCodes.AssignmentToConstant,
+                WsDiagnosticCodes.DuplicateDeclaration, WsDiagnosticCodes.UndefinedIdentifier
             },
             compilation.Diagnostics.Select(d => d.Code));
         Assert.Null(compilation.LoweredProgram);

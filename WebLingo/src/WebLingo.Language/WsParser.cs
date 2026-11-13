@@ -105,10 +105,12 @@ public sealed class WsParser : IWsParser
             Advance();
             initializer = ParseExpression();
         }
-        else if (kind == WsDeclarationKind.Const && !_statementHasError)
+        else if (!_statementHasError)
         {
-            Report(WsDiagnosticCodes.MissingConstantInitializer,
-                $"The constant '{name}' needs a value: 'const {name} = …;'.", nameSpan);
+            // Every declaration has a value (specification, section 3.1).
+            var keywordText = kind == WsDeclarationKind.Const ? "const" : "var";
+            Report(WsDiagnosticCodes.MissingInitializer,
+                $"'{name}' needs a value where it is declared: '{keywordText} {name} = …;'.", nameSpan);
         }
         ExpectSemicolon();
         return new WsVariableDeclarationSyntax(kind, name, nameSpan, initializer, SpanFrom(start));

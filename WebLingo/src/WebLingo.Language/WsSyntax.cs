@@ -13,7 +13,10 @@ public abstract record WsStatementSyntax(WsSourceSpan Span) : WsSyntaxNode(Span)
 
 public enum WsDeclarationKind { Var, Const }
 
-/// <summary><c>var x;</c>, <c>var x = 1;</c> or <c>const x = 1;</c>; the span includes the semicolon.</summary>
+/// <summary>
+/// <c>var x = 1;</c> or <c>const x = 1;</c>; the span includes the semicolon. <paramref name="Initializer"/> is null
+/// only in a tree with errors (a declaration without a value is WS1006).
+/// </summary>
 public sealed record WsVariableDeclarationSyntax(
     WsDeclarationKind Kind, string Name, WsSourceSpan NameSpan, WsExpressionSyntax? Initializer, WsSourceSpan Span)
     : WsStatementSyntax(Span);

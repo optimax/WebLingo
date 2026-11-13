@@ -34,6 +34,8 @@ public sealed class ConformanceTests : IDisposable
 
     [Theory]
     [InlineData("const x;", "WS1006", 1, 7)]
+    [InlineData("var x;", "WS1006", 1, 5)]
+    [InlineData("print(x); var x = 1;", "WS2001", 1, 7)]
     [InlineData("var x = 10", "WS1002", 1, 11)]
     [InlineData("var x = 1; var x = 2;", "WS2002", 1, 16)]
     [InlineData("x = 10;", "WS2001", 1, 1)]
@@ -46,15 +48,6 @@ public sealed class ConformanceTests : IDisposable
             Assert.Equal("", output);
             Assert.Equal($"program.ws({line},{column}): error {code}:", FirstLineStart(error));
         }
-    }
-
-    [Fact]
-    public void AnUninitializedReadIsARuntimeError()
-    {
-        Assert.Equal(WsCommandLine.Success, Weblingo("check", "var x; print(x);").Exit);
-        var (exit, output, error) = Weblingo("run", "var x; print(x);");
-        Assert.Equal((WsCommandLine.RuntimeFailed, ""), (exit, output));
-        Assert.Equal("program.ws(1,14): error WS2004:", FirstLineStart(error));
     }
 
     [Theory]
@@ -100,8 +93,8 @@ public sealed class ConformanceTests : IDisposable
     {
         var good = string.Join(newline, "var a = 2;", "var b = a * 3;", "print(b);");
         Assert.Equal((WsCommandLine.Success, "6\n", ""), Weblingo("run", good));
-        var bad = string.Join(newline, "var x;", "print(x);");
-        Assert.Equal("program.ws(2,7): error WS2004:", FirstLineStart(Weblingo("run", bad).Error));
+        var bad = string.Join(newline, "var x = 1;", "print(y);");
+        Assert.Equal("program.ws(2,7): error WS2001:", FirstLineStart(Weblingo("run", bad).Error));
     }
 
     [Fact]
@@ -142,7 +135,7 @@ public sealed class ConformanceTests : IDisposable
     public void MalformedBytecodeFailsVerificationNotACrash()
     {
         var module = new WsCompiler(new WsCompilerOptions([new WsBuiltinDeclaration("print", 1)]))
-            .Compile("var a = 10; var b = a * 2 - 3; var c; c = -b / a; print(c);", "base.ws").Module!;
+            .Compile("var a = 10; var b = a * 2 - 3; var c = 0; c = -b / a; print(c);", "base.ws").Module!;
         var random = new Random(8_6);
         var opCodes = Enum.GetValues<WsOpCode>();
         var vm = new WsVirtualMachine();

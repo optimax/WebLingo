@@ -4,10 +4,10 @@ namespace WebLingo.Compiler;
 
 /// <summary>
 /// The binder (specification, section 8.4, "Binder/IR"; its choices are in section 15.2). It resolves every name
-/// lexically. A block's declarations are known from its start, so a name used before its declaration resolves to
-/// it, and the temporal dead zone makes that use a runtime error (WS2004, decided by <see cref="WsLowerer"/>), not
-/// a reference to an outer name. The host's built-ins are in a scope around the program's, so a declaration may
-/// shadow one. Binding goes on after an error, so that every binding error is reported.
+/// lexically. A declaration takes effect where it stands, after its initializer (section 3.1): before it, and in
+/// its own initializer, the name means what it means outside, and is undefined (WS2001) if nothing outside
+/// declares it. The host's built-ins are in a scope around the program's, so a declaration may shadow one. Binding
+/// goes on after an error, so that every binding error is reported.
 /// </summary>
 public sealed class WsBinder
 {
@@ -27,29 +27,9 @@ public sealed class WsBinder
 
     public WsBoundProgram Bind(WsCompilationUnitSyntax unit)
     {
-        DeclareBlock(unit.Statements);
         var statements = new List<WsBoundStatement>();
         foreach (var statement in unit.Statements) statements.Add(BindStatement(statement));
         return new WsBoundProgram(statements, _locals, _builtinsInOrder);
-    }
-
-    /// <summary>Declares a block's variables before binding it: duplicates are reported at the later name.</summary>
-    private void DeclareBlock(IReadOnlyList<WsStatementSyntax> statements)
-    {
-        foreach (var statement in statements)
-        {
-            if (statement is not WsVariableDeclarationSyntax declaration || declaration.Name.Length == 0) continue;
-            if (_scope.Locals.ContainsKey(declaration.Name))
-            {
-                Report(WsDiagnosticCodes.DuplicateDeclaration,
-                    $"'{declaration.Name}' is already declared in this scope.", declaration.NameSpan);
-                continue;
-            }
-            var local = new WsLocalSymbol(declaration.Name, declaration.Kind, _locals.Count, declaration.NameSpan);
-            _locals.Add(local);
-            _scope.Locals.Add(declaration.Name, local);
-            _scope.Declarations.Add(declaration, local);
-        }
     }
 
     private WsBoundStatement BindStatement(WsStatementSyntax statement)
@@ -57,12 +37,19 @@ public sealed class WsBinder
         switch (statement)
         {
             case WsVariableDeclarationSyntax declaration:
-                var initializer = declaration.Initializer is null ? null : BindExpression(declaration.Initializer);
-                if (!_scope.Declarations.TryGetValue(declaration, out var local))
+                // The initializer is bound first: the name it declares does not exist in it yet.
+                var initializer = declaration.Initializer is null
+                    ? new WsBoundError(declaration.Span)
+                    : BindExpression(declaration.Initializer);
+                if (_scope.Locals.ContainsKey(declaration.Name))
                 {
-                    // A duplicate, already reported: bind its initializer for its own errors, then drop it.
-                    return new WsBoundExpressionStatement(initializer ?? new WsBoundError(declaration.Span), declaration.Span);
+                    Report(WsDiagnosticCodes.DuplicateDeclaration,
+                        $"'{declaration.Name}' is already declared in this scope.", declaration.NameSpan);
+                    return new WsBoundExpressionStatement(initializer, declaration.Span);
                 }
+                var local = new WsLocalSymbol(declaration.Name, declaration.Kind, _locals.Count, declaration.NameSpan);
+                _locals.Add(local);
+                _scope.Locals.Add(declaration.Name, local);
                 return new WsBoundVariableDeclaration(local, initializer, declaration.Span);
             case WsExpressionStatementSyntax expressionStatement:
                 return new WsBoundExpressionStatement(BindExpression(expressionStatement.Expression), statement.Span);
@@ -197,8 +184,7 @@ public sealed class WsBinder
     private sealed class Scope(Scope? parent)
     {
         public Scope? Parent { get; } = parent;
+        /// <summary>The names declared so far in this block, each from its declaration on.</summary>
         public Dictionary<string, WsLocalSymbol> Locals { get; } = new(StringComparer.Ordinal);
-        public Dictionary<WsVariableDeclarationSyntax, WsLocalSymbol> Declarations { get; } =
-            new(ReferenceEqualityComparer.Instance);
     }
 }

@@ -14,9 +14,7 @@ public static class WsValueFormatter
         WsValueKind.Null => "null",
         WsValueKind.Boolean => value.AsBoolean ? "true" : "false",
         WsValueKind.Int64 => value.AsInt64.ToString(CultureInfo.InvariantCulture),
-        WsValueKind.Binary64 => FormatBinary64(value.AsBinary64),
-        WsValueKind.DeadZone => "<dead zone>",
-        _ => "<unassigned>"
+        _ => FormatBinary64(value.AsBinary64)
     };
 
     /// <summary>A value described in a message: its kind, and the value itself where that helps.</summary>
@@ -25,8 +23,7 @@ public static class WsValueFormatter
         WsValueKind.Null => "null",
         WsValueKind.Boolean => $"the Boolean {Format(value)}",
         WsValueKind.Int64 => $"the integer {Format(value)}",
-        WsValueKind.Binary64 => $"the number {Format(value)}",
-        _ => "a variable without a value"
+        _ => $"the number {Format(value)}"
     };
 
     private static string FormatBinary64(double value)

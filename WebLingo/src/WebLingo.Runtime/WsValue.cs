@@ -1,10 +1,9 @@
 namespace WebLingo.Runtime;
 
 /// <summary>
-/// The kinds of runtime value. <see cref="DeadZone"/> and <see cref="Unassigned"/> are the VM's own markers for a
-/// local that has no value yet (in its temporal dead zone, or declared without a value); no script ever sees one.
+/// The kinds of runtime value.
 /// </summary>
-public enum WsValueKind : byte { Null, Boolean, Int64, Binary64, DeadZone, Unassigned }
+public enum WsValueKind : byte { Null, Boolean, Int64, Binary64 }
 
 /// <summary>
 /// A runtime value (specification, section 4.1): a kind and a 64-bit payload, 16 bytes in all. M0.6 has null,
@@ -25,16 +24,11 @@ public readonly struct WsValue : IEquatable<WsValue>
     public static WsValue Null => default;
     public static WsValue True => new(WsValueKind.Boolean, 1);
     public static WsValue False => new(WsValueKind.Boolean, 0);
-    public static WsValue DeadZone => new(WsValueKind.DeadZone, 0);
-    public static WsValue Unassigned => new(WsValueKind.Unassigned, 0);
 
     public static WsValue FromBoolean(bool value) => value ? True : False;
     public static WsValue FromInt64(long value) => new(WsValueKind.Int64, value);
     public static WsValue FromBinary64(double value) => new(WsValueKind.Binary64, BitConverter.DoubleToInt64Bits(value));
     public static WsValue FromBinary64Bits(long bits) => new(WsValueKind.Binary64, bits);
-
-    /// <summary>Whether this is a value a script may hold, not one of the VM's markers.</summary>
-    public bool IsScriptValue => Kind <= WsValueKind.Binary64;
 
     public bool AsBoolean => _bits != 0;
     public long AsInt64 => _bits;

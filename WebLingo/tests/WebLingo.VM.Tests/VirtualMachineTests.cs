@@ -24,7 +24,7 @@ public sealed class VirtualMachineTests
     [InlineData("print((2 + 3) * 4);", "20")]
     [InlineData("print(-(1 - 4));", "3")]
     [InlineData("print(10 / 4 + 1);", "3.5")]
-    [InlineData("var x; x = 5; print(x * x);", "25")]
+    [InlineData("var x = 1; x = 5; print(x * x);", "25")]
     [InlineData("var a = 1; var b = a = 7; print(a + b);", "14")]
     [InlineData("var x = 1; print(x + (x = 5));", "6")]
     [InlineData("print(print(1));", "1\nnull")]
@@ -44,27 +44,6 @@ public sealed class VirtualMachineTests
         Assert.Equal(new[] { "1" }, lines);
         Assert.Equal(WsDiagnosticCodes.IntegerOverflow, result.Error!.Code);
         Assert.Equal(source.IndexOf("big + 1", StringComparison.Ordinal), result.Error.Span.Start);
-    }
-
-    [Fact]
-    public void ReadingAVariableWithoutAValueIsARuntimeError()
-    {
-        var (result, lines) = Run("var x;\nprint(x);");
-        Assert.Empty(lines);
-        Assert.Equal(WsDiagnosticCodes.ReadBeforeInitialization, result.Error!.Code);
-        Assert.Contains("'x'", result.Error.Message);
-        Assert.Equal(new WsSourceSpan(13, 1), result.Error.Span);
-    }
-
-    [Theory]
-    [InlineData("print(x); var x = 1;", "used before its declaration")]
-    [InlineData("var x = x + 1;", "used before its declaration")]
-    [InlineData("x = 5; var x;", "assigned before its declaration")]
-    public void TheTemporalDeadZoneIsARuntimeError(string source, string message)
-    {
-        var (result, _) = Run(source);
-        Assert.Equal(WsDiagnosticCodes.ReadBeforeInitialization, result.Error!.Code);
-        Assert.Contains(message, result.Error.Message);
     }
 
     [Fact]
@@ -125,9 +104,9 @@ public sealed class VirtualMachineTests
     }
 
     [Fact]
-    public void ABuiltinNeverSeesAVariableWithoutAValue()
+    public void AModuleReadingARegisterBeforeWritingItIsNotRun()
     {
-        // A valid module that passes a local in its dead zone to print without a check: 0: r1 = r0; 1: print(r1).
+        // 0: r1 = r0; 1: print(r1). r0 is never written: the verifier rejects the module, so print never sees it.
         var module = new WsCompiledModule("leak", [], [new WsImport("print", 1)],
             new WsFunction("main", 2, 1, [
                 new WsInstruction(WsOpCode.Move, 1, 0), new WsInstruction(WsOpCode.CallBuiltin, 1, 0, 1, 1),
@@ -135,7 +114,7 @@ public sealed class VirtualMachineTests
             ]));
         var output = new WsCollectedOutput();
         var result = new WsVirtualMachine().Execute(module, Context(output));
-        Assert.Equal(WsDiagnosticCodes.ReadBeforeInitialization, result.Error!.Code);
+        Assert.Equal(WsDiagnosticCodes.BytecodeVerificationFailure, result.Error!.Code);
         Assert.Empty(output.Lines);
     }
 
