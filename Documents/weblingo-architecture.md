@@ -258,7 +258,7 @@ The register VM is the **preferred first implementation**, but the final registe
 | Dataflow/liveness | More explicit | More implicit |
 | Native code / optimization potential | Good | Good |
 
-M0.6 implementation default: implement the minimal register VM first and add a stack VM benchmark prototype later. **This does not approve WS-BC002 permanently.**
+M0.6 implementation default: implement the minimal register VM first and add a stack VM benchmark prototype later. **This does not approve WS-BC002 permanently.** The stack VM and the comparison exist since 13 November 2026 (§5.6, "The comparison"); the decision is still the owner's.
 
 ### 5.3 Proposed WBC binary container
 
@@ -324,6 +324,17 @@ An initial C# `switch` dispatch loop is **proposed** for clarity and portability
 | strings | 26.2 ms | 9.7 ms | 2.7× | 198.1 M | 10,731,560 B | 10,732,304 B |
 
 **The stack VM** (part 3, 13 November 2026). Its bytecode (`WsStackBytecodeContracts.cs`) is in `WebLingo.Bytecode`, beside the register bytecode, whose constants, imports and captures it shares, since the compiler, which generates it, may not depend on a VM (§8.3). A function has locals, its parameters first, and an operand stack, whose deepest point the generator counts; its frame has a slot for each, at most 65,535 in all, as a register function has registers, and the execution's register budget bounds its slots. An instruction takes its operands from the top of the stack and pushes its result, with at most two operands of its own (a local, a constant, a jump target, an argument count). Its verifier checks what the register verifier checks, and that the stack has the same depth wherever paths meet, never pops what it does not have, and never grows past its counted depth. `WebLingo.VM.Stack` holds the VM, which shares `WebLingo.Runtime` and the register VM's contracts (`WsExecutionResult`), and so depends on `WebLingo.VM`. It is tuned as the register VM is (part 2). Every conformance program gives the same diagnostics, output and errors on both VMs, but for one difference: the instruction budget (WS3003) counts each VM's own instructions, and the stack VM runs more of them for the same program, so a program that runs out of its budget stops at a different point on each.
+
+**The comparison** (part 4, 13 November 2026), as part 2 measured, with 11 timed runs: the tuned register VM, and the stack VM, tuned the same way, on the same workloads, compiled from the same lowered IR. The register VM is faster on every workload, by 1.10 to 1.65 times, and executes 1.29 to 1.75 times fewer instructions; the stack bytecode has more instructions, but is 3 to 35 percent smaller in bytes, since most of its instructions have one operand or none; both allocate the same in .NET's heap, and in WebLingo's.
+
+| Workload | Register | Stack | Stack ÷ register | Instructions run, register | Instructions run, stack | Code, register | Code, stack |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| loops | 17.3 ms | 28.6 ms | 1.65 | 10,010,008 | 17,514,512 | 24 (76 B) | 41 (74 B) |
+| calls | 9.1 ms | 10.0 ms | 1.10 | 2,063,676 | 2,670,639 | 23 (74 B) | 28 (48 B) |
+| closures | 12.4 ms | 14.5 ms | 1.17 | 3,120,009 | 4,660,014 | 35 (106 B) | 52 (93 B) |
+| strings | 11.0 ms | 12.8 ms | 1.16 | 1,920,008 | 3,100,012 | 26 (83 B) | 42 (76 B) |
+
+Implementation complexity, in lines of source, the stack VM's against the register VM's: the code generator 375 against 468 (it allocates no registers, and needs no copy of a local that a later operand assigns), the verifier 346 against 402, the VM 633 against 604, and the instruction model 121 against 148. Not measured yet, because the language does not have them: property access, async suspension, template output, and I/O-bound server workloads (this section's list); and startup and latency, which matter once there is a host. The choice between the VMs is the owner's (WS-BC002).
 
 ---
 
@@ -816,7 +827,7 @@ Proposed central props:
 |---|---|---|
 | M0.1 | Language grammar and semantics | Key normative choices approved; detailed semantics drafted |
 | M0.2 | Runtime value model, GC and disposal | Key choices approved; detailed physical contracts drafted |
-| M0.3 | WBC bytecode and VM architecture | Drafted; VM comparison and several encoding choices open |
+| M0.3 | WBC bytecode and VM architecture | Drafted; the VMs compared (13 November 2026, §5.6), the choice and several encoding choices open |
 | M0.4 | Hosting ABI and runtime lifecycle | **Four explicit architectural decisions approved** |
 | M0.5 | Platform abstraction and portability | **Four explicit architectural decisions approved** |
 | M0.6 | Solution scaffolding and implementation contracts | **Approved; M0.6.1–M0.6.7 implemented and verified on Windows and Linux (§15)** |
@@ -840,7 +851,7 @@ Proposed central props:
 
 These items should be explicitly tracked rather than silently treated as approved:
 
-1. **Register versus stack VM (WS-BC002):** compare equivalent benchmark workloads; register-based remains preferred but provisional.
+1. **Register versus stack VM (WS-BC002):** compare equivalent benchmark workloads; register-based remains preferred but provisional. Compared on 13 November 2026 (§5.6, "The comparison"): the register VM is faster on every workload measured, the stack bytecode smaller; the choice is the owner's.
 2. **WBC encoding:** finalize variable-length operand scheme, branch addressing, header/directory layout and binary compatibility.
 3. **Decimal128 binary encoding:** choose IEEE BID or alternative representation, define canonicalization, rounding and interoperability.
 4. **Exceptions and cleanup:** freeze table-driven versus handler-stack mechanics; define guaranteed disposal chaining and cleanup errors.
