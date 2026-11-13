@@ -2,16 +2,11 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [QUESTION] Duplicated Files
+## [QUESTION] Shallow `eng/portability/` Folder
 
-Two files exist twice in the repository (`Documents/implementation.md`, section 11):
+Since "Duplicated Files" (`DONE.md`), documents live in `Documents/`, and the folder structure is kept shallow (`Documents/implementation.md`, section 3). One nested document folder is left: `WebLingo/eng/portability/`, holding only `NativeCompatibility.md`, the portability inventory. The specification names that path in its build conventions (section 8.5, approved with M0.6) and proposes `eng/scripts/` and `eng/ci/` beside it (section 8.2), so I left it where it is.
 
-- the architecture specification, `Documents/weblingo-architecture.md` and `WebLingo/docs/architecture/weblingo-architecture.md`, identical on 2026-11-12; the second is the canonical one (`WebLingo/docs/architecture/README.md`);
-- `.gitignore`: the root one covers the whole repository, and `WebLingo/.gitignore` is a subset of it.
-
-**Q1: Shall `Documents/weblingo-architecture.md` be removed, leaving the canonical copy only, or is it kept on purpose (as your working copy, say), and if so, which copy do you edit?**
-
-**Q2: Shall `WebLingo/.gitignore` be removed, now that the root `.gitignore` covers it, or kept so that the solution folder has its own (for example, for when it becomes the public repository)?**
+**Q: Shall `NativeCompatibility.md` move to `Documents/`, with the specification's section 8.5 changed to match and `eng/` removed, or stay in `WebLingo/eng/portability/` as the specification has it?**
 
 ## Make the CI Workflow Run
 
@@ -19,7 +14,7 @@ Two files exist twice in the repository (`Documents/implementation.md`, section 
 
 ## Verify the M0.6.1 Scaffold
 
-The specification's next activity (section 9): validate M0.6.1 with `dotnet restore`, `dotnet build` and `dotnet test` on Windows and Linux. Then update what reports its verification as pending: `WebLingo/README.md` ("Verification status"), `WebLingo/docs/architecture/M0.6.1-status.md`, and the specification's sections 9 and 14 (and its copy, while there is one).
+The specification's next activity (section 9): validate M0.6.1 with `dotnet restore`, `dotnet build` and `dotnet test` on Windows and Linux. Then update what reports its verification as pending: `WebLingo/README.md` ("Verification status"), `Documents/M0.6.1-status.md`, and the specification's sections 9 and 14.
 
 Found 2026-11-12 (Claude, on Windows, .NET SDK 10.0.404): restore and the Release build succeed with no warnings, the five tests pass, and `weblingo --version` answers. Linux is not tried yet: it waits for "Make the CI Workflow Run".
 
