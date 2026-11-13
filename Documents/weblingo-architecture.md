@@ -39,6 +39,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WS-T001–WS-T008 | Includes, layouts, and parameterized components all required in the first template-capable release | **Approved** |
 | Template named sections | Optional page-specific layout sections | Proposed extension; not yet approved |
 | WS-BC002 | Register VM preferred, stack VM benchmark required before final decision | **Provisional** |
+| WS-BC002 comparison | The stack VM in a project of its own, `WebLingo.VM.Stack`, its code generator in `WebLingo.Compiler`; a console benchmark, `WebLingo.Benchmarks`, timing with `Stopwatch`, with no new package; the register VM's dispatch tuned for speed before the two are compared (§5.6) | Approved (13 November 2026) |
 | M0.3 encoding | Variable-length register operands; disk byte offsets / decoded instruction indices | Proposed |
 | M0.3 numbers | IEEE 754 decimal128 BID binary representation | Proposed |
 | M0.3 exceptions | Table-driven exception and cleanup regions | Proposed |
@@ -303,6 +304,13 @@ Malformed bytecode must fail with a defined verification error, not crash the VM
 ### 5.6 Dispatch and benchmarks
 
 An initial C# `switch` dispatch loop is **proposed** for clarity and portability. Alternative dispatch techniques may be benchmarked later. Benchmarks should include arithmetic, loops, calls, closures, property access, async suspension, template output, and representative I/O-bound server workloads. Measure throughput, latency, allocation, bytecode size, startup and implementation complexity.
+
+**The comparison's parts** (WS-BC002, open question 1). The owner decided on 13 November 2026 that the stack VM is a project of its own, `WebLingo.VM.Stack`, beside `WebLingo.VM`, with its code generator in `WebLingo.Compiler`; that the benchmark is a console project, `WebLingo.Benchmarks`, timing the VMs with `Stopwatch` over fixed workloads (loops, calls, closures, strings), with no new package; and that the register VM is compared with a dispatch tuned for speed. The work lands in four parts:
+
+1. **The benchmark:** `WebLingo.Benchmarks`, its workloads, and what it measures (time, instructions run, bytecode size, allocation), run on the register VM as it is, for a baseline.
+2. **The register VM's dispatch, tuned:** the same bytecode, with the same results, run faster; measured against the baseline.
+3. **The stack VM:** stack bytecode and its verifier (`WebLingo.Bytecode`), its code generator (`WebLingo.Compiler`), from the same lowered IR as the register one, and its VM (`WebLingo.VM.Stack`), sharing `WebLingo.Runtime`; every conformance program gives the same output and the same errors on both VMs.
+4. **The comparison:** both VMs measured on the same workloads, the results recorded here, and the choice between them put to the owner.
 
 ---
 
