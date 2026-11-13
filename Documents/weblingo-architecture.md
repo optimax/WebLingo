@@ -778,7 +778,7 @@ Proposed central props:
 | M0.5 | Platform abstraction and portability | **Four explicit architectural decisions approved** |
 | M0.6 | Solution scaffolding and implementation contracts | **Approved; M0.6.1–M0.6.7 implemented and verified on Windows, Linux verification pending (§15)** |
 | M0.7 | Conformance suite expansion | Planned |
-| M0.8 | Windows/Linux CI and portability validation | Planned |
+| M0.8 | Windows/Linux CI and portability validation | Started (12 November 2026): the CI workflow builds and tests on Windows and Linux (not run yet); tests check the portable core's assemblies against the dependency rules (§8.3) and the portability inventory (WS-P016) |
 
 **Immediate next activity:** M0.6's increments are implemented and pass their tests on Windows (12 November 2026, §15); their Linux validation waits for the CI workflow's first run. The owner's decisions on the choices proposed in §15.2 come next, then M0.7. The compiler and VM cover the M0.6 subset only (§8.4).
 

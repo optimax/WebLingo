@@ -14,9 +14,15 @@
 | .NET Task / ValueTask | Adapted only | Not permitted as WebLingo core async contract |
 | .NET `CancellationToken` | Not used | The VM's cancellation is WebLingo's own `WsCancellationSignal` (WS-P007) |
 | System.Diagnostics.Stopwatch | Adapted | DotNetClock only |
-| System.IO.File | Adapted | CLI/bootstrap only; PAL required for runtime |
+| System.IO.File, Directory, their `Info` types, FileStream | Adapted | CLI/bootstrap only; PAL required for runtime |
+| System.IO.Path | Adapted | Paths and their separators are the PAL's, not the platform's |
+| System.Console | Adapted | A host's (the CLI's), never the core's |
+| System.Environment | Adapted | The core must not depend on the platform, its line ending among others |
+| OS threads (`Thread`, `ThreadPool`) | Adapted | Adapter-only (§7.14) |
+| P/Invoke | Adapted | Adapter-only (§7.14) |
 | ASP.NET Core | Adapted | Hosting adapter only |
 | ADO.NET | Adapted | Future database adapters only |
+| System.Net.Http | Adapted | HTTP is a platform service (§7.2) |
 | Reflection.Emit | Prohibited | No dynamic CLR codegen in portable core |
 
-Dependency direction is enforced by the project references. The CI workflow (`.github/workflows/build.yml` at the repository root) builds and tests on both OSes once it runs; as of 12 November 2026 it has not run yet. Automated API analyzers remain future work.
+**Checks.** Dependency direction is enforced by the project references and by `DependencyTests`; the rows above classified Adapted, Prohibited or Not used are checked on the portable core's built assemblies by `PortabilityTests` (both in `WebLingo.Architecture.Tests`), which fail when the core references such a type or declares a P/Invoke. A new rule for the portable core goes into this table and into `PortabilityTests`. The CI workflow (`.github/workflows/build.yml` at the repository root) runs these tests on both OSes once it runs; as of 12 November 2026 it has not run yet. The Planned rows are not checked: they record what the Native C# compiler and runtime must provide.
