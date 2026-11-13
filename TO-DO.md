@@ -40,16 +40,6 @@ Classes, with single inheritance and no exposed prototype chain (specification, 
 
 
 
-## [WORKING] M0.10.5: `Object` and `equal()`
-
-The base class `Object` and its `equal()` (specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
-
-2026-11-13: waits for the answers to "M0.10 Syntax: Static Members, `Object` and Exceptions".
-
-2026-11-13: answered; waits for M0.10.4.
-
-Done (Claude, 2026-11-13): `Object`, with `equal(other)` giving `this == other`, which a class may override and call as `super.equal(…)`; `new Object()`; every class without `extends` extends it. No new operation, and no change to either VM: `Object` is a class written in WebLingo, which the compiler adds to a program that uses it, so programs without classes compile as before, and `new` runs no extra call, since a class that extends `Object` without saying so does not run its empty constructor (`objects` takes the same time). Choices of mine, in section 15.2 as proposed (row "`Object`"): a program may declare its own `Object`, which classes do not extend; `super` is allowed in every class now, so `super.m()` with no `m` in `Object` is WS3006 when it runs, where it was WS2009 (one conformance case changed for this). `toString()` is M0.10.7. Every new conformance case gives the same result on both VMs. Build and 1,126 tests pass on Windows; Linux not tried.
-
 ## [IDLE] M0.10.6: Exceptions
 
 `throw`, `try`, `catch` and `finally`, runtime errors as exceptions, and `using` when an exception leaves it (specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.

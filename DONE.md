@@ -799,3 +799,13 @@ Static methods and fields (specification, section 3.7), on both VMs. Added by Cl
 2026-11-13: answered; next.
 
 Done (Claude, 2026-11-13, `622798b`): `static name(…) { … }` and `static var name = value;` in a class, reached as `Name.name(…)` and `Name.name`, a class without a member of that name finding its base's (A2); a static field can be assigned, and `this` or `super` in a static member is WS2009. No new operation: the class table gives each class its static methods and fields, and `GetMember`, `SetMember` and `CallMethod` reach them on a class. Choices of mine, in section 15.2 as proposed (row "Static members"): a static field's value is evaluated where its block begins, as a base is, so it cannot name the block's variables (WS2001), and the block's static fields are set once its classes are made, each `null` until then; a static member and a method may share a name; an instance does not reach its class's statics (`p.count` is WS3006); `static const` is reported and read as `static var`. Every new conformance case gives the same result on both VMs. Build and 1,106 tests pass on Windows; Linux not tried.
+
+## [DONE] M0.10.5: `Object` and `equal()`
+
+The base class `Object` and its `equal()` (specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for the answers to "M0.10 Syntax: Static Members, `Object` and Exceptions".
+
+2026-11-13: answered; waits for M0.10.4.
+
+Done (Claude, 2026-11-13, `3024a26`): `Object`, with `equal(other)` giving `this == other`, which a class may override and call as `super.equal(…)`; `new Object()`; every class without `extends` extends it. No new operation, and no change to either VM: `Object` is a class written in WebLingo, which the compiler adds to a program that uses it, so programs without classes compile as before, and `new` runs no extra call, since a class that extends `Object` without saying so does not run its empty constructor (`objects` takes the same time). Choices of mine, in section 15.2 as proposed (row "`Object`"): a program may declare its own `Object`, which classes do not extend; `super` is allowed in every class now, so `super.m()` with no `m` in `Object` is WS3006 when it runs, where it was WS2009 (one conformance case changed for this). `toString()` is M0.10.7. Every new conformance case gives the same result on both VMs. Build and 1,126 tests pass on Windows; Linux not tried.
