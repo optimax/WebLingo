@@ -31,7 +31,7 @@ public sealed record WsIntegerLiteralSyntax(long Value, WsSourceSpan Span) : WsE
 
 public sealed record WsNameSyntax(string Name, WsSourceSpan Span) : WsExpressionSyntax(Span);
 
-public enum WsUnaryOperator { Negate }
+public enum WsUnaryOperator { Negate, Plus }
 
 public sealed record WsUnaryExpressionSyntax(WsUnaryOperator Operator, WsExpressionSyntax Operand, WsSourceSpan Span)
     : WsExpressionSyntax(Span);

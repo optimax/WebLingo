@@ -101,6 +101,12 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         registers[instruction.A] = negated;
                     }
                     break;
+                case WsOpCode.Plus:
+                    if (WsOperators.TryPlus(registers[instruction.B], out var same, out error))
+                    {
+                        registers[instruction.A] = same;
+                    }
+                    break;
                 case WsOpCode.Add:
                 case WsOpCode.Subtract:
                 case WsOpCode.Multiply:

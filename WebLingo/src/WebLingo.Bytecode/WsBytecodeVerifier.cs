@@ -74,6 +74,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return Register(function, a, "destination") ?? Index(b, module.Constants.Count, "constant") ?? Unused(c, d);
             case WsOpCode.Move:
             case WsOpCode.Negate:
+            case WsOpCode.Plus:
                 return Register(function, a, "destination") ?? Register(function, b, "operand") ?? Unused(c, d);
             case WsOpCode.Add:
             case WsOpCode.Subtract:
@@ -201,6 +202,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         {
             case WsOpCode.Move:
             case WsOpCode.Negate:
+            case WsOpCode.Plus:
                 return Unwritten(instruction.B, state, locals);
             case WsOpCode.Add:
             case WsOpCode.Subtract:
@@ -231,7 +233,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
 
     private static int? Writes(WsInstruction instruction) => instruction.OpCode switch
     {
-        WsOpCode.LoadConstant or WsOpCode.Move or WsOpCode.Negate or WsOpCode.Add or WsOpCode.Subtract
+        WsOpCode.LoadConstant or WsOpCode.Move or WsOpCode.Negate or WsOpCode.Plus or WsOpCode.Add or WsOpCode.Subtract
             or WsOpCode.Multiply or WsOpCode.Divide or WsOpCode.CallBuiltin => instruction.A,
         _ => null
     };

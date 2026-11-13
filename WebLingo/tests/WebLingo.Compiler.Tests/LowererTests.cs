@@ -66,7 +66,7 @@ public sealed class LowererTests
         WsIrInt64Constant constant => constant.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
         WsIrLoadLocal load => "load " + load.Local,
         WsIrStoreLocal store => $"(store {store.Local} = {Show(store.Value)})",
-        WsIrUnary unary => $"-{Show(unary.Operand)}",
+        WsIrUnary unary => $"{(unary.Operator == WsUnaryOperator.Negate ? "-" : "+")}{Show(unary.Operand)}",
         WsIrBinary binary => $"({Show(binary.Left)} {Symbol(binary.Operator)} {Show(binary.Right)})",
         WsIrCallBuiltin call => $"print#{call.Builtin}({string.Join(", ", call.Arguments.Select(Show))})",
         _ => "?"

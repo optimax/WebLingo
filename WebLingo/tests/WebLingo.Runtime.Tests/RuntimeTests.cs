@@ -111,6 +111,18 @@ public sealed class OperatorTests
         Assert.Equal(-long.MaxValue, result.AsInt64);
     }
 
+    [Fact]
+    public void UnaryPlusGivesTheNumberItself()
+    {
+        Assert.True(WsOperators.TryPlus(Int(-7), out var integer, out _));
+        Assert.Equal(Int(-7), integer);
+        Assert.True(WsOperators.TryPlus(WsValue.FromBinary64(-0.0), out var number, out _));
+        Assert.True(double.IsNegative(number.AsBinary64));
+        Assert.False(WsOperators.TryPlus(WsValue.Null, out _, out var error));
+        Assert.Equal(WsDiagnosticCodes.InvalidOperation, error!.Code);
+        Assert.Contains("'+'", error.Message);
+    }
+
     [Theory]
     [InlineData(10L, 2L, 5.0)]
     [InlineData(7L, 2L, 3.5)]

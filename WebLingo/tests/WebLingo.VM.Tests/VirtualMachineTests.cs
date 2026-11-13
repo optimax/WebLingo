@@ -29,6 +29,7 @@ public sealed class VirtualMachineTests
     [InlineData("var x = 1; print(x + (x = 5));", "6")]
     [InlineData("print(print(1));", "1\nnull")]
     [InlineData("print(9223372036854775807);", "9223372036854775807")]
+    [InlineData("print(+(1 - 4) + +2);", "-1")]
     public void ComputesWhatTheProgramSays(string source, string expected)
     {
         var (result, lines) = Run(source);

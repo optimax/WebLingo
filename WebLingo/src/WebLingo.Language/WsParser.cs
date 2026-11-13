@@ -3,7 +3,7 @@ namespace WebLingo.Language;
 
 /// <summary>
 /// The M0.6 parser (specification, section 8.4, "Parser"; its choices are in section 15.2): variable declarations,
-/// expression statements, integer literals, names, unary minus, <c>+ - * /</c>, parentheses, assignment and calls,
+/// expression statements, integer literals, names, unary <c>-</c> and <c>+</c>, <c>+ - * /</c>, parentheses, assignment and calls,
 /// each simple statement ended by a mandatory semicolon. It recovers from an error at the next semicolon or
 /// declaration, so that one pass reports several errors, and reports no error twice: a token the lexer already
 /// reported as bad gives no further diagnostic.
@@ -195,13 +195,14 @@ public sealed class WsParser : IWsParser
 
     private WsExpressionSyntax ParseUnary()
     {
-        if (Current.Kind != WsTokenKind.Minus) return ParseCall();
+        if (Current.Kind is not (WsTokenKind.Minus or WsTokenKind.Plus)) return ParseCall();
         if (!EnterRecursion()) return new WsErrorExpressionSyntax(new WsSourceSpan(Current.Span.Start, 0));
         try
         {
-            var minus = Advance();
+            var sign = Advance();
             var operand = ParseUnary();
-            return new WsUnaryExpressionSyntax(WsUnaryOperator.Negate, operand, Between(minus.Span, operand.Span));
+            var kind = sign.Kind == WsTokenKind.Minus ? WsUnaryOperator.Negate : WsUnaryOperator.Plus;
+            return new WsUnaryExpressionSyntax(kind, operand, Between(sign.Span, operand.Span));
         }
         finally
         {

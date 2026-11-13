@@ -33,6 +33,9 @@ public sealed class ParserTests
     [InlineData("f()", "f()")]
     [InlineData("f(1)(2)", "f(1)(2)")]
     [InlineData("-f(1)", "(-f(1))")]
+    [InlineData("+2 * 3", "((+2) * 3)")]
+    [InlineData("- +a", "(-(+a))")]
+    [InlineData("1 + +2", "(1 + (+2))")]
     public void OperatorsHaveTheirPrecedenceAndAssociativity(string expression, string expected)
     {
         var tree = Parse(expression + ";");
@@ -108,7 +111,6 @@ public sealed class ParserTests
     }
 
     [Theory]
-    [InlineData("+5;")]
     [InlineData(";")]
     [InlineData(")")]
     [InlineData("var = 5;")]
@@ -210,7 +212,7 @@ public sealed class ParserTests
     {
         WsIntegerLiteralSyntax literal => literal.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
         WsNameSyntax name => name.Name,
-        WsUnaryExpressionSyntax unary => $"(-{Show(unary.Operand)})",
+        WsUnaryExpressionSyntax unary => $"({(unary.Operator == WsUnaryOperator.Negate ? "-" : "+")}{Show(unary.Operand)})",
         WsBinaryExpressionSyntax binary => $"({Show(binary.Left)} {Symbol(binary.Operator)} {Show(binary.Right)})",
         WsParenthesizedExpressionSyntax parenthesized => $"[{Show(parenthesized.Expression)}]",
         WsAssignmentExpressionSyntax assignment => $"({assignment.Target.Name} = {Show(assignment.Value)})",

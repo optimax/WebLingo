@@ -101,7 +101,8 @@ public sealed class WsCodeGenerator
                 var operand = EmitExpression(unary.Operand, null);
                 _nextRegister = mark;
                 var destination = target ?? Allocate();
-                Emit(new WsInstruction(WsOpCode.Negate, destination, operand), unary.Span);
+                var opCode = unary.Operator == WsUnaryOperator.Negate ? WsOpCode.Negate : WsOpCode.Plus;
+                Emit(new WsInstruction(opCode, destination, operand), unary.Span);
                 return destination;
             }
             case WsIrBinary binary:

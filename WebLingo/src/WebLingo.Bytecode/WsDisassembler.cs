@@ -31,6 +31,7 @@ public static class WsDisassembler
             WsOpCode.LoadConstant => $"LoadConstant {Register(function, a)}, {Constant(module, b)}",
             WsOpCode.Move => $"Move {Register(function, a)}, {Register(function, b)}",
             WsOpCode.Negate => $"Negate {Register(function, a)}, {Register(function, b)}",
+            WsOpCode.Plus => $"Plus {Register(function, a)}, {Register(function, b)}",
             WsOpCode.Add or WsOpCode.Subtract or WsOpCode.Multiply or WsOpCode.Divide =>
                 $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
             WsOpCode.CallBuiltin => $"CallBuiltin {Register(function, a)}, {Import(module, b)}({Arguments(function, c, d)})",

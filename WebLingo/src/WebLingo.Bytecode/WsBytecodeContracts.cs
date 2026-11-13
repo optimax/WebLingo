@@ -18,6 +18,8 @@ public enum WsOpCode : byte
     Move,
     /// <summary>A = destination register, B = operand register.</summary>
     Negate,
+    /// <summary>A = destination register, B = operand register; the operand, which must be a number.</summary>
+    Plus,
     /// <summary>A = destination register, B = left register, C = right register.</summary>
     Add,
     /// <summary>A = destination register, B = left register, C = right register.</summary>

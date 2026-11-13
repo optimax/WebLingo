@@ -44,6 +44,14 @@ public static class WsOperators
         return true;
     }
 
+    /// <summary>Unary <c>+</c>: the operand itself, which must be a number.</summary>
+    public static bool TryPlus(WsValue operand, out WsValue result, out WsRuntimeError? error)
+    {
+        error = CheckOperand(operand, null, "+");
+        result = error is null ? operand : WsValue.Null;
+        return error is null;
+    }
+
     public static bool TryNegate(WsValue operand, out WsValue result, out WsRuntimeError? error)
     {
         result = WsValue.Null;
@@ -64,10 +72,10 @@ public static class WsOperators
         return true;
     }
 
-    private static WsRuntimeError? CheckOperand(WsValue value, WsArithmeticOperator? op)
+    private static WsRuntimeError? CheckOperand(WsValue value, WsArithmeticOperator? op, string unary = "-")
     {
         if (value.Kind is WsValueKind.Int64 or WsValueKind.Binary64) return null;
-        var what = op is { } binary ? $"'{Symbol(binary)}'" : "'-'";
+        var what = op is { } binary ? $"'{Symbol(binary)}'" : $"'{unary}'";
         return new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
             $"{what} needs numbers, not {WsValueFormatter.Describe(value)}.");
     }
