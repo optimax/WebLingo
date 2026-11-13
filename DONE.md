@@ -709,3 +709,9 @@ Q17, use after disposal: for a class written in WebLingo, (a) nothing is checked
 A17: (a).
 
 Done (Claude, 2026-11-13, `20eeb6c`): recorded as approved in the specification, a new section 3.7 ("Classes and disposal"), its decision register, and its section 8.4, with WS2009 and WS2011 (WS2010 and WS3008 are not needed, after A7 and A17). A1's optional `function` before a method's name is part of it. A8 (static members), A10 (`Object` and `equal()`) and A16 (exceptions) are follow-up questions, in "M0.10 Syntax: Static Members, `Object` and Exceptions". M0.10 is split into the parts the specification defines in section 9 ("M0.10 parts"), each a task below.
+
+## [DONE] M0.10.1: Classes
+
+Class declarations, `new`, fields, methods, `this`, methods as values, `x?.name`, and an instance's text (specification, section 3.7), on both VMs, with their conformance tests. Added by Claude, 2026-11-13.
+
+Done (Claude, 2026-11-13, `54cc651`): classes on both VMs: declarations (a method with or without `function`, A1), hoisted as functions are; `new`, running the constructor; fields made by assignment; methods, with `this`, which closures inside them see; methods as bound values; `x?.name`; and an instance's text, `Point {x: 1, y: 2}`. WS2009 is reported for `this` outside a method. Both VMs' calls now share one path for functions, built-ins, bound methods, methods and constructors. The benchmark gets an `objects` workload, property access: 81 ms on the register VM, 86 to 93 ms on the stack VM (specification, section 5.6). Choices of mine, in section 15.2 as proposed: the keywords and `?.`; a field cannot take a method's name; a bound method is made on each read; a constructor's result is dropped; an instance's fields are written in the order first assigned. Two tests changed, since `x.name = v` is now a field's assignment, not WS1007. Every new conformance case gives the same result on both VMs. Build and 1,000 tests pass on Windows; Linux not tried.
