@@ -16,7 +16,7 @@ WebLingo is a JavaScript-inspired, native-oriented, cross-platform **server-side
 - The compiler, VM, runtime and hosting are written first in C# on .NET 10. The long-term goal is to compile that same C# code with the project's independent Native C# compiler, so that WebLingo runs without .NET and without a rewrite in C++. Native C# and WebLingo are separate languages and runtime systems.
 - The engine and the platform services are independent of IIS, ASP.NET Core, FastCGI, Kestrel, Windows and Linux. IIS, through an ASP.NET Core adapter, is the first deployment target; FastCGI and a standalone HTTP host are architectural targets.
 
-The current state is the M0.6.1 solution scaffold (specification, sections 8.7 and 14): the project boundaries, the initial contracts, a minimal lexer seed, a CLI that answers `--version` only, and a few tests. It is not yet a working compiler or interpreter. The samples under `WebLingo/samples` are future conformance fixtures, not programs that run today.
+The current state (specification, sections 9 and 15): a compiler and a register VM for M0.6's subset and the language of M0.7 (specification, section 3.5), which the `weblingo` CLI runs; templates, hosting and the platform layer are not implemented yet. `samples/HelloWorld` and `samples/Arithmetic` run; `samples/SimpleWebsite` waits for templates.
 
 **Names** (specification, section 1): the project is **WebLingo** (formerly WebScript), its intended domain `weblingo.dev`, the solution `WebLingo.slnx`, the project and namespace roots `WebLingo`, and the CLI executable `weblingo`. Specification IDs (`WS-L011`, `WS-BC002`) and diagnostic codes (`WS1001`) keep their `WS` prefix, and so do type names in source (`WsLexer`, `WsToken`).
 
@@ -49,6 +49,7 @@ WebLingo/                      the repository
     ├── Directory.Build.props
     ├── Directory.Packages.props
     ├── global.json
+    ├── benchmarks/WebLingo.Benchmarks/
     ├── samples/
     ├── src/WebLingo.*/
     └── tests/WebLingo.*.Tests/
@@ -75,7 +76,8 @@ WebLingo.202611121500.zip
 - **The portable core:** `WebLingo.Core`, `WebLingo.Language`, `WebLingo.Bytecode`, `WebLingo.Compiler`, `WebLingo.Runtime`, `WebLingo.VM`, `WebLingo.Templates`, `WebLingo.StdLib`, `WebLingo.Platform.Abstractions`, and `WebLingo.Hosting.Abstractions`.
 - **The adapters to .NET:** `WebLingo.Platform.DotNet` (the .NET implementation of the platform abstraction layer, the PAL) and `WebLingo.Hosting.AspNetCore` (the host for IIS).
 - **The command line:** `WebLingo.Cli`, which builds `weblingo`.
-- **The tests:** `WebLingo.Language.Tests` (lexer, parser, source text), `WebLingo.Compiler.Tests` (binder, lowering, code generation), `WebLingo.Bytecode.Tests` (the verifier, with a fuzz test), `WebLingo.Runtime.Tests` (values, arithmetic, formatting, `write` and `writeLn`), `WebLingo.VM.Tests` (execution, runtime errors, budgets), `WebLingo.Conformance.Tests` (the specification's section 8.6, end to end through the CLI, and fuzz tests of malformed source and bytecode), and `WebLingo.Architecture.Tests` (contracts, and the dependency rules checked on the built assemblies).
+- **The benchmark:** `WebLingo.Benchmarks`, in `benchmarks/`, a console program that times the VMs on fixed workloads with `Stopwatch` (the specification's section 5.6, WS-BC002). It is a tool, not part of the product, and uses no package. Its workloads are `.ws` files in its `Workloads/` folder, embedded in it, each with the output every VM must give (`WsWorkloads`); a VM is added to it as an `IWsBenchmarkEngine`.
+- **The tests:** `WebLingo.Language.Tests` (lexer, parser, source text), `WebLingo.Compiler.Tests` (binder, lowering, code generation), `WebLingo.Bytecode.Tests` (the verifier, with a fuzz test), `WebLingo.Runtime.Tests` (values, arithmetic, formatting, `write` and `writeLn`), `WebLingo.VM.Tests` (execution, runtime errors, budgets, and the benchmark's workloads on every VM it measures), `WebLingo.Conformance.Tests` (the specification's section 8.6, end to end through the CLI, and fuzz tests of malformed source and bytecode), and `WebLingo.Architecture.Tests` (contracts, and the dependency rules checked on the built assemblies).
 
 ## The Pipeline
 
@@ -188,7 +190,10 @@ dotnet test WebLingo.slnx -c Release --no-build
 dotnet test tests/WebLingo.Language.Tests -c Release --no-build --filter "FullyQualifiedName~LexerTests"
 dotnet run --project src/WebLingo.Cli -c Release --no-build -- --version
 dotnet run --project src/WebLingo.Cli -c Release --no-build -- run samples/Arithmetic/arithmetic.ws
+dotnet run --project benchmarks/WebLingo.Benchmarks -c Release --no-build
 ```
+
+The benchmark (section 3) writes a Markdown table: each workload's median and fastest time on each VM, the instructions a run executes, what it allocates, and its code's size. Its times are only comparable when they come from one run of it, in Release, on an otherwise idle machine; `--runs`, `--warm-ups` and `--workload` change what it runs.
 
 - The solution is small: build all of it rather than one project, and run the complete test suite after a change, which today takes seconds. When the suite grows, run targeted test classes during active development and the complete suite before a task is done.
 - Each behavior in the specification's conformance table (section 8.6) has a test in `WebLingo.Conformance.Tests`, which runs programs through the CLI as files; a new conformance case goes there too. Template tests go into `WebLingo.Templates.Tests` once that project exists (specification, section 13).

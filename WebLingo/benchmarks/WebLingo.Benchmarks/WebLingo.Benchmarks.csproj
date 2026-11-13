@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Workloads/*.ws" LogicalName="Workloads/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/WebLingo.Compiler/WebLingo.Compiler.csproj" />
+    <ProjectReference Include="../../src/WebLingo.VM/WebLingo.VM.csproj" />
+    <ProjectReference Include="../../src/WebLingo.StdLib/WebLingo.StdLib.csproj" />
+  </ItemGroup>
+</Project>

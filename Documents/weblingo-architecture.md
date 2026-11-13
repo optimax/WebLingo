@@ -312,6 +312,17 @@ An initial C# `switch` dispatch loop is **proposed** for clarity and portability
 3. **The stack VM:** stack bytecode and its verifier (`WebLingo.Bytecode`), its code generator (`WebLingo.Compiler`), from the same lowered IR as the register one, and its VM (`WebLingo.VM.Stack`), sharing `WebLingo.Runtime`; every conformance program gives the same output and the same errors on both VMs.
 4. **The comparison:** both VMs measured on the same workloads, the results recorded here, and the choice between them put to the owner.
 
+**Workloads** (part 1, 13 November 2026): `loops`, nested `for` loops with int64 arithmetic, comparisons and `if`, a million times; `calls`, a recursive `fib(25)`, about 243,000 calls; `closures`, 20,000 closures made and 200,000 calls of them, sharing captured cells; `strings`, 200,000 concatenations and 20,000 comparisons, with the heap's collector. Each writes one result, which every VM must give.
+
+**Baseline** (part 1, 13 November 2026): the register VM as M0.7.6 left it, on one Windows development machine (x64, .NET 10.0.15, Release), the median of 7 timed runs after 3 warm-ups. Allocation is .NET's, a run's; code is the workload's instructions, and their size with a byte per operation and each operand it uses in LEB128.
+
+| Workload | Median | Instructions | Instructions/s | Allocated | Code | Code bytes |
+|---|---:|---:|---:|---:|---:|---:|
+| loops | 130.3 ms | 10,010,008 | 76.8 M | 3,288 B | 24 | 76 |
+| calls | 33.1 ms | 2,063,676 | 62.3 M | 48,561,928 B | 23 | 74 |
+| closures | 51.6 ms | 3,120,009 | 60.5 M | 36,733,392 B | 35 | 106 |
+| strings | 29.4 ms | 1,920,008 | 65.2 M | 10,731,504 B | 26 | 83 |
+
 ---
 
 ## 6. Hosting architecture (WS-H001–WS-H014)

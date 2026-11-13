@@ -15,7 +15,7 @@ var result = a + b;
 writeLn(result);   // 30
 ```
 
-Every variable is initialized where it is declared, and a name means nothing before its declaration (both are compile-time errors); integer overflow is a runtime error. String literals, functions, control flow and `.wsp` templates come later, so `samples/HelloWorld` and `samples/SimpleWebsite` do not run yet; `samples/Arithmetic` does.
+Every variable is initialized where it is declared, and a name means nothing before its declaration (both are compile-time errors); integer overflow is a runtime error. `.wsp` templates come later, so `samples/SimpleWebsite` does not run yet; `samples/HelloWorld` and `samples/Arithmetic` do.
 
 ## Prerequisites
 
@@ -31,7 +31,10 @@ dotnet test WebLingo.slnx -c Release
 dotnet run --project src/WebLingo.Cli -- run samples/Arithmetic/arithmetic.ws
 dotnet run --project src/WebLingo.Cli -- check samples/Arithmetic/arithmetic.ws
 dotnet run --project src/WebLingo.Cli -- --version
+dotnet run --project benchmarks/WebLingo.Benchmarks -c Release
 ```
+
+The last command times the VM on the benchmark's workloads (`benchmarks/WebLingo.Benchmarks/Workloads`), and writes the results as a table.
 
 `weblingo run <file>` compiles a script and runs it; `weblingo check <file>` compiles it and reports its errors without running it. Errors go to standard error as `file(line,column): error CODE: message`. The exit code is 0 on success, 1 for compilation errors, 2 for a usage error, 3 for a runtime error, and 4 for a file that cannot be read.
 

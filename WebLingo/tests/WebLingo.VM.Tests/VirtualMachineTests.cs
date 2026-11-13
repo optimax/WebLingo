@@ -60,6 +60,16 @@ public sealed class VirtualMachineTests
         var result = new WsVirtualMachine().Execute(module, Context(output) with { InstructionBudget = 4 });
         Assert.Equal(WsDiagnosticCodes.BudgetExceeded, result.Error!.Code);
         Assert.Equal(new[] { "1", "2" }, output.Lines);
+        Assert.Equal(4, result.Instructions);
+    }
+
+    [Fact]
+    public void TheResultCountsTheInstructionsRun()
+    {
+        // Three times LoadConstant and CallBuiltin, then Return.
+        var result = new WsVirtualMachine().Execute(Compile("writeLn(1); writeLn(2); writeLn(3);"), Context(new WsCollectedOutput()));
+        Assert.True(result.Succeeded);
+        Assert.Equal(7, result.Instructions);
     }
 
     [Fact]

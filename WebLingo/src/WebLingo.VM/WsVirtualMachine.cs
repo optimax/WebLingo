@@ -110,11 +110,13 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                 if (executed >= budget)
                 {
                     return Failure(WsDiagnosticCodes.BudgetExceeded,
-                        $"The program ran {executed} instructions, its whole budget, and was stopped.", SpanOf(frame.Function, pc));
+                        $"The program ran {executed} instructions, its whole budget, and was stopped.", SpanOf(frame.Function, pc))
+                        with { Instructions = executed };
                 }
                 if (cancellation is not null && executed % CancellationInterval == 0 && cancellation.IsCancellationRequested)
                 {
-                    return Failure(WsDiagnosticCodes.Cancelled, "The program was cancelled.", SpanOf(frame.Function, pc));
+                    return Failure(WsDiagnosticCodes.Cancelled, "The program was cancelled.", SpanOf(frame.Function, pc))
+                        with { Instructions = executed };
                 }
                 executed++;
 
@@ -132,8 +134,11 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         $"The bytecode is invalid: {exception.Message}");
                     next = frame;
                 }
-                if (error is not null) return Failure(error.Code, error.Message, SpanOf(frame.Function, pc));
-                if (next is null) return WsExecutionResult.Success;
+                if (error is not null)
+                {
+                    return Failure(error.Code, error.Message, SpanOf(frame.Function, pc)) with { Instructions = executed };
+                }
+                if (next is null) return WsExecutionResult.Success with { Instructions = executed };
                 frame = next;
             }
         }

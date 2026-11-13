@@ -7,5 +7,6 @@
     <ProjectReference Include="../../src/WebLingo.VM/WebLingo.VM.csproj" />
     <ProjectReference Include="../../src/WebLingo.Compiler/WebLingo.Compiler.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib/WebLingo.StdLib.csproj" />
+    <ProjectReference Include="../../benchmarks/WebLingo.Benchmarks/WebLingo.Benchmarks.csproj" />
   </ItemGroup>
 </Project>
