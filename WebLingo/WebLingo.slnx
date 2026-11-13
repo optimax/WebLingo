@@ -6,6 +6,7 @@
   <Project Path="src/WebLingo.Compiler/WebLingo.Compiler.csproj" />
   <Project Path="src/WebLingo.Runtime/WebLingo.Runtime.csproj" />
   <Project Path="src/WebLingo.VM/WebLingo.VM.csproj" />
+  <Project Path="src/WebLingo.VM.Stack/WebLingo.VM.Stack.csproj" />
   <Project Path="src/WebLingo.Templates/WebLingo.Templates.csproj" />
   <Project Path="src/WebLingo.Platform.DotNet/WebLingo.Platform.DotNet.csproj" />
   <Project Path="src/WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />

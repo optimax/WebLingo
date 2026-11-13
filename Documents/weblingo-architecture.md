@@ -323,6 +323,8 @@ An initial C# `switch` dispatch loop is **proposed** for clarity and portability
 | closures | 44.9 ms | 12.3 ms | 3.7× | 253.5 M | 36,733,560 B | 3,294,656 B |
 | strings | 26.2 ms | 9.7 ms | 2.7× | 198.1 M | 10,731,560 B | 10,732,304 B |
 
+**The stack VM** (part 3, 13 November 2026). Its bytecode (`WsStackBytecodeContracts.cs`) is in `WebLingo.Bytecode`, beside the register bytecode, whose constants, imports and captures it shares, since the compiler, which generates it, may not depend on a VM (§8.3). A function has locals, its parameters first, and an operand stack, whose deepest point the generator counts; its frame has a slot for each, at most 65,535 in all, as a register function has registers, and the execution's register budget bounds its slots. An instruction takes its operands from the top of the stack and pushes its result, with at most two operands of its own (a local, a constant, a jump target, an argument count). Its verifier checks what the register verifier checks, and that the stack has the same depth wherever paths meet, never pops what it does not have, and never grows past its counted depth. `WebLingo.VM.Stack` holds the VM, which shares `WebLingo.Runtime` and the register VM's contracts (`WsExecutionResult`), and so depends on `WebLingo.VM`. It is tuned as the register VM is (part 2). Every conformance program gives the same diagnostics, output and errors on both VMs, but for one difference: the instruction budget (WS3003) counts each VM's own instructions, and the stack VM runs more of them for the same program, so a program that runs out of its budget stops at a different point on each.
+
 ---
 
 ## 6. Hosting architecture (WS-H001–WS-H014)

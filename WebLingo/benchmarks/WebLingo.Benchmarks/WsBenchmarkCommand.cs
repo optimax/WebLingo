@@ -3,9 +3,9 @@ using System.Runtime.InteropServices;
 namespace WebLingo.Benchmarks;
 
 /// <summary>
-/// The benchmark's command line: <c>[--runs N] [--warm-ups N] [--workload NAME]…</c>. It measures every workload, or
-/// the ones named, on each VM, and writes the results as a Markdown table. Exit codes: 0 success, 1 a workload that
-/// failed or gave the wrong output, 2 a usage error.
+/// The benchmark's command line: <c>[--runs N] [--warm-ups N] [--workload NAME]… [--vm NAME]…</c>. It measures every
+/// workload, or the ones named, on every VM, or the ones named, and writes the results as a Markdown table. Exit
+/// codes: 0 success, 1 a workload that failed or gave the wrong output, 2 a usage error.
 /// </summary>
 public static class WsBenchmarkCommand
 {
@@ -13,13 +13,14 @@ public static class WsBenchmarkCommand
     public const int MeasurementFailed = 1;
     public const int UsageError = 2;
 
-    public static IReadOnlyList<IWsBenchmarkEngine> Engines { get; } = [new WsRegisterEngine()];
+    public static IReadOnlyList<IWsBenchmarkEngine> Engines { get; } = [new WsRegisterEngine(), new WsStackEngine()];
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
         var runs = 7;
         var warmUps = 3;
         var names = new List<string>();
+        var vms = new List<string>();
         for (var i = 0; i < args.Length; i++)
         {
             var value = i + 1 < args.Length ? args[i + 1] : null;
@@ -33,11 +34,16 @@ public static class WsBenchmarkCommand
                     names.Add(value!);
                     i++;
                     break;
+                case "--vm" when Engines.Any(engine => engine.Name == value):
+                    vms.Add(value!);
+                    i++;
+                    break;
                 default:
                     return Usage(error);
             }
         }
         var workloads = names.Count == 0 ? WsWorkloads.All : WsWorkloads.All.Where(w => names.Contains(w.Name)).ToList();
+        var engines = vms.Count == 0 ? Engines : Engines.Where(engine => vms.Contains(engine.Name)).ToList();
 
         output.WriteLine($"WebLingo benchmark: {runs} timed runs of each workload after {warmUps} warm-ups.");
         output.WriteLine($".NET {Environment.Version}, {RuntimeInformation.OSDescription.Trim()}, " +
@@ -49,7 +55,7 @@ public static class WsBenchmarkCommand
         {
             foreach (var workload in workloads)
             {
-                foreach (var engine in Engines)
+                foreach (var engine in engines)
                 {
                     var m = WsBenchmark.Measure(engine, workload, runs, warmUps);
                     output.WriteLine($"| {m.Workload} | {m.Engine} | {Milliseconds(m.Median)} | {Milliseconds(m.Fastest)} | " +
@@ -76,12 +82,14 @@ public static class WsBenchmarkCommand
 
     private static int Usage(TextWriter error)
     {
-        error.WriteLine("Usage: WebLingo.Benchmarks [--runs N] [--warm-ups N] [--workload NAME]...");
+        error.WriteLine("Usage: WebLingo.Benchmarks [--runs N] [--warm-ups N] [--workload NAME]... [--vm NAME]...");
         error.WriteLine($"  workloads: {string.Join(", ", WsWorkloads.All.Select(workload => workload.Name))}");
+        error.WriteLine($"  VMs: {string.Join(", ", Engines.Select(engine => engine.Name))}");
         return UsageError;
     }
 
-    private static string Milliseconds(TimeSpan time) => time.TotalMilliseconds.ToString("0.0", CultureInfo.InvariantCulture) + " ms";
+    private static string Milliseconds(TimeSpan time) =>
+        time.TotalMilliseconds.ToString("0.0", CultureInfo.InvariantCulture) + " ms";
 
     private static string Millions(double value) => (value / 1e6).ToString("0.0", CultureInfo.InvariantCulture) + " M";
 

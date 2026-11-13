@@ -9,6 +9,7 @@
     <ProjectReference Include="../../src/WebLingo.Compiler/WebLingo.Compiler.csproj" />
     <ProjectReference Include="../../src/WebLingo.Runtime/WebLingo.Runtime.csproj" />
     <ProjectReference Include="../../src/WebLingo.VM/WebLingo.VM.csproj" />
+    <ProjectReference Include="../../src/WebLingo.VM.Stack/WebLingo.VM.Stack.csproj" />
     <ProjectReference Include="../../src/WebLingo.Templates/WebLingo.Templates.csproj" />
     <ProjectReference Include="../../src/WebLingo.Language/WebLingo.Language.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib/WebLingo.StdLib.csproj" />

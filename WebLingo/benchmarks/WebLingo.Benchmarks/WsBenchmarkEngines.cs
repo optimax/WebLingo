@@ -2,6 +2,7 @@ using WebLingo.Bytecode;
 using WebLingo.Compiler;
 using WebLingo.Runtime;
 using WebLingo.VM;
+using WebLingo.VM.Stack;
 namespace WebLingo.Benchmarks;
 
 /// <summary>A VM the benchmark measures, with the compiler that generates its bytecode.</summary>
@@ -73,6 +74,54 @@ public sealed class WsRegisterEngine : IWsBenchmarkEngine
                 or WsOpCode.GreaterOrEqual => 3,
             WsOpCode.CallBuiltin or WsOpCode.Call => 4,
             _ => 2
+        };
+    }
+}
+
+/// <summary>The stack VM, <see cref="WsStackVirtualMachine"/>, with <see cref="WsStackCompiler"/>.</summary>
+public sealed class WsStackEngine : IWsBenchmarkEngine
+{
+    public string Name => "stack";
+
+    public IWsBenchmarkProgram Compile(string source, string name, WsCompilerOptions options)
+    {
+        var compiled = new WsStackCompiler(options).Compile(source, name);
+        if (compiled.Module is not { } module)
+        {
+            throw new InvalidOperationException($"{name} does not compile: {string.Join("; ", compiled.Diagnostics)}");
+        }
+        return new CompiledProgram(module);
+    }
+
+    private sealed class CompiledProgram(WsStackModule module) : IWsBenchmarkProgram
+    {
+        private readonly WsStackVirtualMachine _vm = new();
+
+        public int CodeInstructions { get; } = Functions(module).Sum(function => function.Code.Count);
+
+        public long CodeBytes { get; } = Functions(module).Sum(function => function.Code.Sum(Bytes));
+
+        public WsExecutionResult Run(WsExecutionContext context) => _vm.Execute(module, context);
+
+        private static IEnumerable<WsStackFunction> Functions(WsStackModule module) =>
+            module.Functions.Prepend(module.EntryPoint);
+
+        private static long Bytes(WsStackInstruction instruction)
+        {
+            int[] operands = [instruction.A, instruction.B];
+            return 1 + operands.Take(OperandCount(instruction.OpCode)).Sum(WsEncoding.Leb128Size);
+        }
+
+        /// <summary>How many of A and B the operation uses (<see cref="WsStackOpCode"/>); the ones it uses come first.</summary>
+        private static int OperandCount(WsStackOpCode opCode) => opCode switch
+        {
+            WsStackOpCode.LoadConstant or WsStackOpCode.LoadBoolean or WsStackOpCode.LoadLocal or WsStackOpCode.StoreLocal
+                or WsStackOpCode.Jump or WsStackOpCode.JumpIfFalse or WsStackOpCode.JumpIfTrue or WsStackOpCode.NewCell
+                or WsStackOpCode.BoxLocal or WsStackOpCode.CopyCell or WsStackOpCode.LoadCell or WsStackOpCode.StoreCell
+                or WsStackOpCode.LoadCapture or WsStackOpCode.StoreCapture or WsStackOpCode.MakeClosure
+                or WsStackOpCode.LoadBuiltin or WsStackOpCode.Call => 1,
+            WsStackOpCode.CallBuiltin => 2,
+            _ => 0
         };
     }
 }

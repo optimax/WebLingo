@@ -1,11 +1,12 @@
 using WebLingo.Compiler;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
+using WebLingo.VM.Stack;
 using Xunit;
 namespace WebLingo.VM.Tests;
 
 /// <summary>
-/// The VM does the arithmetic and comparisons of two int64s, or of two binary64s, itself, for speed, and leaves the
+/// Each VM does the arithmetic and comparisons of two int64s, or of two binary64s, itself, for speed, and leaves the
 /// rest to <see cref="WsOperators"/>. Every operator, on pairs of edge values of both kinds, must give what
 /// <see cref="WsOperators"/> gives: the same value, or the same error.
 /// </summary>
@@ -72,23 +73,36 @@ public sealed class OperatorTests
 
     private static readonly WsCompilerOptions WithWriteLn = new([new WsBuiltinDeclaration("writeLn", 1)]);
 
-    /// <summary>Runs the expression on operands held in variables, so that the VM, not the compiler, evaluates it.</summary>
+    /// <summary>
+    /// Runs the expression on operands held in variables, so that the VM, not the compiler, evaluates it, on the
+    /// register VM and on the stack VM.
+    /// </summary>
     private static void AssertTheVmGives(string left, string symbol, string right, WsValue value, WsRuntimeError? error)
     {
         var source = $"var a = {left}; var b = {right}; writeLn(a {symbol} b);";
-        var compiled = new WsCompiler(WithWriteLn).Compile(source, "operators.ws");
-        Assert.True(compiled.Module is not null, source);
-        var output = new WsCollectedOutput();
-        var context = new WsExecutionContext(new WsWorkerId(0)) { Services = new WsBuiltinRegistry(WsStandardBuiltins.Create(output)) };
-        var result = new WsVirtualMachine().Execute(compiled.Module, context);
-        if (error is null)
+        var registerModule = new WsCompiler(WithWriteLn).Compile(source, "operators.ws").Module;
+        var stackModule = new WsStackCompiler(WithWriteLn).Compile(source, "operators.ws").Module;
+        Assert.True(registerModule is not null && stackModule is not null, source);
+        foreach (var vm in new[] { "register", "stack" })
         {
-            Assert.True(result.Succeeded, $"{source}: {result.Error?.Message}");
-            Assert.Equal((source, WsValueFormatter.Format(value) + "\n"), (source, output.Text));
-        }
-        else
-        {
-            Assert.Equal((source, error.Code, error.Message), (source, result.Error?.Code, result.Error?.Message));
+            var output = new WsCollectedOutput();
+            var context = new WsExecutionContext(new WsWorkerId(0))
+            {
+                Services = new WsBuiltinRegistry(WsStandardBuiltins.Create(output))
+            };
+            var result = vm == "register"
+                ? new WsVirtualMachine().Execute(registerModule, context)
+                : new WsStackVirtualMachine().Execute(stackModule, context);
+            var what = $"{source} on the {vm} VM";
+            if (error is null)
+            {
+                Assert.True(result.Succeeded, $"{what}: {result.Error?.Message}");
+                Assert.Equal((what, WsValueFormatter.Format(value) + "\n"), (what, output.Text));
+            }
+            else
+            {
+                Assert.Equal((what, error.Code, error.Message), (what, result.Error?.Code, result.Error?.Message));
+            }
         }
     }
 }

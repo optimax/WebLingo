@@ -40,7 +40,7 @@ The last command times the VM on the benchmark's workloads (`benchmarks/WebLingo
 
 ## Architecture
 
-See [`Documents/weblingo-architecture.md`](../Documents/weblingo-architecture.md) at the repository root; section 15 has M0.6's status, and the choices made where the specification is silent, all still proposed. The VM instruction architecture remains provisional, with register VM first and a later stack-VM benchmark. Includes, layouts, and parameterized components are **all mandatory** for the first template-capable release; they are not implemented yet.
+See [`Documents/weblingo-architecture.md`](../Documents/weblingo-architecture.md) at the repository root; section 15 has M0.6's status, and the choices made where the specification is silent, all still proposed. The VM instruction architecture remains provisional (WS-BC002): there are a register VM, which `weblingo` runs, and a stack VM, both from the same lowered IR, which the benchmark (`benchmarks/WebLingo.Benchmarks`) compares. Includes, layouts, and parameterized components are **all mandatory** for the first template-capable release; they are not implemented yet.
 
 ## Verification status
 

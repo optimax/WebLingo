@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/WebLingo.Compiler/WebLingo.Compiler.csproj" />
     <ProjectReference Include="../../src/WebLingo.VM/WebLingo.VM.csproj" />
+    <ProjectReference Include="../../src/WebLingo.VM.Stack/WebLingo.VM.Stack.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib/WebLingo.StdLib.csproj" />
   </ItemGroup>
 </Project>
