@@ -162,6 +162,48 @@ public sealed class VerifierTests
     }
 
     [Fact]
+    public void AFunctionsParametersAreWrittenWhenItBegins()
+    {
+        var function = new WsFunction("f", 2, 2, [I(WsOpCode.Add, 0, 0, 1), I(WsOpCode.ReturnValue, 0)]) { ParameterCount = 2 };
+        var module = Module(registers: 1, locals: 0, I(WsOpCode.MakeClosure, 0, 0), I(WsOpCode.Return)) with { Functions = [function] };
+        Assert.Equal(Valid, Verify(module));
+        var reading = function with { Code = [I(WsOpCode.ReturnValue, 1)], ParameterCount = 1 };
+        Assert.False(Verify(module with { Functions = [reading] }).IsValid);
+    }
+
+    [Theory]
+    [InlineData(WsOpCode.MakeClosure, 0, 1, 0, 0, "function")]
+    [InlineData(WsOpCode.LoadCapture, 0, 0, 0, 0, "capture")]
+    [InlineData(WsOpCode.StoreCapture, 0, 0, 0, 0, "capture")]
+    [InlineData(WsOpCode.LoadBuiltin, 0, 1, 0, 0, "import")]
+    [InlineData(WsOpCode.Call, 0, 0, 1, 2, "arguments")]
+    [InlineData(WsOpCode.Call, 0, 0, 0, -1, "negative")]
+    public void BadFunctionOperandsAreRejected(WsOpCode opCode, int a, int b, int c, int d, string reason)
+    {
+        var callee = new WsFunction("f", 0, 0, [I(WsOpCode.Return)]);
+        var module = Module(registers: 2, locals: 2, I(WsOpCode.LoadNull, 0), I(opCode, a, b, c, d), I(WsOpCode.Return))
+            with { Functions = [callee] };
+        AssertRejected(module, 1, reason);
+    }
+
+    [Fact]
+    public void AClosuresCapturedRegistersMustBeWritten()
+    {
+        var callee = new WsFunction("f", 0, 0, [I(WsOpCode.Return)]) { Captures = [new WsCapture(true, 1)] };
+        var module = Module(registers: 2, locals: 0, I(WsOpCode.MakeClosure, 0, 0), I(WsOpCode.Return)) with { Functions = [callee] };
+        AssertRejected(module, 0, "register 1");
+        var beyond = callee with { Captures = [new WsCapture(true, 5)] };
+        AssertRejected(module with { Functions = [beyond] }, 0, "captured");
+    }
+
+    [Fact]
+    public void TheEntryPointTakesNoParameters()
+    {
+        var module = WsCompiledModule.Empty("m");
+        AssertRejected(module with { EntryPoint = module.EntryPoint with { ParameterCount = 1 } }, -1, "entry point");
+    }
+
+    [Fact]
     public void ALoopTerminatesVerification()
     {
         // 0: r1 = c0; 1: r1 = -r1; 2: jump 1. An endless loop, but a valid one.

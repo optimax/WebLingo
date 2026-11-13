@@ -17,6 +17,8 @@ public static class WsValueFormatter
     {
         WsValueKind.Null => "null",
         WsValueKind.String => $"string#{value.Handle}",
+        WsValueKind.Function or WsValueKind.Builtin => "function",
+        WsValueKind.Cell => "cell",
         WsValueKind.Boolean => value.AsBoolean ? "true" : "false",
         WsValueKind.Int64 => value.AsInt64.ToString(CultureInfo.InvariantCulture),
         _ => FormatBinary64(value.AsBinary64)
@@ -29,6 +31,7 @@ public static class WsValueFormatter
         WsValueKind.Boolean => $"the Boolean {Format(value)}",
         WsValueKind.Int64 => $"the integer {Format(value)}",
         WsValueKind.String => "a string",
+        WsValueKind.Function or WsValueKind.Builtin => "a function",
         _ => $"the number {Format(value)}"
     };
 

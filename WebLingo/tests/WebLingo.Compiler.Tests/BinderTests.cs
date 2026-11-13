@@ -66,14 +66,18 @@ public sealed class BinderTests
     }
 
     [Theory]
-    [InlineData("var x = 1; x(2);", WsDiagnosticCodes.NotAFunction)]
-    [InlineData("var x = 1; (x)(2);", WsDiagnosticCodes.NotAFunction)]
-    [InlineData("writeLn(1)(2);", WsDiagnosticCodes.NotAFunction)]
     [InlineData("(1)(2);", WsDiagnosticCodes.NotAFunction)]
+    [InlineData("\"f\"();", WsDiagnosticCodes.NotAFunction)]
     [InlineData("writeLn();", WsDiagnosticCodes.WrongArgumentCount)]
     [InlineData("writeLn(1, 2);", WsDiagnosticCodes.WrongArgumentCount)]
-    [InlineData("var p = write;", WsDiagnosticCodes.InvalidOperation)]
+    [InlineData("function f(a) {} f();", WsDiagnosticCodes.WrongArgumentCount)]
     [InlineData("write = 1;", WsDiagnosticCodes.InvalidOperation)]
+    [InlineData("function f() {} f = 1;", WsDiagnosticCodes.AssignmentToConstant)]
+    [InlineData("function f(a, a) {}", WsDiagnosticCodes.DuplicateDeclaration)]
+    [InlineData("function f() {} function f() {}", WsDiagnosticCodes.DuplicateDeclaration)]
+    [InlineData("return 1;", WsDiagnosticCodes.ReturnOutsideFunction)]
+    [InlineData("function f() { break; }", WsDiagnosticCodes.NotInLoop)]
+    [InlineData("while (true) { function f() { continue; } }", WsDiagnosticCodes.NotInLoop)]
     public void CallsAndBuiltinsAreChecked(string source, string code)
     {
         var diagnostic = Assert.Single(Compile(source).Diagnostics);
@@ -93,7 +97,27 @@ public sealed class BinderTests
     {
         var compilation = Compile("var write = 1;");
         Assert.Empty(compilation.Diagnostics);
-        Assert.Equal(WsDiagnosticCodes.NotAFunction, Assert.Single(Compile("var write = 1; write(2);").Diagnostics).Code);
+        // Now a variable, which is called as any value is, and found not to be a function at run time.
+        var call = Compile("var write = 1; write(2);");
+        Assert.Empty(call.Diagnostics);
+        Assert.IsType<WsBoundCall>(((WsBoundExpressionStatement)call.BoundProgram!.Statements[1]).Expression);
+    }
+
+    [Fact]
+    public void AFunctionIsInScopeThroughoutItsBlock()
+    {
+        Assert.Empty(Compile("writeLn(f(1)); function f(a) { return g(a); } function g(b) { return b; }").Diagnostics);
+        Assert.Equal(WsDiagnosticCodes.UndefinedIdentifier, Assert.Single(Compile("{ function f() {} } f();").Diagnostics).Code);
+    }
+
+    [Fact]
+    public void ANameOfAnOuterFunctionIsCaptured()
+    {
+        var compilation = Compile("var a = 1; var b = 2; function f() { return a; }");
+        Assert.Empty(compilation.Diagnostics);
+        var locals = compilation.BoundProgram!.Locals;
+        // The function is declared first, since it is in scope throughout the block.
+        Assert.Equal(new[] { ("f", false), ("a", true), ("b", false) }, locals.Select(l => (l.Name, l.IsCaptured)));
     }
 
     [Theory]

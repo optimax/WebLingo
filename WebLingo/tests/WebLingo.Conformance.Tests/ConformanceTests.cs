@@ -50,6 +50,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("if (true) { continue; }", "WS2007", 1, 13)]
     [InlineData("for (var i = 0; i < 1; i = i + 1) {} writeLn(i);", "WS2001", 1, 46)]
     [InlineData("do writeLn(1) while (true);", "WS1002", 1, 14)]
+    [InlineData("return;", "WS2008", 1, 1)]
+    [InlineData("function f(a) {} f(1, 2);", "WS2006", 1, 18)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -108,6 +110,21 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(\"x\" == 'x'); writeLn(\"x\" != \"y\"); writeLn(\"1\" == 1); writeLn(\"\" == null);", "true\ntrue\nfalse\nfalse")]
     [InlineData("var s = \"\"; for (var i = 0; i < 3; i = i + 1) s = s + \"ab\"; writeLn(s);", "ababab")]
     [InlineData("writeLn(\"\\u{1F600}\");", "\U0001F600")]
+    [InlineData("function add(a, b) { return a + b; } writeLn(add(2, 3));", "5")]
+    [InlineData("function f() {} writeLn(f()); function g() { return; } writeLn(g());", "null\nnull")]
+    [InlineData("function fact(n) { if (n <= 1) return 1; return n * fact(n - 1); } writeLn(fact(20));", "2432902008176640000")]
+    [InlineData("writeLn(even(10)); function even(n) { if (n == 0) return true; return odd(n - 1); } function odd(n) { if (n == 0) return false; return even(n - 1); }", "true")]
+    [InlineData("var make = function () { var c = 0; return function () { c = c + 1; return c; }; }; var a = make(); a(); var b = make(); writeLn(a()); writeLn(b());", "2\n1")]
+    [InlineData("function times(k) { return function (x) { return x * k; }; } writeLn(times(3)(7));", "21")]
+    [InlineData("var w = writeLn; w(\"through a variable\");", "through a variable")]
+    [InlineData("var total = 0; function bump(by) { total = total + by; } bump(5); bump(6); writeLn(total);", "11")]
+    [InlineData("var f = 0; var g = 0; for (var i = 0; i < 3; i = i + 1) { if (i == 0) f = function () { return i; }; if (i == 2) g = function () { return i; }; } writeLn(f()); writeLn(g());", "0\n2")]
+    [InlineData("var fs = 0; var k = 0; while (k < 2) { var j = k; if (k == 0) fs = function () { return j; }; k = k + 1; } writeLn(fs());", "0")]
+    [InlineData("function f(x) { var g = function () { x = x + 1; return x; }; g(); return g(); } writeLn(f(10));", "12")]
+    [InlineData("function outer() { var v = 1; function mid() { function inner() { return v; } return inner(); } v = 5; return mid(); } writeLn(outer());", "5")]
+    [InlineData("function deep(n) { if (n == 0) return 0; return 1 + deep(n - 1); } writeLn(deep(5000));", "5000")]
+    [InlineData("function f() {} var g = f; writeLn(f == g); writeLn(function () {} == function () {}); writeLn(writeLn == writeLn);", "true\nfalse\ntrue")]
+    [InlineData("function f(a) { var a = 2; return a; } writeLn(f(1));", "2")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -130,11 +147,27 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(\"a\" < \"b\");")]
     [InlineData("writeLn(-\"a\");")]
     [InlineData("if (\"true\") writeLn(1);")]
+    [InlineData("writeLn(function () {} + 1);")]
     public void BooleansAndNumbersDoNotMix(string source)
     {
         var (exit, _, error) = Weblingo("run", source);
         Assert.Equal(WsCommandLine.RuntimeFailed, exit);
         Assert.Contains("error WS3001:", error);
+    }
+
+    [Theory]
+    [InlineData("var x = 1; x(2);", "WS2005")]
+    [InlineData("writeLn(1)(2);", "WS2005")]
+    [InlineData("var write = 1; write(2);", "WS2005")]
+    [InlineData("var f = function (a) {}; f();", "WS2006")]
+    [InlineData("var w = writeLn; w(1, 2);", "WS2006")]
+    [InlineData("function f() { return f(); } f();", "WS3003")]
+    [InlineData("f(); var y = 1; function f() { writeLn(y); }", "WS2004")]
+    public void CallsAreCheckedAtRunTime(string source, string code)
+    {
+        var (exit, _, error) = Weblingo("run", source);
+        Assert.Equal(WsCommandLine.RuntimeFailed, exit);
+        Assert.Contains($"error {code}:", error);
     }
 
     [Fact]

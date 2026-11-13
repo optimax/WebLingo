@@ -21,9 +21,10 @@ public sealed record WsExecutionContext(WsWorkerId OwnerWorkerId)
 
 /// <summary>
 /// The resources an execution may take: registers (a module that needs more is not run, WS3003), and its heap's
-/// units (<see cref="WsHeap"/>; an allocation beyond them is WS3003).
+/// units (<see cref="WsHeap"/>; an allocation beyond them is WS3003), and how deep calls may nest (WS3003). The
+/// defaults are arbitrary, and easy to change.
 /// </summary>
-public sealed record WsResourceBudget(int MaxRegisters, long MaxHeapUnits = WsHeap.DefaultMaxUnits)
+public sealed record WsResourceBudget(int MaxRegisters, long MaxHeapUnits = WsHeap.DefaultMaxUnits, int MaxCallDepth = 10_000)
 {
     public static WsResourceBudget Default { get; } = new(65535);
 }

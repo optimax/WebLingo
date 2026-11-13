@@ -111,6 +111,48 @@ public sealed class HeapTests
     }
 
     [Fact]
+    public void AClosureKeepsItsCellsAndTheirValuesAlive()
+    {
+        var heap = new WsHeap();
+        var roots = new WsValue[1];
+        heap.AddRoots(roots);
+        heap.TryAllocateString("kept through a cell", out var text, out _);
+        heap.TryAllocateCell(text, true, out var cell, out _);
+        heap.TryAllocateClosure(0, [cell], out roots[0], out _);
+        heap.TryAllocateString("garbage", out _, out _);
+        heap.Collect();
+        Assert.Equal(3, heap.ObjectCount);
+        var (function, cells) = heap.GetClosure(roots[0]);
+        Assert.Equal(0, function);
+        Assert.True(heap.TryReadCell(cells[0], out var held));
+        Assert.Equal("kept through a cell", heap.GetString(held));
+    }
+
+    [Fact]
+    public void ACellHasNoValueUntilOneIsWritten()
+    {
+        var heap = new WsHeap();
+        heap.TryAllocateCell(WsValue.Null, false, out var cell, out _);
+        Assert.False(heap.TryReadCell(cell, out _));
+        heap.WriteCell(cell, WsValue.FromInt64(7));
+        Assert.True(heap.TryReadCell(cell, out var value));
+        Assert.Equal(WsValue.FromInt64(7), value);
+    }
+
+    [Fact]
+    public void RootsComeAndGoWithFrames()
+    {
+        var heap = new WsHeap();
+        var frame = new WsValue[1];
+        heap.AddRoots(frame);
+        heap.TryAllocateString("frame's", out frame[0], out _);
+        heap.RemoveLastRoots(frame);
+        heap.Collect();
+        Assert.Equal(0, heap.ObjectCount);
+        Assert.Throws<InvalidOperationException>(() => heap.RemoveLastRoots(frame));
+    }
+
+    [Fact]
     public void AStringBeyondTheBudgetIsAnError()
     {
         var heap = new WsHeap(maxUnits: 100);

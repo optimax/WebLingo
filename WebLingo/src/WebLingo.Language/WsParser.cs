@@ -76,6 +76,14 @@ public sealed class WsParser : IWsParser
         if (Current.Kind == WsTokenKind.While) return ParseWhile(start);
         if (Current.Kind == WsTokenKind.Do) return ParseDoWhile(start);
         if (Current.Kind == WsTokenKind.For) return ParseFor(start);
+        if (Current.Kind == WsTokenKind.Function && Peek(1).Kind == WsTokenKind.Identifier) return ParseFunctionDeclaration(start);
+        if (Current.Kind == WsTokenKind.Return)
+        {
+            Advance();
+            var value = Current.Kind == WsTokenKind.Semicolon ? null : ParseExpression();
+            ExpectSemicolon();
+            return new WsReturnSyntax(value, SpanFrom(start));
+        }
         if (Current.Kind is WsTokenKind.Break or WsTokenKind.Continue)
         {
             var keyword = Advance();
@@ -189,6 +197,46 @@ public sealed class WsParser : IWsParser
         var body = ParseNested();
         return body is null ? new WsBlockSyntax([], SpanFrom(start))
             : new WsForSyntax(init, condition, step, body, SpanFrom(start));
+    }
+
+    private WsStatementSyntax ParseFunctionDeclaration(int start)
+    {
+        Advance();
+        var name = Advance();
+        var (parameters, body) = ParseFunctionRest();
+        return new WsFunctionDeclarationSyntax(name.Text, name.Span, parameters, body, SpanFrom(start));
+    }
+
+    /// <summary>A function's parameters and body, after <c>function</c> and its name, if it has one.</summary>
+    private (IReadOnlyList<WsParameterSyntax> Parameters, WsBlockSyntax Body) ParseFunctionRest()
+    {
+        _statementHasError = false;
+        var parameters = new List<WsParameterSyntax>();
+        Expect(WsTokenKind.OpenParen, "'('");
+        if (Current.Kind != WsTokenKind.CloseParen)
+        {
+            while (true)
+            {
+                if (Current.Kind != WsTokenKind.Identifier)
+                {
+                    ReportUnexpected("a parameter name");
+                    break;
+                }
+                var parameter = Advance();
+                parameters.Add(new WsParameterSyntax(parameter.Text, parameter.Span));
+                if (Current.Kind != WsTokenKind.Comma) break;
+                Advance();
+            }
+        }
+        Expect(WsTokenKind.CloseParen, "')'");
+        var bodyStart = Current.Span.Start;
+        if (Current.Kind != WsTokenKind.OpenBrace)
+        {
+            if (!_statementHasError) ReportUnexpected("'{', which begins the function's body");
+            return (parameters, new WsBlockSyntax([], new WsSourceSpan(bodyStart, 0)));
+        }
+        var body = ParseBlock(bodyStart);
+        return (parameters, body as WsBlockSyntax ?? new WsBlockSyntax([], body.Span));
     }
 
     /// <summary>A statement nested in another, within the parser's recursion limit; null beyond it.</summary>
@@ -432,6 +480,20 @@ public sealed class WsParser : IWsParser
             case WsTokenKind.StringLiteral:
                 Advance();
                 return new WsStringLiteralSyntax(token.StringValue!, token.Span);
+            case WsTokenKind.Function:
+            {
+                Advance();
+                if (!EnterRecursion()) return new WsErrorExpressionSyntax(token.Span);
+                try
+                {
+                    var (parameters, body) = ParseFunctionRest();
+                    return new WsFunctionExpressionSyntax(parameters, body, SpanFrom(token.Span.Start));
+                }
+                finally
+                {
+                    _recursionDepth--;
+                }
+            }
             case WsTokenKind.Infinity:
                 Advance();
                 return new WsBinary64LiteralSyntax(double.PositiveInfinity, token.Span);
@@ -530,6 +592,7 @@ public sealed class WsParser : IWsParser
                 statements.Push(conditional.Then);
             }
             if (statement is WsWhileSyntax whileLoop) statements.Push(whileLoop.Body);
+            if (statement is WsFunctionDeclarationSyntax function) statements.Push(function.Body);
             if (statement is WsDoWhileSyntax doLoop) statements.Push(doLoop.Body);
             if (statement is WsForSyntax forLoop)
             {
@@ -547,6 +610,7 @@ public sealed class WsParser : IWsParser
                 WsIfSyntax ifStatement => ifStatement.Condition,
                 WsWhileSyntax whileStatement => whileStatement.Condition,
                 WsDoWhileSyntax doStatement => doStatement.Condition,
+                WsReturnSyntax { Value: { } returned } => returned,
                 _ => null
             };
             if (top is null) continue;
@@ -572,6 +636,9 @@ public sealed class WsParser : IWsParser
                         pending.Push((binary.Right, depth + 1));
                         break;
                     case WsAssignmentExpressionSyntax assignment: pending.Push((assignment.Value, depth + 1)); break;
+                    case WsFunctionExpressionSyntax functionExpression:
+                        statements.Push(functionExpression.Body);
+                        break;
                     case WsCallExpressionSyntax call:
                         pending.Push((call.Callee, depth + 1));
                         foreach (var argument in call.Arguments) pending.Push((argument, depth + 1));
@@ -580,6 +647,8 @@ public sealed class WsParser : IWsParser
             }
         }
     }
+
+    private WsToken Peek(int ahead) => _tokens[Math.Min(_index + ahead, _tokens.Count - 1)];
 
     private WsToken Advance()
     {

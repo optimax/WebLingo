@@ -9,6 +9,20 @@ namespace WebLingo.Compiler;
 public sealed record WsBoundProgram(
     IReadOnlyList<WsBoundStatement> Statements, IReadOnlyList<WsLocalSymbol> Locals, IReadOnlyList<WsBuiltinSymbol> Builtins);
 
+/// <summary>
+/// Where a function's capture comes from when its closure is made: a local of the function that makes it
+/// (<paramref name="FromLocal"/>), or one of that function's own captures.
+/// </summary>
+public sealed record WsBoundCapture(bool FromLocal, int Index, WsLocalSymbol Local);
+
+/// <summary>
+/// A function: its parameters (its first locals), all its locals, what it captures from the functions around it,
+/// and its body.
+/// </summary>
+public sealed record WsBoundFunction(
+    string Name, int ParameterCount, IReadOnlyList<WsLocalSymbol> Locals, IReadOnlyList<WsBoundCapture> Captures,
+    IReadOnlyList<WsBoundStatement> Body, WsSourceSpan Span);
+
 public abstract record WsBoundStatement(WsSourceSpan Span);
 
 public sealed record WsBoundVariableDeclaration(WsLocalSymbol Local, WsBoundExpression Initializer, WsSourceSpan Span)
@@ -17,6 +31,12 @@ public sealed record WsBoundVariableDeclaration(WsLocalSymbol Local, WsBoundExpr
 public sealed record WsBoundExpressionStatement(WsBoundExpression Expression, WsSourceSpan Span) : WsBoundStatement(Span);
 
 public sealed record WsBoundBlock(IReadOnlyList<WsBoundStatement> Statements, WsSourceSpan Span) : WsBoundStatement(Span);
+
+/// <summary>A function declaration; its closure is made when its block begins, since it is in scope throughout.</summary>
+public sealed record WsBoundFunctionDeclaration(WsLocalSymbol Local, WsBoundFunction Function, WsSourceSpan Span)
+    : WsBoundStatement(Span);
+
+public sealed record WsBoundReturn(WsBoundExpression? Value, WsSourceSpan Span) : WsBoundStatement(Span);
 
 public sealed record WsBoundIf(WsBoundExpression Condition, WsBoundStatement Then, WsBoundStatement? Else, WsSourceSpan Span)
     : WsBoundStatement(Span);
@@ -27,7 +47,11 @@ public sealed record WsBoundIf(WsBoundExpression Condition, WsBoundStatement The
 /// </summary>
 public sealed record WsBoundLoop(
     WsBoundExpression? Condition, WsBoundStatement Body, WsBoundExpression? Step, bool TestFirst, WsSourceSpan Span)
-    : WsBoundStatement(Span);
+    : WsBoundStatement(Span)
+{
+    /// <summary>A <c>for</c>'s variables, each of which gets a binding of its own for every iteration.</summary>
+    public IReadOnlyList<WsLocalSymbol> PerIterationLocals { get; init; } = [];
+}
 
 public sealed record WsBoundBreak(WsSourceSpan Span) : WsBoundStatement(Span);
 
@@ -62,3 +86,18 @@ public sealed record WsBoundBuiltinCall(WsBuiltinSymbol Builtin, IReadOnlyList<W
 
 /// <summary>Where binding failed; its diagnostic is already reported, and nothing is lowered from it.</summary>
 public sealed record WsBoundError(WsSourceSpan Span) : WsBoundExpression(Span);
+
+/// <summary>A local of a function around this one, through this function's capture <paramref name="Index"/>.</summary>
+public sealed record WsBoundCaptureReference(int Index, WsLocalSymbol Local, WsSourceSpan Span) : WsBoundExpression(Span);
+
+public sealed record WsBoundCaptureAssignment(int Index, WsLocalSymbol Local, WsBoundExpression Value, WsSourceSpan Span)
+    : WsBoundExpression(Span);
+
+/// <summary>A built-in used as a value.</summary>
+public sealed record WsBoundBuiltinReference(WsBuiltinSymbol Builtin, WsSourceSpan Span) : WsBoundExpression(Span);
+
+public sealed record WsBoundFunctionExpression(WsBoundFunction Function, WsSourceSpan Span) : WsBoundExpression(Span);
+
+/// <summary>A call of any value, checked to be a function, with the right number of arguments, at run time.</summary>
+public sealed record WsBoundCall(WsBoundExpression Callee, IReadOnlyList<WsBoundExpression> Arguments, WsSourceSpan Span)
+    : WsBoundExpression(Span);

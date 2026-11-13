@@ -41,6 +41,8 @@ public static class WsDiagnosticCodes
     public const string WrongArgumentCount = "WS2006";
     /// <summary>A <c>break</c> or <c>continue</c> outside a loop (proposed).</summary>
     public const string NotInLoop = "WS2007";
+    /// <summary>A <c>return</c> outside a function (proposed).</summary>
+    public const string ReturnOutsideFunction = "WS2008";
 
     /// <summary>Invalid operation.</summary>
     public const string InvalidOperation = "WS3001";

@@ -127,6 +127,8 @@ public sealed class WsLexer(string source) : IWsLexer
             "do" => WsTokenKind.Do,
             "break" => WsTokenKind.Break,
             "continue" => WsTokenKind.Continue,
+            "function" => WsTokenKind.Function,
+            "return" => WsTokenKind.Return,
             _ => WsTokenKind.Identifier
         };
         return new WsToken(kind, text, new WsSourceSpan(start, _position - start));

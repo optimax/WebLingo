@@ -12,46 +12,80 @@ namespace WebLingo.Compiler;
 /// </summary>
 public sealed class WsCodeGenerator
 {
-    private readonly WsIrProgram _program;
+    private readonly ModuleState _module;
     private readonly int _locals;
     private readonly List<WsInstruction> _code = [];
     private readonly List<WsSourceSpan> _spans = [];
-    private readonly List<WsConstant> _constants = [];
-    private readonly Dictionary<long, int> _int64Constants = [];
-    private readonly Dictionary<long, int> _binary64Constants = []; // By IEEE bits, so that 0.0 and -0.0 stay apart.
-    private readonly Dictionary<string, int> _stringConstants = new(StringComparer.Ordinal);
     private readonly Stack<LoopJumps> _loops = new();
     private int _nextRegister;
     private int _registerCount;
 
-    private WsCodeGenerator(WsIrProgram program)
+    private WsCodeGenerator(ModuleState module, int locals)
     {
-        _program = program;
-        _locals = program.LocalNames.Count;
+        _module = module;
+        _locals = locals;
         _nextRegister = _locals;
         _registerCount = _locals;
     }
 
-    /// <summary>Generates the module; null, with a diagnostic, if it needs more registers than a function may have.</summary>
+    private List<WsConstant> _constants => _module.Constants;
+    private Dictionary<long, int> _int64Constants => _module.Int64Constants;
+    private Dictionary<long, int> _binary64Constants => _module.Binary64Constants;
+    private Dictionary<string, int> _stringConstants => _module.StringConstants;
+
+    /// <summary>
+    /// Generates the module: the program's statements as its entry point, and each function it declares; null, with a
+    /// diagnostic, if a function needs more registers than a function may have.
+    /// </summary>
     public static WsCompiledModule? Generate(WsIrProgram program, string moduleName, List<WsDiagnostic> diagnostics)
     {
-        var generator = new WsCodeGenerator(program);
-        foreach (var statement in program.Statements) generator.EmitStatement(statement);
-        generator.Emit(new WsInstruction(WsOpCode.Return), new WsSourceSpan(0, 0));
-
-        if (generator._registerCount > WsFunction.MaxRegisters)
+        var module = new ModuleState();
+        var main = GenerateFunction(module, "main", 0, program.LocalNames, [], program.Statements, diagnostics);
+        var functions = new List<WsFunction>();
+        foreach (var function in program.Functions)
         {
-            diagnostics.Add(new WsDiagnostic(WsDiagnosticCodes.ProgramTooLarge, WsDiagnosticSeverity.Error,
-                $"The program needs {generator._registerCount} registers; a function may have {WsFunction.MaxRegisters}.",
-                new WsSourceSpan(0, 0)));
-            return null;
+            var captures = new List<WsCapture>();
+            foreach (var capture in function.Captures) captures.Add(new WsCapture(capture.FromLocal, capture.Index));
+            var name = function.Name.Length == 0 ? "function" : function.Name;
+            var generated = GenerateFunction(module, name, function.ParameterCount, function.LocalNames, captures, function.Body,
+                diagnostics);
+            if (generated is not null) functions.Add(generated);
         }
+        if (main is null || functions.Count != program.Functions.Count) return null;
 
         var imports = new WsImport[program.Builtins.Count];
         foreach (var builtin in program.Builtins) imports[builtin.Index] = new WsImport(builtin.Name, builtin.Arity);
-        var main = new WsFunction("main", generator._registerCount, generator._locals, generator._code, generator._spans,
-            program.LocalNames);
-        return new WsCompiledModule(moduleName, generator._constants, imports, main);
+        return new WsCompiledModule(moduleName, module.Constants, imports, main) { Functions = functions };
+    }
+
+    private static WsFunction? GenerateFunction(ModuleState module, string name, int parameterCount,
+        IReadOnlyList<string> localNames, IReadOnlyList<WsCapture> captures, IReadOnlyList<WsIrStatement> body,
+        List<WsDiagnostic> diagnostics)
+    {
+        var generator = new WsCodeGenerator(module, localNames.Count);
+        foreach (var statement in body) generator.EmitStatement(statement);
+        generator.Emit(new WsInstruction(WsOpCode.Return), new WsSourceSpan(0, 0));
+        if (generator._registerCount > WsFunction.MaxRegisters)
+        {
+            diagnostics.Add(new WsDiagnostic(WsDiagnosticCodes.ProgramTooLarge, WsDiagnosticSeverity.Error,
+                $"'{name}' needs {generator._registerCount} registers; a function may have {WsFunction.MaxRegisters}.",
+                new WsSourceSpan(0, 0)));
+            return null;
+        }
+        return new WsFunction(name, generator._registerCount, generator._locals, generator._code, generator._spans, localNames)
+        {
+            ParameterCount = parameterCount,
+            Captures = captures
+        };
+    }
+
+    /// <summary>What the functions of one module share: its constants.</summary>
+    private sealed class ModuleState
+    {
+        public List<WsConstant> Constants { get; } = [];
+        public Dictionary<long, int> Int64Constants { get; } = [];
+        public Dictionary<long, int> Binary64Constants { get; } = []; // By IEEE bits, so that 0.0 and -0.0 stay apart.
+        public Dictionary<string, int> StringConstants { get; } = new(StringComparer.Ordinal);
     }
 
     private void EmitStatement(WsIrStatement statement)
@@ -75,6 +109,23 @@ public sealed class WsCodeGenerator
                 break;
             case WsIrContinue continueStatement:
                 _loops.Peek().Continues.Add(EmitJump(WsOpCode.Jump, 0, continueStatement.Span));
+                break;
+            case WsIrNewCell cell:
+                Emit(new WsInstruction(WsOpCode.NewCell, cell.Local), cell.Span);
+                break;
+            case WsIrBoxLocal box:
+                Emit(new WsInstruction(WsOpCode.BoxRegister, box.Local), box.Span);
+                break;
+            case WsIrCopyCells copies:
+                foreach (var local in copies.Locals) Emit(new WsInstruction(WsOpCode.CopyCell, local), copies.Span);
+                break;
+            case WsIrReturn returnStatement:
+                if (returnStatement.Value is null)
+                {
+                    Emit(new WsInstruction(WsOpCode.Return), returnStatement.Span);
+                    break;
+                }
+                Emit(new WsInstruction(WsOpCode.ReturnValue, EmitExpression(returnStatement.Value, null)), returnStatement.Span);
                 break;
             case WsIrIf conditional:
             {
@@ -158,6 +209,61 @@ public sealed class WsCodeGenerator
                 _nextRegister = mark;
                 return destination;
             }
+            case WsIrLoadCell load:
+            {
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.LoadCell, destination, load.Local), load.Span);
+                return destination;
+            }
+            case WsIrLoadCapture load:
+            {
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.LoadCapture, destination, load.Capture), load.Span);
+                return destination;
+            }
+            case WsIrStoreCell store:
+            {
+                var value = EmitExpression(store.Value, target);
+                Emit(new WsInstruction(WsOpCode.StoreCell, store.Local, value), store.Span);
+                return value;
+            }
+            case WsIrStoreCapture store:
+            {
+                var value = EmitExpression(store.Value, target);
+                Emit(new WsInstruction(WsOpCode.StoreCapture, store.Capture, value), store.Span);
+                return value;
+            }
+            case WsIrMakeClosure closure:
+            {
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.MakeClosure, destination, closure.Function), closure.Span);
+                return destination;
+            }
+            case WsIrLoadBuiltin builtin:
+            {
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.LoadBuiltin, destination, builtin.Builtin), builtin.Span);
+                return destination;
+            }
+            case WsIrCall call:
+            {
+                var mark = _nextRegister;
+                var callee = EmitExpression(call.Callee, null);
+                if (callee < _locals && AnyAssigns(call.Arguments, callee))
+                {
+                    var copy = Allocate();
+                    Emit(new WsInstruction(WsOpCode.Move, copy, callee), call.Callee.Span);
+                    callee = copy;
+                }
+                var first = _nextRegister;
+                for (var i = 0; i < call.Arguments.Count; i++) Allocate();
+                for (var i = 0; i < call.Arguments.Count; i++) EmitExpression(call.Arguments[i], first + i);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.Call, destination, callee, call.Arguments.Count == 0 ? 0 : first,
+                    call.Arguments.Count), call.Span);
+                return destination;
+            }
             case WsIrLoadLocal load:
             {
                 if (target is not { } destination || destination == load.Local) return load.Local;
@@ -229,6 +335,9 @@ public sealed class WsCodeGenerator
         WsIrBinary binary => Assigns(binary.Left, local) || Assigns(binary.Right, local),
         WsIrLogical logical => Assigns(logical.Left, local) || Assigns(logical.Right, local),
         WsIrCallBuiltin call => AnyAssigns(call.Arguments, local),
+        WsIrCall call => Assigns(call.Callee, local) || AnyAssigns(call.Arguments, local),
+        WsIrStoreCell store => Assigns(store.Value, local),
+        WsIrStoreCapture store => Assigns(store.Value, local),
         _ => false
     };
 
@@ -290,6 +399,7 @@ public sealed class WsCodeGenerator
         }
         EmitStatement(loop.Body);
         foreach (var at in jumps.Continues) PatchJump(at);
+        if (loop.PerIteration is { } perIteration) EmitStatement(perIteration);
         if (loop.Step is { } step)
         {
             EmitExpression(step, null);

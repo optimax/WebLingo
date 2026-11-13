@@ -19,16 +19,22 @@ public abstract class WsSymbol(string name)
 }
 
 /// <summary>
-/// A variable or constant declared by the script. <see cref="Index"/> numbers the locals of the program from 0, in
-/// declaration order.
+/// A variable, constant, function or parameter the script declares. <see cref="Index"/> numbers the locals of the
+/// function that owns it (<see cref="Owner"/>; the program is the outermost function) from 0, parameters first.
 /// </summary>
-public sealed class WsLocalSymbol(string name, WsDeclarationKind kind, int index, WsSourceSpan declarationSpan)
+public sealed class WsLocalSymbol(string name, WsDeclarationKind kind, int index, WsSourceSpan declarationSpan, object owner)
     : WsSymbol(name)
 {
     public WsDeclarationKind Kind { get; } = kind;
     public int Index { get; } = index;
     public WsSourceSpan DeclarationSpan { get; } = declarationSpan;
-    public bool IsConstant => Kind == WsDeclarationKind.Const;
+    /// <summary>The function whose frame holds the local.</summary>
+    public object Owner { get; } = owner;
+    /// <summary>Whether an inner function uses it, so that it lives in a cell the closures share (section 3.5).</summary>
+    public bool IsCaptured { get; internal set; }
+    /// <summary>A declared function's parameter count, which a direct call is checked against.</summary>
+    public int? FunctionArity { get; init; }
+    public bool IsConstant => Kind is WsDeclarationKind.Const or WsDeclarationKind.Function;
 }
 
 /// <summary>A host built-in function the script calls; <see cref="Index"/> numbers the built-ins it uses from 0.</summary>

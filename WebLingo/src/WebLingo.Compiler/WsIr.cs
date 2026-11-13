@@ -7,9 +7,36 @@ namespace WebLingo.Compiler;
 // Evaluation order is left to right; an assignment evaluates its value before it stores it (section 15.2). Every
 // local has a value from its declaration on (section 3.1), so no operation needs a check that it has one.
 
-/// <summary>A lowered program; <see cref="LocalNames"/> are indexed by local, for runtime error messages.</summary>
+/// <summary>
+/// A lowered program: the statements of its outermost function, its locals' names (indexed by local, for runtime
+/// error messages), the built-ins it calls, and every function it declares, at any depth, which
+/// <see cref="WsIrMakeClosure"/> refers to by index.
+/// </summary>
 public sealed record WsIrProgram(
-    IReadOnlyList<WsIrStatement> Statements, IReadOnlyList<string> LocalNames, IReadOnlyList<WsBuiltinSymbol> Builtins);
+    IReadOnlyList<WsIrStatement> Statements, IReadOnlyList<string> LocalNames, IReadOnlyList<WsBuiltinSymbol> Builtins)
+{
+    public IReadOnlyList<WsIrFunction> Functions { get; init; } = [];
+}
+
+/// <summary>Where a closure's capture comes from: a local of the function making it, or one of that one's captures.</summary>
+public sealed record WsIrCapture(bool FromLocal, int Index);
+
+/// <summary>A function: its parameters (its first locals), its locals' names, its captures, and its body.</summary>
+public sealed record WsIrFunction(
+    string Name, int ParameterCount, IReadOnlyList<string> LocalNames, IReadOnlyList<WsIrCapture> Captures,
+    IReadOnlyList<WsIrStatement> Body, WsSourceSpan Span);
+
+/// <summary>Gives the local a new cell, without a value until it is initialized.</summary>
+public sealed record WsIrNewCell(int Local, WsSourceSpan Span) : WsIrStatement(Span);
+
+/// <summary>Moves the local's value into a new cell, which the local then holds: a captured parameter.</summary>
+public sealed record WsIrBoxLocal(int Local, WsSourceSpan Span) : WsIrStatement(Span);
+
+/// <summary>Gives each local a new cell holding the value of its old one: a <c>for</c>'s per-iteration bindings.</summary>
+public sealed record WsIrCopyCells(IReadOnlyList<int> Locals, WsSourceSpan Span) : WsIrStatement(Span);
+
+/// <summary>Ends the function, giving the value, or <c>null</c>.</summary>
+public sealed record WsIrReturn(WsIrExpression? Value, WsSourceSpan Span) : WsIrStatement(Span);
 
 public abstract record WsIrStatement(WsSourceSpan Span);
 
@@ -28,7 +55,11 @@ public sealed record WsIrIf(WsIrExpression Condition, WsIrStatement Then, WsIrSt
 
 /// <summary>A loop; see <c>WsBoundLoop</c>. A missing condition is true.</summary>
 public sealed record WsIrLoop(WsIrExpression? Condition, WsIrStatement Body, WsIrExpression? Step, bool TestFirst, WsSourceSpan Span)
-    : WsIrStatement(Span);
+    : WsIrStatement(Span)
+{
+    /// <summary>Run after the body and before the step: a <c>for</c>'s captured variables, given new cells.</summary>
+    public WsIrCopyCells? PerIteration { get; init; }
+}
 
 /// <summary>Leaves the innermost loop.</summary>
 public sealed record WsIrBreak(WsSourceSpan Span) : WsIrStatement(Span);
@@ -64,6 +95,26 @@ public sealed record WsIrStoreLocal(int Local, WsIrExpression Value, WsSourceSpa
 public sealed record WsIrUnary(WsUnaryOperator Operator, WsIrExpression Operand, WsSourceSpan Span) : WsIrExpression(Span);
 
 public sealed record WsIrBinary(WsBinaryOperator Operator, WsIrExpression Left, WsIrExpression Right, WsSourceSpan Span)
+    : WsIrExpression(Span);
+
+/// <summary>Reads a captured local of this function, through the cell its frame holds.</summary>
+public sealed record WsIrLoadCell(int Local, WsSourceSpan Span) : WsIrExpression(Span);
+
+/// <summary>Stores into a captured local's cell; its value is the value stored.</summary>
+public sealed record WsIrStoreCell(int Local, WsIrExpression Value, WsSourceSpan Span) : WsIrExpression(Span);
+
+/// <summary>Reads a local of a function around this one, through this function's capture of it.</summary>
+public sealed record WsIrLoadCapture(int Capture, WsSourceSpan Span) : WsIrExpression(Span);
+
+public sealed record WsIrStoreCapture(int Capture, WsIrExpression Value, WsSourceSpan Span) : WsIrExpression(Span);
+
+/// <summary>A new closure of the program's function <paramref name="Function"/>.</summary>
+public sealed record WsIrMakeClosure(int Function, WsSourceSpan Span) : WsIrExpression(Span);
+
+public sealed record WsIrLoadBuiltin(int Builtin, WsSourceSpan Span) : WsIrExpression(Span);
+
+/// <summary>Calls the callee's value, which must be a function taking as many arguments as are given.</summary>
+public sealed record WsIrCall(WsIrExpression Callee, IReadOnlyList<WsIrExpression> Arguments, WsSourceSpan Span)
     : WsIrExpression(Span);
 
 public sealed record WsIrCallBuiltin(int Builtin, IReadOnlyList<WsIrExpression> Arguments, WsSourceSpan Span)

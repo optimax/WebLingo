@@ -8,23 +8,34 @@ namespace WebLingo.Bytecode;
 /// </summary>
 public static class WsDisassembler
 {
+    /// <summary>The module's entry point, then each of its other functions, with its index.</summary>
     public static string Format(WsCompiledModule module)
     {
         var text = new StringBuilder();
-        var function = module.EntryPoint;
-        text.Append("function ").Append(function.Name).Append(" (").Append(function.LocalCount).Append(" locals, ")
-            .Append(function.RegisterCount).Append(" registers)\n");
-        for (var i = 0; i < function.Code.Count; i++)
-        {
-            text.Append(i.ToString("D2", System.Globalization.CultureInfo.InvariantCulture)).Append("  ")
-                .Append(Format(module, function.Code[i])).Append('\n');
-        }
+        Append(text, module, module.EntryPoint, "");
+        for (var i = 0; i < module.Functions.Count; i++) Append(text.Append('\n'), module, module.Functions[i], $"function{i} ");
         return text.ToString();
     }
 
-    public static string Format(WsCompiledModule module, WsInstruction instruction)
+    private static void Append(StringBuilder text, WsCompiledModule module, WsFunction function, string label)
     {
-        var function = module.EntryPoint;
+        text.Append("function ").Append(label).Append(function.Name).Append(" (");
+        if (function.ParameterCount > 0) text.Append(function.ParameterCount).Append(" parameters, ");
+        if (function.Captures.Count > 0) text.Append(function.Captures.Count).Append(" captures, ");
+        text.Append(function.LocalCount).Append(" locals, ").Append(function.RegisterCount).Append(" registers)\n");
+        for (var i = 0; i < function.Code.Count; i++)
+        {
+            text.Append(i.ToString("D2", System.Globalization.CultureInfo.InvariantCulture)).Append("  ")
+                .Append(Format(module, function, function.Code[i])).Append('\n');
+        }
+    }
+
+    /// <summary>An instruction of the module's entry point.</summary>
+    public static string Format(WsCompiledModule module, WsInstruction instruction) =>
+        Format(module, module.EntryPoint, instruction);
+
+    public static string Format(WsCompiledModule module, WsFunction function, WsInstruction instruction)
+    {
         var (a, b, c, d) = (instruction.A, instruction.B, instruction.C, instruction.D);
         return instruction.OpCode switch
         {
@@ -40,6 +51,14 @@ public static class WsDisassembler
                 $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
             WsOpCode.JumpIfFalse or WsOpCode.JumpIfTrue => $"{instruction.OpCode} {Register(function, a)}, {b:D2}",
             WsOpCode.CheckBoolean => $"CheckBoolean {Register(function, a)}",
+            WsOpCode.NewCell or WsOpCode.BoxRegister or WsOpCode.CopyCell or WsOpCode.ReturnValue =>
+                $"{instruction.OpCode} {Register(function, a)}",
+            WsOpCode.LoadCell or WsOpCode.StoreCell => $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}",
+            WsOpCode.LoadCapture => $"LoadCapture {Register(function, a)}, capture{b}",
+            WsOpCode.StoreCapture => $"StoreCapture capture{a}, {Register(function, b)}",
+            WsOpCode.MakeClosure => $"MakeClosure {Register(function, a)}, function{b}",
+            WsOpCode.LoadBuiltin => $"LoadBuiltin {Register(function, a)}, {Import(module, b)}",
+            WsOpCode.Call => $"Call {Register(function, a)}, {Register(function, b)}({Arguments(function, c, d)})",
             WsOpCode.Add or WsOpCode.Subtract or WsOpCode.Multiply or WsOpCode.Divide =>
                 $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
             WsOpCode.CallBuiltin => $"CallBuiltin {Register(function, a)}, {Import(module, b)}({Arguments(function, c, d)})",

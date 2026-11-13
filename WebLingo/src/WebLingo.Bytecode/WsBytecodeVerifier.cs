@@ -33,7 +33,18 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             if (import is null || string.IsNullOrEmpty(import.Name)) return Fail($"Import {i} has no name.");
             if (import.Arity < 0) return Fail($"Import {i} ('{import.Name}') has a negative arity.");
         }
-        return VerifyFunction(module, module.EntryPoint);
+        if (module.Functions is null) return Fail("The module has no function table.");
+        if (module.EntryPoint is { } main && (main.ParameterCount != 0 || main.Captures is not { Count: 0 }))
+        {
+            return Fail("The entry point takes no parameters and captures nothing.");
+        }
+        var result = VerifyFunction(module, module.EntryPoint);
+        for (var i = 0; i < module.Functions.Count && result.IsValid; i++)
+        {
+            result = VerifyFunction(module, module.Functions[i]);
+            if (!result.IsValid) result = result with { Error = $"Function {i}: {result.Error}" };
+        }
+        return result;
     }
 
     private static WsVerificationResult VerifyFunction(WsCompiledModule module, WsFunction? function)
@@ -56,6 +67,11 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         {
             return Fail($"The function has {function.LocalNames.Count} local names for {function.LocalCount} locals.");
         }
+        if (function.ParameterCount < 0 || function.ParameterCount > function.LocalCount)
+        {
+            return Fail($"The function has {function.ParameterCount} parameters in {function.LocalCount} locals.");
+        }
+        if (function.Captures is null) return Fail("The function has no capture table.");
 
         var code = function.Code;
         for (var i = 0; i < code.Count; i++)
@@ -67,7 +83,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return Fail($"Instruction {i} ({code[i].OpCode}) is the last one, and the code would run off its end.", i);
             }
         }
-        return CheckRegistersAreWrittenBeforeRead(function);
+        return CheckRegistersAreWrittenBeforeRead(module, function);
     }
 
     private static string? CheckOperands(WsCompiledModule module, WsFunction function, WsInstruction instruction)
@@ -120,7 +136,47 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return Register(function, a, "condition") ?? Index(b, function.Code.Count, "target instruction")
                     ?? Unused(c, d);
             case WsOpCode.CheckBoolean:
+            case WsOpCode.NewCell:
+            case WsOpCode.BoxRegister:
+            case WsOpCode.CopyCell:
+            case WsOpCode.ReturnValue:
                 return Register(function, a, "operand") ?? Unused(b, c, d);
+            case WsOpCode.LoadCell:
+                return Register(function, a, "destination") ?? Register(function, b, "cell") ?? Unused(c, d);
+            case WsOpCode.StoreCell:
+                return Register(function, a, "cell") ?? Register(function, b, "source") ?? Unused(c, d);
+            case WsOpCode.LoadCapture:
+                return Register(function, a, "destination") ?? Index(b, function.Captures.Count, "capture") ?? Unused(c, d);
+            case WsOpCode.StoreCapture:
+                return Index(a, function.Captures.Count, "capture") ?? Register(function, b, "source") ?? Unused(c, d);
+            case WsOpCode.LoadBuiltin:
+                return Register(function, a, "destination") ?? Index(b, module.Imports.Count, "import") ?? Unused(c, d);
+            case WsOpCode.MakeClosure:
+            {
+                if ((Register(function, a, "destination") ?? Index(b, module.Functions.Count, "function") ?? Unused(c, d))
+                    is { } closureError)
+                {
+                    return closureError;
+                }
+                if (module.Functions[b] is not { Captures: { } captures }) return $"function {b} is missing.";
+                foreach (var capture in captures)
+                {
+                    var error = capture.FromLocal
+                        ? Register(function, capture.Index, "captured")
+                        : Index(capture.Index, function.Captures.Count, "capture");
+                    if (error is not null) return $"function {b}'s capture: {error}";
+                }
+                return null;
+            }
+            case WsOpCode.Call:
+                if ((Register(function, a, "destination") ?? Register(function, b, "callee")) is { } callError) return callError;
+                if (d < 0) return $"its argument count, {d}, is negative.";
+                if (d == 0) return Unused(c);
+                if (c < 0 || c > function.RegisterCount - d)
+                {
+                    return $"its arguments, registers {c} to {(long)c + d - 1}, are not all in the function's {function.RegisterCount}.";
+                }
+                return null;
             case WsOpCode.Return:
                 return Unused(a, b, c, d);
             default:
@@ -139,7 +195,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
     /// until nothing changes. A set only shrinks, so this ends; its memory and its steps are bounded, and a module
     /// beyond either bound is rejected rather than verified slowly.
     /// </summary>
-    private static WsVerificationResult CheckRegistersAreWrittenBeforeRead(WsFunction function)
+    private static WsVerificationResult CheckRegistersAreWrittenBeforeRead(WsCompiledModule module, WsFunction function)
     {
         var code = function.Code;
         const int locals = 0; // Every register, locals included, must be written before it is read.
@@ -162,7 +218,9 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             return Fail($"The function is too large to verify: {blockCount} blocks of {function.RegisterCount} registers.");
         }
 
-        var atBlockStart = new Dictionary<int, ulong[]> { [0] = new ulong[words] };
+        var entry = new ulong[words];
+        for (var parameter = 0; parameter < function.ParameterCount; parameter++) Set(entry, parameter); // Arguments.
+        var atBlockStart = new Dictionary<int, ulong[]> { [0] = entry };
         var pending = new Stack<int>();
         pending.Push(0);
         var steps = 0L;
@@ -174,7 +232,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             {
                 if (++steps > MaxSteps) return Fail("The function is too complex to verify in the steps allowed.");
                 var instruction = code[index];
-                var unwritten = FirstUnwrittenRead(instruction, state, locals);
+                var unwritten = FirstUnwrittenRead(module, instruction, state, locals);
                 if (unwritten >= 0)
                 {
                     return Fail(
@@ -183,7 +241,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 }
                 if (Writes(instruction) is int target && target >= locals) Set(state, target - locals);
 
-                if (instruction.OpCode == WsOpCode.Return) break;
+                if (instruction.OpCode is WsOpCode.Return or WsOpCode.ReturnValue) break;
                 if (instruction.OpCode == WsOpCode.Jump)
                 {
                     Flow(instruction.A, state, atBlockStart, pending);
@@ -233,10 +291,41 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
     }
 
     /// <summary>The first register the instruction reads that is not certainly written, or -1.</summary>
-    private static int FirstUnwrittenRead(WsInstruction instruction, ulong[] state, int locals)
+    private static int FirstUnwrittenRead(WsCompiledModule module, WsInstruction instruction, ulong[] state, int locals)
     {
         switch (instruction.OpCode)
         {
+            case WsOpCode.BoxRegister:
+            case WsOpCode.CopyCell:
+            case WsOpCode.ReturnValue:
+                return Unwritten(instruction.A, state, locals);
+            case WsOpCode.LoadCell:
+            case WsOpCode.StoreCapture:
+                return Unwritten(instruction.B, state, locals);
+            case WsOpCode.StoreCell:
+            {
+                var cell = Unwritten(instruction.A, state, locals);
+                return cell >= 0 ? cell : Unwritten(instruction.B, state, locals);
+            }
+            case WsOpCode.MakeClosure:
+                foreach (var capture in module.Functions[instruction.B].Captures)
+                {
+                    if (!capture.FromLocal) continue;
+                    var captured = Unwritten(capture.Index, state, locals);
+                    if (captured >= 0) return captured;
+                }
+                return -1;
+            case WsOpCode.Call:
+            {
+                var callee = Unwritten(instruction.B, state, locals);
+                if (callee >= 0) return callee;
+                for (var i = 0; i < instruction.D; i++)
+                {
+                    var argument = Unwritten(instruction.C + i, state, locals);
+                    if (argument >= 0) return argument;
+                }
+                return -1;
+            }
             case WsOpCode.Move:
             case WsOpCode.Negate:
             case WsOpCode.Plus:
@@ -284,11 +373,13 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         WsOpCode.LoadConstant or WsOpCode.Move or WsOpCode.Negate or WsOpCode.Plus or WsOpCode.Add or WsOpCode.Subtract
             or WsOpCode.Multiply or WsOpCode.Divide or WsOpCode.CallBuiltin or WsOpCode.LoadNull or WsOpCode.LoadBoolean
             or WsOpCode.Not or WsOpCode.Equal or WsOpCode.NotEqual or WsOpCode.Less or WsOpCode.LessOrEqual
-            or WsOpCode.Greater or WsOpCode.GreaterOrEqual => instruction.A,
+            or WsOpCode.Greater or WsOpCode.GreaterOrEqual or WsOpCode.NewCell or WsOpCode.BoxRegister or WsOpCode.CopyCell
+            or WsOpCode.LoadCell or WsOpCode.LoadCapture or WsOpCode.MakeClosure or WsOpCode.LoadBuiltin
+            or WsOpCode.Call => instruction.A,
         _ => null
     };
 
-    private static bool EndsPath(WsOpCode opCode) => opCode is WsOpCode.Return or WsOpCode.Jump;
+    private static bool EndsPath(WsOpCode opCode) => opCode is WsOpCode.Return or WsOpCode.ReturnValue or WsOpCode.Jump;
 
     private static string? Register(WsFunction function, int register, string role) =>
         register >= 0 && register < function.RegisterCount

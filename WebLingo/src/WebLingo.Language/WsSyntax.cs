@@ -11,7 +11,8 @@ public sealed record WsCompilationUnitSyntax(IReadOnlyList<WsStatementSyntax> St
 
 public abstract record WsStatementSyntax(WsSourceSpan Span) : WsSyntaxNode(Span);
 
-public enum WsDeclarationKind { Var, Const }
+/// <summary>What declares a name: <c>var</c>, <c>const</c>, a function declaration, or a function's parameter.</summary>
+public enum WsDeclarationKind { Var, Const, Function, Parameter }
 
 /// <summary>
 /// <c>var x = 1;</c> or <c>const x = 1;</c>; the span includes the semicolon. <paramref name="Initializer"/> is null
@@ -50,7 +51,22 @@ public sealed record WsBreakSyntax(WsSourceSpan Span) : WsStatementSyntax(Span);
 
 public sealed record WsContinueSyntax(WsSourceSpan Span) : WsStatementSyntax(Span);
 
+/// <summary>A function's parameter, by name.</summary>
+public sealed record WsParameterSyntax(string Name, WsSourceSpan Span) : WsSyntaxNode(Span);
+
+/// <summary><c>function name(parameters) { body }</c>, in scope throughout its block (specification, section 3.5).</summary>
+public sealed record WsFunctionDeclarationSyntax(
+    string Name, WsSourceSpan NameSpan, IReadOnlyList<WsParameterSyntax> Parameters, WsBlockSyntax Body, WsSourceSpan Span)
+    : WsStatementSyntax(Span);
+
+/// <summary><c>return value;</c>, or <c>return;</c>, which gives <c>null</c>.</summary>
+public sealed record WsReturnSyntax(WsExpressionSyntax? Value, WsSourceSpan Span) : WsStatementSyntax(Span);
+
 public abstract record WsExpressionSyntax(WsSourceSpan Span) : WsSyntaxNode(Span);
+
+/// <summary><c>function (parameters) { body }</c>, a function value.</summary>
+public sealed record WsFunctionExpressionSyntax(IReadOnlyList<WsParameterSyntax> Parameters, WsBlockSyntax Body, WsSourceSpan Span)
+    : WsExpressionSyntax(Span);
 
 public sealed record WsIntegerLiteralSyntax(long Value, WsSourceSpan Span) : WsExpressionSyntax(Span);
 

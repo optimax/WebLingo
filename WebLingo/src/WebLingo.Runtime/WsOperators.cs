@@ -126,7 +126,7 @@ public static class WsOperators
                 ? left.Handle == right.Handle
                 : string.Equals(heap.GetString(left), heap.GetString(right), StringComparison.Ordinal);
         }
-        return left.Kind == right.Kind && (left.Kind == WsValueKind.Null || left.AsBoolean == right.AsBoolean);
+        return left == right; // The same kind and payload: null, a Boolean, or a function by identity.
     }
 
     private static bool IsNumber(WsValue value) => value.Kind is WsValueKind.Int64 or WsValueKind.Binary64;

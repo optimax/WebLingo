@@ -54,9 +54,34 @@ public enum WsOpCode : byte
     JumpIfTrue,
     /// <summary>A = register, which must be a Boolean; nothing is written.</summary>
     CheckBoolean,
+    /// <summary>A = destination register; a new cell, without a value until one is stored.</summary>
+    NewCell,
+    /// <summary>A = register; its value moves into a new cell, which the register then holds.</summary>
+    BoxRegister,
+    /// <summary>A = register holding a cell; it then holds a new cell, with the old one's value.</summary>
+    CopyCell,
+    /// <summary>A = destination register, B = register holding a cell; its value (WS2004 if it has none yet).</summary>
+    LoadCell,
+    /// <summary>A = register holding a cell, B = source register; stores the value in the cell.</summary>
+    StoreCell,
+    /// <summary>A = destination register, B = capture index; the captured cell's value (WS2004 if it has none yet).</summary>
+    LoadCapture,
+    /// <summary>A = capture index, B = source register; stores the value in the captured cell.</summary>
+    StoreCapture,
+    /// <summary>A = destination register, B = function index; a closure, capturing as the function's captures say.</summary>
+    MakeClosure,
+    /// <summary>A = destination register, B = import index; the built-in as a value.</summary>
+    LoadBuiltin,
+    /// <summary>
+    /// A = destination register, B = callee register, which must hold a function taking D arguments (WS2005, WS2006),
+    /// C = first argument register, D = argument count.
+    /// </summary>
+    Call,
+    /// <summary>A = register; ends the function, giving its value.</summary>
+    ReturnValue,
     /// <summary>A = the index of the instruction to go to.</summary>
     Jump,
-    /// <summary>Ends the function.</summary>
+    /// <summary>Ends the function, giving <c>null</c>.</summary>
     Return,
 }
 
@@ -89,12 +114,26 @@ public sealed record WsFunction(
 {
     /// <summary>The most registers a function may have (specification, section 5.3, proposed).</summary>
     public const int MaxRegisters = 65535;
+
+    /// <summary>How many arguments it takes, into its first registers.</summary>
+    public int ParameterCount { get; init; }
+    /// <summary>The cells a closure of it captures, from the function that makes the closure.</summary>
+    public IReadOnlyList<WsCapture> Captures { get; init; } = [];
 }
 
-/// <summary>An in-memory module: its constants, the built-ins it imports, and the function it runs.</summary>
+/// <summary>
+/// Where a closure's capture comes from when <see cref="WsOpCode.MakeClosure"/> makes it: the cell in a register of
+/// the making function (<paramref name="FromLocal"/>), or one of that function's own captures.
+/// </summary>
+public readonly record struct WsCapture(bool FromLocal, int Index);
+
+/// <summary>An in-memory module: its constants, the built-ins it imports, the function it runs, and its other functions.</summary>
 public sealed record WsCompiledModule(
     string Name, IReadOnlyList<WsConstant> Constants, IReadOnlyList<WsImport> Imports, WsFunction EntryPoint)
 {
+    /// <summary>The functions the module declares, besides its entry point, which closures are made of by index.</summary>
+    public IReadOnlyList<WsFunction> Functions { get; init; } = [];
+
     /// <summary>The smallest valid module: it returns at once.</summary>
     public static WsCompiledModule Empty(string name) =>
         new(name, [], [], new WsFunction("main", 0, 0, [new WsInstruction(WsOpCode.Return)]));
