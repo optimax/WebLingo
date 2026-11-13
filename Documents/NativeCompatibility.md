@@ -12,6 +12,10 @@
 | Invariant number parsing (`double.Parse` with `NumberStyles.Float` and `CultureInfo.InvariantCulture`) | Planned | The lexer's binary64 literals (`WsLexer`). The Native C# runtime must give the same value: the binary64 nearest to the decimal, as IEEE 754 rounds it |
 | `System.Text.StringBuilder` | Planned | The disassembler, the lexer's string literals, and `WsCollectedOutput` (`WebLingo.StdLib`), which collects a script's output for tests and hosts |
 | `volatile` fields | Planned | `WsCancellationSignal`, set by the host, read by the VM |
+| `ref readonly` locals and `in` parameters | Planned | The register VM reads its instructions where they are, without copying them |
+| `Math.BigMul(long, long, out long)` | Planned | The register VM's int64 multiplication, whose 128-bit product shows an overflow |
+| `Array.Resize`, `Array.Clear` | Planned | The register VM's stack of frames, and the registers a returning call clears |
+| `[MethodImpl(MethodImplOptions.AggressiveInlining)]` | Planned | A hint to .NET's JIT on the register VM's arithmetic and comparisons; a compiler that ignores it still compiles the code correctly |
 | .NET Task / ValueTask | Adapted only | Not permitted as WebLingo core async contract |
 | .NET `CancellationToken` | Not used | The VM's cancellation is WebLingo's own `WsCancellationSignal` (WS-P007) |
 | System.Diagnostics.Stopwatch | Adapted | DotNetClock only |

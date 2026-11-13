@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using WebLingo.Bytecode;
 using WebLingo.Core;
 using WebLingo.Runtime;
@@ -11,6 +12,13 @@ namespace WebLingo.VM;
 /// the thread's stack. Each frame's registers, and its closure, are roots of the execution's heap. A runtime error
 /// stops the execution and is returned with the source span of the instruction that raised it. Nothing a module or
 /// a built-in does can crash the VM: a failure is a result.
+/// <para>
+/// Its dispatch is tuned for speed (section 5.6): one loop runs every instruction, with the running frame's code,
+/// registers and position in locals; the budget and the cancellation signal are looked at only when a count of
+/// instructions comes due; integer and binary64 arithmetic and comparisons are done in the loop, and anything else
+/// (strings, mixed operands, every error) by <see cref="WsOperators"/>, so that the results and the messages are the
+/// runtime's; and a call reuses the frame, and the registers, that the last call at its depth left.
+/// </para>
 /// </summary>
 public sealed class WsVirtualMachine : IWsVirtualMachine
 {
@@ -76,211 +84,360 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                 : WsValue.FromBinary64Bits(constant.Bits);
         }
 
-        return new Execution(module, constants, builtins, context, heap).Run();
+        // Each function's code as an array, which the loop indexes directly.
+        var codes = new WsInstruction[module.Functions.Count][];
+        for (var i = 0; i < codes.Length; i++) codes[i] = ToArray(module.Functions[i].Code);
+
+        return new Execution(module, ToArray(module.EntryPoint.Code), codes, constants, builtins, context, heap).Run();
     }
 
-    /// <summary>A function running: its registers, the closure it runs as (its roots), and where it is.</summary>
-    private sealed class Frame(WsFunction function, WsValue[] registers, WsValue[] closure, WsValue[] cells)
+    /// <summary>A copy of the code, without LINQ, which the portable core does not use.</summary>
+    private static WsInstruction[] ToArray(IReadOnlyList<WsInstruction> code)
     {
-        public WsFunction Function { get; } = function;
-        public WsValue[] Registers { get; } = registers;
-        /// <summary>The closure, as the one root that keeps its captured cells alive; empty for the entry point.</summary>
-        public WsValue[] Closure { get; } = closure;
-        public WsValue[] Cells { get; } = cells;
-        public int Pc { get; set; }
+        var array = new WsInstruction[code.Count];
+        for (var i = 0; i < array.Length; i++) array[i] = code[i];
+        return array;
+    }
+
+    /// <summary>
+    /// A function running, at one depth of the VM's stack: its code, its registers, the closure it runs as (a root,
+    /// which keeps its captured cells alive), and where its caller goes on. A frame, and its registers, are reused by
+    /// the next call at the same depth; its registers may be more than the function's, and are null when unused.
+    /// </summary>
+    private sealed class Frame
+    {
+        public WsFunction Function = null!;
+        public WsInstruction[] Code = [];
+        public WsValue[] Registers = [];
+        public readonly WsValue[] Closure = new WsValue[1];
+        public WsValue[] Cells = [];
+        /// <summary>The next instruction, while the frame waits for a call it made to return.</summary>
+        public int Pc;
         /// <summary>The caller's register that the call's result goes to.</summary>
-        public int ResultRegister { get; set; }
+        public int ResultRegister;
     }
 
-    private sealed class Execution(WsCompiledModule module, WsValue[] constants, IWsBuiltinFunction[] builtins,
-        WsExecutionContext context, WsHeap heap)
+    private sealed class Execution(WsCompiledModule module, WsInstruction[] entryCode, WsInstruction[][] codes,
+        WsValue[] constants, IWsBuiltinFunction[] builtins, WsExecutionContext context, WsHeap heap)
     {
-        private readonly Stack<Frame> _callers = new();
-
         public WsExecutionResult Run()
         {
-            var frame = new Frame(module.EntryPoint, new WsValue[module.EntryPoint.RegisterCount], [], []);
+            var frames = new Frame[16];
+            var depth = 0;
+            var frame = frames[0] = new Frame
+            {
+                Function = module.EntryPoint,
+                Code = entryCode,
+                Registers = new WsValue[module.EntryPoint.RegisterCount]
+            };
             heap.AddRoots(frame.Registers);
+
+            var code = frame.Code;
+            var registers = frame.Registers;
+            var cells = frame.Cells;
+            var pc = 0;
             var budget = context.InstructionBudget;
             var cancellation = context.Cancellation;
+            var maxCallDepth = context.Resources.MaxCallDepth;
             var executed = 0L;
-            while (true)
-            {
-                var pc = frame.Pc;
-                if (executed >= budget)
-                {
-                    return Failure(WsDiagnosticCodes.BudgetExceeded,
-                        $"The program ran {executed} instructions, its whole budget, and was stopped.", SpanOf(frame.Function, pc))
-                        with { Instructions = executed };
-                }
-                if (cancellation is not null && executed % CancellationInterval == 0 && cancellation.IsCancellationRequested)
-                {
-                    return Failure(WsDiagnosticCodes.Cancelled, "The program was cancelled.", SpanOf(frame.Function, pc))
-                        with { Instructions = executed };
-                }
-                executed++;
-
-                WsRuntimeError? error;
-                Frame? next;
-                try
-                {
-                    error = Step(frame, out next);
-                }
-                catch (Exception exception) when (exception is ArgumentException or InvalidOperationException
-                                                      or IndexOutOfRangeException)
-                {
-                    // Only bytecode the verifier cannot judge (a register of the wrong kind) gets here.
-                    error = new WsRuntimeError(WsDiagnosticCodes.BytecodeVerificationFailure,
-                        $"The bytecode is invalid: {exception.Message}");
-                    next = frame;
-                }
-                if (error is not null)
-                {
-                    return Failure(error.Code, error.Message, SpanOf(frame.Function, pc)) with { Instructions = executed };
-                }
-                if (next is null) return WsExecutionResult.Success with { Instructions = executed };
-                frame = next;
-            }
-        }
-
-        /// <summary>Runs the frame's next instruction; <paramref name="next"/> is the frame to go on with, or null at the end.</summary>
-        private WsRuntimeError? Step(Frame frame, out Frame? next)
-        {
-            next = frame;
-            var registers = frame.Registers;
-            var instruction = frame.Function.Code[frame.Pc];
+            var dueAt = 0L; // The count of instructions at which the budget and the cancellation signal are looked at.
             WsRuntimeError? error = null;
-            switch (instruction.OpCode)
+            try
             {
-                case WsOpCode.LoadConstant:
-                    registers[instruction.A] = constants[instruction.B];
-                    break;
-                case WsOpCode.Move:
-                    registers[instruction.A] = registers[instruction.B];
-                    break;
-                case WsOpCode.Negate:
-                    if (WsOperators.TryNegate(registers[instruction.B], out var negated, out error)) registers[instruction.A] = negated;
-                    break;
-                case WsOpCode.Plus:
-                    if (WsOperators.TryPlus(registers[instruction.B], out var same, out error)) registers[instruction.A] = same;
-                    break;
-                case WsOpCode.Add:
-                case WsOpCode.Subtract:
-                case WsOpCode.Multiply:
-                case WsOpCode.Divide:
-                    if (WsOperators.TryBinary(ArithmeticOf(instruction.OpCode), registers[instruction.B],
-                            registers[instruction.C], heap, out var value, out error))
-                    {
-                        registers[instruction.A] = value;
-                    }
-                    break;
-                case WsOpCode.CallBuiltin:
-                    error = CallBuiltin(builtins[instruction.B], registers, instruction);
-                    break;
-                case WsOpCode.LoadNull:
-                    registers[instruction.A] = WsValue.Null;
-                    break;
-                case WsOpCode.LoadBoolean:
-                    registers[instruction.A] = WsValue.FromBoolean(instruction.B != 0);
-                    break;
-                case WsOpCode.Not:
-                    if (WsOperators.TryNot(registers[instruction.B], out var not, out error)) registers[instruction.A] = not;
-                    break;
-                case WsOpCode.Equal:
-                case WsOpCode.NotEqual:
-                case WsOpCode.Less:
-                case WsOpCode.LessOrEqual:
-                case WsOpCode.Greater:
-                case WsOpCode.GreaterOrEqual:
-                    if (WsOperators.TryCompare(ComparisonOf(instruction.OpCode), registers[instruction.B],
-                            registers[instruction.C], heap, out var compared, out error))
-                    {
-                        registers[instruction.A] = compared;
-                    }
-                    break;
-                case WsOpCode.JumpIfFalse:
-                case WsOpCode.JumpIfTrue:
+                while (true)
                 {
-                    var condition = registers[instruction.A];
-                    error = WsOperators.CheckBoolean(condition, "A condition");
-                    if (error is null && condition.AsBoolean == (instruction.OpCode == WsOpCode.JumpIfTrue))
+                    if (executed == dueAt)
                     {
-                        frame.Pc = instruction.B;
-                        return null;
+                        if (executed >= budget)
+                        {
+                            return Failure(WsDiagnosticCodes.BudgetExceeded,
+                                    $"The program ran {executed} instructions, its whole budget, and was stopped.",
+                                    SpanOf(frame.Function, pc))
+                                with { Instructions = executed };
+                        }
+                        if (cancellation is not null && executed % CancellationInterval == 0
+                            && cancellation.IsCancellationRequested)
+                        {
+                            var span = SpanOf(frame.Function, pc);
+                            return Failure(WsDiagnosticCodes.Cancelled, "The program was cancelled.", span)
+                                with { Instructions = executed };
+                        }
+                        dueAt = Math.Min(budget, (executed / CancellationInterval + 1) * CancellationInterval);
                     }
-                    break;
-                }
-                case WsOpCode.CheckBoolean:
-                    error = WsOperators.CheckBoolean(registers[instruction.A], "'&&' and '||' need Booleans:");
-                    break;
-                case WsOpCode.NewCell:
-                    heap.TryAllocateCell(WsValue.Null, false, out registers[instruction.A], out error);
-                    break;
-                case WsOpCode.BoxRegister:
-                    if (heap.TryAllocateCell(registers[instruction.A], true, out var boxed, out error)) registers[instruction.A] = boxed;
-                    break;
-                case WsOpCode.CopyCell:
-                {
-                    var hasValue = heap.TryReadCell(registers[instruction.A], out var held);
-                    if (heap.TryAllocateCell(held, hasValue, out var copy, out error)) registers[instruction.A] = copy;
-                    break;
-                }
-                case WsOpCode.LoadCell:
-                    error = ReadCell(registers[instruction.B], frame.Function, instruction.B, out registers[instruction.A]);
-                    break;
-                case WsOpCode.StoreCell:
-                    heap.WriteCell(registers[instruction.A], registers[instruction.B]);
-                    break;
-                case WsOpCode.LoadCapture:
-                    error = ReadCell(frame.Cells[instruction.B], null, instruction.B, out registers[instruction.A]);
-                    break;
-                case WsOpCode.StoreCapture:
-                    heap.WriteCell(frame.Cells[instruction.A], registers[instruction.B]);
-                    break;
-                case WsOpCode.MakeClosure:
-                {
-                    var captures = module.Functions[instruction.B].Captures;
-                    var cells = new WsValue[captures.Count];
-                    for (var i = 0; i < cells.Length; i++)
+                    executed++;
+
+                    ref readonly var ins = ref code[pc];
+                    switch (ins.OpCode)
                     {
-                        cells[i] = captures[i].FromLocal ? registers[captures[i].Index] : frame.Cells[captures[i].Index];
-                        if (cells[i].Kind != WsValueKind.Cell) throw new InvalidOperationException("A capture is not a cell.");
+                        case WsOpCode.LoadConstant:
+                            registers[ins.A] = constants[ins.B];
+                            pc++;
+                            continue;
+                        case WsOpCode.Move:
+                            registers[ins.A] = registers[ins.B];
+                            pc++;
+                            continue;
+                        case WsOpCode.Negate:
+                        {
+                            if (!WsOperators.TryNegate(registers[ins.B], out var negated, out error)) break;
+                            registers[ins.A] = negated;
+                            pc++;
+                            continue;
+                        }
+                        case WsOpCode.Plus:
+                        {
+                            if (!WsOperators.TryPlus(registers[ins.B], out var same, out error)) break;
+                            registers[ins.A] = same;
+                            pc++;
+                            continue;
+                        }
+                        case WsOpCode.Add:
+                            if (!Arithmetic(WsOpCode.Add, registers, ins, out error)) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.Subtract:
+                            if (!Arithmetic(WsOpCode.Subtract, registers, ins, out error)) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.Multiply:
+                            if (!Arithmetic(WsOpCode.Multiply, registers, ins, out error)) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.Divide:
+                            if (!Arithmetic(WsOpCode.Divide, registers, ins, out error)) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.Equal:
+                            if (!Compare(WsOpCode.Equal, registers, ins, out error)) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.NotEqual:
+                            if (!Compare(WsOpCode.NotEqual, registers, ins, out error)) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.Less:
+                            if (!Compare(WsOpCode.Less, registers, ins, out error)) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.LessOrEqual:
+                            if (!Compare(WsOpCode.LessOrEqual, registers, ins, out error)) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.Greater:
+                            if (!Compare(WsOpCode.Greater, registers, ins, out error)) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.GreaterOrEqual:
+                            if (!Compare(WsOpCode.GreaterOrEqual, registers, ins, out error)) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.LoadNull:
+                            registers[ins.A] = WsValue.Null;
+                            pc++;
+                            continue;
+                        case WsOpCode.LoadBoolean:
+                            registers[ins.A] = WsValue.FromBoolean(ins.B != 0);
+                            pc++;
+                            continue;
+                        case WsOpCode.Not:
+                        {
+                            if (!WsOperators.TryNot(registers[ins.B], out var not, out error)) break;
+                            registers[ins.A] = not;
+                            pc++;
+                            continue;
+                        }
+                        case WsOpCode.JumpIfFalse:
+                        {
+                            var condition = registers[ins.A];
+                            if (condition.Kind != WsValueKind.Boolean)
+                            {
+                                error = WsOperators.CheckBoolean(condition, "A condition");
+                                break;
+                            }
+                            pc = condition.AsBoolean ? pc + 1 : ins.B;
+                            continue;
+                        }
+                        case WsOpCode.JumpIfTrue:
+                        {
+                            var condition = registers[ins.A];
+                            if (condition.Kind != WsValueKind.Boolean)
+                            {
+                                error = WsOperators.CheckBoolean(condition, "A condition");
+                                break;
+                            }
+                            pc = condition.AsBoolean ? ins.B : pc + 1;
+                            continue;
+                        }
+                        case WsOpCode.CheckBoolean:
+                            if (registers[ins.A].Kind != WsValueKind.Boolean)
+                            {
+                                error = WsOperators.CheckBoolean(registers[ins.A], "'&&' and '||' need Booleans:");
+                                break;
+                            }
+                            pc++;
+                            continue;
+                        case WsOpCode.Jump:
+                            pc = ins.A;
+                            continue;
+                        case WsOpCode.NewCell:
+                            if (!heap.TryAllocateCell(WsValue.Null, false, out registers[ins.A], out error)) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.BoxRegister:
+                        {
+                            if (!heap.TryAllocateCell(registers[ins.A], true, out var boxed, out error)) break;
+                            registers[ins.A] = boxed;
+                            pc++;
+                            continue;
+                        }
+                        case WsOpCode.CopyCell:
+                        {
+                            var hasValue = heap.TryReadCell(registers[ins.A], out var held);
+                            if (!heap.TryAllocateCell(held, hasValue, out var copy, out error)) break;
+                            registers[ins.A] = copy;
+                            pc++;
+                            continue;
+                        }
+                        case WsOpCode.LoadCell:
+                            error = ReadCell(registers[ins.B], frame.Function, ins.B, out registers[ins.A]);
+                            if (error is not null) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.StoreCell:
+                            heap.WriteCell(registers[ins.A], registers[ins.B]);
+                            pc++;
+                            continue;
+                        case WsOpCode.LoadCapture:
+                            error = ReadCell(cells[ins.B], null, ins.B, out registers[ins.A]);
+                            if (error is not null) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.StoreCapture:
+                            heap.WriteCell(cells[ins.A], registers[ins.B]);
+                            pc++;
+                            continue;
+                        case WsOpCode.MakeClosure:
+                        {
+                            var captures = module.Functions[ins.B].Captures;
+                            var captured = new WsValue[captures.Count];
+                            for (var i = 0; i < captured.Length; i++)
+                            {
+                                captured[i] = captures[i].FromLocal ? registers[captures[i].Index] : cells[captures[i].Index];
+                                if (captured[i].Kind != WsValueKind.Cell)
+                                {
+                                    throw new InvalidOperationException("A capture is not a cell.");
+                                }
+                            }
+                            if (!heap.TryAllocateClosure(ins.B, captured, out var closure, out error)) break;
+                            registers[ins.A] = closure;
+                            pc++;
+                            continue;
+                        }
+                        case WsOpCode.LoadBuiltin:
+                            registers[ins.A] = WsValue.FromHandle(WsValueKind.Builtin, ins.B);
+                            pc++;
+                            continue;
+                        case WsOpCode.CallBuiltin:
+                            error = CallBuiltin(builtins[ins.B], registers, ins);
+                            if (error is not null) break;
+                            pc++;
+                            continue;
+                        case WsOpCode.Call:
+                        {
+                            // Register B must hold a function taking D arguments: a built-in is called at once, a closure
+                            // in a new frame, its arguments in its first registers. The compiler checks what it can, and
+                            // this the rest (WS2005, WS2006).
+                            var callee = registers[ins.B];
+                            if (callee.Kind == WsValueKind.Builtin)
+                            {
+                                var builtin = builtins[callee.Handle];
+                                error = builtin.Arity != ins.D
+                                    ? WrongArgumentCount(builtin.Name, builtin.Arity, ins.D)
+                                    : CallBuiltin(builtin, registers, ins);
+                                if (error is not null) break;
+                                pc++;
+                                continue;
+                            }
+                            if (callee.Kind != WsValueKind.Function)
+                            {
+                                var what = Capitalized(WsValueFormatter.Describe(callee));
+                                error = new WsRuntimeError(WsDiagnosticCodes.NotAFunction,
+                                    $"{what} is not a function, and cannot be called.");
+                                break;
+                            }
+                            var (index, closureCells) = heap.GetClosure(callee);
+                            var function = module.Functions[index];
+                            if (function.ParameterCount != ins.D)
+                            {
+                                error = WrongArgumentCount(function.Name, function.ParameterCount, ins.D);
+                                break;
+                            }
+                            if (depth + 1 >= maxCallDepth)
+                            {
+                                error = new WsRuntimeError(WsDiagnosticCodes.BudgetExceeded,
+                                    $"The calls nest more than {maxCallDepth} deep, which this execution allows.");
+                                break;
+                            }
+
+                            frame.Pc = pc + 1;
+                            if (++depth == frames.Length) Array.Resize(ref frames, frames.Length * 2);
+                            var called = frames[depth] ??= new Frame();
+                            if (called.Registers.Length < function.RegisterCount)
+                            {
+                                called.Registers = new WsValue[function.RegisterCount];
+                            }
+                            var calledRegisters = called.Registers;
+                            for (var i = 0; i < ins.D; i++) calledRegisters[i] = registers[ins.C + i];
+                            called.Function = function;
+                            called.Code = codes[index];
+                            called.Cells = closureCells;
+                            called.Closure[0] = callee;
+                            called.ResultRegister = ins.A;
+                            heap.AddRoots(calledRegisters);
+                            heap.AddRoots(called.Closure);
+
+                            frame = called;
+                            code = called.Code;
+                            registers = calledRegisters;
+                            cells = closureCells;
+                            pc = 0;
+                            continue;
+                        }
+                        case WsOpCode.Return:
+                        case WsOpCode.ReturnValue:
+                        {
+                            var result = ins.OpCode == WsOpCode.ReturnValue ? registers[ins.A] : WsValue.Null;
+                            if (depth == 0) return WsExecutionResult.Success with { Instructions = executed };
+                            heap.RemoveLastRoots(frame.Closure);
+                            heap.RemoveLastRoots(registers);
+                            Array.Clear(registers, 0, frame.Function.RegisterCount); // So that nothing stays reachable.
+                            frame.Closure[0] = WsValue.Null;
+                            var resultRegister = frame.ResultRegister;
+
+                            frame = frames[--depth];
+                            code = frame.Code;
+                            registers = frame.Registers;
+                            cells = frame.Cells;
+                            pc = frame.Pc;
+                            registers[resultRegister] = result;
+                            continue;
+                        }
+                        default:
+                            // The verifier admits no other operation; this only guards against a verifier that did.
+                            error = new WsRuntimeError(WsDiagnosticCodes.BytecodeVerificationFailure,
+                                $"The operation {(int)ins.OpCode} is unknown.");
+                            break;
                     }
-                    if (heap.TryAllocateClosure(instruction.B, cells, out var closure, out error)) registers[instruction.A] = closure;
-                    break;
+                    return Failure(error!.Code, error.Message, SpanOf(frame.Function, pc)) with { Instructions = executed };
                 }
-                case WsOpCode.LoadBuiltin:
-                    registers[instruction.A] = WsValue.FromHandle(WsValueKind.Builtin, instruction.B);
-                    break;
-                case WsOpCode.Call:
-                    return Call(frame, instruction, out next);
-                case WsOpCode.Jump:
-                    frame.Pc = instruction.A;
-                    return null;
-                case WsOpCode.Return:
-                case WsOpCode.ReturnValue:
-                {
-                    var result = instruction.OpCode == WsOpCode.ReturnValue ? registers[instruction.A] : WsValue.Null;
-                    if (_callers.Count == 0)
-                    {
-                        next = null;
-                        return null;
-                    }
-                    heap.RemoveLastRoots(frame.Closure);
-                    heap.RemoveLastRoots(frame.Registers);
-                    var caller = _callers.Pop();
-                    caller.Registers[frame.ResultRegister] = result;
-                    next = caller;
-                    return null;
-                }
-                default:
-                    // The verifier admits no other operation; this only guards against a verifier that did.
-                    error = new WsRuntimeError(WsDiagnosticCodes.BytecodeVerificationFailure,
-                        $"The operation {(int)instruction.OpCode} is unknown.");
-                    break;
             }
-            if (error is null) frame.Pc++;
-            return error;
+            catch (Exception exception) when (exception is ArgumentException or InvalidOperationException
+                                                  or IndexOutOfRangeException)
+            {
+                // Only bytecode the verifier cannot judge (a register of the wrong kind) gets here.
+                return Failure(WsDiagnosticCodes.BytecodeVerificationFailure, $"The bytecode is invalid: {exception.Message}",
+                    SpanOf(frame.Function, pc)) with { Instructions = executed };
+            }
         }
 
         /// <summary>A cell's value; WS2004 if it has none yet, which only a hoisted function can meet (section 3.5).</summary>
@@ -293,44 +450,102 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         }
 
         /// <summary>
-        /// Calls the value in register B: a built-in at once, or a closure in a new frame, its arguments in its first
-        /// registers. Anything else is not a function (WS2005), and a function given the wrong number of arguments is
-        /// WS2006: the compiler checks what it can, and the VM the rest.
+        /// Arithmetic: two int64s, without overflow, or two binary64s, here; anything else, and every error, by
+        /// <see cref="WsOperators"/>, which gives the same results.
         /// </summary>
-        private WsRuntimeError? Call(Frame frame, WsInstruction instruction, out Frame? next)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool Arithmetic(WsOpCode opCode, WsValue[] registers, in WsInstruction ins, out WsRuntimeError? error)
         {
-            next = frame;
-            var callee = frame.Registers[instruction.B];
-            if (callee.Kind == WsValueKind.Builtin)
+            var (left, right) = (registers[ins.B], registers[ins.C]);
+            error = null;
+            if (left.Kind == WsValueKind.Int64 && right.Kind == WsValueKind.Int64)
             {
-                var builtin = builtins[callee.Handle];
-                if (builtin.Arity != instruction.D) return WrongArgumentCount(builtin.Name, builtin.Arity, instruction.D);
-                var error = CallBuiltin(builtin, frame.Registers, instruction);
-                if (error is null) frame.Pc++;
-                return error;
+                var (a, b) = (left.AsInt64, right.AsInt64);
+                switch (opCode)
+                {
+                    case WsOpCode.Add:
+                    {
+                        var sum = unchecked(a + b);
+                        if (((a ^ sum) & (b ^ sum)) >= 0) return Done(WsValue.FromInt64(sum), registers, ins);
+                        break;
+                    }
+                    case WsOpCode.Subtract:
+                    {
+                        var difference = unchecked(a - b);
+                        if (((a ^ b) & (a ^ difference)) >= 0) return Done(WsValue.FromInt64(difference), registers, ins);
+                        break;
+                    }
+                    case WsOpCode.Multiply:
+                    {
+                        var high = Math.BigMul(a, b, out var low);
+                        if (high == low >> 63) return Done(WsValue.FromInt64(low), registers, ins);
+                        break;
+                    }
+                    default:
+                        return Done(WsValue.FromBinary64((double)a / b), registers, ins);
+                }
             }
-            if (callee.Kind != WsValueKind.Function)
+            else if (left.Kind == WsValueKind.Binary64 && right.Kind == WsValueKind.Binary64)
             {
-                return new WsRuntimeError(WsDiagnosticCodes.NotAFunction,
-                    $"{Capitalized(WsValueFormatter.Describe(callee))} is not a function, and cannot be called.");
+                var (x, y) = (left.AsBinary64, right.AsBinary64);
+                return Done(WsValue.FromBinary64(opCode switch
+                {
+                    WsOpCode.Add => x + y,
+                    WsOpCode.Subtract => x - y,
+                    WsOpCode.Multiply => x * y,
+                    _ => x / y
+                }), registers, ins);
             }
-            var (index, cells) = heap.GetClosure(callee);
-            var function = module.Functions[index];
-            if (function.ParameterCount != instruction.D) return WrongArgumentCount(function.Name, function.ParameterCount, instruction.D);
-            if (_callers.Count + 1 >= context.Resources.MaxCallDepth)
+            if (!WsOperators.TryBinary(ArithmeticOf(opCode), left, right, heap, out var value, out error)) return false;
+            registers[ins.A] = value;
+            return true;
+        }
+
+        /// <summary>
+        /// A comparison: two int64s, or two binary64s (IEEE 754's, so that NaN is unordered and unequal to itself),
+        /// here; anything else by <see cref="WsOperators"/>, which gives the same results.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool Compare(WsOpCode opCode, WsValue[] registers, in WsInstruction ins, out WsRuntimeError? error)
+        {
+            var (left, right) = (registers[ins.B], registers[ins.C]);
+            error = null;
+            if (left.Kind == WsValueKind.Int64 && right.Kind == WsValueKind.Int64)
             {
-                return new WsRuntimeError(WsDiagnosticCodes.BudgetExceeded,
-                    $"The calls nest more than {context.Resources.MaxCallDepth} deep, which this execution allows.");
+                var (a, b) = (left.AsInt64, right.AsInt64);
+                return Done(WsValue.FromBoolean(opCode switch
+                {
+                    WsOpCode.Equal => a == b,
+                    WsOpCode.NotEqual => a != b,
+                    WsOpCode.Less => a < b,
+                    WsOpCode.LessOrEqual => a <= b,
+                    WsOpCode.Greater => a > b,
+                    _ => a >= b
+                }), registers, ins);
             }
-            var registers = new WsValue[function.RegisterCount];
-            for (var i = 0; i < instruction.D; i++) registers[i] = frame.Registers[instruction.C + i];
-            var called = new Frame(function, registers, [callee], cells) { ResultRegister = instruction.A };
-            heap.AddRoots(registers);
-            heap.AddRoots(called.Closure);
-            frame.Pc++;
-            _callers.Push(frame);
-            next = called;
-            return null;
+            if (left.Kind == WsValueKind.Binary64 && right.Kind == WsValueKind.Binary64)
+            {
+                var (x, y) = (left.AsBinary64, right.AsBinary64);
+                return Done(WsValue.FromBoolean(opCode switch
+                {
+                    WsOpCode.Equal => x == y,
+                    WsOpCode.NotEqual => x != y,
+                    WsOpCode.Less => x < y,
+                    WsOpCode.LessOrEqual => x <= y,
+                    WsOpCode.Greater => x > y,
+                    _ => x >= y
+                }), registers, ins);
+            }
+            if (!WsOperators.TryCompare(ComparisonOf(opCode), left, right, heap, out var value, out error)) return false;
+            registers[ins.A] = value;
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool Done(WsValue value, WsValue[] registers, in WsInstruction ins)
+        {
+            registers[ins.A] = value;
+            return true;
         }
 
         private static WsRuntimeError WrongArgumentCount(string name, int arity, int count) =>
@@ -343,7 +558,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         /// Calls a built-in with its arguments copied out of the registers, so that its result may overwrite them.
         /// Its failure, even an exception, is a runtime error.
         /// </summary>
-        private WsRuntimeError? CallBuiltin(IWsBuiltinFunction builtin, WsValue[] registers, WsInstruction instruction)
+        private WsRuntimeError? CallBuiltin(IWsBuiltinFunction builtin, WsValue[] registers, in WsInstruction instruction)
         {
             var arguments = new WsValue[instruction.D];
             for (var i = 0; i < arguments.Length; i++) arguments[i] = registers[instruction.C + i];

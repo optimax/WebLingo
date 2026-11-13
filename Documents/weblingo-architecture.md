@@ -314,14 +314,14 @@ An initial C# `switch` dispatch loop is **proposed** for clarity and portability
 
 **Workloads** (part 1, 13 November 2026): `loops`, nested `for` loops with int64 arithmetic, comparisons and `if`, a million times; `calls`, a recursive `fib(25)`, about 243,000 calls; `closures`, 20,000 closures made and 200,000 calls of them, sharing captured cells; `strings`, 200,000 concatenations and 20,000 comparisons, with the heap's collector. Each writes one result, which every VM must give.
 
-**Baseline** (part 1, 13 November 2026): the register VM as M0.7.6 left it, on one Windows development machine (x64, .NET 10.0.15, Release), the median of 7 timed runs after 3 warm-ups. Allocation is .NET's, a run's; code is the workload's instructions, and their size with a byte per operation and each operand it uses in LEB128.
+**Baseline and tuned dispatch** (parts 1 and 2, 13 November 2026), on one Windows development machine (x64, .NET 10.0.15, Release), each the median of 7 timed runs after 3 warm-ups, with every method fully optimized from its first call (the benchmark turns .NET's tiered compilation off, so that no VM is timed while it is still being compiled; with the tiers on, part 1 measured the baseline at 130.3, 33.1, 51.6 and 29.4 ms). The baseline is the register VM as M0.7.6 left it; the tuned one runs the same bytecode, with the same instruction counts and results: one loop with the running frame in locals, the budget and the cancellation signal looked at only when they come due, int64 and binary64 arithmetic and comparisons done in the loop (the rest, and every error, by `WsOperators`), and frames and their registers reused by the next call at the same depth. Allocation is .NET's, a run's. Instructions run, and code size (instructions, and bytes with a byte per operation and each operand it uses in LEB128), are the same for both: 10,010,008 instructions run and 24 instructions of code (76 bytes) for `loops`, 2,063,676 and 23 (74 bytes) for `calls`, 3,120,009 and 35 (106 bytes) for `closures`, 1,920,008 and 26 (83 bytes) for `strings`.
 
-| Workload | Median | Instructions | Instructions/s | Allocated | Code | Code bytes |
+| Workload | Baseline | Tuned | Speed-up | Instructions/s, tuned | Allocated, baseline | Allocated, tuned |
 |---|---:|---:|---:|---:|---:|---:|
-| loops | 130.3 ms | 10,010,008 | 76.8 M | 3,288 B | 24 | 76 |
-| calls | 33.1 ms | 2,063,676 | 62.3 M | 48,561,928 B | 23 | 74 |
-| closures | 51.6 ms | 3,120,009 | 60.5 M | 36,733,392 B | 35 | 106 |
-| strings | 29.4 ms | 1,920,008 | 65.2 M | 10,731,504 B | 26 | 83 |
+| loops | 120.1 ms | 19.5 ms | 6.2× | 513.6 M | 3,288 B | 3,992 B |
+| calls | 31.9 ms | 9.2 ms | 3.5× | 223.3 M | 48,561,928 B | 10,552 B |
+| closures | 44.9 ms | 12.3 ms | 3.7× | 253.5 M | 36,733,560 B | 3,294,656 B |
+| strings | 26.2 ms | 9.7 ms | 2.7× | 198.1 M | 10,731,560 B | 10,732,304 B |
 
 ---
 

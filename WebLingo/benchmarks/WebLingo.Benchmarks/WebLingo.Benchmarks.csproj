@@ -2,6 +2,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
+    <!-- Every method fully optimized from its first call, so that no VM is timed while .NET's tiers still compile it. -->
+    <TieredCompilation>false</TieredCompilation>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Workloads/*.ws" LogicalName="Workloads/%(Filename)%(Extension)" />

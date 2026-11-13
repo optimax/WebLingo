@@ -193,7 +193,7 @@ dotnet run --project src/WebLingo.Cli -c Release --no-build -- run samples/Arith
 dotnet run --project benchmarks/WebLingo.Benchmarks -c Release --no-build
 ```
 
-The benchmark (section 3) writes a Markdown table: each workload's median and fastest time on each VM, the instructions a run executes, what it allocates, and its code's size. Its times are only comparable when they come from one run of it, in Release, on an otherwise idle machine; `--runs`, `--warm-ups` and `--workload` change what it runs.
+The benchmark (section 3) writes a Markdown table: each workload's median and fastest time on each VM, the instructions a run executes, what it allocates, and its code's size. Its times are only comparable when they come from one run of it, in Release, on an otherwise idle machine; `--runs`, `--warm-ups` and `--workload` change what it runs. It turns .NET's tiered compilation off (`TieredCompilation` in its project), so that every method is fully optimized from its first call and no VM is timed while .NET still compiles it.
 
 - The solution is small: build all of it rather than one project, and run the complete test suite after a change, which today takes seconds. When the suite grows, run targeted test classes during active development and the complete suite before a task is done.
 - Each behavior in the specification's conformance table (section 8.6) has a test in `WebLingo.Conformance.Tests`, which runs programs through the CLI as files; a new conformance case goes there too. Template tests go into `WebLingo.Templates.Tests` once that project exists (specification, section 13).
@@ -245,6 +245,10 @@ The open-source release needs an inventory of every dependency, with its version
 CI is the only place Linux is tried, and it runs on a push or a pull request, which needs the user's go-ahead: work not yet pushed has been tried on Windows only. Until 2026-11-12 the workflow was in the solution folder, where GitHub Actions does not look (it reads `.github/workflows` at the repository root only), so it never ran; its first run, from the root, passed on both platforms (CI run 1, 12 November 2026, commit `5229806`). Keep the workflow at the root and its `working-directory` pointing at the solution folder.
 
 The run logs need a signed-in GitHub account; the run's page and its result do not.
+
+### The VM Repeats Part of the Runtime's Arithmetic
+
+For speed, the register VM does the arithmetic and comparisons of two int64s, or of two binary64s, in its dispatch loop, and leaves everything else, and every error, to `WsOperators` (`WebLingo.Runtime`). A change to the semantics of those operators changes both; `OperatorTests` (`WebLingo.VM.Tests`) runs every operator on pairs of edge values through the VM and checks that it gives what `WsOperators` gives.
 
 ### Warnings Are Errors
 
