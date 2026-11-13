@@ -24,10 +24,9 @@ The current state is the M0.6.1 solution scaffold (specification, sections 8.7 a
 
 # 2. Documents
 
-- `WebLingo/docs/architecture/weblingo-architecture.md` is the canonical architecture specification (its folder's `README.md`): the language, the runtime values and the GC, the bytecode and the VM, hosting, the platform abstraction layer, templates, the solution's structure, the milestone roadmap, the open questions, and the register of decisions with their status. In this document, "the specification" means that document. It is the design document that `AGENTS.md` and `TO-DO-INSTRUCTIONS.md` refer to.
-- `Documents/weblingo-architecture.md` is at present an identical copy of the specification (section 11).
+- `Documents/weblingo-architecture.md` is the architecture specification, and its only copy (user decision, 2026-11-12; specification, section 8.2): the language, the runtime values and the GC, the bytecode and the VM, hosting, the platform abstraction layer, templates, the solution's structure, the milestone roadmap, the open questions, and the register of decisions with their status. In this document, "the specification" means that document. It is the design document that `AGENTS.md` and `TO-DO-INSTRUCTIONS.md` refer to.
 - `WebLingo/README.md` says how to build, test and run the solution.
-- `WebLingo/docs/architecture/M0.6.1-status.md` records what the current milestone delivered and what it does not implement.
+- `Documents/M0.6.1-status.md` records what the current milestone delivered and what it does not implement.
 - `WebLingo/eng/portability/NativeCompatibility.md` is the inventory of .NET facilities and how the portable core may use each (section 6).
 - `HANDOFF.md` at the root, when present, records the current state of the work and its next steps.
 - `TO-DO.md`, `TO-DO-INSTRUCTIONS.md` and `DONE.md` at the root hold the tasks, how to work them, and the tasks that are done.
@@ -38,7 +37,7 @@ Before changing source, read the specification's decision register (section 1.1)
 
 # 3. Repository Layout and Projects
 
-The repository root holds the files for agents and for planning (`AGENTS.md`, `CLAUDE.md`, `TO-DO.md`, `TO-DO-INSTRUCTIONS.md`, `DONE.md`, `HANDOFF.md`) and the owner's `Documents/`. The solution is in the `WebLingo/` folder:
+The repository root holds the files for agents and for planning (`AGENTS.md`, `CLAUDE.md`, `TO-DO.md`, `TO-DO-INSTRUCTIONS.md`, `DONE.md`, `HANDOFF.md`), the `.gitignore` for the whole repository, and `Documents/`, the project's documents. The solution is in the `WebLingo/` folder:
 
 ```text
 WebLingo/                      the repository
@@ -49,7 +48,6 @@ WebLingo/                      the repository
     ├── Directory.Build.props
     ├── Directory.Packages.props
     ├── global.json
-    ├── docs/architecture/
     ├── eng/portability/
     ├── samples/
     ├── src/WebLingo.*/
@@ -57,6 +55,8 @@ WebLingo/                      the repository
 ```
 
 Commands in this document are run from the solution folder, `WebLingo/`, unless they say otherwise.
+
+**Shallow folders** (user decision, 2026-11-12; specification, section 8.2): keep the folder structure shallow. Documents go into `Documents/` itself, not into subfolders of it or into a `docs/` tree in the solution.
 
 A ZIP of changes (`AGENTS.md`, section 10) includes the repository's root folder, with the solution one level below it:
 
@@ -122,7 +122,7 @@ The specification marks each decision **Approved** (explicitly accepted by the p
 - Do not treat a Proposed or Provisional item as Approved: not in code, in tests, in comments, or in documents. Where a task needs one of them settled, ask. Until it is answered, build so that the choice stays easy to change, and say which choice you made.
 - Where the specification is silent and the work needs a decision, do not invent language semantics. Check the specification's stated intent and its open questions, then ask. A choice made only to unblock work is recorded in the specification as Proposed.
 - Do not borrow JavaScript's behavior merely because JavaScript has it. WebLingo's semantics are its own, and where the specification has decided otherwise (mandatory semicolons, `var` and `const` without `let`, int64 overflow as an error), it wins.
-- When the owner approves a decision, update the specification in the same change: the section concerned and the decision register, with the date (`WebLingo/docs/architecture/README.md`: update the specification whenever a new decision is approved).
+- When the owner approves a decision, update the specification in the same change: the section concerned and the decision register, with the date.
 - When a milestone's state changes, update the documents that report it: the specification's roadmap and status (sections 9 and 14), the solution's `README.md`, and the milestone's status document.
 
 The specification defines the milestones (M0.1 to M0.8, section 9), the increments of M0.6 (M0.6.1 to M0.6.7, section 8.7), and the specification IDs (`WS-…`), so these may be named in tasks, handoffs and commit messages, with that section (`AGENTS.md`, section 14, "Referring to Work").
@@ -209,7 +209,9 @@ A small change in one stage of the pipeline can change the behavior of every lat
 
 ------
 
-# 10. Licensing and Dependencies
+# 10. Licensing, Dependencies and Publication
+
+**The whole repository may become public** (user decision, 2026-11-12; specification, section 8.2), not only the solution folder. Put nothing into it that should stay private: no personal data or contact details, credentials, keys or tokens, paths or names of private machines and drives, or private notes. This holds for every file, `TO-DO.md`, `DONE.md` and `HANDOFF.md` included, and for commit messages.
 
 WebLingo is meant to become free and open source, but no license has been chosen: MIT is the preferred candidate, not a decision (specification, section 12). Until the owner selects a license, do not add a `LICENSE` file, license headers, `PackageLicenseExpression` or other license metadata, and do not describe any license as WebLingo's.
 
@@ -222,14 +224,6 @@ The open-source release needs an inventory of every dependency, with its version
 ### The CI Workflow Does Not Run
 
 The workflow `WebLingo/.github/workflows/build.yml` is in the solution folder, but GitHub Actions reads workflows only from `.github/workflows` at the repository root, and the workflow's commands expect `WebLingo.slnx` at the root. Until the workflow is moved and its commands pointed at the solution folder, CI has built and tested nothing, on Linux or on Windows.
-
-### Two Copies of the Specification
-
-`Documents/weblingo-architecture.md` and `WebLingo/docs/architecture/weblingo-architecture.md` were identical on 2026-11-12. The second is the canonical one. Until the owner decides what becomes of the first, an edit to one goes into the other in the same change.
-
-### Two `.gitignore` Files
-
-The root `.gitignore` covers the whole repository. The solution's own, `WebLingo/.gitignore`, is a subset of it.
 
 ### Warnings Are Errors
 

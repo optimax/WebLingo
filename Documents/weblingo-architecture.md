@@ -53,6 +53,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WS-S001–S016 | M0.6 solution scaffolding and initial implementation contracts | Approved |
 | M0.6 implementation default | Register VM first; stack comparison later | Adopted M0.6 default; VM architecture still provisional |
 | M0.6 testing default | xUnit on .NET 10 | Adopted M0.6 default |
+| Repository documents | One copy of this specification, `Documents/weblingo-architecture.md`; documents in the repository's root `Documents/` folder; a shallow folder structure, with no `docs/architecture/` folder; the whole repository may become public (§8.2) | Approved (12 November 2026) |
 
 **Approval boundary:** M0.6 was approved as a specification. This does not imply the repository or implementation already exists. Detailed M0.3 encoding choices were recommended but not separately approved; the architectural decision between stack and register VMs remains open.
 
@@ -624,6 +625,8 @@ WebLingo/
 ```
 
 Add FastCGI, database provider and native adapter projects when their implementation milestones begin, rather than creating unnecessary empty projects.
+
+**Documents — approved amendment (12 November 2026):** the repository's root holds the solution folder above, `WebLingo/`, beside a flat `Documents/` folder for the project's documents. This specification exists once, as `Documents/weblingo-architecture.md`; there is no `docs/architecture/` folder, and the folder structure is kept shallow. The whole repository may become public, so nothing that should stay private is put into it.
 
 ### 8.3 Project dependencies (WS-S002)
 

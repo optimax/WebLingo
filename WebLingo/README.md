@@ -22,7 +22,7 @@ dotnet run --project src/WebLingo.Cli -- --version
 
 ## Architecture
 
-See `docs/architecture/weblingo-architecture.md`. The VM instruction architecture remains provisional, with register VM first and a later stack-VM benchmark. Includes, layouts, and parameterized components are **all mandatory** for the first template-capable release; they are not implemented in this scaffold.
+See [`Documents/weblingo-architecture.md`](../Documents/weblingo-architecture.md) at the repository root. The VM instruction architecture remains provisional, with register VM first and a later stack-VM benchmark. Includes, layouts, and parameterized components are **all mandatory** for the first template-capable release; they are not implemented in this scaffold.
 
 ## Verification status
 
