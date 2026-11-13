@@ -220,7 +220,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return Unused(d);
             case WsOpCode.GetIndex:
                 return Register(function, a, "destination") ?? Register(function, b, "target")
-                    ?? Register(function, c, "index") ?? Unused(d);
+                    ?? Register(function, c, "index") ?? (d is 0 or 1 ? null : $"its D is {d}, not 0 or 1.");
             case WsOpCode.SetIndex:
                 return Register(function, a, "target") ?? Register(function, b, "index") ?? Register(function, c, "value")
                     ?? Unused(d);

@@ -293,6 +293,8 @@ public sealed class VerifierTests
         AssertRejected(With(module, code, 1, I(WsOpCode.GetMember, 1, 0, 1)), 1, "constant 1 is not a name");
         AssertRejected(With(module, code, 4, I(WsOpCode.CallMethod, 1, 0, 1, 1)), 4, "registers 1 to 2");
         AssertRejected(With(module, code, 2, I(WsOpCode.GetIndex, 1, 0, 2)), 2, "index register 2");
+        Assert.Equal(Valid, Verify(With(module, code, 2, I(WsOpCode.GetIndex, 1, 0, 1, 1)))); // ?[
+        AssertRejected(With(module, code, 2, I(WsOpCode.GetIndex, 1, 0, 1, 2)), 2, "not 0 or 1");
         AssertRejected(With(module, code, 3, I(WsOpCode.SetIndex, 0, 1, 1, 1)), 3, "not 0");
         // r1 read before it is written: the member read that wrote it is gone.
         AssertRejected(With(module, code, 1, I(WsOpCode.LoadConstant, 0, 0)), 2, "reads register 1");

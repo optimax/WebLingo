@@ -118,7 +118,11 @@ public sealed record WsBoundMapLiteral(IReadOnlyList<(string Key, WsBoundExpress
     : WsBoundExpression(Span);
 
 /// <summary><c>target[index]</c>, checked when it runs (specification, section 3.6).</summary>
-public sealed record WsBoundIndex(WsBoundExpression Target, WsBoundExpression Index, WsSourceSpan Span) : WsBoundExpression(Span);
+public sealed record WsBoundIndex(WsBoundExpression Target, WsBoundExpression Index, WsSourceSpan Span) : WsBoundExpression(Span)
+{
+    /// <summary><c>target?[index]</c> (section 3.6).</summary>
+    public bool IsOptional { get; init; }
+}
 
 /// <summary><c>target[index] = value</c>, whose value is the value assigned.</summary>
 public sealed record WsBoundIndexAssignment(

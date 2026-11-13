@@ -6,7 +6,7 @@ public enum WsTokenKind
     EndOfFile, Bad, Identifier, IntegerLiteral, Binary64Literal, StringLiteral,
     Var, Const, Let, Infinity, NaN, True, False, Null, If, Else, While, For, Do, Break, Continue, Function, Return, Plus, Minus, Star, Slash, Equals, Semicolon,
     EqualEqual, BangEqual, Less, LessEqual, Greater, GreaterEqual, Bang, AmpAmp, PipePipe,
-    OpenParen, CloseParen, OpenBrace, CloseBrace, Comma, Dot, OpenBracket, CloseBracket, Colon, Foreach, HashBrace
+    OpenParen, CloseParen, OpenBrace, CloseBrace, Comma, Dot, OpenBracket, CloseBracket, Colon, Foreach, HashBrace, QuestionBracket
 }
 
 /// <summary>

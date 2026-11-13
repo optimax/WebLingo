@@ -264,7 +264,10 @@ public sealed class WsBinder
                 return new WsBoundMapLiteral(entries, map.Span);
             }
             case WsIndexExpressionSyntax index:
-                return new WsBoundIndex(BindExpression(index.Target), BindExpression(index.Index), index.Span);
+                return new WsBoundIndex(BindExpression(index.Target), BindExpression(index.Index), index.Span)
+                {
+                    IsOptional = index.IsOptional
+                };
             case WsIndexAssignmentSyntax element:
                 return new WsBoundIndexAssignment(BindExpression(element.Target.Target), BindExpression(element.Target.Index),
                     BindExpression(element.Value), element.Span);

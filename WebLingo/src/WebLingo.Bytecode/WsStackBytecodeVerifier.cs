@@ -166,6 +166,7 @@ public sealed class WsStackBytecodeVerifier
             case WsStackOpCode.StoreIndex:
                 return (a is 0 or 1 ? null : $"its A is {a}, not 0 or 1.") ?? Unused(b);
             case WsStackOpCode.GetIndex:
+                return (a is 0 or 1 ? null : $"its A is {a}, not 0 or 1.") ?? Unused(b);
             case WsStackOpCode.LoadNull:
             case WsStackOpCode.Duplicate:
             case WsStackOpCode.Pop:

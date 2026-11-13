@@ -132,7 +132,11 @@ public sealed record WsMapLiteralSyntax(IReadOnlyList<WsMapEntrySyntax> Entries,
 
 /// <summary><c>target[index]</c>: an element of an array, an entry of a map, or a character of a string (section 3.6).</summary>
 public sealed record WsIndexExpressionSyntax(WsExpressionSyntax Target, WsExpressionSyntax Index, WsSourceSpan Span)
-    : WsExpressionSyntax(Span);
+    : WsExpressionSyntax(Span)
+{
+    /// <summary><c>target?[index]</c>, which gives <c>null</c> for an absent entry, or a <c>null</c> target (section 3.6).</summary>
+    public bool IsOptional { get; init; }
+}
 
 /// <summary><c>target.name</c>: a member of a value (section 3.6); called, <c>target.name(…)</c>, a method.</summary>
 public sealed record WsMemberAccessSyntax(WsExpressionSyntax Target, string Name, WsSourceSpan NameSpan, WsSourceSpan Span)

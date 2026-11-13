@@ -498,7 +498,10 @@ public sealed class WsStackVirtualMachine
                         }
                         case WsStackOpCode.GetIndex:
                         {
-                            if (!WsMembers.TryGetIndex(slots[sp - 2], slots[sp - 1], heap, out var element, out error)) break;
+                            if (!WsMembers.TryGetIndex(slots[sp - 2], slots[sp - 1], heap, ins.A != 0, out var element, out error))
+                            {
+                                break;
+                            }
                             sp--;
                             slots[sp - 1] = element;
                             pc++;

@@ -405,7 +405,7 @@ public sealed class WsParser : IWsParser
         var value = ParseExpression();
         var span = Between(left.Span, value.Span);
         if (left is WsNameSyntax target) return new WsAssignmentExpressionSyntax(target, value, span);
-        if (left is WsIndexExpressionSyntax element) return new WsIndexAssignmentSyntax(element, value, span);
+        if (left is WsIndexExpressionSyntax { IsOptional: false } element) return new WsIndexAssignmentSyntax(element, value, span);
         if (left is not WsErrorExpressionSyntax)
         {
             Report(WsDiagnosticCodes.InvalidAssignmentTarget,
@@ -536,12 +536,15 @@ public sealed class WsParser : IWsParser
                     expression = new WsMemberAccessSyntax(expression, name.Text, name.Span, SpanFrom(expression.Span.Start));
                     continue;
                 }
-                case WsTokenKind.OpenBracket:
+                case WsTokenKind.OpenBracket or WsTokenKind.QuestionBracket:
                 {
-                    Advance();
+                    var isOptional = Advance().Kind == WsTokenKind.QuestionBracket;
                     var index = ParseExpression();
                     Expect(WsTokenKind.CloseBracket, "']'");
-                    expression = new WsIndexExpressionSyntax(expression, index, SpanFrom(expression.Span.Start));
+                    expression = new WsIndexExpressionSyntax(expression, index, SpanFrom(expression.Span.Start))
+                    {
+                        IsOptional = isOptional
+                    };
                     continue;
                 }
                 default:

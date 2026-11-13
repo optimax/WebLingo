@@ -47,6 +47,7 @@ public sealed class WsLexer(string source) : IWsLexer
             ('=', '=') => WsTokenKind.EqualEqual, ('!', '=') => WsTokenKind.BangEqual,
             ('<', '=') => WsTokenKind.LessEqual, ('>', '=') => WsTokenKind.GreaterEqual,
             ('&', '&') => WsTokenKind.AmpAmp, ('|', '|') => WsTokenKind.PipePipe, ('#', '{') => WsTokenKind.HashBrace,
+            ('?', '[') => WsTokenKind.QuestionBracket,
             _ => WsTokenKind.Bad
         };
         if (pair != WsTokenKind.Bad)

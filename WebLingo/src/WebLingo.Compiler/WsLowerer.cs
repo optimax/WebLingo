@@ -184,7 +184,10 @@ public sealed class WsLowerer
                 return new WsIrNewMap(entries, map.Span);
             }
             case WsBoundIndex index:
-                return new WsIrIndex(LowerExpression(index.Target), LowerExpression(index.Index), index.Span);
+                return new WsIrIndex(LowerExpression(index.Target), LowerExpression(index.Index), index.Span)
+                {
+                    IsOptional = index.IsOptional
+                };
             case WsBoundIndexAssignment element:
                 return new WsIrStoreIndex(LowerExpression(element.Target), LowerExpression(element.Index),
                     LowerExpression(element.Value), element.Span);

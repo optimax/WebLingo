@@ -60,7 +60,9 @@ public sealed class WsRegisterEngine : IWsBenchmarkEngine
         private static long Bytes(WsInstruction instruction)
         {
             int[] operands = [instruction.A, instruction.B, instruction.C, instruction.D];
-            return 1 + operands.Take(OperandCount(instruction.OpCode)).Sum(WsEncoding.Leb128Size);
+            // GetIndex uses its D only for ?[.
+            var count = instruction is { OpCode: WsOpCode.GetIndex, D: not 0 } ? 4 : OperandCount(instruction.OpCode);
+            return 1 + operands.Take(count).Sum(WsEncoding.Leb128Size);
         }
 
         /// <summary>How many of A, B, C and D the operation uses (<see cref="WsOpCode"/>); the ones it uses come first.</summary>
@@ -111,7 +113,9 @@ public sealed class WsStackEngine : IWsBenchmarkEngine
         private static long Bytes(WsStackInstruction instruction)
         {
             int[] operands = [instruction.A, instruction.B];
-            return 1 + operands.Take(OperandCount(instruction.OpCode)).Sum(WsEncoding.Leb128Size);
+            // GetIndex uses its A only for ?[.
+            var count = instruction is { OpCode: WsStackOpCode.GetIndex, A: not 0 } ? 1 : OperandCount(instruction.OpCode);
+            return 1 + operands.Take(count).Sum(WsEncoding.Leb128Size);
         }
 
         /// <summary>How many of A and B the operation uses (<see cref="WsStackOpCode"/>); the ones it uses come first.</summary>

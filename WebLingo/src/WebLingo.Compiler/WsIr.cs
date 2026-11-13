@@ -140,7 +140,14 @@ public sealed record WsIrMapEntry(string Key, WsIrExpression Value);
 public sealed record WsIrNewMap(IReadOnlyList<WsIrMapEntry> Entries, WsSourceSpan Span) : WsIrExpression(Span);
 
 /// <summary><c>target[index]</c> (specification, section 3.6).</summary>
-public sealed record WsIrIndex(WsIrExpression Target, WsIrExpression Index, WsSourceSpan Span) : WsIrExpression(Span);
+public sealed record WsIrIndex(WsIrExpression Target, WsIrExpression Index, WsSourceSpan Span) : WsIrExpression(Span)
+{
+    /// <summary>
+    /// <c>target?[index]</c>: <c>null</c> where <c>target[index]</c> would raise a missing key or an index out of range,
+    /// or the target is <c>null</c>; the index is evaluated either way.
+    /// </summary>
+    public bool IsOptional { get; init; }
+}
 
 /// <summary><c>target[index] = value</c>: the target, the index, then the value, evaluated; its value is the value.</summary>
 public sealed record WsIrStoreIndex(WsIrExpression Target, WsIrExpression Index, WsIrExpression Value, WsSourceSpan Span)

@@ -171,6 +171,20 @@ public sealed class LexerTests
     }
 
     [Fact]
+    public void OptionalAccessAndSetsHaveTheirTokens()
+    {
+        var tokens = WsLexer.Tokenize("m?[0] #{}", out var diagnostics);
+        Assert.Equal(
+            new[]
+            {
+                WsTokenKind.Identifier, WsTokenKind.QuestionBracket, WsTokenKind.IntegerLiteral, WsTokenKind.CloseBracket,
+                WsTokenKind.HashBrace, WsTokenKind.CloseBrace, WsTokenKind.EndOfFile
+            },
+            tokens.Select(t => t.Kind));
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
     public void MembersAndIndexesHaveTheirTokens()
     {
         var tokens = WsLexer.Tokenize("a.length[0]", out var diagnostics);

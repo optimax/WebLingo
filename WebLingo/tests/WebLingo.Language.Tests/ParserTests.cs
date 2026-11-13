@@ -50,6 +50,7 @@ public sealed class ParserTests
     [InlineData("a[i + 1] * 2", "(a[(i + 1)] * 2)")]
     [InlineData("x[i] = y = 2", "(x[i] = (y = 2))")]
     [InlineData("s.length + 1", "(s.length + 1)")]
+    [InlineData("a?[0]?[b[1]]", "a?[0]?[b[1]]")]
     public void OperatorsHaveTheirPrecedenceAndAssociativity(string expression, string expected)
     {
         var tree = Parse(expression + ";");
@@ -300,7 +301,7 @@ public sealed class ParserTests
         WsAssignmentExpressionSyntax assignment => $"({assignment.Target.Name} = {Show(assignment.Value)})",
         WsCallExpressionSyntax call => $"{Show(call.Callee)}({string.Join(", ", call.Arguments.Select(Show))})",
         WsMemberAccessSyntax member => $"{Show(member.Target)}.{member.Name}",
-        WsIndexExpressionSyntax index => $"{Show(index.Target)}[{Show(index.Index)}]",
+        WsIndexExpressionSyntax index => $"{Show(index.Target)}{(index.IsOptional ? "?[" : "[")}{Show(index.Index)}]",
         WsIndexAssignmentSyntax element => $"({Show(element.Target)} = {Show(element.Value)})",
         _ => "?"
     };

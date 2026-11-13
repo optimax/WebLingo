@@ -274,7 +274,7 @@ public sealed class WsStackCodeGenerator
             case WsIrIndex index:
                 EmitValue(index.Target);
                 EmitValue(index.Index);
-                Emit(WsStackOpCode.GetIndex, index.Span);
+                Emit(WsStackOpCode.GetIndex, index.Span, index.IsOptional ? 1 : 0);
                 return;
             case WsIrStoreIndex store:
                 EmitValue(store.Target);

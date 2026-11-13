@@ -90,7 +90,10 @@ public enum WsOpCode : byte
     /// the D arguments in the registers after it, D = argument count.
     /// </summary>
     CallMethod,
-    /// <summary>A = destination register, B = target register, C = index register.</summary>
+    /// <summary>
+    /// A = destination register, B = target register, C = index register, D = 1 for <c>?[</c>, which gives <c>null</c>
+    /// for an absent entry or a <c>null</c> target, else 0.
+    /// </summary>
     GetIndex,
     /// <summary>A = target register, B = index register, C = value register; nothing is written.</summary>
     SetIndex,

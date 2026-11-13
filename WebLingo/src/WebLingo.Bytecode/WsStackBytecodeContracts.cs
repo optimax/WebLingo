@@ -97,7 +97,10 @@ public enum WsStackOpCode : byte
     /// below them, and pushes the method's result.
     /// </summary>
     CallMethod,
-    /// <summary>Pops the index, then the target; pushes the target's element at the index.</summary>
+    /// <summary>
+    /// A = 1 for <c>?[</c>, which gives <c>null</c> for an absent entry or a <c>null</c> target, else 0; pops the index,
+    /// then the target, and pushes the target's element at the index.
+    /// </summary>
     GetIndex,
     /// <summary>A = 1 to push the value back, 0 not to; pops the value, the index, then the target, and stores it.</summary>
     StoreIndex,

@@ -101,6 +101,8 @@ public sealed class StackVerifierTests
             1, "constant 2 is not a name");
         AssertRejected(module with { EntryPoint = module.EntryPoint with { Code = Changed(module, 10, I(WsStackOpCode.StoreIndex, 2)) } },
             10, "not 0 or 1");
+        AssertRejected(module with { EntryPoint = module.EntryPoint with { Code = Changed(module, 5, I(WsStackOpCode.GetIndex, 2)) } },
+            5, "not 0 or 1");
         // Keeping no value leaves nothing for the Pop after it.
         AssertRejected(module with { EntryPoint = module.EntryPoint with { Code = Changed(module, 10, I(WsStackOpCode.StoreIndex)) } },
             11, "pops 1 values from a stack of 0");

@@ -133,21 +133,28 @@ public static class WsMembers
         return false;
     }
 
-    /// <summary><c>target[index]</c>.</summary>
-    public static bool TryGetIndex(WsValue target, WsValue index, WsHeap heap, out WsValue result, out WsRuntimeError? error)
+    /// <summary>
+    /// <c>target[index]</c>, or with <paramref name="optional"/> <c>target?[index]</c>, which gives <c>null</c> where
+    /// the other would raise a missing key (WS3007) or an index out of range (WS3005), and for a <c>null</c> target, but
+    /// raises every other error as the other does (section 3.6).
+    /// </summary>
+    public static bool TryGetIndex(WsValue target, WsValue index, WsHeap heap, bool optional, out WsValue result,
+        out WsRuntimeError? error)
     {
         result = WsValue.Null;
+        error = null;
+        if (optional && target.Kind == WsValueKind.Null) return true;
         if (target.Kind == WsValueKind.Array)
         {
             var elements = heap.GetArray(target);
-            if (!TryIndex(index, elements.Count, out var at, out error)) return false;
+            if (!TryIndex(index, elements.Count, out var at, out error)) return Absent(optional, ref error);
             result = elements[(int)at];
             return true;
         }
         if (target.Kind == WsValueKind.Map)
         {
             if (!heap.TryFindInMap(target, index, out result, out var found, out error)) return false;
-            if (found) return true;
+            if (found || optional) return true;
             error = new WsRuntimeError(WsDiagnosticCodes.NoSuchKey, $"The map has no key {KeyText(index, heap)}.");
             return false;
         }
@@ -157,10 +164,18 @@ public static class WsMembers
             return false;
         }
         var text = heap.GetString(target);
-        if (!TryIndex(index, ScalarCount(text), out var position, out error)) return false;
+        if (!TryIndex(index, ScalarCount(text), out var position, out error)) return Absent(optional, ref error);
         var start = ScalarStart(text, position);
         var length = start + 1 < text.Length && char.IsSurrogatePair(text[start], text[start + 1]) ? 2 : 1;
         return heap.TryAllocateString(text.Substring(start, length), out result, out error);
+    }
+
+    /// <summary>An index out of range, which <c>?[</c> answers with <c>null</c>: true then, and the error cleared.</summary>
+    private static bool Absent(bool optional, ref WsRuntimeError? error)
+    {
+        if (!optional || error?.Code != WsDiagnosticCodes.IndexOutOfRange) return false;
+        error = null;
+        return true;
     }
 
     /// <summary><c>target[index] = value</c>.</summary>

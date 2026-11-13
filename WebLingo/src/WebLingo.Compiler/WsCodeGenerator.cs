@@ -363,7 +363,7 @@ public sealed class WsCodeGenerator
                 var key = EmitExpression(index.Index, null);
                 _nextRegister = mark; // The operation reads its operands before it writes its destination.
                 var destination = target ?? Allocate();
-                Emit(new WsInstruction(WsOpCode.GetIndex, destination, subject, key), index.Span);
+                Emit(new WsInstruction(WsOpCode.GetIndex, destination, subject, key, index.IsOptional ? 1 : 0), index.Span);
                 return destination;
             }
             case WsIrStoreIndex store:

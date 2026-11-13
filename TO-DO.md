@@ -20,6 +20,8 @@ Arrays, maps and sets, with indexing, `length`, member access and `foreach` (spe
 
 2026-11-13: the answers are in (specification, section 3.6); it no longer waits.
 
+Done (Claude, 2026-11-13): `x?[k]` on both VMs: `null` for a missing key, an index out of range (of an array or a string) and a `null` target; WS3001 still for a wrong key or index kind, or a value that cannot be indexed; `m?[k] = v` is WS1007. No new operation: `GetIndex` takes a flag. Choices of mine, in section 15.2 as proposed: `?[` is one token, and `?` alone stays invalid; the index is evaluated even when the target is `null`; each `?[` stands alone, so `m?["a"].length` is WS3006 when there is no `"a"`. Every new conformance case gives the same result on both VMs. Build and 932 tests pass on Windows; Linux not tried.
+
 ## [IDLE] M0.10: Classes, `dispose()` and `using`
 
 Classes, with single inheritance and no exposed prototype chain (specification, section 3.2), the disposal protocol, `dispose()` and its `destructor()` sugar, and `using` blocks (section 3.4, WS-L011), on both VMs. Their syntax and part of their meaning are not in the specification yet, and will be proposed as questions. Added by Claude, 2026-11-13.

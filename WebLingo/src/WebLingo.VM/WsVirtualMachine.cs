@@ -459,7 +459,11 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         }
                         case WsOpCode.GetIndex:
                         {
-                            if (!WsMembers.TryGetIndex(registers[ins.B], registers[ins.C], heap, out var element, out error)) break;
+                            if (!WsMembers.TryGetIndex(registers[ins.B], registers[ins.C], heap, ins.D != 0, out var element,
+                                    out error))
+                            {
+                                break;
+                            }
                             registers[ins.A] = element;
                             pc++;
                             continue;
