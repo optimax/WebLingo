@@ -727,3 +727,65 @@ Done (Claude, 2026-11-13, `5c89f1d`): `class B extends A`, with `super(…)` in 
 `dispose()` and `destructor()`, disposal once and chained from a derived class to its base, and `using` on its ways out but exceptions (specification, section 3.7, WS-L011), on both VMs. Added by Claude, 2026-11-13.
 
 Done (Claude, 2026-11-13, `f6c014a`): `dispose()`, or `destructor()` (both in one class is WS2011), run at most once per instance, a derived class's then its bases', by `x.dispose()`, by `x.dispose` called as a value, and by `using (var r = …) statement` at its end, `break`, `continue` and `return`, innermost first; `null` is not disposed. One new operation per VM, `Dispose`; each VM runs the chain of dispose methods in one frame, off its ordinary call and return paths, so `calls`, `closures` and `objects` take the same time as before, within their noise. An instance is 8 bytes larger in .NET's heap, for its disposed flag (`objects` allocates 44.0 MB, not 43.2). Choices of mine, in section 15.2 as proposed (row "Disposal"): disposal passes no arguments (`x.dispose(1)`, or a dispose method with parameters, is WS2006); a `using` of a value with no dispose method is WS3006 at its end, a field named `dispose` not counting; `x.destructor()` is WS3006; `super.dispose()` calls the base's method as any call does, so it runs once more than the disposal's own run of it, which you may prefer otherwise. Every new conformance case gives the same result on both VMs. Build and 1,066 tests pass on Windows; Linux not tried.
+
+## [DONE] M0.10 Syntax: Static Members, `Object` and Exceptions
+
+Follow-ups to "M0.10 Syntax: Classes, `dispose()` and `using`": A8 asks for static members, A10 for a base class `Object` whose `equal()` can be overridden, and A16 for exceptions, designed now. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
+
+Q1, static members: `static name(…) { … }` declares a method of the class itself, called as `Name.name(…)`, and `static var count = 0;` a field of the class, `Name.count`, set when the class is declared. In a static method, `this` is WS2009. Agreed?
+
+A1: Yes.
+
+Q2, statics and inheritance: (a) `B.name` finds A's static member when B has none of its own, as C# does; (b) each class has only its own static members.
+
+A2: (a).
+
+Q3, `Object`: a class without `extends` extends `Object`, a built-in class with no fields and one method, `equal(other)`, which gives `this == other` and may be overridden; `new Object()` makes a plain instance. Agreed?
+
+A3: Yes. And also `toString()`.
+
+Q4, `==` and `equal`: (a) `==` stays identity for instances (A10), and `a.equal(b)` runs only where a program calls it; (b) `==` between two instances calls the left one's `equal`.
+
+A4: (a).
+
+Q5, `equal` on other values: (a) only instances have `equal`; (b) every value has it, meaning `==` for values that are not instances (`"a".equal("a")` is true).
+
+A5: (a).
+
+Q6, throwing: `throw value;` throws (a) any value; (b) only an instance of `Error`, or of a class extending it (WS3001 otherwise).
+
+A6: (a).
+
+Q7, catching: `try { … } catch (e) { … }`, `try { … } finally { … }`, and `try { … } catch (e) { … } finally { … }`, with one `catch`, which catches every exception, and `e` a `var` in scope in its block. Typed catches may come later. Agreed?
+
+A7: OK. Add a TO-DO for typed catches.
+
+Q8, `Error`: a built-in class, `new Error(message)`, with the fields `message` and `code` (a diagnostic code, or `null` for one a program throws), which programs may extend. Agreed?
+
+A8: Yes.
+
+Q9, runtime errors as exceptions: the runtime errors (WS2004 to WS2006 at run time, WS3001, WS3002, WS3005 to WS3007) become instances of `Error`, with their code and message, which a `catch` may catch; the execution's limits (WS3003) and a cancellation (WS3004) cannot be caught, and still stop the program. Agreed?
+
+A9: Yes.
+
+Q10, an exception nothing catches stops the program as a runtime error does now: exit code 3, reported where it was thrown, with its own code for a runtime error, and a new one, WS3008 "uncaught exception", for a value a program threw. Agreed?
+
+A10: Yes.
+
+Q11, `finally`: it runs on every way out of its `try` (its end, `break`, `continue`, `return`, an exception); a `break`, `continue` or `return` that would leave a `finally` block is a compile-time error, a new WS2012, so that a `finally` cannot drop an exception or a result. Agreed?
+
+A11: Yes.
+
+Q12, rethrowing: `throw;` alone, in a `catch`, throws the caught exception again, keeping where it was first thrown. Agreed?
+
+A12: Yes.
+
+Q13, `using` and exceptions: `using` disposes on every way out, an exception's included, as a `finally` would. An exception from `dispose()` while another is on its way out: (a) replaces it, as in C#; (b) is dropped, and the first one goes on.
+
+A13: (a).
+
+Q14, how the VMs do it: (a) table-driven protected regions, as section 5.4 prefers: each function lists its `try` ranges and their handlers, and nothing runs on the way into a `try`; (b) instructions that push and pop a handler as the code enters and leaves a `try`. Open question 4 (section 10) keeps this choice for you.
+
+A14: (a).
+
+Done (Claude, 2026-11-13, `f6dc8c8`): recorded as approved in the specification: section 3.7 (static members, `Object`, equality, and exceptions in eight points), its decision register (with section 5.4's table-driven regions, A14), section 8.4 (WS2012 and WS3008), section 10 (open question 4, but for a base's disposal when a derived one throws), and section 9's parts of M0.10. A3's `toString()` is a part of its own, M0.10.7, since its details are asked in "M0.10 Syntax: `toString()` and Disposal That Throws"; A7's typed catches are the task "Typed Catches".
