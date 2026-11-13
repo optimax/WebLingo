@@ -53,7 +53,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WS-S001–S016 | M0.6 solution scaffolding and initial implementation contracts | Approved |
 | M0.6 implementation default | Register VM first; stack comparison later | Adopted M0.6 default; VM architecture still provisional |
 | M0.6 testing default | xUnit on .NET 10 | Adopted M0.6 default |
-| M0.6 implementation choices | Lexical, syntax, runtime and CLI choices made where this specification is silent, while implementing M0.6.2 onward (§15.2) | Each row of §15.2 has its own status; the lexical ones (§15.2, "Line terminators" to "Not yet lexed") approved 12 November 2026 |
+| M0.6 implementation choices | Lexical, syntax, runtime and CLI choices made where this specification is silent, while implementing M0.6.2 onward (§15.2) | Each row of §15.2 has its own status; the lexical and syntax ones (§15.2, "Line terminators" to "Nesting limits") approved 12 November 2026 |
 | Repository documents | One copy of this specification, `Documents/weblingo-architecture.md`; documents in the repository's root `Documents/` folder; a shallow folder structure, with no `docs/architecture/` folder; the whole repository may become public (§8.2) | Approved (12 November 2026) |
 
 **Approval boundary:** M0.6 was approved as a specification. This does not imply the repository or implementation already exists. Detailed M0.3 encoding choices were recommended but not separately approved; the architectural decision between stack and register VMs remains open.
@@ -660,9 +660,9 @@ Codes added while implementing M0.6 (§15.2):
 | WS1003 | Invalid character | Approved (12 November 2026) |
 | WS1004 | Invalid numeric literal (malformed, or out of range) | Approved (12 November 2026) |
 | WS1005 | Unterminated comment | Approved (12 November 2026) |
-| WS1006 | Declaration without an initializer | Proposed |
-| WS1007 | Invalid assignment target | Proposed |
-| WS1008 | Source nested too deeply | Proposed |
+| WS1006 | Declaration without an initializer | Approved (12 November 2026) |
+| WS1007 | Invalid assignment target | Approved (12 November 2026) |
+| WS1008 | Source nested too deeply | Approved (12 November 2026) |
 | WS3002 | Integer overflow (a result outside int64) | Proposed |
 | WS3003 | Execution budget exceeded (instructions or registers) | Proposed |
 | WS3004 | Execution cancelled by the host | Proposed |
@@ -1041,14 +1041,14 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Integer literals | Decimal digits only; leading zeros allowed and still decimal (`007` is 7); at most 9223372036854775807, larger is an error (WS1004) | Approved (12 November 2026) |
 | Literal suffixes | Digits followed directly by a letter, digit or `_` are one invalid literal (WS1004), which keeps room for the decimal suffix `m` (§3.2) | Approved (12 November 2026) |
 | Not yet lexed | String, binary64 and decimal literals: their characters are invalid (WS1003) until their syntax is specified | Approved (12 November 2026) |
-| Statements | Variable declarations and expression statements, each ended by `;`; a lone `;` (an empty statement) is an error (WS1001); blocks come later | Proposed |
-| Operators | Unary `-`; binary `* /` above `+ -`, both left-associative; unary `+` also accepted (WS1001) | Proposed |
-| Assignment | An expression, right-associative (`a = b = 3`), whose value is the value assigned; only a variable's name may be assigned (WS1007), not even a parenthesized one | Proposed |
-| Calls | `callee(argument, …)`, no trailing comma; the callee is any expression, checked when bound | Proposed |
-| `let` | Reported as not a WebLingo keyword (WS1001), with a hint to use `var` or `const`, and parsed as `var` to recover | Proposed |
+| Statements | Variable declarations and expression statements, each ended by `;`; a lone `;` (an empty statement) is an error (WS1001); blocks come later | Approved (12 November 2026) |
+| Operators | Unary `-` and `+` (`+` gives the number itself; on anything but a number either is WS3001); binary `* /` above `+ -`, both left-associative | Approved (12 November 2026) |
+| Assignment | An expression, right-associative (`a = b = 3`), whose value is the value assigned; only a variable's name may be assigned (WS1007), not even a parenthesized one | Approved (12 November 2026) |
+| Calls | `callee(argument, …)`, no trailing comma; the callee is any expression, checked when bound | Approved (12 November 2026) |
+| `let` | Reported as not a WebLingo keyword (WS1001), with a hint to use `var` or `const`, and parsed as `var` to recover | Approved (12 November 2026) |
 | Declaration without a value | `var x;` and `const x;` are syntax errors (WS1006, §3.1) | Approved |
-| Error recovery | After an error, parsing resumes at the next `;` or declaration keyword; a token the lexer reported is not reported again, and a statement gets at most one diagnostic for what follows its first error | Proposed |
-| Nesting limits | Parsing recurses at most 256 levels (parentheses, unary minus, assignments, arguments), and an expression is at most 1000 operations deep, so that a recursive compiler stage cannot overflow its stack; deeper source is an error (WS1008) | Proposed |
+| Error recovery | After an error, parsing resumes at the next `;` or declaration keyword; a token the lexer reported is not reported again, and a statement gets at most one diagnostic for what follows its first error | Approved (12 November 2026) |
+| Nesting limits | Parsing recurses at most 256 levels (parentheses, unary operators, assignments, arguments), and an expression is at most 1000 operations deep, so that a recursive compiler stage cannot overflow its stack; deeper source is an error (WS1008). Both limits are arbitrary, and are constants that are easy to change (`WsParser.MaxRecursionDepth`, `WsParser.MaxExpressionDepth`) | Approved (12 November 2026) |
 | Compilation stages | Binding runs only on a source without syntax errors, and lowering only on one that binds without errors: a source reports the errors of its first failing stage | Proposed |
 | Host built-ins | The host declares its built-ins (name and arity) to the compiler; they live in a scope around the program's, so a declaration may shadow one (`var print = 1;`) | Proposed |
 | Functions as values | Not yet: a built-in can only be called; naming it otherwise is an error (WS3001), and so is calling anything but a built-in (WS3001), or calling one with the wrong number of arguments (WS3001). But make sure this is supported later. | Proposed |
@@ -1057,7 +1057,7 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Evaluation order | Left to right: operands, then arguments; an assignment evaluates its value before it stores it | Proposed |
 | Instruction model | An in-memory register instruction model, not WBC (§5.3, §8.4): an operation and up to four integer operands A to D, unused ones 0 (`WsBytecodeContracts.cs`); a module holds its constants (int64 and binary64, kept as IEEE bits), the built-ins it imports by name and arity, and one function, with a source span per instruction and the names of its locals for runtime messages | Proposed |
 | Registers | A function's locals take registers 0 to n − 1 and its temporaries the registers above; at most 65535 registers (§5.3), more is a compile-time error (WS4002) | Proposed |
-| Operations | `LoadConstant`, `Move`, `Negate`, `Add`, `Subtract`, `Multiply`, `Divide`, `CallBuiltin` (arguments in consecutive registers, §5.4), `Jump`, `Return`; the compiler emits no `Jump` yet | Proposed |
+| Operations | `LoadConstant`, `Move`, `Negate`, `Plus`, `Add`, `Subtract`, `Multiply`, `Divide`, `CallBuiltin` (arguments in consecutive registers, §5.4), `Jump`, `Return`; the compiler emits no `Jump` yet | Proposed |
 | Verification | Besides §5.5: unused operands must be 0; no path may run off the end of the code; every register, local or temporary, must be written before it is read on every path, which is what keeps a variable from being read before it has a value (§3.1); a function whose check needs more than 16 million words of state or 100 million steps is rejected rather than verified slowly | Proposed |
 | Compiler output | The compiler verifies what it generates, and reports a module that fails as an internal error (WS4001), with no module | Proposed |
 | Runtime values | `WsValue`, a kind and a 64-bit payload, 16 bytes (§4.1's target, met): null, Boolean, int64 and binary64 (§8.4); the language has no `null`, `true` or `false` literals yet, so scripts produce only numbers | Proposed |
