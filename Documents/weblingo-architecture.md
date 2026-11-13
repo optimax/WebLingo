@@ -667,6 +667,9 @@ Codes added while implementing M0.6, all **proposed** (§15.2):
 | WS1006 | `const` declaration without an initializer |
 | WS1007 | Invalid assignment target |
 | WS1008 | Source nested too deeply |
+| WS3002 | Integer overflow (a result outside int64) |
+| WS3003 | Execution budget exceeded (instructions or registers) |
+| WS3004 | Execution cancelled by the host |
 | WS4002 | Program too large for the bytecode (more registers than a function may have) |
 
 **Lexer:** identifiers, keywords (`var`, `const`), literals, operators, punctuation, source spans and malformed-input diagnostics.
@@ -1011,6 +1014,7 @@ This section records the state of the M0.6 increments after M0.6.1 (§8.7), and 
 | M0.6.3 parser, AST and diagnostics | Implemented (12 November 2026); built and tested on Windows, Linux pending |
 | M0.6.4 binder and lowered IR | Implemented (12 November 2026); built and tested on Windows, Linux pending |
 | M0.6.5 minimal bytecode generator and verifier | Implemented (12 November 2026); built and tested on Windows, Linux pending |
+| M0.6.6 minimal register VM, arithmetic, locals and `print` | Implemented (12 November 2026): `weblingo run` runs §8.4's example and prints `30`; built and tested on Windows, Linux pending |
 
 ### 15.2 Proposed choices
 
@@ -1046,4 +1050,15 @@ This section records the state of the M0.6 increments after M0.6.1 (§8.7), and 
 | Dead zone in the VM | The VM starts every local in its temporal dead zone; the check operations guard locals, and the verifier guards temporaries | Proposed |
 | Verification | Besides §5.5: unused operands must be 0; no path may run off the end of the code; a temporary must be written before it is read on every path; a function whose check needs more than 16 million words of state or 100 million steps is rejected rather than verified slowly | Proposed |
 | Compiler output | The compiler verifies what it generates, and reports a module that fails as an internal error (WS4001), with no module | Proposed |
-| Diagnostic codes | WS1003 to WS1008 and WS4002 (§8.4); WS3001 is used at compile time too, for invalid calls | Proposed |
+| Runtime values | `WsValue`, a kind and a 64-bit payload, 16 bytes (§4.1's target, met): null, Boolean, int64 and binary64 (§8.4); the language has no `null`, `true` or `false` literals yet, so scripts produce only numbers | Proposed |
+| Mixed arithmetic | An int64 meeting a binary64 is converted to binary64 (`1 + 0.5`, and `10 / 4 + 1` is 3.5) | Proposed |
+| Binary64 results | IEEE 754 throughout: `1 / 0` is `Infinity`, `-1 / 0` is `-Infinity`, `0 / 0` is `NaN`; only integer arithmetic raises an error (WS3002) | Proposed |
+| Invalid operands | Arithmetic on anything but numbers is WS3001 | Proposed |
+| `print` | One argument; writes the value as text and a line break, and gives `null`; registered by the host (the CLI), implemented once in `WebLingo.StdLib` | Proposed |
+| Text of a value | `null`, `true`, `false`; an int64 in decimal digits; a binary64 as the shortest decimal that reads back as the same number, always with a decimal point or an exponent (`5.0`, `3.5`, `0.1`, `-0.0`, `1E+21`), or `NaN`, `Infinity`, `-Infinity`; never culture-dependent (`WsValueFormatter`) | Proposed |
+| Linking | The VM verifies a module, then links its imports to the host's built-ins by name and arity; a missing one stops the module before it runs (WS2001) | Proposed |
+| Runtime errors | The first runtime error stops the execution, and is reported with the source span of the instruction that raised it; output printed before it stays | Proposed |
+| Budgets and cancellation | An execution has an instruction budget (exceeded: WS3003) and a register budget (a module needing more is not run: WS3003); the VM looks at the host's cancellation signal every 1024 instructions (WS3004); a WebLingo-owned signal, not .NET's `CancellationToken` (WS-P007) | Proposed |
+| Built-in failures | A built-in that fails, even by throwing, is a runtime error (WS3001); a built-in never receives a variable without a value (WS2004) | Proposed |
+| CLI | `weblingo run <file>` compiles and runs; `weblingo check <file>` compiles and reports, without running; `weblingo --version` prints `WebLingo M0.6 (pre-alpha)`. Diagnostics go to standard error as `file(line,column): error CODE: message`. Exit codes: 0 success, 1 compilation errors, 2 a usage error or an unreadable file, 3 a runtime error (M0.6.1's 3, "not implemented", is gone). `print`'s lines end in LF on every platform | Proposed |
+| Diagnostic codes | WS1003 to WS1008, WS3002 to WS3004, and WS4002 (§8.4); WS3001 is used at compile time too, for invalid calls; WS2004 is a runtime error | Proposed |

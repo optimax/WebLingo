@@ -76,13 +76,15 @@ WebLingo.202611121500.zip
 - **The portable core:** `WebLingo.Core`, `WebLingo.Language`, `WebLingo.Bytecode`, `WebLingo.Compiler`, `WebLingo.Runtime`, `WebLingo.VM`, `WebLingo.Templates`, `WebLingo.StdLib`, `WebLingo.Platform.Abstractions`, and `WebLingo.Hosting.Abstractions`.
 - **The adapters to .NET:** `WebLingo.Platform.DotNet` (the .NET implementation of the platform abstraction layer, the PAL) and `WebLingo.Hosting.AspNetCore` (the host for IIS).
 - **The command line:** `WebLingo.Cli`, which builds `weblingo`.
-- **The tests:** `WebLingo.Language.Tests` (lexer, parser, source text), `WebLingo.Compiler.Tests` (binder, lowering, code generation), `WebLingo.Bytecode.Tests` (the verifier, with a fuzz test), and `WebLingo.Architecture.Tests`.
+- **The tests:** `WebLingo.Language.Tests` (lexer, parser, source text), `WebLingo.Compiler.Tests` (binder, lowering, code generation), `WebLingo.Bytecode.Tests` (the verifier, with a fuzz test), `WebLingo.Runtime.Tests` (values, arithmetic, formatting, `print`), `WebLingo.VM.Tests` (execution, runtime errors, budgets), and `WebLingo.Architecture.Tests`.
 
 ## The Pipeline
 
 The compiler's stages are separate classes (specification, section 8.8): `WsLexer` and `WsParser` in `WebLingo.Language` give a `WsSyntaxTree`; in `WebLingo.Compiler`, `WsBinder` resolves names into a bound tree (`WsBoundTree.cs`, `WsSymbols.cs`), and `WsLowerer` reduces it to the lowered IR (`WsIr.cs`), a tree neither register- nor stack-shaped (WS-BC002). `WsCompilation` runs them in order and stops at the first stage that reports an error. The host's built-ins reach the compiler as `WsCompilerOptions`. `WsCodeGenerator` turns the IR into a module of the in-memory bytecode (`WebLingo.Bytecode`, `WsBytecodeContracts.cs`), and `WsCompiler` runs the whole compiler, checking its own output with `WsBytecodeVerifier`. A stack VM would get a generator of its own from the same IR. `WsDisassembler` shows a module as text.
 
 The verifier must reject a malformed module, never throw or run out of memory on one: its dataflow check keeps state only at block starts, as bit sets, within fixed bounds (`MaxStateWords`, `MaxSteps`). Keep it so when operations are added, and add each one to the fuzz test's range.
+
+At run time, `WsVirtualMachine` (`WebLingo.VM`) verifies a module, links its imports to the host's built-ins, and runs it in a `WsExecutionContext` (`WebLingo.Runtime`: owner worker, cancellation signal, instruction and resource budgets, runtime services). The semantics of values live in `WebLingo.Runtime`, not in the VM, so that another VM shares them: `WsValue`, `WsOperators` (the arithmetic), and `WsValueFormatter` (a value as text). `print` is `WsPrintFunction` in `WebLingo.StdLib`; the CLI, `WsCommandLine`, is the host that registers it and runs `run` and `check`.
 
 ## Dependency Direction
 
@@ -186,6 +188,7 @@ dotnet build WebLingo.slnx -c Release
 dotnet test WebLingo.slnx -c Release --no-build
 dotnet test tests/WebLingo.Language.Tests -c Release --no-build --filter "FullyQualifiedName~LexerTests"
 dotnet run --project src/WebLingo.Cli -c Release --no-build -- --version
+dotnet run --project src/WebLingo.Cli -c Release --no-build -- run samples/Arithmetic/arithmetic.ws
 ```
 
 - The solution is small: build all of it rather than one project, and run the complete test suite after a change, which today takes seconds. When the suite grows, run targeted test classes during active development and the complete suite before a task is done.

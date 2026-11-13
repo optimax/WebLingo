@@ -34,6 +34,12 @@ public static class WsDiagnosticCodes
 
     /// <summary>Invalid operation.</summary>
     public const string InvalidOperation = "WS3001";
+    /// <summary>An integer result outside int64 (proposed).</summary>
+    public const string IntegerOverflow = "WS3002";
+    /// <summary>An execution stopped for exceeding its instruction or resource budget (proposed).</summary>
+    public const string BudgetExceeded = "WS3003";
+    /// <summary>An execution stopped because its host cancelled it (proposed).</summary>
+    public const string Cancelled = "WS3004";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WS4001";
