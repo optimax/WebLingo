@@ -27,7 +27,7 @@ The current state is the M0.6.1 solution scaffold (specification, sections 8.7 a
 - `Documents/weblingo-architecture.md` is the architecture specification, and its only copy (user decision, 2026-11-12; specification, section 8.2): the language, the runtime values and the GC, the bytecode and the VM, hosting, the platform abstraction layer, templates, the solution's structure, the milestone roadmap, the open questions, and the register of decisions with their status. In this document, "the specification" means that document. It is the design document that `AGENTS.md` and `TO-DO-INSTRUCTIONS.md` refer to.
 - `WebLingo/README.md` says how to build, test and run the solution.
 - `Documents/M0.6.1-status.md` records what the current milestone delivered and what it does not implement.
-- `WebLingo/eng/portability/NativeCompatibility.md` is the inventory of .NET facilities and how the portable core may use each (section 6).
+- `Documents/NativeCompatibility.md` is the inventory of .NET facilities and how the portable core may use each (section 6).
 - `HANDOFF.md` at the root, when present, records the current state of the work and its next steps.
 - `TO-DO.md`, `TO-DO-INSTRUCTIONS.md` and `DONE.md` at the root hold the tasks, how to work them, and the tasks that are done.
 
@@ -49,7 +49,6 @@ WebLingo/                      the repository
     ├── Directory.Build.props
     ├── Directory.Packages.props
     ├── global.json
-    ├── eng/portability/
     ├── samples/
     ├── src/WebLingo.*/
     └── tests/WebLingo.*.Tests/
@@ -143,7 +142,7 @@ The specification defines the milestones (M0.1 to M0.8, section 9), the incremen
 The specification's guiding invariants (section 11) bind every change. In code they mean:
 
 - **One semantics.** WebLingo behaves the same on every host (IIS, FastCGI, standalone, the CLI) and every toolchain (.NET now, Native C# later). A difference between hosts or toolchains is never visible to a script.
-- **The portable core stays portable.** Code in the portable core uses only what `WebLingo/eng/portability/NativeCompatibility.md` allows: no ASP.NET Core, no ADO.NET, no `Reflection.Emit` or other generation of CLR code at run time, no .NET `Task` or `ValueTask` as WebLingo's asynchronous contract, and no direct `System.IO.File` in the runtime, which goes through the PAL. When portable code needs a .NET facility the inventory does not list, add it there, with its classification, in the same change, and ask if it is not obviously portable. `PortabilityTests` (`WebLingo.Architecture.Tests`) checks the built assemblies against the inventory's adapter-only, prohibited and unused rows, so a rule added there for the core is added to that test too.
+- **The portable core stays portable.** Code in the portable core uses only what `Documents/NativeCompatibility.md` allows: no ASP.NET Core, no ADO.NET, no `Reflection.Emit` or other generation of CLR code at run time, no .NET `Task` or `ValueTask` as WebLingo's asynchronous contract, and no direct `System.IO.File` in the runtime, which goes through the PAL. When portable code needs a .NET facility the inventory does not list, add it there, with its classification, in the same change, and ask if it is not obviously portable. `PortabilityTests` (`WebLingo.Architecture.Tests`) checks the built assemblies against the inventory's adapter-only, prohibited and unused rows, so a rule added there for the core is added to that test too.
 - **Dependencies point one way** (section 3), and framework types (ASP.NET Core's, ADO.NET's) never leak into the portable core.
 - **Minimal third-party dependencies.** Ask before adding any package to the portable core.
 - **WebLingo is its own engine.** Do not execute WebLingo by delegating to an existing JavaScript engine (V8, Node.js, Jint, ClearScript), by translating it to C#, or by generating CLR code at run time. The released product must not need .NET, Node.js, V8 or PHP (specification, section 12.1).

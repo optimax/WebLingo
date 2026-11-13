@@ -619,15 +619,11 @@ WebLingo/
     Arithmetic/
     Functions/
     SimpleWebsite/
-  eng/
-    scripts/
-    portability/
-    ci/
 ```
 
 Add FastCGI, database provider and native adapter projects when their implementation milestones begin, rather than creating unnecessary empty projects.
 
-**Documents — approved amendment (12 November 2026):** the repository's root holds the solution folder above, `WebLingo/`, beside a flat `Documents/` folder for the project's documents. This specification exists once, as `Documents/weblingo-architecture.md`; there is no `docs/architecture/` folder, and the folder structure is kept shallow. The whole repository may become public, so nothing that should stay private is put into it.
+**Documents — approved amendment (12 November 2026):** the repository's root holds the solution folder above, `WebLingo/`, beside a flat `Documents/` folder for the project's documents. This specification exists once, as `Documents/weblingo-architecture.md`; there is no `docs/architecture/` folder, and the folder structure is kept shallow: the portability inventory is `Documents/NativeCompatibility.md`, and there is no `eng/` folder. The whole repository may become public, so nothing that should stay private is put into it.
 
 ### 8.3 Project dependencies (WS-S002)
 
@@ -706,7 +702,7 @@ Expected output: `30`. `print` may initially be a CLI-host registered built-in.
 - Implicit usings enabled.
 - Deterministic builds; warnings treated as errors.
 - Central package management; minimal third-party dependencies in portable core.
-- Maintain `eng/portability/NativeCompatibility.md`.
+- Maintain the portability inventory, `Documents/NativeCompatibility.md`.
 - **Testing default:** xUnit on .NET 10, adopted with M0.6 approval.
 
 Proposed central props:
@@ -1027,7 +1023,7 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | CLI compiles and runs simple `.ws` programs | Yes: `weblingo run` and `weblingo check` (`WebLingo.Conformance.Tests`) |
 | Lexer, parser, binder, generator, verifier and VM are separate components | Yes: `WsLexer`, `WsParser`, `WsBinder` and `WsLowerer`, `WsCodeGenerator`, `WsBytecodeVerifier`, `WsVirtualMachine` |
 | Tests pass; malformed inputs fail safely | Yes, on Windows and Linux (294 tests at M0.6.7, 305 with M0.8's checks); fuzz tests give random source to the compiler, and mutated bytecode to the VM, and find diagnostics, never a crash |
-| Portability inventory exists | Yes, `eng/portability/NativeCompatibility.md`, with what M0.6 uses |
+| Portability inventory exists | Yes, `Documents/NativeCompatibility.md`, with what M0.6 uses |
 | Portable core has no ASP.NET Core or ADO.NET dependency | Yes, checked by `DependencyTests` |
 | Compiler IR is not tied to a permanent VM choice | Yes: the lowered IR is a tree; only the code generator is register-specific |
 | Build and test instructions are documented | Yes, the solution's `README.md` |

@@ -5,7 +5,7 @@ using Xunit;
 namespace WebLingo.Architecture.Tests;
 
 /// <summary>
-/// The portability inventory (<c>eng/portability/NativeCompatibility.md</c>), checked on the portable core's built
+/// The portability inventory (<c>Documents/NativeCompatibility.md</c>), checked on the portable core's built
 /// assemblies (WS-P016): no type the inventory rules out for the core (adapter-only, prohibited, or not used) is
 /// referenced, and no method is a P/Invoke. A rule added to the inventory for the portable core gets its entry here.
 /// </summary>
