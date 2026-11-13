@@ -30,7 +30,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WS-017 | Native C# portability contract and replaceable adapters | Approved |
 | WS-002.3 | `var` mutable, `const` immutable; both block-scoped, in scope from their declaration to the end of the block; no `let` declaration keyword | Approved |
 | Statements, operators and literals | The syntax M0.7 implements (§3.5): blocks, `true`, `false` and `null`, comparisons and logic, `if`, loops, `foreach`, strings, and functions, hoisted in their block; a hoisted function reading a variable before its declaration has run is a runtime error (WS2004) | Approved (12 November 2026; the hoisted function's read, 13 November 2026) |
-| Collections | Arrays, maps and sets, with indexing, members, `length`, `foreach`, identity and text (§3.6); how a set is made is still open | Approved (13 November 2026) |
+| Collections | Arrays, maps and sets, with indexing, members, `length`, `foreach`, identity, text, set literals and optional access (§3.6) | Approved (13 November 2026) |
 | M0.1 | Mandatory semicolons; no automatic semicolon insertion | Approved |
 | M0.1 | Numeric categories int64, IEEE binary64, decimal128 | Approved |
 | M0.1 | String indexing and `length` count Unicode scalar values | Approved |
@@ -214,7 +214,7 @@ The syntax M0.7 implements (§9, "M0.7 parts"). Everything here was approved by 
 
 ### 3.6 Collections — approved 13 November 2026
 
-The syntax and meaning of arrays, maps and sets, which M0.9 implements (§9), approved by the owner on 13 November 2026, but for the points that say they are still open.
+The syntax and meaning of arrays, maps and sets, which M0.9 implements (§9), approved by the owner on 13 November 2026.
 
 - **Arrays.** `[a, b, c]` makes a new array of those values, which may be of any kinds, mixed; `[]` makes an empty one; there is no trailing comma, as in calls.
 - **Indexing.** `x[i]` reads element `i` of an array, counting from 0, and `x[i] = v` replaces it. The index must be an int64: a binary64, even `1.0`, is WS3001, since nothing converts implicitly. An index outside 0 to the length − 1 is a runtime error, WS3005 (index out of range).
@@ -227,9 +227,10 @@ The syntax and meaning of arrays, maps and sets, which M0.9 implements (§9), ap
 - **Keys.** Strings, int64s, Booleans and `null` may be keys, and a set's values, compared as `==` compares them (so an int64 is never equal to a string key). A binary64 key is WS3001, so that `1` and `1.0`, and NaN, raise no question; so are arrays, maps, sets and functions, until a use for keying by identity comes.
 - **Order.** The order of a map's entries, and of a set's values, is not defined: it is a hash table's.
 - **`foreach`.** `foreach (var item in a)` visits an array's elements in order, a set's values, and a string's Unicode scalar values, each as a string of one; `foreach (var (key, value) in m)` visits a map's entries, and `(key, value)` is allowed only there for now (§3.5). `foreach (var item in m)` over a map is WS3001, and so is anything else to loop over. A collection changed while `foreach` visits it is not an error: the loop sees the change, as a `for` loop with an index would.
-- **Sets.** `s.add(v)` adds `v`, giving whether it was new; `s.has(v)` tells whether `v` is in it; `s.remove(v)` removes it, giving whether it was there. How a set is made, and written, is still open (a literal is proposed).
+- **Sets.** `s.add(v)` adds `v`, giving whether it was new; `s.has(v)` tells whether `v` is in it; `s.remove(v)` removes it, giving whether it was there. `#{a, b, c}` makes a new set of those values, and `#{}` an empty one; its values are what a map's keys may be (see "Keys"), and an equal value given twice is there once.
+- **Optional access.** `x?[k]` reads as `x[k]` does, but gives `null` where `x[k]` would raise a missing key (WS3007) or an index out of range (WS3005), whether `x` is a map, an array or a string, and gives `null` too when `x` is `null`, so that `rows?[0]?["name"]` stops at the first `null`. A key or an index of the wrong kind (`m?[1.5]`, `a?["x"]`), and a value that cannot be indexed (`5?[0]`), stay WS3001: `?[` allows for an absent entry, not for a wrong program. It is written as C# writes it; a conditional operator, `c ? a : b`, if WebLingo gets one, is told apart from it by the parser. `x?.name`, its form for members, comes later.
 - **Equality.** Arrays, maps and sets are equal only to themselves, as functions are (§3.2), so `[1] == [1]` is false.
-- **Text.** `write` writes an array as `[1, "a", null]` and a map as `{"active": true}`: their strings quoted, with their escapes, their collections written the same way, and one it is already writing as `[…]` or `{…}`. A set is written as its literal, once that is decided.
+- **Text.** `write` writes an array as `[1, "a", null]` and a map as `{"active": true}`: their strings quoted, with their escapes, their collections written the same way, and one it is already writing as `[…]` or `{…}`. A set is written as its literal, `#{1, "a"}`.
 
 ---
 
@@ -862,7 +863,7 @@ Proposed central props:
 | M0.6 | Solution scaffolding and implementation contracts | **Approved; M0.6.1–M0.6.7 implemented and verified on Windows and Linux (§15)** |
 | M0.7 | Conformance suite expansion: the language of §3.5, in parts M0.7.1 to M0.7.6 (below), each with its conformance tests | Implemented (12 November 2026), on Windows; `foreach` waits for collections |
 | M0.8 | Windows/Linux CI and portability validation | Started (12 November 2026): the CI workflow builds and tests on Windows and Linux (first run passed: CI run 1, 12 November 2026, commit `5229806`); tests check the portable core's assemblies against the dependency rules (§8.3) and the portability inventory (WS-P016) |
-| M0.9 | Collections: arrays, maps and sets (§3.2), with indexing, `length` and member access (§3.3), and `foreach` (§3.5) | Next (order approved 13 November 2026); its syntax approved (§3.6), but for sets and optional access |
+| M0.9 | Collections: arrays, maps and sets (§3.2), with indexing, `length` and member access (§3.3), and `foreach` (§3.5) | Next (order approved 13 November 2026); its syntax approved (§3.6) |
 | M0.10 | Classes, `dispose()` and `using` (§3.2, §3.4, WS-L011) | After M0.9 |
 | M0.11 | `.wsp` templates: includes, layouts and parameterized components, together (§13, WS-T001 to WS-T008) | After M0.10 |
 | M0.12 | WBC, the bytecode's binary format (§5.1, §5.3) | After M0.11 |
