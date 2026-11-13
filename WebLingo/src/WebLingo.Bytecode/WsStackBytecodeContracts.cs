@@ -101,6 +101,8 @@ public enum WsStackOpCode : byte
     GetIndex,
     /// <summary>A = 1 to push the value back, 0 not to; pops the value, the index, then the target, and stores it.</summary>
     StoreIndex,
+    /// <summary>A = element count; pops that many values, the last one on top, and pushes a new array of them.</summary>
+    NewArray,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);

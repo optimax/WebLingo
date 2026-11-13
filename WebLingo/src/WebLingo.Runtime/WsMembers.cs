@@ -40,10 +40,23 @@ public static class WsMembers
             error = null;
             return true;
         }
+        if (target.Kind == WsValueKind.Array && member == WsMember.Length)
+        {
+            result = WsValue.FromInt64(heap.GetArray(target).Count);
+            error = null;
+            return true;
+        }
         result = WsValue.Null;
-        error = NoSuchMember(target, name);
+        error = IsMethod(target, member)
+            ? new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                $"'{name}' is a method of {WsValueFormatter.Describe(target)}, and can only be called.")
+            : NoSuchMember(target, name);
         return false;
     }
+
+    /// <summary>Whether the member is a method of the value: an array's <c>push</c> and <c>pop</c>.</summary>
+    private static bool IsMethod(WsValue target, WsMember member) =>
+        target.Kind == WsValueKind.Array && member is WsMember.Push or WsMember.Pop;
 
     /// <summary>
     /// Calls a method, <c>x.name(…)</c>, with the <paramref name="count"/> arguments from
@@ -52,12 +65,26 @@ public static class WsMembers
     public static bool TryCall(WsValue target, WsMember member, string name, WsValue[] values, int first, int count,
         WsHeap heap, out WsValue result, out WsRuntimeError? error)
     {
-        _ = values;
-        _ = first;
-        _ = count;
-        _ = heap;
         result = WsValue.Null;
-        error = target.Kind == WsValueKind.String && member == WsMember.Length
+        if (target.Kind == WsValueKind.Array && member == WsMember.Push)
+        {
+            if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+            if (!heap.TryAddToArray(target, values[first], out error)) return false;
+            return true;
+        }
+        if (target.Kind == WsValueKind.Array && member == WsMember.Pop)
+        {
+            if (count != 0) return WrongArgumentCount(name, 0, count, out error);
+            if (heap.GetArray(target).Count == 0)
+            {
+                error = new WsRuntimeError(WsDiagnosticCodes.IndexOutOfRange, "'pop' cannot remove an element from an empty array.");
+                return false;
+            }
+            result = heap.RemoveLastOfArray(target);
+            error = null;
+            return true;
+        }
+        error = target.Kind is WsValueKind.String or WsValueKind.Array && member == WsMember.Length
             ? new WsRuntimeError(WsDiagnosticCodes.NotAFunction,
                 $"'{name}' of {WsValueFormatter.Describe(target)} is not a method, and cannot be called.")
             : NoSuchMember(target, name);
@@ -68,6 +95,13 @@ public static class WsMembers
     public static bool TryGetIndex(WsValue target, WsValue index, WsHeap heap, out WsValue result, out WsRuntimeError? error)
     {
         result = WsValue.Null;
+        if (target.Kind == WsValueKind.Array)
+        {
+            var elements = heap.GetArray(target);
+            if (!TryIndex(index, elements.Count, out var at, out error)) return false;
+            result = elements[(int)at];
+            return true;
+        }
         if (target.Kind != WsValueKind.String)
         {
             error = CannotBeIndexed(target);
@@ -83,9 +117,13 @@ public static class WsMembers
     /// <summary><c>target[index] = value</c>.</summary>
     public static bool TrySetIndex(WsValue target, WsValue index, WsValue value, WsHeap heap, out WsRuntimeError? error)
     {
-        _ = index;
-        _ = value;
-        _ = heap;
+        if (target.Kind == WsValueKind.Array)
+        {
+            var elements = heap.GetArray(target);
+            if (!TryIndex(index, elements.Count, out var at, out error)) return false;
+            elements[(int)at] = value;
+            return true;
+        }
         error = target.Kind == WsValueKind.String
             ? new WsRuntimeError(WsDiagnosticCodes.InvalidOperation, "A string cannot be changed: strings are immutable.")
             : CannotBeIndexed(target);
@@ -135,6 +173,13 @@ public static class WsMembers
         }
         error = null;
         return true;
+    }
+
+    private static bool WrongArgumentCount(string name, int arity, int count, out WsRuntimeError? error)
+    {
+        error = new WsRuntimeError(WsDiagnosticCodes.WrongArgumentCount,
+            $"'{name}' takes {arity} {(arity == 1 ? "argument" : "arguments")}, not {count}.");
+        return false;
     }
 
     private static WsRuntimeError CannotBeIndexed(WsValue target) =>

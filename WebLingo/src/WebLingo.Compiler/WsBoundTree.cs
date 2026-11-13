@@ -98,6 +98,9 @@ public sealed record WsBoundBuiltinReference(WsBuiltinSymbol Builtin, WsSourceSp
 
 public sealed record WsBoundFunctionExpression(WsBoundFunction Function, WsSourceSpan Span) : WsBoundExpression(Span);
 
+/// <summary><c>[a, b, c]</c>: a new array (specification, section 3.6).</summary>
+public sealed record WsBoundArrayLiteral(IReadOnlyList<WsBoundExpression> Elements, WsSourceSpan Span) : WsBoundExpression(Span);
+
 /// <summary><c>target[index]</c>, checked when it runs (specification, section 3.6).</summary>
 public sealed record WsBoundIndex(WsBoundExpression Target, WsBoundExpression Index, WsSourceSpan Span) : WsBoundExpression(Span);
 

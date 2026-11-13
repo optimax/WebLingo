@@ -55,6 +55,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var x = 1; x.length = 2;", "WS1007", 1, 12)]
     [InlineData("writeLn(\"abc\".);", "WS1001", 1, 15)]
     [InlineData("writeLn(\"abc\"[0);", "WS1001", 1, 16)]
+    [InlineData("writeLn([1,]);", "WS1001", 1, 12)]
+    [InlineData("var a = [1 2];", "WS1001", 1, 12)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -132,6 +134,14 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(\"a\U0001F600b\"[1]); var s = \"abc\"; writeLn(s[0] + s[2]); writeLn(s[s.length - 1]);", "\U0001F600\nac\nc")]
     [InlineData("var i = 0; var s = \"xyz\"; writeLn(s[i = 2] + s[i]); writeLn((\"a\" + \"b\").length);", "zz\n2")]
     [InlineData("var s = \"ab\"; writeLn(s[(s = \"cd\").length - 1]); writeLn(s);", "b\ncd")]
+    [InlineData("var a = [1, \"a\\n\\\"q\\\"\", null, 2.5, [true, []]]; writeLn(a); writeLn(a.length); writeLn(a[4][0]);", "[1, \"a\\n\\\"q\\\"\", null, 2.5, [true, []]]\n5\ntrue")]
+    [InlineData("var a = [1, 2]; a[0] = a[0] + 40; a[1] = \"x\"; writeLn(a); writeLn([]); writeLn([].length);", "[41, \"x\"]\n[]\n0")]
+    [InlineData("var a = []; a.push(1); writeLn(a.push(2)); writeLn(a.pop()); writeLn(a.pop()); writeLn(a);", "null\n2\n1\n[]")]
+    [InlineData("var a = [1]; var b = a; b[0] = 9; writeLn(a[0]); writeLn(a == b); writeLn([1] == [1]); writeLn(a != [9]);", "9\ntrue\nfalse\ntrue")]
+    [InlineData("var a = [0]; a.push(a); writeLn(a);", "[0, […]]")]
+    [InlineData("var a = [writeLn]; a[0](\"called\"); var b = [function (x) { return x * 2; }]; writeLn(b[0](21));", "called\n42")]
+    [InlineData("var i = 0; var a = [i = 1, i, i = 2]; writeLn(a); var b = [0, 0]; b[i = 1] = i; writeLn(b);", "[1, 1, 2]\n[0, 1]")]
+    [InlineData("var m = [[1, 2], [3, 4]]; m[1][0] = 30; writeLn(m[0][1] + m[1][0]); writeLn(m);", "32\n[[1, 2], [30, 4]]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -189,6 +199,17 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(null.length);", "WS3006")]
     [InlineData("writeLn(\"abc\".length());", "WS2005")]
     [InlineData("writeLn(\"abc\".size(1));", "WS3006")]
+    [InlineData("writeLn([].pop());", "WS3005")]
+    [InlineData("writeLn([1, 2][2]);", "WS3005")]
+    [InlineData("var a = [1]; a[-1] = 0;", "WS3005")]
+    [InlineData("writeLn([1][\"0\"]);", "WS3001")]
+    [InlineData("writeLn([1].push);", "WS3001")]
+    [InlineData("var a = [1]; a.push(1, 2);", "WS2006")]
+    [InlineData("var a = [1]; a.pop(1);", "WS2006")]
+    [InlineData("writeLn([1].size);", "WS3006")]
+    [InlineData("writeLn([1].length());", "WS2005")]
+    [InlineData("writeLn([1] + [2]);", "WS3001")]
+    [InlineData("writeLn([1] < [2]);", "WS3001")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

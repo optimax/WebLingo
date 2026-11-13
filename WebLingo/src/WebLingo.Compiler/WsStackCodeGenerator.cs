@@ -252,6 +252,10 @@ public sealed class WsStackCodeGenerator
                 foreach (var argument in call.Arguments) EmitValue(argument);
                 Emit(WsStackOpCode.Call, call.Span, call.Arguments.Count);
                 return;
+            case WsIrNewArray array:
+                foreach (var element in array.Elements) EmitValue(element);
+                Emit(WsStackOpCode.NewArray, array.Span, array.Elements.Count);
+                return;
             case WsIrIndex index:
                 EmitValue(index.Target);
                 EmitValue(index.Index);
@@ -391,6 +395,7 @@ public sealed class WsStackCodeGenerator
             WsStackOpCode.Call => (a + 1, 1),
             WsStackOpCode.CallBuiltin => (b, 1),
             WsStackOpCode.GetMember => (1, 1),
+            WsStackOpCode.NewArray => (a, 1),
             WsStackOpCode.CallMethod => (b + 1, 1),
             WsStackOpCode.GetIndex => (2, 1),
             WsStackOpCode.StoreIndex => (3, a),

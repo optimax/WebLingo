@@ -113,6 +113,9 @@ public sealed record WsIrMakeClosure(int Function, WsSourceSpan Span) : WsIrExpr
 
 public sealed record WsIrLoadBuiltin(int Builtin, WsSourceSpan Span) : WsIrExpression(Span);
 
+/// <summary>A new array of the elements' values, evaluated in order (specification, section 3.6).</summary>
+public sealed record WsIrNewArray(IReadOnlyList<WsIrExpression> Elements, WsSourceSpan Span) : WsIrExpression(Span);
+
 /// <summary><c>target[index]</c> (specification, section 3.6).</summary>
 public sealed record WsIrIndex(WsIrExpression Target, WsIrExpression Index, WsSourceSpan Span) : WsIrExpression(Span);
 

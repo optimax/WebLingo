@@ -534,6 +534,23 @@ public sealed class WsParser : IWsParser
             case WsTokenKind.Identifier:
                 Advance();
                 return new WsNameSyntax(token.Text, token.Span);
+            case WsTokenKind.OpenBracket:
+            {
+                // [a, b, c], or [], with no trailing comma, as in calls (section 3.6).
+                Advance();
+                var elements = new List<WsExpressionSyntax>();
+                if (Current.Kind != WsTokenKind.CloseBracket)
+                {
+                    elements.Add(ParseExpression());
+                    while (Current.Kind == WsTokenKind.Comma)
+                    {
+                        Advance();
+                        elements.Add(ParseExpression());
+                    }
+                }
+                Expect(WsTokenKind.CloseBracket, "']'");
+                return new WsArrayLiteralSyntax(elements, SpanFrom(token.Span.Start));
+            }
             case WsTokenKind.OpenParen:
                 Advance();
                 var inner = ParseExpression();
@@ -679,6 +696,9 @@ public sealed class WsParser : IWsParser
                         pending.Push((index.Index, depth + 1));
                         break;
                     case WsMemberAccessSyntax member: pending.Push((member.Target, depth + 1)); break;
+                    case WsArrayLiteralSyntax array:
+                        foreach (var element in array.Elements) pending.Push((element, depth + 1));
+                        break;
                     case WsIndexAssignmentSyntax element:
                         pending.Push((element.Target, depth + 1));
                         pending.Push((element.Value, depth + 1));

@@ -94,6 +94,8 @@ public enum WsOpCode : byte
     GetIndex,
     /// <summary>A = target register, B = index register, C = value register; nothing is written.</summary>
     SetIndex,
+    /// <summary>A = destination register, B = first element register, C = element count; a new array of them.</summary>
+    NewArray,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);

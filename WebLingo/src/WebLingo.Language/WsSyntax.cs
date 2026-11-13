@@ -109,6 +109,9 @@ public sealed record WsParenthesizedExpressionSyntax(WsExpressionSyntax Expressi
 public sealed record WsAssignmentExpressionSyntax(WsNameSyntax Target, WsExpressionSyntax Value, WsSourceSpan Span)
     : WsExpressionSyntax(Span);
 
+/// <summary><c>[a, b, c]</c>, a new array of those values (section 3.6).</summary>
+public sealed record WsArrayLiteralSyntax(IReadOnlyList<WsExpressionSyntax> Elements, WsSourceSpan Span) : WsExpressionSyntax(Span);
+
 /// <summary><c>target[index]</c>: an element of an array, an entry of a map, or a character of a string (section 3.6).</summary>
 public sealed record WsIndexExpressionSyntax(WsExpressionSyntax Target, WsExpressionSyntax Index, WsSourceSpan Span)
     : WsExpressionSyntax(Span);

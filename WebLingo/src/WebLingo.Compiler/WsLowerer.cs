@@ -165,6 +165,8 @@ public sealed class WsLowerer
                 return new WsIrCallBuiltin(call.Builtin.Index, LowerArguments(call.Arguments), call.Span);
             case WsBoundCall call:
                 return new WsIrCall(LowerExpression(call.Callee), LowerArguments(call.Arguments), call.Span);
+            case WsBoundArrayLiteral array:
+                return new WsIrNewArray(LowerArguments(array.Elements), array.Span);
             case WsBoundIndex index:
                 return new WsIrIndex(LowerExpression(index.Target), LowerExpression(index.Index), index.Span);
             case WsBoundIndexAssignment element:

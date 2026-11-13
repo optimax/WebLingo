@@ -425,6 +425,13 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             pc++;
                             continue;
                         }
+                        case WsOpCode.NewArray:
+                        {
+                            if (!heap.TryAllocateArray(registers, ins.B, ins.C, out var array, out error)) break;
+                            registers[ins.A] = array;
+                            pc++;
+                            continue;
+                        }
                         case WsOpCode.GetIndex:
                         {
                             if (!WsMembers.TryGetIndex(registers[ins.B], registers[ins.C], heap, out var element, out error)) break;

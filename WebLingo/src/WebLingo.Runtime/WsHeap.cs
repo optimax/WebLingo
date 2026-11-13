@@ -6,10 +6,11 @@ namespace WebLingo.Runtime;
 /// handle, never by a .NET reference. It has WebLingo's own tracing collector, nonmoving mark-and-sweep: a
 /// collection marks what the roots (the arrays its owner registers, such as the VM's registers and constants) refer
 /// to, through every object that refers to others, and frees the rest, whose handles are reused. Its objects are
-/// strings, closures (a function and the cells it captures), and cells (one variable that closures share, which
-/// has no value until it is initialized).
+/// strings, closures (a function and the cells it captures), cells (one variable that closures share, which has no
+/// value until it is initialized), and arrays (section 3.6).
 /// <para>
-/// Its size is counted in units: a string's length in UTF-16 code units, a closure's capture count, each plus
+/// Its size is counted in units: a string's length in UTF-16 code units, a closure's capture count, an array's
+/// element count (which grows and shrinks with it), each plus
 /// <see cref="ObjectOverhead"/>. A collection runs when an allocation would pass the next threshold, which is twice
 /// what was live after the last collection, and at least <see cref="FirstCollectionAt"/>; an allocation that does
 /// not fit in the budget even after a collection is an error (WS3003). These numbers are arbitrary, and are
@@ -84,6 +85,37 @@ public sealed class WsHeap
         return (closure.Function, closure.Cells);
     }
 
+    /// <summary>A new array of the <paramref name="count"/> values from <paramref name="values"/>[<paramref name="first"/>] on.</summary>
+    public bool TryAllocateArray(WsValue[] values, int first, int count, out WsValue array, out WsRuntimeError? error)
+    {
+        var elements = new List<WsValue>(count);
+        for (var i = 0; i < count; i++) elements.Add(values[first + i]);
+        return TryAllocate(new ArrayObject(elements), WsValueKind.Array, count, out array, out error);
+    }
+
+    /// <summary>An array's elements, which its owner may read and replace, but grows only by <see cref="TryAddToArray"/>.</summary>
+    public List<WsValue> GetArray(WsValue value) => Get<ArrayObject>(value, WsValueKind.Array).Elements;
+
+    /// <summary>Adds a value at the end of an array: one more unit, within the budget (WS3003).</summary>
+    public bool TryAddToArray(WsValue array, WsValue value, out WsRuntimeError? error)
+    {
+        var elements = GetArray(array);
+        if (!TryReserve(1, out error)) return false;
+        elements.Add(value);
+        Units++;
+        return true;
+    }
+
+    /// <summary>Removes an array's last element, which must exist, and gives it.</summary>
+    public WsValue RemoveLastOfArray(WsValue array)
+    {
+        var elements = GetArray(array);
+        var last = elements[^1];
+        elements.RemoveAt(elements.Count - 1);
+        Units--;
+        return last;
+    }
+
     /// <summary>Marks what the roots refer to, through every object, and frees every other object.</summary>
     public void Collect()
     {
@@ -103,6 +135,9 @@ public sealed class WsHeap
                 case Cell cell:
                     Mark(cell.Value, marked, pending);
                     break;
+                case ArrayObject array:
+                    foreach (var element in array.Elements) Mark(element, marked, pending);
+                    break;
             }
         }
         for (var handle = 0; handle < _objects.Count; handle++)
@@ -118,7 +153,7 @@ public sealed class WsHeap
 
     private static void Mark(WsValue value, bool[] marked, Stack<int> pending)
     {
-        if (value.Kind is not (WsValueKind.String or WsValueKind.Function or WsValueKind.Cell)) return;
+        if (value.Kind is not (WsValueKind.String or WsValueKind.Function or WsValueKind.Cell or WsValueKind.Array)) return;
         if (marked[value.Handle]) return;
         marked[value.Handle] = true;
         pending.Push(value.Handle);
@@ -128,8 +163,22 @@ public sealed class WsHeap
     {
         string text => text.Length,
         Closure closure => closure.Cells.Length,
+        ArrayObject array => array.Elements.Count,
         _ => 0
     };
+
+    /// <summary>Makes room for <paramref name="units"/> more, collecting first if the next collection is due.</summary>
+    private bool TryReserve(long units, out WsRuntimeError? error)
+    {
+        if (Units + units > _nextCollectionAt || Units + units > _maxUnits) Collect();
+        if (Units + units > _maxUnits)
+        {
+            error = new WsRuntimeError(WsDiagnosticCodes.BudgetExceeded, "The program has used all the memory this execution may use.");
+            return false;
+        }
+        error = null;
+        return true;
+    }
 
     private bool TryAllocate(object item, WsValueKind kind, long content, out WsValue value, out WsRuntimeError? error)
     {
@@ -174,4 +223,6 @@ public sealed class WsHeap
     }
 
     private sealed record Closure(int Function, WsValue[] Cells);
+
+    private sealed record ArrayObject(List<WsValue> Elements);
 }

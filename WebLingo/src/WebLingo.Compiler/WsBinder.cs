@@ -219,6 +219,12 @@ public sealed class WsBinder
                 return BindAssignment(assignment);
             case WsCallExpressionSyntax call:
                 return BindCall(call);
+            case WsArrayLiteralSyntax array:
+            {
+                var elements = new List<WsBoundExpression>();
+                foreach (var element in array.Elements) elements.Add(BindExpression(element));
+                return new WsBoundArrayLiteral(elements, array.Span);
+            }
             case WsIndexExpressionSyntax index:
                 return new WsBoundIndex(BindExpression(index.Target), BindExpression(index.Index), index.Span);
             case WsIndexAssignmentSyntax element:

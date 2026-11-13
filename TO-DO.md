@@ -42,6 +42,8 @@ Arrays, maps and sets, with indexing, `length`, member access and `foreach` (spe
 
 Array literals, indexing, `length`, `push` and `pop`, identity and text (specification, section 3.6), on both VMs, with their conformance tests. Added by Claude, 2026-11-13.
 
+Done (Claude, 2026-11-13): arrays, `[a, b]` and `[]`, with `a[i]`, `a[i] = v`, `a.length`, `a.push(v)` and `a.pop()`, on both VMs. They are a new kind of heap object, traced by the collector, and their units grow and shrink with them within the heap's budget (WS3003). They are equal only to themselves. `write` writes them as `[1, "a", null]`, their strings quoted, one being written already as `[…]`, and without .NET's stack, so a deeply nested array cannot overflow it. Choices of mine, in the specification's section 15.2 as proposed: `a.push` read without a call is WS3001; the cycle mark is the character U+2026. Every new conformance case gives the same result on both VMs. Build and 778 tests pass on Windows; Linux not tried.
+
 ## M0.9.3: Maps
 
 Map literals, entries, `has`, `remove`, `length`, keys and text (specification, section 3.6), on both VMs, with their conformance tests. Added by Claude, 2026-11-13.

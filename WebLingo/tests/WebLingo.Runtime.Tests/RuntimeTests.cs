@@ -323,3 +323,16 @@ public sealed class WriteTests
         Assert.False(registry.TryGetBuiltin("Write", out _));
     }
 }
+
+public sealed class QuoteTests
+{
+    [Theory]
+    [InlineData("abc", "\"abc\"")]
+    [InlineData("", "\"\"")]
+    [InlineData("a\"b\\c", "\"a\\\"b\\\\c\"")]
+    [InlineData("\n\r\t\0", "\"\\n\\r\\t\\0\"")]
+    [InlineData("\u0001\u007F", "\"\\u{1}\\u{7F}\"")]
+    [InlineData("é\U0001F600'", "\"é\U0001F600'\"")]
+    public void AStringIsQuotedAsALiteralWouldWriteIt(string text, string quoted) =>
+        Assert.Equal(quoted, WebLingo.Runtime.WsValueFormatter.Quote(text));
+}

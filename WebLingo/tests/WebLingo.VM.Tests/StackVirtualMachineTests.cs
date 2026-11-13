@@ -89,6 +89,51 @@ public sealed class StackVirtualMachineTests
     }
 
     [Fact]
+    public void GarbageArraysAreCollectedOnBothVms()
+    {
+        const string source = "var t = []; for (var i = 0; i < 20000; i = i + 1) { t = [i, i, i, i]; } writeLn(t.length);";
+        foreach (var run in BothVms)
+        {
+            var output = new WsCollectedOutput();
+            var result = run(source, Context(output) with { Resources = new WsResourceBudget(65535, MaxHeapUnits: 10_000) });
+            Assert.True(result.Succeeded, result.Error?.Message);
+            Assert.Equal(new[] { "4" }, output.Lines);
+        }
+    }
+
+    [Fact]
+    public void AnArrayGrowingPastTheBudgetStopsTheProgramOnBothVms()
+    {
+        foreach (var run in BothVms)
+        {
+            var result = run("var a = []; while (true) a.push(1);",
+                new WsExecutionContext(new WsWorkerId(0)) { Resources = new WsResourceBudget(65535, MaxHeapUnits: 100_000) });
+            Assert.Equal(WsDiagnosticCodes.BudgetExceeded, result.Error!.Code);
+        }
+    }
+
+    [Fact]
+    public void ADeeplyNestedArrayIsWrittenWithoutOverflowingTheStack()
+    {
+        const string source = "var a = []; for (var i = 0; i < 100000; i = i + 1) { a = [a]; } write(a);";
+        foreach (var run in BothVms)
+        {
+            var output = new WsCollectedOutput();
+            var result = run(source, Context(output));
+            Assert.True(result.Succeeded, result.Error?.Message);
+            Assert.Equal(200_002, output.Text.Length);
+            Assert.StartsWith("[[[", output.Text);
+        }
+    }
+
+    /// <summary>A program compiled for each VM and run on it.</summary>
+    private static Func<string, WsExecutionContext, WsExecutionResult>[] BothVms =>
+    [
+        (source, context) => new WsVirtualMachine().Execute(new WsCompiler(WithWrite).Compile(source, "test.ws").Module!, context),
+        (source, context) => new WsStackVirtualMachine().Execute(Compile(source), context),
+    ];
+
+    [Fact]
     public void AModuleThatFailsVerificationIsNotRun()
     {
         // writeLn with nothing on the stack to give it.

@@ -310,6 +310,19 @@ public sealed class WsCodeGenerator
                 Emit(new WsInstruction(OpCodeOf(binary.Operator), destination, left, right), binary.Span);
                 return destination;
             }
+            case WsIrNewArray array:
+            {
+                // The elements in consecutive registers, as a call's arguments.
+                var mark = _nextRegister;
+                var first = _nextRegister;
+                for (var i = 0; i < array.Elements.Count; i++) Allocate();
+                for (var i = 0; i < array.Elements.Count; i++) EmitExpression(array.Elements[i], first + i);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.NewArray, destination, array.Elements.Count == 0 ? 0 : first, array.Elements.Count),
+                    array.Span);
+                return destination;
+            }
             case WsIrIndex index:
             {
                 var mark = _nextRegister;
@@ -389,6 +402,7 @@ public sealed class WsCodeGenerator
         WsIrStoreCell store => Assigns(store.Value, local),
         WsIrStoreCapture store => Assigns(store.Value, local),
         WsIrIndex index => Assigns(index.Target, local) || Assigns(index.Index, local),
+        WsIrNewArray array => AnyAssigns(array.Elements, local),
         WsIrStoreIndex store => Assigns(store.Target, local) || Assigns(store.Index, local) || Assigns(store.Value, local),
         WsIrMember member => Assigns(member.Target, local),
         WsIrCallMethod call => Assigns(call.Target, local) || AnyAssigns(call.Arguments, local),
