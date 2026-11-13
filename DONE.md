@@ -575,3 +575,31 @@ Done (Claude, 2026-11-13, `83ba9ca`): maps, `{ key: value }` and `{}`, with `m[k
 `foreach` over arrays, strings and maps (specification, sections 3.5 and 3.6), on both VMs, with their conformance tests, and a benchmark workload of collections (section 5.6). Added by Claude, 2026-11-13.
 
 Done (Claude, 2026-11-13, `2a8113c`): `foreach (var x in a)` over arrays (in order), strings (by Unicode scalar value) and, with `(key, value)`, maps, on both VMs. The loop sees changes to its collection, as section 3.6 says. Closures capture each iteration's variables, and `break`, `continue` and `return` work in it. One new operation per VM, `ForEachNext`, whose way out the verifiers check writes only the loop's position. A `collections` workload joins the benchmark; the register VM ran it in 3.7 to 4.5 ms, the stack VM in 4.7 to 5.2 ms (specification, section 5.6). Choices of mine, in section 15.2 as proposed: `foreach` is a keyword and `in` only inside its parentheses; recovery reads `const` as `var` and a wrong word as `in`; the loop's state lives in hidden locals. Every new conformance case gives the same result on both VMs. Build and 878 tests pass on Windows; Linux not tried.
+
+## [DONE] M0.9 Syntax: Optional Access and Set Literals
+
+Two follow-ups to "M0.9 Syntax: Collections". In the chat (2026-11-13), the owner chose new syntax for a read that may find nothing: `m?[k]` gives `null` where `m[k]` raises a missing key (WS3007), and `x?.name` extends it to members later, so that a template can show an absent value as blank. Whether a template writes `null` as nothing is decided with M0.11 ("M0.11: Templates"). And A14 asks for a set literal. Added by Claude, 2026-11-13.
+
+Q1, `?[` and a conditional operator: (a) `m?[k]`, as chosen, and as C# writes it; if WebLingo gets a conditional operator, `c ? a : b`, its parser tells `c ?[k]` and `c ? [k] : d` apart, as C#'s does; (b) `m?.[k]`, as JavaScript writes it, precisely so that `?[` never needs telling apart from a conditional operator.
+
+A1: (a).
+
+Q2, arrays and strings too: `a?[i]` and `s?[i]` give `null` for an index out of range, where `a[i]` and `s[i]` raise WS3005. Agreed?
+
+A2: Yes.
+
+Q3, a `null` before `?[`: (a) `x?[k]` with `x` null is `null` too, as in C# and JavaScript, so that `rows?[0]?["name"]` stops at the first `null`; (b) only a missing key or index gives `null`, and a `null` `x` is WS3001, as `x[k]` is.
+
+A3: (a).
+
+Q4, what `?[` still rejects: a key or index of the wrong kind (`m?[1.5]`, `a?["x"]`), and a value that cannot be indexed (`5?[0]`), stay WS3001: `?[` allows for an absent entry, not for a wrong program. Agreed?
+
+A4: Yes.
+
+How other languages write sets (A14): Python writes `{1, 2, 3}`, but its empty set is `set()`, since `{}` is a dictionary; Clojure writes `#{1 2 3}`; Swift writes an array literal where a set is expected (`let s: Set = [1, 2, 3]`), and C#'s collection expressions do the same; JavaScript, Kotlin and Ruby have no literal (`new Set([1, 2, 3])`, `setOf(1, 2, 3)`, `Set[1, 2, 3]`). WebLingo cannot take Python's way as it is: with A7, `{ a, b }` would look like a map whose keys are the names `"a"` and `"b"`, and `{}` is already the empty map. Nor Swift's, without declared types.
+
+Q5, a set literal: (a) `#{1, 2, 3}`, and `#{}` for an empty set, as Clojure writes it, its elements any expressions; `#` is unused in WebLingo code; (b) no literal: a built-in function, `set([1, 2, 3])`, as A14's option (a) said. Either way, `write` writes a set as its literal (A17).
+
+A5: (a).
+
+Done (Claude, 2026-11-13, `78cf2fd`): recorded as approved in the specification, section 3.6 ("Optional access", "Sets", "Text") and its decision register. They are built as "M0.9.5: Sets" and "M0.9.6: Optional Access".
