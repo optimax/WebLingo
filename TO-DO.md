@@ -48,27 +48,25 @@ Done (Claude, 2026-11-12): the answers are recorded as approved in the specifica
 
 2026-11-12: waits for its parts, M0.7.1 to M0.7.6.
 
-## Syntax of `for` and `do … while`
+## [QUESTION] Syntax of `foreach`
 
-The owner put `for` and `do … while` in M0.7 ("What M0.7 Covers", A4), but their syntax was not proposed. Added by Claude, 2026-11-12.
+The owner's answer to "Syntax of `for` and `do … while`", Q3: design a loop over collections now, as `foreach` rather than `for … of`. It is implemented when collections exist (specification, section 3.2: arrays, maps, sets). Added by Claude, 2026-11-12.
 
-**Q1: `for (init; condition; step) statement`, as in C: `init` is a declaration or an expression, or empty; `condition` is a Boolean expression, or empty, meaning `true`; `step` is an expression, or empty. A `var` declared in `init` is scoped to the loop and gets a new binding on each iteration, so that closures capture each one (section 3.1). Agreed?**
+**Q1: Which form? (a) `foreach (var item in items) statement`, as in C#; (b) `foreach (var item of items) statement`; (c) `foreach (var item : items) statement`, as in Java.**
 
-A1: Yes.
+A1:
 
-**Q2: `do statement while (condition);`, ending with a `;`, as in C. Agreed?**
+**Q2: May the loop variable be declared `const` as well as `var` (`foreach (const item in items)`)? Like `for`'s, it gets a new binding on each iteration.**
 
-A2: Yes;
+A2:
 
-**Q3: Should a `for … of` loop over collections wait until arrays exist? (a) yes, later; (b) design it now.**
+**Q3: Over a map, `foreach` gives each entry as a key and a value: `foreach (var (key, value) in map)`. Agreed, with the destructuring syntax decided when maps are?**
 
-A3: (b), but I'd rather have `foreach` loops over collections. `for`-`of` is unintuitive for me.
-
-BTW: Thank you for thoughtfully inserting `An:` placeholders for my answers.
+A3:
 
 ## M0.7.4: Loops, `break` and `continue`
 
-`while`, `for` and `do … while`, with `break` and `continue` (specification, section 3.5). `while` comes first; `for` and `do … while` wait for "Syntax of `for` and `do … while`". Added by Claude, 2026-11-12.
+`while`, `for` and `do … while`, with `break` and `continue` (specification, section 3.5). Added by Claude, 2026-11-12.
 
 ## M0.7.5: String Literals and Concatenation
 

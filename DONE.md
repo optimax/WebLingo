@@ -279,3 +279,23 @@ Done (Claude, 2026-11-12): `true`, `false` and `null`, `== != < <= > >=`, `!`, a
 `if (condition) statement`, with an optional `else`, and a strict Boolean condition (specification, section 3.5). Added by Claude, 2026-11-12.
 
 Done (Claude, 2026-11-12): `if (condition) statement`, with an optional `else`. The `else` binds to the nearest `if`, and the condition must be a Boolean at run time (WS3001). The code generator patches forward jumps (`EmitJump`, `PatchJump`), which the loops will use too. I guessed one thing, recorded in the specification as proposed: a branch that is not a block still has a scope of its own, so a declaration in it ends with the branch. Build and 388 tests pass on Windows; Linux not tried.
+
+## [DONE] Syntax of `for` and `do … while`
+
+The owner put `for` and `do … while` in M0.7 ("What M0.7 Covers", A4), but their syntax was not proposed. Added by Claude, 2026-11-12.
+
+Q1: `for (init; condition; step) statement`, as in C: `init` is a declaration or an expression, or empty; `condition` is a Boolean expression, or empty, meaning `true`; `step` is an expression, or empty. A `var` declared in `init` is scoped to the loop and gets a new binding on each iteration, so that closures capture each one (section 3.1). Agreed?
+
+A1: Yes.
+
+Q2: `do statement while (condition);`, ending with a `;`, as in C. Agreed?
+
+A2: Yes;
+
+Q3: Should a `for … of` loop over collections wait until arrays exist? (a) yes, later; (b) design it now.
+
+A3: (b), but I'd rather have `foreach` loops over collections. `for`-`of` is unintuitive for me.
+
+BTW: Thank you for thoughtfully inserting `An:` placeholders for my answers.
+
+Done (Claude, 2026-11-12): Q1 and Q2 are recorded as approved in the specification, section 3.5 ("`for`", "`do … while`"). Q3, a `foreach` over collections, is the new question "Syntax of `foreach`". Nothing to build.
