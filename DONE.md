@@ -635,3 +635,77 @@ Arrays, maps and sets, with indexing, `length`, member access and `foreach` (spe
 2026-11-13: the syntax is approved but for sets and optional access (specification, section 3.6). M0.9 is split into the parts the specification defines in section 9 ("M0.9 parts"), each a task below, M0.9.1 to M0.9.6. Waits for them.
 
 Done (Claude, 2026-11-13): all six parts have landed, M0.9.1 to M0.9.6 (`7af3c9a`, `a8ea4ee`, `83ba9ca`, `2a8113c`, `fe4392d`, `2035e47`): members and indexing, arrays, maps, `foreach`, sets and optional access, on both VMs, recorded in the specification, sections 3.6 and 9.
+
+## [DONE] M0.10 Syntax: Classes, `dispose()` and `using`
+
+M0.10 brings classes, the disposal protocol and `using` (specification, sections 3.2 and 3.4). The specification approves `dispose()`, its `destructor()` sugar and `using` (WS-L011), and gives section 3.4's example, but not the syntax of classes, nor several points of their meaning. These are my proposals, one decision each, each answerable with "yes" or a letter; whatever is decided is built on both VMs. Added by Claude, 2026-11-13.
+
+Q1, declaring a class: `class Name { constructor(a) { … } method(b) { … } }`, its methods written as a name, parameters and a body, without `function`, as section 3.4's example writes them. A class is in scope throughout its block, as a function is, and its name is a constant. Agreed?
+
+A1: Yes, but allow optionally to include the keyword `function`.
+
+Q2, making an instance: `new Name(a, b)` makes one and runs its `constructor` with those arguments; a class without a `constructor` takes none. Calling a class without `new`, or `new` on anything but a class, is WS2005. Agreed?
+
+A2: Yes.
+
+Q3, fields: (a) a field exists once a method assigns it, `this.file = …`, as section 3.4's example does, and reading one that was never assigned is WS3006; (b) fields are declared in the class body, `var file = null;`, each instance getting its own, and assigning or reading an undeclared one is WS3006.
+
+A3: (a).
+
+Q4, `this`: a keyword, the instance a method or the constructor runs on; a function expression inside a method sees the method's `this`, as a closure sees a variable. `this` anywhere else is a compile-time error, with a new code, WS2009. Agreed?
+
+A4: Yes.
+
+Q5, methods as values: `obj.method` without a call (a) gives a function bound to `obj`, so `var f = obj.method; f();` calls it on `obj`; (b) is WS3001, "a method can only be called", as an array's `push` is now.
+
+A5: (a).
+
+Q6, inheritance: `class B extends A { … }`; a method of B with the name of one of A's replaces it; `super(…)` in B's constructor runs A's, and `super.name(…)` calls A's method. A class extends at most one other (section 3.2). Agreed?
+
+A6: Yes.
+
+Q7, a constructor that does not call `super(…)`: (a) is a compile-time error when the base class has a `constructor` (a new code, WS2010); (b) runs the base's constructor first, with no arguments, as C# does.
+
+A7: (b).
+
+Q8, visibility: every field and method is public, and there are no static members, for now. Agreed?
+
+A8: Yes to public, but `static` is useful.
+
+Q9, `x?.name`: (a) gives `null` when `x` is `null`, and when it has no field `name`, as `x?[k]` does for a missing key; (b) gives `null` only when `x` is `null`.
+
+A9: (a).
+
+Q10, equality: an instance is equal only to itself (section 3.2: object equality uses identity), so two instances with equal fields are not equal. Agreed?
+
+A10: Yes. Base Object should provide `.equal()` that can be overriden. 
+
+Q11, an instance as text: (a) `write` writes it as its class's name and its fields, `Point {x: 1, y: 2}`, in no defined order, one already being written as `Point {…}`; (b) only its class's name, `Point`.
+
+A11: (a).
+
+Q12, `destructor()`: a class may declare `dispose()` or `destructor()`, which are the same method; both in one class is a compile-time error, with a new code, WS2011 (section 3.4 recommends it). Callers always call `dispose()`. Agreed?
+
+A12: Yes.
+
+Q13, disposing once: the runtime runs an object's disposal at most once; a second `dispose()` does nothing and gives `null` (section 3.4: disposal is idempotent). Agreed?
+
+A13: Yes.
+
+Q14, derived classes: (a) disposing an instance of B runs B's disposal, then A's, each once, without `super.dispose()`, as section 3.4 proposes; (b) B's disposal calls `super.dispose()` itself, as any other method would.
+
+A14: (a).
+
+Q15, `using`: `using (var x = expr) statement` declares `x`, in scope in the statement only, and calls `x.dispose()` when the statement ends, by its end, `break`, `continue` or `return`; a `null` value is not disposed, and a value without `dispose` is WS3006 at the end. One resource per `using`; nest them for more. Agreed?
+
+A15: Yes.
+
+Q16, a runtime error inside `using`: WebLingo has no exceptions yet, so a runtime error stops the program. (a) As it stops, the VM disposes what the open `using` statements hold, innermost first, and an error in a disposal is reported after the first; (b) nothing is disposed: `using` disposes only on the ways out of Q15, until exceptions exist.
+
+A16: Design exceptions now.
+
+Q17, use after disposal: for a class written in WebLingo, (a) nothing is checked: the class checks its own state if it needs to; (b) calling any method but `dispose()` on a disposed instance is a runtime error, a new WS3008 (section 3.4 proposes a `ResourceClosedError`).
+
+A17: (a).
+
+Done (Claude, 2026-11-13, `20eeb6c`): recorded as approved in the specification, a new section 3.7 ("Classes and disposal"), its decision register, and its section 8.4, with WS2009 and WS2011 (WS2010 and WS3008 are not needed, after A7 and A17). A1's optional `function` before a method's name is part of it. A8 (static members), A10 (`Object` and `equal()`) and A16 (exceptions) are follow-up questions, in "M0.10 Syntax: Static Members, `Object` and Exceptions". M0.10 is split into the parts the specification defines in section 9 ("M0.10 parts"), each a task below.
