@@ -74,12 +74,6 @@ Classes, with single inheritance and no exposed prototype chain (specification, 
 
 
 
-## [WORKING] M0.10.2: Inheritance
-
-`extends`, `super(…)`, `super.name(…)`, and the base's constructor run first when a constructor does not call `super(…)` (specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
-
-Done (Claude, 2026-11-13): `class B extends A`, with `super(…)` in a constructor, `super.name(…)` and `super.name` in methods, methods overridden (a base method calling `this.name()` reaches the derived one), and a constructor without `super(…)` running its base's first, with no arguments, through any number of levels. One new operation per VM, `GetSuper`, and `MakeClass` takes the base. Choices of mine, in section 15.2 as proposed: a class's base is evaluated where its block begins, since the class is made there, so it cannot name the block's variables (WS2001); the block's classes are made bases first, and a cycle is WS2013, a new code; a class without a constructor gets one; misplaced `super` is WS2009. Every new conformance case gives the same result on both VMs. Build and 1,028 tests pass on Windows; Linux not tried.
-
 ## M0.10.3: Disposal
 
 `dispose()` and `destructor()`, disposal once and chained from a derived class to its base, and `using` on its ways out but exceptions (specification, section 3.7, WS-L011), on both VMs. Added by Claude, 2026-11-13.
