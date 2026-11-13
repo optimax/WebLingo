@@ -85,10 +85,6 @@ Windows done (Claude, 2026-11-12, `93df634`):
 - **Acceptance criteria:** the specification's section 15.1 now gives each of section 8.8's its status; all are met on Windows, and "Builds cleanly on Windows and Linux" waits for Linux.
 - 294 tests, all passing on Windows.
 
-## M0.8: Machine-Checked Portability Inventory
-
-The approved WS-P016 asks for the portability inventory and CI checks (specification, sections 7.14 and 1.1), and the inventory says automated API checks remain future work. Check the portable core's built assemblies against `WebLingo/eng/portability/NativeCompatibility.md` in a test, so that CI fails when portable code uses what the inventory rules out: `System.IO` file access, the console, `Reflection.Emit`, P/Invoke, OS threads, .NET `Task`/`ValueTask` and `CancellationToken`, ADO.NET, ASP.NET Core, `System.Net.Http`, and LINQ (which the inventory keeps out). Added by Claude, 2026-11-12, from the specification's roadmap (`Documents/implementation.md`, section 13).
-
 ## [QUESTION] What M0.7 Covers
 
 M0.7 is "Conformance suite expansion" (specification, section 9), with no detail yet. Expanding the conformance suite needs language beyond M0.6's subset, and most of it needs syntax the specification does not give yet. Added by Claude, 2026-11-12, from the roadmap (`Documents/implementation.md`, section 13).
