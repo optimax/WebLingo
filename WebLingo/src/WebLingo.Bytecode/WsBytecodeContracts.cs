@@ -133,6 +133,11 @@ public enum WsOpCode : byte
     /// <c>this</c>: what <c>super</c> calls (section 3.7).
     /// </summary>
     GetSuper,
+    /// <summary>
+    /// A = register holding a resource; disposes it, unless it is <c>null</c>: its class's disposal, then its bases',
+    /// at most once (WS3006 for a value with nothing to dispose; section 3.7).
+    /// </summary>
+    Dispose,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);

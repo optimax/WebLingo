@@ -6,7 +6,7 @@ namespace WebLingo.Runtime;
 /// once, when it loads a module, so that it does not compare names as it runs; a name that is no member of any value
 /// is <see cref="Unknown"/>, and is kept for the message of its error.
 /// </summary>
-public enum WsMember : byte { Unknown, Length, Push, Pop, Has, Remove, Add }
+public enum WsMember : byte { Unknown, Length, Push, Pop, Has, Remove, Add, Dispose }
 
 /// <summary>A member's name as a module's constant gives it, and the member it names.</summary>
 public readonly record struct WsMemberName(WsMember Member, string Text);
@@ -27,6 +27,7 @@ public static class WsMembers
         "has" => WsMember.Has,
         "remove" => WsMember.Remove,
         "add" => WsMember.Add,
+        "dispose" => WsMember.Dispose,
         _ => WsMember.Unknown
     };
 
@@ -50,7 +51,7 @@ public static class WsMembers
             if (heap.TryGetField(target, name, out result)) return true;
             if (heap.TryGetMethod(heap.ClassOf(target), name, out var method))
             {
-                return heap.TryAllocateBoundMethod(target, method, out result, out error);
+                return heap.TryAllocateBoundMethod(target, method, out result, out error, member == WsMember.Dispose);
             }
             if (optional) return true;
             error = NoSuchMember(target, name, heap);
@@ -151,6 +152,29 @@ public static class WsMembers
         isMethod = heap.TryGetMethod(heap.ClassOf(instance), name, out callee);
         if (isMethod) return true;
         error = NoSuchMember(instance, name, heap);
+        return false;
+    }
+
+    /// <summary>
+    /// Begins disposing an instance, for <c>x.dispose()</c> and <c>using</c> (section 3.7): gives the dispose methods to
+    /// run on it, its class's own first, then its bases', or <c>null</c> if its disposal has begun already, which then
+    /// does nothing. A value whose class has no dispose method, or that is no instance, is WS3006.
+    /// </summary>
+    public static bool TryBeginDisposal(WsValue target, WsHeap heap, out WsValue[]? chain, out WsRuntimeError? error)
+    {
+        chain = null;
+        error = null;
+        if (target.Kind == WsValueKind.Instance)
+        {
+            var methods = heap.DisposeChain(heap.ClassOf(target));
+            if (methods.Length > 0)
+            {
+                if (heap.TryMarkDisposed(target)) chain = methods;
+                return true;
+            }
+        }
+        error = new WsRuntimeError(WsDiagnosticCodes.NoSuchMember,
+            $"{Capitalized(WsValueFormatter.Describe(target, heap))} has no method 'dispose', and cannot be disposed.");
         return false;
     }
 

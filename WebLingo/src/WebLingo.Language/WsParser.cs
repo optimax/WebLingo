@@ -79,6 +79,7 @@ public sealed class WsParser : IWsParser
         if (Current.Kind == WsTokenKind.For) return ParseFor(start);
         if (Current.Kind == WsTokenKind.Foreach) return ParseForEach(start);
         if (Current.Kind == WsTokenKind.Class) return ParseClass(start);
+        if (Current.Kind == WsTokenKind.Using) return ParseUsing(start);
         if (Current.Kind == WsTokenKind.Function && Peek(1).Kind == WsTokenKind.Identifier) return ParseFunctionDeclaration(start);
         if (Current.Kind == WsTokenKind.Return)
         {
@@ -268,6 +269,24 @@ public sealed class WsParser : IWsParser
         }
         Expect(WsTokenKind.CloseBrace, "'}'");
         return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start)) { Base = baseClass };
+    }
+
+    /// <summary><c>using (var name = value) body</c>, one resource, declared with <c>var</c> (section 3.7).</summary>
+    private WsStatementSyntax ParseUsing(int start)
+    {
+        Advance();
+        _statementHasError = false;
+        Expect(WsTokenKind.OpenParen, "'('");
+        if (Current.Kind != WsTokenKind.Var && !_statementHasError) ReportUnexpected("'var'");
+        if (Current.Kind is WsTokenKind.Var or WsTokenKind.Const or WsTokenKind.Let) Advance(); // 'const' read as 'var' to recover.
+        var (name, nameSpan) = ExpectName();
+        Expect(WsTokenKind.Equals, "'='");
+        var value = ParseExpression();
+        Expect(WsTokenKind.CloseParen, "')'");
+        var body = ParseNested();
+        return body is null
+            ? new WsExpressionStatementSyntax(value, SpanFrom(start))
+            : new WsUsingSyntax(name, nameSpan, value, body, SpanFrom(start));
     }
 
     /// <summary>A name being declared; an empty one, reported, if there is none.</summary>
@@ -852,6 +871,7 @@ public sealed class WsParser : IWsParser
             if (statement is WsFunctionDeclarationSyntax function) statements.Push(function.Body);
             if (statement is WsDoWhileSyntax doLoop) statements.Push(doLoop.Body);
             if (statement is WsForEachSyntax forEachLoop) statements.Push(forEachLoop.Body);
+            if (statement is WsUsingSyntax usingStatement) statements.Push(usingStatement.Body);
             if (statement is WsClassDeclarationSyntax classDeclaration)
             {
                 foreach (var method in classDeclaration.Methods) statements.Push(method.Body);
@@ -873,6 +893,7 @@ public sealed class WsParser : IWsParser
                 WsWhileSyntax whileStatement => whileStatement.Condition,
                 WsDoWhileSyntax doStatement => doStatement.Condition,
                 WsForEachSyntax forEachStatement => forEachStatement.Collection,
+                WsUsingSyntax usingResource => usingResource.Value,
                 WsReturnSyntax { Value: { } returned } => returned,
                 _ => null
             };

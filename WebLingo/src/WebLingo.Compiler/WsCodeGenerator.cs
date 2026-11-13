@@ -112,10 +112,19 @@ public sealed class WsCodeGenerator
                 EmitForEach(forEach);
                 break;
             case WsIrBreak breakStatement:
+                EmitCleanups(_loops.Peek().Cleanups, breakStatement.Span);
                 _loops.Peek().Breaks.Add(EmitJump(WsOpCode.Jump, 0, breakStatement.Span));
                 break;
             case WsIrContinue continueStatement:
+                EmitCleanups(_loops.Peek().Cleanups, continueStatement.Span);
                 _loops.Peek().Continues.Add(EmitJump(WsOpCode.Jump, 0, continueStatement.Span));
+                break;
+            case WsIrUsing usingStatement:
+                foreach (var initialize in usingStatement.Initialize) EmitStatement(initialize);
+                _cleanups.Add(usingStatement.Resource);
+                EmitStatement(usingStatement.Body);
+                _cleanups.RemoveAt(_cleanups.Count - 1);
+                EmitDispose(usingStatement.Resource, usingStatement.Span);
                 break;
             case WsIrNewCell cell:
                 Emit(new WsInstruction(WsOpCode.NewCell, cell.Local), cell.Span);
@@ -129,10 +138,21 @@ public sealed class WsCodeGenerator
             case WsIrReturn returnStatement:
                 if (returnStatement.Value is null)
                 {
+                    EmitCleanups(0, returnStatement.Span);
                     Emit(new WsInstruction(WsOpCode.Return), returnStatement.Span);
                     break;
                 }
-                Emit(new WsInstruction(WsOpCode.ReturnValue, EmitExpression(returnStatement.Value, null)), returnStatement.Span);
+                if (_cleanups.Count == 0)
+                {
+                    Emit(new WsInstruction(WsOpCode.ReturnValue, EmitExpression(returnStatement.Value, null)), returnStatement.Span);
+                    break;
+                }
+                {
+                    // The value, in a register of its own, before the open using statements' resources are disposed.
+                    var value = EmitExpression(returnStatement.Value, Allocate());
+                    EmitCleanups(0, returnStatement.Span);
+                    Emit(new WsInstruction(WsOpCode.ReturnValue, value), returnStatement.Span);
+                }
                 break;
             case WsIrIf conditional:
             {
@@ -574,7 +594,7 @@ public sealed class WsCodeGenerator
     /// </summary>
     private void EmitLoop(WsIrLoop loop)
     {
-        var jumps = new LoopJumps();
+        var jumps = new LoopJumps { Cleanups = _cleanups.Count };
         _loops.Push(jumps);
         var top = _code.Count;
         int? exit = null;
@@ -617,7 +637,7 @@ public sealed class WsCodeGenerator
         EmitExpression(loop.Collection, collection);
         _nextRegister = _locals;
         Emit(new WsInstruction(WsOpCode.LoadConstant, collection + 1, Int64Constant(0)), loop.Span);
-        var jumps = new LoopJumps();
+        var jumps = new LoopJumps { Cleanups = _cleanups.Count };
         _loops.Push(jumps);
         var top = _code.Count;
         Emit(new WsInstruction(WsOpCode.ForEachNext, 0, collection, loop.ItemCount), loop.Collection.Span);
@@ -634,6 +654,26 @@ public sealed class WsCodeGenerator
     {
         public List<int> Breaks { get; } = [];
         public List<int> Continues { get; } = [];
+        /// <summary>How many <c>using</c> statements were open where the loop began: a jump out of it disposes the rest.</summary>
+        public int Cleanups { get; init; }
+    }
+
+    /// <summary>The resources of the open <c>using</c> statements, innermost last.</summary>
+    private readonly List<WsIrExpression> _cleanups = [];
+
+    /// <summary>Disposes the open <c>using</c> statements' resources down to <paramref name="depth"/>, innermost first.</summary>
+    private void EmitCleanups(int depth, WsSourceSpan span)
+    {
+        for (var i = _cleanups.Count - 1; i >= depth; i--) EmitDispose(_cleanups[i], span);
+    }
+
+    /// <summary>Disposes a resource, unless it is <c>null</c> (section 3.7).</summary>
+    private void EmitDispose(WsIrExpression resource, WsSourceSpan span)
+    {
+        var mark = _nextRegister;
+        var value = EmitExpression(resource, null);
+        Emit(new WsInstruction(WsOpCode.Dispose, value), span);
+        _nextRegister = mark;
     }
 
     /// <summary>Emits a jump whose target <see cref="PatchJump"/> fills in later, and returns where it is.</summary>

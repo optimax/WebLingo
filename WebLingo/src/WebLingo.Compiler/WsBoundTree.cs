@@ -80,6 +80,10 @@ public sealed record WsBoundForEach(
     WsBoundExpression CollectionValue, WsBoundStatement Body, WsSourceSpan Span)
     : WsBoundStatement(Span);
 
+/// <summary><c>using (var name = value) body</c>: the local disposed when the body ends, by any way out (section 3.7).</summary>
+public sealed record WsBoundUsing(WsLocalSymbol Local, WsBoundExpression Value, WsBoundStatement Body, WsSourceSpan Span)
+    : WsBoundStatement(Span);
+
 public sealed record WsBoundBreak(WsSourceSpan Span) : WsBoundStatement(Span);
 
 public sealed record WsBoundContinue(WsSourceSpan Span) : WsBoundStatement(Span);

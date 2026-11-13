@@ -108,6 +108,17 @@ public sealed class ParserTests
     }
 
     [Fact]
+    public void AUsingStatementDeclaresItsResource()
+    {
+        var tree = Parse("using (var r = open()) { r.write(1); }");
+        Assert.Empty(tree.Diagnostics);
+        var statement = Assert.IsType<WsUsingSyntax>(Assert.Single(tree.Root.Statements));
+        Assert.Equal(("r", new WsSourceSpan(11, 1), new WsSourceSpan(0, 38)), (statement.Name, statement.NameSpan, statement.Span));
+        Assert.IsType<WsCallExpressionSyntax>(statement.Value);
+        Assert.IsType<WsBlockSyntax>(statement.Body);
+    }
+
+    [Fact]
     public void AnUnclosedBlockIsReportedAtItsBrace()
     {
         var tree = Parse("var a = 1;\n{ a;");
@@ -207,6 +218,10 @@ public sealed class ParserTests
     [InlineData("class A { m( {} }")]
     [InlineData("var a = new A;")]
     [InlineData("foreach (var in a) {}")]
+    [InlineData("using (const r = 1) {}")]
+    [InlineData("using (r = 1) {}")]
+    [InlineData("using (var r 1) {}")]
+    [InlineData("using (var r = 1 {}")]
     public void MalformedStatementsGiveOneDiagnosticEach(string source)
     {
         var diagnostic = Assert.Single(Parse(source).Diagnostics);

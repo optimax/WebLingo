@@ -22,6 +22,15 @@ public sealed class StackVerifierTests
     }
 
     [Fact]
+    public void DisposePopsItsResource()
+    {
+        Assert.Equal(WsVerificationResult.Valid,
+            Verify(Module(locals: 0, maxStack: 1, I(WsStackOpCode.LoadNull), I(WsStackOpCode.Dispose), I(WsStackOpCode.Return))));
+        AssertRejected(Module(locals: 0, maxStack: 1, I(WsStackOpCode.Dispose), I(WsStackOpCode.Return)), 0,
+            "pops 1 values from a stack of 0");
+    }
+
+    [Fact]
     public void AStackDeeperThanItsMaximumIsRejected()
     {
         AssertRejected(Module(locals: 0, maxStack: 1, I(WsStackOpCode.LoadNull), I(WsStackOpCode.LoadNull), I(WsStackOpCode.Return)),

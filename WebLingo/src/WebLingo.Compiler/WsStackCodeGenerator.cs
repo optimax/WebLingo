@@ -103,10 +103,19 @@ public sealed class WsStackCodeGenerator
                 EmitForEach(forEach);
                 break;
             case WsIrBreak breakStatement:
+                EmitCleanups(_loops.Peek().Cleanups, breakStatement.Span);
                 _loops.Peek().Breaks.Add(EmitJump(WsStackOpCode.Jump, breakStatement.Span));
                 break;
             case WsIrContinue continueStatement:
+                EmitCleanups(_loops.Peek().Cleanups, continueStatement.Span);
                 _loops.Peek().Continues.Add(EmitJump(WsStackOpCode.Jump, continueStatement.Span));
+                break;
+            case WsIrUsing usingStatement:
+                foreach (var initialize in usingStatement.Initialize) EmitStatement(initialize);
+                _cleanups.Add(usingStatement.Resource);
+                EmitStatement(usingStatement.Body);
+                _cleanups.RemoveAt(_cleanups.Count - 1);
+                EmitDispose(usingStatement.Resource, usingStatement.Span);
                 break;
             case WsIrNewCell cell:
                 Emit(WsStackOpCode.NewCell, cell.Span, cell.Local);
@@ -120,10 +129,12 @@ public sealed class WsStackCodeGenerator
             case WsIrReturn returnStatement:
                 if (returnStatement.Value is null)
                 {
+                    EmitCleanups(0, returnStatement.Span);
                     Emit(WsStackOpCode.Return, returnStatement.Span);
                     break;
                 }
-                EmitValue(returnStatement.Value);
+                EmitValue(returnStatement.Value); // On the stack, while the open using statements' resources are disposed.
+                EmitCleanups(0, returnStatement.Span);
                 Emit(WsStackOpCode.ReturnValue, returnStatement.Span);
                 break;
             case WsIrIf conditional:
@@ -349,7 +360,7 @@ public sealed class WsStackCodeGenerator
     /// </summary>
     private void EmitLoop(WsIrLoop loop)
     {
-        var jumps = new LoopJumps();
+        var jumps = new LoopJumps { Cleanups = _cleanups.Count };
         _loops.Push(jumps);
         var top = _code.Count;
         int? exit = null;
@@ -388,7 +399,7 @@ public sealed class WsStackCodeGenerator
         Emit(WsStackOpCode.StoreLocal, loop.Span, collection);
         Emit(WsStackOpCode.LoadConstant, loop.Span, Int64Constant(0));
         Emit(WsStackOpCode.StoreLocal, loop.Span, collection + 1);
-        var jumps = new LoopJumps();
+        var jumps = new LoopJumps { Cleanups = _cleanups.Count };
         _loops.Push(jumps);
         var top = _code.Count;
         Emit(loop.ItemCount == 1 ? WsStackOpCode.ForEachNext : WsStackOpCode.ForEachNextEntry, loop.Collection.Span, 0,
@@ -406,6 +417,24 @@ public sealed class WsStackCodeGenerator
     {
         public List<int> Breaks { get; } = [];
         public List<int> Continues { get; } = [];
+        /// <summary>How many <c>using</c> statements were open where the loop began: a jump out of it disposes the rest.</summary>
+        public int Cleanups { get; init; }
+    }
+
+    /// <summary>The resources of the open <c>using</c> statements, innermost last.</summary>
+    private readonly List<WsIrExpression> _cleanups = [];
+
+    /// <summary>Disposes the open <c>using</c> statements' resources down to <paramref name="depth"/>, innermost first.</summary>
+    private void EmitCleanups(int depth, WsSourceSpan span)
+    {
+        for (var i = _cleanups.Count - 1; i >= depth; i--) EmitDispose(_cleanups[i], span);
+    }
+
+    /// <summary>Disposes a resource, unless it is <c>null</c> (section 3.7).</summary>
+    private void EmitDispose(WsIrExpression resource, WsSourceSpan span)
+    {
+        EmitValue(resource);
+        Emit(WsStackOpCode.Dispose, span);
     }
 
     /// <summary>Emits a jump whose target <see cref="PatchJump"/> fills in later, and returns where it is.</summary>
@@ -466,6 +495,7 @@ public sealed class WsStackCodeGenerator
             WsStackOpCode.GetMember => (1, 1),
             WsStackOpCode.MakeClass => (b, 1),
             WsStackOpCode.GetSuper => (2, 1),
+            WsStackOpCode.Dispose => (1, 0),
             WsStackOpCode.New => (a + 1, 1),
             WsStackOpCode.SetMember => (2, b),
             WsStackOpCode.NewArray => (a, 1),

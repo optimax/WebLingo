@@ -142,6 +142,17 @@ public sealed class WsLowerer
                 return new WsIrForEach(forEach.Collection.Index, LowerExpression(forEach.CollectionValue),
                     forEach.Value is null ? 1 : 2, captured, LowerStatement(forEach.Body), forEach.Span);
             }
+            case WsBoundUsing usingStatement:
+            {
+                var local = usingStatement.Local;
+                var initialize = new List<WsIrStatement>();
+                if (local.IsCaptured) initialize.Add(new WsIrNewCell(local.Index, usingStatement.Span));
+                initialize.Add(Initialize(local, LowerExpression(usingStatement.Value), usingStatement.Span));
+                WsIrExpression resource = local.IsCaptured
+                    ? new WsIrLoadCell(local.Index, usingStatement.Span)
+                    : new WsIrLoadLocal(local.Index, usingStatement.Span);
+                return new WsIrUsing(initialize, resource, LowerStatement(usingStatement.Body), usingStatement.Span);
+            }
             case WsBoundBreak breakStatement:
                 return new WsIrBreak(breakStatement.Span);
             case WsBoundContinue continueStatement:

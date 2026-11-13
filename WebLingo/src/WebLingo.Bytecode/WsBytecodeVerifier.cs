@@ -143,6 +143,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return Register(function, a, "condition") ?? Index(b, function.Code.Count, "target instruction")
                     ?? Unused(c, d);
             case WsOpCode.CheckBoolean:
+            case WsOpCode.Dispose:
             case WsOpCode.NewCell:
             case WsOpCode.BoxRegister:
             case WsOpCode.CopyCell:
@@ -431,6 +432,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             case WsOpCode.JumpIfFalse:
             case WsOpCode.JumpIfTrue:
             case WsOpCode.CheckBoolean:
+            case WsOpCode.Dispose:
                 return Unwritten(instruction.A, state, locals);
             case WsOpCode.Add:
             case WsOpCode.Subtract:

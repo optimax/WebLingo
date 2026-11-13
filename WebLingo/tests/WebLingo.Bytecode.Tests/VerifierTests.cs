@@ -36,6 +36,14 @@ public sealed class VerifierTests
     }
 
     [Fact]
+    public void ADisposedRegisterMustHaveBeenWritten()
+    {
+        Assert.Equal(WsVerificationResult.Valid,
+            Verify(Module(registers: 1, locals: 1, I(WsOpCode.LoadNull, 0), I(WsOpCode.Dispose, 0), I(WsOpCode.Return))));
+        AssertRejected(Module(registers: 1, locals: 1, I(WsOpCode.Dispose, 0), I(WsOpCode.Return)), 0, "register 0");
+    }
+
+    [Fact]
     public void AnUnknownOperationIsRejected()
     {
         AssertRejected(Module(registers: 0, locals: 0, I((WsOpCode)200), I(WsOpCode.Return)), 0, "unknown");
@@ -47,6 +55,7 @@ public sealed class VerifierTests
     [InlineData(WsOpCode.Add, 0, 1, 3)]
     [InlineData(WsOpCode.Negate, 3, 0, 0)]
     [InlineData(WsOpCode.LoadConstant, 3, 0, 0)]
+    [InlineData(WsOpCode.Dispose, 3, 0, 0)]
     public void ARegisterOutOfRangeIsRejected(WsOpCode opCode, int a, int b, int c)
     {
         AssertRejected(Module(registers: 3, locals: 3, I(opCode, a, b, c), I(WsOpCode.Return)), 0, "register");

@@ -56,6 +56,13 @@ public sealed record WsForEachSyntax(
     WsStatementSyntax Body, WsSourceSpan Span)
     : WsStatementSyntax(Span);
 
+/// <summary>
+/// <c>using (var name = value) body</c>: <paramref name="Name"/>, in scope in the body only, is disposed when the body
+/// ends, by any way out (section 3.7).
+/// </summary>
+public sealed record WsUsingSyntax(string Name, WsSourceSpan NameSpan, WsExpressionSyntax Value, WsStatementSyntax Body, WsSourceSpan Span)
+    : WsStatementSyntax(Span);
+
 public sealed record WsBreakSyntax(WsSourceSpan Span) : WsStatementSyntax(Span);
 
 public sealed record WsContinueSyntax(WsSourceSpan Span) : WsStatementSyntax(Span);

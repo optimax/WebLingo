@@ -66,6 +66,7 @@ public static class WsDisassembler
             WsOpCode.Return => "Return",
             WsOpCode.GetMember => $"GetMember {Register(function, a)}, {Register(function, b)}{(d == 0 ? "." : "?.")}{Constant(module, c)}",
             WsOpCode.SetMember => $"SetMember {Register(function, a)}.{Constant(module, b)}, {Register(function, c)}",
+            WsOpCode.Dispose => $"Dispose {Register(function, a)}",
             WsOpCode.MakeClass => $"MakeClass {Register(function, a)}, class{b}" + (d == 1 ? $" extends {Register(function, c)}" : ""),
             WsOpCode.GetSuper => $"GetSuper {Register(function, a)}, {Register(function, b)}, {Register(function, c)}, {Constant(module, d)}",
             WsOpCode.New => $"New {Register(function, a)}, {Register(function, b)}({Arguments(function, c, d)})",

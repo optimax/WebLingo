@@ -141,6 +141,8 @@ public enum WsStackOpCode : byte
     /// that name, or its constructor for <c>constructor</c>, bound to <c>this</c> (section 3.7).
     /// </summary>
     GetSuper,
+    /// <summary>Pops a resource and disposes it, unless it is <c>null</c>, as the register bytecode's <c>Dispose</c> does.</summary>
+    Dispose,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);

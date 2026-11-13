@@ -111,7 +111,8 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         public WsFunction Function = null!;
         public WsInstruction[] Code = [];
         public WsValue[] Registers = [];
-        public readonly WsValue[] Closure = new WsValue[1];
+        /// <summary>The closure it runs as, and, for a disposal, the instance disposed: the frame's roots.</summary>
+        public readonly WsValue[] Closure = new WsValue[2];
         public WsValue[] Cells = [];
         /// <summary>The next instruction, while the frame waits for a call it made to return.</summary>
         public int Pc;
@@ -119,6 +120,12 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         public int ResultRegister;
         /// <summary>For a constructor run by <c>new</c>: the instance, which is the call's result (section 3.7).</summary>
         public WsValue Constructed;
+        /// <summary>
+        /// For a disposal: the instance's dispose methods, which run on it in turn in this frame, and the next of them;
+        /// the instance is the frame's second root (section 3.7).
+        /// </summary>
+        public WsValue[]? DisposeChain;
+        public int DisposeNext;
     }
 
     private sealed class Execution(WsCompiledModule module, WsInstruction[] entryCode, WsInstruction[][] codes,
@@ -148,7 +155,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             WsRuntimeError? error = null;
             // A call being made, which the operations that call set up, and the code after their switch carries out: the
             // value called, the instance a method runs on, where the arguments are, where the result goes, and, for
-            // new, the instance made.
+            // new, the instance made. A result register of -1, a using's disposal's, drops the result.
             var callee = WsValue.Null;
             var self = WsValue.Null;
             var arguments = registers;
@@ -387,6 +394,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                                 argumentCount = ins.D;
                                 resultRegister = ins.A;
                                 constructed = WsValue.Null;
+                                if (isMethod && name.Member == WsMember.Dispose) goto dispose;
                                 goto call;
                             }
                             if (!WsMembers.TryCall(target, name.Member, name.Text, registers, ins.C + 1, ins.D, heap,
@@ -496,6 +504,34 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             if (!WsMembers.TrySetIndex(registers[ins.A], registers[ins.B], registers[ins.C], heap, out error)) break;
                             pc++;
                             continue;
+                        case WsOpCode.Dispose:
+                        {
+                            // A using's end: its resource disposed, unless it is null, as x.dispose() disposes it, the
+                            // result dropped (section 3.7).
+                            var resource = registers[ins.A];
+                            if (resource.Kind == WsValueKind.Null)
+                            {
+                                pc++;
+                                continue;
+                            }
+                            error = BeginDisposal(resource, 0, out var chain);
+                            if (error is not null) break;
+                            if (chain is null)
+                            {
+                                pc++;
+                                continue;
+                            }
+                            if (depth + 1 == frames.Length) Array.Resize(ref frames, frames.Length * 2);
+                            Disposing(frames, depth + 1, chain, resource);
+                            callee = chain[0];
+                            self = resource;
+                            arguments = registers;
+                            firstArgument = 0;
+                            argumentCount = 0;
+                            resultRegister = -1;
+                            constructed = WsValue.Null;
+                            goto call;
+                        }
                         case WsOpCode.Return:
                         case WsOpCode.ReturnValue:
                         {
@@ -504,6 +540,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             heap.RemoveLastRoots(frame.Closure);
                             heap.RemoveLastRoots(registers);
                             Array.Clear(registers, 0, frame.Function.RegisterCount); // So that nothing stays reachable.
+                            if (frame.DisposeChain is not null) goto disposed;
                             frame.Closure[0] = WsValue.Null;
                             if (frame.Constructed.Kind == WsValueKind.Instance) result = frame.Constructed;
                             frame.Constructed = WsValue.Null;
@@ -528,7 +565,15 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                 call:
                     // The call the operations above set up: a built-in at once, a closure in a new frame, its arguments
                     // in its first registers, after the instance it runs on if it is a method (section 3.7).
-                    if (callee.Kind == WsValueKind.BoundMethod) (self, callee) = heap.GetBoundMethod(callee);
+                    if (callee.Kind == WsValueKind.BoundMethod)
+                    {
+                        if (heap.IsDisposal(callee))
+                        {
+                            self = heap.GetBoundMethod(callee).Instance;
+                            goto dispose;
+                        }
+                        (self, callee) = heap.GetBoundMethod(callee);
+                    }
                     if (callee.Kind == WsValueKind.Builtin)
                     {
                         var builtin = builtins[callee.Handle];
@@ -589,6 +634,62 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         registers = calledRegisters;
                         cells = closureCells;
                         pc = 0;
+                        continue;
+                    }
+
+                dispose:
+                    // x.dispose(): the instance's dispose methods run on it in turn, once, in the frame of one call, which
+                    // gives null (section 3.7).
+                    {
+                        error = BeginDisposal(self, argumentCount, out var chain);
+                        if (error is not null) goto failed;
+                        if (chain is null)
+                        {
+                            registers[resultRegister] = WsValue.Null;
+                            pc++;
+                            continue;
+                        }
+                        if (depth + 1 == frames.Length) Array.Resize(ref frames, frames.Length * 2);
+                        Disposing(frames, depth + 1, chain, self);
+                        callee = chain[0];
+                        goto call;
+                    }
+
+                disposed:
+                    // A dispose method has returned: the instance's next one runs in the same frame, or the disposal is
+                    // done, and gives null, or nothing to a using (section 3.7).
+                    {
+                        var chain = frame.DisposeChain!;
+                        if (frame.DisposeNext < chain.Length)
+                        {
+                            // The instance's next dispose method, in the same frame, its result dropped.
+                            var next = chain[frame.DisposeNext++];
+                            var (nextIndex, nextCells) = heap.GetClosure(next);
+                            var nextFunction = module.Functions[nextIndex];
+                            if (registers.Length < nextFunction.RegisterCount)
+                            {
+                                frame.Registers = registers = new WsValue[nextFunction.RegisterCount];
+                            }
+                            registers[0] = frame.Closure[1];
+                            frame.Function = nextFunction;
+                            frame.Code = code = codes[nextIndex];
+                            frame.Cells = cells = nextCells;
+                            frame.Closure[0] = next;
+                            heap.AddRoots(registers);
+                            heap.AddRoots(frame.Closure);
+                            pc = 0;
+                            continue;
+                        }
+                        frame.DisposeChain = null;
+                        frame.Closure[0] = WsValue.Null;
+                        frame.Closure[1] = WsValue.Null;
+                        var disposedTo = frame.ResultRegister;
+                        frame = frames[--depth];
+                        code = frame.Code;
+                        registers = frame.Registers;
+                        cells = frame.Cells;
+                        pc = frame.Pc;
+                        if (disposedTo >= 0) registers[disposedTo] = WsValue.Null;
                         continue;
                     }
 
@@ -711,6 +812,42 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         {
             registers[ins.A] = value;
             return true;
+        }
+
+        /// <summary>
+        /// Begins disposing an instance, for <c>x.dispose()</c> or a using's end (section 3.7): its dispose methods, to run
+        /// on it in turn, or <c>null</c> if its disposal has begun already. Disposal gives them no arguments, so a call
+        /// with some, or a dispose method that takes some, is WS2006.
+        /// </summary>
+        private WsRuntimeError? BeginDisposal(WsValue instance, int argumentCount, out WsValue[]? chain)
+        {
+            chain = null;
+            if (argumentCount != 0)
+            {
+                return new WsRuntimeError(WsDiagnosticCodes.WrongArgumentCount, $"'dispose' takes no arguments, not {argumentCount}.");
+            }
+            if (!WsMembers.TryBeginDisposal(instance, heap, out chain, out var error)) return error;
+            if (chain is null) return null;
+            foreach (var method in chain)
+            {
+                var (index, _) = heap.GetClosure(method);
+                var function = module.Functions[index];
+                if (function.ParameterCount != 1) return WrongArgumentCount(function.Name, function.ParameterCount - 1, 0);
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Makes the frame at <paramref name="depth"/> ready to run an instance's dispose methods in turn, the first by the
+        /// call about to be made, the rest as each returns (section 3.7).
+        /// </summary>
+        private static Frame Disposing(Frame[] frames, int depth, WsValue[] chain, WsValue instance)
+        {
+            var frame = frames[depth] ??= new Frame();
+            frame.DisposeChain = chain;
+            frame.DisposeNext = 1;
+            frame.Closure[1] = instance;
+            return frame;
         }
 
         private static WsRuntimeError WrongArgumentCount(string name, int arity, int count) =>

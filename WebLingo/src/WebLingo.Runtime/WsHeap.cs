@@ -164,8 +164,32 @@ public sealed class WsHeap
             all = new Dictionary<string, WsValue>(Get<ClassObject>(baseClass, WsValueKind.Class).Methods, StringComparer.Ordinal);
             foreach (var (methodName, closure) in methods) all[methodName] = closure;
         }
-        return TryAllocate(new ClassObject(name, constructor, all) { Base = baseClass }, WsValueKind.Class, all.Count + 1,
-            out value, out error);
+        // Its disposal: its own dispose method, if it declares one, then its base's disposal (section 3.7).
+        var inherited = baseClass.Kind == WsValueKind.Class ? Get<ClassObject>(baseClass, WsValueKind.Class).DisposeChain : [];
+        var disposeChain = inherited;
+        if (methods.TryGetValue("dispose", out var own))
+        {
+            disposeChain = new WsValue[inherited.Length + 1];
+            disposeChain[0] = own;
+            for (var i = 0; i < inherited.Length; i++) disposeChain[i + 1] = inherited[i];
+        }
+        var made = new ClassObject(name, constructor, all) { Base = baseClass, DisposeChain = disposeChain };
+        return TryAllocate(made, WsValueKind.Class, all.Count + 1, out value, out error);
+    }
+
+    /// <summary>
+    /// A class's disposal: the dispose methods that disposing an instance runs on it, in order, its own first, then its
+    /// bases', each once (section 3.7); none if neither it nor a base declares one.
+    /// </summary>
+    public WsValue[] DisposeChain(WsValue classValue) => Get<ClassObject>(classValue, WsValueKind.Class).DisposeChain;
+
+    /// <summary>Marks an instance disposed, giving whether it was not already (section 3.7).</summary>
+    public bool TryMarkDisposed(WsValue instance)
+    {
+        var target = Get<InstanceObject>(instance, WsValueKind.Instance);
+        if (target.Disposed) return false;
+        target.Disposed = true;
+        return true;
     }
 
     /// <summary>The class a class extends, or <c>null</c>.</summary>
@@ -211,9 +235,16 @@ public sealed class WsHeap
     public (string Name, WsValue Value) FieldAt(WsValue instance, int position) =>
         Get<InstanceObject>(instance, WsValueKind.Instance).At(position);
 
-    /// <summary>A method bound to an instance: a function that runs the method on it (section 3.7).</summary>
-    public bool TryAllocateBoundMethod(WsValue instance, WsValue closure, out WsValue bound, out WsRuntimeError? error) =>
-        TryAllocate(new BoundMethodObject(instance, closure), WsValueKind.BoundMethod, 2, out bound, out error);
+    /// <summary>
+    /// A method bound to an instance: a function that runs the method on it (section 3.7); with
+    /// <paramref name="disposes"/>, the instance's <c>dispose</c>, whose call disposes it as <c>x.dispose()</c> does.
+    /// </summary>
+    public bool TryAllocateBoundMethod(WsValue instance, WsValue closure, out WsValue bound, out WsRuntimeError? error,
+        bool disposes = false) =>
+        TryAllocate(new BoundMethodObject(instance, closure, disposes), WsValueKind.BoundMethod, 2, out bound, out error);
+
+    /// <summary>Whether a bound method is an instance's <c>dispose</c>, whose call disposes it (section 3.7).</summary>
+    public bool IsDisposal(WsValue bound) => Get<BoundMethodObject>(bound, WsValueKind.BoundMethod).Disposes;
 
     public (WsValue Instance, WsValue Closure) GetBoundMethod(WsValue bound)
     {
@@ -378,6 +409,7 @@ public sealed class WsHeap
                     Mark(classObject.Base, marked, pending);
                     Mark(classObject.Constructor, marked, pending);
                     foreach (var method in classObject.Methods.Values) Mark(method, marked, pending);
+                    foreach (var method in classObject.DisposeChain) Mark(method, marked, pending);
                     break;
                 case InstanceObject instance:
                     Mark(instance.Class, marked, pending);
@@ -494,9 +526,10 @@ public sealed class WsHeap
     private sealed record ClassObject(string Name, WsValue Constructor, Dictionary<string, WsValue> Methods)
     {
         public WsValue Base { get; init; }
+        public WsValue[] DisposeChain { get; init; } = [];
     }
 
-    private sealed record BoundMethodObject(WsValue Instance, WsValue Closure);
+    private sealed record BoundMethodObject(WsValue Instance, WsValue Closure, bool Disposes);
 
     /// <summary>An instance: its class, and its fields, by name, in no defined order.</summary>
     private sealed class InstanceObject(WsValue classValue)
@@ -506,6 +539,8 @@ public sealed class WsHeap
 
         public WsValue Class { get; } = classValue;
         public int Count => _fields.Count;
+        /// <summary>Whether its disposal has begun, which runs at most once (section 3.7).</summary>
+        public bool Disposed { get; set; }
 
         public bool TryGet(string name, out WsValue value)
         {

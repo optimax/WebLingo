@@ -194,6 +194,17 @@ public sealed class WsBinder
                 _scope = _scope.Parent!;
                 return new WsBoundForEach(collection, position, item, value, collectionValue, body, forEach.Span);
             }
+            case WsUsingSyntax usingStatement:
+            {
+                // The value is bound first: the name it declares does not exist in it yet.
+                var value = BindExpression(usingStatement.Value);
+                _scope = new Scope(_scope, _function);
+                var local = Declare(usingStatement.Name, WsDeclarationKind.Var, usingStatement.NameSpan, null)
+                    ?? DeclareHidden(usingStatement.Name, usingStatement.NameSpan);
+                var body = BindInOwnScope(usingStatement.Body);
+                _scope = _scope.Parent!;
+                return new WsBoundUsing(local, value, body, usingStatement.Span);
+            }
             case WsBreakSyntax or WsContinueSyntax:
             {
                 var isBreak = statement is WsBreakSyntax;
@@ -266,9 +277,27 @@ public sealed class WsBinder
             members.Insert(0, new WsMethodSyntax("constructor", span, [], new WsBlockSyntax([], span), span));
         }
         var outerClass = _class;
+        var disposer = members.Find(member => member.Name is "dispose" or "destructor");
         foreach (var syntax in members)
         {
             var method = syntax;
+            if (method.Name == "destructor")
+            {
+                // The same method as dispose(), which callers call (section 3.7).
+                if (disposer is not null && disposer != method)
+                {
+                    Report(WsDiagnosticCodes.DisposeAndDestructor,
+                        "A class declares 'dispose()' or 'destructor()', which are the same method, not both.", method.NameSpan);
+                    continue;
+                }
+                method = method with { Name = "dispose" };
+            }
+            else if (method.Name == "dispose" && disposer is not null && disposer != method)
+            {
+                Report(WsDiagnosticCodes.DisposeAndDestructor,
+                    "A class declares 'dispose()' or 'destructor()', which are the same method, not both.", method.NameSpan);
+                continue;
+            }
             var isConstructor = method.Name == "constructor";
             if (isConstructor && hasBase && !method.CallsSuper)
             {

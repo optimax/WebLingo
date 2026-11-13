@@ -81,6 +81,13 @@ public sealed record WsIrForEach(
     WsSourceSpan Span)
     : WsIrStatement(Span);
 
+/// <summary>
+/// <c>using</c>: the local's initialization, then the body; the resource, read by <paramref name="Resource"/>, is disposed
+/// on every way out of the body, its end, <c>break</c>, <c>continue</c> and <c>return</c>, unless it is <c>null</c>.
+/// </summary>
+public sealed record WsIrUsing(IReadOnlyList<WsIrStatement> Initialize, WsIrExpression Resource, WsIrStatement Body, WsSourceSpan Span)
+    : WsIrStatement(Span);
+
 /// <summary>Leaves the innermost loop.</summary>
 public sealed record WsIrBreak(WsSourceSpan Span) : WsIrStatement(Span);
 
