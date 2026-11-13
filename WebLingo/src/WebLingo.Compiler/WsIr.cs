@@ -127,6 +127,9 @@ public sealed record WsIrLoadBuiltin(int Builtin, WsSourceSpan Span) : WsIrExpre
 /// <summary>A new array of the elements' values, evaluated in order (specification, section 3.6).</summary>
 public sealed record WsIrNewArray(IReadOnlyList<WsIrExpression> Elements, WsSourceSpan Span) : WsIrExpression(Span);
 
+/// <summary>A new set of the elements' values, evaluated in order, an equal value given twice there once (section 3.6).</summary>
+public sealed record WsIrNewSet(IReadOnlyList<WsIrExpression> Elements, WsSourceSpan Span) : WsIrExpression(Span);
+
 /// <summary>One entry of a new map: its key, a string, and its value.</summary>
 public sealed record WsIrMapEntry(string Key, WsIrExpression Value);
 

@@ -20,6 +20,8 @@ Sets, their members, `foreach` over them, and their text (specification, section
 
 2026-11-13: the answers are in (specification, section 3.6); it no longer waits.
 
+Done (Claude, 2026-11-13): sets, `#{1, "a"}` and `#{}`, with `s.add(v)`, `s.has(v)`, `s.remove(v)`, `s.length` and `foreach`, on both VMs. Their values are what a map's keys may be (WS3001 otherwise, "cannot be in a set"), an equal one given twice is there once, and `write` writes a set as its literal, also inside other collections. A set is a heap object the collector traces, within the budget, equal only to itself. Choices of mine, in section 15.2 as proposed: `#{` is one token, and `#` alone stays invalid; a set shares a map's hash table. Every new conformance case gives the same result on both VMs. Build and 908 tests pass on Windows; Linux not tried.
+
 ## M0.9.6: Optional Access
 
 `x?[k]` (specification, section 3.6), on both VMs. Added by Claude, 2026-11-13.

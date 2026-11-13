@@ -251,6 +251,12 @@ public sealed class WsBinder
                 foreach (var element in array.Elements) elements.Add(BindExpression(element));
                 return new WsBoundArrayLiteral(elements, array.Span);
             }
+            case WsSetLiteralSyntax set:
+            {
+                var elements = new List<WsBoundExpression>();
+                foreach (var element in set.Elements) elements.Add(BindExpression(element));
+                return new WsBoundSetLiteral(elements, set.Span);
+            }
             case WsMapLiteralSyntax map:
             {
                 var entries = new List<(string, WsBoundExpression)>();

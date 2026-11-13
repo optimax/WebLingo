@@ -597,18 +597,15 @@ public sealed class WsParser : IWsParser
             {
                 // [a, b, c], or [], with no trailing comma, as in calls (section 3.6).
                 Advance();
-                var elements = new List<WsExpressionSyntax>();
-                if (Current.Kind != WsTokenKind.CloseBracket)
-                {
-                    elements.Add(ParseExpression());
-                    while (Current.Kind == WsTokenKind.Comma)
-                    {
-                        Advance();
-                        elements.Add(ParseExpression());
-                    }
-                }
-                Expect(WsTokenKind.CloseBracket, "']'");
+                var elements = ParseElements(WsTokenKind.CloseBracket, "']'");
                 return new WsArrayLiteralSyntax(elements, SpanFrom(token.Span.Start));
+            }
+            case WsTokenKind.HashBrace:
+            {
+                // #{a, b, c}, or #{} (section 3.6).
+                Advance();
+                var elements = ParseElements(WsTokenKind.CloseBrace, "'}'");
+                return new WsSetLiteralSyntax(elements, SpanFrom(token.Span.Start));
             }
             case WsTokenKind.OpenBrace:
             {
@@ -658,6 +655,23 @@ public sealed class WsParser : IWsParser
                 }
                 return new WsErrorExpressionSyntax(new WsSourceSpan(token.Span.Start, 0));
         }
+    }
+
+    /// <summary>A literal's elements, separated by commas, with no trailing comma, up to and with its closing token.</summary>
+    private List<WsExpressionSyntax> ParseElements(WsTokenKind close, string shown)
+    {
+        var elements = new List<WsExpressionSyntax>();
+        if (Current.Kind != close)
+        {
+            elements.Add(ParseExpression());
+            while (Current.Kind == WsTokenKind.Comma)
+            {
+                Advance();
+                elements.Add(ParseExpression());
+            }
+        }
+        Expect(close, shown);
+        return elements;
     }
 
     /// <summary>
@@ -806,6 +820,9 @@ public sealed class WsParser : IWsParser
                     case WsMemberAccessSyntax member: pending.Push((member.Target, depth + 1)); break;
                     case WsArrayLiteralSyntax array:
                         foreach (var element in array.Elements) pending.Push((element, depth + 1));
+                        break;
+                    case WsSetLiteralSyntax set:
+                        foreach (var element in set.Elements) pending.Push((element, depth + 1));
                         break;
                     case WsMapLiteralSyntax map:
                         foreach (var entry in map.Entries) pending.Push((entry.Value, depth + 1));

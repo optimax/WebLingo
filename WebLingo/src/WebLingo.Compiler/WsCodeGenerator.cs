@@ -326,6 +326,19 @@ public sealed class WsCodeGenerator
                     array.Span);
                 return destination;
             }
+            case WsIrNewSet set:
+            {
+                // The values in consecutive registers, as an array's elements.
+                var mark = _nextRegister;
+                var first = _nextRegister;
+                for (var i = 0; i < set.Elements.Count; i++) Allocate();
+                for (var i = 0; i < set.Elements.Count; i++) EmitExpression(set.Elements[i], first + i);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.NewSet, destination, set.Elements.Count == 0 ? 0 : first, set.Elements.Count),
+                    set.Span);
+                return destination;
+            }
             case WsIrNewMap map:
             {
                 // Each key, then its value, in consecutive registers.
@@ -423,6 +436,7 @@ public sealed class WsCodeGenerator
         WsIrStoreCapture store => Assigns(store.Value, local),
         WsIrIndex index => Assigns(index.Target, local) || Assigns(index.Index, local),
         WsIrNewArray array => AnyAssigns(array.Elements, local),
+        WsIrNewSet set => AnyAssigns(set.Elements, local),
         WsIrNewMap map => AnyEntryAssigns(map.Entries, local),
         WsIrStoreIndex store => Assigns(store.Target, local) || Assigns(store.Index, local) || Assigns(store.Value, local),
         WsIrMember member => Assigns(member.Target, local),

@@ -121,6 +121,9 @@ public sealed record WsAssignmentExpressionSyntax(WsNameSyntax Target, WsExpress
 /// <summary><c>[a, b, c]</c>, a new array of those values (section 3.6).</summary>
 public sealed record WsArrayLiteralSyntax(IReadOnlyList<WsExpressionSyntax> Elements, WsSourceSpan Span) : WsExpressionSyntax(Span);
 
+/// <summary><c>#{a, b, c}</c>, a new set of those values (section 3.6).</summary>
+public sealed record WsSetLiteralSyntax(IReadOnlyList<WsExpressionSyntax> Elements, WsSourceSpan Span) : WsExpressionSyntax(Span);
+
 /// <summary>One entry of a map literal: its key, a string, written as a name or as a string literal, and its value.</summary>
 public sealed record WsMapEntrySyntax(string Key, WsSourceSpan KeySpan, WsExpressionSyntax Value);
 

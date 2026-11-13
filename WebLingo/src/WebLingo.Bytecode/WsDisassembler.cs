@@ -68,6 +68,7 @@ public static class WsDisassembler
             WsOpCode.CallMethod => $"CallMethod {Register(function, a)}, {Register(function, c)}.{Constant(module, b)}" +
                                    $"({Arguments(function, c + 1, d)})",
             WsOpCode.NewArray => $"NewArray {Register(function, a)}, [{Arguments(function, b, c)}]",
+            WsOpCode.NewSet => $"NewSet {Register(function, a)}, #{{{Arguments(function, b, c)}}}",
             WsOpCode.NewMap => $"NewMap {Register(function, a)}, {{{Arguments(function, b, 2 * c)}}}",
             WsOpCode.ForEachNext => $"ForEachNext {Register(function, b)}, {Register(function, b + 1)}, " +
                                     $"{Arguments(function, b + 2, c)} else {a:D2}",

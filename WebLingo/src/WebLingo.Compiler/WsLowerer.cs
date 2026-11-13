@@ -175,6 +175,8 @@ public sealed class WsLowerer
                 return new WsIrCall(LowerExpression(call.Callee), LowerArguments(call.Arguments), call.Span);
             case WsBoundArrayLiteral array:
                 return new WsIrNewArray(LowerArguments(array.Elements), array.Span);
+            case WsBoundSetLiteral set:
+                return new WsIrNewSet(LowerArguments(set.Elements), set.Span);
             case WsBoundMapLiteral map:
             {
                 var entries = new List<WsIrMapEntry>();

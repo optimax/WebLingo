@@ -259,6 +259,10 @@ public sealed class WsStackCodeGenerator
                 foreach (var element in array.Elements) EmitValue(element);
                 Emit(WsStackOpCode.NewArray, array.Span, array.Elements.Count);
                 return;
+            case WsIrNewSet set:
+                foreach (var element in set.Elements) EmitValue(element);
+                Emit(WsStackOpCode.NewSet, set.Span, set.Elements.Count);
+                return;
             case WsIrNewMap map:
                 foreach (var entry in map.Entries)
                 {
@@ -434,6 +438,7 @@ public sealed class WsStackCodeGenerator
             WsStackOpCode.GetMember => (1, 1),
             WsStackOpCode.NewArray => (a, 1),
             WsStackOpCode.NewMap => (2 * a, 1),
+            WsStackOpCode.NewSet => (a, 1),
             WsStackOpCode.CallMethod => (b + 1, 1),
             WsStackOpCode.GetIndex => (2, 1),
             WsStackOpCode.StoreIndex => (3, a),

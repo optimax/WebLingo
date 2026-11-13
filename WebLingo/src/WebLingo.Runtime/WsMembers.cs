@@ -52,6 +52,12 @@ public static class WsMembers
             error = null;
             return true;
         }
+        if (target.Kind == WsValueKind.Set && member == WsMember.Length)
+        {
+            result = WsValue.FromInt64(heap.SetCount(target));
+            error = null;
+            return true;
+        }
         result = WsValue.Null;
         error = IsMethod(target, member)
             ? new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
@@ -63,7 +69,8 @@ public static class WsMembers
     /// <summary>Whether the member is a method of the value: an array's <c>push</c> and <c>pop</c>, a map's <c>has</c> and <c>remove</c>.</summary>
     private static bool IsMethod(WsValue target, WsMember member) =>
         (target.Kind == WsValueKind.Array && member is WsMember.Push or WsMember.Pop)
-        || (target.Kind == WsValueKind.Map && member is WsMember.Has or WsMember.Remove);
+        || (target.Kind == WsValueKind.Map && member is WsMember.Has or WsMember.Remove)
+        || (target.Kind == WsValueKind.Set && member is WsMember.Add or WsMember.Has or WsMember.Remove);
 
     /// <summary>
     /// Calls a method, <c>x.name(…)</c>, with the <paramref name="count"/> arguments from
@@ -105,7 +112,21 @@ public static class WsMembers
             result = WsValue.FromBoolean(removed);
             return true;
         }
-        error = target.Kind is WsValueKind.String or WsValueKind.Array or WsValueKind.Map && member == WsMember.Length
+        if (target.Kind == WsValueKind.Set && member is WsMember.Add or WsMember.Has or WsMember.Remove)
+        {
+            if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+            bool answer;
+            var succeeded = member switch
+            {
+                WsMember.Add => heap.TryAddToSet(target, values[first], out answer, out error),
+                WsMember.Has => heap.TryFindInSet(target, values[first], out answer, out error),
+                _ => heap.TryRemoveFromSet(target, values[first], out answer, out error)
+            };
+            if (succeeded) result = WsValue.FromBoolean(answer);
+            return succeeded;
+        }
+        error = target.Kind is WsValueKind.String or WsValueKind.Array or WsValueKind.Map or WsValueKind.Set
+                && member == WsMember.Length
             ? new WsRuntimeError(WsDiagnosticCodes.NotAFunction,
                 $"'{name}' of {WsValueFormatter.Describe(target)} is not a method, and cannot be called.")
             : NoSuchMember(target, name);
@@ -185,6 +206,14 @@ public static class WsMembers
                 next = WsValue.FromInt64(at + 1);
                 return true;
             }
+            case WsValueKind.Set when items == 1:
+            {
+                done = at >= heap.SetCount(collection);
+                if (done) return true;
+                values[first] = heap.SetValueAt(collection, (int)at);
+                next = WsValue.FromInt64(at + 1);
+                return true;
+            }
             case WsValueKind.Map when items == 2:
             {
                 done = at >= heap.MapCount(collection);
@@ -208,7 +237,7 @@ public static class WsMembers
                 error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
                     "A map's loop takes a key and a value: 'foreach (var (key, value) in map)'.");
                 return false;
-            case WsValueKind.Array or WsValueKind.String:
+            case WsValueKind.Array or WsValueKind.String or WsValueKind.Set:
                 error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
                     $"Only a map's loop takes a key and a value, not {WsValueFormatter.Describe(collection)}'s.");
                 return false;

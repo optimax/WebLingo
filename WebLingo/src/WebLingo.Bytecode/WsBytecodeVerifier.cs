@@ -192,6 +192,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 }
                 return null;
             case WsOpCode.NewArray:
+            case WsOpCode.NewSet:
                 if (Register(function, a, "destination") is { } arrayError) return arrayError;
                 if (c < 0) return $"its element count, {c}, is negative.";
                 if (c == 0) return Unused(b, d);
@@ -423,6 +424,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 }
                 return -1;
             case WsOpCode.NewArray:
+            case WsOpCode.NewSet:
                 for (var i = 0; i < instruction.C; i++)
                 {
                     var element = Unwritten(instruction.B + i, state, locals);
@@ -470,7 +472,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             or WsOpCode.Greater or WsOpCode.GreaterOrEqual or WsOpCode.NewCell or WsOpCode.BoxRegister or WsOpCode.CopyCell
             or WsOpCode.LoadCell or WsOpCode.LoadCapture or WsOpCode.MakeClosure or WsOpCode.LoadBuiltin
             or WsOpCode.Call or WsOpCode.GetMember or WsOpCode.CallMethod or WsOpCode.GetIndex
-            or WsOpCode.NewArray or WsOpCode.NewMap => instruction.A,
+            or WsOpCode.NewArray or WsOpCode.NewMap or WsOpCode.NewSet => instruction.A,
         _ => null
     };
 

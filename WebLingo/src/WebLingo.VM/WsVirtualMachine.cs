@@ -432,6 +432,13 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             pc++;
                             continue;
                         }
+                        case WsOpCode.NewSet:
+                        {
+                            if (!heap.TryAllocateSet(registers, ins.B, ins.C, out var set, out error)) break;
+                            registers[ins.A] = set;
+                            pc++;
+                            continue;
+                        }
                         case WsOpCode.NewMap:
                         {
                             if (!heap.TryAllocateMap(registers, ins.B, ins.C, out var map, out error)) break;

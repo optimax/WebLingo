@@ -7,10 +7,10 @@ namespace WebLingo.Runtime;
 /// collection marks what the roots (the arrays its owner registers, such as the VM's registers and constants) refer
 /// to, through every object that refers to others, and frees the rest, whose handles are reused. Its objects are
 /// strings, closures (a function and the cells it captures), cells (one variable that closures share, which has no
-/// value until it is initialized), arrays and maps (section 3.6).
+/// value until it is initialized), arrays, maps and sets (section 3.6).
 /// <para>
 /// Its size is counted in units: a string's length in UTF-16 code units, a closure's capture count, an array's
-/// element count and a map's entry count (which grow and shrink with them), each plus
+/// element count and a map's or a set's entry count (which grow and shrink with them), each plus
 /// <see cref="ObjectOverhead"/>. A collection runs when an allocation would pass the next threshold, which is twice
 /// what was live after the last collection, and at least <see cref="FirstCollectionAt"/>; an allocation that does
 /// not fit in the budget even after a collection is an error (WS3003). These numbers are arbitrary, and are
@@ -135,6 +135,61 @@ public sealed class WsHeap
         return TryAllocate(entries, WsValueKind.Map, entries.Count, out map, out error);
     }
 
+    /// <summary>A new set of the <paramref name="count"/> values from <paramref name="values"/>[<paramref name="first"/>] on.</summary>
+    public bool TryAllocateSet(WsValue[] values, int first, int count, out WsValue set, out WsRuntimeError? error)
+    {
+        var entries = new MapObject();
+        for (var i = 0; i < count; i++)
+        {
+            if (!TryKey(values[first + i], out var key, out error, inSet: true))
+            {
+                set = WsValue.Null;
+                return false;
+            }
+            entries.Set(key, values[first + i], WsValue.Null);
+        }
+        return TryAllocate(entries, WsValueKind.Set, entries.Count, out set, out error);
+    }
+
+    /// <summary>Adds a value to a set, giving whether it was new: a new one is one more unit, within the budget.</summary>
+    public bool TryAddToSet(WsValue set, WsValue value, out bool added, out WsRuntimeError? error)
+    {
+        added = false;
+        var entries = Get<MapObject>(set, WsValueKind.Set);
+        if (!TryKey(value, out var key, out error, inSet: true)) return false;
+        if (entries.TryGet(key, out _)) return true;
+        if (!TryReserve(1, out error)) return false;
+        entries.Set(key, value, WsValue.Null);
+        Units++;
+        added = true;
+        return true;
+    }
+
+    /// <summary>Whether a set holds a value; WS3001 if the value cannot be in a set.</summary>
+    public bool TryFindInSet(WsValue set, WsValue value, out bool found, out WsRuntimeError? error)
+    {
+        found = false;
+        if (!TryKey(value, out var key, out error, inSet: true)) return false;
+        found = Get<MapObject>(set, WsValueKind.Set).TryGet(key, out _);
+        return true;
+    }
+
+    /// <summary>Removes a value from a set, giving whether it was there.</summary>
+    public bool TryRemoveFromSet(WsValue set, WsValue value, out bool removed, out WsRuntimeError? error)
+    {
+        removed = false;
+        if (!TryKey(value, out var key, out error, inSet: true)) return false;
+        removed = Get<MapObject>(set, WsValueKind.Set).Remove(key);
+        if (removed) Units--;
+        return true;
+    }
+
+    /// <summary>How many values the set has.</summary>
+    public int SetCount(WsValue set) => Get<MapObject>(set, WsValueKind.Set).Count;
+
+    /// <summary>The set's value at a position from 0 to its count − 1, in no defined order (section 3.6).</summary>
+    public WsValue SetValueAt(WsValue set, int position) => Get<MapObject>(set, WsValueKind.Set).At(position).Key;
+
     /// <summary>The map's value for the key: false if it has none; WS3001 if the value cannot be a key.</summary>
     public bool TryFindInMap(WsValue map, WsValue key, out WsValue value, out bool found, out WsRuntimeError? error)
     {
@@ -181,7 +236,7 @@ public sealed class WsHeap
     /// The key a value is: strings, int64s, Booleans and null may be keys, compared as <c>==</c> compares them; any
     /// other value is WS3001 (section 3.6).
     /// </summary>
-    private bool TryKey(WsValue value, out MapKey key, out WsRuntimeError? error)
+    private bool TryKey(WsValue value, out MapKey key, out WsRuntimeError? error, bool inSet = false)
     {
         switch (value.Kind)
         {
@@ -199,8 +254,10 @@ public sealed class WsHeap
                 break;
             default:
                 key = default;
-                error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
-                    $"{Capitalized(WsValueFormatter.Describe(value))} cannot be a key: keys are strings, integers, Booleans and null.");
+                var what = Capitalized(WsValueFormatter.Describe(value));
+                error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation, inSet
+                    ? $"{what} cannot be in a set: a set's values are strings, integers, Booleans and null."
+                    : $"{what} cannot be a key: keys are strings, integers, Booleans and null.");
                 return false;
         }
         error = null;
@@ -231,7 +288,7 @@ public sealed class WsHeap
                 case ArrayObject array:
                     foreach (var element in array.Elements) Mark(element, marked, pending);
                     break;
-                case MapObject map:
+                case MapObject map: // A set's too, whose values are its keys.
                     for (var i = 0; i < map.Count; i++)
                     {
                         var (key, value) = map.At(i);
@@ -255,7 +312,7 @@ public sealed class WsHeap
     private static void Mark(WsValue value, bool[] marked, Stack<int> pending)
     {
         if (value.Kind is not (WsValueKind.String or WsValueKind.Function or WsValueKind.Cell or WsValueKind.Array
-            or WsValueKind.Map))
+            or WsValueKind.Map or WsValueKind.Set))
         {
             return;
         }

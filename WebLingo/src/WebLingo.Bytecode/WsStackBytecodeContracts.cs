@@ -114,6 +114,8 @@ public enum WsStackOpCode : byte
     ForEachNext,
     /// <summary>As <see cref="ForEachNext"/>, writing the next entry's key and value into the two locals after the position.</summary>
     ForEachNextEntry,
+    /// <summary>A = value count; pops that many values and pushes a new set of them.</summary>
+    NewSet,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);

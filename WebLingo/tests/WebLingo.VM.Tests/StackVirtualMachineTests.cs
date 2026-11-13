@@ -115,8 +115,8 @@ public sealed class StackVirtualMachineTests
     [Fact]
     public void GarbageMapsAreCollectedAndAGrowingOneIsBoundedOnBothVms()
     {
-        const string garbage = "var t = {}; for (var i = 0; i < 20000; i = i + 1) { t = {a: i, b: [i]}; } writeLn(t[\"a\"]);";
-        const string growing = "var m = {}; var i = 0; while (true) { m[i] = i; i = i + 1; }";
+        const string garbage = "var t = {}; for (var i = 0; i < 20000; i = i + 1) { t = {a: i, b: [i], c: #{i}}; } writeLn(t[\"a\"]);";
+        const string growing = "var m = {}; var s = #{}; var i = 0; while (true) { m[i] = i; s.add(i); i = i + 1; }";
         foreach (var run in BothVms)
         {
             var output = new WsCollectedOutput();

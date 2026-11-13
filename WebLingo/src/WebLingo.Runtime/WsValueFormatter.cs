@@ -7,7 +7,8 @@ namespace WebLingo.Runtime;
 /// <c>false</c>, an int64 in decimal digits, and a binary64 as the shortest decimal that reads back as the same
 /// number, always with a decimal point or an exponent so that it is not mistaken for an integer (<c>5.0</c>,
 /// <c>3.5</c>, <c>1E+21</c>), or <c>NaN</c>, <c>Infinity</c>, <c>-Infinity</c>. A string is its own text, an array
-/// <c>[1, "a", null]</c> and a map <c>{"active": true}</c>, their strings quoted, with their escapes (section 3.6). It
+/// <c>[1, "a", null]</c>, a map <c>{"active": true}</c> and a set <c>#{1, "a"}</c>, their strings quoted, with their
+/// escapes (section 3.6). It
 /// never depends on the culture.
 /// </summary>
 public static class WsValueFormatter
@@ -19,7 +20,7 @@ public static class WsValueFormatter
         return value.Kind switch
         {
             WsValueKind.String => heap.GetString(value),
-            WsValueKind.Array or WsValueKind.Map => FormatCollection(value, heap),
+            WsValueKind.Array or WsValueKind.Map or WsValueKind.Set => FormatCollection(value, heap),
             _ => Format(value)
         };
     }
@@ -32,6 +33,7 @@ public static class WsValueFormatter
         WsValueKind.Cell => "cell",
         WsValueKind.Array => $"array#{value.Handle}",
         WsValueKind.Map => $"map#{value.Handle}",
+        WsValueKind.Set => $"set#{value.Handle}",
         WsValueKind.Boolean => value.AsBoolean ? "true" : "false",
         WsValueKind.Int64 => value.AsInt64.ToString(CultureInfo.InvariantCulture),
         _ => FormatBinary64(value.AsBinary64)
@@ -47,6 +49,7 @@ public static class WsValueFormatter
         WsValueKind.Function or WsValueKind.Builtin => "a function",
         WsValueKind.Array => "an array",
         WsValueKind.Map => "a map",
+        WsValueKind.Set => "a set",
         _ => $"the number {Format(value)}"
     };
 
@@ -98,10 +101,15 @@ public static class WsValueFormatter
         {
             var (collection, next) = pending.Pop();
             var isMap = collection.Kind == WsValueKind.Map;
-            var count = isMap ? heap.MapCount(collection) : heap.GetArray(collection).Count;
+            var count = collection.Kind switch
+            {
+                WsValueKind.Map => heap.MapCount(collection),
+                WsValueKind.Set => heap.SetCount(collection),
+                _ => heap.GetArray(collection).Count
+            };
             if (next >= count)
             {
-                text.Append(isMap ? '}' : ']');
+                text.Append(collection.Kind == WsValueKind.Array ? ']' : '}');
                 open.Remove(collection.Handle);
                 continue;
             }
@@ -116,13 +124,13 @@ public static class WsValueFormatter
             }
             else
             {
-                item = heap.GetArray(collection)[next];
+                item = collection.Kind == WsValueKind.Set ? heap.SetValueAt(collection, next) : heap.GetArray(collection)[next];
             }
-            if (item.Kind is WsValueKind.Array or WsValueKind.Map)
+            if (item.Kind is WsValueKind.Array or WsValueKind.Map or WsValueKind.Set)
             {
                 if (open.Contains(item.Handle))
                 {
-                    text.Append(item.Kind == WsValueKind.Map ? "{…}" : "[…]");
+                    text.Append(item.Kind switch { WsValueKind.Map => "{…}", WsValueKind.Set => "#{…}", _ => "[…]" });
                     continue;
                 }
                 Open(item, text, open, pending);
@@ -135,7 +143,7 @@ public static class WsValueFormatter
 
     private static void Open(WsValue collection, StringBuilder text, HashSet<int> open, Stack<(WsValue, int)> pending)
     {
-        text.Append(collection.Kind == WsValueKind.Map ? '{' : '[');
+        text.Append(collection.Kind switch { WsValueKind.Map => "{", WsValueKind.Set => "#{", _ => "[" });
         open.Add(collection.Handle);
         pending.Push((collection, 0));
     }

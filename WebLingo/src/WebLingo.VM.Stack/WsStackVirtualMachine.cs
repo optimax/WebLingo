@@ -465,6 +465,15 @@ public sealed class WsStackVirtualMachine
                             pc++;
                             continue;
                         }
+                        case WsStackOpCode.NewSet:
+                        {
+                            var first = sp - ins.A;
+                            if (!heap.TryAllocateSet(slots, first, ins.A, out var set, out error)) break;
+                            sp = first;
+                            slots[sp++] = set;
+                            pc++;
+                            continue;
+                        }
                         case WsStackOpCode.NewMap:
                         {
                             var first = sp - 2 * ins.A;

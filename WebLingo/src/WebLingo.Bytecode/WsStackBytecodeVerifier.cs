@@ -160,6 +160,7 @@ public sealed class WsStackBytecodeVerifier
                     ? $"its entry count, {a}, is not 0 to {WsFunction.MaxRegisters / 2}."
                     : null) ?? Unused(b);
             case WsStackOpCode.NewArray:
+            case WsStackOpCode.NewSet:
                 return (a is < 0 or > WsFunction.MaxRegisters ? $"its element count, {a}, is not 0 to {WsFunction.MaxRegisters}." : null)
                     ?? Unused(b);
             case WsStackOpCode.StoreIndex:
@@ -301,7 +302,7 @@ public sealed class WsStackBytecodeVerifier
         WsStackOpCode.Call => (instruction.A + 1, 1),
         WsStackOpCode.CallBuiltin => (instruction.B, 1),
         WsStackOpCode.GetMember => (1, 1),
-        WsStackOpCode.NewArray => (instruction.A, 1),
+        WsStackOpCode.NewArray or WsStackOpCode.NewSet => (instruction.A, 1),
         WsStackOpCode.NewMap => (2 * instruction.A, 1),
         WsStackOpCode.CallMethod => (instruction.B + 1, 1),
         WsStackOpCode.GetIndex => (2, 1),

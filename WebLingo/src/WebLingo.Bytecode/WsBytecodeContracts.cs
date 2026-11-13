@@ -107,6 +107,8 @@ public enum WsOpCode : byte
     /// item, 2 for a key and a value (specification, section 3.6).
     /// </summary>
     ForEachNext,
+    /// <summary>A = destination register, B = first value register, C = value count; a new set of them.</summary>
+    NewSet,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);

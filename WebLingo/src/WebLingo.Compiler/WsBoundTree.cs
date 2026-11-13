@@ -110,6 +110,9 @@ public sealed record WsBoundFunctionExpression(WsBoundFunction Function, WsSourc
 /// <summary><c>[a, b, c]</c>: a new array (specification, section 3.6).</summary>
 public sealed record WsBoundArrayLiteral(IReadOnlyList<WsBoundExpression> Elements, WsSourceSpan Span) : WsBoundExpression(Span);
 
+/// <summary><c>#{a, b, c}</c>: a new set (specification, section 3.6).</summary>
+public sealed record WsBoundSetLiteral(IReadOnlyList<WsBoundExpression> Elements, WsSourceSpan Span) : WsBoundExpression(Span);
+
 /// <summary><c>{ key: value, … }</c>: a new map, its keys strings (specification, section 3.6).</summary>
 public sealed record WsBoundMapLiteral(IReadOnlyList<(string Key, WsBoundExpression Value)> Entries, WsSourceSpan Span)
     : WsBoundExpression(Span);
