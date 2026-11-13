@@ -8,11 +8,15 @@ Since "Duplicated Files" (`DONE.md`), documents live in `Documents/`, and the fo
 
 **Q: Shall `NativeCompatibility.md` move to `Documents/`, with the specification's section 8.5 changed to match and `eng/` removed, or stay in `WebLingo/eng/portability/` as the specification has it?**
 
-## Verify the M0.6.1 Scaffold
+## [QUESTION] Verify the M0.6.1 Scaffold
 
 The specification's next activity (section 9): validate M0.6.1 with `dotnet restore`, `dotnet build` and `dotnet test` on Windows and Linux. Then update what reports its verification as pending: `WebLingo/README.md` ("Verification status"), `Documents/M0.6.1-status.md`, and the specification's sections 9 and 14.
 
-Found 2026-11-12 (Claude, on Windows, .NET SDK 10.0.404): restore and the Release build succeed with no warnings, the five tests pass, and `weblingo --version` answers. Linux is not tried yet: it waits for "Make the CI Workflow Run".
+Windows done (Claude, 2026-11-12, `f0ee564`): a fresh clone of `main`, with .NET SDK 10.0.404, restores, builds in Release with no warnings, and passes its 5 tests, and `weblingo --version` answers. `WebLingo/README.md`, `Documents/M0.6.1-status.md` and the specification (header, section 9, section 14) say so, and say that Linux is not verified yet.
+
+Linux waits for the CI workflow's first run (`.github/workflows/build.yml`, since "Make the CI Workflow Run"), which runs on a push. There is no Linux here to try it on.
+
+**Q: May I push `main` to GitHub (`optimax/WebLingo`), so that CI runs on Linux and Windows? Everything committed since `e45fa73` would go: the agent files, `Documents/implementation.md`, the one specification, the CI move, and the M0.6 work done by then. Pushing needs your go-ahead (`AGENTS.md`, section 16).**
 
 ## M0.6.2: Lexer and Tokenization Tests
 
