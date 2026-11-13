@@ -220,7 +220,8 @@ public sealed class WsParser : IWsParser
 
     /// <summary>
     /// <c>class Name { members }</c>, each member a method, or the <c>constructor</c>: a name, with or without
-    /// <c>function</c> before it, its parameters and its body (section 3.7).
+    /// <c>function</c> before it, its parameters and its body; or, after <c>static</c>, a method of the class itself, or
+    /// a field of it, <c>static var name = value;</c> (section 3.7).
     /// </summary>
     private WsStatementSyntax ParseClass(int start)
     {
@@ -241,25 +242,43 @@ public sealed class WsParser : IWsParser
         }
         Expect(WsTokenKind.OpenBrace, "'{'");
         var methods = new List<WsMethodSyntax>();
+        var staticFields = new List<WsStaticFieldSyntax>();
+        WsClassDeclarationSyntax Made() =>
+            new(name, nameSpan, methods, SpanFrom(start)) { Base = baseClass, StaticFields = staticFields };
         while (Current.Kind is not (WsTokenKind.CloseBrace or WsTokenKind.EndOfFile))
         {
             var memberStart = Current.Span.Start;
+            var isStatic = Current.Kind == WsTokenKind.Static;
+            if (isStatic)
+            {
+                Advance();
+                if (Current.Kind is WsTokenKind.Var or WsTokenKind.Const or WsTokenKind.Let)
+                {
+                    if (ParseStaticField(memberStart) is { } field) staticFields.Add(field);
+                    continue;
+                }
+            }
             if (Current.Kind == WsTokenKind.Function) Advance();
             if (Current.Kind != WsTokenKind.Identifier)
             {
-                if (!_statementHasError) ReportUnexpected("a method");
+                if (!_statementHasError) ReportUnexpected(isStatic ? "a static method or 'var'" : "a method");
                 SkipToClosingBrace();
-                return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start)) { Base = baseClass };
+                return Made();
             }
             var methodName = Advance();
-            if (!EnterRecursion()) return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start)) { Base = baseClass };
+            if (isStatic && methodName.Text == "constructor" && !_statementHasError)
+            {
+                Report(WsDiagnosticCodes.UnexpectedToken, "A constructor cannot be static.", methodName.Span);
+            }
+            if (!EnterRecursion()) return Made();
             try
             {
                 var superCalls = _superCalls;
                 var (parameters, body) = ParseFunctionRest();
                 methods.Add(new WsMethodSyntax(methodName.Text, methodName.Span, parameters, body, SpanFrom(memberStart))
                 {
-                    CallsSuper = _superCalls != superCalls
+                    CallsSuper = _superCalls != superCalls,
+                    IsStatic = isStatic
                 });
             }
             finally
@@ -268,7 +287,32 @@ public sealed class WsParser : IWsParser
             }
         }
         Expect(WsTokenKind.CloseBrace, "'}'");
-        return new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start)) { Base = baseClass };
+        return Made();
+    }
+
+    /// <summary>
+    /// <c>static var name = value;</c>, after its <c>static</c>: a field of a class itself (section 3.7). <c>const</c> or
+    /// <c>let</c> in place of <c>var</c> is reported, and read as <c>var</c>; a field without a value is WS1006, and
+    /// none.
+    /// </summary>
+    private WsStaticFieldSyntax? ParseStaticField(int start)
+    {
+        if (Current.Kind != WsTokenKind.Var && !_statementHasError) ReportUnexpected("'var'");
+        Advance();
+        var (name, nameSpan) = ExpectName();
+        WsExpressionSyntax? value = null;
+        if (Current.Kind == WsTokenKind.Equals)
+        {
+            Advance();
+            value = ParseExpression();
+        }
+        else if (!_statementHasError)
+        {
+            Report(WsDiagnosticCodes.MissingInitializer,
+                $"'{name}' needs a value where it is declared: 'static var {name} = …;'.", nameSpan);
+        }
+        ExpectSemicolon();
+        return value is null || name.Length == 0 ? null : new WsStaticFieldSyntax(name, nameSpan, value, SpanFrom(start));
     }
 
     /// <summary><c>using (var name = value) body</c>, one resource, declared with <c>var</c> (section 3.7).</summary>
@@ -875,6 +919,10 @@ public sealed class WsParser : IWsParser
             if (statement is WsClassDeclarationSyntax classDeclaration)
             {
                 foreach (var method in classDeclaration.Methods) statements.Push(method.Body);
+                foreach (var field in classDeclaration.StaticFields)
+                {
+                    statements.Push(new WsExpressionStatementSyntax(field.Value, field.Value.Span));
+                }
             }
             if (statement is WsForSyntax forLoop)
             {

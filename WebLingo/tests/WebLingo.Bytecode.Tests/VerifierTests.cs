@@ -36,6 +36,27 @@ public sealed class VerifierTests
     }
 
     [Fact]
+    public void AStaticMethodIsAFunctionWithoutThis()
+    {
+        var method = new WsFunction("m", 1, 1, [I(WsOpCode.Return)]) { HasThis = true, ParameterCount = 1 };
+        var function = new WsFunction("f", 0, 0, [I(WsOpCode.Return)]);
+        var module = Module(registers: 0, locals: 0, I(WsOpCode.Return)) with
+        {
+            Functions = [method, function],
+            Classes = [new WsClassInfo("A", -1, []) { StaticMethods = [new WsClassMethod("s", 1)], StaticFields = ["n"] }]
+        };
+        Assert.Equal(WsVerificationResult.Valid, Verify(module));
+        AssertRejected(module with
+        {
+            Classes = [new WsClassInfo("A", -1, []) { StaticMethods = [new WsClassMethod("s", 0)] }]
+        }, -1, "not a function without 'this'");
+        AssertRejected(module with
+        {
+            Classes = [new WsClassInfo("A", -1, []) { StaticMethods = [new WsClassMethod("n", 1)], StaticFields = ["n"] }]
+        }, -1, "one it shares");
+    }
+
+    [Fact]
     public void ADisposedRegisterMustHaveBeenWritten()
     {
         Assert.Equal(WsVerificationResult.Valid,

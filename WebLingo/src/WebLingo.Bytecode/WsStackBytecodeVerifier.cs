@@ -47,7 +47,8 @@ public sealed class WsStackBytecodeVerifier
         }
         var methods = new List<WsStackFunction?>();
         foreach (var function in module.Functions) methods.Add(function);
-        if (WsClassTables.Check(module.Classes, index => index >= 0 && index < methods.Count && methods[index] is { HasThis: true })
+        if (WsClassTables.Check(module.Classes,
+                index => index >= 0 && index < methods.Count && methods[index] is { } function ? (function.HasThis ? 1 : 0) : -1)
             is { } classError)
         {
             return Fail(classError);

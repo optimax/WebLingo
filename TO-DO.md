@@ -8,23 +8,23 @@ Follow-ups to "M0.10 Syntax: Static Members, `Object` and Exceptions": A3 adds `
 
 **Q1, `toString()` when a class does not override it gives (a) the text `write` writes, `Point {x: 1, y: 2}`; (b) the class's name, `Point`, as C#'s `ToString()` does.**
 
-A1:
+A1: (a).
 
 **Q2, `write`, `writeLn` and a template's `<%= %>` given an instance whose class overrides `toString()`: (a) write what it returns, wherever the instance is, inside an array or a map too, as C#'s `Console.Write` does; (b) write its class and fields as now, `toString()` running only where a program calls it.**
 
-A2:
+A2: (a).
 
 **Q3, if Q2 is (a): a `toString()` that returns anything but a string is (a) WS3001 where it is written; (b) written as the value it returns.**
 
-A3:
+A3: (a).
 
 **Q4, `toString()` on other values: (a) only instances have it; (b) every value has it, giving the text `write` writes (`n.toString()` is `"5"` when `n` is 5), so that `"n = " + n.toString()` joins a number to a string, which `+` alone does not (section 3.5).**
 
-A4:
+A4: (b).
 
 **Q5, disposal that throws: when B's `dispose()` throws while an instance of B is disposed, (a) A's `dispose()` still runs, as section 3.4 proposes, and an exception it throws replaces B's, as A13 has it for `using`; (b) A's does not run, and B's exception goes on.**
 
-A5:
+A5: (
 
 ## [IDLE] M0.10: Classes, `dispose()` and `using`
 
@@ -40,13 +40,15 @@ Classes, with single inheritance and no exposed prototype chain (specification, 
 
 
 
-## [IDLE] M0.10.4: Static Members
+## [WORKING] M0.10.4: Static Members
 
 Static methods and fields (specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
 
 2026-11-13: waits for the answers to "M0.10 Syntax: Static Members, `Object` and Exceptions".
 
 2026-11-13: answered; next.
+
+Done (Claude, 2026-11-13): `static name(…) { … }` and `static var name = value;` in a class, reached as `Name.name(…)` and `Name.name`, a class without a member of that name finding its base's (A2); a static field can be assigned, and `this` or `super` in a static member is WS2009. No new operation: the class table gives each class its static methods and fields, and `GetMember`, `SetMember` and `CallMethod` reach them on a class. Choices of mine, in section 15.2 as proposed (row "Static members"): a static field's value is evaluated where its block begins, as a base is, so it cannot name the block's variables (WS2001), and the block's static fields are set once its classes are made, each `null` until then; a static member and a method may share a name; an instance does not reach its class's statics (`p.count` is WS3006); `static const` is reported and read as `static var`. Every new conformance case gives the same result on both VMs. Build and 1,106 tests pass on Windows; Linux not tried.
 
 ## [IDLE] M0.10.5: `Object` and `equal()`
 

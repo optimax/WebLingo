@@ -384,6 +384,18 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         {
                             var name = names[ins.B];
                             var target = registers[ins.C];
+                            if (target.Kind == WsValueKind.Class)
+                            {
+                                // A static member, called as any function is (section 3.7).
+                                if (!WsMembers.TryGet(target, name.Member, name.Text, heap, false, out callee, out error)) break;
+                                self = WsValue.Null;
+                                arguments = registers;
+                                firstArgument = ins.C + 1;
+                                argumentCount = ins.D;
+                                resultRegister = ins.A;
+                                constructed = WsValue.Null;
+                                goto call;
+                            }
                             if (target.Kind == WsValueKind.Instance)
                             {
                                 // A field's function is called as any function is; a method runs on the instance.
@@ -880,7 +892,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             out WsRuntimeError? error)
         {
             made = WsValue.Null;
-            var closures = new WsValue[info.Methods.Count + 1];
+            var closures = new WsValue[info.Methods.Count + info.StaticMethods.Count + 1];
             heap.AddRoots(closures);
             try
             {
@@ -891,7 +903,15 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                     if (!TryMakeClosure(info.Methods[i].Function, registers, cells, out closures[i + 1], out error)) return false;
                     methods.Add(info.Methods[i].Name, closures[i + 1]);
                 }
-                return heap.TryAllocateClass(info.Name, closures[0], methods, baseClass, out made, out error);
+                var statics = new Dictionary<string, WsValue>(StringComparer.Ordinal);
+                for (var i = 0; i < info.StaticMethods.Count; i++)
+                {
+                    var slot = info.Methods.Count + 1 + i;
+                    if (!TryMakeClosure(info.StaticMethods[i].Function, registers, cells, out closures[slot], out error)) return false;
+                    statics.Add(info.StaticMethods[i].Name, closures[slot]);
+                }
+                return heap.TryAllocateClass(info.Name, closures[0], methods, baseClass, out made, out error, statics,
+                    info.StaticFields);
             }
             finally
             {

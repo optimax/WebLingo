@@ -179,7 +179,14 @@ public sealed record WsFunction(
 }
 
 /// <summary>A class of a module: its name, its constructor's function, or -1 if it has none, and its methods' (section 3.7).</summary>
-public sealed record WsClassInfo(string Name, int Constructor, IReadOnlyList<WsClassMethod> Methods);
+public sealed record WsClassInfo(string Name, int Constructor, IReadOnlyList<WsClassMethod> Methods)
+{
+    /// <summary>Its static methods, functions without <c>this</c>, by name (section 3.7).</summary>
+    public IReadOnlyList<WsClassMethod> StaticMethods { get; init; } = [];
+
+    /// <summary>The names of its static fields, which exist, as <c>null</c>, from when it is made.</summary>
+    public IReadOnlyList<string> StaticFields { get; init; } = [];
+}
 
 /// <summary>A method of a class: its name, and the module's function that is its body.</summary>
 public readonly record struct WsClassMethod(string Name, int Function);

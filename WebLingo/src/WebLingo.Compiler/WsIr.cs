@@ -21,7 +21,14 @@ public sealed record WsIrProgram(
 }
 
 /// <summary>A class: its constructor's function, or -1 if it has none, and its methods' (section 3.7).</summary>
-public sealed record WsIrClass(string Name, int Constructor, IReadOnlyList<(string Name, int Function)> Methods);
+public sealed record WsIrClass(string Name, int Constructor, IReadOnlyList<(string Name, int Function)> Methods)
+{
+    /// <summary>Its static methods, functions without <c>this</c>, by name (section 3.7).</summary>
+    public IReadOnlyList<(string Name, int Function)> StaticMethods { get; init; } = [];
+
+    /// <summary>The names of its static fields, which exist, as <c>null</c>, from when it is made.</summary>
+    public IReadOnlyList<string> StaticFields { get; init; } = [];
+}
 
 /// <summary>Where a closure's capture comes from: a local of the function making it, or one of that one's captures.</summary>
 public sealed record WsIrCapture(bool FromLocal, int Index);

@@ -146,10 +146,12 @@ public sealed class WsHeap
 
     /// <summary>
     /// A class that extends <paramref name="baseClass"/> (<c>null</c> for none): its methods are the base's, with its
-    /// own in place of those it declares again (section 3.7). A base that is not a class is WS3001.
+    /// own in place of those it declares again (section 3.7). A base that is not a class is WS3001. Its static methods'
+    /// closures, by name, and its static fields, <c>null</c> until they are set, are its own.
     /// </summary>
     public bool TryAllocateClass(string name, WsValue constructor, Dictionary<string, WsValue> methods, WsValue baseClass,
-        out WsValue value, out WsRuntimeError? error)
+        out WsValue value, out WsRuntimeError? error, Dictionary<string, WsValue>? staticMethods = null,
+        IReadOnlyList<string>? staticFields = null)
     {
         value = WsValue.Null;
         var all = methods;
@@ -173,8 +175,57 @@ public sealed class WsHeap
             disposeChain[0] = own;
             for (var i = 0; i < inherited.Length; i++) disposeChain[i + 1] = inherited[i];
         }
-        var made = new ClassObject(name, constructor, all) { Base = baseClass, DisposeChain = disposeChain };
-        return TryAllocate(made, WsValueKind.Class, all.Count + 1, out value, out error);
+        var fields = new Dictionary<string, WsValue>(StringComparer.Ordinal);
+        if (staticFields is not null)
+        {
+            foreach (var field in staticFields) fields[field] = WsValue.Null;
+        }
+        var made = new ClassObject(name, constructor, all)
+        {
+            Base = baseClass,
+            DisposeChain = disposeChain,
+            StaticMethods = staticMethods ?? new Dictionary<string, WsValue>(StringComparer.Ordinal),
+            StaticFields = fields
+        };
+        return TryAllocate(made, WsValueKind.Class, Size(made), out value, out error);
+    }
+
+    /// <summary>A class's static member, its own, or its base's if it has none of that name (section 3.7).</summary>
+    public bool TryGetStatic(WsValue classValue, string name, out WsValue value)
+    {
+        for (var current = classValue; current.Kind == WsValueKind.Class;)
+        {
+            var target = Get<ClassObject>(current, WsValueKind.Class);
+            if (target.StaticFields.TryGetValue(name, out value) || target.StaticMethods.TryGetValue(name, out value)) return true;
+            current = target.Base;
+        }
+        value = WsValue.Null;
+        return false;
+    }
+
+    /// <summary>
+    /// Assigns a static field, the class's own or its base's, as <see cref="TryGetStatic"/> finds it; false if there is
+    /// none of that name, or if the name is a static method's (<paramref name="isMethod"/>).
+    /// </summary>
+    public bool TrySetStatic(WsValue classValue, string name, WsValue value, out bool isMethod)
+    {
+        isMethod = false;
+        for (var current = classValue; current.Kind == WsValueKind.Class;)
+        {
+            var target = Get<ClassObject>(current, WsValueKind.Class);
+            if (target.StaticFields.ContainsKey(name))
+            {
+                target.StaticFields[name] = value;
+                return true;
+            }
+            if (target.StaticMethods.ContainsKey(name))
+            {
+                isMethod = true;
+                return false;
+            }
+            current = target.Base;
+        }
+        return false;
     }
 
     /// <summary>
@@ -410,6 +461,8 @@ public sealed class WsHeap
                     Mark(classObject.Constructor, marked, pending);
                     foreach (var method in classObject.Methods.Values) Mark(method, marked, pending);
                     foreach (var method in classObject.DisposeChain) Mark(method, marked, pending);
+                    foreach (var method in classObject.StaticMethods.Values) Mark(method, marked, pending);
+                    foreach (var field in classObject.StaticFields.Values) Mark(field, marked, pending);
                     break;
                 case InstanceObject instance:
                     Mark(instance.Class, marked, pending);
@@ -458,7 +511,7 @@ public sealed class WsHeap
         Closure closure => closure.Cells.Length,
         ArrayObject array => array.Elements.Count,
         MapObject map => map.Count,
-        ClassObject classObject => classObject.Methods.Count + 1,
+        ClassObject classObject => Size(classObject),
         InstanceObject instance => instance.Count,
         BoundMethodObject => 2,
         _ => 0
@@ -527,7 +580,13 @@ public sealed class WsHeap
     {
         public WsValue Base { get; init; }
         public WsValue[] DisposeChain { get; init; } = [];
+        public Dictionary<string, WsValue> StaticMethods { get; init; } = new(StringComparer.Ordinal);
+        public Dictionary<string, WsValue> StaticFields { get; init; } = new(StringComparer.Ordinal);
     }
+
+    /// <summary>A class's units: one, and one for each method and static member.</summary>
+    private static int Size(ClassObject classObject) =>
+        classObject.Methods.Count + classObject.StaticMethods.Count + classObject.StaticFields.Count + 1;
 
     private sealed record BoundMethodObject(WsValue Instance, WsValue Closure, bool Disposes);
 

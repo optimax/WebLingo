@@ -29,6 +29,12 @@ public sealed class WsBinder
 
     private ClassContext? _class;
 
+    /// <summary>
+    /// What <c>this</c> names in a static method or a static field's value: nothing, rather than an outer method's
+    /// <c>this</c> (section 3.7). It is never a local of a function.
+    /// </summary>
+    private readonly WsLocalSymbol _noThis = new("this", WsDeclarationKind.Parameter, -1, default, new object());
+
     public IReadOnlyList<WsDiagnostic> Diagnostics => _diagnostics;
 
     public WsBoundProgram Bind(WsCompilationUnitSyntax unit)
@@ -59,6 +65,19 @@ public sealed class WsBinder
         {
             if (statement is WsClassDeclarationSyntax { Base: { } baseSyntax } derived) bases.Add(derived, BindExpression(baseSyntax));
         }
+        // A class's static fields are set when it is made, so their values are bound where the block begins too, where
+        // 'this' is not the class's (WS2009).
+        var statics = new Dictionary<WsClassDeclarationSyntax, List<(string, WsBoundExpression, WsSourceSpan)>>();
+        foreach (var statement in syntax)
+        {
+            if (statement is not WsClassDeclarationSyntax { StaticFields.Count: > 0 } withStatics) continue;
+            _scope = new Scope(_scope, _function);
+            _scope.Locals.Add("this", _noThis);
+            var values = new List<(string, WsBoundExpression, WsSourceSpan)>();
+            foreach (var field in withStatics.StaticFields) values.Add((field.Name, BindExpression(field.Value), field.NameSpan));
+            _scope = _scope.Parent!;
+            statics.Add(withStatics, values);
+        }
         var statements = new List<WsBoundStatement>();
         foreach (var statement in syntax)
         {
@@ -74,7 +93,8 @@ public sealed class WsBinder
             if (statement is WsClassDeclarationSyntax declaration)
             {
                 declared.TryGetValue(declaration, out var local);
-                var bound = BindClass(declaration, local, bases.GetValueOrDefault(declaration));
+                var bound = BindClass(declaration, local, bases.GetValueOrDefault(declaration),
+                    statics.GetValueOrDefault(declaration) ?? []);
                 if (local is not null) statements.Add(new WsBoundClassDeclaration(local, bound, declaration.Span));
                 continue;
             }
@@ -262,15 +282,19 @@ public sealed class WsBinder
     /// A class: its base, bound where the class is, then its constructor and its methods, each a function whose first
     /// parameter is <c>this</c>; a name declared twice in it is WS2002 (section 3.7). A class without a constructor gets
     /// one that does nothing but run its base's; a constructor of a derived class that does not call <c>super(…)</c>
-    /// runs its base's first, with no arguments.
+    /// runs its base's first, with no arguments. Its static members, fields and methods, have names of their own, apart
+    /// from its methods'; its static methods are functions without <c>this</c> or <c>super</c> (WS2009).
     /// </summary>
-    private WsBoundClass BindClass(WsClassDeclarationSyntax declaration, WsLocalSymbol? local, WsBoundExpression? baseClass)
+    private WsBoundClass BindClass(WsClassDeclarationSyntax declaration, WsLocalSymbol? local, WsBoundExpression? baseClass,
+        List<(string Name, WsBoundExpression Value, WsSourceSpan Span)> staticFields)
     {
         var hasBase = baseClass is not null;
         WsBoundFunction? constructor = null;
         var methods = new List<(string, WsBoundFunction)>();
         var names = new HashSet<string>(StringComparer.Ordinal);
-        var members = new List<WsMethodSyntax>(declaration.Methods);
+        var members = new List<WsMethodSyntax>();
+        var staticSyntax = new List<WsMethodSyntax>();
+        foreach (var member in declaration.Methods) (member.IsStatic ? staticSyntax : members).Add(member);
         if (!members.Exists(member => member.Name == "constructor"))
         {
             var span = new WsSourceSpan(declaration.Span.Start, 0);
@@ -317,7 +341,28 @@ public sealed class WsBinder
             if (isConstructor) constructor = function;
             else methods.Add((method.Name, function));
         }
-        return new WsBoundClass(declaration.Name, constructor, methods, declaration.Span) { Base = baseClass };
+        var staticNames = new HashSet<string>(StringComparer.Ordinal);
+        var fields = new List<(string, WsBoundExpression, WsSourceSpan)>();
+        foreach (var field in staticFields)
+        {
+            if (staticNames.Add(field.Name)) fields.Add(field);
+            else Report(WsDiagnosticCodes.DuplicateDeclaration, $"'{field.Name}' is already declared in this class.", field.Span);
+        }
+        var staticMethods = new List<(string, WsBoundFunction)>();
+        foreach (var method in staticSyntax)
+        {
+            _class = null; // No 'super' in a static method.
+            var function = BindFunction(method.Name, method.Parameters, method.Body, method.Span, isStatic: true);
+            _class = outerClass;
+            if (staticNames.Add(method.Name)) staticMethods.Add((method.Name, function));
+            else Report(WsDiagnosticCodes.DuplicateDeclaration, $"'{method.Name}' is already declared in this class.", method.NameSpan);
+        }
+        return new WsBoundClass(declaration.Name, constructor, methods, declaration.Span)
+        {
+            Base = baseClass,
+            StaticMethods = staticMethods,
+            StaticFields = fields
+        };
     }
 
     /// <summary>
@@ -325,13 +370,14 @@ public sealed class WsBinder
     /// <c>this</c>, which only a method declares (section 3.7).
     /// </summary>
     private WsBoundFunction BindFunction(string name, IReadOnlyList<WsParameterSyntax> parameters, WsBlockSyntax body,
-        WsSourceSpan span, bool isMethod = false)
+        WsSourceSpan span, bool isMethod = false, bool isStatic = false)
     {
         var outerFunction = _function;
         var outerScope = _scope;
         _function = new FunctionContext(outerFunction, name);
         _scope = new Scope(outerScope, _function);
         if (isMethod) Declare("this", WsDeclarationKind.Parameter, span, null);
+        if (isStatic) _scope.Locals.Add("this", _noThis); // An outer method's 'this' is not a static method's (WS2009).
         foreach (var parameter in parameters) Declare(parameter.Name, WsDeclarationKind.Parameter, parameter.Span, null);
         _scope = new Scope(_scope, _function); // The body may declare a name its parameters have, shadowing it.
         var statements = BindStatements(body.Statements);
@@ -364,7 +410,8 @@ public sealed class WsBinder
     /// </summary>
     private WsBoundExpression BindSuper(string name, WsSourceSpan span)
     {
-        if (_class is not { HasBase: true, Local: { } classLocal } || LookupLocal("this") is not { } self)
+        if (_class is not { HasBase: true, Local: { } classLocal } || LookupLocal("this") is not { } self
+            || ReferenceEquals(self, _noThis))
         {
             Report(WsDiagnosticCodes.ThisOutsideMethod,
                 "'super' is only allowed in a method or a constructor of a class that extends another.", span);
@@ -454,8 +501,11 @@ public sealed class WsBinder
                 return new WsBoundError(expression.Span);
             case WsThisSyntax self:
             {
-                if (LookupLocal("this") is { } local) return Reference(local, self.Span);
-                Report(WsDiagnosticCodes.ThisOutsideMethod, "'this' is only allowed in a method or a constructor.", self.Span);
+                var local = LookupLocal("this");
+                if (local is not null && !ReferenceEquals(local, _noThis)) return Reference(local, self.Span);
+                Report(WsDiagnosticCodes.ThisOutsideMethod, local is null
+                    ? "'this' is only allowed in a method or a constructor."
+                    : "'this' is not allowed in a static method or a static field's value.", self.Span);
                 return new WsBoundError(self.Span);
             }
             case WsFunctionExpressionSyntax function:

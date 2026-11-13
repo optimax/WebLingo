@@ -51,6 +51,12 @@ public sealed record WsBoundClass(
 {
     /// <summary>The class it extends, evaluated when it is made, or null.</summary>
     public WsBoundExpression? Base { get; init; }
+
+    /// <summary>Its static methods, functions without <c>this</c> (section 3.7).</summary>
+    public IReadOnlyList<(string Name, WsBoundFunction Function)> StaticMethods { get; init; } = [];
+
+    /// <summary>Its static fields, each with its value, set in their order once its block's classes are made.</summary>
+    public IReadOnlyList<(string Name, WsBoundExpression Value, WsSourceSpan Span)> StaticFields { get; init; } = [];
 }
 
 /// <summary>A class declaration; the class is made when its block begins, since it is in scope throughout.</summary>

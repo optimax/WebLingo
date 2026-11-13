@@ -57,6 +57,14 @@ public static class WsMembers
             error = NoSuchMember(target, name, heap);
             return false;
         }
+        if (target.Kind == WsValueKind.Class)
+        {
+            // A static member, the class's own or its base's (section 3.7).
+            error = null;
+            if (heap.TryGetStatic(target, name, out result) || optional) return true;
+            error = NoSuchMember(target, name, heap);
+            return false;
+        }
         if (target.Kind == WsValueKind.String && member == WsMember.Length)
         {
             result = WsValue.FromInt64(ScalarCount(heap.GetString(target)));
@@ -93,11 +101,22 @@ public static class WsMembers
     }
 
     /// <summary>
-    /// Assigns a field of an instance, <c>x.name = v</c>, which exists from then on (section 3.7). A method's name is not
-    /// a field's, and nothing else has fields to assign (WS3001).
+    /// Assigns a field of an instance, <c>x.name = v</c>, which exists from then on, or a static field of a class, its
+    /// own or its base's, which it declares (WS3006 otherwise; section 3.7). A method's name is not a field's, and
+    /// nothing else has fields to assign (WS3001).
     /// </summary>
     public static bool TrySet(WsValue target, string name, WsValue value, WsHeap heap, out WsRuntimeError? error)
     {
+        if (target.Kind == WsValueKind.Class)
+        {
+            error = null;
+            if (heap.TrySetStatic(target, name, value, out var isMethod)) return true;
+            error = isMethod
+                ? new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                    $"'{name}' is a static method of {WsValueFormatter.Describe(target, heap)}, and cannot be assigned.")
+                : NoSuchMember(target, name, heap);
+            return false;
+        }
         if (target.Kind != WsValueKind.Instance)
         {
             error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,

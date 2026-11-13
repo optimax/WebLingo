@@ -108,6 +108,18 @@ public sealed class ParserTests
     }
 
     [Fact]
+    public void AClassHasStaticFieldsAndMethods()
+    {
+        var tree = Parse("class A { static var n = 1; static function f() {} static g(x) {} m() {} }");
+        Assert.Empty(tree.Diagnostics);
+        var declaration = Assert.IsType<WsClassDeclarationSyntax>(Assert.Single(tree.Root.Statements));
+        var field = Assert.Single(declaration.StaticFields);
+        Assert.Equal(("n", new WsSourceSpan(21, 1), new WsSourceSpan(10, 17)), (field.Name, field.NameSpan, field.Span));
+        Assert.Equal(new[] { ("f", true), ("g", true), ("m", false) },
+            declaration.Methods.Select(method => (method.Name, method.IsStatic)));
+    }
+
+    [Fact]
     public void AUsingStatementDeclaresItsResource()
     {
         var tree = Parse("using (var r = open()) { r.write(1); }");
@@ -222,6 +234,8 @@ public sealed class ParserTests
     [InlineData("using (r = 1) {}")]
     [InlineData("using (var r 1) {}")]
     [InlineData("using (var r = 1 {}")]
+    [InlineData("class A { static const x = 1; }")]
+    [InlineData("class A { static 5 }")]
     public void MalformedStatementsGiveOneDiagnosticEach(string source)
     {
         var diagnostic = Assert.Single(Parse(source).Diagnostics);

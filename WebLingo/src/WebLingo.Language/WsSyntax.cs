@@ -82,7 +82,14 @@ public sealed record WsMethodSyntax(
 {
     /// <summary>Whether its body calls <c>super(…)</c> anywhere, a function inside it included.</summary>
     public bool CallsSuper { get; init; }
+
+    /// <summary>Whether it is <c>static</c>: a method of the class itself, without <c>this</c> (section 3.7).</summary>
+    public bool IsStatic { get; init; }
 }
+
+/// <summary><c>static var name = value;</c>, a field of a class itself, set when the class is made (section 3.7).</summary>
+public sealed record WsStaticFieldSyntax(string Name, WsSourceSpan NameSpan, WsExpressionSyntax Value, WsSourceSpan Span)
+    : WsSyntaxNode(Span);
 
 /// <summary><c>class Name { members }</c>, in scope throughout its block, as a function is (section 3.7).</summary>
 public sealed record WsClassDeclarationSyntax(
@@ -91,6 +98,9 @@ public sealed record WsClassDeclarationSyntax(
 {
     /// <summary>The class it extends, <c>extends Base</c>, or null (section 3.7).</summary>
     public WsExpressionSyntax? Base { get; init; }
+
+    /// <summary>Its static fields, in their order; its static methods are among <see cref="Methods"/>.</summary>
+    public IReadOnlyList<WsStaticFieldSyntax> StaticFields { get; init; } = [];
 }
 
 /// <summary><c>return value;</c>, or <c>return;</c>, which gives <c>null</c>.</summary>

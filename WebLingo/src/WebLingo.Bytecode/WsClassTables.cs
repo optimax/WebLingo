@@ -5,10 +5,13 @@ internal static class WsClassTables
 {
     /// <summary>
     /// The first fault of the classes, or null: each has a name, its methods have names, none twice, and its
-    /// constructor and methods are functions that take <c>this</c> (<paramref name="isMethod"/>).
+    /// constructor and methods are functions that take <c>this</c>; its static fields and methods have names, none
+    /// twice among them, and its static methods are functions that do not. <paramref name="kind"/> tells what a
+    /// function is: 1 a method, 0 another function, -1 none.
     /// </summary>
-    public static string? Check(IReadOnlyList<WsClassInfo>? classes, Func<int, bool> isMethod)
+    public static string? Check(IReadOnlyList<WsClassInfo>? classes, Func<int, int> kind)
     {
+        bool isMethod(int function) => kind(function) == 1;
         if (classes is null) return "The module has no class table.";
         for (var i = 0; i < classes.Count; i++)
         {
@@ -27,12 +30,32 @@ internal static class WsClassTables
                 }
                 if (!isMethod(method.Function)) return $"Class {i} ('{info.Name}'): '{method.Name}', function {method.Function}, is not a method.";
             }
+            if (info.StaticMethods is null || info.StaticFields is null) return $"Class {i} ('{info.Name}') has no static members.";
+            var statics = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var field in info.StaticFields)
+            {
+                if (string.IsNullOrEmpty(field) || !statics.Add(field))
+                {
+                    return $"Class {i} ('{info.Name}'): a static field has no name, or one it shares.";
+                }
+            }
+            foreach (var method in info.StaticMethods)
+            {
+                if (string.IsNullOrEmpty(method.Name) || !statics.Add(method.Name))
+                {
+                    return $"Class {i} ('{info.Name}'): a static method has no name, or one it shares.";
+                }
+                if (kind(method.Function) != 0)
+                {
+                    return $"Class {i} ('{info.Name}'): static '{method.Name}', function {method.Function}, is not a function without 'this'.";
+                }
+            }
         }
         return null;
     }
 
     /// <summary>
-    /// The functions of a class: its constructor, if it has one, then its methods. A list, not an iterator, whose
+    /// The functions of a class: its constructor, if it has one, then its methods, then its static methods. A list, not an iterator, whose
     /// generated code would use <c>System.Environment</c>, which the portable core does not.
     /// </summary>
     public static List<int> Functions(WsClassInfo info)
@@ -40,6 +63,7 @@ internal static class WsClassTables
         var functions = new List<int>();
         if (info.Constructor != -1) functions.Add(info.Constructor);
         foreach (var method in info.Methods) functions.Add(method.Function);
+        foreach (var method in info.StaticMethods) functions.Add(method.Function);
         return functions;
     }
 }

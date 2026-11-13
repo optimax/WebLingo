@@ -11,7 +11,13 @@ internal static class WsClassTable
         {
             var methods = new List<WsClassMethod>();
             foreach (var (name, function) in declared.Methods) methods.Add(new WsClassMethod(name, function));
-            classes.Add(new WsClassInfo(declared.Name, declared.Constructor, methods));
+            var statics = new List<WsClassMethod>();
+            foreach (var (name, function) in declared.StaticMethods) statics.Add(new WsClassMethod(name, function));
+            classes.Add(new WsClassInfo(declared.Name, declared.Constructor, methods)
+            {
+                StaticMethods = statics,
+                StaticFields = declared.StaticFields
+            });
         }
         return classes;
     }

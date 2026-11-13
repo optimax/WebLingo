@@ -68,6 +68,17 @@ public sealed class WsLowerer
         }
         foreach (var statement in block)
         {
+            // A class's static fields, set in their order once the block's classes are made (section 3.7).
+            if (statement is not WsBoundClassDeclaration { Class.StaticFields.Count: > 0 } declaration) continue;
+            var local = declaration.Local;
+            foreach (var (name, value, span) in declaration.Class.StaticFields)
+            {
+                WsIrExpression target = local.IsCaptured ? new WsIrLoadCell(local.Index, span) : new WsIrLoadLocal(local.Index, span);
+                lowered.Add(new WsIrEvaluate(new WsIrStoreMember(target, name, LowerExpression(value), span), span));
+            }
+        }
+        foreach (var statement in block)
+        {
             if (statement is not (WsBoundFunctionDeclaration or WsBoundClassDeclaration)) lowered.Add(LowerStatement(statement));
         }
         return lowered;
@@ -83,7 +94,11 @@ public sealed class WsLowerer
         var constructor = declaration.Constructor is null ? -1 : LowerFunction(declaration.Constructor);
         var methods = new List<(string, int)>();
         foreach (var (name, function) in declaration.Methods) methods.Add((name, LowerFunction(function)));
-        _classes.Add(new WsIrClass(declaration.Name, constructor, methods));
+        var staticMethods = new List<(string, int)>();
+        foreach (var (name, function) in declaration.StaticMethods) staticMethods.Add((name, LowerFunction(function)));
+        var staticFields = new List<string>();
+        foreach (var (name, _, _) in declaration.StaticFields) staticFields.Add(name);
+        _classes.Add(new WsIrClass(declaration.Name, constructor, methods) { StaticMethods = staticMethods, StaticFields = staticFields });
         return _classes.Count - 1;
     }
 
