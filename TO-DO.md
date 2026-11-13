@@ -38,12 +38,6 @@ Arrays, maps and sets, with indexing, `length`, member access and `foreach` (spe
 
 2026-11-13: the syntax is approved but for sets and optional access (specification, section 3.6). M0.9 is split into the parts the specification defines in section 9 ("M0.9 parts"), each a task below, M0.9.1 to M0.9.6. Waits for them.
 
-## [WORKING] M0.9.4: `foreach`
-
-`foreach` over arrays, strings and maps (specification, sections 3.5 and 3.6), on both VMs, with their conformance tests, and a benchmark workload of collections (section 5.6). Added by Claude, 2026-11-13.
-
-Done (Claude, 2026-11-13): `foreach (var x in a)` over arrays (in order), strings (by Unicode scalar value) and, with `(key, value)`, maps, on both VMs. The loop sees changes to its collection, as section 3.6 says. Closures capture each iteration's variables, and `break`, `continue` and `return` work in it. One new operation per VM, `ForEachNext`, whose way out the verifiers check writes only the loop's position. A `collections` workload joins the benchmark; the register VM ran it in 3.7 to 4.5 ms, the stack VM in 4.7 to 5.2 ms (specification, section 5.6). Choices of mine, in section 15.2 as proposed: `foreach` is a keyword and `in` only inside its parentheses; recovery reads `const` as `var` and a wrong word as `in`; the loop's state lives in hidden locals. Every new conformance case gives the same result on both VMs. Build and 878 tests pass on Windows; Linux not tried.
-
 ## [IDLE] M0.9.5: Sets
 
 Sets, their members, `foreach` over them, and their text (specification, section 3.6), on both VMs. Added by Claude, 2026-11-13.
