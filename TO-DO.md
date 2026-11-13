@@ -74,12 +74,6 @@ Classes, with single inheritance and no exposed prototype chain (specification, 
 
 
 
-## [WORKING] M0.10.3: Disposal
-
-`dispose()` and `destructor()`, disposal once and chained from a derived class to its base, and `using` on its ways out but exceptions (specification, section 3.7, WS-L011), on both VMs. Added by Claude, 2026-11-13.
-
-Done (Claude, 2026-11-13): `dispose()`, or `destructor()` (both in one class is WS2011), run at most once per instance, a derived class's then its bases', by `x.dispose()`, by `x.dispose` called as a value, and by `using (var r = …) statement` at its end, `break`, `continue` and `return`, innermost first; `null` is not disposed. One new operation per VM, `Dispose`; each VM runs the chain of dispose methods in one frame, off its ordinary call and return paths, so `calls`, `closures` and `objects` take the same time as before, within their noise. An instance is 8 bytes larger in .NET's heap, for its disposed flag (`objects` allocates 44.0 MB, not 43.2). Choices of mine, in section 15.2 as proposed (row "Disposal"): disposal passes no arguments (`x.dispose(1)`, or a dispose method with parameters, is WS2006); a `using` of a value with no dispose method is WS3006 at its end, a field named `dispose` not counting; `x.destructor()` is WS3006; `super.dispose()` calls the base's method as any call does, so it runs once more than the disposal's own run of it, which you may prefer otherwise. Every new conformance case gives the same result on both VMs. Build and 1,066 tests pass on Windows; Linux not tried.
-
 ## [IDLE] M0.10.4: Static Members
 
 Static methods and fields (specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
