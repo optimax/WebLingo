@@ -6,13 +6,13 @@ The intended project domain is `weblingo.dev`.
 
 ## What runs
 
-M0.6 compiles and runs `.ws` scripts made of `var` and `const` declarations, integer literals, `+ - * /` (where `/` gives a binary64: `10 / 2` is `5.0`), parentheses, assignment, and the built-in `print`:
+M0.6 compiles and runs `.ws` scripts made of `var` and `const` declarations, integer literals, `+ - * /` (where `/` gives a binary64: `10 / 2` is `5.0`), parentheses, assignment, unary `+` and `-`, and the built-ins `write` (the value as text) and `writeLn` (the same, then a line break):
 
 ```javascript
 var a = 10;
 var b = 20;
 var result = a + b;
-print(result);   // 30
+writeLn(result);   // 30
 ```
 
 Every variable is initialized where it is declared, and a name means nothing before its declaration (both are compile-time errors); integer overflow is a runtime error. String literals, functions, control flow and `.wsp` templates come later, so `samples/HelloWorld` and `samples/SimpleWebsite` do not run yet; `samples/Arithmetic` does.

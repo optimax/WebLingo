@@ -31,6 +31,10 @@ public static class WsDiagnosticCodes
     public const string AssignmentToConstant = "WS2003";
     /// <summary>Read before initialization.</summary>
     public const string ReadBeforeInitialization = "WS2004";
+    /// <summary>A call of something that is not a function.</summary>
+    public const string NotAFunction = "WS2005";
+    /// <summary>A call with the wrong number of arguments.</summary>
+    public const string WrongArgumentCount = "WS2006";
 
     /// <summary>Invalid operation.</summary>
     public const string InvalidOperation = "WS3001";

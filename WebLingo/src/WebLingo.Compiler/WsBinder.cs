@@ -136,12 +136,12 @@ public sealed class WsBinder
         if (calleeSyntax is not WsNameSyntax callee)
         {
             BindExpression(calleeSyntax);
-            Report(WsDiagnosticCodes.InvalidOperation, "Only a built-in function can be called.", calleeSyntax.Span);
+            Report(WsDiagnosticCodes.NotAFunction, "Only a built-in function can be called.", calleeSyntax.Span);
             return new WsBoundError(call.Span);
         }
         if (LookupLocal(callee.Name) is not null)
         {
-            Report(WsDiagnosticCodes.InvalidOperation, $"'{callee.Name}' is a variable, not a function.", callee.Span);
+            Report(WsDiagnosticCodes.NotAFunction, $"'{callee.Name}' is a variable, not a function.", callee.Span);
             return new WsBoundError(call.Span);
         }
         if (!_hostBuiltins.TryGetValue(callee.Name, out var declaration))
@@ -152,7 +152,7 @@ public sealed class WsBinder
         if (arguments.Count != declaration.Arity)
         {
             var noun = declaration.Arity == 1 ? "argument" : "arguments";
-            Report(WsDiagnosticCodes.InvalidOperation,
+            Report(WsDiagnosticCodes.WrongArgumentCount,
                 $"'{callee.Name}' takes {declaration.Arity} {noun}, not {arguments.Count}.", call.Span);
             return new WsBoundError(call.Span);
         }

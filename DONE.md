@@ -177,3 +177,27 @@ Q3: The new diagnostic codes are WS1006 (`const` without a value), WS1007 (inval
 A3: Yes.
 
 Done (Claude, 2026-11-12): from the comment in the specification's "Operators" row, unary `+` is now accepted. It gives the number itself and is WS3001 on anything else, through a new `Plus` operation (parser, code generator, verifier, disassembler, VM, `WsOperators.TryPlus`), with tests. The code went into `06c82f1`, together with the lexical approval. The other syntax rows of section 15.2 had no comments, and stand as written. All of them, and WS1006 to WS1008, are marked Approved. The nesting limits were already the constants `WsParser.MaxRecursionDepth` and `MaxExpressionDepth`, and the specification now says so. Build and 300 tests pass on Windows; Linux not tried.
+
+## [DONE] Binding Choices (M0.6.4)
+
+Where the specification is silent, the M0.6.4 binder and lowering made choices of their own, recorded as Proposed in the specification's section 15.2 (rows "Compilation stages" to "Diagnostic codes").
+
+Q1: The temporal dead zone at run time: reading a variable before its declaration has run, or a `var x;` before it is assigned, is a runtime error (WS2004), as the specification's `var x; print(x);` example says; so is assigning a variable before its declaration has run (as JavaScript does). Neither is reported at compile time, though in M0.6's straight-line programs the compiler could prove both. Is that what you want, or should provable cases be compile-time errors (or warnings)?
+
+A1 (the user, in chat, 2026-11-12): No temporal dead zone. A name means its outer meaning until its declaration, which takes effect after its initializer; and every declaration needs an initializer, so `var x;` is a syntax error (WS1006).
+
+Done (Claude, 2026-11-12, not yet committed): the specification's sections 1.1, 3.1, 8.4, 8.6 and 15.2 say so, and the code follows. `print(x); var x = 1;` and `var x = x + 1;` (with no outer `x`) are compile-time errors (WS2001), the VM's dead-zone checks are gone, and the verifier now requires every register, locals included, to be written before it is read. WS2004 is no longer reported. 296 tests pass on Windows.
+
+Q2: The host's built-ins (`print`) are in a scope around the program's, so `var print = 1;` is allowed and hides the built-in. Should a declaration be allowed to shadow a built-in, or should that be an error?
+
+A2: I changed `print` to `write` and introduced `writeLn`. Otherwise, built-ins should not be privileged in any way, so yes, allow shadowing.
+
+Q3: Until functions are values, naming a built-in other than to call it is an error, and so is calling anything but a built-in, or with the wrong number of arguments: all WS3001, at compile time. Do they want codes of their own (say WS2005 "not a function", WS2006 "wrong number of arguments")?
+
+A3: Yes. However, make sure that functions can be values (add to TO-DO?)
+
+Q4: Evaluation is left to right, and an assignment evaluates its value before it stores it. Agreed?
+
+A4: Yes.
+
+Done (Claude, 2026-11-12): Q1 as recorded above. Q2: `print` is now `write`, with no line break, and `writeLn` writes a line break after the value (`WsWriteFunction`, `WsWriteLnFunction`). The output contract writes text as it comes (`IWsTextOutput.Write`). Samples, tests and documents use them. I guessed that `writeLn` takes one argument, like `write`. Built-ins stay unprivileged, and may be shadowed. Q3: calling what is not a function is WS2005, and calling with the wrong number of arguments is WS2006. Naming a built-in other than to call it stays WS3001 until functions are values, which is the new task "Functions as Values". Q4: approved. The "Checks" row is gone, per the comment on it. The specification's section 15.2 marks these rows Approved, and section 8.4 lists WS2005 and WS2006. `samples/Arithmetic` prints 30. `samples/HelloWorld` needs string literals, so it still does not compile. Build and 303 tests pass on Windows; Linux not tried.

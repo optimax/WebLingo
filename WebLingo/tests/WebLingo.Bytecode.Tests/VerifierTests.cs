@@ -16,7 +16,7 @@ public sealed class VerifierTests
     [Fact]
     public void AWellFormedModuleIsValid()
     {
-        // var a = 1; var b = a + 2; print(-b);
+        // var a = 1; var b = a + 2; writeLn(-b);
         Assert.Equal(Valid, Verify(Module(
             registers: 4, locals: 2,
             I(WsOpCode.LoadConstant, 0, 0),
@@ -172,7 +172,7 @@ public sealed class VerifierTests
         Assert.False(verifier.Verify(WsCompiledModule.Empty("m") with { EntryPoint = null! }).IsValid);
         Assert.False(verifier.Verify(WsCompiledModule.Empty("m") with { Constants = null! }).IsValid);
         Assert.False(verifier.Verify(WsCompiledModule.Empty("m") with { Imports = [null!] }).IsValid);
-        Assert.False(verifier.Verify(WsCompiledModule.Empty("m") with { Imports = [new WsImport("print", -1)] }).IsValid);
+        Assert.False(verifier.Verify(WsCompiledModule.Empty("m") with { Imports = [new WsImport("writeLn", -1)] }).IsValid);
     }
 
     [Fact]
@@ -194,7 +194,7 @@ public sealed class VerifierTests
                 code[i] = new WsInstruction(opCode, Operand(random), Operand(random), Operand(random), Operand(random));
             }
             if (length > 0 && random.Next(2) == 0) code[^1] = new WsInstruction(WsOpCode.Return); // Often near-valid.
-            var module = new WsCompiledModule("random", [WsConstant.Int64(1)], [new WsImport("print", 1)],
+            var module = new WsCompiledModule("random", [WsConstant.Int64(1)], [new WsImport("writeLn", 1)],
                 new WsFunction("main", registers, locals, code));
             if (verifier.Verify(module).IsValid) valid++;
         }
@@ -222,7 +222,7 @@ public sealed class VerifierTests
     private static WsInstruction I(WsOpCode opCode, int a = 0, int b = 0, int c = 0, int d = 0) => new(opCode, a, b, c, d);
 
     private static WsCompiledModule Module(int registers, int locals, params WsInstruction[] code) =>
-        new("test", [WsConstant.Int64(1), WsConstant.Int64(2)], [new WsImport("print", 1)],
+        new("test", [WsConstant.Int64(1), WsConstant.Int64(2)], [new WsImport("writeLn", 1)],
             new WsFunction("main", registers, locals, code));
 
     private static WsVerificationResult Verify(WsCompiledModule module) => new WsBytecodeVerifier().Verify(module);

@@ -7,7 +7,7 @@ namespace WebLingo.Cli;
 
 /// <summary>
 /// The <c>weblingo</c> command line (specification, section 8.4, "CLI"): <c>run</c>, <c>check</c> and
-/// <c>--version</c>. It is the host: it registers <c>print</c>, writing to standard output, compiles a file, and runs
+/// <c>--version</c>. It is the host: it registers <c>write</c> and <c>writeLn</c>, writing to standard output, compiles a file, and runs
 /// it in the VM. Diagnostics go to standard error as <c>file(line,column): error CODE: message</c>. Exit codes
 /// (proposed, section 15.2): 0 success, 1 compilation errors, 2 a usage error or a file that cannot be read, 3 a
 /// runtime error.
@@ -51,7 +51,7 @@ public static class WsCommandLine
         }
 
         var text = new WsSourceText(source, path);
-        var services = new WsBuiltinRegistry(new WsPrintFunction(new TextWriterOutput(output)));
+        var services = new WsBuiltinRegistry(WsStandardBuiltins.Create(new TextWriterOutput(output)));
         var declarations = new List<WsBuiltinDeclaration>();
         foreach (var builtin in services.Builtins) declarations.Add(new WsBuiltinDeclaration(builtin.Name, builtin.Arity));
 
@@ -81,13 +81,9 @@ public static class WsCommandLine
         return $"{source.Name}({location.Line},{location.Column}): {severity} {diagnostic.Code}: {diagnostic.Message}";
     }
 
-    /// <summary>Script output to a text writer, each line ended by LF on every platform.</summary>
+    /// <summary>Script output to a text writer as it is written, line breaks LF on every platform.</summary>
     private sealed class TextWriterOutput(TextWriter writer) : IWsTextOutput
     {
-        public void WriteLine(string text)
-        {
-            writer.Write(text);
-            writer.Write('\n');
-        }
+        public void Write(string text) => writer.Write(text);
     }
 }

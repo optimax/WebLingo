@@ -8,10 +8,10 @@ public sealed class LowererTests
     [Fact]
     public void LowersTheSpecificationsExample()
     {
-        var program = Lower("var a = 10;\nvar b = 20;\nvar result = a + b;\nprint(result);");
+        var program = Lower("var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);");
         Assert.Equal(
             new[] {
-                "init 0 = 10", "init 1 = 20", "init 2 = (load 0 + load 1)", "eval print#0(load 2)"
+                "init 0 = 10", "init 1 = 20", "init 2 = (load 0 + load 1)", "eval writeLn#0(load 2)"
             },
             program.Statements.Select(Show));
         Assert.Equal(new[] { "a", "b", "result" }, program.LocalNames);
@@ -21,8 +21,8 @@ public sealed class LowererTests
     public void AnAssignmentStoresAndYieldsItsValue()
     {
         Assert.Equal(
-            new[] { "init 0 = 1", "eval (store 0 = 5)", "eval print#0(load 0)" },
-            Lower("var x = 1; x = 5; print(x);").Statements.Select(Show));
+            new[] { "init 0 = 1", "eval (store 0 = 5)", "eval writeLn#0(load 0)" },
+            Lower("var x = 1; x = 5; writeLn(x);").Statements.Select(Show));
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public sealed class LowererTests
         WsIrStoreLocal store => $"(store {store.Local} = {Show(store.Value)})",
         WsIrUnary unary => $"{(unary.Operator == WsUnaryOperator.Negate ? "-" : "+")}{Show(unary.Operand)}",
         WsIrBinary binary => $"({Show(binary.Left)} {Symbol(binary.Operator)} {Show(binary.Right)})",
-        WsIrCallBuiltin call => $"print#{call.Builtin}({string.Join(", ", call.Arguments.Select(Show))})",
+        WsIrCallBuiltin call => $"writeLn#{call.Builtin}({string.Join(", ", call.Arguments.Select(Show))})",
         _ => "?"
     };
 

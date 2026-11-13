@@ -8,8 +8,8 @@
 | System.Collections.Generic (`List<T>`, `Dictionary<TKey, TValue>`, `Stack<T>`) | Planned | Compiler, verifier, VM (M0.6) |
 | System.Linq | Not used | Kept out of the portable core's source (tests use it) |
 | `BitConverter.DoubleToInt64Bits` / `Int64BitsToDouble` | Portable target | binary64 values and constants are kept as their IEEE 754 bits |
-| Invariant number formatting (`long.ToString`, `double.ToString("R")` with `CultureInfo.InvariantCulture`) | Planned | The text `print` writes for a number (`WsValueFormatter`). The Native C# runtime must give the same text: the shortest decimal that reads back as the same binary64 |
-| `System.Text.StringBuilder` | Planned | The disassembler only |
+| Invariant number formatting (`long.ToString`, `double.ToString("R")` with `CultureInfo.InvariantCulture`) | Planned | The text `write` writes for a number (`WsValueFormatter`). The Native C# runtime must give the same text: the shortest decimal that reads back as the same binary64 |
+| `System.Text.StringBuilder` | Planned | The disassembler, and `WsCollectedOutput` (`WebLingo.StdLib`), which collects a script's output for tests and hosts |
 | `volatile` fields | Planned | `WsCancellationSignal`, set by the host, read by the VM |
 | .NET Task / ValueTask | Adapted only | Not permitted as WebLingo core async contract |
 | .NET `CancellationToken` | Not used | The VM's cancellation is WebLingo's own `WsCancellationSignal` (WS-P007) |

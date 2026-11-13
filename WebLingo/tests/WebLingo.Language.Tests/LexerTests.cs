@@ -45,7 +45,7 @@ public sealed class LexerTests
                 WsTokenKind.Identifier, WsTokenKind.OpenParen, WsTokenKind.Identifier, WsTokenKind.Plus,
                 WsTokenKind.IntegerLiteral, WsTokenKind.CloseParen, WsTokenKind.Semicolon, WsTokenKind.EndOfFile
             },
-            Kinds("print(a+10);", out _));
+            Kinds("writeLn(a+10);", out _));
     }
 
     [Fact]

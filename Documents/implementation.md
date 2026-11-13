@@ -75,7 +75,7 @@ WebLingo.202611121500.zip
 - **The portable core:** `WebLingo.Core`, `WebLingo.Language`, `WebLingo.Bytecode`, `WebLingo.Compiler`, `WebLingo.Runtime`, `WebLingo.VM`, `WebLingo.Templates`, `WebLingo.StdLib`, `WebLingo.Platform.Abstractions`, and `WebLingo.Hosting.Abstractions`.
 - **The adapters to .NET:** `WebLingo.Platform.DotNet` (the .NET implementation of the platform abstraction layer, the PAL) and `WebLingo.Hosting.AspNetCore` (the host for IIS).
 - **The command line:** `WebLingo.Cli`, which builds `weblingo`.
-- **The tests:** `WebLingo.Language.Tests` (lexer, parser, source text), `WebLingo.Compiler.Tests` (binder, lowering, code generation), `WebLingo.Bytecode.Tests` (the verifier, with a fuzz test), `WebLingo.Runtime.Tests` (values, arithmetic, formatting, `print`), `WebLingo.VM.Tests` (execution, runtime errors, budgets), `WebLingo.Conformance.Tests` (the specification's section 8.6, end to end through the CLI, and fuzz tests of malformed source and bytecode), and `WebLingo.Architecture.Tests` (contracts, and the dependency rules checked on the built assemblies).
+- **The tests:** `WebLingo.Language.Tests` (lexer, parser, source text), `WebLingo.Compiler.Tests` (binder, lowering, code generation), `WebLingo.Bytecode.Tests` (the verifier, with a fuzz test), `WebLingo.Runtime.Tests` (values, arithmetic, formatting, `write` and `writeLn`), `WebLingo.VM.Tests` (execution, runtime errors, budgets), `WebLingo.Conformance.Tests` (the specification's section 8.6, end to end through the CLI, and fuzz tests of malformed source and bytecode), and `WebLingo.Architecture.Tests` (contracts, and the dependency rules checked on the built assemblies).
 
 ## The Pipeline
 
@@ -83,7 +83,7 @@ The compiler's stages are separate classes (specification, section 8.8): `WsLexe
 
 The verifier must reject a malformed module, never throw or run out of memory on one: its dataflow check keeps state only at block starts, as bit sets, within fixed bounds (`MaxStateWords`, `MaxSteps`). Keep it so when operations are added, and add each one to the fuzz test's range.
 
-At run time, `WsVirtualMachine` (`WebLingo.VM`) verifies a module, links its imports to the host's built-ins, and runs it in a `WsExecutionContext` (`WebLingo.Runtime`: owner worker, cancellation signal, instruction and resource budgets, runtime services). The semantics of values live in `WebLingo.Runtime`, not in the VM, so that another VM shares them: `WsValue`, `WsOperators` (the arithmetic), and `WsValueFormatter` (a value as text). `print` is `WsPrintFunction` in `WebLingo.StdLib`; the CLI, `WsCommandLine`, is the host that registers it and runs `run` and `check`.
+At run time, `WsVirtualMachine` (`WebLingo.VM`) verifies a module, links its imports to the host's built-ins, and runs it in a `WsExecutionContext` (`WebLingo.Runtime`: owner worker, cancellation signal, instruction and resource budgets, runtime services). The semantics of values live in `WebLingo.Runtime`, not in the VM, so that another VM shares them: `WsValue`, `WsOperators` (the arithmetic), and `WsValueFormatter` (a value as text). `write` and `writeLn` are `WsWriteFunction` and `WsWriteLnFunction` in `WebLingo.StdLib` (`WsStandardBuiltins` gives both); the CLI, `WsCommandLine`, is the host that registers them and runs `run` and `check`.
 
 ## Dependency Direction
 

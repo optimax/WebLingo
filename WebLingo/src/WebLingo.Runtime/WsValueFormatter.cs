@@ -2,7 +2,7 @@ using System.Globalization;
 namespace WebLingo.Runtime;
 
 /// <summary>
-/// How a value is shown as text (what <c>print</c> writes; proposed, section 15.2): <c>null</c>, <c>true</c>,
+/// How a value is shown as text (what <c>write</c> writes; proposed, section 15.2): <c>null</c>, <c>true</c>,
 /// <c>false</c>, an int64 in decimal digits, and a binary64 as the shortest decimal that reads back as the same
 /// number, always with a decimal point or an exponent so that it is not mistaken for an integer (<c>5.0</c>,
 /// <c>3.5</c>, <c>1E+21</c>), or <c>NaN</c>, <c>Infinity</c>, <c>-Infinity</c>. It never depends on the culture.

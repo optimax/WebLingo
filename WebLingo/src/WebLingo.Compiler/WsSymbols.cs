@@ -2,7 +2,7 @@ using WebLingo.Core;
 using WebLingo.Language;
 namespace WebLingo.Compiler;
 
-/// <summary>A built-in function the host offers to scripts (<c>print</c>, registered by the CLI), by name and arity.</summary>
+/// <summary>A built-in function the host offers to scripts (<c>write</c>, registered by the CLI), by name and arity.</summary>
 public sealed record WsBuiltinDeclaration(string Name, int Arity);
 
 /// <summary>What the compiler needs from its host: the built-in functions scripts may call.</summary>

@@ -35,7 +35,7 @@ public sealed class ConformanceTests : IDisposable
     [Theory]
     [InlineData("const x;", "WS1006", 1, 7)]
     [InlineData("var x;", "WS1006", 1, 5)]
-    [InlineData("print(x); var x = 1;", "WS2001", 1, 7)]
+    [InlineData("writeLn(x); var x = 1;", "WS2001", 1, 9)]
     [InlineData("var x = 10", "WS1002", 1, 11)]
     [InlineData("var x = 1; var x = 2;", "WS2002", 1, 16)]
     [InlineData("x = 10;", "WS2001", 1, 1)]
@@ -51,8 +51,8 @@ public sealed class ConformanceTests : IDisposable
     }
 
     [Theory]
-    [InlineData("var x = 10 + 20; print(x);", "30")]
-    [InlineData("var x = 10 / 2; print(x);", "5.0")]
+    [InlineData("var x = 10 + 20; writeLn(x);", "30")]
+    [InlineData("var x = 10 / 2; writeLn(x);", "5.0")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed + "\n", ""), Weblingo("run", source));
@@ -72,7 +72,7 @@ public sealed class ConformanceTests : IDisposable
     public void TheSpecificationsExamplePrints30()
     {
         Assert.Equal((WsCommandLine.Success, "30\n", ""),
-            Weblingo("run", "var a = 10;\nvar b = 20;\nvar result = a + b;\nprint(result);\n"));
+            Weblingo("run", "var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);\n"));
     }
 
     [Fact]
@@ -91,10 +91,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("\r")]
     public void EveryLineEndingGivesTheSameResultAndPositions(string newline)
     {
-        var good = string.Join(newline, "var a = 2;", "var b = a * 3;", "print(b);");
+        var good = string.Join(newline, "var a = 2;", "var b = a * 3;", "writeLn(b);");
         Assert.Equal((WsCommandLine.Success, "6\n", ""), Weblingo("run", good));
-        var bad = string.Join(newline, "var x = 1;", "print(y);");
-        Assert.Equal("program.ws(2,7): error WS2001:", FirstLineStart(Weblingo("run", bad).Error));
+        var bad = string.Join(newline, "var x = 1;", "writeLn(y);");
+        Assert.Equal("program.ws(2,9): error WS2001:", FirstLineStart(Weblingo("run", bad).Error));
     }
 
     [Fact]
@@ -102,11 +102,11 @@ public sealed class ConformanceTests : IDisposable
     {
         string[] fragments =
         [
-            "var", "const", "let", "x", "y", "print", "=", "+", "-", "*", "/", "(", ")", ";", ",", "10", "0",
+            "var", "const", "let", "x", "y", "writeLn", "=", "+", "-", "*", "/", "(", ")", ";", ",", "10", "0",
             "9223372036854775807", "9223372036854775808", "1x", "@", "\"", ".", "/*", "*/", "//", "\n", "\r\n", " ", "é",
         ];
         var random = new Random(8_6);
-        var compiler = new WsCompiler(new WsCompilerOptions([new WsBuiltinDeclaration("print", 1)]));
+        var compiler = new WsCompiler(new WsCompilerOptions([new WsBuiltinDeclaration("writeLn", 1)]));
         var vm = new WsVirtualMachine();
         var compiled = 0;
         for (var round = 0; round < 5_000; round++)
@@ -122,7 +122,7 @@ public sealed class ConformanceTests : IDisposable
             compiled++;
             var context = new WsExecutionContext(new WsWorkerId(0))
             {
-                Services = new WsBuiltinRegistry(new WsPrintFunction(new WsCollectedOutput())),
+                Services = new WsBuiltinRegistry(WsStandardBuiltins.Create(new WsCollectedOutput())),
                 InstructionBudget = 10_000,
             };
             var run = vm.Execute(result.Module, context);
@@ -134,8 +134,8 @@ public sealed class ConformanceTests : IDisposable
     [Fact]
     public void MalformedBytecodeFailsVerificationNotACrash()
     {
-        var module = new WsCompiler(new WsCompilerOptions([new WsBuiltinDeclaration("print", 1)]))
-            .Compile("var a = 10; var b = a * 2 - 3; var c = 0; c = -b / a; print(c);", "base.ws").Module!;
+        var module = new WsCompiler(new WsCompilerOptions([new WsBuiltinDeclaration("writeLn", 1)]))
+            .Compile("var a = 10; var b = a * 2 - 3; var c = 0; c = -b / a; writeLn(c);", "base.ws").Module!;
         var random = new Random(8_6);
         var opCodes = Enum.GetValues<WsOpCode>();
         var vm = new WsVirtualMachine();
@@ -157,7 +157,7 @@ public sealed class ConformanceTests : IDisposable
             var mutated = module with { EntryPoint = module.EntryPoint with { Code = code } };
             var context = new WsExecutionContext(new WsWorkerId(0))
             {
-                Services = new WsBuiltinRegistry(new WsPrintFunction(new WsCollectedOutput())),
+                Services = new WsBuiltinRegistry(WsStandardBuiltins.Create(new WsCollectedOutput())),
                 InstructionBudget = 10_000,
             };
             var result = vm.Execute(mutated, context);

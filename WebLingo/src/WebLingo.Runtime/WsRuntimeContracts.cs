@@ -37,7 +37,7 @@ public sealed class WsCancellationSignal
     public void Cancel() => _requested = true;
 }
 
-/// <summary>A host built-in function, such as <c>print</c>.</summary>
+/// <summary>A host built-in function, such as <c>write</c>.</summary>
 public interface IWsBuiltinFunction
 {
     string Name { get; }
@@ -81,8 +81,8 @@ public sealed class WsBuiltinRegistry : IWsRuntimeServices
         _byName.TryGetValue(name, out builtin);
 }
 
-/// <summary>Where a host sends a script's text output, one line at a time.</summary>
+/// <summary>Where a host sends a script's text output, as it is written; a line break in it is LF.</summary>
 public interface IWsTextOutput
 {
-    void WriteLine(string text);
+    void Write(string text);
 }

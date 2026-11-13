@@ -172,25 +172,40 @@ public sealed class OperatorTests
     private static WsValue Int(long value) => WsValue.FromInt64(value);
 }
 
-public sealed class PrintTests
+public sealed class WriteTests
 {
     [Fact]
-    public void PrintWritesTheValueAsALineAndGivesNull()
+    public void WriteWritesTheValueAsTextWithNoLineBreakAndGivesNull()
     {
         var output = new WsCollectedOutput();
-        var print = new WsPrintFunction(output);
-        Assert.Equal(("print", 1), (print.Name, print.Arity));
-        Assert.True(print.TryInvoke([WsValue.FromBinary64(5.0)], out var result, out _));
+        var write = new WsWriteFunction(output);
+        Assert.Equal(("write", 1), (write.Name, write.Arity));
+        Assert.True(write.TryInvoke([WsValue.FromBinary64(5.0)], out var result, out _));
+        Assert.True(write.TryInvoke([WsValue.FromInt64(6)], out _, out _));
         Assert.Equal(WsValue.Null, result);
-        Assert.Equal(new[] { "5.0" }, output.Lines);
+        Assert.Equal("5.06", output.Text);
+    }
+
+    [Fact]
+    public void WriteLnEndsTheValueWithALineFeed()
+    {
+        var output = new WsCollectedOutput();
+        var writeLn = new WsWriteLnFunction(output);
+        Assert.Equal(("writeLn", 1), (writeLn.Name, writeLn.Arity));
+        Assert.True(writeLn.TryInvoke([WsValue.FromInt64(1)], out var result, out _));
+        Assert.True(writeLn.TryInvoke([WsValue.Null], out _, out _));
+        Assert.Equal(WsValue.Null, result);
+        Assert.Equal("1\nnull\n", output.Text);
+        Assert.Equal(new[] { "1", "null" }, output.Lines);
     }
 
     [Fact]
     public void ARegistryRefusesTwoBuiltinsOfOneName()
     {
-        var registry = new WsBuiltinRegistry(new WsPrintFunction(new WsCollectedOutput()));
-        Assert.Throws<ArgumentException>(() => registry.Register(new WsPrintFunction(new WsCollectedOutput())));
-        Assert.True(registry.TryGetBuiltin("print", out _));
-        Assert.False(registry.TryGetBuiltin("Print", out _));
+        var registry = new WsBuiltinRegistry(WsStandardBuiltins.Create(new WsCollectedOutput()));
+        Assert.Throws<ArgumentException>(() => registry.Register(new WsWriteFunction(new WsCollectedOutput())));
+        Assert.True(registry.TryGetBuiltin("write", out _));
+        Assert.True(registry.TryGetBuiltin("writeLn", out _));
+        Assert.False(registry.TryGetBuiltin("Write", out _));
     }
 }

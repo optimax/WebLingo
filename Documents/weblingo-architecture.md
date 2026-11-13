@@ -53,7 +53,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WS-S001–S016 | M0.6 solution scaffolding and initial implementation contracts | Approved |
 | M0.6 implementation default | Register VM first; stack comparison later | Adopted M0.6 default; VM architecture still provisional |
 | M0.6 testing default | xUnit on .NET 10 | Adopted M0.6 default |
-| M0.6 implementation choices | Lexical, syntax, runtime and CLI choices made where this specification is silent, while implementing M0.6.2 onward (§15.2) | Each row of §15.2 has its own status; the lexical and syntax ones (§15.2, "Line terminators" to "Nesting limits") approved 12 November 2026 |
+| M0.6 implementation choices | Lexical, syntax, runtime and CLI choices made where this specification is silent, while implementing M0.6.2 onward (§15.2) | Each row of §15.2 has its own status; the lexical and syntax ones, and the binding ones but "Compilation stages", approved 12 November 2026 |
 | Repository documents | One copy of this specification, `Documents/weblingo-architecture.md`; documents in the repository's root `Documents/` folder; a shallow folder structure, with no `docs/architecture/` folder; the whole repository may become public (§8.2) | Approved (12 November 2026) |
 
 **Approval boundary:** M0.6 was approved as a specification. This does not imply the repository or implementation already exists. Detailed M0.3 encoding choices were recommended but not separately approved; the architectural decision between stack and register VMs remains open.
@@ -663,6 +663,8 @@ Codes added while implementing M0.6 (§15.2):
 | WS1006 | Declaration without an initializer | Approved (12 November 2026) |
 | WS1007 | Invalid assignment target | Approved (12 November 2026) |
 | WS1008 | Source nested too deeply | Approved (12 November 2026) |
+| WS2005 | Not a function (a call of something that cannot be called) | Approved (12 November 2026) |
+| WS2006 | Wrong number of arguments in a call | Approved (12 November 2026) |
 | WS3002 | Integer overflow (a result outside int64) | Proposed |
 | WS3003 | Execution budget exceeded (instructions or registers) | Proposed |
 | WS3004 | Execution cancelled by the host | Proposed |
@@ -690,10 +692,10 @@ Example:
 var a = 10;
 var b = 20;
 var result = a + b;
-print(result);
+writeLn(result);
 ```
 
-Expected output: `30`. `print` may initially be a CLI-host registered built-in.
+Expected output: `30`. `write` and `writeLn` are built-ins the CLI host registers (§15.2).
 
 ### 8.5 Build conventions (WS-S013–WS-S014)
 
@@ -731,7 +733,7 @@ Proposed central props:
 | `var x = 1; var x = 2;` | Duplicate declaration error |
 | `x = 10;` | Undefined identifier error |
 | `var x;` | Compile error |
-| `print(x); var x = 1;` | Undefined identifier error |
+| `writeLn(x); var x = 1;` | Undefined identifier error |
 | `var x = 10 + 20;` | Result 30 |
 | `var x = 10 / 2;` | Result 5.0 |
 | Signed int64 overflow | Runtime error |
@@ -747,7 +749,7 @@ Proposed central props:
 3. **M0.6.3:** parser, AST and diagnostics.
 4. **M0.6.4:** binder and lowered IR.
 5. **M0.6.5:** minimal bytecode generator and verifier.
-6. **M0.6.6:** minimal register VM, arithmetic, locals and `print`.
+6. **M0.6.6:** minimal register VM, arithmetic, locals and a built-in that writes output (`write`, `writeLn`).
 7. **M0.6.7:** end-to-end conformance on Windows/Linux.
 
 ### 8.8 M0.6 acceptance criteria
@@ -1011,7 +1013,7 @@ This section records the state of the M0.6 increments after M0.6.1 (§8.7), and 
 | M0.6.3 parser, AST and diagnostics | Implemented (12 November 2026); built and tested on Windows and Linux |
 | M0.6.4 binder and lowered IR | Implemented (12 November 2026); built and tested on Windows and Linux |
 | M0.6.5 minimal bytecode generator and verifier | Implemented (12 November 2026); built and tested on Windows and Linux |
-| M0.6.6 minimal register VM, arithmetic, locals and `print` | Implemented (12 November 2026): `weblingo run` runs §8.4's example and prints `30`; built and tested on Windows and Linux |
+| M0.6.6 minimal register VM, arithmetic, locals and `write` | Implemented (12 November 2026): `weblingo run` runs §8.4's example and prints `30`; built and tested on Windows and Linux |
 | M0.6.7 end-to-end conformance on Windows and Linux | Implemented (12 November 2026): every program of §8.6 runs through the CLI with its expected output, diagnostic and exit code; passes on Windows and Linux (CI run 1, 12 November 2026, commit `5229806`) |
 
 M0.6's acceptance criteria (§8.8), as of 12 November 2026:
@@ -1050,11 +1052,10 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Error recovery | After an error, parsing resumes at the next `;` or declaration keyword; a token the lexer reported is not reported again, and a statement gets at most one diagnostic for what follows its first error | Approved (12 November 2026) |
 | Nesting limits | Parsing recurses at most 256 levels (parentheses, unary operators, assignments, arguments), and an expression is at most 1000 operations deep, so that a recursive compiler stage cannot overflow its stack; deeper source is an error (WS1008). Both limits are arbitrary, and are constants that are easy to change (`WsParser.MaxRecursionDepth`, `WsParser.MaxExpressionDepth`) | Approved (12 November 2026) |
 | Compilation stages | Binding runs only on a source without syntax errors, and lowering only on one that binds without errors: a source reports the errors of its first failing stage | Proposed |
-| Host built-ins | The host declares its built-ins (name and arity) to the compiler; they live in a scope around the program's, so a declaration may shadow one (`var print = 1;`) | Proposed |
-| Functions as values | Not yet: a built-in can only be called; naming it otherwise is an error (WS3001), and so is calling anything but a built-in (WS3001), or calling one with the wrong number of arguments (WS3001). But make sure this is supported later. | Proposed |
+| Host built-ins | The host declares its built-ins (name and arity) to the compiler; they live in a scope around the program's and are not privileged in any way, so a declaration may shadow one (`var write = 1;`) | Approved (12 November 2026) |
+| Functions as values | Not yet, but they will be: until then a built-in can only be called, and naming it otherwise is an error (WS3001); calling anything but a built-in is WS2005, and calling one with the wrong number of arguments is WS2006, both at compile time | Approved (12 November 2026); functions as values are still to come |
 | Use before declaration | A name used before its declaration, or in its own initializer, means the outer declaration, or is undefined (WS2001, at compile time) if there is none (§3.1) | Approved |
-| Checks | The compiler keeps a runtime check only where a variable may not have a value yet; in M0.6's straight-line programs that is exactly where the check fails. A variable cannot NOT have a value though. | Proposed |
-| Evaluation order | Left to right: operands, then arguments; an assignment evaluates its value before it stores it | Proposed |
+| Evaluation order | Left to right: operands, then arguments; an assignment evaluates its value before it stores it | Approved (12 November 2026) |
 | Instruction model | An in-memory register instruction model, not WBC (§5.3, §8.4): an operation and up to four integer operands A to D, unused ones 0 (`WsBytecodeContracts.cs`); a module holds its constants (int64 and binary64, kept as IEEE bits), the built-ins it imports by name and arity, and one function, with a source span per instruction and the names of its locals for runtime messages | Proposed |
 | Registers | A function's locals take registers 0 to n − 1 and its temporaries the registers above; at most 65535 registers (§5.3), more is a compile-time error (WS4002) | Proposed |
 | Operations | `LoadConstant`, `Move`, `Negate`, `Plus`, `Add`, `Subtract`, `Multiply`, `Divide`, `CallBuiltin` (arguments in consecutive registers, §5.4), `Jump`, `Return`; the compiler emits no `Jump` yet | Proposed |
@@ -1064,11 +1065,11 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Mixed arithmetic | An int64 meeting a binary64 is converted to binary64 (`1 + 0.5`, and `10 / 4 + 1` is 3.5) | Proposed |
 | Binary64 results | IEEE 754 throughout: `1 / 0` is `Infinity`, `-1 / 0` is `-Infinity`, `0 / 0` is `NaN`; only integer arithmetic raises an error (WS3002) | Proposed |
 | Invalid operands | Arithmetic on anything but numbers is WS3001. String concatenation with + is allowed though. | Proposed |
-| `write` | One argument; writes the value as text ~~and a line break~~, and gives `null`; registered by the host (the CLI), implemented once in `WebLingo.StdLib`. No line break. `writeLn`, or `write('\n')` outputs line break. | Proposed |
+| `write` | `write(value)` writes the value as text, with no line break; `writeLn(value)` writes it and a line break (LF); each takes one argument and gives `null`; the host (the CLI) registers them, and they are implemented once in `WebLingo.StdLib`. A line break can also be written as text, once string literals exist | Approved (12 November 2026) |
 | Text of a value | `null`, `true`, `false`; an int64 in decimal digits; a binary64 as the shortest decimal that reads back as the same number, always with a decimal point or an exponent (`5.0`, `3.5`, `0.1`, `-0.0`, `1E+21`), or `NaN`, `Infinity`, `-Infinity`; never culture-dependent (`WsValueFormatter`) | Proposed |
 | Linking | The VM verifies a module, then links its imports to the host's built-ins by name and arity; a missing one stops the module before it runs (WS2001) | Proposed |
 | Runtime errors | The first runtime error stops the execution, and is reported with the source span of the instruction that raised it; output printed before it stays | Proposed |
 | Budgets and cancellation | An execution has an instruction budget (exceeded: WS3003) and a register budget (a module needing more is not run: WS3003); the VM looks at the host's cancellation signal every 1024 instructions (WS3004); a WebLingo-owned signal, not .NET's `CancellationToken` (WS-P007) | Proposed |
 | Built-in failures | A built-in that fails, even by throwing, is a runtime error (WS3001) | Proposed |
 | CLI | `weblingo run <file>` compiles and runs; `weblingo check <file>` compiles and reports, without running; `weblingo --version` prints `WebLingo M0.6 (pre-alpha)`. Diagnostics go to standard error as `file(line,column): error CODE: message`. Exit codes: 0 success, 1 compilation errors, 2 a usage error or an unreadable file, 3 a runtime error (M0.6.1's 3, "not implemented", is gone). `write`'s lines end in LF on every platform | Proposed |
-| Diagnostic codes | WS1003 to WS1008, WS3002 to WS3004, and WS4002 (§8.4); WS3001 is used at compile time too, for invalid calls; WS2004 is not reported, since no variable can be read before it has a value (§3.1) | Proposed |
+| Diagnostic codes | WS1003 to WS1008, WS3002 to WS3004, and WS4002 (§8.4); WS2005 and WS2006 for invalid calls, and WS3001 at compile time too, for a built-in named other than to call it; WS2004 is not reported, since no variable can be read before it has a value (§3.1) | Proposed |
