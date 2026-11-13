@@ -31,6 +31,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WS-002.3 | `var` mutable, `const` immutable; both block-scoped, in scope from their declaration to the end of the block; no `let` declaration keyword | Approved |
 | Statements, operators and literals | The syntax M0.7 implements (§3.5): blocks, `true`, `false` and `null`, comparisons and logic, `if`, loops, `foreach`, strings, and functions, hoisted in their block; a hoisted function reading a variable before its declaration has run is a runtime error (WS2004) | Approved (12 November 2026; the hoisted function's read, 13 November 2026) |
 | Collections | Arrays, maps and sets, with indexing, members, `length`, `foreach`, identity, text, set literals and optional access (§3.6) | Approved (13 November 2026) |
+| Classes and disposal | Classes, instances, fields, `this`, methods, inheritance, `x?.name`, text, `dispose()` and `destructor()`, disposal once and chained, and `using` (§3.7); static members, `Object` and exceptions still open | Approved (13 November 2026) |
 | M0.1 | Mandatory semicolons; no automatic semicolon insertion | Approved |
 | M0.1 | Numeric categories int64, IEEE binary64, decimal128 | Approved |
 | M0.1 | String indexing and `length` count Unicode scalar values | Approved |
@@ -231,6 +232,27 @@ The syntax and meaning of arrays, maps and sets, which M0.9 implements (§9), ap
 - **Optional access.** `x?[k]` reads as `x[k]` does, but gives `null` where `x[k]` would raise a missing key (WS3007) or an index out of range (WS3005), whether `x` is a map, an array or a string, and gives `null` too when `x` is `null`, so that `rows?[0]?["name"]` stops at the first `null`. A key or an index of the wrong kind (`m?[1.5]`, `a?["x"]`), and a value that cannot be indexed (`5?[0]`), stay WS3001: `?[` allows for an absent entry, not for a wrong program. It is written as C# writes it; a conditional operator, `c ? a : b`, if WebLingo gets one, is told apart from it by the parser. `x?.name`, its form for members, comes later.
 - **Equality.** Arrays, maps and sets are equal only to themselves, as functions are (§3.2), so `[1] == [1]` is false.
 - **Text.** `write` writes an array as `[1, "a", null]` and a map as `{"active": true}`: their strings quoted, with their escapes, their collections written the same way, and one it is already writing as `[…]` or `{…}`. A set is written as its literal, `#{1, "a"}`.
+
+### 3.7 Classes and disposal — approved 13 November 2026
+
+The syntax and meaning of classes, the disposal protocol and `using` (§3.2, §3.4, WS-L011), which M0.10 implements (§9), approved by the owner on 13 November 2026, but for the points that say they are still open.
+
+- **Declaring a class.** `class Name { constructor(a) { … } method(b) { … } }`: a method is written as a name, parameters and a body, with or without `function` before the name (`function method(b) { … }`). A class is in scope throughout its block, as a function is, and its name is a constant.
+- **Instances.** `new Name(a, b)` makes one and runs its `constructor` with those arguments; a class without a `constructor` takes none. Calling a class without `new`, or `new` on anything but a class, is WS2005.
+- **Fields.** A field exists once a method assigns it (`this.file = …`), as §3.4's example does; reading one that was never assigned is WS3006.
+- **`this`.** A keyword, the instance a method or the constructor runs on; a function expression inside a method sees the method's `this`, as a closure sees a variable. `this` anywhere else is a compile-time error, WS2009.
+- **Methods as values.** `obj.method` without a call gives a function bound to `obj`: `var f = obj.method; f();` calls it on `obj`.
+- **Inheritance.** `class B extends A { … }`; a method of B with the name of one of A's replaces it; `super(…)` in B's constructor runs A's, and `super.name(…)` calls A's method. A class extends at most one other (§3.2). A constructor that does not call `super(…)` runs the base's constructor first, with no arguments, as C# does.
+- **Visibility.** Every field and method is public. Static members are wanted; their syntax and meaning are still open.
+- **`x?.name`** gives `null` when `x` is `null`, and when it has no member `name`, as `x?[k]` does for a missing key (§3.6).
+- **Equality.** An instance is equal only to itself (§3.2), so two instances with equal fields are not equal. A base class, `Object`, is to give every class an `equal()` method that it may override; its details are still open.
+- **Text.** `write` writes an instance as its class's name and its fields, `Point {x: 1, y: 2}`, in no defined order, one it is already writing as `Point {…}`.
+- **`destructor()`.** A class may declare `dispose()` or `destructor()`, which are the same method (§3.4); both in one class is a compile-time error, WS2011. Callers always call `dispose()`.
+- **Disposing once.** The runtime runs an object's disposal at most once; a second `dispose()` does nothing and gives `null` (§3.4).
+- **Derived classes.** Disposing an instance of B runs B's disposal, then A's, each once, without `super.dispose()` (§3.4).
+- **`using`.** `using (var x = expr) statement` declares `x`, in scope in the statement only, and calls `x.dispose()` when the statement ends, by its end, `break`, `continue` or `return`; a `null` value is not disposed, and a value without `dispose` is WS3006 at the end. One resource per `using`; nest them for more.
+- **Exceptions.** The owner asked for exceptions to be designed now, with M0.10: what `using` does when an exception leaves it waits for that design, which is still open.
+- **Use after disposal.** For a class written in WebLingo, nothing is checked: the class checks its own state if it needs to.
 
 ---
 
@@ -747,6 +769,8 @@ Codes added while implementing M0.6 (§15.2):
 | WS2006 | Wrong number of arguments in a call | Approved (12 November 2026) |
 | WS2007 | `break` or `continue` outside a loop | Proposed |
 | WS2008 | `return` outside a function | Proposed |
+| WS2009 | `this` outside a method or a constructor | Approved (13 November 2026) |
+| WS2011 | A class declaring both `dispose()` and `destructor()` | Approved (13 November 2026) |
 | WS3002 | Integer overflow (a result outside int64) | Approved (12 November 2026) |
 | WS3003 | Execution budget exceeded (instructions or registers) | Approved (12 November 2026) |
 | WS3004 | Execution cancelled by the host | Approved (12 November 2026) |
@@ -864,7 +888,7 @@ Proposed central props:
 | M0.7 | Conformance suite expansion: the language of §3.5, in parts M0.7.1 to M0.7.6 (below), each with its conformance tests | Implemented (12 November 2026), on Windows; `foreach` waits for collections |
 | M0.8 | Windows/Linux CI and portability validation | Started (12 November 2026): the CI workflow builds and tests on Windows and Linux (first run passed: CI run 1, 12 November 2026, commit `5229806`); tests check the portable core's assemblies against the dependency rules (§8.3) and the portability inventory (WS-P016) |
 | M0.9 | Collections: arrays, maps and sets (§3.2), with indexing, `length` and member access (§3.3), and `foreach` (§3.5) | Implemented (13 November 2026), in parts M0.9.1 to M0.9.6 (below), on both VMs, on Windows |
-| M0.10 | Classes, `dispose()` and `using` (§3.2, §3.4, WS-L011) | After M0.9 |
+| M0.10 | Classes, `dispose()` and `using` (§3.2, §3.4, WS-L011) | Next; its syntax approved (§3.7), but for static members, `Object` and exceptions |
 | M0.11 | `.wsp` templates: includes, layouts and parameterized components, together (§13, WS-T001 to WS-T008) | After M0.10 |
 | M0.12 | WBC, the bytecode's binary format (§5.1, §5.3) | After M0.11 |
 
@@ -876,6 +900,15 @@ Proposed central props:
 4. **M0.7.4:** `while`, `for` and `do … while`, with `break` and `continue`. Implemented (12 November 2026); `break` or `continue` outside a loop is WS2007 (proposed), and a `for`'s per-iteration bindings (§3.5) become observable, and are implemented, with closures in M0.7.6.
 5. **M0.7.5:** string literals and concatenation. Implemented (12 November 2026), with the first heap objects (§15.2, "Heap").
 6. **M0.7.6:** functions, function values and closures. Implemented (12 November 2026).
+
+**M0.10 parts** (13 November 2026), each landing on its own with its conformance tests, on both VMs:
+
+1. **M0.10.1:** classes: declarations, `new`, fields, methods, `this`, methods as values, `x?.name`, and text (§3.7).
+2. **M0.10.2:** inheritance: `extends`, `super(…)`, `super.name(…)`, and the base's constructor run first.
+3. **M0.10.3:** disposal: `dispose()` and `destructor()`, once and chained, and `using` on its ways out but exceptions.
+4. **M0.10.4:** static members, once they are decided.
+5. **M0.10.5:** `Object` and `equal()`, once they are decided.
+6. **M0.10.6:** exceptions, and `using` when one leaves it, once they are decided.
 
 **M0.9 parts** (13 November 2026), each landing on its own with its conformance tests, on both VMs (§5.6, "Both VMs, for now"):
 
