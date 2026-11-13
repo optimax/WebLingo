@@ -38,13 +38,7 @@ Arrays, maps and sets, with indexing, `length`, member access and `foreach` (spe
 
 2026-11-13: the syntax is approved but for sets and optional access (specification, section 3.6). M0.9 is split into the parts the specification defines in section 9 ("M0.9 parts"), each a task below, M0.9.1 to M0.9.6. Waits for them.
 
-## [WORKING] M0.9.3: Maps
-
-Map literals, entries, `has`, `remove`, `length`, keys and text (specification, section 3.6), on both VMs, with their conformance tests. Added by Claude, 2026-11-13.
-
-Done (Claude, 2026-11-13): maps, `{ key: value }` and `{}`, with `m[k]`, `m[k] = v`, `m.has(k)`, `m.remove(k)` and `m.length`, on both VMs. Keys are strings, int64s, Booleans and `null` (WS3001 otherwise), and a missing key is WS3007. A map is a heap object the collector traces, within the budget, equal only to itself, written as `{"active": true}`. Choices of mine, in the specification's section 15.2 as proposed: a later key in a literal replaces an earlier one; a removal moves the last entry into its place, so the order is a hash table's, not defined; a malformed key in a literal skips the rest of it, for one diagnostic. `{` at the start of a statement still opens a block, as section 3.6 says, so `{a: 1};` there is a syntax error. Every new conformance case gives the same result on both VMs. Build and 827 tests pass on Windows; Linux not tried.
-
-## M0.9.4: `foreach`
+## [WORKING] M0.9.4: `foreach`
 
 `foreach` over arrays, strings and maps (specification, sections 3.5 and 3.6), on both VMs, with their conformance tests, and a benchmark workload of collections (section 5.6). Added by Claude, 2026-11-13.
 
