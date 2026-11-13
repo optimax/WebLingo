@@ -1,0 +1,107 @@
+# ============================================
+# .NET / C# on Windows and Linux
+# ============================================
+#
+# Unlike the WPF solutions this file was adapted from, it does not ignore folders by
+# name alone (Debug/, Release/, x64/, x86/, arm/, arm64/, packages/) or *.g.cs and
+# *.manifest files: a compiler, a VM and native adapters may well have source folders
+# and files called that. Build output goes to bin/ and obj/ in every project.
+
+# Visual Studio user-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Visual Studio workspace/cache
+.vs/
+
+# Build output
+[Bb]in/
+[Oo]bj/
+
+# .NET build artifacts
+artifacts/
+TestResults/
+
+# Publish output
+publish/
+
+# NuGet packages
+*.nupkg
+*.snupkg
+
+# NuGet generated files
+*.nuget.props
+*.nuget.targets
+
+# Visual Studio generated files
+*.VC.db
+*.VC.VC.opendb
+*.opendb
+
+# ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# VS Code
+.vscode/
+
+# Code coverage
+*.coverage
+*.coveragexml
+coverage/
+coverage.*
+coverage*.xml
+
+# BenchmarkDotNet (the register and stack VM benchmarks, WS-BC002)
+BenchmarkDotNet.Artifacts/
+
+# Claude Code: local settings and worktrees (whole copies of the repository)
+.claude/settings.local.json
+.claude/worktrees/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.bak
+*.old
+*.orig
+*.cache
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux and macOS
+*~
+*.swp
+*.swo
+.directory
+.DS_Store
+
+# Database temporary/local files
+*.db-shm
+*.db-wal
+
+# Local configuration / secrets
+appsettings.Local.json
+appsettings.Development.local.json
+secrets.json
+
+# Certificates / keys
+*.pfx
+*.p12
+
+# Backup files
+*.backup
+*.Backup
