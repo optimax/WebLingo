@@ -667,6 +667,7 @@ Codes added while implementing M0.6, all **proposed** (§15.2):
 | WS1006 | `const` declaration without an initializer |
 | WS1007 | Invalid assignment target |
 | WS1008 | Source nested too deeply |
+| WS4002 | Program too large for the bytecode (more registers than a function may have) |
 
 **Lexer:** identifiers, keywords (`var`, `const`), literals, operators, punctuation, source spans and malformed-input diagnostics.
 
@@ -1009,6 +1010,7 @@ This section records the state of the M0.6 increments after M0.6.1 (§8.7), and 
 | M0.6.2 lexer and tokenization tests | Implemented (12 November 2026); built and tested on Windows, Linux pending |
 | M0.6.3 parser, AST and diagnostics | Implemented (12 November 2026); built and tested on Windows, Linux pending |
 | M0.6.4 binder and lowered IR | Implemented (12 November 2026); built and tested on Windows, Linux pending |
+| M0.6.5 minimal bytecode generator and verifier | Implemented (12 November 2026); built and tested on Windows, Linux pending |
 
 ### 15.2 Proposed choices
 
@@ -1038,4 +1040,10 @@ This section records the state of the M0.6 increments after M0.6.1 (§8.7), and 
 | Temporal dead zone at run time | Reading a variable before its declaration has run, or a `var` declared without a value before it is assigned, is a runtime error, WS2004 (§8.6, `var x; print(x);`); so is assigning a variable before its declaration has run; it is not reported at compile time | Proposed |
 | Checks | The compiler keeps a runtime check only where a variable may not have a value yet; in M0.6's straight-line programs that is exactly where the check fails | Proposed |
 | Evaluation order | Left to right: operands, then arguments; an assignment evaluates its value before it stores it | Proposed |
-| Diagnostic codes | WS1003 to WS1008 (§8.4); WS3001 is used at compile time too, for invalid calls | Proposed |
+| Instruction model | An in-memory register instruction model, not WBC (§5.3, §8.4): an operation and up to four integer operands A to D, unused ones 0 (`WsBytecodeContracts.cs`); a module holds its constants (int64 and binary64, kept as IEEE bits), the built-ins it imports by name and arity, and one function, with a source span per instruction and the names of its locals for runtime messages | Proposed |
+| Registers | A function's locals take registers 0 to n − 1 and its temporaries the registers above; at most 65535 registers (§5.3), more is a compile-time error (WS4002) | Proposed |
+| Operations | `LoadConstant`, `Move`, `Negate`, `Add`, `Subtract`, `Multiply`, `Divide`, `CheckInitialized`, `CheckDeclared`, `DeclareUnassigned`, `CallBuiltin` (arguments in consecutive registers, §5.4), `Jump`, `Return`; the compiler emits no `Jump` yet | Proposed |
+| Dead zone in the VM | The VM starts every local in its temporal dead zone; the check operations guard locals, and the verifier guards temporaries | Proposed |
+| Verification | Besides §5.5: unused operands must be 0; no path may run off the end of the code; a temporary must be written before it is read on every path; a function whose check needs more than 16 million words of state or 100 million steps is rejected rather than verified slowly | Proposed |
+| Compiler output | The compiler verifies what it generates, and reports a module that fails as an internal error (WS4001), with no module | Proposed |
+| Diagnostic codes | WS1003 to WS1008 and WS4002 (§8.4); WS3001 is used at compile time too, for invalid calls | Proposed |

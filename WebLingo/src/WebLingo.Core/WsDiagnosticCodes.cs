@@ -37,4 +37,6 @@ public static class WsDiagnosticCodes
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WS4001";
+    /// <summary>A program too large for the bytecode, such as one needing more registers than a function has (proposed).</summary>
+    public const string ProgramTooLarge = "WS4002";
 }

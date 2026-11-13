@@ -1,0 +1,242 @@
+using WebLingo.Bytecode;
+using WebLingo.Core;
+using Xunit;
+namespace WebLingo.Bytecode.Tests;
+
+public sealed class VerifierTests
+{
+    private static readonly WsVerificationResult Valid = WsVerificationResult.Valid;
+
+    [Fact]
+    public void AnEmptyModuleIsValid()
+    {
+        Assert.Equal(Valid, Verify(WsCompiledModule.Empty("empty")));
+    }
+
+    [Fact]
+    public void AWellFormedModuleIsValid()
+    {
+        // var a = 1; var b = a + 2; print(-b);
+        Assert.Equal(Valid, Verify(Module(
+            registers: 4, locals: 2,
+            I(WsOpCode.LoadConstant, 0, 0),
+            I(WsOpCode.LoadConstant, 2, 1),
+            I(WsOpCode.Add, 1, 0, 2),
+            I(WsOpCode.Negate, 2, 1),
+            I(WsOpCode.CallBuiltin, 3, 0, 2, 1),
+            I(WsOpCode.Return))));
+    }
+
+    [Fact]
+    public void LocalsMayBeReadWithoutBeingWritten()
+    {
+        // The VM starts locals in their dead zone; the check instructions guard them.
+        Assert.Equal(Valid, Verify(Module(registers: 2, locals: 1,
+            I(WsOpCode.CheckInitialized, 0), I(WsOpCode.Negate, 1, 0), I(WsOpCode.Return))));
+    }
+
+    [Fact]
+    public void AnUnknownOperationIsRejected()
+    {
+        AssertRejected(Module(registers: 0, locals: 0, I((WsOpCode)200), I(WsOpCode.Return)), 0, "unknown");
+    }
+
+    [Theory]
+    [InlineData(WsOpCode.Move, 5, 0, 0)]
+    [InlineData(WsOpCode.Move, 0, -1, 0)]
+    [InlineData(WsOpCode.Add, 0, 1, 3)]
+    [InlineData(WsOpCode.Negate, 3, 0, 0)]
+    [InlineData(WsOpCode.LoadConstant, 3, 0, 0)]
+    public void ARegisterOutOfRangeIsRejected(WsOpCode opCode, int a, int b, int c)
+    {
+        AssertRejected(Module(registers: 3, locals: 3, I(opCode, a, b, c), I(WsOpCode.Return)), 0, "register");
+    }
+
+    [Fact]
+    public void AMissingConstantIsRejected()
+    {
+        AssertRejected(Module(registers: 1, locals: 1, I(WsOpCode.LoadConstant, 0, 2), I(WsOpCode.Return)), 0, "constant 2");
+    }
+
+    [Fact]
+    public void AnUnknownConstantKindIsRejected()
+    {
+        var module = Module(registers: 1, locals: 1, I(WsOpCode.Return)) with
+        {
+            Constants = [new WsConstant((WsConstantKind)9, 0)]
+        };
+        AssertRejected(module, -1, "kind");
+    }
+
+    [Fact]
+    public void AMissingImportIsRejected()
+    {
+        AssertRejected(Module(registers: 2, locals: 1, I(WsOpCode.CallBuiltin, 0, 1, 1, 1), I(WsOpCode.Return)), 0, "import 1");
+    }
+
+    [Fact]
+    public void ACallWithTheWrongArgumentCountIsRejected()
+    {
+        AssertRejected(Module(registers: 3, locals: 3, I(WsOpCode.CallBuiltin, 0, 0, 1, 2), I(WsOpCode.Return)), 0, "takes 1");
+    }
+
+    [Fact]
+    public void CallArgumentsBeyondTheRegistersAreRejected()
+    {
+        AssertRejected(Module(registers: 3, locals: 3, I(WsOpCode.CallBuiltin, 0, 0, 3, 1), I(WsOpCode.Return)), 0, "arguments");
+    }
+
+    [Fact]
+    public void ACheckOnATemporaryIsRejected()
+    {
+        AssertRejected(Module(registers: 2, locals: 1, I(WsOpCode.CheckInitialized, 1), I(WsOpCode.Return)), 0, "local 1");
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(-1)]
+    public void AJumpOutsideTheCodeIsRejected(int target)
+    {
+        AssertRejected(Module(registers: 0, locals: 0, I(WsOpCode.Jump, target), I(WsOpCode.Return)), 0, "target");
+    }
+
+    [Fact]
+    public void CodeThatRunsOffItsEndIsRejected()
+    {
+        AssertRejected(Module(registers: 1, locals: 1, I(WsOpCode.LoadConstant, 0, 0)), 0, "off its end");
+    }
+
+    [Fact]
+    public void EmptyCodeIsRejected()
+    {
+        AssertRejected(Module(registers: 0, locals: 0), -1, "no code");
+    }
+
+    [Fact]
+    public void AnUnusedOperandThatIsNotZeroIsRejected()
+    {
+        AssertRejected(Module(registers: 1, locals: 1, I(WsOpCode.Return, 1)), 0, "not 0");
+    }
+
+    [Fact]
+    public void ATemporaryReadBeforeItIsWrittenIsRejected()
+    {
+        AssertRejected(Module(registers: 3, locals: 1, I(WsOpCode.Add, 2, 0, 1), I(WsOpCode.Return)), 0, "register 1");
+    }
+
+    [Fact]
+    public void ATemporaryWrittenOnOnlyOnePathIsRejected()
+    {
+        // 0: jump 3; 1: r1 = c0; 2: jump 3; 3: r2 = -r1; 4: return. The path 0, 3 reaches 3 without writing r1.
+        AssertRejected(Module(registers: 3, locals: 1,
+            I(WsOpCode.Jump, 3), I(WsOpCode.LoadConstant, 1, 0), I(WsOpCode.Jump, 3), I(WsOpCode.Negate, 2, 1),
+            I(WsOpCode.Return)), 3, "every path");
+    }
+
+    [Fact]
+    public void ATemporaryWrittenOnEveryPathIsAccepted()
+    {
+        // 0: r1 = c0; 1: jump 3; 2: return (unreachable); 3: r2 = -r1; 4: return.
+        Assert.Equal(Valid, Verify(Module(registers: 3, locals: 1,
+            I(WsOpCode.LoadConstant, 1, 0), I(WsOpCode.Jump, 3), I(WsOpCode.Return), I(WsOpCode.Negate, 2, 1),
+            I(WsOpCode.Return))));
+    }
+
+    [Fact]
+    public void ALoopTerminatesVerification()
+    {
+        // 0: r1 = c0; 1: r1 = -r1; 2: jump 1. An endless loop, but a valid one.
+        Assert.Equal(Valid, Verify(Module(registers: 2, locals: 1,
+            I(WsOpCode.LoadConstant, 1, 0), I(WsOpCode.Negate, 1, 1), I(WsOpCode.Jump, 1))));
+    }
+
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(WsFunction.MaxRegisters + 1, 0)]
+    [InlineData(2, 3)]
+    [InlineData(2, -1)]
+    public void ImpossibleRegisterCountsAreRejected(int registers, int locals)
+    {
+        AssertRejected(Module(registers, locals, I(WsOpCode.Return)), -1, "");
+    }
+
+    [Fact]
+    public void DebugInformationMustMatchTheCode()
+    {
+        var function = new WsFunction("main", 1, 1, [I(WsOpCode.Return)], [new WsSourceSpan(0, 1), new WsSourceSpan(1, 1)]);
+        AssertRejected(new WsCompiledModule("m", [], [], function), -1, "spans");
+        var named = new WsFunction("main", 1, 1, [I(WsOpCode.Return)], LocalNames: ["a", "b"]);
+        AssertRejected(new WsCompiledModule("m", [], [], named), -1, "local names");
+    }
+
+    [Fact]
+    public void MissingPartsAreRejectedNotThrown()
+    {
+        var verifier = new WsBytecodeVerifier();
+        Assert.False(verifier.Verify(null!).IsValid);
+        Assert.False(verifier.Verify(WsCompiledModule.Empty("m") with { EntryPoint = null! }).IsValid);
+        Assert.False(verifier.Verify(WsCompiledModule.Empty("m") with { Constants = null! }).IsValid);
+        Assert.False(verifier.Verify(WsCompiledModule.Empty("m") with { Imports = [null!] }).IsValid);
+        Assert.False(verifier.Verify(WsCompiledModule.Empty("m") with { Imports = [new WsImport("print", -1)] }).IsValid);
+    }
+
+    [Fact]
+    public void RandomModulesAreVerifiedWithoutThrowing()
+    {
+        var random = new Random(20261112);
+        var opCodes = Enum.GetValues<WsOpCode>();
+        var verifier = new WsBytecodeVerifier();
+        var valid = 0;
+        for (var round = 0; round < 20_000; round++)
+        {
+            var registers = random.Next(-1, 6);
+            var locals = random.Next(-1, 4);
+            var length = random.Next(0, 8);
+            var code = new WsInstruction[length];
+            for (var i = 0; i < length; i++)
+            {
+                var opCode = random.Next(10) == 0 ? (WsOpCode)random.Next(256) : opCodes[random.Next(opCodes.Length)];
+                code[i] = new WsInstruction(opCode, Operand(random), Operand(random), Operand(random), Operand(random));
+            }
+            if (length > 0 && random.Next(2) == 0) code[^1] = new WsInstruction(WsOpCode.Return); // Often near-valid.
+            var module = new WsCompiledModule("random", [WsConstant.Int64(1)], [new WsImport("print", 1)],
+                new WsFunction("main", registers, locals, code));
+            if (verifier.Verify(module).IsValid) valid++;
+        }
+        Assert.InRange(valid, 1, 19_999); // Some pass and most fail, and none of them threw.
+    }
+
+    [Fact]
+    public void AHugeFunctionIsRejectedWithinItsBounds()
+    {
+        // Every instruction a jump target, over 65535 temporaries: too much state to keep, so rejected, not attempted.
+        const int length = 300_000;
+        var code = new WsInstruction[length];
+        for (var i = 0; i < length - 1; i++) code[i] = I(WsOpCode.Jump, i + 1);
+        code[^1] = I(WsOpCode.Return);
+        AssertRejected(Module(WsFunction.MaxRegisters, 0, code), -1, "too large");
+    }
+
+    private static int Operand(Random random) => random.Next(3) switch
+    {
+        0 => 0,
+        1 => random.Next(0, 6),
+        _ => random.Next(8) == 0 ? random.Next(-3, 100) : random.Next(0, 3)
+    };
+
+    private static WsInstruction I(WsOpCode opCode, int a = 0, int b = 0, int c = 0, int d = 0) => new(opCode, a, b, c, d);
+
+    private static WsCompiledModule Module(int registers, int locals, params WsInstruction[] code) =>
+        new("test", [WsConstant.Int64(1), WsConstant.Int64(2)], [new WsImport("print", 1)],
+            new WsFunction("main", registers, locals, code));
+
+    private static WsVerificationResult Verify(WsCompiledModule module) => new WsBytecodeVerifier().Verify(module);
+
+    private static void AssertRejected(WsCompiledModule module, int instruction, string reason)
+    {
+        var result = Verify(module);
+        Assert.False(result.IsValid);
+        Assert.Contains(reason, result.Error);
+        Assert.Equal(instruction, result.InstructionIndex);
+    }
+}

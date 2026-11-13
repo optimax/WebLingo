@@ -16,8 +16,9 @@ public sealed class ContractTests
     [Fact]
     public void EmptyBytecodeModuleCanBeRepresented()
     {
-        var module = new WsCompiledModule("test", ReadOnlyMemory<byte>.Empty);
+        var module = WsCompiledModule.Empty("test");
         Assert.Equal("test", module.Name);
+        Assert.True(new WsBytecodeVerifier().Verify(module).IsValid);
     }
     [Fact]
     public void WorkerIdentityIsExplicit()
