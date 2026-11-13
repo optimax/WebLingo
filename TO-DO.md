@@ -48,6 +48,24 @@ Done (Claude, 2026-11-12): the answers are recorded as approved in the specifica
 
 2026-11-12: waits for its parts, M0.7.1 to M0.7.6.
 
+## [QUESTION] A Hoisted Function Called Before a Variable It Uses
+
+A function is in scope throughout its block (specification, section 3.5), so it can be called before a variable it uses is declared, which no other code can do (section 3.1):
+
+```javascript
+f();
+var y = 1;
+function f() { writeLn(y); }
+```
+
+Added by Claude, 2026-11-12, while implementing "M0.7.6: Functions, Function Values and Closures".
+
+**Q1: What does that call do? (a) It is a runtime error (WS2004, "read before initialization", the code you kept), and only a variable a hoisted function uses can raise it; (b) a function sees only the variables declared before the function's own declaration, so `y` is undefined in `f` (WS2001), and a call can then never come too early; (c) a function is in scope only from its declaration on, like `var`, and mutual recursion needs a function expression stored in a variable declared first.**
+
+A1:
+
+Until you answer, M0.7.6 does (a), which is the easiest to change: it touches only the variables that functions capture.
+
 ## M0.7.6: Functions, Function Values and Closures
 
 Function declarations and expressions, `return`, function values, and closures capturing binding cells (specification, section 3.5). It takes over "Functions as Values", and needs calls in the bytecode and the VM (sections 5.4 and 5.5). Added by Claude, 2026-11-12.
