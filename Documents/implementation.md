@@ -161,7 +161,11 @@ Be careful when translating between:
 - Unicode scalar values, which string indexing and `length` count (M0.1),
 - the one-based line and column numbers that diagnostics report.
 
-The specification does not yet document which characters end a line or how a column is counted; ask before deciding either.
+`WsSourceText` (`WebLingo.Core`) is the one place that turns a position into a line and a column. Which characters end a line (CRLF, LF, CR) and how a column is counted (in Unicode scalar values) are proposed in the specification, section 15.2, and not yet decided: change them only there and in `WsSourceText`, with the owner's decision.
+
+## Implementation Choices
+
+Where the specification is silent, the choices M0.6 made are listed, as Proposed, in its section 15.2 (section 5 above). Each is made in one place in the code, named in that table where it is not obvious, so that the owner's decision changes one place. The diagnostic codes are constants in `WsDiagnosticCodes` (`WebLingo.Core`); a new one is added there and to the specification's section 8.4.
 
 ------
 

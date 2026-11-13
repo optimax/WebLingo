@@ -53,6 +53,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WS-S001–S016 | M0.6 solution scaffolding and initial implementation contracts | Approved |
 | M0.6 implementation default | Register VM first; stack comparison later | Adopted M0.6 default; VM architecture still provisional |
 | M0.6 testing default | xUnit on .NET 10 | Adopted M0.6 default |
+| M0.6 implementation choices | Lexical, syntax, runtime and CLI choices made where this specification is silent, while implementing M0.6.2 onward (§15.2) | Proposed |
 | Repository documents | One copy of this specification, `Documents/weblingo-architecture.md`; documents in the repository's root `Documents/` folder; a shallow folder structure, with no `docs/architecture/` folder; the whole repository may become public (§8.2) | Approved (12 November 2026) |
 
 **Approval boundary:** M0.6 was approved as a specification. This does not imply the repository or implementation already exists. Detailed M0.3 encoding choices were recommended but not separately approved; the architectural decision between stack and register VMs remains open.
@@ -656,6 +657,14 @@ Add FastCGI, database provider and native adapter projects when their implementa
 | WS3001 | Invalid operation |
 | WS4001 | Bytecode verification failure |
 
+Codes added while implementing M0.6, all **proposed** (§15.2):
+
+| Code | Meaning |
+|---|---|
+| WS1003 | Invalid character |
+| WS1004 | Invalid numeric literal (malformed, or out of range) |
+| WS1005 | Unterminated comment |
+
 **Lexer:** identifiers, keywords (`var`, `const`), literals, operators, punctuation, source spans and malformed-input diagnostics.
 
 **Parser:** initial subset of variable declarations, integer literals, identifiers, arithmetic, parentheses and mandatory semicolons; preserve source spans and recover sufficiently to report multiple errors.
@@ -985,3 +994,28 @@ Rendering must support asynchronous output and backpressure without mandatory fu
 - The initial `WsSourceSpan` and lexer positions use .NET string indices in this scaffold; production source-map byte offsets remain specified as UTF-8 and require explicit conversion.
 - Register-based execution remains provisional (WS-BC002); both stack and register execution must eventually be benchmarked.
 - All three approved template composition features (includes, layouts, parameterized components) remain mandatory together in the first `.wsp`-capable implementation.
+
+## 15. M0.6 implementation — status and proposed choices
+
+This section records the state of the M0.6 increments after M0.6.1 (§8.7), and the choices made while implementing them where this specification is silent. Every choice in §15.2 is **Proposed**: made to unblock the work, kept in one place in the code so that it stays easy to change, and awaiting the owner's decision. None of them changes an approved decision.
+
+### 15.1 Status
+
+| Increment | Status |
+|---|---|
+| M0.6.2 lexer and tokenization tests | Implemented (12 November 2026); built and tested on Windows, Linux pending |
+
+### 15.2 Proposed choices
+
+| Area | Choice | Status |
+|---|---|---|
+| Line terminators | CRLF, LF, and CR each end a line (`WsSourceText`) | Proposed |
+| Columns | One-based, counting Unicode scalar values from the start of the line; a tab is one column (`WsSourceText`) | Proposed |
+| Whitespace | Space, tab, CR, and LF only; any other character, Unicode spaces included, is invalid (WS1003) | Proposed |
+| Comments | `//` to the end of the line; `/* … */`, not nested; an unterminated `/*` is an error (WS1005) | Proposed |
+| Identifiers | ASCII letters, digits and `_`, not starting with a digit; case-sensitive | Proposed |
+| Keywords | `var` and `const`; `let` reserved and reported (WS-002.3); no other reserved words yet | Proposed |
+| Integer literals | Decimal digits only; leading zeros allowed and still decimal (`007` is 7); at most 9223372036854775807, larger is an error (WS1004) | Proposed |
+| Literal suffixes | Digits followed directly by a letter, digit or `_` are one invalid literal (WS1004), which keeps room for the decimal suffix `m` (§3.2) | Proposed |
+| Not yet lexed | String, binary64 and decimal literals: their characters are invalid (WS1003) until their syntax is specified | Proposed |
+| Diagnostic codes | WS1003, WS1004, and WS1005 (§8.4) | Proposed |
