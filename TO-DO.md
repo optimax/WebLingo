@@ -40,16 +40,6 @@ Classes, with single inheritance and no exposed prototype chain (specification, 
 
 
 
-## [WORKING] M0.10.4: Static Members
-
-Static methods and fields (specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
-
-2026-11-13: waits for the answers to "M0.10 Syntax: Static Members, `Object` and Exceptions".
-
-2026-11-13: answered; next.
-
-Done (Claude, 2026-11-13): `static name(…) { … }` and `static var name = value;` in a class, reached as `Name.name(…)` and `Name.name`, a class without a member of that name finding its base's (A2); a static field can be assigned, and `this` or `super` in a static member is WS2009. No new operation: the class table gives each class its static methods and fields, and `GetMember`, `SetMember` and `CallMethod` reach them on a class. Choices of mine, in section 15.2 as proposed (row "Static members"): a static field's value is evaluated where its block begins, as a base is, so it cannot name the block's variables (WS2001), and the block's static fields are set once its classes are made, each `null` until then; a static member and a method may share a name; an instance does not reach its class's statics (`p.count` is WS3006); `static const` is reported and read as `static var`. Every new conformance case gives the same result on both VMs. Build and 1,106 tests pass on Windows; Linux not tried.
-
 ## [IDLE] M0.10.5: `Object` and `equal()`
 
 The base class `Object` and its `equal()` (specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
