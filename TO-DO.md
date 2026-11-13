@@ -26,13 +26,7 @@ A3: (b)
 
 2026-11-13: the answers are recorded as approved in the specification, section 5.6 ("The comparison's parts"), and in its decision register. That section splits the work into four parts, each a task below: "Stack VM Comparison 1: The Benchmark", "Stack VM Comparison 2: The Register VM's Dispatch, Tuned", "Stack VM Comparison 3: The Stack VM" and "Stack VM Comparison 4: The Comparison". Waits for them.
 
-## [WORKING] Stack VM Comparison 2: The Register VM's Dispatch, Tuned
-
-The register VM runs the same bytecode faster: its dispatch loop tuned for speed (specification, section 5.6, part 2), with no change to the bytecode or to what a program does, and measured with the benchmark against part 1's baseline. Added by Claude, 2026-11-13.
-
-Done (Claude, 2026-11-13): `WsVirtualMachine` runs every instruction in one loop, with the running frame's code, registers and position in locals. It looks at the budget and the cancellation signal only when they come due, and does int64 and binary64 arithmetic and comparisons itself, leaving the rest, and every error, to `WsOperators`. A call reuses the frame and the registers that the last call at its depth left. The bytecode, the instruction counts, the results and the messages are unchanged. The speed-ups, both measured fully optimized, are 6.2× on `loops`, 3.5× on `calls`, 3.7× on `closures` and 2.7× on `strings`; `calls` allocates 10 KB instead of 49 MB. They are recorded in the specification, section 5.6. New: `OperatorTests`, which checks the VM's own arithmetic against `WsOperators` on every operator and pairs of edge values. The benchmark now turns .NET's tiered compilation off, because with it the VM's loop was still being compiled while it was timed; the baseline was measured again that way. The inventory has the facilities the VM now uses. Build and 517 tests pass on Windows; Linux not tried.
-
-## Stack VM Comparison 3: The Stack VM
+## [WORKING] Stack VM Comparison 3: The Stack VM
 
 Stack bytecode and its verifier in `WebLingo.Bytecode`, its code generator in `WebLingo.Compiler`, from the same lowered IR as the register one, and the stack VM in `WebLingo.VM.Stack`, sharing `WebLingo.Runtime`'s semantics (specification, section 5.6, part 3). Every conformance program gives the same output and the same errors on both VMs. Added by Claude, 2026-11-13.
 
