@@ -1693,3 +1693,13 @@ A3: (a)
 A4: (a) in module `std:tasks`, once it exists, so both (a) and (b) I guess.
 
 Done (Claude, 2026-11-14, `98bafad`): recorded as approved in the specification, section 3.8 ("Tasks"), with the new code WL3010 (section 8.4); `Task.all`, `Task.any` and `Task.timeout` on both VMs, with conformance tests, their choices recorded as Proposed in section 15.2 ("Asynchrony"), among them that `Task.any([])` is WL3001, and that a timeout's error is thrown from the `await` it reaches. `std:tasks` is "Standard Module `std:tasks`", below. A2's question: yes, a task is WebLingo's promise, much as a JavaScript `Promise` or a C# `Task` is: a value standing for a result that comes later. Unlike a `Promise`, a task is used only through `await`, with no `then`; its exception, if nothing awaits it, is reported when the execution ends, unless `t.forget()`; and every task of an execution runs on its one worker, switching only at `await`. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Modules, Quoted Parameters
+
+A6 of "Modules, Continued" asked whether a shell removes the quotes of `value="10"`. Checked on 2026-11-14, with a program printing the arguments it gets: bash gives it `value=10`, and only `'value="10"'` keeps the quotes; Windows PowerShell 5.1 gives `value=10` for both `value="10"` and `'value="10"'`; and cmd.exe gives `value=10`. So A8's quotes rarely reach `weblingo`, and never from Windows PowerShell 5.1. Added by Claude, 2026-11-14.
+
+**Q1, a parameter given as a string when it looks like another literal: (a) quotes, as A8 has it, which a shell must be asked to keep (`'value="10"'` in bash), and which Windows PowerShell 5.1 cannot pass; (b) a flag before it, `weblingo run script.wl --string value=10`; (c) every parameter a string, which the script converts itself (`new Integer(value)`).**
+
+A1: (c)
+
+Done (Claude, 2026-11-14, `b260d5f`): recorded as approved in the specification, section 3.9 ("A script's parameters"), in place of reading a value as a literal. A script converting one needs a conversion `new Integer(…)` does not make yet (a string given to it is WL3001): asked in "Converting Strings to Values". Checks: the Release build, without warnings, and the full test suite, on Windows only; Linux not tried.

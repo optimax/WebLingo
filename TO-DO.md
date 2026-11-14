@@ -8,16 +8,6 @@
 
 2026-11-14: waits for the design of how standard modules are packaged, which A5 of "Native Code Extensions" makes native extensions, installed as other native modules are.
 
-## Modules, Quoted Parameters
-
-A6 of "Modules, Continued" asked whether a shell removes the quotes of `value="10"`. Checked on 2026-11-14, with a program printing the arguments it gets: bash gives it `value=10`, and only `'value="10"'` keeps the quotes; Windows PowerShell 5.1 gives `value=10` for both `value="10"` and `'value="10"'`; and cmd.exe gives `value=10`. So A8's quotes rarely reach `weblingo`, and never from Windows PowerShell 5.1. Added by Claude, 2026-11-14.
-
-**Q1, a parameter given as a string when it looks like another literal: (a) quotes, as A8 has it, which a shell must be asked to keep (`'value="10"'` in bash), and which Windows PowerShell 5.1 cannot pass; (b) a flag before it, `weblingo run script.wl --string value=10`; (c) every parameter a string, which the script converts itself (`new Integer(value)`).**
-
-A1: (c)
-
-Done (Claude, 2026-11-14): recorded as approved in the specification, section 3.9 ("A script's parameters"), in place of reading a value as a literal. A script converting one needs a conversion `new Integer(…)` does not make yet (a string given to it is WL3001): asked in "Converting Strings to Values". Checks: the Release build, without warnings, and the full test suite, on Windows only; Linux not tried.
-
 ## [QUESTION] Converting Strings to Values
 
 A follow-up to A1 of "Modules, Quoted Parameters": a script's parameters are strings, which a script converts itself; `new Integer("10")` is WL3001 now, `new` on a class of values taking only a value of its kind (specification, section 15.2, "Classes holding a value"). Added by Claude, 2026-11-14.
