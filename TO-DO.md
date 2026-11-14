@@ -28,7 +28,7 @@ If text that rebuilds a value (round-trip text) is wanted, it is a serialization
 
 It is deferred: nothing needs it yet, and it can be added later, if it proves necessary, without changing `write`'s text or any program.
 
-## Multi-line Strings
+## [QUESTION] Multi-line Strings
 
 WebLingo's string literals end at their line (WL1010, specification, section 3.5, "Strings"), and the language needs strings that span lines too: SQL, HTML fragments, messages and test data. The owner decided so, 2026-11-14, in a chat with Claude, while weighing how a template's `<% … %>` block ends ("`%>` inside a block's code"): if the template compiler reads a block's code as WebLingo's tokens, an unclosed multi-line string, like an unclosed `/* */` comment, runs on over the blocks and the text after it, so its diagnostic should name both where it opened and the `<%` of the block it is in, and its closing delimiter should be one that ordinary text rarely holds. Added by Claude, 2026-11-14.
 
@@ -51,6 +51,32 @@ A4: Yes,
 **Q5, interpolation (`"Hello, {name}"`), a separate feature: (a) not now; (b) not now, but the delimiter chosen in Q1 leaves room for it (C# writes `$"""…{name}…"""`, JavaScript `` `…${name}…` ``); (c) designed together with multi-line strings.**
 
 A5: (c), but also needed for single line strings.
+
+2026-11-14 (Claude): A5 has interpolation designed with multi-line strings, single-line ones included, so both wait for its decisions, below, one each, answerable with a letter. Q1 to Q4 stand as answered.
+
+**Q6, which strings interpolate: (a) those marked with `$` before them, as C# marks them, `$"Hello, {name}"` and `$"""…{name}…"""`, so that a string without it keeps its braces as they are; (b) every string, `{` in an ordinary string then beginning an interpolation, which changes what existing strings holding braces mean.**
+
+A6:
+
+**Q7, what an interpolation holds: (a) any expression, `{a + b}`, `{user.name}`, `{f(x)}`; (b) a name, or a chain of members, `{user.name}`, only.**
+
+A7:
+
+**Q8, an interpolated value's text: (a) the text `write` writes, an instance's `toString()` included, `null` as `null`; (b) the same, but `null` as nothing, as `<%= %>` writes it.**
+
+A8:
+
+**Q9, a brace written as itself in an interpolated single-line string: (a) doubled, `{{` and `}}`, as C# writes it; (b) escaped, `\{` and `\}`.**
+
+A9:
+
+**Q10, an interpolated multi-line string, raw by A2, holding braces of its own, as JSON, CSS or code does: (a) as C# has it, as many `$` before the string as the braces that open an interpolation, `$$"""{ "name": {{name}} }"""`; (b) braces doubled, as Q9's (a) has them.**
+
+A10:
+
+**Q11, a format after a colon, `{price:0.00}`, as C# has it: (a) not now, a `:` at an interpolation's top level being an error, so that it stays free for them; (b) not at all, formatting being a function's, `{format(price, "0.00")}`.**
+
+A11:
 
 ## [QUESTION] Native Modules
 
