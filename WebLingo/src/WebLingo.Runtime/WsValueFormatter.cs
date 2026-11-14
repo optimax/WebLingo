@@ -127,7 +127,7 @@ public static class WsValueFormatter
             };
             if (next >= count)
             {
-                text.Append(collection.Kind == WsValueKind.Array ? ']' : '}').Append(ClassSuffix(collection, heap));
+                text.Append(collection.Kind == WsValueKind.Array ? ']' : '}');
                 open.Remove(collection.Handle);
                 continue;
             }
@@ -160,7 +160,7 @@ public static class WsValueFormatter
                         WsValueKind.Set => "#{…}",
                         WsValueKind.Instance => heap.ClassName(heap.ClassOf(item)) + " {…}",
                         _ => "[…]"
-                    }).Append(ClassSuffix(item, heap));
+                    });
                     continue;
                 }
                 Open(item, text, open, pending, heap);
@@ -186,20 +186,13 @@ public static class WsValueFormatter
     }
 
     /// <summary>
-    /// What comes before a collection that a class extending Array, Map or Set made: its class's name and a parenthesis,
-    /// as it is made, without <c>new</c> (<c>Stack([1, 2])</c>; section 3.7); <see cref="ClassSuffix"/> closes it.
+    /// What comes before a collection that a class extending Array, Map or Set made: its class's name and a colon
+    /// (<c>Stack:[1, 2]</c>; section 3.7).
     /// </summary>
     internal static string ClassPrefix(WsValue collection, WsHeap heap) =>
         collection.Kind is WsValueKind.Array or WsValueKind.Map or WsValueKind.Set
         && heap.ClassOfValue(collection) is { Kind: WsValueKind.Class } classValue
-            ? heap.ClassName(classValue) + "("
-            : "";
-
-    /// <summary>What comes after a collection that a class extending Array, Map or Set made: the parenthesis closed.</summary>
-    internal static string ClassSuffix(WsValue collection, WsHeap heap) =>
-        collection.Kind is WsValueKind.Array or WsValueKind.Map or WsValueKind.Set
-        && heap.ClassOfValue(collection) is { Kind: WsValueKind.Class }
-            ? ")"
+            ? heap.ClassName(classValue) + ":"
             : "";
 
     /// <summary>A value in a collection that is not a collection itself: a string quoted, anything else as written.</summary>

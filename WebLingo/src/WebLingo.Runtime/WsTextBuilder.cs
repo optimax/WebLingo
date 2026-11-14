@@ -77,7 +77,7 @@ public sealed class WsTextBuilder
             };
             if (next >= count)
             {
-                _text.Append(collection.Kind == WsValueKind.Array ? ']' : '}').Append(WsValueFormatter.ClassSuffix(collection, _heap));
+                _text.Append(collection.Kind == WsValueKind.Array ? ']' : '}');
                 _open.Remove(collection.Handle);
                 Roots.RemoveAt(Roots.Count - 1);
                 continue;
@@ -114,7 +114,7 @@ public sealed class WsTextBuilder
                     WsValueKind.Set => "#{…}",
                     WsValueKind.Instance => _heap.ClassName(_heap.ClassOf(item)) + " {…}",
                     _ => "[…]"
-                }).Append(WsValueFormatter.ClassSuffix(item, _heap));
+                });
                 continue;
             }
             if (Overrides(item, out method))
