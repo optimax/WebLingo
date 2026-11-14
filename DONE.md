@@ -1863,3 +1863,16 @@ var v = m.PI;
 ```
 
 Done (Claude, 2026-11-14, `a3722a9`): `const PI = 3.14;` in a class, or an `extend` block, declares a constant of the class itself, as C#'s `const` does and as `static const` does, so that `m.PI` reads it through the instance, as any static member is read, and `MathStuff.PI` through the class; recorded in the specification, section 3.7, as the owner's request, its being static recorded as Proposed in section 15.2 ("Classes made while the program runs"). On both VMs, with conformance tests. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Internals on Par with Script
+
+Make sure that there is only one implementation of - for example - how to make a class, so the way to make a class at run time via code (`var Point = new Class("Point");` ) and the way the runtime makes classes from 
+
+```
+class Point {
+}
+```
+
+is *literally* the same implementation in C# (not just identical code in two places - the very same code should be executed in both cases).
+
+Done (Claude, 2026-11-14, `30cb3a5`): a class's declaration, and an `extend` block, now make and fill a class by the very methods of `WebLingoHeap` that a program's own calls run: `TryMakeClass` (`new Class(name, base)`, a metaclass's `new`, a declaration), `GiveConstructor` and `TrySetMethod` (`setMethod`, `setProperty`'s accessors, a declaration's constructor, methods and properties), `TrySetStaticMethod` (`setStaticProperty`'s accessors, a declaration's static methods), `TryDeclareStatic` (assigning a class a static member it does not have, a declaration's static fields), and `TrySetConstant` (`setConstant`, `static const`); each VM's `TryGiveMembers` only makes the closures. Recorded in the specification, section 3.7, as the owner's request, its details in section 15.2 ("Classes made while the program runs"), and in `Documents/implementation.md`, section 6. Two things changed that a program can see: a metaclass's base that is not a class, or is sealed, is reported in a declared class's words (WL3001 as before); and a static method an extension gives in place of a constant no longer leaves the constant's mark, which made the field assigned in its place WL3001 on its second assignment. A change to a class's methods now gathers anew only that class's, unless another extends it, and sets the flag that gives plain values their class's methods only for `Object` and the kinds of values' classes. On both VMs, with conformance tests; the VMs' `Run` is unchanged, so no timing against `main`'s. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
