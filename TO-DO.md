@@ -22,12 +22,6 @@ A3: (a). So `var x = new Integer(42);` is the same as `var x = 42`.
 
 A4: (a).
 
-## [WORKING] Default Parameter Values
-
-`function f(a, b = 1) { … }`, for functions, methods and constructors (A5 of "M0.11 Syntax: Templates, Continued"; specification, section 3.5), on both VMs. Added by Claude, 2026-11-13.
-
-Done (Claude, 2026-11-13): default values for the parameters of functions, function expressions, methods and constructors, on both VMs: evaluated when the parameter is left out, a `null` given being a value; a call checked against the range of arguments it may give. One new operation, `JumpIfGiven`, and a function's `OptionalCount`; the call path gained no work for a call that gives every argument, and `calls` takes the same time. Choices of mine, in section 15.2 as proposed (row "Default values"): a default is evaluated before its own parameter is declared, so it may use the ones before it, and `b = b` names an outer `b`; a parameter without a default after one with one is WS1001. Every new conformance case gives the same result on both VMs. Build and 1,275 tests pass on Windows; Linux not tried.
-
 ## [IDLE] M0.11: Asynchrony
 
 `async` functions and methods, `await`, tasks, and asynchronous disposal (specification, section 3.8), on both VMs, before M0.12's templates, which use them. Added by Claude, 2026-11-13.
