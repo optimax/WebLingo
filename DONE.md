@@ -2096,3 +2096,55 @@ Done (Claude, 2026-11-14, `1556607`): `std:system` is a native module, `WebLingo
 2026-11-14: part 3 is done (`1556607`), `std:system` a native module; this can begin.
 
 Done (Claude, 2026-11-14, `c908bc9`): `import { all, any, timeout } from "std:tasks";` gives `Task.all`, `Task.any` and `Task.timeout`, the same tasks and the same errors, on both VMs: `std:tasks` is a native module, `WebLingoTasksModule`, in a project of its own, `WebLingo.StdLib.Tasks` (an assembly holds one module), installed as `std/tasks.dll` beside `std/system.dll`. A standard module other than `std:system` is now a native module of the `std` scheme; one that is not installed is still "there is no such standard module" (WL2015). Recorded in the specification, sections 3.8 and 15.2 ("Native modules"), and in `Documents/implementation.md`, whose portable core is now twelve projects, with the architecture tests' rules for the new one. Checks: the Release build, without warnings, the full test suite, and both command lines on the samples and on a script importing `std:tasks`, on Windows only; Linux not tried.
+
+## [DONE] Multi-line Strings
+
+WebLingo's string literals end at their line (WL1010, specification, section 3.5, "Strings"), and the language needs strings that span lines too: SQL, HTML fragments, messages and test data. The owner decided so, 2026-11-14, in a chat with Claude, while weighing how a template's `<% … %>` block ends ("`%>` inside a block's code"): if the template compiler reads a block's code as WebLingo's tokens, an unclosed multi-line string, like an unclosed `/* */` comment, runs on over the blocks and the text after it, so its diagnostic should name both where it opened and the `<%` of the block it is in, and its closing delimiter should be one that ordinary text rarely holds. Added by Claude, 2026-11-14.
+
+Q1, the delimiter: (a) three double quotes, `"""…"""`, as C# 11 and Python write them, with more quotes (`""""…""""`) for a string that holds three; (b) backticks, `` `…` ``, as JavaScript writes them.
+
+A1: (a), with alternative three single quotes `'''`.
+
+Q2, escapes in a multi-line string: (a) none, a raw string, `\` being a character like any other (good for regular expressions and Windows paths); (b) the same escapes as an ordinary string's.
+
+A2: (a). 
+
+Q3, indentation: the whitespace before the closing delimiter's column is removed from every line, as C# does, so that a string indented with the code around it does not keep that indentation; and the line breaks just after the opening delimiter and just before the closing one are not part of the string. Agreed?
+
+A3: Yes.
+
+Q4, line breaks inside a multi-line string are always LF (`\n`), whether the source file's lines end in CRLF, LF or CR, so that a program gives the same string on every platform. Agreed?
+
+A4: Yes,
+
+Q5, interpolation (`"Hello, {name}"`), a separate feature: (a) not now; (b) not now, but the delimiter chosen in Q1 leaves room for it (C# writes `$"""…{name}…"""`, JavaScript `` `…${name}…` ``); (c) designed together with multi-line strings.
+
+A5: (c), but also needed for single line strings.
+
+2026-11-14 (Claude): A5 has interpolation designed with multi-line strings, single-line ones included, so both wait for its decisions, below, one each, answerable with a letter. Q1 to Q4 stand as answered.
+
+Q6, which strings interpolate: (a) those marked with `$` before them, as C# marks them, `$"Hello, {name}"` and `$"""…{name}…"""`, so that a string without it keeps its braces as they are; (b) every string, `{` in an ordinary string then beginning an interpolation, which changes what existing strings holding braces mean.
+
+A6: (a)
+
+Q7, what an interpolation holds: (a) any expression, `{a + b}`, `{user.name}`, `{f(x)}`; (b) a name, or a chain of members, `{user.name}`, only.
+
+A7: (a)
+
+Q8, an interpolated value's text: (a) the text `write` writes, an instance's `toString()` included, `null` as `null`; (b) the same, but `null` as nothing, as `<%= %>` writes it.
+
+A8: (b)
+
+Q9, a brace written as itself in an interpolated single-line string: (a) doubled, `{{` and `}}`, as C# writes it; (b) escaped, `\{` and `\}`.
+
+A9: (c) Both.
+
+Q10, an interpolated multi-line string, raw by A2, holding braces of its own, as JSON, CSS or code does: (a) as C# has it, as many `$` before the string as the braces that open an interpolation, `$$"""{ "name": {{name}} }"""`; (b) braces doubled, as Q9's (a) has them.
+
+A10: (a)
+
+Q11, a format after a colon, `{price:0.00}`, as C# has it: (a) not now, a `:` at an interpolation's top level being an error, so that it stays free for them; (b) not at all, formatting being a function's, `{format(price, "0.00")}`; (c) yes, format after  the colon supported.
+
+A11: (c)
+
+Done (Claude, 2026-11-14, `d776599`): `"""…"""` and `'''…'''` strings, raw, on one line or over several, without the closing delimiter's indentation, their line breaks LF; and interpolation, `$"Hello, {name}!"` and `$$"""{ "n": {{n}} }"""`, any expression, `null` as nothing, a brace doubled or escaped in a single-line one, on both VMs, and in pages' blocks, where a multi-line string never closed also names its block's `<%`. Recorded as approved in the specification, section 3.5 ("Strings"), and its decision register, the details as Proposed in section 15.2 ("Multi-line and interpolated strings"), with WL1011 and WL1012 (section 8.4). The parser reads an interpolated string into the syntax of `+` and a hidden class's `of(value)`, written in WebLingo, which gives `""` for `null` and else `value.toString()`, so that nothing after the parser is new. Guessed: `"""a"""` on one line is a raw string too, as C# has it; an interpolation in a multi-line string stays on one line; interpolations nest at most 32 deep. A11's formats need their language decided: "Interpolation Formats", below; until then a format is WL1001. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples and a script of such strings, on Windows only; Linux not tried.
