@@ -1121,3 +1121,13 @@ Q7, components found at run time (A13): each is compiled on first use and kept, 
 A7: Yes.
 
 Done (Claude, 2026-11-13, `c45b3aa`): recorded as approved in the specification, section 13 ("Contracts") and section 3.5 (functions' default values). A4's question, `param` as a keyword of the language, is asked with the module system in "Modules: `import` and `param`"; functions' default values are the task "Default Parameter Values".
+
+## [DONE] Classes That Extend Array, Map and Set
+
+A1 of "Typed Catches Syntax: Classes of Values": classes may extend `Array`, `Map` and `Set` (specification, section 3.7, "Classes of values"), on both VMs. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for the answers to "Classes of Values, Continued".
+
+2026-11-13: answered; next, with A1's `A.equal(e)` for a catch whose name is not a class, and the NOTE's static members by assignment.
+
+Done (Claude, 2026-11-13, `439330d`): `class Stack extends Array { … }`, and `Map` and `Set` likewise: `new Stack()` is an array of class `Stack`, with its methods and fields, written `Stack [1, 2]`; `new Array()`, `new Map()` and `new Set()` make empty ones; a catch, or `is`, whose name is not a class calls its `equal()` (A1); and assigning a class a member it has not declares a static one (the NOTE), on both VMs. No new operation: a classed collection's value is marked, so that plain collections cost nothing more (the first try, which looked at the heap, was 5 to 8% slower on `collections`; now within the noise). Choices of mine, in section 15.2 as proposed (row "Classes extending `Array`, `Map` and `Set`"): a member is a field, then a class's method, then the collection's own, so a class may override `push`, but `super.push(…)` is WS3006; the text shows no fields; `dispose()` and `using` do not apply to such a collection yet. `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class` stay sealed until "Classes of Values, Further" is answered. Two conformance cases removed for your decisions (`A.x = 1;` and `class S extends Array {}` no longer fail). Every new conformance case gives the same result on both VMs. Build and 1,252 tests pass on Windows; Linux not tried.
