@@ -1320,4 +1320,4 @@ Q5, `new Class()` (A9) needs what "Adding Methods at Run Time" describes, a func
 
 A5: (a)
 
-Done (Claude, 2026-11-13): recorded as approved in the specification, section 3.7 ("Classes of values"), with parts 6 and 7 in section 9 ("Extending the classes of values") for A4's text and A3's operators, each a task below; A5's design is the task "Building Classes at Run Time".
+Done (Claude, 2026-11-13, `e871811`): recorded as approved in the specification, section 3.7 ("Classes of values"), with parts 6 and 7 in section 9 ("Extending the classes of values") for A4's text and A3's operators, each a task below; A5's design is the task "Building Classes at Run Time".
