@@ -134,7 +134,7 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 
 2026-11-13: M0.13 now, after M0.12, templates (specification, section 9); waits for M0.12.
 
-## Adding Methods at Run Time
+## [WORKING] Adding Methods at Run Time
 
 `extend` (see "Classes of Values, Extensions") adds methods to a class as a declaration, written once in the source, its methods having `this` as a class's do. This task would add a way to do the same while the program runs, for a method, or a class to give it to, that is known only then: chosen by a condition, built by a factory, or named by data. Discussed with the owner, 2026-11-13; added by Claude the same day.
 
@@ -160,6 +160,8 @@ A2: (a)
 **Q3: may a method attached at run time be removed again (`Point.removeMethod("describe")`)? (a) no; (b) yes.**
 
 A3: (b)
+
+Done (Claude, 2026-11-14): A1 and A2 were built with "Extending the Classes of Values: `Class`, Making Classes" (`d009021`), `addMethod` since named `setMethod`; A3, `Point.removeMethod(name)`, on both VMs, with conformance tests, recorded as approved in the specification, section 3.7, its choices in section 15.2 ("Classes made while the program runs"): it gives whether the class had the method, and removes a declared method as one given while the program runs, both being a class's own methods alike. That declared classes and classes made while the program runs share one implementation is "Internals on Par with Script", below. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
 
 ## Native Code Extensions
 

@@ -453,6 +453,9 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class Celsius extends Number {} writeLn([new Integer(\"10\"), new Number(\"2.5\"), new Boolean(\"false\"), new Celsius(\"21.5\")]);", "[10, 2.5, false, Celsius:21.5]")]
     [InlineData("class C { static var count = 0; } class D extends C {} var p = new C(); var q = new D(); p.count = 5; q.count = q.count + 1; p.other = 1; writeLn([C.count, p.count, q.count, p, C?.other]);", "[6, 6, 6, C {other: 1}, null]")]
     [InlineData("class Stack extends Array { static var made = 0; } var s = new Stack(); s.made = 3; writeLn([Stack.made, s]);", "[3, Stack:[]]")]
+    [InlineData("class A { hi() { return \"A\"; } } class B extends A { hi() { return \"B\"; } } var b = new B(); var before = b.hi(); var removed = [B.removeMethod(\"hi\"), B.removeMethod(\"hi\")]; writeLn([before, removed, b.hi()]);", "[\"B\", [true, false], \"A\"]")]
+    [InlineData("var P = new Class(\"P\"); P.setMethod(\"describe\", function (this) { return \"p\"; }); var p = new P(); var before = p.describe(); P.removeMethod(\"describe\"); try { p.describe(); } catch (e) { writeLn([before, e.code]); }", "[\"p\", \"WL3006\"]")]
+    [InlineData("class A { constructor(x) { this.x = x; } } class B extends A { constructor() { super(1); this.y = 2; } } B.removeMethod(\"constructor\"); writeLn(new B(5));", "B {x: 5}")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -656,6 +659,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("String.parse(\"x\");", "WL3006")]
     [InlineData("class K { static const max = 1; } new K().max = 2;", "WL3001")]
     [InlineData("class C {} var p = new C(); p.count = 1; writeLn(C.count);", "WL3006")]
+    [InlineData("class A {} A.removeMethod(5);", "WL3001")]
+    [InlineData("class A {} A.removeMethod();", "WL2006")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

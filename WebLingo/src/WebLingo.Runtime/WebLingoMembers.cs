@@ -9,6 +9,7 @@ namespace WebLingo.Runtime;
 public enum WebLingoMember : byte
 {
     Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, SetMethod, SetProperty, SetStaticProperty, SetConstant,
+    RemoveMethod,
     All, Any, Timeout, Parse,
     /// <summary>The names every value, or every class, has (section 3.7), last, so that one comparison finds them.</summary>
     ClassName, InstanceOf, Parent
@@ -38,6 +39,7 @@ public static class WebLingoMembers
         "equal" => WebLingoMember.Equal,
         "forget" => WebLingoMember.Forget,
         "setMethod" => WebLingoMember.SetMethod,
+        "removeMethod" => WebLingoMember.RemoveMethod,
         "setProperty" => WebLingoMember.SetProperty,
         "setStaticProperty" => WebLingoMember.SetStaticProperty,
         "setConstant" or "static:const" => WebLingoMember.SetConstant,
@@ -668,6 +670,7 @@ public static class WebLingoMembers
     public static bool IsClassMethod(WebLingoValue target, WebLingoMember member, WebLingoHeap heap) =>
         target.Kind == WebLingoValueKind.Class
         && (member is WebLingoMember.SetMethod or WebLingoMember.SetProperty or WebLingoMember.SetStaticProperty or WebLingoMember.SetConstant
+                or WebLingoMember.RemoveMethod
             || (member is WebLingoMember.All or WebLingoMember.Any or WebLingoMember.Timeout && heap.ValueClasses is { } classes
                 && classes[(int)WebLingoValueClass.Task] == target)
             || (member == WebLingoMember.Parse && ParsedKind(target, heap) != WebLingoValueKind.Null));
@@ -738,6 +741,20 @@ public static class WebLingoMembers
                 error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
                     $"'parse' reads a string, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
                 return false;
+            }
+            if (member == WebLingoMember.RemoveMethod)
+            {
+                // Point.removeMethod(name): whether the class had that method of its own (section 3.7).
+                if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+                if (values[first].Kind != WebLingoValueKind.String || !IsName(heap.GetString(values[first])))
+                {
+                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                        $"A member's name is a name, letters, digits and '_', not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                    return false;
+                }
+                result = WebLingoValue.FromBoolean(heap.RemoveMethod(target, heap.GetString(values[first])));
+                error = null;
+                return true;
             }
             return TryCallClassMethod(target, member, name, values, first, count, heap, out error);
         }

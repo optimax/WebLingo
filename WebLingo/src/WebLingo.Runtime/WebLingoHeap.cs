@@ -800,6 +800,27 @@ public sealed class WebLingoHeap
     /// <summary><c>Point.__className = name</c>: a class named, or renamed, or unnamed by an empty name (section 3.7).</summary>
     public void RenameClass(WebLingoValue classValue, string name) => Get<ClassObject>(classValue, WebLingoValueKind.Class).Name = name;
 
+    /// <summary>
+    /// <c>Point.removeMethod(name)</c>: a class's own method removed, declared or given while the program runs, its base's
+    /// of that name then reaching its instances; <c>constructor</c> its constructor, the class then acting as one that
+    /// declares none, and <c>destructor</c> its <c>dispose</c>. Whether it had one (section 3.7).
+    /// </summary>
+    public bool RemoveMethod(WebLingoValue classValue, string name)
+    {
+        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        if (name == "constructor")
+        {
+            if (target.DefaultConstructor) return false;
+            target.Constructor = WebLingoValue.Null;
+            target.DefaultConstructor = true;
+            return true;
+        }
+        if (!target.OwnMethods.Remove(name == "destructor" ? "dispose" : name)) return false;
+        _classVersion++;
+        Units--;
+        return true;
+    }
+
     /// <summary>Whether a class has a name; one <c>new Class()</c> made has none (section 3.7).</summary>
     public bool IsNamed(WebLingoValue classValue) => Get<ClassObject>(classValue, WebLingoValueKind.Class).Name.Length > 0;
 
