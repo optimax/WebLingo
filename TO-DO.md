@@ -134,16 +134,6 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 
 2026-11-13: M0.13 now, after M0.12, templates (specification, section 9); waits for M0.12.
 
-## [WORKING] Static Members Through Instances, Continued
-
-A follow-up to "Static Members Callable on Instances". Added by Claude, 2026-11-14.
-
-**Q1, `p.count = 5`, where `count` is a static field of `p`'s class: (a) it assigns a field of the instance, which then shadows the static, as built; (b) it assigns the static field, as Java does.**
-
-A1: (b) if the static field already exists.
-
-Done (Claude, 2026-11-14): recorded as approved in the specification, section 3.7 ("Static members"), on both VMs, with conformance tests; its choices recorded in section 15.2 ("Static members"): an instance's own field of that name, made before, still comes first, as reading one does, and a static method is not replaced through an instance. Checks: the Release build, without warnings, the full test suite, a timing of field assignments against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## Adding Methods at Run Time
 
 `extend` (see "Classes of Values, Extensions") adds methods to a class as a declaration, written once in the source, its methods having `this` as a class's do. This task would add a way to do the same while the program runs, for a method, or a class to give it to, that is known only then: chosen by a condition, built by a factory, or named by data. Discussed with the owner, 2026-11-13; added by Claude the same day.

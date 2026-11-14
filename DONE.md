@@ -1777,3 +1777,13 @@ The module system: `import`, static and dynamic, `export`, `param`, a script's p
 2026-11-14: split into the parts the specification defines in section 9 ("Modules"), each a task below. Waits for them.
 
 Done (Claude, 2026-11-14): every part section 9 defines has landed, on both VMs, the last a script's parameters (`3599f1d`). Checks: those of each part, on Windows only; Linux not tried.
+
+## [DONE] Static Members Through Instances, Continued
+
+A follow-up to "Static Members Callable on Instances". Added by Claude, 2026-11-14.
+
+**Q1, `p.count = 5`, where `count` is a static field of `p`'s class: (a) it assigns a field of the instance, which then shadows the static, as built; (b) it assigns the static field, as Java does.**
+
+A1: (b) if the static field already exists.
+
+Done (Claude, 2026-11-14, `3c20e93`): recorded as approved in the specification, section 3.7 ("Static members"), on both VMs, with conformance tests; its choices recorded in section 15.2 ("Static members"): an instance's own field of that name, made before, still comes first, as reading one does, and a static method is not replaced through an instance. Checks: the Release build, without warnings, the full test suite, a timing of field assignments against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
