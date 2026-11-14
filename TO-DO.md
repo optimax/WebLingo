@@ -88,18 +88,6 @@ A16: (a).
 
 2026-11-14: those are done, and the module system it needs too; split into the parts the specification defines in section 9 ("M0.12 parts"), each a task below. Waits for them.
 
-## [WORKING] M0.12.2: Includes
-
-`<% include "/includes/header.wlp"; %>`, textual, resolved and compiled with the page, a cycle of them an error of the templates' range, WL5001 on (specification, section 13, "Contracts", and section 9, M0.12.2), on both VMs. Added by Claude, 2026-11-14.
-
-Section 13 has a path starting with `/` be "from the application's root", which a host gives; `welp` needs a decision of its own, answerable with a letter.
-
-**Q1, the application's root under `welp`: (a) the folder of the page it is given; (b) the current folder; (c) an option, `welp run --root site page.wlp`, the page's folder when it is left out.**
-
-A1: (c), with site root under web server.
-
-Done (Claude, 2026-11-14): A1 recorded as approved in the specification, section 13 ("Contracts", "Includes"), and its decision register. `include "path";` in a block's code is replaced by the template it names, as if its text stood there, on both VMs; `welp run --root site page.wlp` gives the application's root, the page's folder when it is left out. Each file's positions are its own among the program's, so that an error in an included template, at compile time or at run time, names that template, at its own line and column. Guessed, and recorded as Proposed in section 15.2 ("Includes"): `include` is not a keyword, only the name followed by a string literal, in a statement block, being an include; `.wlp` is added to a path without an extension, as `.wl` is to an import's; a template that cannot be found or read, or is outside the root, is WL5002, a cycle WL5003, and includes nested more than 64 deep, or reading more than 16M characters in all, WL5004; the imports of an included template's code are found from the page's folder, its text standing in the page. Checks: the Release build, without warnings, the full test suite, and both command lines, on Windows only; Linux not tried.
-
 ## [IDLE] M0.12.3: Components
 
 `<% param product; %>` in a component, `renderComponent(path, values)`, a task, the component found and compiled when it runs, as `Module.import(…)` is, and a missing one's error (specification, section 13, "Contracts", and section 9, M0.12.3), on both VMs. Added by Claude, 2026-11-14.
