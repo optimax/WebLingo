@@ -60,11 +60,29 @@ A4:
 
 A5:
 
-## [IDLE] Task Combinators
+## [QUESTION] Task Combinators
 
 `Task.all`, `Task.any` and timeouts (A6 of "Asynchrony: `async` and `await`"; specification, section 3.8). Added by Claude, 2026-11-13.
 
 2026-11-13: waits for "M0.11: Asynchrony".
+
+2026-11-14: M0.11 is done; what they do needs the owner's decisions first. One decision each, answerable with "yes" or a letter.
+
+**Q1, `Task.all(values)`, an array of values, tasks or not, gives a task that completes with an array of their results, in their order, once all have; when one faults: (a) it faults at once with that exception, as JavaScript's `Promise.all` does, the others going on, observed; (b) once all are done, with the first exception in their order.**
+
+A1:
+
+**Q2, `Task.any(values)`: (a) the first to complete, with its result, or faulting with its exception (JavaScript's `Promise.race`); (b) the first to complete with a result, faulting only if all fault, with an error holding their exceptions (JavaScript's `Promise.any`).**
+
+A2:
+
+**Q3, a timeout: (a) `Task.timeout(task, milliseconds)`, a task that gives the task's result, or faults with a `TimeoutError` (a new class extending `Error`, with a code of its own) if it takes longer, the task itself going on; (b) the same as a method of tasks, `t.timeout(milliseconds)`.**
+
+A3:
+
+**Q4, where they live: (a) static methods of `Task`, as section 3.8 names them; (b) a standard module, `std:tasks`, once modules exist.**
+
+A4:
 
 ## [QUESTION] Modules, Quoted Parameters
 
