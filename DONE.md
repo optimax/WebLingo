@@ -1436,3 +1436,33 @@ Done (Claude, 2026-11-14, `e992b43`): recorded as approved in the specification,
 The scheme `std:`, and `std:system`, which every module imports, with `write` and `writeLn` (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
 
 Done (Claude, 2026-11-14, `318f33a`): `std:system`, the host's built-ins, on both VMs, with its tests in `ModuleTests`; its choices are recorded as Proposed in the specification, section 15.2 ("Modules"). It needed no dynamic imports. Other standard modules (`std:fs`) come with the services they give. Checks: the Release build, without warnings, the 1,549 tests, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Properties
+
+With getters and setters.
+
+The design needs the owner's decisions first. One decision each, answerable with "yes" or a letter. Questions added by Claude, 2026-11-14.
+
+Q1, declaring one: (a) `get area() { return this.w * this.h; }` and `set area(value) { … }` in a class, as JavaScript does; (b) a block, `property area { get { … } set(value) { … } }`, as C# groups them.
+
+A1: (b)
+
+Q2, using one: `p.area` runs its getter, and `p.area = 5` its setter, with `5`; a property with only a getter cannot be assigned (WL3001), and one with only a setter cannot be read (WL3006). Agreed?
+
+A2: Yes.
+
+Q3, a property and a field of the same name: (a) the property wins, always, so a setter keeps its value in a field of another name (`this._area`), as in JavaScript; (b) a property's own field, `field` inside its getter and setter, as C# 14 has it, which nothing else can reach.
+
+A3: (b)
+
+Q4, where else: static properties (`static get count() { … }`), properties in `extend` blocks, a subclass's replacing its base's, and `super.area` reading the base's, all as methods do. Agreed?
+
+A4: Yes.
+
+Q5, text: `write` writes an instance's fields, as now, and not its properties, which are computed. Agreed?
+
+A5: Yes. That's what toString() overriding is for. How would it write the `field` of a property though? Presumably as property name.
+
+2026-11-14 (Claude): answered, and recorded as approved in the specification, section 3.7 ("Properties"), A5's `field` written under the property's name, as A5 presumes. The implementation, on both VMs, waits behind the tasks above it.
+
+Done (Claude, 2026-11-14, `e657f29`): on both VMs, with conformance tests; the choices the answers leave open are recorded as Proposed in the specification, section 15.2 ("Properties"), among them that a static property is reached through its class only, while "Static Members Through Instances, Continued" is open, and that a variable named `field` declared around a property does not reach into its accessors. The specification's section 3.7 wrote WS3001 and WS3006 for this task, and section 3.9 WS3001, which the renaming had missed: now WL3001 and WL3006. Checks: the Release build, without warnings, the 1,605 tests, the benchmark against `main`'s (no workload slower beyond the machine's noise, `objects` within 0.2 percent on both VMs, once an assignment looked its class up once), and the CLI on the samples, on Windows only; Linux not tried.
