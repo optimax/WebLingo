@@ -1333,3 +1333,9 @@ Done (Claude, 2026-11-13, `81b722b`): for collections, on both VMs, with their c
 Classes extending them, whose instances hold a value, given by `super(value)`, which arithmetic, comparisons and `==` use, written `Celsius(21.5)`; and `new` on those classes (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
 
 Done (Claude, 2026-11-13, `fb8815d`): on both VMs, with their conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Classes holding a value"), two of them asked in "Classes of Values, Constructors". Checks: the Release build, without warnings, the 1,476 tests, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Extending the Classes of Values: `Function`
+
+`new Function(f)`, `new Function()`, and classes extending `Function`, whose instances are functions with methods of their own (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
+
+Done (Claude, 2026-11-13, `ab81414`): on both VMs, with their conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Classes holding a value"): `new Function()` is an instance of `Function` holding a function that does nothing, written `Function:function`. Checks: the Release build, without warnings, the 1,492 tests, and the CLI on the samples, on Windows only; Linux not tried.
