@@ -48,24 +48,6 @@ A9: Well, internally `Class` is represented by some object, right? `new Class()`
 
 2026-11-13: waits for the answers to "Classes of Values, Extensions".
 
-## [IDLE] M0.11: Asynchrony
-
-`async` functions and methods, `await`, tasks, and asynchronous disposal (specification, section 3.8), on both VMs, before M0.12's templates, which use them. Added by Claude, 2026-11-13.
-
-2026-11-13: waits for the answers to "Asynchrony, Continued", whose first question, concurrency, shapes it.
-
-2026-11-13: answered; it is M0.11 (specification, section 9), after the tasks above it.
-
-2026-11-13: M0.11 is split into the parts the specification defines in section 9 ("M0.11 parts"), each a task below. Waits for them.
-
-Done (Claude, 2026-11-13): its last part, M0.11.2, landed.
-
-## [WORKING] M0.11.2: Asynchronous Disposal
-
-An `async` `dispose()`, which `using` awaits, and WS3001 where it cannot (specification, section 3.8), on both VMs. Added by Claude, 2026-11-13.
-
-Done (Claude, 2026-11-13): on both VMs, with their conformance tests. Its choices are recorded as Proposed in the specification, section 15.2 ("Asynchrony"); what `x.dispose()` gives when its disposal is `async` is asked in "Asynchronous Disposal, Continued", built meanwhile as that question's (a). Checks: the Release build, without warnings, the 1,398 tests, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## [QUESTION] Asynchronous Disposal, Continued
 
 What "M0.11.2: Asynchronous Disposal" left to the owner. Added by Claude, 2026-11-13.

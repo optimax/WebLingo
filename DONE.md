@@ -1165,3 +1165,21 @@ Done (Claude, 2026-11-13, `b0d3ff3`): recorded as approved in the specification,
 `async` functions, methods and function expressions, `await`, tasks, their exceptions, `t.forget()`, the end of an execution, `delay()`, and a benchmark workload (specification, sections 3.8 and 9), on both VMs. Added by Claude, 2026-11-13.
 
 Done (Claude, 2026-11-13, `1a7bee3`): on both VMs, with their conformance tests, and the benchmark's `async` workload (specification, section 5.6). The choices the specification leaves open are recorded as Proposed in its section 15.2 ("Asynchrony"), among them two codes, WS2014 (`await` outside an `async` function) and WS3009 (a task that nothing can complete); until M0.11.2, a disposal whose dispose method is `async` is WS3001 when it begins. Checks: the Release build, without warnings, the 1,363 tests, and the CLI on the samples and on programs that await, on Windows only; Linux not tried.
+
+## [DONE] M0.11: Asynchrony
+
+`async` functions and methods, `await`, tasks, and asynchronous disposal (specification, section 3.8), on both VMs, before M0.12's templates, which use them. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for the answers to "Asynchrony, Continued", whose first question, concurrency, shapes it.
+
+2026-11-13: answered; it is M0.11 (specification, section 9), after the tasks above it.
+
+2026-11-13: M0.11 is split into the parts the specification defines in section 9 ("M0.11 parts"), each a task below. Waits for them.
+
+Done (Claude, 2026-11-13, `9d3247e`): its last part, M0.11.2, landed.
+
+## [DONE] M0.11.2: Asynchronous Disposal
+
+An `async` `dispose()`, which `using` awaits, and WS3001 where it cannot (specification, section 3.8), on both VMs. Added by Claude, 2026-11-13.
+
+Done (Claude, 2026-11-13, `9d3247e`): on both VMs, with their conformance tests. Its choices are recorded as Proposed in the specification, section 15.2 ("Asynchrony"); what `x.dispose()` gives when its disposal is `async` is asked in "Asynchronous Disposal, Continued", built meanwhile as that question's (a). Checks: the Release build, without warnings, the 1,398 tests, and the CLI on the samples, on Windows only; Linux not tried.
