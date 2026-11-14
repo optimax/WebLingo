@@ -26,11 +26,15 @@
 
 2026-11-14: waits for Q3 of "Building Classes at Run Time, Continued", and for "Extending the Classes of Values: `Class`, Making Classes".
 
+2026-11-14: both done; the names are `__className`, `__instanceOf` and `__parent` (A3 of "Building Classes at Run Time, Continued").
+
 ## [IDLE] Extending the Classes of Values: `Class`, Properties and Constants
 
 `addProperty`, `addStaticProperty`, `addConstant` and `static const`, and replacing a class's static methods, properties and constants while the program runs (specification, section 3.7, and part 5.3 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
 
 2026-11-14: waits for Q1 and Q2 of "Building Classes at Run Time, Continued", and for "Extending the Classes of Values: `Class`, Making Classes".
+
+2026-11-14: both done; the methods are `setProperty`, `setStaticProperty` and `setConstant`, each adding its member the first time and replacing it after, and assignment replaces a static method (A1 and A2 of "Building Classes at Run Time, Continued").
 
 ## [IDLE] Extending the Classes of Values: `Class`, Metaclasses
 
@@ -54,7 +58,17 @@ A2: So, instead of add____ and set____, have just set____ with the semantics tha
 
 A3: Ugly, but effective: use `__className`, `__instanceOf`, and `__parent`.
 
-ASIDE: 
+Done (Claude, 2026-11-14): recorded as approved in the specification, section 3.7 ("Classes of values"), and in the parts of section 9 they change ("Extending the classes of values", parts 5.2 and 5.3). Whether `addMethod`, approved before A2, becomes `setMethod` too is asked in "Building Classes at Run Time: `addMethod`'s Name". Checks: the Release build, without warnings, and the full test suite, on Windows only; Linux not tried.
+
+## [QUESTION] Building Classes at Run Time: `addMethod`'s Name
+
+A follow-up to A2 of "Building Classes at Run Time, Continued", which names `setProperty`, `setStaticProperty` and `setConstant`, each adding its member the first time and replacing it after, as `addMethod` (A3 of "Building Classes at Run Time", implemented in `d009021`) already does for methods. Added by Claude, 2026-11-14.
+
+**Q1, `addMethod`: (a) renamed `setMethod`, so that every member a program gives a class while it runs has a `set…` method; (b) kept `addMethod`.**
+
+A1:
+
+ASIDE: `Point.__instanceOf` == `Class`, right? What about `Class.
 
 ## Task Combinators
 
