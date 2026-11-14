@@ -6,7 +6,7 @@
     <TieredCompilation>false</TieredCompilation>
   </PropertyGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Workloads/*.ws" LogicalName="Workloads/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Workloads/*.wl" LogicalName="Workloads/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/WebLingo.Compiler/WebLingo.Compiler.csproj" />

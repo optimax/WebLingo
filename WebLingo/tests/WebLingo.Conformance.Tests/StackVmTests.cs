@@ -75,8 +75,8 @@ public sealed class StackVmTests
             var register = RunOnRegisterVm(source, 100_000);
             var stack = RunOnStackVm(source, 100_000);
             // The two VMs count different instructions, so a program that runs out of its budget stops at different places.
-            if (register.Error.StartsWith(WsDiagnosticCodes.BudgetExceeded, StringComparison.Ordinal)
-                || stack.Error.StartsWith(WsDiagnosticCodes.BudgetExceeded, StringComparison.Ordinal))
+            if (register.Error.StartsWith(WebLingoDiagnosticCodes.BudgetExceeded, StringComparison.Ordinal)
+                || stack.Error.StartsWith(WebLingoDiagnosticCodes.BudgetExceeded, StringComparison.Ordinal))
             {
                 continue;
             }
@@ -89,12 +89,12 @@ public sealed class StackVmTests
     [Fact]
     public void MalformedStackBytecodeFailsVerificationNotACrash()
     {
-        var module = new WsStackCompiler(Options)
+        var module = new WebLingoStackCompiler(Options)
             .Compile("var a = 10; var b = a * 2 - 3; function f(n) { return n + b; } var c = 0; c = -f(b) / a; writeLn(c);",
-                "base.ws").Module!;
+                "base.wl").Module!;
         var random = new Random(8_6);
-        var opCodes = Enum.GetValues<WsStackOpCode>();
-        var vm = new WsStackVirtualMachine();
+        var opCodes = Enum.GetValues<WebLingoStackOpCode>();
+        var vm = new WebLingoStackVirtualMachine();
         var rejected = 0;
         for (var round = 0; round < 5_000; round++)
         {
@@ -106,27 +106,27 @@ public sealed class StackVmTests
                 {
                     0 => code[i] with
                     {
-                        OpCode = random.Next(8) == 0 ? (WsStackOpCode)random.Next(256) : opCodes[random.Next(opCodes.Length)]
+                        OpCode = random.Next(8) == 0 ? (WebLingoStackOpCode)random.Next(256) : opCodes[random.Next(opCodes.Length)]
                     },
                     1 => code[i] with { A = random.Next(-2, 8) },
                     _ => code[i] with { B = random.Next(-2, 3) },
                 };
             }
             var mutated = module with { EntryPoint = module.EntryPoint with { Code = code } };
-            var context = new WsExecutionContext(new WsWorkerId(0))
+            var context = new WebLingoExecutionContext(new WebLingoWorkerId(0))
             {
-                Services = new WsBuiltinRegistry(WsStandardBuiltins.Create(new WsCollectedOutput())),
+                Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(new WebLingoCollectedOutput())),
                 InstructionBudget = 10_000,
             };
             var result = vm.Execute(mutated, context);
             Assert.True(result.Succeeded || result.Error is not null);
-            if (result.Error?.Code == WsDiagnosticCodes.BytecodeVerificationFailure) rejected++;
+            if (result.Error?.Code == WebLingoDiagnosticCodes.BytecodeVerificationFailure) rejected++;
         }
         Assert.InRange(rejected, 1, 5_000);
     }
 
-    private static readonly WsCompilerOptions Options =
-        new([new WsBuiltinDeclaration("write", 1), new WsBuiltinDeclaration("writeLn", 1), new WsBuiltinDeclaration("delay", 1)]);
+    private static readonly WebLingoCompilerOptions Options =
+        new([new WebLingoBuiltinDeclaration("write", 1), new WebLingoBuiltinDeclaration("writeLn", 1), new WebLingoBuiltinDeclaration("delay", 1)]);
 
     /// <summary>What a program gives: its diagnostics, its output, and its runtime error, each as text.</summary>
     private sealed record Outcome(string[] Diagnostics, string Output, string Error)
@@ -141,30 +141,30 @@ public sealed class StackVmTests
 
     private static Outcome RunOnRegisterVm(string source, long budget)
     {
-        var compiled = new WsCompiler(Options).Compile(source, "program.ws");
-        var output = new WsCollectedOutput();
-        var result = compiled.Module is { } module ? new WsVirtualMachine().Execute(module, Context(output, budget)) : null;
+        var compiled = new WebLingoCompiler(Options).Compile(source, "program.wl");
+        var output = new WebLingoCollectedOutput();
+        var result = compiled.Module is { } module ? new WebLingoVirtualMachine().Execute(module, Context(output, budget)) : null;
         return OutcomeOf(compiled.Diagnostics, output, result);
     }
 
     private static Outcome RunOnStackVm(string source, long budget)
     {
-        var compiled = new WsStackCompiler(Options).Compile(source, "program.ws");
-        var output = new WsCollectedOutput();
-        var result = compiled.Module is { } module ? new WsStackVirtualMachine().Execute(module, Context(output, budget)) : null;
+        var compiled = new WebLingoStackCompiler(Options).Compile(source, "program.wl");
+        var output = new WebLingoCollectedOutput();
+        var result = compiled.Module is { } module ? new WebLingoStackVirtualMachine().Execute(module, Context(output, budget)) : null;
         return OutcomeOf(compiled.Diagnostics, output, result);
     }
 
-    private static WsExecutionContext Context(IWsTextOutput output, long budget) =>
-        new(new WsWorkerId(0))
+    private static WebLingoExecutionContext Context(IWebLingoTextOutput output, long budget) =>
+        new(new WebLingoWorkerId(0))
         {
-            Services = new WsBuiltinRegistry(WsStandardBuiltins.Create(output)),
+            Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output)),
             InstructionBudget = budget,
         };
 
-    private static Outcome OutcomeOf(IReadOnlyList<WsDiagnostic> diagnostics, WsCollectedOutput output, WsExecutionResult? result) =>
+    private static Outcome OutcomeOf(IReadOnlyList<WebLingoDiagnostic> diagnostics, WebLingoCollectedOutput output, WebLingoExecutionResult? result) =>
         new([.. diagnostics.Select(Describe)], output.Text, result?.Error is { } error ? Describe(error) : "");
 
-    private static string Describe(WsDiagnostic diagnostic) =>
+    private static string Describe(WebLingoDiagnostic diagnostic) =>
         $"{diagnostic.Code} at {diagnostic.Span.Start}+{diagnostic.Span.Length}: {diagnostic.Message}";
 }

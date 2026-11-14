@@ -48,7 +48,7 @@ public sealed class VirtualMachineTests
         var source = "var big = 9223372036854775807;\nwriteLn(1);\nvar bigger = big + 1;\nwriteLn(2);";
         var (result, lines) = Run(source);
         Assert.Equal(new[] { "1" }, lines);
-        Assert.Equal(WsDiagnosticCodes.IntegerOverflow, result.Error!.Code);
+        Assert.Equal(WebLingoDiagnosticCodes.IntegerOverflow, result.Error!.Code);
         Assert.Equal(source.IndexOf("big + 1", StringComparison.Ordinal), result.Error.Span.Start);
     }
 
@@ -56,9 +56,9 @@ public sealed class VirtualMachineTests
     public void AnInstructionBudgetStopsTheProgram()
     {
         var module = Compile("writeLn(1); writeLn(2); writeLn(3);");
-        var output = new WsCollectedOutput();
-        var result = new WsVirtualMachine().Execute(module, Context(output) with { InstructionBudget = 4 });
-        Assert.Equal(WsDiagnosticCodes.BudgetExceeded, result.Error!.Code);
+        var output = new WebLingoCollectedOutput();
+        var result = new WebLingoVirtualMachine().Execute(module, Context(output) with { InstructionBudget = 4 });
+        Assert.Equal(WebLingoDiagnosticCodes.BudgetExceeded, result.Error!.Code);
         Assert.Equal(new[] { "1", "2" }, output.Lines);
         Assert.Equal(4, result.Instructions);
     }
@@ -67,7 +67,7 @@ public sealed class VirtualMachineTests
     public void TheResultCountsTheInstructionsRun()
     {
         // Three times LoadConstant and CallBuiltin, then Return.
-        var result = new WsVirtualMachine().Execute(Compile("writeLn(1); writeLn(2); writeLn(3);"), Context(new WsCollectedOutput()));
+        var result = new WebLingoVirtualMachine().Execute(Compile("writeLn(1); writeLn(2); writeLn(3);"), Context(new WebLingoCollectedOutput()));
         Assert.True(result.Succeeded);
         Assert.Equal(7, result.Instructions);
     }
@@ -76,9 +76,9 @@ public sealed class VirtualMachineTests
     public void ARegisterBudgetKeepsAModuleFromRunning()
     {
         var module = Compile("var a = 1; var b = 2; writeLn(a + b);");
-        var output = new WsCollectedOutput();
-        var result = new WsVirtualMachine().Execute(module, Context(output) with { Resources = new WsResourceBudget(2) });
-        Assert.Equal(WsDiagnosticCodes.BudgetExceeded, result.Error!.Code);
+        var output = new WebLingoCollectedOutput();
+        var result = new WebLingoVirtualMachine().Execute(module, Context(output) with { Resources = new WebLingoResourceBudget(2) });
+        Assert.Equal(WebLingoDiagnosticCodes.BudgetExceeded, result.Error!.Code);
         Assert.Empty(output.Lines);
     }
 
@@ -86,33 +86,33 @@ public sealed class VirtualMachineTests
     public void CancellationStopsAnEndlessProgram()
     {
         // An endless loop, which the compiler cannot write yet: 0: r0 = 1; 1: r0 = -r0; 2: jump 1.
-        var module = new WsCompiledModule("loop", [WsConstant.Int64(1)], [],
-            new WsFunction("main", 1, 0, [
-                new WsInstruction(WsOpCode.LoadConstant, 0, 0), new WsInstruction(WsOpCode.Negate, 0, 0),
-                new WsInstruction(WsOpCode.Jump, 1)
+        var module = new WebLingoCompiledModule("loop", [WebLingoConstant.Int64(1)], [],
+            new WebLingoFunction("main", 1, 0, [
+                new WebLingoInstruction(WebLingoOpCode.LoadConstant, 0, 0), new WebLingoInstruction(WebLingoOpCode.Negate, 0, 0),
+                new WebLingoInstruction(WebLingoOpCode.Jump, 1)
             ]));
-        var signal = new WsCancellationSignal();
+        var signal = new WebLingoCancellationSignal();
         signal.Cancel();
-        var result = new WsVirtualMachine().Execute(module, new WsExecutionContext(new WsWorkerId(1)) { Cancellation = signal });
-        Assert.Equal(WsDiagnosticCodes.Cancelled, result.Error!.Code);
+        var result = new WebLingoVirtualMachine().Execute(module, new WebLingoExecutionContext(new WebLingoWorkerId(1)) { Cancellation = signal });
+        Assert.Equal(WebLingoDiagnosticCodes.Cancelled, result.Error!.Code);
 
-        var budgeted = new WsVirtualMachine().Execute(module, new WsExecutionContext(new WsWorkerId(1)) { InstructionBudget = 100_000 });
-        Assert.Equal(WsDiagnosticCodes.BudgetExceeded, budgeted.Error!.Code);
+        var budgeted = new WebLingoVirtualMachine().Execute(module, new WebLingoExecutionContext(new WebLingoWorkerId(1)) { InstructionBudget = 100_000 });
+        Assert.Equal(WebLingoDiagnosticCodes.BudgetExceeded, budgeted.Error!.Code);
     }
 
     [Fact]
     public void GarbageStringsAreCollectedAsTheProgramRuns()
     {
-        var output = new WsCollectedOutput();
-        var compiled = new WsCompiler(WithWrite).Compile(
+        var output = new WebLingoCollectedOutput();
+        var compiled = new WebLingoCompiler(WithWrite).Compile(
             "var t = \"\"; for (var i = 0; i < 20000; i = i + 1) { t = \"abcdefghij\" + \"klmnopqrst\"; } writeLn(t);",
-            "test.ws");
-        var context = new WsExecutionContext(new WsWorkerId(0))
+            "test.wl");
+        var context = new WebLingoExecutionContext(new WebLingoWorkerId(0))
         {
-            Services = new WsBuiltinRegistry(WsStandardBuiltins.Create(output)),
-            Resources = new WsResourceBudget(65535, MaxHeapUnits: 10_000)
+            Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output)),
+            Resources = new WebLingoResourceBudget(65535, MaxHeapUnits: 10_000)
         };
-        var result = new WsVirtualMachine().Execute(compiled.Module!, context);
+        var result = new WebLingoVirtualMachine().Execute(compiled.Module!, context);
         Assert.True(result.Succeeded, result.Error?.Message);
         Assert.Equal(new[] { "abcdefghijklmnopqrst" }, output.Lines);
     }
@@ -120,21 +120,21 @@ public sealed class VirtualMachineTests
     [Fact]
     public void AStringGrowingPastTheBudgetStopsTheProgram()
     {
-        var compiled = new WsCompiler(WithWrite).Compile(
-            "var t = \"x\"; while (true) t = t + t;", "test.ws");
-        var context = new WsExecutionContext(new WsWorkerId(0)) { Resources = new WsResourceBudget(65535, MaxHeapUnits: 100_000) };
-        var result = new WsVirtualMachine().Execute(compiled.Module!, context);
-        Assert.Equal(WsDiagnosticCodes.BudgetExceeded, result.Error!.Code);
+        var compiled = new WebLingoCompiler(WithWrite).Compile(
+            "var t = \"x\"; while (true) t = t + t;", "test.wl");
+        var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Resources = new WebLingoResourceBudget(65535, MaxHeapUnits: 100_000) };
+        var result = new WebLingoVirtualMachine().Execute(compiled.Module!, context);
+        Assert.Equal(WebLingoDiagnosticCodes.BudgetExceeded, result.Error!.Code);
     }
 
     [Fact]
     public void AModuleThatFailsVerificationIsNotRun()
     {
-        var module = new WsCompiledModule("bad", [], [new WsImport("writeLn", 1)],
-            new WsFunction("main", 1, 0, [new WsInstruction(WsOpCode.CallBuiltin, 0, 0, 0, 1), new WsInstruction(WsOpCode.Return)]));
-        var output = new WsCollectedOutput();
-        var result = new WsVirtualMachine().Execute(module, Context(output));
-        Assert.Equal(WsDiagnosticCodes.BytecodeVerificationFailure, result.Error!.Code);
+        var module = new WebLingoCompiledModule("bad", [], [new WebLingoImport("writeLn", 1)],
+            new WebLingoFunction("main", 1, 0, [new WebLingoInstruction(WebLingoOpCode.CallBuiltin, 0, 0, 0, 1), new WebLingoInstruction(WebLingoOpCode.Return)]));
+        var output = new WebLingoCollectedOutput();
+        var result = new WebLingoVirtualMachine().Execute(module, Context(output));
+        Assert.Equal(WebLingoDiagnosticCodes.BytecodeVerificationFailure, result.Error!.Code);
         Assert.Empty(output.Lines);
     }
 
@@ -142,22 +142,22 @@ public sealed class VirtualMachineTests
     public void AnImportTheHostDoesNotOfferIsNotRun()
     {
         var module = Compile("writeLn(1);");
-        var result = new WsVirtualMachine().Execute(module, new WsExecutionContext(new WsWorkerId(0)));
-        Assert.Equal(WsDiagnosticCodes.UndefinedIdentifier, result.Error!.Code);
+        var result = new WebLingoVirtualMachine().Execute(module, new WebLingoExecutionContext(new WebLingoWorkerId(0)));
+        Assert.Equal(WebLingoDiagnosticCodes.UndefinedIdentifier, result.Error!.Code);
     }
 
     [Fact]
     public void AModuleReadingARegisterBeforeWritingItIsNotRun()
     {
         // 0: r1 = r0; 1: writeLn(r1). r0 is never written: the verifier rejects the module, so print never sees it.
-        var module = new WsCompiledModule("leak", [], [new WsImport("writeLn", 1)],
-            new WsFunction("main", 2, 1, [
-                new WsInstruction(WsOpCode.Move, 1, 0), new WsInstruction(WsOpCode.CallBuiltin, 1, 0, 1, 1),
-                new WsInstruction(WsOpCode.Return)
+        var module = new WebLingoCompiledModule("leak", [], [new WebLingoImport("writeLn", 1)],
+            new WebLingoFunction("main", 2, 1, [
+                new WebLingoInstruction(WebLingoOpCode.Move, 1, 0), new WebLingoInstruction(WebLingoOpCode.CallBuiltin, 1, 0, 1, 1),
+                new WebLingoInstruction(WebLingoOpCode.Return)
             ]));
-        var output = new WsCollectedOutput();
-        var result = new WsVirtualMachine().Execute(module, Context(output));
-        Assert.Equal(WsDiagnosticCodes.BytecodeVerificationFailure, result.Error!.Code);
+        var output = new WebLingoCollectedOutput();
+        var result = new WebLingoVirtualMachine().Execute(module, Context(output));
+        Assert.Equal(WebLingoDiagnosticCodes.BytecodeVerificationFailure, result.Error!.Code);
         Assert.Empty(output.Lines);
     }
 
@@ -165,9 +165,9 @@ public sealed class VirtualMachineTests
     public void ABuiltinThatThrowsIsARuntimeErrorNotACrash()
     {
         var module = Compile("writeLn(1);");
-        var context = new WsExecutionContext(new WsWorkerId(0)) { Services = new WsBuiltinRegistry(new ThrowingPrint()) };
-        var result = new WsVirtualMachine().Execute(module, context);
-        Assert.Equal(WsDiagnosticCodes.InvalidOperation, result.Error!.Code);
+        var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = new WebLingoBuiltinRegistry(new ThrowingPrint()) };
+        var result = new WebLingoVirtualMachine().Execute(module, context);
+        Assert.Equal(WebLingoDiagnosticCodes.InvalidOperation, result.Error!.Code);
         Assert.Contains("broken", result.Error.Message);
     }
 
@@ -179,30 +179,30 @@ public sealed class VirtualMachineTests
         Assert.Empty(lines);
     }
 
-    private sealed class ThrowingPrint : IWsBuiltinFunction
+    private sealed class ThrowingPrint : IWebLingoBuiltinFunction
     {
         public string Name => "writeLn";
         public int Arity => 1;
-        public bool TryInvoke(WsValue[] arguments, WsHeap heap, out WsValue result, out WsRuntimeError? error) =>
+        public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
             throw new InvalidOperationException("broken output");
     }
 
-    private static readonly WsCompilerOptions WithWrite = new([new WsBuiltinDeclaration("write", 1), new WsBuiltinDeclaration("writeLn", 1)]);
+    private static readonly WebLingoCompilerOptions WithWrite = new([new WebLingoBuiltinDeclaration("write", 1), new WebLingoBuiltinDeclaration("writeLn", 1)]);
 
-    private static WsCompiledModule Compile(string source)
+    private static WebLingoCompiledModule Compile(string source)
     {
-        var compiled = new WsCompiler(WithWrite).Compile(source, "test.ws");
+        var compiled = new WebLingoCompiler(WithWrite).Compile(source, "test.wl");
         Assert.Empty(compiled.Diagnostics);
         return compiled.Module!;
     }
 
-    private static WsExecutionContext Context(IWsTextOutput output) =>
-        new(new WsWorkerId(0)) { Services = new WsBuiltinRegistry(WsStandardBuiltins.Create(output)) };
+    private static WebLingoExecutionContext Context(IWebLingoTextOutput output) =>
+        new(new WebLingoWorkerId(0)) { Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output)) };
 
-    private static (WsExecutionResult Result, IReadOnlyList<string> Lines) Run(string source)
+    private static (WebLingoExecutionResult Result, IReadOnlyList<string> Lines) Run(string source)
     {
-        var output = new WsCollectedOutput();
-        var result = new WsVirtualMachine().Execute(Compile(source), Context(output));
+        var output = new WebLingoCollectedOutput();
+        var result = new WebLingoVirtualMachine().Execute(Compile(source), Context(output));
         return (result, output.Lines);
     }
 }

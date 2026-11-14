@@ -1,1 +1,1 @@
-return WebLingo.Benchmarks.WsBenchmarkCommand.Run(args, Console.Out, Console.Error);
+return WebLingo.Benchmarks.WebLingoBenchmarkCommand.Run(args, Console.Out, Console.Error);

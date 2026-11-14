@@ -2,7 +2,7 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## Rename WebScript's Leftovers to WebLingo
+## [WORKING] Rename WebScript's Leftovers to WebLingo
 
 The project was renamed from WebScript to WebLingo (specification, section 1), but kept WebScript's `ws` in its file extensions, its diagnostic codes, its specification IDs and its type names. The owner decided, 2026-11-13, in a chat with Claude, to rename them all now, while nothing is released: "Better now than later." Added by Claude, 2026-11-14.
 
@@ -14,6 +14,16 @@ The project was renamed from WebScript to WebLingo (specification, section 1), b
 - **No backward compatibility:** the old extension is not accepted, and the old codes and names are not kept as aliases (the owner: "Don't worry about backwards compatibility. We are building and designing the system as we speak.").
 
 Where it reaches: the CLI and anything else that looks at an extension; the samples, and the benchmark's workloads (`Workloads/*.ws`); every test that writes a source file or checks a code (`program.ws`, `"WS2001"`); `WsDiagnosticCodes` and every `Ws` type, in every project; the specification (sections 1, 1.1, 2.2, 6.9, 8.4, 13, 15.2, and every `WS-` ID and `WS` code), `Documents/implementation.md` (sections 1, 7, 12, and its paths), `Documents/NativeCompatibility.md`, `WebLingo/README.md`, `TO-DO.md` and `DONE.md`'s open text, and the GitHub workflow if it names any. `Documents/implementation.md`, section 12, lists the extensions and the `WS` prefixes among the names not to change without asking: this task is the owner's asking, and the section is updated to the new names. The rename is mechanical, so it lands as one change, checked by the Release build, the full test suite, and the CLI run on the renamed samples, on both VMs.
+
+Done (Claude, 2026-11-14): as listed, on both VMs: 60 files renamed (the `Ws` types' and the samples' and workloads'), and every `WS` code and ID, `Ws` type name and `.ws` or `.wsp` in the solution, the documents and `TO-DO.md` (but this task's own text); recorded in the specification, sections 1 and 1.1, and `Documents/implementation.md`, sections 1, 5 and 12. `DONE.md` is left as written, a record of what was done under the old names. WSHI, the host interface's name (specification, section 6), is not in the list, and is asked in "WSHI". Checks: the Release build, without warnings, the 1,528 tests, and the CLI on the renamed samples, on Windows only; Linux not tried.
+
+## [QUESTION] WSHI
+
+A follow-up to "Rename WebScript's Leftovers to WebLingo". Added by Claude, 2026-11-14.
+
+**Q1, WSHI, the host-neutral interface's name (specification, sections 6.2, 6.6 and 6.8), WebScript's: (a) WLHI; (b) WSHI, as it is.**
+
+A1:
 
 ## [IDLE] Extending the Classes of Values
 
@@ -31,17 +41,15 @@ Where it reaches: the CLI and anything else that looks at an extension; the samp
 
 2026-11-13: waits for the design of "Building Classes at Run Time".
 
-## [QUESTION] Classes of Values, Constructors
-
 What "Extending the Classes of Values: `Boolean`, `Integer`, `Number` and `String`" chose where the answers so far leave it open (specification, section 15.2, "Classes holding a value"). One decision each, answerable with a letter. Added by Claude, 2026-11-13.
 
 **Q1, A7's "a class without a constructor passes its arguments on": (a) for every class, so that `class B extends A {}` makes `new B(1)` run `A`'s constructor with `1` (it is WS2006 now, a class without a constructor taking none); (b) only for a class holding a value, as built.**
 
-A1:
+A1: Only if A defines a constructor that takes a parameter. In general, supplying a parameter where none is expected is an error. This is a special case that saves calling base(1).
 
 **Q2, an arithmetic result not of its class's kind, `count / 2` where `Count` extends `Integer`, a binary64: (a) a plain value, `1.5`, as built; (b) WS3001.**
 
-A2:
+A2: (a)
 
 ## [QUESTION] Building Classes at Run Time
 
@@ -63,7 +71,7 @@ A3:
 
 A4:
 
-**Q5, `extends Class`: (a) WS3001 still, `new Class(…)` being how a program makes a class; (b) a class extending `Class` makes classes, `new Meta("Point")`, its methods becoming theirs as static ones, as a metaclass does.**
+**Q5, `extends Class`: (a) WL3001 still, `new Class(…)` being how a program makes a class; (b) a class extending `Class` makes classes, `new Meta("Point")`, its methods becoming theirs as static ones, as a metaclass does.**
 
 A5:
 
@@ -73,11 +81,11 @@ A5:
 
 2026-11-13: waits for "M0.11: Asynchrony".
 
-## [QUESTION] Modules, Continued
+## Modules, Continued
 
 Follow-ups to "Modules: `import` and `param`" (specification, section 3.9). One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
 
-**Q1, `Module.import(path)`: a module's top level is `async` (`exec()`), so it gives a task, which completes with the instance once the module has run, `var db = await Module.import("lib/db.ws");`. Agreed?**
+**Q1, `Module.import(path)`: a module's top level is `async` (`exec()`), so it gives a task, which completes with the instance once the module has run, `var db = await Module.import("lib/db.wl");`. Agreed?**
 
 A1: Yes.
 
@@ -85,19 +93,19 @@ A1: Yes.
 
 A2: (a)
 
-**Q3, a module's lifetime under a host: A2 runs a module once per execution, and section 2.3 once per application generation: (a) once per execution, a request's, its instance the request's own; (b) once per application generation, its instance shared by the requests, which then cannot change it, since a heap is one worker's (WS-P013).**
+**Q3, a module's lifetime under a host: A2 runs a module once per execution, and section 2.3 once per application generation: (a) once per execution, a request's, its instance the request's own; (b) once per application generation, its instance shared by the requests, which then cannot change it, since a heap is one worker's (WL-P013).**
 
 A3: (a)
 
-**Q4, `export` marks a `function`, `class`, `var` or `const` declaration at a module's top level, and an importer reads an exported `var` as it is when read (`db.count`); assigning it: (a) WS3001, an export being the module's to change; (b) allowed, as a member is assigned.**
+**Q4, `export` marks a `function`, `class`, `var` or `const` declaration at a module's top level, and an importer reads an exported `var` as it is when read (`db.count`); assigning it: (a) WL3001, an export being the module's to change; (b) allowed, as a member is assigned.**
 
 A4: (a)
 
-**Q5, importing names: (a) only the instance, `import util from "lib/util.ws";`, then `util.f()`; (b) names too, `import { f, g } from "lib/util.ws";`, as JavaScript does.**
+**Q5, importing names: (a) only the instance, `import util from "lib/util.wl";`, then `util.f()`; (b) names too, `import { f, g } from "lib/util.wl";`, as JavaScript does.**
 
 A5: (b), both forms allowed, really
 
-**Q6, a quoted parameter (A8): a shell removes the quotes of `value="10"`, so `weblingo` gets `value=10`, an integer: (a) quotes that reach it make a string, `value='"10"'` in a shell; (b) `weblingo run script.ws --string value=10` makes a string, whatever the value looks like.**
+**Q6, a quoted parameter (A8): a shell removes the quotes of `value="10"`, so `weblingo` gets `value=10`, an integer: (a) quotes that reach it make a string, `value='"10"'` in a shell; (b) `weblingo run script.wl --string value=10` makes a string, whatever the value looks like.**
 
 A6: "a shell removes the quotes " Does it? Have you checked?
 
@@ -113,7 +121,7 @@ The module system: `import`, static and dynamic, `export`, `param`, a script's p
 
 ## [IDLE] M0.12: Templates
 
-`.wsp` templates, with includes, layouts and parameterized components together (specification, section 13, WS-T001 to WS-T008), in `WebLingo.Templates`, with `WebLingo.Templates.Tests`, on both VMs, and a benchmark workload for template output (section 5.6). Their open contracts (the include and component syntax, context-aware escaping) will be proposed as questions. Added by Claude, 2026-11-13.
+`.wlp` templates, with includes, layouts and parameterized components together (specification, section 13, WL-T001 to WL-T008), in `WebLingo.Templates`, with `WebLingo.Templates.Tests`, on both VMs, and a benchmark workload for template output (section 5.6). Their open contracts (the include and component syntax, context-aware escaping) will be proposed as questions. Added by Claude, 2026-11-13.
 
 NOTE: WebLingo must be designed in a way that lends itself to using it outside of the templated web environment, as a general purpose, embeddable scripting language. Nothing in the language itself should depend on having templates. Propose a name for the technology that uses WebLingo and templates in a web server (classic-ASP-like). Maybe WebLingoPages?
 
@@ -121,9 +129,9 @@ To propose with it, from the chat (2026-11-13): `<%= value %>` writes `null` as 
 
 2026-11-13: waits for M0.10.
 
-2026-11-13: M0.10 is done. The questions below settle what sections 2.2 and 13 leave open, one decision each, answerable with "yes" or a letter. Once they are answered, M0.11 will be split into parts in the specification, as M0.10 was, with includes, layouts and components still released together (WS-T001).
+2026-11-13: M0.10 is done. The questions below settle what sections 2.2 and 13 leave open, one decision each, answerable with "yes" or a letter. Once they are answered, M0.11 will be split into parts in the specification, as M0.10 was, with includes, layouts and components still released together (WL-T001).
 
-Q1, how a `.wsp` runs: it compiles, through the same compiler and VM as a `.ws` (WS-T001), into a program that writes the page: its text as it stands, `<% … %>` as statements, `<%= … %>` and `<%- … %>` as writes of their expression, and `<%# … %>` as nothing. Agreed?
+Q1, how a `.wlp` runs: it compiles, through the same compiler and VM as a `.wl` (WL-T001), into a program that writes the page: its text as it stands, `<% … %>` as statements, `<%= … %>` and `<%- … %>` as writes of their expression, and `<%# … %>` as nothing. Agreed?
 
 A1: It compiles through a derivative compiler that incorporates the regular WebLingo compiler and extends it to support templating of web pages.
 
@@ -135,7 +143,7 @@ Q3, where a template writes: (a) where `write` writes, standard output under the
 
 A3: (a).
 
-Q4, the CLI: `weblingo run page.wsp` writes the page to standard output, and `weblingo check page.wsp` compiles it, its includes, layout and components included. Agreed?
+Q4, the CLI: `weblingo run page.wlp` writes the page to standard output, and `weblingo check page.wlp` compiles it, its includes, layout and components included. Agreed?
 
 A4: Yes. Weblingo being strictly the language text compiler. We need a different executable for the combined WebLingo+templates compiler.
 
@@ -151,7 +159,7 @@ Q7, line breaks: (a) the text is written exactly as it stands, every line break 
 
 A7: (b).
 
-Q8, includes: `<% include "/includes/header.wsp"; %>`, a statement whose path is a string literal, resolved and compiled with the page, as section 13 illustrates. Agreed?
+Q8, includes: `<% include "/includes/header.wlp"; %>`, a statement whose path is a string literal, resolved and compiled with the page, as section 13 illustrates. Agreed?
 
 A8: Yes. 
 
@@ -163,15 +171,15 @@ Q10, what an include sees: (a) the variables where it is included, as if its tex
 
 A10: (a). Also introduce `import` for the other case, so `include` is textual inclusion.
 
-Q11, layouts: `<% layout "/layouts/main.wsp"; %>`, at most one, before anything the page writes; the layout runs, and the page's own output comes where the layout calls `renderBody()`, as section 13 illustrates. Agreed?
+Q11, layouts: `<% layout "/layouts/main.wlp"; %>`, at most one, before anything the page writes; the layout runs, and the page's own output comes where the layout calls `renderBody()`, as section 13 illustrates. Agreed?
 
 A11: At moset one for a given page, but  alayout can itself have a layout, all the way down. The compiler must prevent dependency cycles (compile-time error).
 
-Q12, a layout's data, such as the page's title: (a) values given with it, `<% layout "/layouts/main.wsp", { title: "Products" }; %>`, which the layout reads as its parameters, so that the page's body can run, and stream, at `renderBody()` (WS-T003); (b) the page's top-level declarations, which the layout sees (`pageTitle` in section 13's example), the page's body then running before the layout writes anything, buffered.
+Q12, a layout's data, such as the page's title: (a) values given with it, `<% layout "/layouts/main.wlp", { title: "Products" }; %>`, which the layout reads as its parameters, so that the page's body can run, and stream, at `renderBody()` (WL-T003); (b) the page's top-level declarations, which the layout sees (`pageTitle` in section 13's example), the page's body then running before the layout writes anything, buffered.
 
 A12: (a).
 
-Q13, components: `renderComponent("/components/card.wsp", { product: p })`, where the compiler reads the path, a string literal, compiles the component with the page, and checks its parameters: (a) agreed; (b) a built-in instead, its path any string, the component found and compiled when it runs.
+Q13, components: `renderComponent("/components/card.wlp", { product: p })`, where the compiler reads the path, a string literal, compiles the component with the page, and checks its parameters: (a) agreed; (b) a built-in instead, its path any string, the component found and compiled when it runs.
 
 A13: (b), it's more flexible.
 
@@ -183,7 +191,7 @@ Q15, asynchrony: WebLingo has no `await` yet, so a component renders when it is 
 
 A15: Design async await first.
 
-Q16, template errors (a cycle of includes or layouts, a missing file, a path outside the application, a component's parameters): (a) a new range of codes, WS5001 on, for templates; (b) codes in the existing ranges, WS1xxx for what is wrong in a template's text, WS2xxx for the rest.
+Q16, template errors (a cycle of includes or layouts, a missing file, a path outside the application, a component's parameters): (a) a new range of codes, WL5001 on, for templates; (b) codes in the existing ranges, WL1xxx for what is wrong in a template's text, WL2xxx for the rest.
 
 A16: (a).
 
@@ -191,7 +199,7 @@ A16: (a).
 
 ## [IDLE] M0.13: WBC
 
-WBC, the bytecode's binary format, its writing and its reading, with verification (specification, sections 5.1, 5.3 and 5.5). Its encoding choices are proposed in the specification and not yet approved, and the format is the chosen VM's, so this waits for the choice between the VMs (WS-BC002) as well. Added by Claude, 2026-11-13.
+WBC, the bytecode's binary format, its writing and its reading, with verification (specification, sections 5.1, 5.3 and 5.5). Its encoding choices are proposed in the specification and not yet approved, and the format is the chosen VM's, so this waits for the choice between the VMs (WL-BC002) as well. Added by Claude, 2026-11-13.
 
 2026-11-13: waits for M0.11.
 
@@ -211,7 +219,7 @@ A1:
 
 What it needs:
 
-- **A function with a receiver.** A method is a function whose first, hidden parameter is `this` (specification, section 15.2, "Classes"), and a plain function expression has none (`this` in one is WS2009, unless a method around it lends its own). One way: a function expression may declare `this` as its first parameter, `function (this, prefix) { return prefix + this.x; }`, the parameter bound by a call's target (`p.describe("x = ")`), or given as an argument when the function is called directly (`describe(p, "x = ")`).
+- **A function with a receiver.** A method is a function whose first, hidden parameter is `this` (specification, section 15.2, "Classes"), and a plain function expression has none (`this` in one is WL2009, unless a method around it lends its own). One way: a function expression may declare `this` as its first parameter, `function (this, prefix) { return prefix + this.x; }`, the parameter bound by a call's target (`p.describe("x = ")`), or given as an argument when the function is called directly (`describe(p, "x = ")`).
 - **A way to attach it.** A built-in method of classes, `Point.addMethod("describe", describe)`, after which every instance of `Point`, and of its subclasses, has `describe`, with `this` bound, replacing a method of that name as an extension's does (the owner chose replacing for `extend`, 2026-11-13).
 
 Its cost: a class's members could change at any point of a run, so the same call could mean different things at different times, and the VMs could no longer gather a class's methods once, when it is made.
@@ -238,7 +246,7 @@ If text that rebuilds a value (round-trip text) is wanted, it is a serialization
 
 It is deferred: nothing needs it yet, and it can be added later, if it proves necessary, without changing `write`'s text or any program.
 
-## [QUESTION] Properties
+## Properties
 
 With getters and setters.
 
@@ -246,22 +254,26 @@ The design needs the owner's decisions first. One decision each, answerable with
 
 **Q1, declaring one: (a) `get area() { return this.w * this.h; }` and `set area(value) { … }` in a class, as JavaScript does; (b) a block, `property area { get { … } set(value) { … } }`, as C# groups them.**
 
-A1:
+A1: (b)
 
-**Q2, using one: `p.area` runs its getter, and `p.area = 5` its setter, with `5`; a property with only a getter cannot be assigned (WS3001), and one with only a setter cannot be read (WS3006). Agreed?**
+**Q2, using one: `p.area` runs its getter, and `p.area = 5` its setter, with `5`; a property with only a getter cannot be assigned (WL3001), and one with only a setter cannot be read (WL3006). Agreed?**
 
-A2:
+A2: Yes.
 
 **Q3, a property and a field of the same name: (a) the property wins, always, so a setter keeps its value in a field of another name (`this._area`), as in JavaScript; (b) a property's own field, `field` inside its getter and setter, as C# 14 has it, which nothing else can reach.**
 
-A3:
+A3: (b)
 
 **Q4, where else: static properties (`static get count() { … }`), properties in `extend` blocks, a subclass's replacing its base's, and `super.area` reading the base's, all as methods do. Agreed?**
 
-A4:
+A4: Yes.
 
 **Q5, text: `write` writes an instance's fields, as now, and not its properties, which are computed. Agreed?**
 
-A5:
+A5: Yes. That's what toString() overriding is for. How would it write the `field` of a property though? Presumably as property name.
+
+## Native Code Extensions
+
+Make it possible to install and bind native (C# on CLR, later Native C#) code as (external) modules extending the library available to scripts (like Python does for C).
 
 # END-OF-TO-DO

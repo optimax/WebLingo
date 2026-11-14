@@ -47,36 +47,36 @@ public sealed class LowererTests
         Assert.Equal(new[] { "init 0 = (-((1 + 2) * 3) / 4)" }, Lower("var v = -((1 + 2) * 3) / 4;").Statements.Select(Show));
     }
 
-    private static WsIrProgram Lower(string source)
+    private static WebLingoIrProgram Lower(string source)
     {
         var compilation = BinderTests.Compile(source);
         Assert.Empty(compilation.Diagnostics);
         return compilation.LoweredProgram!;
     }
 
-    private static string Show(WsIrStatement statement) => statement switch
+    private static string Show(WebLingoIrStatement statement) => statement switch
     {
-        WsIrInitializeLocal init => $"init {init.Local} = {Show(init.Value)}",
-        WsIrEvaluate evaluate => $"eval {Show(evaluate.Expression)}",
+        WebLingoIrInitializeLocal init => $"init {init.Local} = {Show(init.Value)}",
+        WebLingoIrEvaluate evaluate => $"eval {Show(evaluate.Expression)}",
         _ => "?"
     };
 
-    private static string Show(WsIrExpression expression) => expression switch
+    private static string Show(WebLingoIrExpression expression) => expression switch
     {
-        WsIrInt64Constant constant => constant.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        WsIrLoadLocal load => "load " + load.Local,
-        WsIrStoreLocal store => $"(store {store.Local} = {Show(store.Value)})",
-        WsIrUnary unary => $"{(unary.Operator == WsUnaryOperator.Negate ? "-" : "+")}{Show(unary.Operand)}",
-        WsIrBinary binary => $"({Show(binary.Left)} {Symbol(binary.Operator)} {Show(binary.Right)})",
-        WsIrCallBuiltin call => $"writeLn#{call.Builtin}({string.Join(", ", call.Arguments.Select(Show))})",
+        WebLingoIrInt64Constant constant => constant.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        WebLingoIrLoadLocal load => "load " + load.Local,
+        WebLingoIrStoreLocal store => $"(store {store.Local} = {Show(store.Value)})",
+        WebLingoIrUnary unary => $"{(unary.Operator == WebLingoUnaryOperator.Negate ? "-" : "+")}{Show(unary.Operand)}",
+        WebLingoIrBinary binary => $"({Show(binary.Left)} {Symbol(binary.Operator)} {Show(binary.Right)})",
+        WebLingoIrCallBuiltin call => $"writeLn#{call.Builtin}({string.Join(", ", call.Arguments.Select(Show))})",
         _ => "?"
     };
 
-    private static string Symbol(WsBinaryOperator op) => op switch
+    private static string Symbol(WebLingoBinaryOperator op) => op switch
     {
-        WsBinaryOperator.Add => "+",
-        WsBinaryOperator.Subtract => "-",
-        WsBinaryOperator.Multiply => "*",
+        WebLingoBinaryOperator.Add => "+",
+        WebLingoBinaryOperator.Subtract => "-",
+        WebLingoBinaryOperator.Multiply => "*",
         _ => "/"
     };
 }

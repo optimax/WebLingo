@@ -6,7 +6,7 @@ namespace WebLingo.Architecture.Tests;
 
 /// <summary>
 /// The portability inventory (<c>Documents/NativeCompatibility.md</c>), checked on the portable core's built
-/// assemblies (WS-P016): no type the inventory rules out for the core (adapter-only, prohibited, or not used) is
+/// assemblies (WL-P016): no type the inventory rules out for the core (adapter-only, prohibited, or not used) is
 /// referenced, and no method is a P/Invoke. A rule added to the inventory for the portable core gets its entry here.
 /// </summary>
 public sealed class PortabilityTests
@@ -36,8 +36,8 @@ public sealed class PortabilityTests
         ("System.Environment", "the core must not depend on the platform (its line ending among others)"),
         ("System.Threading.Thread", "OS threads are adapter-only"),
         ("System.Threading.ThreadPool", "OS threads are adapter-only"),
-        ("System.Threading.CancellationToken", "cancellation is WebLingo's own WsCancellationSignal"),
-        ("System.Threading.CancellationTokenSource", "cancellation is WebLingo's own WsCancellationSignal"),
+        ("System.Threading.CancellationToken", "cancellation is WebLingo's own WebLingoCancellationSignal"),
+        ("System.Threading.CancellationTokenSource", "cancellation is WebLingo's own WebLingoCancellationSignal"),
     ];
 
     public static TheoryData<string> PortableCore => new()

@@ -1,0 +1,3 @@
+<% layout "/layouts/main.wlp"; %>
+<h1>Hello from WebLingo</h1>
+<% include "/includes/footer.wlp"; %>

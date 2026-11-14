@@ -8,12 +8,12 @@ public sealed class LexerTests
     [Fact]
     public void RecognizesVarConstAndSemicolon()
     {
-        var lexer = new WsLexer("var a = 10; const b = 20;");
+        var lexer = new WebLingoLexer("var a = 10; const b = 20;");
         var expected = new[] {
-            WsTokenKind.Var, WsTokenKind.Identifier, WsTokenKind.Equals,
-            WsTokenKind.IntegerLiteral, WsTokenKind.Semicolon,
-            WsTokenKind.Const, WsTokenKind.Identifier, WsTokenKind.Equals,
-            WsTokenKind.IntegerLiteral, WsTokenKind.Semicolon, WsTokenKind.EndOfFile
+            WebLingoTokenKind.Var, WebLingoTokenKind.Identifier, WebLingoTokenKind.Equals,
+            WebLingoTokenKind.IntegerLiteral, WebLingoTokenKind.Semicolon,
+            WebLingoTokenKind.Const, WebLingoTokenKind.Identifier, WebLingoTokenKind.Equals,
+            WebLingoTokenKind.IntegerLiteral, WebLingoTokenKind.Semicolon, WebLingoTokenKind.EndOfFile
         };
         foreach (var kind in expected) Assert.Equal(kind, lexer.NextToken().Kind);
     }
@@ -21,7 +21,7 @@ public sealed class LexerTests
     [Fact]
     public void LetIsNotTreatedAsVarOrConst()
     {
-        Assert.Equal(WsTokenKind.Let, new WsLexer("let").NextToken().Kind);
+        Assert.Equal(WebLingoTokenKind.Let, new WebLingoLexer("let").NextToken().Kind);
     }
 
     [Fact]
@@ -29,9 +29,9 @@ public sealed class LexerTests
     {
         Assert.Equal(
             new[] {
-                WsTokenKind.Plus, WsTokenKind.Minus, WsTokenKind.Star, WsTokenKind.Slash, WsTokenKind.Equals,
-                WsTokenKind.Semicolon, WsTokenKind.OpenParen, WsTokenKind.CloseParen, WsTokenKind.OpenBrace,
-                WsTokenKind.CloseBrace, WsTokenKind.Comma, WsTokenKind.EndOfFile
+                WebLingoTokenKind.Plus, WebLingoTokenKind.Minus, WebLingoTokenKind.Star, WebLingoTokenKind.Slash, WebLingoTokenKind.Equals,
+                WebLingoTokenKind.Semicolon, WebLingoTokenKind.OpenParen, WebLingoTokenKind.CloseParen, WebLingoTokenKind.OpenBrace,
+                WebLingoTokenKind.CloseBrace, WebLingoTokenKind.Comma, WebLingoTokenKind.EndOfFile
             },
             Kinds("+ - * / = ; ( ) { } ,", out var diagnostics));
         Assert.Empty(diagnostics);
@@ -42,13 +42,13 @@ public sealed class LexerTests
     {
         Assert.Equal(
             new[] {
-                WsTokenKind.EqualEqual, WsTokenKind.BangEqual, WsTokenKind.Less, WsTokenKind.LessEqual, WsTokenKind.Greater,
-                WsTokenKind.GreaterEqual, WsTokenKind.Bang, WsTokenKind.AmpAmp, WsTokenKind.PipePipe, WsTokenKind.Equals,
-                WsTokenKind.True, WsTokenKind.False, WsTokenKind.Null, WsTokenKind.EndOfFile
+                WebLingoTokenKind.EqualEqual, WebLingoTokenKind.BangEqual, WebLingoTokenKind.Less, WebLingoTokenKind.LessEqual, WebLingoTokenKind.Greater,
+                WebLingoTokenKind.GreaterEqual, WebLingoTokenKind.Bang, WebLingoTokenKind.AmpAmp, WebLingoTokenKind.PipePipe, WebLingoTokenKind.Equals,
+                WebLingoTokenKind.True, WebLingoTokenKind.False, WebLingoTokenKind.Null, WebLingoTokenKind.EndOfFile
             },
             Kinds("== != < <= > >= ! && || = true false null", out var diagnostics));
         Assert.Empty(diagnostics);
-        Assert.Equal(new[] { WsTokenKind.EqualEqual, WsTokenKind.Equals, WsTokenKind.EndOfFile }, Kinds("===", out _));
+        Assert.Equal(new[] { WebLingoTokenKind.EqualEqual, WebLingoTokenKind.Equals, WebLingoTokenKind.EndOfFile }, Kinds("===", out _));
     }
 
     [Theory]
@@ -56,8 +56,8 @@ public sealed class LexerTests
     [InlineData("|")]
     public void ASingleAmpersandOrBarIsInvalid(string text)
     {
-        Assert.Equal(new[] { WsTokenKind.Bad, WsTokenKind.EndOfFile }, Kinds(text, out var diagnostics));
-        Assert.Equal(WsDiagnosticCodes.InvalidCharacter, Assert.Single(diagnostics).Code);
+        Assert.Equal(new[] { WebLingoTokenKind.Bad, WebLingoTokenKind.EndOfFile }, Kinds(text, out var diagnostics));
+        Assert.Equal(WebLingoDiagnosticCodes.InvalidCharacter, Assert.Single(diagnostics).Code);
     }
 
     [Fact]
@@ -65,8 +65,8 @@ public sealed class LexerTests
     {
         Assert.Equal(
             new[] {
-                WsTokenKind.Identifier, WsTokenKind.OpenParen, WsTokenKind.Identifier, WsTokenKind.Plus,
-                WsTokenKind.IntegerLiteral, WsTokenKind.CloseParen, WsTokenKind.Semicolon, WsTokenKind.EndOfFile
+                WebLingoTokenKind.Identifier, WebLingoTokenKind.OpenParen, WebLingoTokenKind.Identifier, WebLingoTokenKind.Plus,
+                WebLingoTokenKind.IntegerLiteral, WebLingoTokenKind.CloseParen, WebLingoTokenKind.Semicolon, WebLingoTokenKind.EndOfFile
             },
             Kinds("writeLn(a+10);", out _));
     }
@@ -74,20 +74,20 @@ public sealed class LexerTests
     [Fact]
     public void TokensCarryTheirTextAndSpan()
     {
-        var tokens = WsLexer.Tokenize("var total = 42;", out _);
-        Assert.Equal(("total", new WsSourceSpan(4, 5)), (tokens[1].Text, tokens[1].Span));
-        Assert.Equal(("42", new WsSourceSpan(12, 2)), (tokens[3].Text, tokens[3].Span));
-        Assert.Equal(new WsSourceSpan(14, 1), tokens[4].Span);
+        var tokens = WebLingoLexer.Tokenize("var total = 42;", out _);
+        Assert.Equal(("total", new WebLingoSourceSpan(4, 5)), (tokens[1].Text, tokens[1].Span));
+        Assert.Equal(("42", new WebLingoSourceSpan(12, 2)), (tokens[3].Text, tokens[3].Span));
+        Assert.Equal(new WebLingoSourceSpan(14, 1), tokens[4].Span);
     }
 
     [Fact]
     public void EndOfFileIsAnEmptySpanAtTheEndAndRepeats()
     {
-        var lexer = new WsLexer("a ");
+        var lexer = new WebLingoLexer("a ");
         lexer.NextToken();
         var end = lexer.NextToken();
-        Assert.Equal((WsTokenKind.EndOfFile, new WsSourceSpan(2, 0)), (end.Kind, end.Span));
-        Assert.Equal(WsTokenKind.EndOfFile, lexer.NextToken().Kind);
+        Assert.Equal((WebLingoTokenKind.EndOfFile, new WebLingoSourceSpan(2, 0)), (end.Kind, end.Span));
+        Assert.Equal(WebLingoTokenKind.EndOfFile, lexer.NextToken().Kind);
     }
 
     [Theory]
@@ -99,14 +99,14 @@ public sealed class LexerTests
     [InlineData("letter")]
     public void KeywordsAreWholeAndCaseSensitive(string text)
     {
-        var token = new WsLexer(text).NextToken();
-        Assert.Equal((WsTokenKind.Identifier, text), (token.Kind, token.Text));
+        var token = new WebLingoLexer(text).NextToken();
+        Assert.Equal((WebLingoTokenKind.Identifier, text), (token.Kind, token.Text));
     }
 
     [Fact]
     public void AnIdentifierMayHoldDigitsButNotStartWithOne()
     {
-        Assert.Equal(new[] { WsTokenKind.Identifier, WsTokenKind.EndOfFile }, Kinds("a1b2", out _));
+        Assert.Equal(new[] { WebLingoTokenKind.Identifier, WebLingoTokenKind.EndOfFile }, Kinds("a1b2", out _));
     }
 
     [Theory]
@@ -116,19 +116,19 @@ public sealed class LexerTests
     [InlineData("9223372036854775807", long.MaxValue)]
     public void IntegerLiteralsCarryTheirValue(string text, long value)
     {
-        var token = new WsLexer(text).NextToken();
-        Assert.Equal((WsTokenKind.IntegerLiteral, value), (token.Kind, token.IntegerValue));
+        var token = new WebLingoLexer(text).NextToken();
+        Assert.Equal((WebLingoTokenKind.IntegerLiteral, value), (token.Kind, token.IntegerValue));
     }
 
     [Fact]
     public void AnIntegerLiteralTooLargeForInt64IsReported()
     {
-        var tokens = WsLexer.Tokenize("9223372036854775808;", out var diagnostics);
-        Assert.Equal(WsTokenKind.Bad, tokens[0].Kind);
-        Assert.Equal(WsTokenKind.Semicolon, tokens[1].Kind);
+        var tokens = WebLingoLexer.Tokenize("9223372036854775808;", out var diagnostics);
+        Assert.Equal(WebLingoTokenKind.Bad, tokens[0].Kind);
+        Assert.Equal(WebLingoTokenKind.Semicolon, tokens[1].Kind);
         var diagnostic = Assert.Single(diagnostics);
-        Assert.Equal((WsDiagnosticCodes.InvalidNumericLiteral, new WsSourceSpan(0, 19)), (diagnostic.Code, diagnostic.Span));
-        Assert.Equal(WsDiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal((WebLingoDiagnosticCodes.InvalidNumericLiteral, new WebLingoSourceSpan(0, 19)), (diagnostic.Code, diagnostic.Span));
+        Assert.Equal(WebLingoDiagnosticSeverity.Error, diagnostic.Severity);
     }
 
     [Theory]
@@ -143,42 +143,42 @@ public sealed class LexerTests
     [InlineData("1e-400", 0.0)]
     public void Binary64LiteralsCarryTheNearestValue(string text, double value)
     {
-        var tokens = WsLexer.Tokenize(text, out var diagnostics);
+        var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);
         Assert.Empty(diagnostics);
-        Assert.Equal((WsTokenKind.Binary64Literal, value, text), (tokens[0].Kind, tokens[0].Binary64Value, tokens[0].Text));
-        Assert.Equal(WsTokenKind.EndOfFile, tokens[1].Kind);
+        Assert.Equal((WebLingoTokenKind.Binary64Literal, value, text), (tokens[0].Kind, tokens[0].Binary64Value, tokens[0].Text));
+        Assert.Equal(WebLingoTokenKind.EndOfFile, tokens[1].Kind);
     }
 
     [Fact]
     public void ABinary64LiteralTooLargeIsReported()
     {
-        var tokens = WsLexer.Tokenize("1e309;", out var diagnostics);
-        Assert.Equal(new[] { WsTokenKind.Bad, WsTokenKind.Semicolon, WsTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
+        var tokens = WebLingoLexer.Tokenize("1e309;", out var diagnostics);
+        Assert.Equal(new[] { WebLingoTokenKind.Bad, WebLingoTokenKind.Semicolon, WebLingoTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
         var diagnostic = Assert.Single(diagnostics);
-        Assert.Equal((WsDiagnosticCodes.InvalidNumericLiteral, new WsSourceSpan(0, 5)), (diagnostic.Code, diagnostic.Span));
+        Assert.Equal((WebLingoDiagnosticCodes.InvalidNumericLiteral, new WebLingoSourceSpan(0, 5)), (diagnostic.Code, diagnostic.Span));
     }
 
     [Theory]
-    [InlineData("1.", new[] { WsTokenKind.IntegerLiteral, WsTokenKind.Dot })]
-    [InlineData(".5", new[] { WsTokenKind.Dot, WsTokenKind.IntegerLiteral })]
-    [InlineData("1.e5", new[] { WsTokenKind.IntegerLiteral, WsTokenKind.Dot, WsTokenKind.Identifier })]
-    public void APointNeedsDigitsOnBothSides(string text, WsTokenKind[] kinds)
+    [InlineData("1.", new[] { WebLingoTokenKind.IntegerLiteral, WebLingoTokenKind.Dot })]
+    [InlineData(".5", new[] { WebLingoTokenKind.Dot, WebLingoTokenKind.IntegerLiteral })]
+    [InlineData("1.e5", new[] { WebLingoTokenKind.IntegerLiteral, WebLingoTokenKind.Dot, WebLingoTokenKind.Identifier })]
+    public void APointNeedsDigitsOnBothSides(string text, WebLingoTokenKind[] kinds)
     {
         // Without digits on both sides, a point is not part of a number but a member access's (section 3.6).
-        var tokens = WsLexer.Tokenize(text, out var diagnostics);
-        Assert.Equal(kinds.Append(WsTokenKind.EndOfFile), tokens.Select(t => t.Kind));
+        var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);
+        Assert.Equal(kinds.Append(WebLingoTokenKind.EndOfFile), tokens.Select(t => t.Kind));
         Assert.Empty(diagnostics);
     }
 
     [Fact]
     public void OptionalAccessAndSetsHaveTheirTokens()
     {
-        var tokens = WsLexer.Tokenize("m?[0] #{}", out var diagnostics);
+        var tokens = WebLingoLexer.Tokenize("m?[0] #{}", out var diagnostics);
         Assert.Equal(
             new[]
             {
-                WsTokenKind.Identifier, WsTokenKind.QuestionBracket, WsTokenKind.IntegerLiteral, WsTokenKind.CloseBracket,
-                WsTokenKind.HashBrace, WsTokenKind.CloseBrace, WsTokenKind.EndOfFile
+                WebLingoTokenKind.Identifier, WebLingoTokenKind.QuestionBracket, WebLingoTokenKind.IntegerLiteral, WebLingoTokenKind.CloseBracket,
+                WebLingoTokenKind.HashBrace, WebLingoTokenKind.CloseBrace, WebLingoTokenKind.EndOfFile
             },
             tokens.Select(t => t.Kind));
         Assert.Empty(diagnostics);
@@ -187,12 +187,12 @@ public sealed class LexerTests
     [Fact]
     public void MembersAndIndexesHaveTheirTokens()
     {
-        var tokens = WsLexer.Tokenize("a.length[0]", out var diagnostics);
+        var tokens = WebLingoLexer.Tokenize("a.length[0]", out var diagnostics);
         Assert.Equal(
             new[]
             {
-                WsTokenKind.Identifier, WsTokenKind.Dot, WsTokenKind.Identifier, WsTokenKind.OpenBracket,
-                WsTokenKind.IntegerLiteral, WsTokenKind.CloseBracket, WsTokenKind.EndOfFile
+                WebLingoTokenKind.Identifier, WebLingoTokenKind.Dot, WebLingoTokenKind.Identifier, WebLingoTokenKind.OpenBracket,
+                WebLingoTokenKind.IntegerLiteral, WebLingoTokenKind.CloseBracket, WebLingoTokenKind.EndOfFile
             },
             tokens.Select(t => t.Kind));
         Assert.Empty(diagnostics);
@@ -212,9 +212,9 @@ public sealed class LexerTests
     [InlineData("\"é ✓\"", "é ✓")]
     public void StringLiteralsDecodeTheirEscapes(string text, string value)
     {
-        var tokens = WsLexer.Tokenize(text, out var diagnostics);
+        var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);
         Assert.Empty(diagnostics);
-        Assert.Equal((WsTokenKind.StringLiteral, value, text), (tokens[0].Kind, tokens[0].StringValue, tokens[0].Text));
+        Assert.Equal((WebLingoTokenKind.StringLiteral, value, text), (tokens[0].Kind, tokens[0].StringValue, tokens[0].Text));
     }
 
     [Theory]
@@ -227,10 +227,10 @@ public sealed class LexerTests
     [InlineData("\"\\x41\"", 1, 2)]
     public void AnInvalidEscapeIsReportedWhereItIs(string text, int start, int length)
     {
-        var tokens = WsLexer.Tokenize(text, out var diagnostics);
-        Assert.Equal(new[] { WsTokenKind.Bad, WsTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
+        var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);
+        Assert.Equal(new[] { WebLingoTokenKind.Bad, WebLingoTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
         var diagnostic = Assert.Single(diagnostics);
-        Assert.Equal((WsDiagnosticCodes.InvalidEscape, new WsSourceSpan(start, length)), (diagnostic.Code, diagnostic.Span));
+        Assert.Equal((WebLingoDiagnosticCodes.InvalidEscape, new WebLingoSourceSpan(start, length)), (diagnostic.Code, diagnostic.Span));
     }
 
     [Theory]
@@ -239,17 +239,17 @@ public sealed class LexerTests
     [InlineData("\"abc\\", 5)]
     public void AStringNotClosedOnItsLineIsReported(string text, int length)
     {
-        var tokens = WsLexer.Tokenize(text, out var diagnostics);
-        Assert.Equal(WsTokenKind.Bad, tokens[0].Kind);
-        var unterminated = diagnostics.First(d => d.Code == WsDiagnosticCodes.UnterminatedString);
-        Assert.Equal(new WsSourceSpan(0, length), unterminated.Span);
+        var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);
+        Assert.Equal(WebLingoTokenKind.Bad, tokens[0].Kind);
+        var unterminated = diagnostics.First(d => d.Code == WebLingoDiagnosticCodes.UnterminatedString);
+        Assert.Equal(new WebLingoSourceSpan(0, length), unterminated.Span);
     }
 
     [Fact]
     public void InfinityAndNaNAreKeywords()
     {
-        Assert.Equal(new[] { WsTokenKind.Infinity, WsTokenKind.NaN, WsTokenKind.Identifier, WsTokenKind.Identifier,
-                WsTokenKind.EndOfFile },
+        Assert.Equal(new[] { WebLingoTokenKind.Infinity, WebLingoTokenKind.NaN, WebLingoTokenKind.Identifier, WebLingoTokenKind.Identifier,
+                WebLingoTokenKind.EndOfFile },
             Kinds("Infinity NaN infinity nan", out var diagnostics));
         Assert.Empty(diagnostics);
     }
@@ -263,10 +263,10 @@ public sealed class LexerTests
     [InlineData("2.5e3x")]
     public void DigitsRunningIntoLettersAreOneInvalidLiteral(string text)
     {
-        var tokens = WsLexer.Tokenize(text, out var diagnostics);
-        Assert.Equal(new[] { WsTokenKind.Bad, WsTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
+        var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);
+        Assert.Equal(new[] { WebLingoTokenKind.Bad, WebLingoTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
         var diagnostic = Assert.Single(diagnostics);
-        Assert.Equal((WsDiagnosticCodes.InvalidNumericLiteral, new WsSourceSpan(0, text.Length)),
+        Assert.Equal((WebLingoDiagnosticCodes.InvalidNumericLiteral, new WebLingoSourceSpan(0, text.Length)),
             (diagnostic.Code, diagnostic.Span));
     }
 
@@ -278,7 +278,7 @@ public sealed class LexerTests
     [InlineData("  a   b  ")]
     public void SpacesTabsAndEveryLineEndingSeparateTokens(string text)
     {
-        Assert.Equal(new[] { WsTokenKind.Identifier, WsTokenKind.Identifier, WsTokenKind.EndOfFile }, Kinds(text, out var d));
+        Assert.Equal(new[] { WebLingoTokenKind.Identifier, WebLingoTokenKind.Identifier, WebLingoTokenKind.EndOfFile }, Kinds(text, out var d));
         Assert.Empty(d);
     }
 
@@ -292,14 +292,14 @@ public sealed class LexerTests
     [InlineData("a /* not /* nested */ b")]
     public void CommentsAreSkipped(string text)
     {
-        Assert.Equal(new[] { WsTokenKind.Identifier, WsTokenKind.Identifier, WsTokenKind.EndOfFile }, Kinds(text, out var d));
+        Assert.Equal(new[] { WebLingoTokenKind.Identifier, WebLingoTokenKind.Identifier, WebLingoTokenKind.EndOfFile }, Kinds(text, out var d));
         Assert.Empty(d);
     }
 
     [Fact]
     public void ALineCommentMayEndTheFile()
     {
-        Assert.Equal(new[] { WsTokenKind.Identifier, WsTokenKind.EndOfFile }, Kinds("a // to the end", out var d));
+        Assert.Equal(new[] { WebLingoTokenKind.Identifier, WebLingoTokenKind.EndOfFile }, Kinds("a // to the end", out var d));
         Assert.Empty(d);
     }
 
@@ -307,17 +307,17 @@ public sealed class LexerTests
     public void ASingleSlashIsDivision()
     {
         Assert.Equal(
-            new[] { WsTokenKind.Identifier, WsTokenKind.Slash, WsTokenKind.Identifier, WsTokenKind.EndOfFile },
+            new[] { WebLingoTokenKind.Identifier, WebLingoTokenKind.Slash, WebLingoTokenKind.Identifier, WebLingoTokenKind.EndOfFile },
             Kinds("a / b", out _));
     }
 
     [Fact]
     public void AnUnterminatedCommentIsReportedFromItsStart()
     {
-        var tokens = WsLexer.Tokenize("a /* no end", out var diagnostics);
-        Assert.Equal(new[] { WsTokenKind.Identifier, WsTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
+        var tokens = WebLingoLexer.Tokenize("a /* no end", out var diagnostics);
+        Assert.Equal(new[] { WebLingoTokenKind.Identifier, WebLingoTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
         var diagnostic = Assert.Single(diagnostics);
-        Assert.Equal((WsDiagnosticCodes.UnterminatedComment, new WsSourceSpan(2, 9)), (diagnostic.Code, diagnostic.Span));
+        Assert.Equal((WebLingoDiagnosticCodes.UnterminatedComment, new WebLingoSourceSpan(2, 9)), (diagnostic.Code, diagnostic.Span));
     }
 
     [Theory]
@@ -328,41 +328,41 @@ public sealed class LexerTests
     [InlineData("\u0001")]
     public void AnInvalidCharacterIsOneBadToken(string text)
     {
-        var tokens = WsLexer.Tokenize(text, out var diagnostics);
-        Assert.Equal(new[] { WsTokenKind.Bad, WsTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
+        var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);
+        Assert.Equal(new[] { WebLingoTokenKind.Bad, WebLingoTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
         var diagnostic = Assert.Single(diagnostics);
-        Assert.Equal((WsDiagnosticCodes.InvalidCharacter, new WsSourceSpan(0, 1)), (diagnostic.Code, diagnostic.Span));
+        Assert.Equal((WebLingoDiagnosticCodes.InvalidCharacter, new WebLingoSourceSpan(0, 1)), (diagnostic.Code, diagnostic.Span));
     }
 
     [Fact]
     public void ASurrogatePairIsOneInvalidCharacter()
     {
-        var tokens = WsLexer.Tokenize("\U0001F600", out var diagnostics);
-        Assert.Equal(new WsSourceSpan(0, 2), tokens[0].Span);
+        var tokens = WebLingoLexer.Tokenize("\U0001F600", out var diagnostics);
+        Assert.Equal(new WebLingoSourceSpan(0, 2), tokens[0].Span);
         Assert.Contains("U+1F600", Assert.Single(diagnostics).Message);
     }
 
     [Fact]
     public void LexingGoesOnAfterAnErrorAndReportsEachOne()
     {
-        var tokens = WsLexer.Tokenize("var a = 1 @ 2 # 3;", out var diagnostics);
+        var tokens = WebLingoLexer.Tokenize("var a = 1 @ 2 # 3;", out var diagnostics);
         Assert.Equal(
             new[] {
-                WsTokenKind.Var, WsTokenKind.Identifier, WsTokenKind.Equals, WsTokenKind.IntegerLiteral, WsTokenKind.Bad,
-                WsTokenKind.IntegerLiteral, WsTokenKind.Bad, WsTokenKind.IntegerLiteral, WsTokenKind.Semicolon,
-                WsTokenKind.EndOfFile
+                WebLingoTokenKind.Var, WebLingoTokenKind.Identifier, WebLingoTokenKind.Equals, WebLingoTokenKind.IntegerLiteral, WebLingoTokenKind.Bad,
+                WebLingoTokenKind.IntegerLiteral, WebLingoTokenKind.Bad, WebLingoTokenKind.IntegerLiteral, WebLingoTokenKind.Semicolon,
+                WebLingoTokenKind.EndOfFile
             },
             tokens.Select(t => t.Kind));
-        Assert.Equal(new[] { new WsSourceSpan(10, 1), new WsSourceSpan(14, 1) }, diagnostics.Select(d => d.Span));
+        Assert.Equal(new[] { new WebLingoSourceSpan(10, 1), new WebLingoSourceSpan(14, 1) }, diagnostics.Select(d => d.Span));
     }
 
     [Fact]
     public void AnEmptySourceIsJustTheEndOfFile()
     {
-        Assert.Equal(new[] { WsTokenKind.EndOfFile }, Kinds("", out var d));
+        Assert.Equal(new[] { WebLingoTokenKind.EndOfFile }, Kinds("", out var d));
         Assert.Empty(d);
     }
 
-    private static IEnumerable<WsTokenKind> Kinds(string source, out IReadOnlyList<WsDiagnostic> diagnostics) =>
-        WsLexer.Tokenize(source, out diagnostics).Select(t => t.Kind).ToArray();
+    private static IEnumerable<WebLingoTokenKind> Kinds(string source, out IReadOnlyList<WebLingoDiagnostic> diagnostics) =>
+        WebLingoLexer.Tokenize(source, out diagnostics).Select(t => t.Kind).ToArray();
 }

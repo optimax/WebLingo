@@ -21,8 +21,8 @@ public sealed class CodeGeneratorTests
             05  Return
 
             """.ReplaceLineEndings("\n"),
-            WsDisassembler.Format(module));
-        Assert.Equal(new[] { new WsImport("writeLn", 1) }, module.Imports);
+            WebLingoDisassembler.Format(module));
+        Assert.Equal(new[] { new WebLingoImport("writeLn", 1) }, module.Imports);
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public sealed class CodeGeneratorTests
     public void ConstantsAreShared()
     {
         var module = Generate("var a = 7; var b = 7 + 8; var c = 8;");
-        Assert.Equal(new[] { WsConstant.Int64(7), WsConstant.Int64(8) }, module.Constants);
+        Assert.Equal(new[] { WebLingoConstant.Int64(7), WebLingoConstant.Int64(8) }, module.Constants);
     }
 
     [Fact]
@@ -63,8 +63,8 @@ public sealed class CodeGeneratorTests
     {
         var module = Generate("var a = 1;\nwriteLn(-a);");
         Assert.Equal(module.EntryPoint.Code.Count, module.EntryPoint.Spans!.Count);
-        var negate = module.EntryPoint.Code.ToList().FindIndex(i => i.OpCode == WsOpCode.Negate);
-        Assert.Equal(new WsSourceSpan(19, 2), module.EntryPoint.Spans[negate]);
+        var negate = module.EntryPoint.Code.ToList().FindIndex(i => i.OpCode == WebLingoOpCode.Negate);
+        Assert.Equal(new WebLingoSourceSpan(19, 2), module.EntryPoint.Spans[negate]);
     }
 
     [Theory]
@@ -75,26 +75,26 @@ public sealed class CodeGeneratorTests
     [InlineData("")]
     public void WhatTheCompilerGeneratesVerifies(string source)
     {
-        var result = new WsCompiler(BinderTests.WithWrite).Compile(source, "test.ws");
+        var result = new WebLingoCompiler(BinderTests.WithWrite).Compile(source, "test.wl");
         Assert.Empty(result.Diagnostics);
-        Assert.True(new WsBytecodeVerifier().Verify(result.Module!).IsValid);
+        Assert.True(new WebLingoBytecodeVerifier().Verify(result.Module!).IsValid);
     }
 
     [Fact]
     public void ASourceWithErrorsGivesNoModule()
     {
-        var result = new WsCompiler(BinderTests.WithWrite).Compile("var x = ;", "test.ws");
+        var result = new WebLingoCompiler(BinderTests.WithWrite).Compile("var x = ;", "test.wl");
         Assert.Null(result.Module);
-        Assert.Equal(WsDiagnosticCodes.UnexpectedToken, Assert.Single(result.Diagnostics).Code);
+        Assert.Equal(WebLingoDiagnosticCodes.UnexpectedToken, Assert.Single(result.Diagnostics).Code);
     }
 
     [Fact]
     public void TooManyVariablesForAFunctionIsADiagnostic()
     {
-        var source = string.Concat(Enumerable.Range(0, WsFunction.MaxRegisters + 1).Select(i => $"var v{i} = 1;"));
-        var result = new WsCompiler(BinderTests.WithWrite).Compile(source, "test.ws");
+        var source = string.Concat(Enumerable.Range(0, WebLingoFunction.MaxRegisters + 1).Select(i => $"var v{i} = 1;"));
+        var result = new WebLingoCompiler(BinderTests.WithWrite).Compile(source, "test.wl");
         Assert.Null(result.Module);
-        Assert.Equal(WsDiagnosticCodes.ProgramTooLarge, Assert.Single(result.Diagnostics).Code);
+        Assert.Equal(WebLingoDiagnosticCodes.ProgramTooLarge, Assert.Single(result.Diagnostics).Code);
     }
 
     [Fact]
@@ -104,15 +104,15 @@ public sealed class CodeGeneratorTests
         Assert.False(module.EntryPoint.IsAsync);
         var f = Assert.Single(module.Functions);
         Assert.True(f.IsAsync);
-        Assert.Equal(new[] { WsOpCode.Await, WsOpCode.ReturnValue, WsOpCode.Return }, f.Code.Select(i => i.OpCode).ToArray());
+        Assert.Equal(new[] { WebLingoOpCode.Await, WebLingoOpCode.ReturnValue, WebLingoOpCode.Return }, f.Code.Select(i => i.OpCode).ToArray());
         Assert.Equal((1, 0), (f.Code[0].A, f.Code[0].B));
         Assert.True(Generate("await 1;").EntryPoint.IsAsync);
         Assert.Contains("Await r0, r0", Instructions("await 1;"));
     }
 
-    private static WsCompiledModule Generate(string source)
+    private static WebLingoCompiledModule Generate(string source)
     {
-        var result = new WsCompiler(BinderTests.WithWrite).Compile(source, "test.ws");
+        var result = new WebLingoCompiler(BinderTests.WithWrite).Compile(source, "test.wl");
         Assert.Empty(result.Diagnostics);
         return result.Module!;
     }
@@ -120,6 +120,6 @@ public sealed class CodeGeneratorTests
     private static string[] Instructions(string source)
     {
         var module = Generate(source);
-        return module.EntryPoint.Code.Select(i => WsDisassembler.Format(module, i)).ToArray();
+        return module.EntryPoint.Code.Select(i => WebLingoDisassembler.Format(module, i)).ToArray();
     }
 }

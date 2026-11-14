@@ -10,7 +10,7 @@ Paths in this document start at the repository root.
 
 WebLingo is a JavaScript-inspired, native-oriented, cross-platform **server-side scripting language**, meant to combine the easy deployment of PHP and classic ASP with modern language semantics, secure defaults and efficient execution (specification, section 1).
 
-- Scripts and modules are `.ws` files; HTML pages with server-side WebLingo templates are `.wsp` files.
+- Scripts and modules are `.wl` files; HTML pages with server-side WebLingo templates are `.wlp` files.
 - Source is compiled to WBC, a verified portable bytecode, and executed by the WebLingo VM.
 - The language is JavaScript-inspired but does **not** promise ECMAScript compatibility.
 - The compiler, VM, runtime and hosting are written first in C# on .NET 10. The long-term goal is to compile that same C# code with the project's independent Native C# compiler, so that WebLingo runs without .NET and without a rewrite in C++. Native C# and WebLingo are separate languages and runtime systems.
@@ -18,7 +18,7 @@ WebLingo is a JavaScript-inspired, native-oriented, cross-platform **server-side
 
 The current state (specification, sections 9 and 15): a compiler and two VMs, a register VM and a stack VM, for M0.6's subset and the language of the specification's sections 3.5 to 3.8 (statements, collections, classes and exceptions, and asynchrony), whose register VM the `weblingo` CLI runs; templates, hosting and the platform layer are not implemented yet. `samples/HelloWorld` and `samples/Arithmetic` run; `samples/SimpleWebsite` waits for templates.
 
-**Names** (specification, section 1): the project is **WebLingo** (formerly WebScript), its intended domain `weblingo.dev`, the solution `WebLingo.slnx`, the project and namespace roots `WebLingo`, and the CLI executable `weblingo`. Specification IDs (`WS-L011`, `WS-BC002`) and diagnostic codes (`WS1001`) keep their `WS` prefix, and so do type names in source (`WsLexer`, `WsToken`).
+**Names** (specification, section 1): the project is **WebLingo** (formerly WebScript), its intended domain `weblingo.dev`, the solution `WebLingo.slnx`, the project and namespace roots `WebLingo`, and the CLI executable `weblingo`. Scripts and modules are `.wl` files, templates `.wlp` files; specification IDs (`WL-L011`, `WL-BC002`) and diagnostic codes (`WL1001`) have the prefix `WL`, and type names in source the prefix `WebLingo` (`WebLingoLexer`, `WebLingoToken`), each type in a file of its name. WebScript's `.ws`, `.wsp`, `WS` and `Ws` were renamed so on 14 November 2026, the owner's decision, with nothing kept for backward compatibility.
 
 ------
 
@@ -67,8 +67,8 @@ WebLingo.202611121500.zip
     └── WebLingo/
         └── src/
             └── WebLingo.Language/
-                ├── WsLexer.cs
-                └── WsTokens.cs
+                ├── WebLingoLexer.cs
+                └── WebLingoTokens.cs
 ```
 
 ## Projects
@@ -76,16 +76,16 @@ WebLingo.202611121500.zip
 - **The portable core:** `WebLingo.Core`, `WebLingo.Language`, `WebLingo.Bytecode`, `WebLingo.Compiler`, `WebLingo.Runtime`, `WebLingo.VM`, `WebLingo.VM.Stack`, `WebLingo.Templates`, `WebLingo.StdLib`, `WebLingo.Platform.Abstractions`, and `WebLingo.Hosting.Abstractions`: eleven.
 - **The adapters to .NET:** `WebLingo.Platform.DotNet` (the .NET implementation of the platform abstraction layer, the PAL) and `WebLingo.Hosting.AspNetCore` (the host for IIS).
 - **The command line:** `WebLingo.Cli`, which builds `weblingo`.
-- **The benchmark:** `WebLingo.Benchmarks`, in `benchmarks/`, a console program that times the VMs on fixed workloads with `Stopwatch` (the specification's section 5.6, WS-BC002). It is a tool, not part of the product, and uses no package. Its workloads are `.ws` files in its `Workloads/` folder, embedded in it, each with the output every VM must give (`WsWorkloads`); a VM is added to it as an `IWsBenchmarkEngine`.
+- **The benchmark:** `WebLingo.Benchmarks`, in `benchmarks/`, a console program that times the VMs on fixed workloads with `Stopwatch` (the specification's section 5.6, WL-BC002). It is a tool, not part of the product, and uses no package. Its workloads are `.wl` files in its `Workloads/` folder, embedded in it, each with the output every VM must give (`WebLingoWorkloads`); a VM is added to it as an `IWebLingoBenchmarkEngine`.
 - **The tests:** `WebLingo.Language.Tests` (lexer, parser, source text), `WebLingo.Compiler.Tests` (binder, lowering, and both code generators), `WebLingo.Bytecode.Tests` (both verifiers, with fuzz tests), `WebLingo.Runtime.Tests` (values, arithmetic, formatting, `write` and `writeLn`), `WebLingo.VM.Tests` (execution on both VMs, runtime errors, budgets, the VMs' arithmetic against the runtime's, and the benchmark's workloads on every VM it measures), `WebLingo.Conformance.Tests` (the specification's section 8.6, end to end through the CLI; every conformance program on the stack VM, against the register VM's result; and fuzz tests of malformed source and bytecode), and `WebLingo.Architecture.Tests` (contracts, and the dependency rules checked on the built assemblies).
 
 ## The Pipeline
 
-The compiler's stages are separate classes (specification, section 8.8): `WsLexer` and `WsParser` in `WebLingo.Language` give a `WsSyntaxTree`; in `WebLingo.Compiler`, `WsBinder` resolves names into a bound tree (`WsBoundTree.cs`, `WsSymbols.cs`), and `WsLowerer` reduces it to the lowered IR (`WsIr.cs`), a tree neither register- nor stack-shaped (WS-BC002). `WsCompilation` runs them in order and stops at the first stage that reports an error. The host's built-ins reach the compiler as `WsCompilerOptions`. `WsCodeGenerator` turns the IR into a module of the in-memory bytecode (`WebLingo.Bytecode`, `WsBytecodeContracts.cs`), and `WsCompiler` runs the whole compiler, checking its own output with `WsBytecodeVerifier`. `WsDisassembler` shows a module as text. For the comparison of the two kinds of VM (WS-BC002, the specification's section 5.6), the same IR also goes to `WsStackCodeGenerator`, which generates the stack bytecode (`WsStackBytecodeContracts.cs`, in `WebLingo.Bytecode`, since the compiler may not depend on a VM), and `WsStackCompiler` runs the whole compiler for it, checking its output with `WsStackBytecodeVerifier`.
+The compiler's stages are separate classes (specification, section 8.8): `WebLingoLexer` and `WebLingoParser` in `WebLingo.Language` give a `WebLingoSyntaxTree`; in `WebLingo.Compiler`, `WebLingoBinder` resolves names into a bound tree (`WebLingoBoundTree.cs`, `WebLingoSymbols.cs`), and `WebLingoLowerer` reduces it to the lowered IR (`WebLingoIr.cs`), a tree neither register- nor stack-shaped (WL-BC002). `WebLingoCompilation` runs them in order and stops at the first stage that reports an error. The host's built-ins reach the compiler as `WebLingoCompilerOptions`. `WebLingoCodeGenerator` turns the IR into a module of the in-memory bytecode (`WebLingo.Bytecode`, `WebLingoBytecodeContracts.cs`), and `WebLingoCompiler` runs the whole compiler, checking its own output with `WebLingoBytecodeVerifier`. `WebLingoDisassembler` shows a module as text. For the comparison of the two kinds of VM (WL-BC002, the specification's section 5.6), the same IR also goes to `WebLingoStackCodeGenerator`, which generates the stack bytecode (`WebLingoStackBytecodeContracts.cs`, in `WebLingo.Bytecode`, since the compiler may not depend on a VM), and `WebLingoStackCompiler` runs the whole compiler for it, checking its output with `WebLingoStackBytecodeVerifier`.
 
 The verifier must reject a malformed module, never throw or run out of memory on one: its dataflow check keeps state only at block starts, as bit sets, within fixed bounds (`MaxStateWords`, `MaxSteps`). Keep it so when operations are added, and add each one to the fuzz test's range.
 
-At run time, `WsVirtualMachine` (`WebLingo.VM`) verifies a module, links its imports to the host's built-ins, and runs it, a call pushing a frame onto the VM's own stack (never .NET's), in a `WsExecutionContext` (`WebLingo.Runtime`: owner worker, cancellation signal, instruction and resource budgets, runtime services). The semantics of values live in `WebLingo.Runtime`, not in the VM, so that another VM shares them: `WsValue`, `WsOperators` (arithmetic, comparisons and concatenation), `WsValueFormatter` (a value as text), `WsMembers` (members and indexing, `x.name`, `x.name(…)`, `x[i]`), `WsExceptions` (which runtime errors a handler catches, the `Error` one becomes, and how one nothing catches is reported), `WsTextBuilder` (a value's text, which stops where an instance's `toString()` must run, for the VM to run it as a call), `WsTasks.cs` (tasks, heap objects, and `WsScheduler`, the execution's queue of tasks ready to resume and its timers, which a VM runs its waiting frames by; and `IWsExecutionClock`, the host's clock, given as `WsExecutionContext.Clock`, without which the execution runs in virtual time), and `WsHeap`, the execution's worker-local heap, where strings live and values refer to them by handle; its roots are the VM's registers and constants, so anything else that holds a value of the heap must be registered as a root too (`AddRoots`), or a collection frees what it refers to. `WsStackVirtualMachine` (`WebLingo.VM.Stack`) runs the stack bytecode the same way, sharing all of that, and `WsExecutionResult` with the register VM (so it depends on `WebLingo.VM`); only its instructions differ, and its budget counts them. `weblingo` runs the register VM; the stack VM is run by the benchmark and the tests. `write` and `writeLn` are `WsWriteFunction` and `WsWriteLnFunction` in `WebLingo.StdLib`, and `delay` is `WsDelayFunction` (`WsStandardBuiltins` gives all three); the CLI, `WsCommandLine`, is the host that registers them, gives an execution the platform's monotonic clock (`DotNetClock`), and runs `run` and `check`.
+At run time, `WebLingoVirtualMachine` (`WebLingo.VM`) verifies a module, links its imports to the host's built-ins, and runs it, a call pushing a frame onto the VM's own stack (never .NET's), in a `WebLingoExecutionContext` (`WebLingo.Runtime`: owner worker, cancellation signal, instruction and resource budgets, runtime services). The semantics of values live in `WebLingo.Runtime`, not in the VM, so that another VM shares them: `WebLingoValue`, `WebLingoOperators` (arithmetic, comparisons and concatenation), `WebLingoValueFormatter` (a value as text), `WebLingoMembers` (members and indexing, `x.name`, `x.name(…)`, `x[i]`), `WebLingoExceptions` (which runtime errors a handler catches, the `Error` one becomes, and how one nothing catches is reported), `WebLingoTextBuilder` (a value's text, which stops where an instance's `toString()` must run, for the VM to run it as a call), `WebLingoTasks.cs` (tasks, heap objects, and `WebLingoScheduler`, the execution's queue of tasks ready to resume and its timers, which a VM runs its waiting frames by; and `IWebLingoExecutionClock`, the host's clock, given as `WebLingoExecutionContext.Clock`, without which the execution runs in virtual time), and `WebLingoHeap`, the execution's worker-local heap, where strings live and values refer to them by handle; its roots are the VM's registers and constants, so anything else that holds a value of the heap must be registered as a root too (`AddRoots`), or a collection frees what it refers to. `WebLingoStackVirtualMachine` (`WebLingo.VM.Stack`) runs the stack bytecode the same way, sharing all of that, and `WebLingoExecutionResult` with the register VM (so it depends on `WebLingo.VM`); only its instructions differ, and its budget counts them. `weblingo` runs the register VM; the stack VM is run by the benchmark and the tests. `write` and `writeLn` are `WebLingoWriteFunction` and `WebLingoWriteLnFunction` in `WebLingo.StdLib`, and `delay` is `WebLingoDelayFunction` (`WebLingoStandardBuiltins` gives all three); the CLI, `WebLingoCommandLine`, is the host that registers them, gives an execution the platform's monotonic clock (`DotNetClock`), and runs `run` and `check`.
 
 ## Dependency Direction
 
@@ -100,7 +100,7 @@ Project references follow the specification, section 8.3:
 - Hosting and the CLI compose the engine; framework-specific types do not leak into the core.
 - All references form a directed acyclic graph.
 
-Add projects (FastCGI, database providers, native adapters, `WebLingo.Hosting.Standalone`, the further test projects the specification lists) when their milestone begins, not before (specification, sections 8.2 and 13, WS-T008).
+Add projects (FastCGI, database providers, native adapters, `WebLingo.Hosting.Standalone`, the further test projects the specification lists) when their milestone begins, not before (specification, sections 8.2 and 13, WL-T008).
 
 ------
 
@@ -135,7 +135,7 @@ The specification marks each decision **Approved** (explicitly accepted by the p
 - When the owner approves a decision, update the specification in the same change: the section concerned and the decision register, with the date.
 - When a milestone's state changes, update the documents that report it: the specification's roadmap and status (sections 9 and 14), the solution's `README.md`, and the milestone's status document.
 
-The specification defines the milestones (M0.1 to M0.8, section 9), the increments of M0.6 (M0.6.1 to M0.6.7, section 8.7), and the specification IDs (`WS-…`), so these may be named in tasks, handoffs and commit messages, with that section (`AGENTS.md`, section 14, "Referring to Work").
+The specification defines the milestones (M0.1 to M0.8, section 9), the increments of M0.6 (M0.6.1 to M0.6.7, section 8.7), and the specification IDs (`WL-…`), so these may be named in tasks, handoffs and commit messages, with that section (`AGENTS.md`, section 14, "Referring to Work").
 
 ------
 
@@ -148,12 +148,12 @@ The specification's guiding invariants (section 11) bind every change. In code t
 - **Dependencies point one way** (section 3), and framework types (ASP.NET Core's, ADO.NET's) never leak into the portable core.
 - **Minimal third-party dependencies.** Ask before adding any package to the portable core.
 - **WebLingo is its own engine.** Do not execute WebLingo by delegating to an existing JavaScript engine (V8, Node.js, Jint, ClearScript), by translating it to C#, or by generating CLR code at run time. The released product must not need .NET, Node.js, V8 or PHP (specification, section 12.1).
-- **The IR stays VM-neutral.** The choice between a register VM and a stack VM is Provisional (WS-BC002). The register VM comes first, but the bound tree and the lowered IR must not depend on it, so that both can be benchmarked on equivalent workloads.
-- **Every feature on both VMs** (user decision, 2026-11-13; specification, section 5.6, "Both VMs, for now"). Until WS-BC002 is decided, a feature that reaches the bytecode is built on both VMs in the same change: `WsCodeGenerator`, `WsBytecodeVerifier` and `WsVirtualMachine`, and `WsStackCodeGenerator`, `WsStackBytecodeVerifier` and `WsStackVirtualMachine`, each with its tests. Its conformance cases then run on both (`StackVmTests`), and both must give the same output and errors. Property access, async suspension, template output and I/O-bound work each get a benchmark workload (`WsWorkloads`) when the language can express them.
+- **The IR stays VM-neutral.** The choice between a register VM and a stack VM is Provisional (WL-BC002). The register VM comes first, but the bound tree and the lowered IR must not depend on it, so that both can be benchmarked on equivalent workloads.
+- **Every feature on both VMs** (user decision, 2026-11-13; specification, section 5.6, "Both VMs, for now"). Until WL-BC002 is decided, a feature that reaches the bytecode is built on both VMs in the same change: `WebLingoCodeGenerator`, `WebLingoBytecodeVerifier` and `WebLingoVirtualMachine`, and `WebLingoStackCodeGenerator`, `WebLingoStackBytecodeVerifier` and `WebLingoStackVirtualMachine`, each with its tests. Its conformance cases then run on both (`StackVmTests`), and both must give the same output and errors. Property access, async suspension, template output and I/O-bound work each get a benchmark workload (`WebLingoWorkloads`) when the language can express them.
 - **Bytecode is verified before it runs.** Malformed bytecode fails verification; it never crashes the VM.
 - **Bad input gives diagnostics, not crashes.** Malformed source produces diagnostics with stable codes and source spans, and the parser recovers far enough to report more than one error. A diagnostic code, once assigned, keeps its meaning; use the codes the specification suggests (section 8.4), and ask before starting a new range.
 - **Secure by default.** Template output is escaped unless it is explicitly raw; filesystem, network, database and native access goes through capabilities; resource use is bounded.
-- **Templates ship whole.** Includes, layouts and parameterized components are all required in the first `.wsp`-capable release (WS-T001 to WS-T008); none of them is deferred to a later one.
+- **Templates ship whole.** Includes, layouts and parameterized components are all required in the first `.wlp`-capable release (WL-T001 to WL-T008); none of them is deferred to a later one.
 - **Ownership is explicit.** Mutable heaps are worker-local, data crosses workers only by explicit transfer, `dispose()` releases resources deterministically, and the tracing GC reclaims script-object memory. Disposal and GC are separate.
 - **Hot reload is atomic.** A reload swaps whole, fully initialized application generations; no request sees a partly initialized one.
 - **Vertical slices first.** Get the pipeline working end to end on a small subset (source, lexer, parser, binder, lowered IR, bytecode generator, verifier, VM) before widening the language or the hosting.
@@ -166,16 +166,16 @@ WebLingo source is read on Windows and Linux, from files that may end their line
 
 Be careful when translating between:
 
-- .NET string indices (UTF-16 code units), which the scaffold's `WsSourceSpan` and lexer use today,
+- .NET string indices (UTF-16 code units), which the scaffold's `WebLingoSourceSpan` and lexer use today,
 - UTF-8 byte offsets, which serialized offsets and source maps use (specification, sections 8.4 and 14),
 - Unicode scalar values, which string indexing and `length` count (M0.1),
 - the one-based line and column numbers that diagnostics report.
 
-`WsSourceText` (`WebLingo.Core`) is the one place that turns a position into a line and a column. Which characters end a line (CRLF, LF, CR) and how a column is counted (in Unicode scalar values) are proposed in the specification, section 15.2, and not yet decided: change them only there and in `WsSourceText`, with the owner's decision.
+`WebLingoSourceText` (`WebLingo.Core`) is the one place that turns a position into a line and a column. Which characters end a line (CRLF, LF, CR) and how a column is counted (in Unicode scalar values) are proposed in the specification, section 15.2, and not yet decided: change them only there and in `WebLingoSourceText`, with the owner's decision.
 
 ## Implementation Choices
 
-Where the specification is silent, the choices M0.6 made are listed, as Proposed, in its section 15.2 (section 5 above). Each is made in one place in the code, named in that table where it is not obvious, so that the owner's decision changes one place. The diagnostic codes are constants in `WsDiagnosticCodes` (`WebLingo.Core`); a new one is added there and to the specification's section 8.4.
+Where the specification is silent, the choices M0.6 made are listed, as Proposed, in its section 15.2 (section 5 above). Each is made in one place in the code, named in that table where it is not obvious, so that the owner's decision changes one place. The diagnostic codes are constants in `WebLingoDiagnosticCodes` (`WebLingo.Core`); a new one is added there and to the specification's section 8.4.
 
 ------
 
@@ -190,7 +190,7 @@ dotnet build WebLingo.slnx -c Release
 dotnet test WebLingo.slnx -c Release --no-build
 dotnet test tests/WebLingo.Language.Tests -c Release --no-build --filter "FullyQualifiedName~LexerTests"
 dotnet run --project src/WebLingo.Cli -c Release --no-build -- --version
-dotnet run --project src/WebLingo.Cli -c Release --no-build -- run samples/Arithmetic/arithmetic.ws
+dotnet run --project src/WebLingo.Cli -c Release --no-build -- run samples/Arithmetic/arithmetic.wl
 dotnet run --project benchmarks/WebLingo.Benchmarks -c Release --no-build
 ```
 
@@ -249,7 +249,7 @@ The run logs need a signed-in GitHub account; the run's page and its result do n
 
 ### The VMs Repeat Part of the Runtime's Arithmetic, and Its Messages
 
-For speed, each VM does the arithmetic and comparisons of two int64s, or of two binary64s, in its dispatch loop, and leaves everything else, and every error, to `WsOperators` (`WebLingo.Runtime`). A change to the semantics of those operators changes all three; `OperatorTests` (`WebLingo.VM.Tests`) runs every operator on pairs of edge values through both VMs and checks that each gives what `WsOperators` gives. The messages of the errors the VMs raise themselves (calls, cells, budgets) are written in each VM; `StackVmTests` (`WebLingo.Conformance.Tests`) checks that both VMs give every conformance program the same output and the same errors, so a change to one VM's message is a change to the other's.
+For speed, each VM does the arithmetic and comparisons of two int64s, or of two binary64s, in its dispatch loop, and leaves everything else, and every error, to `WebLingoOperators` (`WebLingo.Runtime`). A change to the semantics of those operators changes all three; `OperatorTests` (`WebLingo.VM.Tests`) runs every operator on pairs of edge values through both VMs and checks that each gives what `WebLingoOperators` gives. The messages of the errors the VMs raise themselves (calls, cells, budgets) are written in each VM; `StackVmTests` (`WebLingo.Conformance.Tests`) checks that both VMs give every conformance program the same output and the same errors, so a change to one VM's message is a change to the other's.
 
 ### A VM's Dispatch Method Is Sensitive to Its Locals
 
@@ -261,7 +261,7 @@ Each VM's `Run` is one large method, which keeps the running frame's state in lo
 
 ### Spans Are UTF-16 Indices
 
-The scaffold's `WsSourceSpan` and lexer positions are .NET string indices, not the UTF-8 byte offsets serialized forms need (specification, section 14). Convert explicitly; do not assume they are the same.
+The scaffold's `WebLingoSourceSpan` and lexer positions are .NET string indices, not the UTF-8 byte offsets serialized forms need (specification, section 14). Convert explicitly; do not assume they are the same.
 
 ------
 
@@ -270,7 +270,7 @@ The scaffold's `WsSourceSpan` and lexer positions are .NET string indices, not t
 In addition to the list in `AGENTS.md`, section 13, do not change these without explicit approval:
 
 - any Approved decision in the specification's decision register, or the status of a Proposed or Provisional one
-- the names: WebLingo, `weblingo`, the `.ws` and `.wsp` extensions, the `WebLingo` namespace roots, the `WS` prefixes of specification IDs and diagnostic codes
+- the names: WebLingo, `weblingo`, the `.wl` and `.wlp` extensions, the `WebLingo` namespace roots, the `WL` prefixes of specification IDs and diagnostic codes, and the `WebLingo` prefix of type names
 - the implementation strategy: C# on .NET 10 first, Native C# later, no rewrite in another language
 - the target framework, `net10.0`, and `global.json`
 - the choice between a register VM and a stack VM, and the WBC binary format: do not freeze either

@@ -28,104 +28,104 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var x = 10 / 2;")]
     public void ValidProgramsCompileAndRun(string source)
     {
-        Assert.Equal((WsCommandLine.Success, "", ""), Weblingo("check", source));
-        Assert.Equal((WsCommandLine.Success, "", ""), Weblingo("run", source));
+        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo("check", source));
+        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo("run", source));
     }
 
     [Theory]
-    [InlineData("const x;", "WS1006", 1, 7)]
-    [InlineData("var x;", "WS1006", 1, 5)]
-    [InlineData("writeLn(x); var x = 1;", "WS2001", 1, 9)]
-    [InlineData("var x = 10", "WS1002", 1, 11)]
-    [InlineData("var x = 1; var x = 2;", "WS2002", 1, 16)]
-    [InlineData("x = 10;", "WS2001", 1, 1)]
-    [InlineData("{ var y = 1; } writeLn(y);", "WS2001", 1, 24)]
-    [InlineData("{ var y = 1; var y = 2; }", "WS2002", 1, 18)]
-    [InlineData("if (true) var y = 1; writeLn(y);", "WS2001", 1, 30)]
-    [InlineData("if true) writeLn(1);", "WS1001", 1, 4)]
-    [InlineData("else writeLn(1);", "WS1001", 1, 1)]
-    [InlineData("break;", "WS2007", 1, 1)]
-    [InlineData("writeLn(\"a\\qb\");", "WS1009", 1, 11)]
-    [InlineData("writeLn(\"open);", "WS1010", 1, 9)]
-    [InlineData("if (true) { continue; }", "WS2007", 1, 13)]
-    [InlineData("for (var i = 0; i < 1; i = i + 1) {} writeLn(i);", "WS2001", 1, 46)]
-    [InlineData("do writeLn(1) while (true);", "WS1002", 1, 14)]
-    [InlineData("return;", "WS2008", 1, 1)]
-    [InlineData("function f(a) {} f(1, 2);", "WS2006", 1, 18)]
-    [InlineData("var m = {}; m?.a = 1;", "WS1007", 1, 13)]
-    [InlineData("writeLn(this);", "WS2009", 1, 9)]
-    [InlineData("var f = function () { return this; };", "WS2009", 1, 30)]
-    [InlineData("class A { m() {} m() {} }", "WS2002", 1, 18)]
-    [InlineData("class A {} class A {}", "WS2002", 1, 18)]
-    [InlineData("class A {} A = 1;", "WS2003", 1, 12)]
-    [InlineData("class A {} var a = A();", "WS2005", 1, 20)]
-    [InlineData("var a = new A;", "WS1001", 1, 14)]
-    [InlineData("class { }", "WS1001", 1, 7)]
-    [InlineData("class A extends B {} class B extends A {}", "WS2013", 1, 1)]
-    [InlineData("Object = 1;", "WS2003", 1, 1)]
-    [InlineData("throw;", "WS2010", 1, 1)]
-    [InlineData("function f() { try {} finally { return; } }", "WS2012", 1, 33)]
-    [InlineData("while (true) { try {} finally { break; } }", "WS2012", 1, 33)]
-    [InlineData("try {} writeLn(1);", "WS1001", 1, 8)]
-    [InlineData("try {} catch (e) {} catch (Error e) {}", "WS1001", 1, 21)]
-    [InlineData("try {} catch (Nope e) {}", "WS2001", 1, 15)]
-    [InlineData("function f(a = 1, b) {}", "WS1001", 1, 19)]
-    [InlineData("function f(a, b = 1) {} f();", "WS2006", 1, 25)]
-    [InlineData("function f(a, b = 1) {} f(1, 2, 3);", "WS2006", 1, 25)]
-    [InlineData("try { } catch (e) { var e = 1; }", "WS2002", 1, 25)]
-    [InlineData("class A {} class B extends A { m() { super(); } }", "WS2009", 1, 38)]
-    [InlineData("var X = 5; class A extends X {}", "WS2001", 1, 28)]
-    [InlineData("var s = super;", "WS2009", 1, 9)]
-    [InlineData("class A { dispose() {} destructor() {} }", "WS2011", 1, 24)]
-    [InlineData("class A { destructor() {} function dispose() {} }", "WS2011", 1, 36)]
-    [InlineData("using (var r = 1) {} writeLn(r);", "WS2001", 1, 30)]
-    [InlineData("using (var r = r) {}", "WS2001", 1, 16)]
-    [InlineData("using (const r = 1) {}", "WS1001", 1, 8)]
-    [InlineData("class A { static m() { return this; } }", "WS2009", 1, 31)]
-    [InlineData("class A { static var x = this; }", "WS2009", 1, 26)]
-    [InlineData("class A {} class B extends A { static m() { return super.m(); } }", "WS2009", 1, 52)]
-    [InlineData("class A { static var x = 1; static x() {} }", "WS2002", 1, 36)]
-    [InlineData("class A { static var x; }", "WS1006", 1, 22)]
-    [InlineData("class A { static constructor() {} }", "WS1001", 1, 18)]
-    [InlineData("var v = 1; class A { static var x = v; }", "WS2001", 1, 37)]
-    [InlineData("writeLn(\"abc\".);", "WS1001", 1, 15)]
-    [InlineData("writeLn(\"abc\"[0);", "WS1001", 1, 16)]
-    [InlineData("writeLn([1,]);", "WS1001", 1, 12)]
-    [InlineData("var a = [1 2];", "WS1001", 1, 12)]
-    [InlineData("var m = {1: 2};", "WS1001", 1, 10)]
-    [InlineData("var m = {a 1};", "WS1001", 1, 12)]
-    [InlineData("var m = {a: 1,};", "WS1001", 1, 15)]
-    [InlineData("var m = {a: {1: 2}, b: 3}; writeLn(1);", "WS1001", 1, 14)]
-    [InlineData("foreach (const x in [1]) writeLn(x);", "WS1001", 1, 10)]
-    [InlineData("writeLn(#{1,});", "WS1001", 1, 13)]
-    [InlineData("var m = {}; m?[\"a\"] = 2;", "WS1007", 1, 13)]
-    [InlineData("var x = true ? 1 : 2;", "WS1003", 1, 14)]
-    [InlineData("writeLn(#[1]);", "WS1003", 1, 9)]
-    [InlineData("foreach (var x of [1]) writeLn(x);", "WS1001", 1, 16)]
-    [InlineData("foreach (var (k, k) in {}) writeLn(k);", "WS2002", 1, 18)]
-    [InlineData("foreach (var x in [1]) {} writeLn(x);", "WS2001", 1, 35)]
-    [InlineData("function g() { await 1; }", "WS2014", 1, 16)]
-    [InlineData("var f = function () { await 1; };", "WS2014", 1, 23)]
-    [InlineData("async function f() { var g = function () { await 1; }; }", "WS2014", 1, 44)]
-    [InlineData("class A { async constructor() {} }", "WS1001", 1, 17)]
-    [InlineData("var async = 1;", "WS1001", 1, 5)]
-    [InlineData("class P { m() { return 1; } } extend P { m() { return super.m(); } }", "WS2009", 1, 55)]
-    [InlineData("class P {} extend P { constructor() {} }", "WS1001", 1, 23)]
-    [InlineData("class P {} extend P { dispose() {} destructor() {} }", "WS2011", 1, 36)]
-    [InlineData("class P {} extend P { m() {} m() {} }", "WS2002", 1, 30)]
-    [InlineData("var extend = 1;", "WS1001", 1, 5)]
-    [InlineData("extend Q { }", "WS2001", 1, 8)]
-    [InlineData("var x = 5; extend x { }", "WS2001", 1, 19)]
-    [InlineData("class E { static operator ==(a, b) { return true; } }", "WS1001", 1, 27)]
-    [InlineData("class W { static operator +(a) { return 1; } }", "WS1001", 1, 27)]
+    [InlineData("const x;", "WL1006", 1, 7)]
+    [InlineData("var x;", "WL1006", 1, 5)]
+    [InlineData("writeLn(x); var x = 1;", "WL2001", 1, 9)]
+    [InlineData("var x = 10", "WL1002", 1, 11)]
+    [InlineData("var x = 1; var x = 2;", "WL2002", 1, 16)]
+    [InlineData("x = 10;", "WL2001", 1, 1)]
+    [InlineData("{ var y = 1; } writeLn(y);", "WL2001", 1, 24)]
+    [InlineData("{ var y = 1; var y = 2; }", "WL2002", 1, 18)]
+    [InlineData("if (true) var y = 1; writeLn(y);", "WL2001", 1, 30)]
+    [InlineData("if true) writeLn(1);", "WL1001", 1, 4)]
+    [InlineData("else writeLn(1);", "WL1001", 1, 1)]
+    [InlineData("break;", "WL2007", 1, 1)]
+    [InlineData("writeLn(\"a\\qb\");", "WL1009", 1, 11)]
+    [InlineData("writeLn(\"open);", "WL1010", 1, 9)]
+    [InlineData("if (true) { continue; }", "WL2007", 1, 13)]
+    [InlineData("for (var i = 0; i < 1; i = i + 1) {} writeLn(i);", "WL2001", 1, 46)]
+    [InlineData("do writeLn(1) while (true);", "WL1002", 1, 14)]
+    [InlineData("return;", "WL2008", 1, 1)]
+    [InlineData("function f(a) {} f(1, 2);", "WL2006", 1, 18)]
+    [InlineData("var m = {}; m?.a = 1;", "WL1007", 1, 13)]
+    [InlineData("writeLn(this);", "WL2009", 1, 9)]
+    [InlineData("var f = function () { return this; };", "WL2009", 1, 30)]
+    [InlineData("class A { m() {} m() {} }", "WL2002", 1, 18)]
+    [InlineData("class A {} class A {}", "WL2002", 1, 18)]
+    [InlineData("class A {} A = 1;", "WL2003", 1, 12)]
+    [InlineData("class A {} var a = A();", "WL2005", 1, 20)]
+    [InlineData("var a = new A;", "WL1001", 1, 14)]
+    [InlineData("class { }", "WL1001", 1, 7)]
+    [InlineData("class A extends B {} class B extends A {}", "WL2013", 1, 1)]
+    [InlineData("Object = 1;", "WL2003", 1, 1)]
+    [InlineData("throw;", "WL2010", 1, 1)]
+    [InlineData("function f() { try {} finally { return; } }", "WL2012", 1, 33)]
+    [InlineData("while (true) { try {} finally { break; } }", "WL2012", 1, 33)]
+    [InlineData("try {} writeLn(1);", "WL1001", 1, 8)]
+    [InlineData("try {} catch (e) {} catch (Error e) {}", "WL1001", 1, 21)]
+    [InlineData("try {} catch (Nope e) {}", "WL2001", 1, 15)]
+    [InlineData("function f(a = 1, b) {}", "WL1001", 1, 19)]
+    [InlineData("function f(a, b = 1) {} f();", "WL2006", 1, 25)]
+    [InlineData("function f(a, b = 1) {} f(1, 2, 3);", "WL2006", 1, 25)]
+    [InlineData("try { } catch (e) { var e = 1; }", "WL2002", 1, 25)]
+    [InlineData("class A {} class B extends A { m() { super(); } }", "WL2009", 1, 38)]
+    [InlineData("var X = 5; class A extends X {}", "WL2001", 1, 28)]
+    [InlineData("var s = super;", "WL2009", 1, 9)]
+    [InlineData("class A { dispose() {} destructor() {} }", "WL2011", 1, 24)]
+    [InlineData("class A { destructor() {} function dispose() {} }", "WL2011", 1, 36)]
+    [InlineData("using (var r = 1) {} writeLn(r);", "WL2001", 1, 30)]
+    [InlineData("using (var r = r) {}", "WL2001", 1, 16)]
+    [InlineData("using (const r = 1) {}", "WL1001", 1, 8)]
+    [InlineData("class A { static m() { return this; } }", "WL2009", 1, 31)]
+    [InlineData("class A { static var x = this; }", "WL2009", 1, 26)]
+    [InlineData("class A {} class B extends A { static m() { return super.m(); } }", "WL2009", 1, 52)]
+    [InlineData("class A { static var x = 1; static x() {} }", "WL2002", 1, 36)]
+    [InlineData("class A { static var x; }", "WL1006", 1, 22)]
+    [InlineData("class A { static constructor() {} }", "WL1001", 1, 18)]
+    [InlineData("var v = 1; class A { static var x = v; }", "WL2001", 1, 37)]
+    [InlineData("writeLn(\"abc\".);", "WL1001", 1, 15)]
+    [InlineData("writeLn(\"abc\"[0);", "WL1001", 1, 16)]
+    [InlineData("writeLn([1,]);", "WL1001", 1, 12)]
+    [InlineData("var a = [1 2];", "WL1001", 1, 12)]
+    [InlineData("var m = {1: 2};", "WL1001", 1, 10)]
+    [InlineData("var m = {a 1};", "WL1001", 1, 12)]
+    [InlineData("var m = {a: 1,};", "WL1001", 1, 15)]
+    [InlineData("var m = {a: {1: 2}, b: 3}; writeLn(1);", "WL1001", 1, 14)]
+    [InlineData("foreach (const x in [1]) writeLn(x);", "WL1001", 1, 10)]
+    [InlineData("writeLn(#{1,});", "WL1001", 1, 13)]
+    [InlineData("var m = {}; m?[\"a\"] = 2;", "WL1007", 1, 13)]
+    [InlineData("var x = true ? 1 : 2;", "WL1003", 1, 14)]
+    [InlineData("writeLn(#[1]);", "WL1003", 1, 9)]
+    [InlineData("foreach (var x of [1]) writeLn(x);", "WL1001", 1, 16)]
+    [InlineData("foreach (var (k, k) in {}) writeLn(k);", "WL2002", 1, 18)]
+    [InlineData("foreach (var x in [1]) {} writeLn(x);", "WL2001", 1, 35)]
+    [InlineData("function g() { await 1; }", "WL2014", 1, 16)]
+    [InlineData("var f = function () { await 1; };", "WL2014", 1, 23)]
+    [InlineData("async function f() { var g = function () { await 1; }; }", "WL2014", 1, 44)]
+    [InlineData("class A { async constructor() {} }", "WL1001", 1, 17)]
+    [InlineData("var async = 1;", "WL1001", 1, 5)]
+    [InlineData("class P { m() { return 1; } } extend P { m() { return super.m(); } }", "WL2009", 1, 55)]
+    [InlineData("class P {} extend P { constructor() {} }", "WL1001", 1, 23)]
+    [InlineData("class P {} extend P { dispose() {} destructor() {} }", "WL2011", 1, 36)]
+    [InlineData("class P {} extend P { m() {} m() {} }", "WL2002", 1, 30)]
+    [InlineData("var extend = 1;", "WL1001", 1, 5)]
+    [InlineData("extend Q { }", "WL2001", 1, 8)]
+    [InlineData("var x = 5; extend x { }", "WL2001", 1, 19)]
+    [InlineData("class E { static operator ==(a, b) { return true; } }", "WL1001", 1, 27)]
+    [InlineData("class W { static operator +(a) { return 1; } }", "WL1001", 1, 27)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
         {
             var (exit, output, error) = Weblingo(command, source);
-            Assert.Equal(WsCommandLine.CompilationFailed, exit);
+            Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
             Assert.Equal("", output);
-            Assert.Equal($"program.ws({line},{column}): error {code}:", FirstLineStart(error));
+            Assert.Equal($"program.wl({line},{column}): error {code}:", FirstLineStart(error));
         }
     }
 
@@ -247,7 +247,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A extends Object { constructor() { super(); this.v = 1; } } class B { constructor() { super(); } } writeLn(new A()); writeLn(new B());", "A {v: 1}\nB {}")]
     [InlineData("function f() { class K {} return new K(); } var k = f(); writeLn(k.equal(k)); writeLn(k.equal(f()));", "true\nfalse")]
     [InlineData("try { throw \"boom\"; } catch (e) { writeLn(\"caught \" + e); }", "caught boom")]
-    [InlineData("try { var a = [1]; a[5]; } catch (e) { writeLn(e); writeLn(e.code); }", "IndexError {message: \"The index 5 is outside 0 to 0.\", code: \"WS3005\"}\nWS3005")]
+    [InlineData("try { var a = [1]; a[5]; } catch (e) { writeLn(e); writeLn(e.code); }", "IndexError {message: \"The index 5 is outside 0 to 0.\", code: \"WL3005\"}\nWL3005")]
     [InlineData("function f(n) { try { if (n == 0) return \"zero\"; return \"other\"; } finally { writeLn(\"finally\"); } } writeLn(f(0)); writeLn(f(1));", "finally\nzero\nfinally\nother")]
     [InlineData("var i = 0; while (i < 3) { i = i + 1; try { if (i == 1) continue; if (i == 2) break; } finally { writeLn(i); } } writeLn(\"end\");", "1\n2\nend")]
     [InlineData("function deep() { var m = {}; return m[\"nope\"]; } try { deep(); } catch (e) { writeLn(e.message); }", "The map has no key \"nope\".")]
@@ -260,7 +260,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var fs = []; for (var i = 0; i < 2; i = i + 1) { try { throw i; } catch (e) { fs.push(function () { return e; }); } } writeLn(fs[0]() + fs[1]());", "1")]
     [InlineData("try { throw 1; } catch (e) { writeLn(\"c\"); } finally { writeLn(\"f\"); }", "c\nf")]
     [InlineData("try { try { throw 1; } catch (e) { throw 2; } finally { writeLn(\"f\"); } } catch (e) { writeLn(e); }", "f\n2")]
-    [InlineData("try { var x = 9223372036854775807 + 1; } catch (e) { writeLn(e.code); }", "WS3002")]
+    [InlineData("try { var x = 9223372036854775807 + 1; } catch (e) { writeLn(e.code); }", "WL3002")]
     [InlineData("var e = new Error(\"m\"); writeLn(e.message); writeLn(e.code);", "m\nnull")]
     [InlineData("class C { constructor() { throw \"no\"; } } try { new C(); } catch (e) { writeLn(e); }", "no")]
     [InlineData("for (var i = 0; i < 1; i = i + 1) { try {} finally { for (var j = 0; j < 3; j = j + 1) { if (j == 1) break; writeLn(j); } } } writeLn(\"ok\");", "0\nok")]
@@ -271,14 +271,14 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class S { toString() { return \"self\"; } } var s = new S(); s.me = s; writeLn([s]); writeLn(s); writeLn(s.me.toString());", "[self]\nself\nself")]
     [InlineData("class Thrower { toString() { throw \"nope\"; } } try { writeLn([new Thrower()]); } catch (e) { writeLn(\"caught \" + e); } writeLn(\"after\");", "caught nope\nafter")]
     [InlineData("class L { toString() { write(\"<\"); return \"L\"; } } writeLn([new L(), new L()]);", "<<[L, L]")]
-    [InlineData("try { var m = {}; m[\"x\"]; } catch (KeyError e) { writeLn(\"key \" + e.code); }", "key WS3007")]
+    [InlineData("try { var m = {}; m[\"x\"]; } catch (KeyError e) { writeLn(\"key \" + e.code); }", "key WL3007")]
     [InlineData("try { [][0]; } catch (KeyError e) { writeLn(\"k\"); } catch (IndexError e) { writeLn(\"i \" + (e is Error).toString()); } catch (e) { writeLn(\"any\"); }", "i true")]
     [InlineData("try { try { throw \"s\"; } catch (Integer e) { writeLn(\"int\"); } finally { writeLn(\"f\"); } } catch (String e) { writeLn(\"string \" + e); }", "f\nstring s")]
     [InlineData("class P {} writeLn([5 is Integer, 5 is Number, 1.5 is Number, \"a\" is String, [1] is Array, {} is Map, #{} is Set]); writeLn([null is Object, 5 is Object, writeLn is Function, new P() is P, new P() is Object, P is Class, true is Boolean, P is P]);", "[true, false, true, true, true, true, true]\n[false, true, true, true, true, true, true, false]")]
     [InlineData("class NotFound extends Error { constructor(m) { super(m); } } class errors { static var NotFound = NotFound; } try { throw new NotFound(\"x\"); } catch (errors.NotFound e) { writeLn(\"nf \" + e.message); }", "nf x")]
     [InlineData("var A = 5; try { throw 5; } catch (A e) { writeLn(\"five\"); } writeLn(5 is A); writeLn(6 is A);", "five\ntrue\nfalse")]
     [InlineData("writeLn(\"a\".equal(\"a\")); writeLn(5.equal(6)); var z = null; writeLn(z.equal(null));", "true\nfalse\ntrue")]
-    [InlineData("try { 1 + \"a\"; } catch (TypeError e) { writeLn(e is TypeError); writeLn(e.code); } try { throw new KeyError(\"mine\"); } catch (KeyError e) { writeLn(e); }", "true\nWS3001\nKeyError {message: \"mine\", code: null}")]
+    [InlineData("try { 1 + \"a\"; } catch (TypeError e) { writeLn(e is TypeError); writeLn(e.code); } try { throw new KeyError(\"mine\"); } catch (KeyError e) { writeLn(e); }", "true\nWL3001\nKeyError {message: \"mine\", code: null}")]
     [InlineData("try { throw null; } catch (Object e) { writeLn(\"object\"); } catch (e) { writeLn(\"any \" + e.toString()); }", "any null")]
     [InlineData("class Stack extends Array { top() { return this[this.length - 1]; } } var s = new Stack(); s.push(1); s.push(2); writeLn(s.top()); writeLn(s.length); writeLn(s); writeLn([s is Array, s is Stack, [] is Stack]); s.name = \"st\"; writeLn(s.name); foreach (var x in s) write(x); writeLn(\"\");", "2\n2\nStack:[1, 2]\n[true, true, false]\nst\n12")]
     [InlineData("class Bag extends Set {} var b = new Bag(); b.add(1); b.add(1); writeLn(b); class Dict extends Map { get(k) { return this?[k]; } } var d = new Dict(); d[\"a\"] = 1; writeLn(d.get(\"a\")); writeLn(d.get(\"b\")); writeLn([d]);", "Bag:#{1}\n1\nnull\n[Dict:{\"a\": 1}]")]
@@ -316,7 +316,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("async function w(n, d) { writeLn(n + \"<\"); await delay(d); writeLn(n + \">\"); return d; } var a = w(\"a\", 20); var b = w(\"b\", 10); writeLn(a is Task); writeLn(await a + await b);", "a<\nb<\ntrue\nb>\na>\n30")]
     [InlineData("async function f() { writeLn(\"f1\"); await null; writeLn(\"f2\"); } var t = f(); writeLn(\"main\"); writeLn(await 5); await t;", "f1\nmain\nf2\n5")]
     [InlineData("async function bad() { await null; throw new Error(\"no\"); } try { await bad(); } catch (e) { writeLn(e.message); }", "no")]
-    [InlineData("async function ix() { return [1][5]; } try { await ix(); } catch (IndexError e) { writeLn(e.code); }", "WS3005")]
+    [InlineData("async function ix() { return [1][5]; } try { await ix(); } catch (IndexError e) { writeLn(e.code); }", "WL3005")]
     [InlineData("async function bad() { throw \"x\"; } bad().forget(); var t = bad(); t.forget(); writeLn(\"ok\");", "ok")]
     [InlineData("class A { constructor() { this.k = 1; } async m(x) { await null; return x + this.k; } } writeLn(await new A().m(41)); var h = async function (x) { return x * 2; }; writeLn(await h(4));", "42\n8")]
     [InlineData("async function f() { await null; writeLn(\"never\"); } f(); writeLn(\"end\");", "end")]
@@ -339,7 +339,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class R { async dispose() { await null; writeLn(\"disposed\"); } } try { using (var r = new R()) { throw \"body\"; } } catch (e) { writeLn(e); }", "disposed\nbody")]
     [InlineData("class A { dispose() { writeLn(\"A\"); } } class B extends A { async dispose() { await null; throw \"B\"; } } try { using (var b = new B()) {} } catch (e) { writeLn(\"caught \" + e); }", "A\ncaught B")]
     [InlineData("class A { async dispose() { throw \"A\"; } } class B extends A { async dispose() { await null; throw \"B\"; } } try { await new B().dispose(); } catch (e) { writeLn(\"caught \" + e); }", "caught A")]
-    [InlineData("class R { async dispose() { writeLn(\"d\"); } } var r = new R(); function f() { using (var x = r) {} } try { f(); } catch (e) { writeLn(e.code); } await r.dispose();", "WS3001\nd")]
+    [InlineData("class R { async dispose() { writeLn(\"d\"); } } var r = new R(); function f() { using (var x = r) {} } try { f(); } catch (e) { writeLn(e.code); } await r.dispose();", "WL3001\nd")]
     [InlineData("class R { async dispose() { writeLn(\"d\"); } } function f(r) { return r.dispose(); } var t = f(new R()); writeLn(t is Task); await t;", "d\ntrue")]
     [InlineData("class R { constructor(n) { this.n = n; } async dispose() { await null; writeLn(\"d\" + this.n.toString()); } } async function f() { foreach (var i in [1, 2]) { using (var r = new R(i)) { if (i == 1) continue; return i; } } } writeLn(await f());", "d1\nd2\n2")]
     [InlineData("class R { constructor(n) { this.n = n; } async dispose() { await delay(this.n); writeLn(this.n); } } async function use(n) { using (var r = new R(n)) {} } var a = use(20); var b = use(10); await a; await b;", "10\n20")]
@@ -389,7 +389,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A { static var k = \"s\"; } var a = new A(); a.k = function () { return \"field\"; }; writeLn(a.k()); class S extends Array { static var size = 3; } writeLn(new S().size);", "field\n3")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
-        Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
+        Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
     }
 
     [Theory]
@@ -413,162 +413,162 @@ public sealed class ConformanceTests : IDisposable
     public void BooleansAndNumbersDoNotMix(string source)
     {
         var (exit, _, error) = Weblingo("run", source);
-        Assert.Equal(WsCommandLine.RuntimeFailed, exit);
-        Assert.Contains("error WS3001:", error);
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
+        Assert.Contains("error WL3001:", error);
     }
 
     [Theory]
-    [InlineData("var x = 1; x(2);", "WS2005")]
-    [InlineData("writeLn(1)(2);", "WS2005")]
-    [InlineData("var write = 1; write(2);", "WS2005")]
-    [InlineData("var f = function (a) {}; f();", "WS2006")]
-    [InlineData("var w = writeLn; w(1, 2);", "WS2006")]
-    [InlineData("function f() { return f(); } f();", "WS3003")]
-    [InlineData("f(); var y = 1; function f() { writeLn(y); }", "WS2004")]
+    [InlineData("var x = 1; x(2);", "WL2005")]
+    [InlineData("writeLn(1)(2);", "WL2005")]
+    [InlineData("var write = 1; write(2);", "WL2005")]
+    [InlineData("var f = function (a) {}; f();", "WL2006")]
+    [InlineData("var w = writeLn; w(1, 2);", "WL2006")]
+    [InlineData("function f() { return f(); } f();", "WL3003")]
+    [InlineData("f(); var y = 1; function f() { writeLn(y); }", "WL2004")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);
-        Assert.Equal(WsCommandLine.RuntimeFailed, exit);
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Contains($"error {code}:", error);
     }
 
     [Theory]
-    [InlineData("writeLn(\"abc\"[3]);", "WS3005")]
-    [InlineData("writeLn(\"abc\"[-1]);", "WS3005")]
-    [InlineData("writeLn(\"\"[0]);", "WS3005")]
-    [InlineData("writeLn(\"abc\"[1.0]);", "WS3001")]
-    [InlineData("var s = \"abc\"; s[0] = \"x\";", "WS3001")]
-    [InlineData("writeLn(5[0]);", "WS3001")]
-    [InlineData("writeLn(\"abc\".size);", "WS3006")]
-    [InlineData("writeLn(5.length);", "WS3006")]
-    [InlineData("writeLn(null.length);", "WS3006")]
-    [InlineData("writeLn(\"abc\".length());", "WS2005")]
-    [InlineData("writeLn(\"abc\".size(1));", "WS3006")]
-    [InlineData("var x = 1; x.length = 2;", "WS3001")]
-    [InlineData("var x = new 5();", "WS2005")]
-    [InlineData("class P {} var c = P; c();", "WS2005")]
-    [InlineData("class P { constructor(a, b) {} } var p = new P(1);", "WS2006")]
-    [InlineData("class E {} var e = new E(1);", "WS2006")]
-    [InlineData("class P { m(a) {} } new P().m();", "WS2006")]
-    [InlineData("class P {} writeLn(new P().missing);", "WS3006")]
-    [InlineData("class P {} new P().missing();", "WS3006")]
-    [InlineData("class P { m() {} } var p = new P(); p.m = 1;", "WS3001")]
-    [InlineData("class P {} var m = {}; m[new P()] = 1;", "WS3001")]
-    [InlineData("class P {} foreach (var x in new P()) writeLn(x);", "WS3001")]
-    [InlineData("class P {} writeLn(new P()[0]);", "WS3001")]
-    [InlineData("class P {} writeLn(P.x);", "WS3006")]
-    [InlineData("class A { constructor(x) {} } class B extends A {} new B();", "WS2006")]
-    [InlineData("class A {} class B extends A { m() { return super.nope(); } } new B().m();", "WS3006")]
-    [InlineData("var NotClass = 5; { class A extends NotClass {} }", "WS3001")]
-    [InlineData("using (var x = 5) {}", "WS3006")]
-    [InlineData("class A {} using (var a = new A()) {}", "WS3006")]
-    [InlineData("class A { dispose() {} } new A().dispose(1);", "WS2006")]
-    [InlineData("class A { dispose(x) {} } using (var a = new A()) {}", "WS2006")]
-    [InlineData("class A { static m() {} } A.m = 1;", "WS3001")]
-    [InlineData("class A { static var n = 1; } writeLn(new A().m);", "WS3006")]
-    [InlineData("class A { static m(x) {} } A.m();", "WS2006")]
-    [InlineData("class A { m() { return super.m(); } } new A().m();", "WS3006")]
-    [InlineData("new Object().equal();", "WS2006")]
-    [InlineData("class A {} new A().equal = 1;", "WS3001")]
-    [InlineData("throw \"x\";", "WS3008")]
-    [InlineData("throw new Error(\"m\");", "WS3008")]
-    [InlineData("try { var a = []; a[1]; } finally { writeLn(1); }", "WS3005")]
-    [InlineData("try { var a = []; a[1]; } catch (e) { throw; }", "WS3005")]
-    [InlineData("class Bad { toString() { return 5; } } writeLn(new Bad());", "WS3001")]
-    [InlineData("class Bad { toString(x) { return \"\"; } } writeLn([new Bad()]);", "WS2006")]
-    [InlineData("class X extends Class {}", "WS3001")]
-    [InlineData("class Bad { equal(o) { return 1; } } var B = new Bad(); try { throw 1; } catch (B e) {}", "WS3001")]
-    [InlineData("try { throw 1; } catch (String e) {}", "WS3008")]
-    [InlineData("var f = function (a, b = 1) {}; f();", "WS2006")]
-    [InlineData("var f = function (a = 1) {}; f(1, 2);", "WS2006")]
-    [InlineData("var a = [1]; a.length = 2;", "WS3001")]
-    [InlineData("writeLn([].pop());", "WS3005")]
-    [InlineData("writeLn([1, 2][2]);", "WS3005")]
-    [InlineData("var a = [1]; a[-1] = 0;", "WS3005")]
-    [InlineData("writeLn([1][\"0\"]);", "WS3001")]
-    [InlineData("writeLn([1].push);", "WS3001")]
-    [InlineData("var a = [1]; a.push(1, 2);", "WS2006")]
-    [InlineData("var a = [1]; a.pop(1);", "WS2006")]
-    [InlineData("writeLn([1].size);", "WS3006")]
-    [InlineData("writeLn([1].length());", "WS2005")]
-    [InlineData("writeLn([1] + [2]);", "WS3001")]
-    [InlineData("writeLn([1] < [2]);", "WS3001")]
-    [InlineData("var m = {a: 1}; writeLn(m[\"b\"]);", "WS3007")]
-    [InlineData("var m = {a: 1}; writeLn(m[1]);", "WS3007")]
-    [InlineData("var m = {}; m[1.5] = 2;", "WS3001")]
-    [InlineData("var m = {}; m[[1]] = 2;", "WS3001")]
-    [InlineData("var m = {}; m[m] = 2;", "WS3001")]
-    [InlineData("var m = {}; writeLn(m.has(NaN));", "WS3001")]
-    [InlineData("var m = {a: 1}; writeLn(m.a);", "WS3006")]
-    [InlineData("var m = {a: 1}; writeLn(m.has);", "WS3001")]
-    [InlineData("var m = {a: 1}; writeLn(m.has());", "WS2006")]
-    [InlineData("var m = {a: 1}; writeLn(m.length());", "WS2005")]
-    [InlineData("var m = {a: 1}; m.push(1);", "WS3006")]
-    [InlineData("foreach (var x in {a: 1}) writeLn(x);", "WS3001")]
-    [InlineData("foreach (var (k, v) in [1]) writeLn(k);", "WS3001")]
-    [InlineData("foreach (var (k, v) in \"ab\") writeLn(k);", "WS3001")]
-    [InlineData("foreach (var x in 5) writeLn(x);", "WS3001")]
-    [InlineData("foreach (var x in null) writeLn(x);", "WS3001")]
-    [InlineData("writeLn(#{1.5});", "WS3001")]
-    [InlineData("var m = {}; writeLn(m?[1.5]);", "WS3001")]
-    [InlineData("writeLn([1]?[\"x\"]);", "WS3001")]
-    [InlineData("writeLn(5?[0]);", "WS3001")]
-    [InlineData("writeLn(true?[0]);", "WS3001")]
-    [InlineData("writeLn(#{1}?[0]);", "WS3001")]
-    [InlineData("var m = {}; writeLn(m?[\"a\"].length);", "WS3006")]
-    [InlineData("var s = #{}; s.add([1]);", "WS3001")]
-    [InlineData("var s = #{}; writeLn(s.has(#{}));", "WS3001")]
-    [InlineData("writeLn(#{1}[0]);", "WS3001")]
-    [InlineData("foreach (var (k, v) in #{1}) writeLn(k);", "WS3001")]
-    [InlineData("var s = #{1}; s.add();", "WS2006")]
-    [InlineData("var s = #{1}; writeLn(s.add);", "WS3001")]
-    [InlineData("var s = #{1}; s.push(1);", "WS3006")]
-    [InlineData("writeLn(#{1}.length());", "WS2005")]
-    [InlineData("var x = 5; { extend x { m() {} } }", "WS3001")]
-    [InlineData("extend Object { d() { return 1; } } null.d();", "WS3006")]
-    [InlineData("extend Integer { m() { return 1; } } \"s\".m();", "WS3006")]
-    [InlineData("var s = new String(5);", "WS3001")]
-    [InlineData("new Integer(1.5);", "WS3001")]
-    [InlineData("new Integer(1, 2);", "WS2006")]
-    [InlineData("class Count extends Integer {} var k = new Count(2.5);", "WS3001")]
-    [InlineData("class Flag extends Boolean {} writeLn(new Flag(true) + 1);", "WS3001")]
-    [InlineData("class N extends Number {} var m = {}; m[new N(1)] = 1;", "WS3001")]
-    [InlineData("new Function(5);", "WS3001")]
-    [InlineData("class H extends Function {} new H(1);", "WS3001")]
-    [InlineData("class H extends Function {} var h = new H(function (x) { return x; }); h(1, 2);", "WS2006")]
-    [InlineData("class C extends Number {} var c = new C(1); c();", "WS2005")]
-    [InlineData("class N { static operator +(a, b) { return 1; } } writeLn(new N() > 1);", "WS3001")]
-    [InlineData("class N { static operator +(a, b) { return 1; } } writeLn(-new N());", "WS3001")]
+    [InlineData("writeLn(\"abc\"[3]);", "WL3005")]
+    [InlineData("writeLn(\"abc\"[-1]);", "WL3005")]
+    [InlineData("writeLn(\"\"[0]);", "WL3005")]
+    [InlineData("writeLn(\"abc\"[1.0]);", "WL3001")]
+    [InlineData("var s = \"abc\"; s[0] = \"x\";", "WL3001")]
+    [InlineData("writeLn(5[0]);", "WL3001")]
+    [InlineData("writeLn(\"abc\".size);", "WL3006")]
+    [InlineData("writeLn(5.length);", "WL3006")]
+    [InlineData("writeLn(null.length);", "WL3006")]
+    [InlineData("writeLn(\"abc\".length());", "WL2005")]
+    [InlineData("writeLn(\"abc\".size(1));", "WL3006")]
+    [InlineData("var x = 1; x.length = 2;", "WL3001")]
+    [InlineData("var x = new 5();", "WL2005")]
+    [InlineData("class P {} var c = P; c();", "WL2005")]
+    [InlineData("class P { constructor(a, b) {} } var p = new P(1);", "WL2006")]
+    [InlineData("class E {} var e = new E(1);", "WL2006")]
+    [InlineData("class P { m(a) {} } new P().m();", "WL2006")]
+    [InlineData("class P {} writeLn(new P().missing);", "WL3006")]
+    [InlineData("class P {} new P().missing();", "WL3006")]
+    [InlineData("class P { m() {} } var p = new P(); p.m = 1;", "WL3001")]
+    [InlineData("class P {} var m = {}; m[new P()] = 1;", "WL3001")]
+    [InlineData("class P {} foreach (var x in new P()) writeLn(x);", "WL3001")]
+    [InlineData("class P {} writeLn(new P()[0]);", "WL3001")]
+    [InlineData("class P {} writeLn(P.x);", "WL3006")]
+    [InlineData("class A { constructor(x) {} } class B extends A {} new B();", "WL2006")]
+    [InlineData("class A {} class B extends A { m() { return super.nope(); } } new B().m();", "WL3006")]
+    [InlineData("var NotClass = 5; { class A extends NotClass {} }", "WL3001")]
+    [InlineData("using (var x = 5) {}", "WL3006")]
+    [InlineData("class A {} using (var a = new A()) {}", "WL3006")]
+    [InlineData("class A { dispose() {} } new A().dispose(1);", "WL2006")]
+    [InlineData("class A { dispose(x) {} } using (var a = new A()) {}", "WL2006")]
+    [InlineData("class A { static m() {} } A.m = 1;", "WL3001")]
+    [InlineData("class A { static var n = 1; } writeLn(new A().m);", "WL3006")]
+    [InlineData("class A { static m(x) {} } A.m();", "WL2006")]
+    [InlineData("class A { m() { return super.m(); } } new A().m();", "WL3006")]
+    [InlineData("new Object().equal();", "WL2006")]
+    [InlineData("class A {} new A().equal = 1;", "WL3001")]
+    [InlineData("throw \"x\";", "WL3008")]
+    [InlineData("throw new Error(\"m\");", "WL3008")]
+    [InlineData("try { var a = []; a[1]; } finally { writeLn(1); }", "WL3005")]
+    [InlineData("try { var a = []; a[1]; } catch (e) { throw; }", "WL3005")]
+    [InlineData("class Bad { toString() { return 5; } } writeLn(new Bad());", "WL3001")]
+    [InlineData("class Bad { toString(x) { return \"\"; } } writeLn([new Bad()]);", "WL2006")]
+    [InlineData("class X extends Class {}", "WL3001")]
+    [InlineData("class Bad { equal(o) { return 1; } } var B = new Bad(); try { throw 1; } catch (B e) {}", "WL3001")]
+    [InlineData("try { throw 1; } catch (String e) {}", "WL3008")]
+    [InlineData("var f = function (a, b = 1) {}; f();", "WL2006")]
+    [InlineData("var f = function (a = 1) {}; f(1, 2);", "WL2006")]
+    [InlineData("var a = [1]; a.length = 2;", "WL3001")]
+    [InlineData("writeLn([].pop());", "WL3005")]
+    [InlineData("writeLn([1, 2][2]);", "WL3005")]
+    [InlineData("var a = [1]; a[-1] = 0;", "WL3005")]
+    [InlineData("writeLn([1][\"0\"]);", "WL3001")]
+    [InlineData("writeLn([1].push);", "WL3001")]
+    [InlineData("var a = [1]; a.push(1, 2);", "WL2006")]
+    [InlineData("var a = [1]; a.pop(1);", "WL2006")]
+    [InlineData("writeLn([1].size);", "WL3006")]
+    [InlineData("writeLn([1].length());", "WL2005")]
+    [InlineData("writeLn([1] + [2]);", "WL3001")]
+    [InlineData("writeLn([1] < [2]);", "WL3001")]
+    [InlineData("var m = {a: 1}; writeLn(m[\"b\"]);", "WL3007")]
+    [InlineData("var m = {a: 1}; writeLn(m[1]);", "WL3007")]
+    [InlineData("var m = {}; m[1.5] = 2;", "WL3001")]
+    [InlineData("var m = {}; m[[1]] = 2;", "WL3001")]
+    [InlineData("var m = {}; m[m] = 2;", "WL3001")]
+    [InlineData("var m = {}; writeLn(m.has(NaN));", "WL3001")]
+    [InlineData("var m = {a: 1}; writeLn(m.a);", "WL3006")]
+    [InlineData("var m = {a: 1}; writeLn(m.has);", "WL3001")]
+    [InlineData("var m = {a: 1}; writeLn(m.has());", "WL2006")]
+    [InlineData("var m = {a: 1}; writeLn(m.length());", "WL2005")]
+    [InlineData("var m = {a: 1}; m.push(1);", "WL3006")]
+    [InlineData("foreach (var x in {a: 1}) writeLn(x);", "WL3001")]
+    [InlineData("foreach (var (k, v) in [1]) writeLn(k);", "WL3001")]
+    [InlineData("foreach (var (k, v) in \"ab\") writeLn(k);", "WL3001")]
+    [InlineData("foreach (var x in 5) writeLn(x);", "WL3001")]
+    [InlineData("foreach (var x in null) writeLn(x);", "WL3001")]
+    [InlineData("writeLn(#{1.5});", "WL3001")]
+    [InlineData("var m = {}; writeLn(m?[1.5]);", "WL3001")]
+    [InlineData("writeLn([1]?[\"x\"]);", "WL3001")]
+    [InlineData("writeLn(5?[0]);", "WL3001")]
+    [InlineData("writeLn(true?[0]);", "WL3001")]
+    [InlineData("writeLn(#{1}?[0]);", "WL3001")]
+    [InlineData("var m = {}; writeLn(m?[\"a\"].length);", "WL3006")]
+    [InlineData("var s = #{}; s.add([1]);", "WL3001")]
+    [InlineData("var s = #{}; writeLn(s.has(#{}));", "WL3001")]
+    [InlineData("writeLn(#{1}[0]);", "WL3001")]
+    [InlineData("foreach (var (k, v) in #{1}) writeLn(k);", "WL3001")]
+    [InlineData("var s = #{1}; s.add();", "WL2006")]
+    [InlineData("var s = #{1}; writeLn(s.add);", "WL3001")]
+    [InlineData("var s = #{1}; s.push(1);", "WL3006")]
+    [InlineData("writeLn(#{1}.length());", "WL2005")]
+    [InlineData("var x = 5; { extend x { m() {} } }", "WL3001")]
+    [InlineData("extend Object { d() { return 1; } } null.d();", "WL3006")]
+    [InlineData("extend Integer { m() { return 1; } } \"s\".m();", "WL3006")]
+    [InlineData("var s = new String(5);", "WL3001")]
+    [InlineData("new Integer(1.5);", "WL3001")]
+    [InlineData("new Integer(1, 2);", "WL2006")]
+    [InlineData("class Count extends Integer {} var k = new Count(2.5);", "WL3001")]
+    [InlineData("class Flag extends Boolean {} writeLn(new Flag(true) + 1);", "WL3001")]
+    [InlineData("class N extends Number {} var m = {}; m[new N(1)] = 1;", "WL3001")]
+    [InlineData("new Function(5);", "WL3001")]
+    [InlineData("class H extends Function {} new H(1);", "WL3001")]
+    [InlineData("class H extends Function {} var h = new H(function (x) { return x; }); h(1, 2);", "WL2006")]
+    [InlineData("class C extends Number {} var c = new C(1); c();", "WL2005")]
+    [InlineData("class N { static operator +(a, b) { return 1; } } writeLn(new N() > 1);", "WL3001")]
+    [InlineData("class N { static operator +(a, b) { return 1; } } writeLn(-new N());", "WL3001")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);
-        Assert.Equal(WsCommandLine.RuntimeFailed, exit);
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Contains($"error {code}:", error);
     }
 
     [Theory]
-    [InlineData("async function f() { throw \"lost\"; } f(); writeLn(\"end\");", "WS3008")]
-    [InlineData("async function f() { await null; throw new Error(\"x\"); } await f();", "WS3008")]
-    [InlineData("async function f() { return [1][3]; } await f();", "WS3005")]
-    [InlineData("async function f() { await delay(1); return [1][3]; } f(); await delay(5);", "WS3005")]
-    [InlineData("var other = null; async function a() { await null; await other; } var ta = a(); async function b() { await ta; } other = b(); await ta;", "WS3009")]
-    [InlineData("async function forever() { await forever(); } await forever();", "WS3003")]
-    [InlineData("delay(-1);", "WS3001")]
-    [InlineData("delay(1.5);", "WS3001")]
-    [InlineData("delay(0).forget(1);", "WS2006")]
-    [InlineData("var n = 5; n.forget();", "WS3006")]
-    [InlineData("class T extends Task {}", "WS3001")]
-    [InlineData("var t = new Task();", "WS3001")]
-    [InlineData("var m = {}; m[delay(0)] = 1;", "WS3001")]
-    [InlineData("class R { async dispose() {} } function f() { using (var r = new R()) {} } f();", "WS3001")]
-    [InlineData("class R { async dispose() {} } var f = function () { using (var r = new R()) {} }; f();", "WS3001")]
-    [InlineData("class R { async dispose() { throw \"x\"; } } new R().dispose();", "WS3008")]
-    [InlineData("class P { async toString() { return \"p\"; } } writeLn(new P());", "WS3001")]
-    [InlineData("class P { async toString() { await null; return \"p\"; } } writeLn([new P()]);", "WS3001")]
+    [InlineData("async function f() { throw \"lost\"; } f(); writeLn(\"end\");", "WL3008")]
+    [InlineData("async function f() { await null; throw new Error(\"x\"); } await f();", "WL3008")]
+    [InlineData("async function f() { return [1][3]; } await f();", "WL3005")]
+    [InlineData("async function f() { await delay(1); return [1][3]; } f(); await delay(5);", "WL3005")]
+    [InlineData("var other = null; async function a() { await null; await other; } var ta = a(); async function b() { await ta; } other = b(); await ta;", "WL3009")]
+    [InlineData("async function forever() { await forever(); } await forever();", "WL3003")]
+    [InlineData("delay(-1);", "WL3001")]
+    [InlineData("delay(1.5);", "WL3001")]
+    [InlineData("delay(0).forget(1);", "WL2006")]
+    [InlineData("var n = 5; n.forget();", "WL3006")]
+    [InlineData("class T extends Task {}", "WL3001")]
+    [InlineData("var t = new Task();", "WL3001")]
+    [InlineData("var m = {}; m[delay(0)] = 1;", "WL3001")]
+    [InlineData("class R { async dispose() {} } function f() { using (var r = new R()) {} } f();", "WL3001")]
+    [InlineData("class R { async dispose() {} } var f = function () { using (var r = new R()) {} }; f();", "WL3001")]
+    [InlineData("class R { async dispose() { throw \"x\"; } } new R().dispose();", "WL3008")]
+    [InlineData("class P { async toString() { return \"p\"; } } writeLn(new P());", "WL3001")]
+    [InlineData("class P { async toString() { await null; return \"p\"; } } writeLn([new P()]);", "WL3001")]
     public void AsynchronyErrorsAreReported(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);
-        Assert.Equal(WsCommandLine.RuntimeFailed, exit);
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Contains($"error {code}:", error);
     }
 
@@ -576,7 +576,7 @@ public sealed class ConformanceTests : IDisposable
     public void ADelayWaitsOnTheClock()
     {
         var started = System.Diagnostics.Stopwatch.GetTimestamp();
-        Assert.Equal((WsCommandLine.Success, "1\n2\n", ""), Weblingo("run", "writeLn(1); await delay(60); writeLn(2);"));
+        Assert.Equal((WebLingoCommandLine.Success, "1\n2\n", ""), Weblingo("run", "writeLn(1); await delay(60); writeLn(2);"));
         Assert.True(System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds >= 60);
     }
 
@@ -584,36 +584,36 @@ public sealed class ConformanceTests : IDisposable
     public void AFaultNothingAwaitedIsReportedWhereItWasThrown()
     {
         var (exit, output, error) = Weblingo("run", "async function f() {\n    throw \"lost\";\n}\nf();\nwriteLn(\"end\");");
-        Assert.Equal(WsCommandLine.RuntimeFailed, exit);
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Equal("end\n", output);
-        Assert.Equal("program.ws(2,5): error WS3008:", FirstLineStart(error));
+        Assert.Equal("program.wl(2,5): error WL3008:", FirstLineStart(error));
     }
 
     [Fact]
     public void SignedInt64OverflowIsARuntimeError()
     {
         const string source = "var x = 9223372036854775807 + 1;";
-        Assert.Equal(WsCommandLine.Success, Weblingo("check", source).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("check", source).Exit);
         var (exit, _, error) = Weblingo("run", source);
-        Assert.Equal(WsCommandLine.RuntimeFailed, exit);
-        Assert.Equal("program.ws(1,9): error WS3002:", FirstLineStart(error));
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
+        Assert.Equal("program.wl(1,9): error WL3002:", FirstLineStart(error));
     }
 
     [Fact]
     public void TheSpecificationsExamplePrints30()
     {
-        Assert.Equal((WsCommandLine.Success, "30\n", ""),
+        Assert.Equal((WebLingoCommandLine.Success, "30\n", ""),
             Weblingo("run", "var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);\n"));
     }
 
     [Theory]
     [InlineData("run")]
     [InlineData("--unknown")]
-    [InlineData("run", "a.ws", "b.ws")]
+    [InlineData("run", "a.wl", "b.wl")]
     public void AUsageErrorExitsWith2(params string[] args)
     {
         var output = new StringWriter();
-        Assert.Equal(WsCommandLine.UsageError, WsCommandLine.Run(args, output, new StringWriter()));
+        Assert.Equal(WebLingoCommandLine.UsageError, WebLingoCommandLine.Run(args, output, new StringWriter()));
         Assert.StartsWith("Usage: weblingo", output.ToString());
     }
 
@@ -621,27 +621,27 @@ public sealed class ConformanceTests : IDisposable
     public void AFileThatCannotBeReadExitsWith4()
     {
         var error = new StringWriter();
-        var missing = Path.Combine(_folder, "missing.ws");
-        Assert.Equal(WsCommandLine.FileUnreadable, WsCommandLine.Run(["run", missing], new StringWriter(), error));
+        var missing = Path.Combine(_folder, "missing.wl");
+        Assert.Equal(WebLingoCommandLine.FileUnreadable, WebLingoCommandLine.Run(["run", missing], new StringWriter(), error));
         Assert.Contains("cannot read the file", error.ToString());
     }
 
     [Fact]
     public void TheHelloWorldSampleGreets()
     {
-        var sample = Path.Combine(SolutionFolder(), "samples", "HelloWorld", "hello.ws");
+        var sample = Path.Combine(SolutionFolder(), "samples", "HelloWorld", "hello.wl");
         var output = new StringWriter();
-        Assert.Equal(WsCommandLine.Success, WsCommandLine.Run(["run", sample], output, new StringWriter()));
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", sample], output, new StringWriter()));
         Assert.Equal("Hello from WebLingo!\n", output.ToString());
     }
 
     [Fact]
     public void TheArithmeticSamplePrints30()
     {
-        var sample = Path.Combine(SolutionFolder(), "samples", "Arithmetic", "arithmetic.ws");
+        var sample = Path.Combine(SolutionFolder(), "samples", "Arithmetic", "arithmetic.wl");
         var output = new StringWriter();
         var error = new StringWriter();
-        Assert.Equal(WsCommandLine.Success, WsCommandLine.Run(["run", sample], output, error));
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", sample], output, error));
         Assert.Equal(("30\n", ""), (output.ToString(), error.ToString()));
     }
 
@@ -652,9 +652,9 @@ public sealed class ConformanceTests : IDisposable
     public void EveryLineEndingGivesTheSameResultAndPositions(string newline)
     {
         var good = string.Join(newline, "var a = 2;", "var b = a * 3;", "writeLn(b);");
-        Assert.Equal((WsCommandLine.Success, "6\n", ""), Weblingo("run", good));
+        Assert.Equal((WebLingoCommandLine.Success, "6\n", ""), Weblingo("run", good));
         var bad = string.Join(newline, "var x = 1;", "writeLn(y);");
-        Assert.Equal("program.ws(2,9): error WS2001:", FirstLineStart(Weblingo("run", bad).Error));
+        Assert.Equal("program.wl(2,9): error WL2001:", FirstLineStart(Weblingo("run", bad).Error));
     }
 
     [Fact]
@@ -667,13 +667,13 @@ public sealed class ConformanceTests : IDisposable
             "[", "]", ".length", "x[0]",
         ];
         var random = new Random(8_6);
-        var compiler = new WsCompiler(new WsCompilerOptions([new WsBuiltinDeclaration("writeLn", 1)]));
-        var vm = new WsVirtualMachine();
+        var compiler = new WebLingoCompiler(new WebLingoCompilerOptions([new WebLingoBuiltinDeclaration("writeLn", 1)]));
+        var vm = new WebLingoVirtualMachine();
         var compiled = 0;
         for (var round = 0; round < 5_000; round++)
         {
             var source = string.Concat(Enumerable.Range(0, random.Next(1, 30)).Select(_ => fragments[random.Next(fragments.Length)] + " "));
-            var result = compiler.Compile(source, "fuzz.ws");
+            var result = compiler.Compile(source, "fuzz.wl");
             if (result.Module is null)
             {
                 Assert.NotEmpty(result.Diagnostics);
@@ -681,9 +681,9 @@ public sealed class ConformanceTests : IDisposable
                 continue;
             }
             compiled++;
-            var context = new WsExecutionContext(new WsWorkerId(0))
+            var context = new WebLingoExecutionContext(new WebLingoWorkerId(0))
             {
-                Services = new WsBuiltinRegistry(WsStandardBuiltins.Create(new WsCollectedOutput())),
+                Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(new WebLingoCollectedOutput())),
                 InstructionBudget = 10_000,
             };
             var run = vm.Execute(result.Module, context);
@@ -695,11 +695,11 @@ public sealed class ConformanceTests : IDisposable
     [Fact]
     public void MalformedBytecodeFailsVerificationNotACrash()
     {
-        var module = new WsCompiler(new WsCompilerOptions([new WsBuiltinDeclaration("writeLn", 1)]))
-            .Compile("var a = 10; var b = a * 2 - 3; var c = 0; c = -b / a; writeLn(c);", "base.ws").Module!;
+        var module = new WebLingoCompiler(new WebLingoCompilerOptions([new WebLingoBuiltinDeclaration("writeLn", 1)]))
+            .Compile("var a = 10; var b = a * 2 - 3; var c = 0; c = -b / a; writeLn(c);", "base.wl").Module!;
         var random = new Random(8_6);
-        var opCodes = Enum.GetValues<WsOpCode>();
-        var vm = new WsVirtualMachine();
+        var opCodes = Enum.GetValues<WebLingoOpCode>();
+        var vm = new WebLingoVirtualMachine();
         var rejected = 0;
         for (var round = 0; round < 5_000; round++)
         {
@@ -709,33 +709,33 @@ public sealed class ConformanceTests : IDisposable
                 var i = random.Next(code.Length);
                 code[i] = random.Next(4) switch
                 {
-                    0 => code[i] with { OpCode = random.Next(8) == 0 ? (WsOpCode)random.Next(256) : opCodes[random.Next(opCodes.Length)] },
+                    0 => code[i] with { OpCode = random.Next(8) == 0 ? (WebLingoOpCode)random.Next(256) : opCodes[random.Next(opCodes.Length)] },
                     1 => code[i] with { A = random.Next(-2, 8) },
                     2 => code[i] with { B = random.Next(-2, 8) },
                     _ => code[i] with { C = random.Next(-2, 8), D = random.Next(-1, 3) },
                 };
             }
             var mutated = module with { EntryPoint = module.EntryPoint with { Code = code } };
-            var context = new WsExecutionContext(new WsWorkerId(0))
+            var context = new WebLingoExecutionContext(new WebLingoWorkerId(0))
             {
-                Services = new WsBuiltinRegistry(WsStandardBuiltins.Create(new WsCollectedOutput())),
+                Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(new WebLingoCollectedOutput())),
                 InstructionBudget = 10_000,
             };
             var result = vm.Execute(mutated, context);
-            if (result.Error?.Code == WsDiagnosticCodes.BytecodeVerificationFailure) rejected++;
+            if (result.Error?.Code == WebLingoDiagnosticCodes.BytecodeVerificationFailure) rejected++;
         }
         Assert.InRange(rejected, 1, 5_000);
     }
 
     private (int Exit, string Output, string Error) Weblingo(string command, string source)
     {
-        var path = Path.Combine(_folder, "program.ws");
+        var path = Path.Combine(_folder, "program.wl");
         File.WriteAllText(path, source);
         var output = new StringWriter();
         var error = new StringWriter();
-        var exit = WsCommandLine.Run([command, path], output, error);
+        var exit = WebLingoCommandLine.Run([command, path], output, error);
         // Diagnostics name the file as it was given; show only its name, so the expectations hold on every machine.
-        return (exit, output.ToString(), error.ToString().Replace(path, "program.ws", StringComparison.Ordinal));
+        return (exit, output.ToString(), error.ToString().Replace(path, "program.wl", StringComparison.Ordinal));
     }
 
     /// <summary>The first line of the error output, up to the end of its "error CODE:".</summary>

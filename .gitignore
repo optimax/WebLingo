@@ -60,7 +60,7 @@ coverage/
 coverage.*
 coverage*.xml
 
-# BenchmarkDotNet (the register and stack VM benchmarks, WS-BC002)
+# BenchmarkDotNet (the register and stack VM benchmarks, WL-BC002)
 BenchmarkDotNet.Artifacts/
 
 # Claude Code: local settings and worktrees (whole copies of the repository)

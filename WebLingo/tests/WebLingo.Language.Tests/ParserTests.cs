@@ -11,10 +11,10 @@ public sealed class ParserTests
         var tree = Parse("var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);\n");
         Assert.Empty(tree.Diagnostics);
         Assert.Equal(4, tree.Root.Statements.Count);
-        var result = Assert.IsType<WsVariableDeclarationSyntax>(tree.Root.Statements[2]);
-        Assert.Equal((WsDeclarationKind.Var, "result"), (result.Kind, result.Name));
+        var result = Assert.IsType<WebLingoVariableDeclarationSyntax>(tree.Root.Statements[2]);
+        Assert.Equal((WebLingoDeclarationKind.Var, "result"), (result.Kind, result.Name));
         Assert.Equal("(a + b)", Show(result.Initializer!));
-        var write = Assert.IsType<WsExpressionStatementSyntax>(tree.Root.Statements[3]);
+        var write = Assert.IsType<WebLingoExpressionStatementSyntax>(tree.Root.Statements[3]);
         Assert.Equal("writeLn(result)", Show(write.Expression));
     }
 
@@ -55,7 +55,7 @@ public sealed class ParserTests
     {
         var tree = Parse(expression + ";");
         Assert.Empty(tree.Diagnostics);
-        Assert.Equal(expected, Show(Assert.IsType<WsExpressionStatementSyntax>(Assert.Single(tree.Root.Statements)).Expression));
+        Assert.Equal(expected, Show(Assert.IsType<WebLingoExpressionStatementSyntax>(Assert.Single(tree.Root.Statements)).Expression));
     }
 
     [Fact]
@@ -63,8 +63,8 @@ public sealed class ParserTests
     {
         var tree = Parse("const limit = 10;");
         Assert.Empty(tree.Diagnostics);
-        var declaration = Assert.IsType<WsVariableDeclarationSyntax>(Assert.Single(tree.Root.Statements));
-        Assert.Equal((WsDeclarationKind.Const, "limit", new WsSourceSpan(6, 5)),
+        var declaration = Assert.IsType<WebLingoVariableDeclarationSyntax>(Assert.Single(tree.Root.Statements));
+        Assert.Equal((WebLingoDeclarationKind.Const, "limit", new WebLingoSourceSpan(6, 5)),
             (declaration.Kind, declaration.Name, declaration.NameSpan));
     }
 
@@ -75,24 +75,24 @@ public sealed class ParserTests
     {
         var tree = Parse(source);
         var diagnostic = Assert.Single(tree.Diagnostics);
-        Assert.Equal((WsDiagnosticCodes.MissingInitializer, new WsSourceSpan(nameStart, 1)), (diagnostic.Code, diagnostic.Span));
-        Assert.Null(Assert.IsType<WsVariableDeclarationSyntax>(Assert.Single(tree.Root.Statements)).Initializer);
+        Assert.Equal((WebLingoDiagnosticCodes.MissingInitializer, new WebLingoSourceSpan(nameStart, 1)), (diagnostic.Code, diagnostic.Span));
+        Assert.Null(Assert.IsType<WebLingoVariableDeclarationSyntax>(Assert.Single(tree.Root.Statements)).Initializer);
     }
 
     [Fact]
     public void AMissingSemicolonIsReportedWhereItBelongs()
     {
         var diagnostic = Assert.Single(Parse("var x = 10").Diagnostics);
-        Assert.Equal((WsDiagnosticCodes.MissingSemicolon, new WsSourceSpan(10, 0)), (diagnostic.Code, diagnostic.Span));
+        Assert.Equal((WebLingoDiagnosticCodes.MissingSemicolon, new WebLingoSourceSpan(10, 0)), (diagnostic.Code, diagnostic.Span));
     }
 
     [Fact]
     public void AMissingSemicolonBeforeTheNextDeclarationLeavesThatDeclarationIntact()
     {
         var tree = Parse("var x = 10\nvar y = 20;");
-        Assert.Equal(WsDiagnosticCodes.MissingSemicolon, Assert.Single(tree.Diagnostics).Code);
+        Assert.Equal(WebLingoDiagnosticCodes.MissingSemicolon, Assert.Single(tree.Diagnostics).Code);
         Assert.Equal(2, tree.Root.Statements.Count);
-        Assert.Equal("y", Assert.IsType<WsVariableDeclarationSyntax>(tree.Root.Statements[1]).Name);
+        Assert.Equal("y", Assert.IsType<WebLingoVariableDeclarationSyntax>(tree.Root.Statements[1]).Name);
     }
 
     [Fact]
@@ -100,11 +100,11 @@ public sealed class ParserTests
     {
         var tree = Parse("{ var a = 1; { a; } {} }");
         Assert.Empty(tree.Diagnostics);
-        var block = Assert.IsType<WsBlockSyntax>(Assert.Single(tree.Root.Statements));
-        Assert.Equal(new WsSourceSpan(0, 24), block.Span);
+        var block = Assert.IsType<WebLingoBlockSyntax>(Assert.Single(tree.Root.Statements));
+        Assert.Equal(new WebLingoSourceSpan(0, 24), block.Span);
         Assert.Equal(3, block.Statements.Count);
-        Assert.IsType<WsExpressionStatementSyntax>(Assert.Single(Assert.IsType<WsBlockSyntax>(block.Statements[1]).Statements));
-        Assert.Empty(Assert.IsType<WsBlockSyntax>(block.Statements[2]).Statements);
+        Assert.IsType<WebLingoExpressionStatementSyntax>(Assert.Single(Assert.IsType<WebLingoBlockSyntax>(block.Statements[1]).Statements));
+        Assert.Empty(Assert.IsType<WebLingoBlockSyntax>(block.Statements[2]).Statements);
     }
 
     [Fact]
@@ -112,13 +112,13 @@ public sealed class ParserTests
     {
         var tree = Parse("try { f(); } catch (e) { throw; } finally { g(); }");
         Assert.Empty(tree.Diagnostics);
-        var statement = Assert.IsType<WsTrySyntax>(Assert.Single(tree.Root.Statements));
+        var statement = Assert.IsType<WebLingoTrySyntax>(Assert.Single(tree.Root.Statements));
         var handler = Assert.Single(statement.Catches);
-        Assert.Equal(("e", new WsSourceSpan(20, 1)), (handler.Name, handler.NameSpan));
+        Assert.Equal(("e", new WebLingoSourceSpan(20, 1)), (handler.Name, handler.NameSpan));
         Assert.Null(handler.Class);
-        Assert.Null(Assert.IsType<WsThrowSyntax>(Assert.Single(handler.Body.Statements)).Value);
+        Assert.Null(Assert.IsType<WebLingoThrowSyntax>(Assert.Single(handler.Body.Statements)).Value);
         Assert.Single(statement.Finally!.Statements);
-        Assert.Empty(Assert.IsType<WsTrySyntax>(Parse("try {} finally {}").Root.Statements[0]).Catches);
+        Assert.Empty(Assert.IsType<WebLingoTrySyntax>(Parse("try {} finally {}").Root.Statements[0]).Catches);
     }
 
     [Fact]
@@ -126,14 +126,14 @@ public sealed class ParserTests
     {
         var tree = Parse("try {} catch (KeyError e) {} catch (errors.NotFound n) {} catch (e) {} var t = x is a.B && y;");
         Assert.Empty(tree.Diagnostics);
-        var statement = Assert.IsType<WsTrySyntax>(tree.Root.Statements[0]);
-        Assert.Equal("KeyError", Assert.IsType<WsNameSyntax>(statement.Catches[0].Class).Name);
-        var dotted = Assert.IsType<WsMemberAccessSyntax>(statement.Catches[1].Class);
-        Assert.Equal(("errors", "NotFound", "n"), (Assert.IsType<WsNameSyntax>(dotted.Target).Name, dotted.Name, statement.Catches[1].Name));
+        var statement = Assert.IsType<WebLingoTrySyntax>(tree.Root.Statements[0]);
+        Assert.Equal("KeyError", Assert.IsType<WebLingoNameSyntax>(statement.Catches[0].Class).Name);
+        var dotted = Assert.IsType<WebLingoMemberAccessSyntax>(statement.Catches[1].Class);
+        Assert.Equal(("errors", "NotFound", "n"), (Assert.IsType<WebLingoNameSyntax>(dotted.Target).Name, dotted.Name, statement.Catches[1].Name));
         Assert.Null(statement.Catches[2].Class);
-        var declaration = Assert.IsType<WsVariableDeclarationSyntax>(tree.Root.Statements[1]);
-        var and = Assert.IsType<WsBinaryExpressionSyntax>(declaration.Initializer);
-        Assert.IsType<WsMemberAccessSyntax>(Assert.IsType<WsIsExpressionSyntax>(and.Left).Class);
+        var declaration = Assert.IsType<WebLingoVariableDeclarationSyntax>(tree.Root.Statements[1]);
+        var and = Assert.IsType<WebLingoBinaryExpressionSyntax>(declaration.Initializer);
+        Assert.IsType<WebLingoMemberAccessSyntax>(Assert.IsType<WebLingoIsExpressionSyntax>(and.Left).Class);
     }
 
     [Fact]
@@ -141,9 +141,9 @@ public sealed class ParserTests
     {
         var tree = Parse("class A { static var n = 1; static function f() {} static g(x) {} m() {} }");
         Assert.Empty(tree.Diagnostics);
-        var declaration = Assert.IsType<WsClassDeclarationSyntax>(Assert.Single(tree.Root.Statements));
+        var declaration = Assert.IsType<WebLingoClassDeclarationSyntax>(Assert.Single(tree.Root.Statements));
         var field = Assert.Single(declaration.StaticFields);
-        Assert.Equal(("n", new WsSourceSpan(21, 1), new WsSourceSpan(10, 17)), (field.Name, field.NameSpan, field.Span));
+        Assert.Equal(("n", new WebLingoSourceSpan(21, 1), new WebLingoSourceSpan(10, 17)), (field.Name, field.NameSpan, field.Span));
         Assert.Equal(new[] { ("f", true), ("g", true), ("m", false) },
             declaration.Methods.Select(method => (method.Name, method.IsStatic)));
     }
@@ -153,10 +153,10 @@ public sealed class ParserTests
     {
         var tree = Parse("using (var r = open()) { r.write(1); }");
         Assert.Empty(tree.Diagnostics);
-        var statement = Assert.IsType<WsUsingSyntax>(Assert.Single(tree.Root.Statements));
-        Assert.Equal(("r", new WsSourceSpan(11, 1), new WsSourceSpan(0, 38)), (statement.Name, statement.NameSpan, statement.Span));
-        Assert.IsType<WsCallExpressionSyntax>(statement.Value);
-        Assert.IsType<WsBlockSyntax>(statement.Body);
+        var statement = Assert.IsType<WebLingoUsingSyntax>(Assert.Single(tree.Root.Statements));
+        Assert.Equal(("r", new WebLingoSourceSpan(11, 1), new WebLingoSourceSpan(0, 38)), (statement.Name, statement.NameSpan, statement.Span));
+        Assert.IsType<WebLingoCallExpressionSyntax>(statement.Value);
+        Assert.IsType<WebLingoBlockSyntax>(statement.Body);
     }
 
     [Fact]
@@ -164,31 +164,31 @@ public sealed class ParserTests
     {
         var tree = Parse("var a = 1;\n{ a;");
         var diagnostic = Assert.Single(tree.Diagnostics);
-        Assert.Equal((WsDiagnosticCodes.UnexpectedToken, new WsSourceSpan(11, 1)), (diagnostic.Code, diagnostic.Span));
+        Assert.Equal((WebLingoDiagnosticCodes.UnexpectedToken, new WebLingoSourceSpan(11, 1)), (diagnostic.Code, diagnostic.Span));
     }
 
     [Fact]
     public void AnErrorInABlockDoesNotSwallowItsBrace()
     {
         var tree = Parse("{ var a = ; } var b = 2;");
-        Assert.Equal(WsDiagnosticCodes.UnexpectedToken, Assert.Single(tree.Diagnostics).Code);
+        Assert.Equal(WebLingoDiagnosticCodes.UnexpectedToken, Assert.Single(tree.Diagnostics).Code);
         Assert.Equal(2, tree.Root.Statements.Count);
-        Assert.Equal("b", Assert.IsType<WsVariableDeclarationSyntax>(tree.Root.Statements[1]).Name);
+        Assert.Equal("b", Assert.IsType<WebLingoVariableDeclarationSyntax>(tree.Root.Statements[1]).Name);
     }
 
     [Fact]
     public void AStrayClosingBraceIsAnError()
     {
         var tree = Parse("var a = 1; } var b = 2;");
-        Assert.Equal(WsDiagnosticCodes.UnexpectedToken, Assert.Single(tree.Diagnostics).Code);
-        Assert.Equal("b", Assert.IsType<WsVariableDeclarationSyntax>(tree.Root.Statements[^1]).Name);
+        Assert.Equal(WebLingoDiagnosticCodes.UnexpectedToken, Assert.Single(tree.Diagnostics).Code);
+        Assert.Equal("b", Assert.IsType<WebLingoVariableDeclarationSyntax>(tree.Root.Statements[^1]).Name);
     }
 
     [Fact]
     public void BlocksNestOnlySoDeep()
     {
-        var source = new string('{', WsParser.MaxRecursionDepth + 1) + new string('}', WsParser.MaxRecursionDepth + 1);
-        Assert.Contains(Parse(source).Diagnostics, d => d.Code == WsDiagnosticCodes.NestingTooDeep);
+        var source = new string('{', WebLingoParser.MaxRecursionDepth + 1) + new string('}', WebLingoParser.MaxRecursionDepth + 1);
+        Assert.Contains(Parse(source).Diagnostics, d => d.Code == WebLingoDiagnosticCodes.NestingTooDeep);
     }
 
     [Fact]
@@ -196,10 +196,10 @@ public sealed class ParserTests
     {
         var tree = Parse("if (a) if (b) x; else y;");
         Assert.Empty(tree.Diagnostics);
-        var outer = Assert.IsType<WsIfSyntax>(Assert.Single(tree.Root.Statements));
+        var outer = Assert.IsType<WebLingoIfSyntax>(Assert.Single(tree.Root.Statements));
         Assert.Null(outer.Else);
-        Assert.NotNull(Assert.IsType<WsIfSyntax>(outer.Then).Else);
-        Assert.Equal(new WsSourceSpan(0, 24), outer.Span);
+        Assert.NotNull(Assert.IsType<WebLingoIfSyntax>(outer.Then).Else);
+        Assert.Equal(new WebLingoSourceSpan(0, 24), outer.Span);
     }
 
     [Fact]
@@ -207,17 +207,17 @@ public sealed class ParserTests
     {
         var tree = Parse("var a = ;\nvar b = 1\nconst c;\nvar d = 4;");
         Assert.Equal(
-            new[] { WsDiagnosticCodes.UnexpectedToken, WsDiagnosticCodes.MissingSemicolon, WsDiagnosticCodes.MissingInitializer },
+            new[] { WebLingoDiagnosticCodes.UnexpectedToken, WebLingoDiagnosticCodes.MissingSemicolon, WebLingoDiagnosticCodes.MissingInitializer },
             tree.Diagnostics.Select(d => d.Code));
         Assert.Equal(4, tree.Root.Statements.Count);
-        Assert.Equal("d", Assert.IsType<WsVariableDeclarationSyntax>(tree.Root.Statements[3]).Name);
+        Assert.Equal("d", Assert.IsType<WebLingoVariableDeclarationSyntax>(tree.Root.Statements[3]).Name);
     }
 
     [Fact]
     public void LetIsReportedAsNotAWebLingoKeyword()
     {
         var diagnostic = Assert.Single(Parse("let x = 1;").Diagnostics);
-        Assert.Equal((WsDiagnosticCodes.UnexpectedToken, new WsSourceSpan(0, 3)), (diagnostic.Code, diagnostic.Span));
+        Assert.Equal((WebLingoDiagnosticCodes.UnexpectedToken, new WebLingoSourceSpan(0, 3)), (diagnostic.Code, diagnostic.Span));
         Assert.Contains("'var'", diagnostic.Message);
     }
 
@@ -231,7 +231,7 @@ public sealed class ParserTests
     public void OnlyAVariableCanBeAssigned(string source, int start, int length)
     {
         var diagnostic = Assert.Single(Parse(source).Diagnostics);
-        Assert.Equal((WsDiagnosticCodes.InvalidAssignmentTarget, new WsSourceSpan(start, length)), (diagnostic.Code, diagnostic.Span));
+        Assert.Equal((WebLingoDiagnosticCodes.InvalidAssignmentTarget, new WebLingoSourceSpan(start, length)), (diagnostic.Code, diagnostic.Span));
     }
 
     [Theory]
@@ -274,16 +274,16 @@ public sealed class ParserTests
     public void MalformedStatementsGiveOneDiagnosticEach(string source)
     {
         var diagnostic = Assert.Single(Parse(source).Diagnostics);
-        Assert.True(diagnostic.Code is WsDiagnosticCodes.UnexpectedToken or WsDiagnosticCodes.MissingSemicolon,
+        Assert.True(diagnostic.Code is WebLingoDiagnosticCodes.UnexpectedToken or WebLingoDiagnosticCodes.MissingSemicolon,
             diagnostic.Code + ": " + diagnostic.Message);
-        Assert.Equal(WsDiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal(WebLingoDiagnosticSeverity.Error, diagnostic.Severity);
     }
 
     [Fact]
     public void AnExpressionCutShortByTheEndOfTheFileIsReported()
     {
         var diagnostic = Assert.Single(Parse("var x = 1 +").Diagnostics);
-        Assert.Equal(WsDiagnosticCodes.UnexpectedToken, diagnostic.Code);
+        Assert.Equal(WebLingoDiagnosticCodes.UnexpectedToken, diagnostic.Code);
         Assert.Contains("end of the file", diagnostic.Message);
     }
 
@@ -291,7 +291,7 @@ public sealed class ParserTests
     public void ALexicalErrorIsNotReportedAgainByTheParser()
     {
         var tree = Parse("var a = 1 @ 2;\nvar b = 10abc;\nvar c = 3;");
-        Assert.Equal(new[] { WsDiagnosticCodes.InvalidCharacter, WsDiagnosticCodes.InvalidNumericLiteral },
+        Assert.Equal(new[] { WebLingoDiagnosticCodes.InvalidCharacter, WebLingoDiagnosticCodes.InvalidNumericLiteral },
             tree.Diagnostics.Select(d => d.Code));
         Assert.Equal(3, tree.Root.Statements.Count);
     }
@@ -309,13 +309,13 @@ public sealed class ParserTests
     public void SpansCoverWhatWasParsed()
     {
         var tree = Parse("var total = (1 + 2) * x;  writeLn(total);");
-        var declaration = Assert.IsType<WsVariableDeclarationSyntax>(tree.Root.Statements[0]);
-        Assert.Equal(new WsSourceSpan(0, 24), declaration.Span);
-        var product = Assert.IsType<WsBinaryExpressionSyntax>(declaration.Initializer);
-        Assert.Equal((new WsSourceSpan(12, 11), new WsSourceSpan(20, 1)), (product.Span, product.OperatorSpan));
-        Assert.Equal(new WsSourceSpan(12, 7), product.Left.Span);
-        var call = Assert.IsType<WsExpressionStatementSyntax>(tree.Root.Statements[1]);
-        Assert.Equal((new WsSourceSpan(26, 15), new WsSourceSpan(26, 14)), (call.Span, call.Expression.Span));
+        var declaration = Assert.IsType<WebLingoVariableDeclarationSyntax>(tree.Root.Statements[0]);
+        Assert.Equal(new WebLingoSourceSpan(0, 24), declaration.Span);
+        var product = Assert.IsType<WebLingoBinaryExpressionSyntax>(declaration.Initializer);
+        Assert.Equal((new WebLingoSourceSpan(12, 11), new WebLingoSourceSpan(20, 1)), (product.Span, product.OperatorSpan));
+        Assert.Equal(new WebLingoSourceSpan(12, 7), product.Left.Span);
+        var call = Assert.IsType<WebLingoExpressionStatementSyntax>(tree.Root.Statements[1]);
+        Assert.Equal((new WebLingoSourceSpan(26, 15), new WebLingoSourceSpan(26, 14)), (call.Span, call.Expression.Span));
     }
 
     [Fact]
@@ -337,15 +337,15 @@ public sealed class ParserTests
         var source = "var x = " + string.Concat(Enumerable.Repeat(open, 100_000)) + "1"
             + string.Concat(Enumerable.Repeat(close, 100_000)) + ";\nvar y = 2;";
         var tree = Parse(source);
-        Assert.Equal(WsDiagnosticCodes.NestingTooDeep, Assert.Single(tree.Diagnostics).Code);
-        Assert.Equal("y", Assert.IsType<WsVariableDeclarationSyntax>(tree.Root.Statements[^1]).Name);
+        Assert.Equal(WebLingoDiagnosticCodes.NestingTooDeep, Assert.Single(tree.Diagnostics).Code);
+        Assert.Equal("y", Assert.IsType<WebLingoVariableDeclarationSyntax>(tree.Root.Statements[^1]).Name);
     }
 
     [Fact]
     public void AVeryLongChainOfOperationsIsADiagnosticNotACrash()
     {
         var tree = Parse("var x = 1" + string.Concat(Enumerable.Repeat(" + 1", 100_000)) + ";");
-        Assert.Equal(WsDiagnosticCodes.NestingTooDeep, Assert.Single(tree.Diagnostics).Code);
+        Assert.Equal(WebLingoDiagnosticCodes.NestingTooDeep, Assert.Single(tree.Diagnostics).Code);
     }
 
     [Fact]
@@ -357,43 +357,43 @@ public sealed class ParserTests
         Assert.Empty(Parse(chain).Diagnostics);
     }
 
-    private static WsSyntaxTree Parse(string source) => new WsParser(source).ParseCompilationUnit();
+    private static WebLingoSyntaxTree Parse(string source) => new WebLingoParser(source).ParseCompilationUnit();
 
-    private static string Show(WsExpressionSyntax expression) => expression switch
+    private static string Show(WebLingoExpressionSyntax expression) => expression switch
     {
-        WsIntegerLiteralSyntax literal => literal.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        WsNameSyntax name => name.Name,
-        WsUnaryExpressionSyntax unary => $"({UnarySymbol(unary.Operator)}{Show(unary.Operand)})",
-        WsBinaryExpressionSyntax binary => $"({Show(binary.Left)} {Symbol(binary.Operator)} {Show(binary.Right)})",
-        WsParenthesizedExpressionSyntax parenthesized => $"[{Show(parenthesized.Expression)}]",
-        WsAssignmentExpressionSyntax assignment => $"({assignment.Target.Name} = {Show(assignment.Value)})",
-        WsCallExpressionSyntax call => $"{Show(call.Callee)}({string.Join(", ", call.Arguments.Select(Show))})",
-        WsMemberAccessSyntax member => $"{Show(member.Target)}.{member.Name}",
-        WsIndexExpressionSyntax index => $"{Show(index.Target)}{(index.IsOptional ? "?[" : "[")}{Show(index.Index)}]",
-        WsIndexAssignmentSyntax element => $"({Show(element.Target)} = {Show(element.Value)})",
+        WebLingoIntegerLiteralSyntax literal => literal.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        WebLingoNameSyntax name => name.Name,
+        WebLingoUnaryExpressionSyntax unary => $"({UnarySymbol(unary.Operator)}{Show(unary.Operand)})",
+        WebLingoBinaryExpressionSyntax binary => $"({Show(binary.Left)} {Symbol(binary.Operator)} {Show(binary.Right)})",
+        WebLingoParenthesizedExpressionSyntax parenthesized => $"[{Show(parenthesized.Expression)}]",
+        WebLingoAssignmentExpressionSyntax assignment => $"({assignment.Target.Name} = {Show(assignment.Value)})",
+        WebLingoCallExpressionSyntax call => $"{Show(call.Callee)}({string.Join(", ", call.Arguments.Select(Show))})",
+        WebLingoMemberAccessSyntax member => $"{Show(member.Target)}.{member.Name}",
+        WebLingoIndexExpressionSyntax index => $"{Show(index.Target)}{(index.IsOptional ? "?[" : "[")}{Show(index.Index)}]",
+        WebLingoIndexAssignmentSyntax element => $"({Show(element.Target)} = {Show(element.Value)})",
         _ => "?"
     };
 
-    private static string UnarySymbol(WsUnaryOperator op) => op switch
+    private static string UnarySymbol(WebLingoUnaryOperator op) => op switch
     {
-        WsUnaryOperator.Negate => "-",
-        WsUnaryOperator.Plus => "+",
+        WebLingoUnaryOperator.Negate => "-",
+        WebLingoUnaryOperator.Plus => "+",
         _ => "!"
     };
 
-    private static string Symbol(WsBinaryOperator op) => op switch
+    private static string Symbol(WebLingoBinaryOperator op) => op switch
     {
-        WsBinaryOperator.Add => "+",
-        WsBinaryOperator.Subtract => "-",
-        WsBinaryOperator.Multiply => "*",
-        WsBinaryOperator.Divide => "/",
-        WsBinaryOperator.Equal => "==",
-        WsBinaryOperator.NotEqual => "!=",
-        WsBinaryOperator.Less => "<",
-        WsBinaryOperator.LessOrEqual => "<=",
-        WsBinaryOperator.Greater => ">",
-        WsBinaryOperator.GreaterOrEqual => ">=",
-        WsBinaryOperator.And => "&&",
+        WebLingoBinaryOperator.Add => "+",
+        WebLingoBinaryOperator.Subtract => "-",
+        WebLingoBinaryOperator.Multiply => "*",
+        WebLingoBinaryOperator.Divide => "/",
+        WebLingoBinaryOperator.Equal => "==",
+        WebLingoBinaryOperator.NotEqual => "!=",
+        WebLingoBinaryOperator.Less => "<",
+        WebLingoBinaryOperator.LessOrEqual => "<=",
+        WebLingoBinaryOperator.Greater => ">",
+        WebLingoBinaryOperator.GreaterOrEqual => ">=",
+        WebLingoBinaryOperator.And => "&&",
         _ => "||"
     };
 }
