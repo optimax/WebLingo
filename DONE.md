@@ -1183,3 +1183,57 @@ Done (Claude, 2026-11-13, `9d3247e`): its last part, M0.11.2, landed.
 An `async` `dispose()`, which `using` awaits, and WS3001 where it cannot (specification, section 3.8), on both VMs. Added by Claude, 2026-11-13.
 
 Done (Claude, 2026-11-13, `9d3247e`): on both VMs, with their conformance tests. Its choices are recorded as Proposed in the specification, section 15.2 ("Asynchrony"); what `x.dispose()` gives when its disposal is `async` is asked in "Asynchronous Disposal, Continued", built meanwhile as that question's (a). Checks: the Release build, without warnings, the 1,398 tests, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Classes of Values, Extensions
+
+Follow-ups to "Classes of Values, Further". One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
+
+Q1, writing an instance of a class extending a kind of value (A2): (a) `Celsius:21.5`; (b) `Celsius(21.5)`, as it is made, without `new`; and the collections the same way, `Stack:[1, 2]` or `Stack([1, 2])`, in place of `Stack [1, 2]`, so that every classed value is written alike.
+
+A1: (b).
+
+Q2, `extend`'s reach: (a) the class itself, everywhere, from when the `extend` runs: every instance and subclass, made before or after, has the new methods; (b) only code where the extension is in scope, as C#'s extension methods are.
+
+A2: (a).
+
+Q3, when an `extend` runs: (a) it is hoisted with its block's classes, and runs when the block begins, after they are made; (b) where it stands, in order with the statements around it.
+
+A3: (a)
+
+Q4, an extension's method whose name the class has already: (a) an error, WS3001 when the `extend` runs; (b) it replaces the class's own, as a subclass's would.
+
+A4: (b)
+
+Q5, what an `extend` block may hold: (a) methods only; (b) methods and static members, `static` as in a class.
+
+A5: (b) 
+
+Q6, arithmetic on a boxed value: `new Celsius(21.5) + 1` is (a) a plain number, `22.5`; (b) a `Celsius`, its class kept.
+
+A6: (b). Wouldn't it depend on the meaning of `+`, so that we would need operator overloading for full control?
+
+Q7, the held value: a class extending `Number` gives it by its constructor's `super(value)`, as `new Number(value)` makes one; a class without a constructor passes its arguments on, so `new Celsius(21.5)` holds `21.5`. Agreed?
+
+A7: Yes.
+
+Q8, `Function`: `new Function(f)` is `f` itself, and `class Handler extends Function { constructor(f) { super(f); } }` makes a function that calls `f`, with `Handler`'s methods and fields; `new Function()` is a function that does nothing and gives `null`. Agreed?
+
+A8: Yes.
+
+Q9, `Class`: (a) `new Class()` and `extends Class` are WS3001, classes being made by `class` declarations, and `Class` takes new methods only by `extend`, which every class then has (`Point.describe()`); (b) as for the other kinds, with a design of its own to come.
+
+A9: Well, internally `Class` is represented by some object, right? `new Class()` should make an instance of that object, that can then be patched by giving it a name, adding methods and fields, etc, at run time, after which it functions as if the class was declared normally in code. So it should in principle be possible to construct classes, and their methods, and fields, completely programmatically.
+
+Done (Claude, 2026-11-13, `ec4677a`): recorded as approved in the specification, section 3.7 ("Classes of values"). What A6 and A9 leave open, and reading A1's text back, are asked in "Classes of Values, Extensions, Continued".
+
+## [DONE] Asynchronous Disposal, Continued
+
+What "M0.11.2: Asynchronous Disposal" left to the owner. Added by Claude, 2026-11-13.
+
+Q1, `x.dispose()` on an instance whose disposal has an `async` method: (a) it gives a task, which completes, with `null`, once the last of its methods has run, so that `await x.dispose();` waits for it; (b) it gives `null`, as a disposal does now, and the disposal goes on by itself.
+
+A1: (a)
+
+2026-11-13: M0.11.2 built (a), which is easy to change: each VM gives the task in one place (`Gave`).
+
+Done (Claude, 2026-11-13, `ec4677a`): recorded as approved in the specification, section 3.8 ("`using`"); M0.11.2 had built it so.
