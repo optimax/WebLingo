@@ -26,20 +26,6 @@
 
 2026-11-14: waits for "Extending the Classes of Values: `Class`, Names", whose `className` a metaclass's methods read.
 
-## Building Classes at Run Time: `addMethod`'s Name
-
-A follow-up to A2 of "Building Classes at Run Time, Continued", which names `setProperty`, `setStaticProperty` and `setConstant`, each adding its member the first time and replacing it after, as `addMethod` (A3 of "Building Classes at Run Time", implemented in `d009021`) already does for methods. Added by Claude, 2026-11-14.
-
-**Q1, `addMethod`: (a) renamed `setMethod`, so that every member a program gives a class while it runs has a `set…` method; (b) kept `addMethod`.**
-
-A1: (a)
-
-ASIDE1: `Point.__instanceOf` == `Class`, right? What about `Class.__instanceOf`? `null`? `Class`? `Object`?
-
-ASIDE2: `var f = function () {};`. Then, `f.__instanceOf` is?
-
-Done (Claude, 2026-11-14): `addMethod` renamed `setMethod` in the runtime, the tests, the specification (section 3.7, recorded as approved, and section 15.2) and the README, with nothing kept for the old name; `DONE.md` keeps the name its tasks used. The asides, as built: `Point.__instanceOf` is `Class`, and so is `Class.__instanceOf`, a class being a value of the class `Class`, `Class` included (as Python's `type(type)` is `type`); `f.__instanceOf` is `Function`; and once metaclasses land, a class that `new Entity("User")` made gives `Entity`. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## Task Combinators
 
 `Task.all`, `Task.any` and timeouts (A6 of "Asynchrony: `async` and `await`"; specification, section 3.8). Added by Claude, 2026-11-13.

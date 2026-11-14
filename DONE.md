@@ -1623,3 +1623,17 @@ Done (Claude, 2026-11-14, `8651b8e`): on both VMs, with conformance tests; the c
 2026-11-14: both done; the methods are `setProperty`, `setStaticProperty` and `setConstant`, each adding its member the first time and replacing it after, and assignment replaces a static method (A1 and A2 of "Building Classes at Run Time, Continued").
 
 Done (Claude, 2026-11-14, `c6ba136`): on both VMs, with conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Classes made while the program runs", and "Static members", which it changes: `static const` declares a constant now, and assigning a static method replaces it), among them that `null` for both of a property's functions leaves it with neither, and that a constant cannot be assigned through a subclass either. A parser test that took `static const` for malformed takes `static let` now, and a conformance test that took assigning a static method for WL3001 is gone, the new ones testing that it replaces the method. Checks: the Release build, without warnings, the 1,697 tests, a timing of member reads and assignments against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Building Classes at Run Time: `addMethod`'s Name
+
+A follow-up to A2 of "Building Classes at Run Time, Continued", which names `setProperty`, `setStaticProperty` and `setConstant`, each adding its member the first time and replacing it after, as `addMethod` (A3 of "Building Classes at Run Time", implemented in `d009021`) already does for methods. Added by Claude, 2026-11-14.
+
+**Q1, `addMethod`: (a) renamed `setMethod`, so that every member a program gives a class while it runs has a `set…` method; (b) kept `addMethod`.**
+
+A1: (a)
+
+ASIDE1: `Point.__instanceOf` == `Class`, right? What about `Class.__instanceOf`? `null`? `Class`? `Object`?
+
+ASIDE2: `var f = function () {};`. Then, `f.__instanceOf` is?
+
+Done (Claude, 2026-11-14, `f081a02`): `addMethod` renamed `setMethod` in the runtime, the tests, the specification (section 3.7, recorded as approved, and section 15.2) and the README, with nothing kept for the old name; `DONE.md` keeps the name its tasks used. The asides, as built: `Point.__instanceOf` is `Class`, and so is `Class.__instanceOf`, a class being a value of the class `Class`, `Class` included (as Python's `type(type)` is `type`); `f.__instanceOf` is `Function`; and once metaclasses land, a class that `new Entity("User")` made gives `Entity`. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
