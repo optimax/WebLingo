@@ -1466,3 +1466,116 @@ A5: Yes. That's what toString() overriding is for. How would it write the `field
 2026-11-14 (Claude): answered, and recorded as approved in the specification, section 3.7 ("Properties"), A5's `field` written under the property's name, as A5 presumes. The implementation, on both VMs, waits behind the tasks above it.
 
 Done (Claude, 2026-11-14, `e657f29`): on both VMs, with conformance tests; the choices the answers leave open are recorded as Proposed in the specification, section 15.2 ("Properties"), among them that a static property is reached through its class only, while "Static Members Through Instances, Continued" is open, and that a variable named `field` declared around a property does not reach into its accessors. The specification's section 3.7 wrote WS3001 and WS3006 for this task, and section 3.9 WS3001, which the renaming had missed: now WL3001 and WL3006. Checks: the Release build, without warnings, the 1,605 tests, the benchmark against `main`'s (no workload slower beyond the machine's noise, `objects` within 0.2 percent on both VMs, once an assignment looked its class up once), and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Building Classes at Run Time
+
+`new Class()`, which a program names and gives methods while it runs, after which it acts as a declared class does (A9 of "Classes of Values, Extensions", and A5 of "Classes of Values, Extensions, Continued": design it now, with what "Adding Methods at Run Time" describes, and `extends Class`). One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
+
+**Q1, making one: (a) `new Class("Point")`, a class extending `Object`, or `new Class("Point", Shape)`, extending `Shape`, its name and base given when it is made; (b) `new Class()`, named later, `c.name = "Point"`, as A9 has it.**
+
+A1: (a) AND (b), both. 
+
+**Q2, a function with a receiver ("Adding Methods at Run Time", Q1): `function (this, prefix) { … }`, its first parameter named `this`, bound by a call's target (`p.describe("x = ")`), or given as the first argument when it is called directly (`describe(p, "x = ")`). Agreed?**
+
+A2: Yes.
+
+**Q3, giving a class a method: (a) a built-in method of every class, `Point.addMethod("describe", f)`, after which its instances, and its subclasses', have it, replacing one of that name, as an extension's does; (b) a statement, `extend Point with describe = f;`.**
+
+A3: (a),
+
+**Q4, its constructor: (a) a method like the others, `Point.addMethod("constructor", f)`, which `new Point(…)` runs; (b) one of its own, `Point.setConstructor(f)`.**
+
+A4: (a)
+
+**Q5, `extends Class`: (a) WL3001 still, `new Class(…)` being how a program makes a class; (b) a class extending `Class` makes classes, `new Meta("Point")`, its methods becoming theirs as static ones, as a metaclass does.**
+
+A5: We need to be careful here. Let's fully lay out how this might work. Create an example of a class created programmatically at run time, with a method being added to it, a static method, a field, a static field, a property (get, set), a static property (get, set), and a const. Then create an instance of this class and call all its members to exercise them.
+
+2026-11-14 (Claude): A5 laid out. A1 to A4 settle making a class, a function with a receiver, `addMethod`, and the constructor; the rest of the example below is a proposal, each new point a question after it. The example builds `Point` while the program runs, then uses every member it gave it:
+
+```javascript
+// The class: named and based when it is made (A1 (a)); new Class() would make an unnamed one, named later (A1 (b)).
+var Point = new Class("Point");                 // extends Object; new Class("Point3", Point) would extend Point
+
+// Its constructor and a method: functions with a receiver (A2), given by addMethod (A3, A4).
+Point.addMethod("constructor", function (this, x, y) { this.x = x; this.y = y; });
+Point.addMethod("describe", function (this, prefix) { return prefix + this.x.toString() + ", " + this.y.toString(); });
+
+// A static method: a function without a receiver (Q6).
+Point.addStaticMethod("origin", function () { return new Point(0, 0); });
+
+// A field: nothing to declare; the constructor assigns this.x and this.y, as a declared class's does (section 3.7, "Fields").
+
+// A static field: assigned, which declares it, as for a declared class (section 3.7, "Static members").
+Point.count = 0;
+
+// A property: its getter and its setter, functions with a receiver, null for none (Q7).
+Point.addProperty("sum",
+    function (this) { return this.x + this.y; },
+    function (this, value) { this.x = value; this.y = 0; });
+
+// A static property: its getter and its setter, functions without a receiver (Q7).
+Point.addStaticProperty("unit",
+    function () { return Point.unitValue; },
+    function (value) { Point.unitValue = value; });
+Point.unitValue = 1;
+
+// A constant: a static member that cannot be assigned (Q8).
+Point.addConstant("dimensions", 2);
+
+// Using every member.
+var p = new Point(3, 4);
+writeLn(p.describe("p = "));             // p = 3, 4             the method
+writeLn(Point.origin());                 // Point {x: 0, y: 0}   the static method
+writeLn(p.x);                            // 3                    a field
+Point.count = Point.count + 1;
+writeLn(Point.count);                    // 1                    the static field
+writeLn(p.sum);                          // 7                    the property's getter
+p.sum = 10;
+writeLn(p);                              // Point {x: 10, y: 0}  its setter
+Point.unit = 5;
+writeLn([Point.unit, Point.unitValue]);  // [5, 5]               the static property
+writeLn(Point.dimensions);               // 2                    the constant
+try { Point.dimensions = 3; } catch (e) { writeLn(e.code); }    // WL3001
+writeLn([p is Point, p is Object, Point.name, Point]);          // [true, true, "Point", class Point]
+```
+
+From then on `Point` acts as a declared class does: `class Line extends Point { … }` may extend it, `extend Point { … }` extend it, and `catch (Point e)` catch its instances. A method, a property or a constant given after its instances were made reaches them too, as an `extend` block's does.
+
+**Q6, a static method: (a) `Point.addStaticMethod("origin", f)`, a static method, which cannot be assigned (WL3001), as a declared class's cannot; (b) none: `Point.origin = f;` declares a static field holding `f`, which `Point.origin()` calls, as it does now.**
+
+A6: (b). Clarification: a declared class's static method should be replaceable, too, so somehow it needs to be assignable. `Point.setStaticMethod("origin",f)` maybe?
+
+**Q7, properties: `Point.addProperty("sum", getter, setter)`, each a function with a receiver, or `null` for none, and `Point.addStaticProperty("unit", getter, setter)`, each without one, acting as a declared class's properties do (section 3.7, "Properties"). A run-time property has no `field` of its own, `field` being a word of the `property` syntax only: it keeps its value in a field it names (`Point.unitValue` above). Agreed?**
+
+A7: Yes, but like in A6, a setter for property is needed, too.
+
+**Q8, constants: (a) `Point.addConstant("dimensions", 2)`, a static member that cannot be assigned (WL3001), and `static const dimensions = 2;` in a declared class, which is WL1001 now; (b) none: a static property with only a getter serves.**
+
+A8: (a), with A6 - a setter.
+
+**Q9, a class's name: `Point.name` gives a class's name, a string, or `null` for an unnamed one; assigning it names an unnamed class, once, and is WL3001 for a named one, so that a class may no longer declare a static member called `name` (WL2002). An unnamed class is written `class`, and its instances `class {x: 1}`. Agreed?**
+
+A9: Should be perhaps `className`. It makes possible things like `Integer.className = "Double"`, but that's OK, I guess. With power comes responsibility.
+
+**Q5 again, `extends Class`, laid out: (b) would let a class make classes and give them members of their own, as a metaclass does:**
+
+```javascript
+class Entity extends Class {
+    constructor(name) {
+        super(name);                                               // the new class, named
+        this.addMethod("save", function (this) { return "saved " + this.toString(); });
+    }
+    describe() { return "entity " + this.name; }                   // a member of every class Entity makes
+}
+var User = new Entity("User");                                     // a class, of class Entity
+writeLn([User.describe(), User is Entity, User is Class]);         // ["entity User", true, true]
+var u = new User();                                                // an instance of User
+writeLn([u.save(), u is User]);                                    // ["saved User {}", true]
+```
+
+**(a) WL3001 still, `new Class(…)` and the `add…` methods being how a program makes a class; (b) as above: an instance of a class extending `Class` is a class, its constructor's `super(name)` making it, and its class's methods are its own members, as its static members are, after them.**
+
+A5 (again): (b). Then, an object instance must be able to point to its class: `p.instanceOf`, and class instance to its parent `Point.parent`  (->  `Object`).
+
+Done (Claude, 2026-11-14, `c485b03`): the design recorded as approved in the specification, section 3.7 ("Classes of values"), A9's `className` renaming any class, as A9 allows; the parts of its implementation defined in section 9 (part 5 of "Extending the classes of values"), each a task below "Extending the Classes of Values: `Class`". What A6 to A9 and A5 leave open is asked in "Building Classes at Run Time, Continued". Checks: the Release build, without warnings, and the full test suite, on Windows only; Linux not tried.
