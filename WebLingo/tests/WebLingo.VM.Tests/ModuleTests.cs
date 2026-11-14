@@ -135,6 +135,61 @@ public sealed class ModuleTests
     }
 
     [Fact]
+    public void AModuleImportedWhileTheProgramRunsJoinsIt()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["main.wl"] = "import { twice } from \"lib/util\"; writeLn(\"main \" + twice(2).toString()); " +
+                          "var g = await Module.import(\"lib/greet\"); writeLn([g.hello(), g.n, new g.Point(3), new g.Point(3) is Object, g]); " +
+                          "var h = await Module.import(\"lib/greet\", { who: \"Ann\" }); var g2 = await Module.import(\"lib/greet\"); " +
+                          "writeLn([h.hello(), g2 == g, h == g, (await Module.import(\"lib/util\")).twice(5), (await g.later()).n]); " +
+                          "var s = await Module.import(\"std:system\"); s.writeLn(\"via std:system\");",
+            ["lib/greet.wl"] = "param who = \"world\"; import { twice } from \"util\"; writeLn(\"greet runs for \" + who); " +
+                               "export function hello() { return \"hello, \" + who; } export class Point { constructor(x) { this.x = x; } } " +
+                               "export var n = twice(21); export async function later() { return await Module.import(\"late\"); }",
+            ["lib/util.wl"] = "writeLn(\"util runs\"); export function twice(x) { return x * 2; }",
+            ["lib/late.wl"] = "export var n = 7;",
+        };
+        AssertBoth(files, "util runs\nmain 4\ngreet runs for world\n[\"hello, world\", 42, Point {x: 3}, true, module lib/greet.wl]\n" +
+                          "greet runs for Ann\n[\"hello, Ann\", true, false, 10, 7]\nvia std:system\n");
+    }
+
+    [Theory]
+    [InlineData("await Module.import(\"nowhere\");", WebLingoDiagnosticCodes.ModuleNotFound)]
+    [InlineData("await Module.import(\"box\", { colour: 1 });", WebLingoDiagnosticCodes.ModuleParameter)]
+    [InlineData("await Module.import(\"box\");", WebLingoDiagnosticCodes.ModuleParameter)]
+    [InlineData("await Module.import(\"box\", 5);", WebLingoDiagnosticCodes.InvalidOperation)]
+    [InlineData("await Module.import(\"broken\");", WebLingoDiagnosticCodes.UnexpectedToken)]
+    [InlineData("await Module.import(5);", WebLingoDiagnosticCodes.InvalidOperation)]
+    [InlineData("await Module.import(\"thrower\");", WebLingoDiagnosticCodes.UncaughtException)]
+    public void AModuleImportedWhileTheProgramRunsIsCheckedThen(string main, string code)
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["main.wl"] = main,
+            ["box.wl"] = "param size;",
+            ["broken.wl"] = "export var x = 1 +;",
+            ["thrower.wl"] = "throw \"no\";",
+        };
+        foreach (var run in BothVms)
+        {
+            var (diagnostics, _, error) = run(files, "main.wl");
+            Assert.Empty(diagnostics);
+            Assert.True(code == error?.Code, error?.Code + ": " + error?.Message);
+        }
+    }
+
+    [Fact]
+    public void AProgramsOwnModuleClassHidesTheBuiltIn()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["main.wl"] = "class Module {} Module.import = function (path) { return \"mine: \" + path; }; writeLn(Module.import(\"x\"));",
+        };
+        AssertBoth(files, "mine: x\n");
+    }
+
+    [Fact]
     public void AProgramsOwnParametersAreItsDefaultsForNow()
     {
         var files = new Dictionary<string, string> { ["main.wl"] = "param n = 5; param s = \"x\"; writeLn([n, s]);" };
@@ -173,14 +228,18 @@ public sealed class ModuleTests
         {
             var output = new WebLingoCollectedOutput();
             var compiled = new WebLingoCompiler(Options(files)).Compile(files[main], main);
-            var result = compiled.Module is { } module ? new WebLingoVirtualMachine().Execute(module, Context(output)) : null;
+            var result = compiled.Module is { } module
+                ? new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(Options(files)) }.Execute(module, Context(output))
+                : null;
             return (compiled.Diagnostics, output.Text, result?.Error);
         },
         (files, main) =>
         {
             var output = new WebLingoCollectedOutput();
             var compiled = new WebLingoStackCompiler(Options(files)).Compile(files[main], main);
-            var result = compiled.Module is { } module ? new WebLingoStackVirtualMachine().Execute(module, Context(output)) : null;
+            var result = compiled.Module is { } module
+                ? new WebLingoStackVirtualMachine { Loader = new WebLingoModuleLoader(Options(files)) }.Execute(module, Context(output))
+                : null;
             return (compiled.Diagnostics, output.Text, result?.Error);
         },
     ];

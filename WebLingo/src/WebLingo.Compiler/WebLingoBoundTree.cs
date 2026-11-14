@@ -17,6 +17,8 @@ public sealed record WebLingoBoundProgram(
     public IReadOnlyList<(string Name, WebLingoBoundClass Class)> BuiltinClasses { get; init; } = [];
     /// <summary>Whether its top level awaits, which makes it an <c>async</c> function itself (section 3.8).</summary>
     public bool IsAsync { get; init; }
+    /// <summary>Whether it is an import's (section 3.9), whose top level takes its file's values, imports it, and gives its instance.</summary>
+    public bool IsImport { get; init; }
     /// <summary>Its files, if it imports others, its own first (section 3.9); empty if it imports none.</summary>
     public IReadOnlyList<WebLingoBoundUnit> Units { get; init; } = [];
 }
@@ -176,6 +178,10 @@ public sealed record WebLingoBoundBreak(WebLingoSourceSpan Span) : WebLingoBound
 public sealed record WebLingoBoundContinue(WebLingoSourceSpan Span) : WebLingoBoundStatement(Span);
 
 public abstract record WebLingoBoundExpression(WebLingoSourceSpan Span);
+
+/// <summary><c>Module.import(path, values)</c>: a task, which completes with the module's instance once it has run (section 3.9).</summary>
+public sealed record WebLingoBoundImportDynamic(WebLingoBoundExpression Path, WebLingoBoundExpression? Values, WebLingoSourceSpan Span)
+    : WebLingoBoundExpression(Span);
 
 /// <summary>
 /// A static constant's value (<c>static const name = value;</c>, section 3.7), which only a class's or an extension's

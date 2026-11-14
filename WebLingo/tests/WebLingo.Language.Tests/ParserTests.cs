@@ -246,7 +246,7 @@ public sealed class ParserTests
     [InlineData("var x = 1 2;")]
     [InlineData("a.;")]
     [InlineData("a.1;")]
-    [InlineData("a.if;")]
+    [InlineData("a.5;")]
     [InlineData("a[;")]
     [InlineData("a[1;")]
     [InlineData("];")]

@@ -66,7 +66,8 @@ public static class WebLingoCommandLine
         if (!run) return Success;
 
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services, Clock = new SystemClock(new DotNetClock()) };
-        var result = new WebLingoVirtualMachine().Execute(compiled.Module, context);
+        // The VM imports modules while the program runs as the compiler imports them, with the same resolver (section 3.9).
+        var result = new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(options) }.Execute(compiled.Module, context);
         output.Flush();
         if (result.Succeeded) return Success;
         error.WriteLine(Format(TextOf(result.Error!), result.Error!));

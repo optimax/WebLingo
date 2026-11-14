@@ -189,6 +189,8 @@ public enum WebLingoOpCode : byte
     MakeModule,
     /// <summary>A = a module the program imports, B = register holding the closure of its function, which runs it.</summary>
     RegisterUnit,
+    /// <summary>A = destination register, B = register of a module's path, C = register of the values its parameters are given, D = 1 if there are values; a task, which completes with the module's instance once it has run (section 3.9).</summary>
+    ImportDynamic
 }
 
 public readonly record struct WebLingoInstruction(WebLingoOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
@@ -313,6 +315,12 @@ public sealed record WebLingoCompiledModule(
     public IReadOnlyList<int> ValueClasses { get; init; } = [];
     /// <summary>The classes of <see cref="Classes"/> that runtime errors become, by their codes (section 3.7).</summary>
     public IReadOnlyList<WebLingoErrorClass> ErrorClasses { get; init; } = [];
+
+    /// <summary>
+    /// Whether it is an import's (section 3.9): a module compiled while a program runs, its file the second of its table
+    /// of files, whose entry point takes the values its parameters are given, imports it, and gives its instance.
+    /// </summary>
+    public bool IsImport { get; init; }
 
     /// <summary>The smallest valid module: it returns at once.</summary>
     public static WebLingoCompiledModule Empty(string name) =>

@@ -30,6 +30,8 @@ public sealed record WebLingoIrProgram(
     public IReadOnlyList<(string Code, int Class)> ErrorClasses { get; init; } = [];
     /// <summary>Whether its top level awaits, which makes it an <c>async</c> function (section 3.8).</summary>
     public bool IsAsync { get; init; }
+    /// <summary>Whether it is an import's, whose top level takes one parameter (section 3.9).</summary>
+    public bool IsImport { get; init; }
 }
 
 /// <summary>A class: its constructor's function, or -1 if it has none, and its methods' (section 3.7).</summary>
@@ -209,6 +211,10 @@ public sealed record WebLingoIrStoreCapture(int Capture, WebLingoIrExpression Va
 public sealed record WebLingoIrMakeClosure(int Function, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
 
 /// <summary>The program's file <paramref name="Unit"/>'s instance, or the task of running it (section 3.9).</summary>
+/// <summary><c>Module.import(path, values)</c>: a task, which completes with the module's instance (section 3.9).</summary>
+public sealed record WebLingoIrImportDynamic(WebLingoIrExpression Path, WebLingoIrExpression? Values, WebLingoSourceSpan Span)
+    : WebLingoIrExpression(Span);
+
 public sealed record WebLingoIrImport(int Unit, WebLingoSourceSpan Span) : WebLingoIrExpression(Span)
 {
     /// <summary>The values it gives the module's parameters, a map, for a module that has some (section 3.9).</summary>

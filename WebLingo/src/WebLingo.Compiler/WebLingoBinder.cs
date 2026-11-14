@@ -116,17 +116,28 @@ public sealed class WebLingoBinder
     /// A program and the files it imports (section 3.9): its own top level as now, each other file's as an <c>async</c>
     /// function of the scope around it, which sees the built-in classes, but none of the program's names.
     /// </summary>
-    public WebLingoBoundProgram Bind(IReadOnlyList<WebLingoModuleSource> modules)
+    public WebLingoBoundProgram Bind(IReadOnlyList<WebLingoModuleSource> modules, bool isImport = false)
     {
         _unitScope = _scope;
         _importTargets = modules[0].Imports;
         _moduleSources = modules;
         var units = new List<WebLingoBoundUnit>();
+        // An import's top level: the values its file is given, its one parameter, first (section 3.9).
+        var importedValues = isImport ? DeclareHidden("values", default) : null;
         // A program that imports, itself included, has a table of its files.
         var mainInstance = modules.Count > 1 || modules[0].Imports.Count > 0 ? DeclareHidden("module", default) : null;
         var mainParameters = ParametersOf(modules[0].Root);
         var statements = BindProgramParameters(mainParameters);
         statements.AddRange(BindStatements(AfterParameters(modules[0].Root, mainParameters.Count)));
+        if (importedValues is not null)
+        {
+            // It imports its file, the program's second, with the values given, which the import checks when it runs, and
+            // gives its instance (section 3.9).
+            var imported = DeclareHidden("import", default);
+            statements.Add(new WebLingoBoundImport(1, imported, default) { Values = Reference(importedValues, default) });
+            statements.Add(new WebLingoBoundReturn(Reference(imported, default), default));
+            _main.Awaits = true;
+        }
         if (mainInstance is not null) units.Add(new WebLingoBoundUnit(modules[0].Name, null, _exports, mainInstance));
         for (var i = 1; i < modules.Count; i++)
         {
@@ -186,8 +197,19 @@ public sealed class WebLingoBinder
             ObjectClass = _object?.Class,
             BuiltinClasses = builtinClasses,
             IsAsync = _main.Awaits,
+            IsImport = isImport,
             Units = units
         };
+    }
+
+    /// <summary>Whether a name's local is the built-in class of that name, which no declaration of the program's hides.</summary>
+    private bool IsBuiltinClass(WebLingoLocalSymbol? local, string name)
+    {
+        foreach (var (builtin, declaration) in _builtinClasses)
+        {
+            if (builtin == name) return ReferenceEquals(declaration.Local, local);
+        }
+        return false;
     }
 
     /// <summary>The program and the files it imports, by their index in its table of files (section 3.9).</summary>
@@ -1194,6 +1216,14 @@ public sealed class WebLingoBinder
         if (_inPrelude && calleeSyntax is WebLingoNameSyntax { Name: "hold" } && arguments.Count == 2)
         {
             return new WebLingoBoundHold(arguments[0], arguments[1], call.Span);
+        }
+        if (calleeSyntax is WebLingoMemberAccessSyntax { Name: "import", Target: WebLingoNameSyntax { Name: "Module" } }
+            && IsBuiltinClass(LookupLocal("Module"), "Module"))
+        {
+            // Module.import(path, values): a module imported while the program runs (section 3.9).
+            if (arguments.Count is 1 or 2) return new WebLingoBoundImportDynamic(arguments[0], arguments.Count == 2 ? arguments[1] : null, call.Span);
+            Report(WebLingoDiagnosticCodes.WrongArgumentCount, $"'import' takes 1 to 2 arguments, not {arguments.Count}.", call.Span);
+            return new WebLingoBoundError(call.Span);
         }
         if (calleeSyntax is WebLingoSuperSyntax)
         {

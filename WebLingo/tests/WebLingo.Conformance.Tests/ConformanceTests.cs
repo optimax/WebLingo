@@ -855,6 +855,15 @@ public sealed class ConformanceTests : IDisposable
     }
 
     [Fact]
+    public void TheCliImportsModulesWhileTheProgramRuns()
+    {
+        Directory.CreateDirectory(Path.Combine(_folder, "lib"));
+        File.WriteAllText(Path.Combine(_folder, "lib", "util.wl"), "export function twice(x) { return x * 2; }");
+        var (exit, output, _) = Weblingo("run", "var u = await Module.import(\"lib/util\");\nwriteLn(u.twice(21));");
+        Assert.Equal((WebLingoCommandLine.Success, "42\n"), (exit, output));
+    }
+
+    [Fact]
     public void AModuleThatCannotBeFoundIsWL2015()
     {
         var (exit, output, error) = Weblingo("run", "import x from \"none\";");

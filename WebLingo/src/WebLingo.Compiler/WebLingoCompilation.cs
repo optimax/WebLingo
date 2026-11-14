@@ -26,16 +26,26 @@ public sealed class WebLingoCompilation
     public IReadOnlyList<WebLingoDiagnostic> Diagnostics { get; }
     public bool HasErrors => LoweredProgram is null;
 
-    public static WebLingoCompilation Create(string source, string sourceName, WebLingoCompilerOptions options)
+    public static WebLingoCompilation Create(string source, string sourceName, WebLingoCompilerOptions options) =>
+        Create(source, sourceName, options, null);
+
+    /// <summary>
+    /// The file <paramref name="name"/>, which the host's resolver finds, compiled as an import (section 3.9): a program of
+    /// its own, whose top level imports it, with the values it is given, and whose second file it is.
+    /// </summary>
+    public static WebLingoCompilation CreateImport(string name, string source, WebLingoCompilerOptions options) =>
+        Create("", "import " + name, options, (name, source));
+
+    private static WebLingoCompilation Create(string source, string sourceName, WebLingoCompilerOptions options, (string Name, string Source)? imported)
     {
         var syntaxTree = new WebLingoParser(source, sourceName).ParseCompilationUnit();
         var modules = new List<WebLingoModuleSource>();
         var found = new List<WebLingoDiagnostic>(syntaxTree.Diagnostics);
-        Gather(syntaxTree, sourceName, options, modules, found);
+        Gather(syntaxTree, sourceName, options, modules, found, imported);
         if (syntaxTree.HasErrors || found.Count > syntaxTree.Diagnostics.Count) return new WebLingoCompilation(syntaxTree, null, null, found);
 
         var binder = new WebLingoBinder(options);
-        var boundProgram = binder.Bind(modules);
+        var boundProgram = binder.Bind(modules, imported is not null);
         var diagnostics = new List<WebLingoDiagnostic>(syntaxTree.Diagnostics);
         diagnostics.AddRange(binder.Diagnostics);
         if (binder.Diagnostics.Count > 0) return new WebLingoCompilation(syntaxTree, boundProgram, null, diagnostics);
@@ -49,13 +59,21 @@ public sealed class WebLingoCompilation
     /// found is WL2015, and a file's syntax errors are reported, each naming its file.
     /// </summary>
     private static void Gather(WebLingoSyntaxTree main, string mainName, WebLingoCompilerOptions options,
-        List<WebLingoModuleSource> modules, List<WebLingoDiagnostic> diagnostics)
+        List<WebLingoModuleSource> modules, List<WebLingoDiagnostic> diagnostics, (string Name, string Source)? imported)
     {
         var indexes = new Dictionary<string, int>(StringComparer.Ordinal) { [mainName] = 0 };
         var roots = new List<(string Name, WebLingoCompilationUnitSyntax Root, Dictionary<WebLingoImportSyntax, int> Imports)>
         {
             (mainName, main.Root, new Dictionary<WebLingoImportSyntax, int>())
         };
+        if (imported is { } file)
+        {
+            // An import's file, the program's second (section 3.9).
+            indexes.Add(file.Name, 1);
+            var tree = new WebLingoParser(file.Source, file.Name).ParseCompilationUnit();
+            foreach (var diagnostic in tree.Diagnostics) diagnostics.Add(diagnostic with { Source = file.Name });
+            roots.Add((file.Name, tree.Root, new Dictionary<WebLingoImportSyntax, int>()));
+        }
         for (var i = 0; i < roots.Count; i++)
         {
             var (name, root, imports) = roots[i];

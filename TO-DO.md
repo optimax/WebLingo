@@ -18,7 +18,7 @@ The module system: `import`, static and dynamic, `export`, `param`, a script's p
 
 2026-11-14: split into the parts the specification defines in section 9 ("Modules"), each a task below. Waits for them.
 
-## Modules: Dynamic Imports
+## [WORKING] Modules: Dynamic Imports
 
 `await Module.import(path)`, a module compiled when it runs (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
 
@@ -29,6 +29,8 @@ The module system: `import`, static and dynamic, `export`, `param`, a script's p
 **Q1, when to build the VMs' linking of a module compiled while the program runs: (a) now, as this part, before the standard modules and properties; (b) with M0.12's components, which need it too, dynamic imports landing with them.**
 
 A1: (a)
+
+Done (Claude, 2026-11-14): on both VMs, with tests in `ModuleTests` (`WebLingo.VM.Tests`) and through the CLI; its choices recorded as Proposed in the specification, section 15.2 ("Modules"), among them that a module that does not compile is a runtime error of its first diagnostic's code, and that a member's name after a point may be a keyword, which `Module.import` needs (a parser test that took `a.if;` for malformed takes `a.5;` now). The compiler compiles the file as an import, a program of its own, and each VM joins it to the running program by appending its tables and moving its instructions' indices; M0.12's components can join the same way. Checks: the Release build, without warnings, the full test suite, the benchmark against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
 
 ## [IDLE] Modules: A Script's Parameters
 
@@ -132,9 +134,11 @@ A follow-up to "Static Members Callable on Instances". Added by Claude, 2026-11-
 
 A1: (b) if the static field already exists.
 
-## [DEFER] Adding Methods at Run Time
+## Adding Methods at Run Time
 
 `extend` (see "Classes of Values, Extensions") adds methods to a class as a declaration, written once in the source, its methods having `this` as a class's do. This task would add a way to do the same while the program runs, for a method, or a class to give it to, that is known only then: chosen by a condition, built by a factory, or named by data. Discussed with the owner, 2026-11-13; added by Claude the same day.
+
+Again, ensure that the implementation is the same for declared classes as well as those instantiated at runtime.
 
 What it needs:
 
@@ -156,14 +160,6 @@ A2: (a)
 **Q3: may a method attached at run time be removed again (`Point.removeMethod("describe")`)? (a) no; (b) yes.**
 
 A3: (b)
-
-## [DEFER] Serialization: Text That Rebuilds a Value
-
-What `write` writes is for people to read, and does not reliably rebuild a value. Writing a classed value as if it were a call (`Celsius(21.5)`, `Stack([1, 2])`, "Classes of Values, Extensions") reads back as the same value only when the class's constructor takes the held value as it is; a class with a constructor of its own (`constructor(fahrenheit) { super((fahrenheit - 32) * 5 / 9); }`) would make something else from it. Discussed with the owner, 2026-11-13; added by Claude the same day.
-
-If text that rebuilds a value (round-trip text) is wanted, it is a serialization feature: a way to write a value, and to read it back into an equal one, that does not depend on its class's constructor (a rebuilt instance gets its fields set directly, as a runtime error's `Error` already does, specification, section 15.2, "Exceptions"). It deserves a design of its own, rather than borrowing call syntax for `write`'s text. Such a design would decide, among other things: its format (JSON, a WebLingo literal form, or both); how a class is named in it, and found again when it is read (a class in another module, or one renamed since); whether a class may shape its own serialized form, as `toString()` shapes its text; what cannot be serialized (functions, closures, tasks, native resources) and what reading one then does; cycles and shared references; and the security of reading text from outside (no code runs, and no class is made, that the reader did not allow).
-
-It is deferred: nothing needs it yet, and it can be added later, if it proves necessary, without changing `write`'s text or any program.
 
 ## Native Code Extensions
 
@@ -230,5 +226,13 @@ should be equivalent to
 ```
 (this) => { return this.x + this.y; }
 ```
+
+## [DEFER] Serialization: Text That Rebuilds a Value
+
+What `write` writes is for people to read, and does not reliably rebuild a value. Writing a classed value as if it were a call (`Celsius(21.5)`, `Stack([1, 2])`, "Classes of Values, Extensions") reads back as the same value only when the class's constructor takes the held value as it is; a class with a constructor of its own (`constructor(fahrenheit) { super((fahrenheit - 32) * 5 / 9); }`) would make something else from it. Discussed with the owner, 2026-11-13; added by Claude the same day.
+
+If text that rebuilds a value (round-trip text) is wanted, it is a serialization feature: a way to write a value, and to read it back into an equal one, that does not depend on its class's constructor (a rebuilt instance gets its fields set directly, as a runtime error's `Error` already does, specification, section 15.2, "Exceptions"). It deserves a design of its own, rather than borrowing call syntax for `write`'s text. Such a design would decide, among other things: its format (JSON, a WebLingo literal form, or both); how a class is named in it, and found again when it is read (a class in another module, or one renamed since); whether a class may shape its own serialized form, as `toString()` shapes its text; what cannot be serialized (functions, closures, tasks, native resources) and what reading one then does; cycles and shared references; and the security of reading text from outside (no code runs, and no class is made, that the reader did not allow).
+
+It is deferred: nothing needs it yet, and it can be added later, if it proves necessary, without changing `write`'s text or any program.
 
 # END-OF-TO-DO

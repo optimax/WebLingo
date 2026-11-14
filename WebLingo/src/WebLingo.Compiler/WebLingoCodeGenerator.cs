@@ -40,7 +40,7 @@ public sealed class WebLingoCodeGenerator
     public static WebLingoCompiledModule? Generate(WebLingoIrProgram program, string moduleName, List<WebLingoDiagnostic> diagnostics)
     {
         var module = new ModuleState();
-        var main = GenerateFunction(module, "main", 0, program.LocalNames, [], program.Statements, diagnostics);
+        var main = GenerateFunction(module, "main", program.IsImport ? 1 : 0, program.LocalNames, [], program.Statements, diagnostics);
         var functions = new List<WebLingoFunction>();
         foreach (var function in program.Functions)
         {
@@ -69,7 +69,8 @@ public sealed class WebLingoCodeGenerator
             ErrorClass = program.ErrorClass,
             ObjectClass = program.ObjectClass,
             ValueClasses = program.ValueClasses,
-            ErrorClasses = ErrorClassesOf(program)
+            ErrorClasses = ErrorClassesOf(program),
+            IsImport = program.IsImport
         };
     }
 
@@ -458,6 +459,17 @@ public sealed class WebLingoCodeGenerator
                 _nextRegister = mark; // The operation reads its operands before it writes its destination.
                 var destination = target ?? Allocate();
                 Emit(new WebLingoInstruction(OpCodeOf(binary.Operator), destination, left, right), binary.Span);
+                return destination;
+            }
+            case WebLingoIrImportDynamic dynamic:
+            {
+                // The path and the values in registers of their own, the destination after them.
+                var mark = _nextRegister;
+                var path = EmitExpression(dynamic.Path, null);
+                var values = dynamic.Values is { } given ? EmitExpression(given, null) : 0;
+                _nextRegister = Math.Max(_nextRegister, mark);
+                var destination = target ?? Allocate();
+                Emit(new WebLingoInstruction(WebLingoOpCode.ImportDynamic, destination, path, values, dynamic.Values is null ? 0 : 1), dynamic.Span);
                 return destination;
             }
             case WebLingoIrImport import:

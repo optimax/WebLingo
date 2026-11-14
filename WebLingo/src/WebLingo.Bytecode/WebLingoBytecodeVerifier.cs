@@ -34,7 +34,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             if (import.Arity < 0) return Fail($"Import {i} ('{import.Name}') has a negative arity.");
         }
         if (module.Functions is null) return Fail("The module has no function table.");
-        if (module.EntryPoint is { } main && (main.ParameterCount != 0 || main.Captures is not { Count: 0 } || main.HasThis))
+        if (module.EntryPoint is { } main && (main.ParameterCount != (module.IsImport ? 1 : 0) || main.Captures is not { Count: 0 } || main.HasThis))
         {
             return Fail("The entry point takes no parameters and captures nothing.");
         }
@@ -291,6 +291,10 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                     return $"its elements, registers {b} to {(long)b + c - 1}, are not all in the function's {function.RegisterCount}.";
                 }
                 return Unused(d);
+            case WebLingoOpCode.ImportDynamic:
+                return Register(function, a, "destination") ?? Register(function, b, "path")
+                    ?? (d == 1 ? Register(function, c, "values")
+                        : d == 0 && c == 0 ? null : $"its values' flag, {d}, is not 0 or 1, or C, {c}, is not 0 without them.");
             case WebLingoOpCode.Import:
                 // D is 1 when C holds the values it gives the file's parameters, which a file that has some is always given.
                 return Register(function, a, "destination") ?? Index(b, module.Units.Count, "file")
@@ -547,6 +551,11 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                 return Unwritten(instruction.A, state, locals);
             case WebLingoOpCode.Import:
                 return instruction.D == 1 ? Unwritten(instruction.C, state, locals) : -1;
+            case WebLingoOpCode.ImportDynamic:
+            {
+                var path = Unwritten(instruction.B, state, locals);
+                return path >= 0 || instruction.D != 1 ? path : Unwritten(instruction.C, state, locals);
+            }
             case WebLingoOpCode.Rethrow:
             {
                 var exception = Unwritten(instruction.A, state, locals);
@@ -685,7 +694,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
 
     private static int? Writes(WebLingoInstruction instruction) => instruction.OpCode switch
     {
-        WebLingoOpCode.LoadConstant or WebLingoOpCode.Move or WebLingoOpCode.Negate or WebLingoOpCode.Plus or WebLingoOpCode.ToText or WebLingoOpCode.IsInstance or WebLingoOpCode.Hold or WebLingoOpCode.Await or WebLingoOpCode.Import
+        WebLingoOpCode.LoadConstant or WebLingoOpCode.Move or WebLingoOpCode.Negate or WebLingoOpCode.Plus or WebLingoOpCode.ToText or WebLingoOpCode.IsInstance or WebLingoOpCode.Hold or WebLingoOpCode.Await or WebLingoOpCode.Import or WebLingoOpCode.ImportDynamic
             or WebLingoOpCode.MakeModule or WebLingoOpCode.Add or WebLingoOpCode.Subtract
             or WebLingoOpCode.Multiply or WebLingoOpCode.Divide or WebLingoOpCode.CallBuiltin or WebLingoOpCode.LoadNull or WebLingoOpCode.LoadBoolean
             or WebLingoOpCode.Not or WebLingoOpCode.Equal or WebLingoOpCode.NotEqual or WebLingoOpCode.Less or WebLingoOpCode.LessOrEqual

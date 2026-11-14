@@ -663,6 +663,20 @@ public sealed class WebLingoParser : IWebLingoParser
         return new WebLingoFunctionDeclarationSyntax(name.Text, name.Span, parameters, body, SpanFrom(start)) { IsAsync = isAsync };
     }
 
+    /// <summary>
+    /// Whether a token's text is a word, a name or a keyword: a member's name may be a keyword after a point, as in
+    /// <c>Module.import(…)</c> (section 3.9).
+    /// </summary>
+    private static bool IsWord(string text)
+    {
+        if (text.Length == 0 || !(char.IsAsciiLetter(text[0]) || text[0] == '_')) return false;
+        foreach (var c in text)
+        {
+            if (!char.IsAsciiLetterOrDigit(c) && c != '_') return false;
+        }
+        return true;
+    }
+
     /// <summary>A function's parameters and body, after <c>function</c> and its name, if it has one.</summary>
     /// <remarks>
     /// A function that is not a method may take a receiver, <c>this</c> as its first parameter, without a default
@@ -984,7 +998,7 @@ public sealed class WebLingoParser : IWebLingoParser
                 case WebLingoTokenKind.Dot or WebLingoTokenKind.QuestionDot:
                 {
                     var isOptional = Advance().Kind == WebLingoTokenKind.QuestionDot;
-                    if (Current.Kind != WebLingoTokenKind.Identifier)
+                    if (Current.Kind != WebLingoTokenKind.Identifier && !IsWord(Current.Text))
                     {
                         ReportUnexpected("a member's name");
                         return new WebLingoErrorExpressionSyntax(SpanFrom(expression.Span.Start));

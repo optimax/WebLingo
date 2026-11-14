@@ -29,7 +29,7 @@ public sealed class WebLingoStackCodeGenerator
     public static WebLingoStackModule? Generate(WebLingoIrProgram program, string moduleName, List<WebLingoDiagnostic> diagnostics)
     {
         var module = new ModuleState();
-        var main = GenerateFunction(module, "main", 0, program.LocalNames, [], program.Statements, diagnostics);
+        var main = GenerateFunction(module, "main", program.IsImport ? 1 : 0, program.LocalNames, [], program.Statements, diagnostics);
         var functions = new List<WebLingoStackFunction>();
         foreach (var function in program.Functions)
         {
@@ -58,7 +58,8 @@ public sealed class WebLingoStackCodeGenerator
             ErrorClass = program.ErrorClass,
             ObjectClass = program.ObjectClass,
             ValueClasses = program.ValueClasses,
-            ErrorClasses = ErrorClassesOf(program)
+            ErrorClasses = ErrorClassesOf(program),
+            IsImport = program.IsImport
         };
     }
 
@@ -327,6 +328,11 @@ public sealed class WebLingoStackCodeGenerator
             case WebLingoIrAwait awaited:
                 EmitValue(awaited.Value);
                 Emit(WebLingoStackOpCode.Await, awaited.Span);
+                return;
+            case WebLingoIrImportDynamic dynamic:
+                EmitValue(dynamic.Path);
+                if (dynamic.Values is { } given) EmitValue(given);
+                Emit(WebLingoStackOpCode.ImportDynamic, dynamic.Span, dynamic.Values is null ? 0 : 1);
                 return;
             case WebLingoIrImport import:
                 if (import.Values is { } values) EmitValue(values);
@@ -693,6 +699,7 @@ public sealed class WebLingoStackCodeGenerator
             WebLingoStackOpCode.Extend => (1, 0),
             WebLingoStackOpCode.Hold => (2, 1),
             WebLingoStackOpCode.Import => (b, 1),
+            WebLingoStackOpCode.ImportDynamic => (a + 1, 1),
             WebLingoStackOpCode.RegisterUnit => (1, 0),
             WebLingoStackOpCode.MakeModule => (b, 1),
             WebLingoStackOpCode.Throw => (1, 0),

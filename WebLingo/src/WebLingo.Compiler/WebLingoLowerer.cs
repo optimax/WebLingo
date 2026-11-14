@@ -62,7 +62,8 @@ public sealed class WebLingoLowerer
             ObjectClass = lowerer._objectClass,
             ValueClasses = lowerer._valueClasses,
             ErrorClasses = lowerer._errorClasses,
-            IsAsync = program.IsAsync
+            IsAsync = program.IsAsync,
+            IsImport = program.IsImport
         };
     }
 
@@ -481,6 +482,9 @@ public sealed class WebLingoLowerer
             case WebLingoBoundIndexAssignment element:
                 return new WebLingoIrStoreIndex(LowerExpression(element.Target), LowerExpression(element.Index),
                     LowerExpression(element.Value), element.Span);
+            case WebLingoBoundImportDynamic imported:
+                return new WebLingoIrImportDynamic(LowerExpression(imported.Path), imported.Values is { } values ? LowerExpression(values) : null,
+                    imported.Span);
             case WebLingoBoundMember member:
                 return new WebLingoIrMember(LowerExpression(member.Target), member.Name, member.Span) { IsOptional = member.IsOptional };
             case WebLingoBoundMemberAssignment field:

@@ -41,7 +41,7 @@ public sealed class WebLingoStackBytecodeVerifier
             if (import.Arity < 0) return Fail($"Import {i} ('{import.Name}') has a negative arity.");
         }
         if (module.Functions is null) return Fail("The module has no function table.");
-        if (module.EntryPoint is { } main && (main.ParameterCount != 0 || main.Captures is not { Count: 0 } || main.HasThis))
+        if (module.EntryPoint is { } main && (main.ParameterCount != (module.IsImport ? 1 : 0) || main.Captures is not { Count: 0 } || main.HasThis))
         {
             return Fail("The entry point takes no parameters and captures nothing.");
         }
@@ -167,6 +167,8 @@ public sealed class WebLingoStackBytecodeVerifier
                 return Index(a, function.Code.Count, "target instruction") ?? Index(b, function.LocalCount, "local");
             case WebLingoStackOpCode.LoadBuiltin:
                 return Index(a, module.Imports.Count, "import") ?? Unused(b);
+            case WebLingoStackOpCode.ImportDynamic:
+                return (a is 0 or 1 ? null : $"its values' flag, {a}, is not 0 or 1.") ?? Unused(b);
             case WebLingoStackOpCode.Import:
                 // B is 1 when the values it gives the file's parameters are on the stack, which a file that has some is always given.
                 return Index(a, module.Units.Count, "file")
@@ -432,6 +434,7 @@ public sealed class WebLingoStackBytecodeVerifier
         WebLingoStackOpCode.Extend => (1, 0),
         WebLingoStackOpCode.Hold => (2, 1),
         WebLingoStackOpCode.Import => (instruction.B, 1),
+        WebLingoStackOpCode.ImportDynamic => (instruction.A + 1, 1),
         WebLingoStackOpCode.RegisterUnit => (1, 0),
         WebLingoStackOpCode.MakeModule => (instruction.B, 1),
         WebLingoStackOpCode.Throw => (1, 0),

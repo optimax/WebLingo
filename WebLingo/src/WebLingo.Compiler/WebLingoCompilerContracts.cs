@@ -12,9 +12,15 @@ public interface IWebLingoCompiler { WebLingoCompilationResult Compile(string so
 /// </summary>
 public sealed class WebLingoCompiler(WebLingoCompilerOptions options) : IWebLingoCompiler
 {
-    public WebLingoCompilationResult Compile(string source, string sourceName)
+    public WebLingoCompilationResult Compile(string source, string sourceName) =>
+        Generate(WebLingoCompilation.Create(source, sourceName, options), sourceName);
+
+    /// <summary>The file <paramref name="name"/>, whose text is <paramref name="source"/>, compiled as an import (section 3.9).</summary>
+    public WebLingoCompilationResult CompileImport(string name, string source) =>
+        Generate(WebLingoCompilation.CreateImport(name, source, options), "import " + name);
+
+    private WebLingoCompilationResult Generate(WebLingoCompilation compilation, string sourceName)
     {
-        var compilation = WebLingoCompilation.Create(source, sourceName, options);
         if (compilation.HasErrors) return new WebLingoCompilationResult(null, compilation.Diagnostics);
 
         var diagnostics = new List<WebLingoDiagnostic>(compilation.Diagnostics);

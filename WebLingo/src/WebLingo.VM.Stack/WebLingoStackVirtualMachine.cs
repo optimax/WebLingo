@@ -27,6 +27,9 @@ public sealed class WebLingoStackVirtualMachine
 
     private readonly WebLingoStackBytecodeVerifier _verifier = new();
 
+    /// <summary>What finds and compiles a module a program imports while it runs (section 3.9); none, and it can import none.</summary>
+    public IWebLingoStackModuleLoader? Loader { get; init; }
+
     public WebLingoExecutionResult Execute(WebLingoStackModule module, WebLingoExecutionContext context)
     {
         var verification = _verifier.Verify(module);
@@ -85,7 +88,7 @@ public sealed class WebLingoStackVirtualMachine
         var codes = new WebLingoStackInstruction[module.Functions.Count][];
         for (var i = 0; i < codes.Length; i++) codes[i] = ToArray(module.Functions[i].Code);
 
-        return new Execution(module, ToArray(module.EntryPoint.Code), codes, constants, names, builtins, context, heap).Run();
+        return new Execution(module, ToArray(module.EntryPoint.Code), codes, constants, names, builtins, context, heap) { Loader = Loader }.Run();
     }
 
     /// <summary>A copy of the code, without LINQ, which the portable core does not use.</summary>
@@ -179,8 +182,9 @@ public sealed class WebLingoStackVirtualMachine
             heap.AddRoots(_errorClasses);
             heap.AddRoots(_main);
             _modules = new WebLingoModuleTable(module.Units.Count, heap);
-            _unitClosures = new WebLingoValue[module.Units.Count];
+            for (var i = 0; i < module.Units.Count; i++) _unitClosures.Add(WebLingoValue.Null);
             heap.AddRoots(_unitClosures);
+            heap.AddRoots(_linked);
             heap.AddRoots(frame.Slots);
             heap.AddRoots(frame.Closure);
             _scheduler = new WebLingoScheduler(heap, context.Clock);
@@ -553,7 +557,9 @@ public sealed class WebLingoStackVirtualMachine
                             continue;
                         }
                         case WebLingoStackOpCode.RegisterUnit:
-                            _unitClosures[ins.A] = slots[--sp];
+                            // A file a module imported while the program runs shares with the program keeps the program's.
+                            if (_unitClosures[ins.A].Kind == WebLingoValueKind.Null) _unitClosures[ins.A] = slots[sp - 1];
+                            sp--;
                             pc++;
                             continue;
                         case WebLingoStackOpCode.MakeModule:
@@ -561,6 +567,15 @@ public sealed class WebLingoStackVirtualMachine
                             sp -= ins.B - 1;
                             pc++;
                             continue;
+                        case WebLingoStackOpCode.ImportDynamic:
+                            // Module.import(path, values): a task, at once, or the call that gives one (section 3.9).
+                            sp = ImportedWhileRunning(ins.A, slots, sp, frame.Function, out error);
+                            if (error is null && _operator.Kind != WebLingoValueKind.Function)
+                            {
+                                pc++;
+                                continue;
+                            }
+                            break;
                         case WebLingoStackOpCode.Import:
                             // A file's instance, for the values given its parameters; else its function runs, as a call, whose
                             // task the code awaits, or the values are wrong (section 3.9).
@@ -1426,7 +1441,7 @@ public sealed class WebLingoStackVirtualMachine
         /// the toString() its instances override run; null if no class of the module overrides toString(), as then the
         /// formatter alone gives every text (section 3.7).
         /// </summary>
-        private readonly bool[]? _texts = TextBuiltins(module, builtins);
+        private bool[]? _texts = TextBuiltins(module, builtins);
 
         /// <summary>The execution's tasks (section 3.8), made when it starts; the program's own task, if its top level awaits, a root.</summary>
         private WebLingoScheduler _scheduler = null!;
@@ -1537,7 +1552,269 @@ public sealed class WebLingoStackVirtualMachine
         /// (section 3.9); roots.
         /// </summary>
         private WebLingoModuleTable _modules = null!;
-        private WebLingoValue[] _unitClosures = [];
+
+        /// <summary>What finds and compiles a module the program imports while it runs (section 3.9).</summary>
+        public IWebLingoStackModuleLoader? Loader { get; init; }
+
+        /// <summary>The values that modules imported while the program runs bring, their constants; a root.</summary>
+        private readonly List<WebLingoValue> _linked = [];
+
+        /// <summary>The built-in classes such a module declares again, and the program's of each, which making it gives.</summary>
+        private Dictionary<WebLingoClassInfo, WebLingoValue>? _madeAlready;
+
+        /// <summary>
+        /// <c>ImportDynamic</c> (section 3.9): its path, and its values if <paramref name="hasValues"/> is 1, on top of the
+        /// stack, give way to a task, which completes with the module's instance once it has run; or to the call that gives
+        /// one, pending: the module's function, if the program has its file, or its compiled import's entry, joined to the
+        /// program, given the values. The stack's new top.
+        /// </summary>
+        private int ImportedWhileRunning(int hasValues, WebLingoValue[] slots, int sp, WebLingoStackFunction function, out WebLingoRuntimeError? error)
+        {
+            error = null;
+            var values = hasValues == 1 ? slots[sp - 1] : WebLingoValue.Null;
+            var path = slots[sp - 1 - hasValues];
+            if (path.Kind != WebLingoValueKind.String)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"A module's path is a string, not {WebLingoValueFormatter.Describe(path, heap)}.");
+                return sp;
+            }
+            var text = heap.GetString(path);
+            var importer = function.Source ?? (module.Units.Count > 0 ? module.Units[0].Name : module.Name);
+            string? why = "this host imports no modules while a program runs";
+            if (Loader is null || !Loader.TryResolve(importer, text, out var name, out why))
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.ModuleNotFound, $"The module '{text}' cannot be imported: {why}.");
+                return sp;
+            }
+            var unit = UnitNamed(name);
+            WebLingoValue callee;
+            var count = 1;
+            if (unit < 0)
+            {
+                if (Loader.Compile(name, out var failure) is not { } compiled)
+                {
+                    error = new WebLingoRuntimeError(failure?.Code ?? WebLingoDiagnosticCodes.ModuleNotFound,
+                        $"The module '{text}' does not compile: {failure?.Message ?? "it cannot be read"}");
+                    return sp;
+                }
+                if (!TryLink(compiled, out callee, out error)) return sp;
+            }
+            else
+            {
+                var info = module.Units[unit];
+                if (!_modules.TryFind(unit, info.Name, info.Parameters, values, out var instance, out error)) return sp;
+                if (instance.Kind == WebLingoValueKind.Module || _unitClosures[unit].Kind != WebLingoValueKind.Function)
+                {
+                    // A file that has run, or is running, for these values: a task already complete with its instance.
+                    if (!heap.TryAllocateTask(out var task, out error)) return sp;
+                    _scheduler.Complete(task, instance);
+                    sp -= 1 + hasValues;
+                    slots[sp++] = task;
+                    return sp;
+                }
+                callee = _unitClosures[unit];
+                count = info.Parameters.Count > 0 ? 1 : 0;
+                if (count == 1 && values.Kind == WebLingoValueKind.Null && !heap.TryAllocateMap([], 0, 0, out values, out error)) return sp;
+            }
+            // The call's one argument, the values, where the path was; or none.
+            sp -= 1 + hasValues;
+            if (count == 1) slots[sp++] = values;
+            Pend(callee, count);
+            return sp;
+        }
+
+        /// <summary>The program's file of that name, by its index in its table of files, or -1.</summary>
+        private int UnitNamed(string name)
+        {
+            for (var i = 0; i < module.Units.Count; i++)
+            {
+                if (module.Units[i].Name == name) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// A module compiled as an import joined to the running program, as the register VM joins one (section 3.9): its
+        /// tables added to the program's, its instructions' indices moved, its files added but for those the program has,
+        /// and its built-in classes the program's where the program has them. Gives the closure of its entry.
+        /// </summary>
+        private bool TryLink(WebLingoStackModule import, out WebLingoValue entry, out WebLingoRuntimeError? error)
+        {
+            entry = WebLingoValue.Null;
+            var verification = new WebLingoStackBytecodeVerifier().Verify(import);
+            if (!import.IsImport || !verification.IsValid)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.BytecodeVerificationFailure,
+                    $"The imported module failed verification: {verification.Error ?? "it is not an import's"}");
+                return false;
+            }
+            foreach (var function in import.Functions)
+            {
+                if ((long)function.LocalCount + function.MaxStack <= context.Resources.MaxRegisters) continue;
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.BudgetExceeded,
+                    $"'{function.Name}' needs {function.LocalCount + function.MaxStack} slots; this execution allows {context.Resources.MaxRegisters}.");
+                return false;
+            }
+            var (functionBase, constantBase, classBase, builtinBase) = (module.Functions.Count, module.Constants.Count, module.Classes.Count, builtins.Length);
+
+            var addedBuiltins = new IWebLingoBuiltinFunction[import.Imports.Count];
+            for (var i = 0; i < addedBuiltins.Length; i++)
+            {
+                var wanted = import.Imports[i];
+                if (context.Services.TryGetBuiltin(wanted.Name, out var builtin) && builtin.Arity == wanted.Arity)
+                {
+                    addedBuiltins[i] = builtin;
+                    continue;
+                }
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.UndefinedIdentifier,
+                    $"This host has no built-in '{wanted.Name}' taking {wanted.Arity} arguments.");
+                return false;
+            }
+            var addedConstants = new WebLingoValue[import.Constants.Count];
+            var addedNames = new WebLingoMemberName[import.Constants.Count];
+            for (var i = 0; i < addedConstants.Length; i++)
+            {
+                var constant = import.Constants[i];
+                if (constant.Kind == WebLingoConstantKind.String)
+                {
+                    addedNames[i] = new WebLingoMemberName(WebLingoMembers.Find(constant.Text!), constant.Text!);
+                    if (!heap.TryAllocateString(constant.Text!, out addedConstants[i], out error)) return false;
+                    _linked.Add(addedConstants[i]);
+                    continue;
+                }
+                addedConstants[i] = constant.Kind == WebLingoConstantKind.Int64
+                    ? WebLingoValue.FromInt64(constant.Bits)
+                    : WebLingoValue.FromBinary64Bits(constant.Bits);
+            }
+
+            var units = new List<WebLingoUnitInfo>(module.Units);
+            var unitMap = new int[import.Units.Count];
+            for (var i = 0; i < unitMap.Length; i++)
+            {
+                var unit = import.Units[i];
+                var existing = i == 0 ? -1 : UnitNamed(unit.Name);
+                unitMap[i] = existing >= 0 ? existing : units.Count;
+                if (existing < 0) units.Add(unit with { Function = unit.Function >= 0 ? unit.Function + functionBase : -1 });
+            }
+
+            WebLingoStackInstruction[] Relocated(IReadOnlyList<WebLingoStackInstruction> code)
+            {
+                var moved = new WebLingoStackInstruction[code.Count];
+                for (var i = 0; i < moved.Length; i++)
+                {
+                    var ins = code[i];
+                    moved[i] = ins.OpCode switch
+                    {
+                        WebLingoStackOpCode.LoadConstant or WebLingoStackOpCode.GetMember or WebLingoStackOpCode.SetMember
+                            or WebLingoStackOpCode.CallMethod or WebLingoStackOpCode.GetSuper => ins with { A = ins.A + constantBase },
+                        WebLingoStackOpCode.CallBuiltin or WebLingoStackOpCode.LoadBuiltin => ins with { A = ins.A + builtinBase },
+                        WebLingoStackOpCode.MakeClosure => ins with { A = ins.A + functionBase },
+                        WebLingoStackOpCode.MakeClass or WebLingoStackOpCode.Extend => ins with { A = ins.A + classBase },
+                        WebLingoStackOpCode.RegisterUnit or WebLingoStackOpCode.MakeModule or WebLingoStackOpCode.Import => ins with { A = unitMap[ins.A] },
+                        _ => ins
+                    };
+                }
+                return moved;
+            }
+
+            var functions = new List<WebLingoStackFunction>(module.Functions);
+            var addedCodes = new List<WebLingoStackInstruction[]>();
+            foreach (var function in import.Functions)
+            {
+                functions.Add(function);
+                addedCodes.Add(Relocated(function.Code));
+            }
+            var entryIndex = functions.Count;
+            functions.Add(import.EntryPoint with { Name = "import", Source = import.Units.Count > 1 ? import.Units[1].Name : null });
+            addedCodes.Add(Relocated(import.EntryPoint.Code));
+
+            WebLingoClassMethod Moved(WebLingoClassMethod method) => method with { Function = method.Function + functionBase };
+            var classes = new List<WebLingoClassInfo>(module.Classes);
+            foreach (var info in import.Classes)
+            {
+                var methods = new List<WebLingoClassMethod>();
+                foreach (var method in info.Methods) methods.Add(Moved(method));
+                var statics = new List<WebLingoClassMethod>();
+                foreach (var method in info.StaticMethods) statics.Add(Moved(method));
+                classes.Add(info with { Constructor = info.Constructor >= 0 ? info.Constructor + functionBase : -1, Methods = methods, StaticMethods = statics });
+            }
+
+            var madeAlready = _madeAlready ?? new Dictionary<WebLingoClassInfo, WebLingoValue>(ReferenceEqualityComparer.Instance);
+            int Role(int programs, int imports, WebLingoValue made)
+            {
+                if (imports < 0) return programs;
+                if (programs >= 0 && made.Kind == WebLingoValueKind.Class) madeAlready[classes[imports + classBase]] = made;
+                return programs >= 0 ? programs : imports + classBase;
+            }
+            var valueClasses = new List<int>();
+            for (var i = 0; i < Math.Max(module.ValueClasses.Count, import.ValueClasses.Count); i++)
+            {
+                var programs = i < module.ValueClasses.Count ? module.ValueClasses[i] : -1;
+                var imports = i < import.ValueClasses.Count ? import.ValueClasses[i] : -1;
+                valueClasses.Add(Role(programs, imports, i < _valueClasses.Length ? _valueClasses[i] : WebLingoValue.Null));
+            }
+            var objectClass = Role(module.ObjectClass, import.ObjectClass, _objectClass[0]);
+            var errorClass = Role(module.ErrorClass, import.ErrorClass, _errorClass[0]);
+            var errorClasses = new List<WebLingoErrorClass>(module.ErrorClasses);
+            foreach (var kind in import.ErrorClasses)
+            {
+                var programs = -1;
+                for (var i = 0; i < errorClasses.Count && programs < 0; i++)
+                {
+                    if (errorClasses[i].Code == kind.Code) programs = i;
+                }
+                if (programs >= 0)
+                {
+                    Role(errorClasses[programs].Class, kind.Class, _errorClasses[programs]);
+                    continue;
+                }
+                if (errorClasses.Count == _errorClasses.Length)
+                {
+                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.BudgetExceeded, "The program has too many kinds of runtime errors' classes.");
+                    return false;
+                }
+                errorClasses.Add(kind with { Class = kind.Class + classBase });
+            }
+
+            var constants2 = new WebLingoValue[constants.Length + addedConstants.Length];
+            Array.Copy(constants, constants2, constants.Length);
+            Array.Copy(addedConstants, 0, constants2, constants.Length, addedConstants.Length);
+            var names2 = new WebLingoMemberName[names.Length + addedNames.Length];
+            Array.Copy(names, names2, names.Length);
+            Array.Copy(addedNames, 0, names2, names.Length, addedNames.Length);
+            var builtins2 = new IWebLingoBuiltinFunction[builtins.Length + addedBuiltins.Length];
+            Array.Copy(builtins, builtins2, builtins.Length);
+            Array.Copy(addedBuiltins, 0, builtins2, builtins.Length, addedBuiltins.Length);
+            var codes2 = new WebLingoStackInstruction[codes.Length + addedCodes.Count][];
+            Array.Copy(codes, codes2, codes.Length);
+            addedCodes.CopyTo(codes2, codes.Length);
+            var constantInfos = new List<WebLingoConstant>(module.Constants);
+            constantInfos.AddRange(import.Constants);
+            var imports2 = new List<WebLingoImport>(module.Imports);
+            imports2.AddRange(import.Imports);
+
+            module = module with
+            {
+                Constants = constantInfos,
+                Imports = imports2,
+                Functions = functions,
+                Classes = classes,
+                Units = units,
+                ValueClasses = valueClasses,
+                ObjectClass = objectClass,
+                ErrorClass = errorClass,
+                ErrorClasses = errorClasses
+            };
+            (constants, names, builtins, codes) = (constants2, names2, builtins2, codes2);
+            _texts = TextBuiltins(module, builtins);
+            _builtin = BuiltinClasses(module);
+            _madeAlready = madeAlready;
+            while (_unitClosures.Count < units.Count) _unitClosures.Add(WebLingoValue.Null);
+            _modules.Grow(units.Count);
+            return heap.TryAllocateClosure(entryIndex, [], out entry, out error);
+        }
+        private readonly List<WebLingoValue> _unitClosures = [];
 
         /// <summary>A file's instance, from then on the one its imports get (section 3.9).</summary>
         private bool TryMakeModule(int unit, WebLingoValue[] values, int first, int count, out WebLingoValue made,
@@ -1566,6 +1843,12 @@ public sealed class WebLingoStackVirtualMachine
                 return sp;
             }
             if (hasValues == 1 && info.Parameters.Count == 0) sp--; // An empty map, for a file without parameters.
+            // A file with parameters given no values is given an empty map, which its function reads them from.
+            if (hasValues == 1 && info.Parameters.Count > 0 && values.Kind == WebLingoValueKind.Null
+                && !heap.TryAllocateMap([], 0, 0, out slots[sp - 1], out error))
+            {
+                return sp;
+            }
             Pend(_unitClosures[unit], info.Parameters.Count > 0 ? 1 : 0);
             return sp;
         }
@@ -1779,10 +2062,13 @@ public sealed class WebLingoStackVirtualMachine
         private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.Module + 1];
 
         /// <summary>The kinds of runtime errors' classes, as <c>module.ErrorClasses</c> lists them, once made; a root.</summary>
-        private readonly WebLingoValue[] _errorClasses = new WebLingoValue[module.ErrorClasses.Count];
+        private readonly WebLingoValue[] _errorClasses = new WebLingoValue[Math.Max(module.ErrorClasses.Count, MaxErrorClasses)];
+
+        /// <summary>The most kinds of runtime errors' classes a program, and the modules it imports while it runs, may have.</summary>
+        private const int MaxErrorClasses = 32;
 
         /// <summary>For each class of the module, whether it is a built-in one that the VM keeps when it makes it.</summary>
-        private readonly bool[] _builtin = BuiltinClasses(module);
+        private bool[] _builtin = BuiltinClasses(module);
 
         private static bool[] BuiltinClasses(WebLingoStackModule module)
         {
@@ -2019,6 +2305,12 @@ public sealed class WebLingoStackVirtualMachine
         private bool TryMakeClass(WebLingoClassInfo info, WebLingoValue baseClass, WebLingoValue[] slots, WebLingoValue[] cells, out WebLingoValue made,
             out WebLingoRuntimeError? error)
         {
+            // A built-in class that a module imported while the program runs declares again is the program's (section 3.9).
+            if (_madeAlready is not null && _madeAlready.TryGetValue(info, out made))
+            {
+                error = null;
+                return true;
+            }
             made = WebLingoValue.Null;
             var closures = new WebLingoValue[info.Methods.Count + info.StaticMethods.Count + 1];
             heap.AddRoots(closures);

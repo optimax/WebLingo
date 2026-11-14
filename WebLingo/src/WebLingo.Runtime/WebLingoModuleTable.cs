@@ -8,7 +8,7 @@ namespace WebLingo.Runtime;
 /// </summary>
 public sealed class WebLingoModuleTable
 {
-    private readonly WebLingoValue[] _instances;
+    private readonly List<WebLingoValue> _instances = [];
     private readonly List<(int Unit, WebLingoValue[] Values, WebLingoValue Instance)> _variants = [];
     private readonly List<WebLingoValue> _roots = [];
     private readonly WebLingoHeap _heap;
@@ -19,9 +19,15 @@ public sealed class WebLingoModuleTable
     public WebLingoModuleTable(int units, WebLingoHeap heap)
     {
         _heap = heap;
-        _instances = new WebLingoValue[units];
+        Grow(units);
         heap.AddRoots(_instances);
         heap.AddRoots(_roots);
+    }
+
+    /// <summary>Room for the files a module imported while the program runs brings (section 3.9).</summary>
+    public void Grow(int units)
+    {
+        while (_instances.Count < units) _instances.Add(WebLingoValue.Null);
     }
 
     /// <summary>

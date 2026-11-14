@@ -168,6 +168,8 @@ public enum WebLingoStackOpCode : byte
     MakeModule,
     /// <summary>A = a module the program imports: pops the closure of its function, which runs it.</summary>
     RegisterUnit,
+    /// <summary>A = 1 if there are values: pops them, then a module's path, and pushes a task, which completes with the module's instance once it has run, as <c>ImportDynamic</c> does (section 3.9).</summary>
+    ImportDynamic
 }
 
 public readonly record struct WebLingoStackInstruction(WebLingoStackOpCode OpCode, int A = 0, int B = 0);
@@ -224,4 +226,7 @@ public sealed record WebLingoStackModule(
     public IReadOnlyList<int> ValueClasses { get; init; } = [];
     /// <summary>The classes runtime errors become, by their codes.</summary>
     public IReadOnlyList<WebLingoErrorClass> ErrorClasses { get; init; } = [];
+
+    /// <summary>Whether it is an import's, as <see cref="WebLingoCompiledModule.IsImport"/> says (section 3.9).</summary>
+    public bool IsImport { get; init; }
 }
