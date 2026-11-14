@@ -1613,3 +1613,13 @@ Done (Claude, 2026-11-14, `93f214e`): recorded as approved in the specification,
 2026-11-14: both done; the names are `__className`, `__instanceOf` and `__parent` (A3 of "Building Classes at Run Time, Continued").
 
 Done (Claude, 2026-11-14, `8651b8e`): on both VMs, with conformance tests; the choices A3 leaves open are recorded as Proposed in the specification, section 15.2 ("Classes made while the program runs"): the three names come before a program's own members of those names, `__className` and `__parent` are a class's only, `null.__instanceOf` is `null`, assigning `null` to `__className` unnames a class, and `__instanceOf` and `__parent` cannot be assigned. Checks: the Release build, without warnings, the 1,669 tests, a timing of member reads and assignments against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Extending the Classes of Values: `Class`, Properties and Constants
+
+`addProperty`, `addStaticProperty`, `addConstant` and `static const`, and replacing a class's static methods, properties and constants while the program runs (specification, section 3.7, and part 5.3 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for Q1 and Q2 of "Building Classes at Run Time, Continued", and for "Extending the Classes of Values: `Class`, Making Classes".
+
+2026-11-14: both done; the methods are `setProperty`, `setStaticProperty` and `setConstant`, each adding its member the first time and replacing it after, and assignment replaces a static method (A1 and A2 of "Building Classes at Run Time, Continued").
+
+Done (Claude, 2026-11-14, `c6ba136`): on both VMs, with conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Classes made while the program runs", and "Static members", which it changes: `static const` declares a constant now, and assigning a static method replaces it), among them that `null` for both of a property's functions leaves it with neither, and that a constant cannot be assigned through a subclass either. A parser test that took `static const` for malformed takes `static let` now, and a conformance test that took assigning a static method for WL3001 is gone, the new ones testing that it replaces the method. Checks: the Release build, without warnings, the 1,697 tests, a timing of member reads and assignments against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
