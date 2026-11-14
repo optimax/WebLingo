@@ -883,3 +883,33 @@ Q1, disposal that throws: when B's `dispose()` throws while an instance of B is 
 A1: (a).
 
 Done (Claude, 2026-11-13, `27bdb58`): recorded as approved in the specification, section 3.7 ("Disposal that throws"), its decision register and section 10's open question 4; the code already does this (`WsExceptions.DisposalGoesOn`), whose comment now says so.
+
+## [DONE] Typed Catches Syntax: Classes of Values
+
+Follow-ups to "Typed Catches": A4 asks whether every value can be an instance of a class, such as `Integer`. It can: each kind of value gets a built-in class, which `is` and a typed catch test by the value's kind, with nothing stored in the value and nothing slower. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
+
+Q1, every value's class: each kind of value has a built-in class extending `Object`: `Boolean`, `Integer`, `Number` (binary64), `String`, `Array`, `Map`, `Set`, `Function` and `Class`, so that `5 is Integer` and `catch (String e)`; programs cannot extend them, nor make one with `new`. Agreed?
+
+A1: Yes, for value types. One should be able to extend arrays, maps, sets.
+
+Q2, binary64's class: (a) `Number`; (b) `Float`; (c) `Double`.
+
+A2: Yes.
+
+Q3, `null`: (a) a value of no class, so `null is Object` is false, and only a catch without a class catches it; (b) it has a class too, `Null`.
+
+A3: (a). WebLingo means to give every kind of value a class, except for `null`.
+
+Q4, `equal` on every value: "M0.10 Syntax: Static Members, `Object` and Exceptions" had only instances have it (A5). With every value an instance of a class extending `Object`: (a) every value has `Object`'s `equal`, giving `==` (`"a".equal("a")` is true); (b) still only instances of the program's classes.
+
+A4: (a).
+
+Q5, a catch's name that is not a class when an exception reaches it (`var A = 5;` … `catch (A e)`), asked again: (a) WS3001, which replaces the exception; (b) the catch does not match, and the exception goes on.
+
+A5: The catch should match, A.equals(5). Is there a problem with that?
+
+Q6, the runtime errors' classes, each extending `Error`: `InitializationError` (WS2004), `CallError` (WS2005), `ArgumentError` (WS2006), `TypeError` (WS3001), `OverflowError` (WS3002), `IndexError` (WS3005), `MemberError` (WS3006) and `KeyError` (WS3007): (a) these; (b) others, which you give.
+
+A6: (a).
+
+Done (Claude, 2026-11-13, `31d35c3`): recorded as approved in the specification, section 3.7 ("Classes of values", "Equality", "Typed catches", "`is`" and the runtime errors' classes) and its decision register. A1's extending of `Array`, `Map` and `Set`, A5's question, and what is left of A1 are asked in "Classes of Values, Continued".
