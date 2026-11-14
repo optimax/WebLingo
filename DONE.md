@@ -1890,3 +1890,15 @@ should be equivalent to
 ```
 
 Done (Claude, 2026-11-14, `07e94bb`): `(parameters) => { … }` is a function expression, parsed into the very syntax `function (parameters) { … }` is, so that the two are the same from the binder on, on both VMs: its parameters are a function's, defaults and a receiver, `(this) => { … }`, included, and inside a method it sees the method's `this`, as any function expression does. Recorded in the specification, section 3.5, as the owner's request, its details as Proposed in section 15.2 ("Functions and calls"). What JavaScript's arrows have besides, an expression for a body, a parameter without parentheses, and `async`, is asked in "Arrow Notation, Continued", below; until then `=>` takes a block. With lexer and conformance tests. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] M0.12.1: Pages
+
+`.wlp` pages: their text, `<% … %>`, `<%= … %>`, `<%- … %>` and `<%# … %>`, statements across blocks, escaping, `null` and line breaks, compiled through the WebLingo compiler into a program that writes the page, in `WebLingo.Templates`, with `WebLingo.Templates.Tests`, and `welp run page.wlp` in `WebLingo.Pages.Cli` (specification, section 13, "Contracts", and section 9, M0.12.1), on both VMs. Added by Claude, 2026-11-14.
+
+Its syntax needs one decision first, which section 13 leaves open; answerable with a letter.
+
+**Q1, `%>` inside a block's code, in a string or a comment (`<% var end = "%>"; %>`): (a) it ends the block wherever it stands, as in classic ASP, a string writing it as `"%" + ">"`; (b) the template compiler reads a block's code as WebLingo's tokens, so that `%>` in a string or a comment does not end it.**
+
+A1: (b)
+
+Done (Claude, 2026-11-14, `224b1f9`): A1 recorded as approved in the specification, section 13 ("Contracts", "A block's end"), and its decision register. A page is read by `WebLingoTemplateParser` into the WebLingo parser's tokens, and compiled by `WebLingoTemplateCompiler`, for either VM; `welp run`, `welp check` and `welp --version`, in `WebLingo.Pages.Cli`, share `weblingo`'s command line; `WebLingo.Templates.Tests` runs each page on both VMs, and `welp` end to end. Guessed, and recorded as Proposed in section 15.2 ("Pages"): a `<%#` block, which holds no code, ends at its first `%>`; a line of several statement or comment blocks, and spaces, writes nothing too; a block without its `%>` is WL5001, the first of the templates' range, and `<%= %>` without an expression WL1001; a page takes parameters (`welp run page.wlp name=value`) and imports modules, as a script does. A consequence of A1 worth knowing: `<% // a note %>` comments out its own `%>`, so the page's text after it is read as code, and reported as such. Checks: the Release build, without warnings, the full test suite, and both command lines on the samples and on a page, on Windows only; Linux not tried.

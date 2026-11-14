@@ -88,18 +88,6 @@ A16: (a).
 
 2026-11-14: those are done, and the module system it needs too; split into the parts the specification defines in section 9 ("M0.12 parts"), each a task below. Waits for them.
 
-## [WORKING] M0.12.1: Pages
-
-`.wlp` pages: their text, `<% … %>`, `<%= … %>`, `<%- … %>` and `<%# … %>`, statements across blocks, escaping, `null` and line breaks, compiled through the WebLingo compiler into a program that writes the page, in `WebLingo.Templates`, with `WebLingo.Templates.Tests`, and `welp run page.wlp` in `WebLingo.Pages.Cli` (specification, section 13, "Contracts", and section 9, M0.12.1), on both VMs. Added by Claude, 2026-11-14.
-
-Its syntax needs one decision first, which section 13 leaves open; answerable with a letter.
-
-**Q1, `%>` inside a block's code, in a string or a comment (`<% var end = "%>"; %>`): (a) it ends the block wherever it stands, as in classic ASP, a string writing it as `"%" + ">"`; (b) the template compiler reads a block's code as WebLingo's tokens, so that `%>` in a string or a comment does not end it.**
-
-A1: (b)
-
-Done (Claude, 2026-11-14): A1 recorded as approved in the specification, section 13 ("Contracts", "A block's end"), and its decision register. A page is read by `WebLingoTemplateParser` into the WebLingo parser's tokens, and compiled by `WebLingoTemplateCompiler`, for either VM; `welp run`, `welp check` and `welp --version`, in `WebLingo.Pages.Cli`, share `weblingo`'s command line; `WebLingo.Templates.Tests` runs each page on both VMs, and `welp` end to end. Guessed, and recorded as Proposed in section 15.2 ("Pages"): a `<%#` block, which holds no code, ends at its first `%>`; a line of several statement or comment blocks, and spaces, writes nothing too; a block without its `%>` is WL5001, the first of the templates' range, and `<%= %>` without an expression WL1001; a page takes parameters (`welp run page.wlp name=value`) and imports modules, as a script does. A consequence of A1 worth knowing: `<% // a note %>` comments out its own `%>`, so the page's text after it is read as code, and reported as such. Checks: the Release build, without warnings, the full test suite, and both command lines on the samples and on a page, on Windows only; Linux not tried.
-
 ## M0.12.2: Includes
 
 `<% include "/includes/header.wlp"; %>`, textual, resolved and compiled with the page, a cycle of them an error of the templates' range, WL5001 on (specification, section 13, "Contracts", and section 9, M0.12.2), on both VMs. Added by Claude, 2026-11-14.
