@@ -66,6 +66,34 @@ public sealed class WebLingoBinder
     private ClassContext? _class;
 
     /// <summary>
+    /// The property whose getter or setter is being bound, where <c>field</c> is its own field (section 3.7): an
+    /// instance's hidden field, or its class's for a static property, named <c>field:name</c>.
+    /// </summary>
+    private Accessor? _accessor;
+
+    /// <summary>A property's getter or setter being bound: its property, whether it is static, its class, and the scope around it.</summary>
+    private sealed record Accessor(string Property, bool IsStatic, WebLingoLocalSymbol? Class, Scope Outer);
+
+    private static bool IsAccessor(string name) =>
+        name.StartsWith("get:", StringComparison.Ordinal) || name.StartsWith("set:", StringComparison.Ordinal);
+
+    /// <summary>A member's name as a program writes it: a getter's or a setter's, its property's.</summary>
+    private static string MemberName(string name) => IsAccessor(name) ? name[4..] : name;
+
+    /// <summary>
+    /// Adds a member's name to its class's, or its extension's, false for one declared there already: a property's name
+    /// is a method's or a field's too, and a property has one getter and one setter (section 3.7).
+    /// </summary>
+    private static bool AddMemberName(HashSet<string> names, string name)
+    {
+        if (!IsAccessor(name)) return !names.Contains("property:" + name) && names.Add(name);
+        var property = name[4..];
+        if (names.Contains(property) || !names.Add(name)) return false;
+        names.Add("property:" + property);
+        return true;
+    }
+
+    /// <summary>
     /// What <c>this</c> names in a static method or a static field's value: nothing, rather than an outer method's
     /// <c>this</c> (section 3.7). It is never a local of a function.
     /// </summary>
@@ -467,6 +495,16 @@ public sealed class WebLingoBinder
                     Report(WebLingoDiagnosticCodes.JumpOutOfFinally,
                         "'return' would leave a 'finally' block, which nothing may leave early.", statement.Span);
                 }
+                if (_function.SetterValue is { } assigned)
+                {
+                    // A setter gives the value assigned (section 3.7).
+                    if (value is not null)
+                    {
+                        Report(WebLingoDiagnosticCodes.UnexpectedToken, "A setter's 'return' gives no value: an assignment's value is the value assigned.",
+                            statement.Span);
+                    }
+                    value = Reference(assigned, statement.Span);
+                }
                 return new WebLingoBoundReturn(value, statement.Span);
             }
             case WebLingoTrySyntax tryStatement:
@@ -608,12 +646,14 @@ public sealed class WebLingoBinder
                 method = method with { Body = method.Body with { Statements = [superCall, .. method.Body.Statements] } };
             }
             _class = new ClassContext(local, hasBase, isConstructor);
+            _accessor = IsAccessor(method.Name) ? new Accessor(method.Name[4..], false, local, _scope) : null;
             var function = BindFunction(isConstructor ? declaration.Name : method.Name, method.Parameters, method.Body,
                 method.Span, isMethod: true, isAsync: method.IsAsync);
-            _class = outerClass;
-            if (!names.Add(method.Name))
+            (_class, _accessor) = (outerClass, null);
+            if (!AddMemberName(names, method.Name))
             {
-                Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{method.Name}' is already declared in this class.", method.NameSpan);
+                Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{MemberName(method.Name)}' is already declared in this class.",
+                    method.NameSpan);
                 continue;
             }
             if (isConstructor) constructor = function;
@@ -623,18 +663,19 @@ public sealed class WebLingoBinder
         var fields = new List<(string, WebLingoBoundExpression, WebLingoSourceSpan)>();
         foreach (var field in staticFields)
         {
-            if (staticNames.Add(field.Name)) fields.Add(field);
+            if (AddMemberName(staticNames, field.Name)) fields.Add(field);
             else Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{field.Name}' is already declared in this class.", field.Span);
         }
         var staticMethods = new List<(string, WebLingoBoundFunction)>();
         foreach (var method in staticSyntax)
         {
             _class = null; // No 'super' in a static method.
+            _accessor = IsAccessor(method.Name) ? new Accessor(method.Name[4..], true, local, _scope) : null;
             var function = BindFunction(method.Name, method.Parameters, method.Body, method.Span, isStatic: true,
                 isAsync: method.IsAsync);
-            _class = outerClass;
-            if (staticNames.Add(method.Name)) staticMethods.Add((method.Name, function));
-            else Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{method.Name}' is already declared in this class.", method.NameSpan);
+            (_class, _accessor) = (outerClass, null);
+            if (AddMemberName(staticNames, method.Name)) staticMethods.Add((method.Name, function));
+            else Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{MemberName(method.Name)}' is already declared in this class.", method.NameSpan);
         }
         return new WebLingoBoundClass(declaration.Name, constructor, methods, declaration.Span)
         {
@@ -684,13 +725,14 @@ public sealed class WebLingoBinder
                 methodName = "dispose";
             }
             _class = method.IsStatic ? null : new ClassContext(null, false, false) { InExtension = true };
+            _accessor = IsAccessor(methodName) ? new Accessor(methodName[4..], method.IsStatic, null, _scope) : null;
             var function = method.IsStatic
                 ? BindFunction(methodName, method.Parameters, method.Body, method.Span, isStatic: true, isAsync: method.IsAsync)
                 : BindFunction(methodName, method.Parameters, method.Body, method.Span, isMethod: true, isAsync: method.IsAsync);
-            _class = outerClass;
-            if (!(method.IsStatic ? staticNames : names).Add(methodName))
+            (_class, _accessor) = (outerClass, null);
+            if (!AddMemberName(method.IsStatic ? staticNames : names, methodName))
             {
-                Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{methodName}' is already declared in this extension.",
+                Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{MemberName(methodName)}' is already declared in this extension.",
                     method.NameSpan);
                 continue;
             }
@@ -699,7 +741,7 @@ public sealed class WebLingoBinder
         var fields = new List<(string, WebLingoBoundExpression, WebLingoSourceSpan)>();
         foreach (var field in staticFields)
         {
-            if (staticNames.Add(field.Name)) fields.Add(field);
+            if (AddMemberName(staticNames, field.Name)) fields.Add(field);
             else Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{field.Name}' is already declared in this extension.", field.Span);
         }
         return new WebLingoBoundClass(name, null, methods, extension.Span) { StaticMethods = staticMethods, StaticFields = fields };
@@ -726,7 +768,17 @@ public sealed class WebLingoBinder
             Declare(parameter.Name, WebLingoDeclarationKind.Parameter, parameter.Span, null);
         }
         _scope = new Scope(_scope, _function); // The body may declare a name its parameters have, shadowing it.
+        // A setter gives the value assigned, which the assignment's value is, whatever its body does with its parameter.
+        var setterParameter = name.StartsWith("set:", StringComparison.Ordinal) && parameters.Count == 1
+            ? _function.Locals[^1]
+            : null;
+        if (setterParameter is not null) _function.SetterValue = DeclareHidden("assigned", span);
         var statements = BindStatements(body.Statements);
+        if (_function.SetterValue is { } assigned)
+        {
+            statements.Insert(0, new WebLingoBoundVariableDeclaration(assigned, Reference(setterParameter!, span), span));
+            statements.Add(new WebLingoBoundReturn(Reference(assigned, span), span));
+        }
         var bound = new WebLingoBoundFunction(name, parameters.Count + (isMethod ? 1 : 0), _function.Locals, _function.Captures,
             statements, span)
         {
@@ -903,6 +955,11 @@ public sealed class WebLingoBinder
 
     private WebLingoBoundExpression BindName(WebLingoNameSyntax name)
     {
+        if (name.Name == "field" && _accessor is { } accessor && !DeclaresField(accessor) && AccessorOwner(accessor, name.Span) is { } owner)
+        {
+            // A property's own field, null until its accessors give it a value (section 3.7).
+            return new WebLingoBoundMember(owner, "field:" + accessor.Property, name.Span) { IsOptional = true };
+        }
         if (LookupLocal(name.Name) is { } local)
         {
             // A name an import takes is its module's export, read as it is when read (section 3.9).
@@ -913,6 +970,26 @@ public sealed class WebLingoBinder
         if (_hostBuiltins.TryGetValue(name.Name, out var builtin)) return new WebLingoBoundBuiltinReference(UseBuiltin(builtin), name.Span);
         Report(WebLingoDiagnosticCodes.UndefinedIdentifier, $"'{name.Name}' is not defined.", name.Span);
         return new WebLingoBoundError(name.Span);
+    }
+
+    /// <summary>What holds a property's own field: the instance, or, for a static property, its class (section 3.7).</summary>
+    /// <summary>
+    /// Whether a variable named <c>field</c> is declared in the accessor being bound, which then means it there, in place
+    /// of its property's field; one declared around the property does not reach into it (section 3.7).
+    /// </summary>
+    private bool DeclaresField(Accessor accessor)
+    {
+        for (var scope = _scope; scope is not null && scope != accessor.Outer; scope = scope.Parent)
+        {
+            if (scope.Locals.ContainsKey("field")) return true;
+        }
+        return false;
+    }
+
+    private WebLingoBoundExpression? AccessorOwner(Accessor accessor, WebLingoSourceSpan span)
+    {
+        if (accessor.IsStatic) return accessor.Class is { } classLocal ? Reference(classLocal, span) : null;
+        return LookupLocal("this") is { } self && !ReferenceEquals(self, _noThis) ? Reference(self, span) : null;
     }
 
     /// <summary>A local read where it is: in its own function, or through this function's capture of it.</summary>
@@ -940,6 +1017,11 @@ public sealed class WebLingoBinder
     {
         var value = BindExpression(assignment.Value);
         var target = assignment.Target;
+        if (target.Name == "field" && _accessor is { } accessor && !DeclaresField(accessor)
+            && AccessorOwner(accessor, target.Span) is { } owner)
+        {
+            return new WebLingoBoundMemberAssignment(owner, "field:" + accessor.Property, value, assignment.Span);
+        }
         var local = LookupLocal(target.Name);
         if (local is null)
         {
@@ -1157,6 +1239,8 @@ public sealed class WebLingoBinder
         public bool Awaits { get; set; }
         /// <summary>Whether it is a file's top level, an imported module's (section 3.9), where <c>return</c> may not stand.</summary>
         public bool IsUnit { get; init; }
+        /// <summary>For a setter: the local holding the value assigned, which it gives (section 3.7).</summary>
+        public WebLingoLocalSymbol? SetterValue { get; set; }
         /// <summary>The hidden locals of the <c>catch</c> blocks being bound, innermost last, which <c>throw;</c> throws from.</summary>
         public List<(WebLingoLocalSymbol Value, WebLingoLocalSymbol Origin)> Catches { get; } = [];
         /// <summary>The loop depth where each <c>finally</c> block being bound begins, innermost last (WL2012).</summary>

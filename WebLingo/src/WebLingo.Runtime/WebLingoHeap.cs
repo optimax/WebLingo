@@ -147,6 +147,20 @@ public sealed class WebLingoHeap
             inherited = baseObject.DisposeChain;
         }
         foreach (var (name, closure) in target.OwnMethods) methods[name] = closure;
+        // Its properties' getters and setters, by the property's name, so that a member's read or assignment finds one
+        // without making a name (section 3.7).
+        target.Getters = target.Setters = null;
+        foreach (var (name, closure) in methods)
+        {
+            if (name.StartsWith("get:", StringComparison.Ordinal))
+            {
+                (target.Getters ??= new Dictionary<string, WebLingoValue>(StringComparer.Ordinal))[name[4..]] = closure;
+            }
+            else if (name.StartsWith("set:", StringComparison.Ordinal))
+            {
+                (target.Setters ??= new Dictionary<string, WebLingoValue>(StringComparer.Ordinal))[name[4..]] = closure;
+            }
+        }
         // Its disposal: its own dispose method, if it has one, then its base's disposal (section 3.7).
         var disposeChain = inherited;
         if (target.OwnMethods.TryGetValue("dispose", out var own))
@@ -570,6 +584,43 @@ public sealed class WebLingoHeap
     /// <summary>A class's constructor's closure, or <c>null</c> if it has none.</summary>
     public WebLingoValue ClassConstructor(WebLingoValue value) => Get<ClassObject>(value, WebLingoValueKind.Class).Constructor;
 
+    /// <summary>
+    /// A property's getter, or its <paramref name="setter"/>, of a class's instances, its own or a base's (section 3.7);
+    /// false at once for a class that has none.
+    /// </summary>
+    public bool TryGetAccessor(WebLingoValue classValue, bool setter, string name, out WebLingoValue closure)
+    {
+        var target = Current(Get<ClassObject>(classValue, WebLingoValueKind.Class));
+        closure = WebLingoValue.Null;
+        return (setter ? target.Setters : target.Getters) is { } accessors && accessors.TryGetValue(name, out closure);
+    }
+
+    /// <summary>What assigning <c>x.name</c> meets on the class of <c>x</c> (section 3.7).</summary>
+    public enum Assignee : byte
+    {
+        /// <summary>None of its members: a field.</summary>
+        Field,
+        /// <summary>A method, which cannot be assigned.</summary>
+        Method,
+        /// <summary>A property's setter, which the assignment calls.</summary>
+        Setter,
+        /// <summary>A property with only a getter, which cannot be assigned.</summary>
+        ReadOnly
+    }
+
+    /// <summary>
+    /// What assigning <c>x.name</c> meets on a class's value, its own members or a base's (section 3.7), with the
+    /// class looked up once: a method, a property's <paramref name="setter"/>, a property without one, or a field.
+    /// </summary>
+    public Assignee FindAssignee(WebLingoValue classValue, string name, out WebLingoValue setter)
+    {
+        var target = Current(Get<ClassObject>(classValue, WebLingoValueKind.Class));
+        setter = WebLingoValue.Null;
+        if (target.Methods.ContainsKey(name)) return Assignee.Method;
+        if (target.Setters is { } setters && setters.TryGetValue(name, out setter)) return Assignee.Setter;
+        return target.Getters is { } getters && getters.ContainsKey(name) ? Assignee.ReadOnly : Assignee.Field;
+    }
+
     /// <summary>A method's closure, by its name, from a class.</summary>
     public bool TryGetMethod(WebLingoValue value, string name, out WebLingoValue closure) =>
         Current(Get<ClassObject>(value, WebLingoValueKind.Class)).Methods.TryGetValue(name, out closure);
@@ -978,6 +1029,9 @@ public sealed class WebLingoHeap
         public bool IsValueClass { get; set; }
         /// <summary>Whether its constructor is the one a class declaring none gets, which only runs its base's.</summary>
         public bool DefaultConstructor { get; init; }
+        /// <summary>Its properties' getters and setters, its own and its bases', by the property's name; null for none (section 3.7).</summary>
+        public Dictionary<string, WebLingoValue>? Getters { get; set; }
+        public Dictionary<string, WebLingoValue>? Setters { get; set; }
         public Dictionary<string, WebLingoValue> StaticMethods { get; init; } = new(StringComparer.Ordinal);
         public Dictionary<string, WebLingoValue> StaticFields { get; init; } = new(StringComparer.Ordinal);
     }

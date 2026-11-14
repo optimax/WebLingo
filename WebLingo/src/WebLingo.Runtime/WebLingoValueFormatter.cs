@@ -148,7 +148,7 @@ public static class WebLingoValueFormatter
             else if (collection.Kind == WebLingoValueKind.Instance)
             {
                 var (name, value) = heap.FieldAt(collection, next);
-                text.Append(name).Append(": ");
+                text.Append(name.StartsWith("field:", StringComparison.Ordinal) ? name[6..] : name).Append(": ");
                 item = value;
             }
             else

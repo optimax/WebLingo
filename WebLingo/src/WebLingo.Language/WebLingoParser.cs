@@ -275,6 +275,50 @@ public sealed class WebLingoParser : IWebLingoParser
                     continue;
                 }
             }
+            if (Current is { Kind: WebLingoTokenKind.Identifier, Text: "property" } && Peek(1).Kind == WebLingoTokenKind.Identifier
+                && Peek(2).Kind == WebLingoTokenKind.OpenBrace)
+            {
+                // property name { get { … } set(value) { … } }: a getter and a setter, methods named get:name and
+                // set:name, which no program can name otherwise (section 3.7).
+                Advance();
+                var property = Advance();
+                Advance();
+                var accessors = 0;
+                while (Current is { Kind: WebLingoTokenKind.Identifier, Text: "get" or "set" })
+                {
+                    var accessor = Advance();
+                    accessors++;
+                    if (!EnterRecursion()) return Made();
+                    try
+                    {
+                        IReadOnlyList<WebLingoParameterSyntax> accessorParameters = [];
+                        WebLingoBlockSyntax? accessorBody;
+                        if (accessor.Text == "set")
+                        {
+                            (accessorParameters, accessorBody) = ParseFunctionRest();
+                            if (accessorParameters.Count != 1 && !_statementHasError)
+                            {
+                                Report(WebLingoDiagnosticCodes.UnexpectedToken, "A setter takes one parameter, the value assigned.",
+                                    accessor.Span);
+                            }
+                        }
+                        else
+                        {
+                            accessorBody = ParseRequiredBlock("'{', which begins the getter");
+                        }
+                        if (accessorBody is null) return Made();
+                        methods.Add(new WebLingoMethodSyntax(accessor.Text + ":" + property.Text, property.Span, accessorParameters,
+                            accessorBody, SpanFrom(memberStart)) { IsStatic = isStatic });
+                    }
+                    finally
+                    {
+                        _recursionDepth--;
+                    }
+                }
+                if (accessors == 0 && !_statementHasError) ReportUnexpected("'get' or 'set'");
+                Expect(WebLingoTokenKind.CloseBrace, "'}'");
+                continue;
+            }
             if (isStatic && Current is { Kind: WebLingoTokenKind.Identifier, Text: "operator" } && IsOperator(Peek(1).Kind))
             {
                 // static operator +(a, b) { … }: what an operator does with the class's values (section 3.7).

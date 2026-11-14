@@ -118,6 +118,14 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var x = 5; extend x { }", "WL2001", 1, 19)]
     [InlineData("class E { static operator ==(a, b) { return true; } }", "WL1001", 1, 27)]
     [InlineData("class W { static operator +(a) { return 1; } }", "WL1001", 1, 27)]
+    [InlineData("class A { property a { } }", "WL1001", 1, 24)]
+    [InlineData("class A { property a { set() { } } }", "WL1001", 1, 24)]
+    [InlineData("class A { property a { set(x, y) { } } }", "WL1001", 1, 24)]
+    [InlineData("class A { property a { set(v) { return v; } } }", "WL1001", 1, 33)]
+    [InlineData("class A { property a { get { return 1; } get { return 2; } } }", "WL2002", 1, 20)]
+    [InlineData("class A { a() { return 1; } property a { get { return 1; } } }", "WL2002", 1, 38)]
+    [InlineData("class A { static var a = 1; static property a { get { return 1; } } }", "WL2002", 1, 45)]
+    [InlineData("extend Integer { static property a { get { return field; } } }", "WL2001", 1, 51)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -389,6 +397,20 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A { static var k = \"s\"; } var a = new A(); a.k = function () { return \"field\"; }; writeLn(a.k()); class S extends Array { static var size = 3; } writeLn(new S().size);", "field\n3")]
     [InlineData("class A { constructor(x, y = 2) { this.x = x; this.y = y; } } class B extends A {} class C extends B { m() { return 1; } } writeLn([new B(5).x, new C(1, 3).y, new C(1).y]);", "[5, 3, 2]")]
     [InlineData("class E extends Error {} var e = new E(\"bad\"); writeLn([e.message, e is Error]);", "[\"bad\", true]")]
+    [InlineData("class R { constructor(w, h) { this.w = w; this.h = h; } property area { get { return this.w * this.h; } } } var n = null; writeLn([new R(2, 3).area, n?.area, new R(1, 1)?.area]);", "[6, null, 1]")]
+    [InlineData("class T { property v { get { return field; } set(value) { field = value; } } } var t = new T(); var before = t.v; t.v = 20; writeLn([before, t.v, t]);", "[null, 20, T {v: 20}]")]
+    [InlineData("class D { property v { get { return field; } set(value) { field = value * 2; } } } var d = new D(); var a = d.v = 5; writeLn([a, d.v, d.v = 1]);", "[5, 10, 1]")]
+    [InlineData("class T { property v { get { return field; } set(value) { field = value; } } } var t = new T(); for (var i = 0; i < 1000; i = i + 1) { t.v = i; } writeLn(t.v);", "999")]
+    [InlineData("class S { static var n = 3; static property count { get { return S.n * 2; } set(v) { S.n = v; } } } S.count = 10; writeLn([S.count, S.n]);", "[20, 10]")]
+    [InlineData("class K { static property total { get { return field; } set(v) { field = v; } } } K.total = 4; writeLn([K.total, K.total = 5]);", "[4, 5]")]
+    [InlineData("class B { property v { get { return 1; } } } class C extends B { property v { get { return super.v + 10; } } } class E extends B {} writeLn([new B().v, new C().v, new E().v]);", "[1, 11, 1]")]
+    [InlineData("class B { property v { get { return field; } } } class C extends B { property v { set(value) { field = value; } } } var c = new C(); c.v = 3; writeLn(c.v);", "3")]
+    [InlineData("extend Integer { property doubled { get { return this * 2; } } } class P { constructor() { this.x = 1; } } extend P { property twice { get { return this.x * 2; } } } writeLn([4.doubled, new P().twice]);", "[8, 2]")]
+    [InlineData("class X { property v { set(value) { throw \"bad\"; } } } var x = new X(); var r = 0; for (var i = 0; i < 3; i = i + 1) { try { x.v = i; } catch (e) { r = r + 1; } } writeLn(r);", "3")]
+    [InlineData("class G { property a { get { this.b = 5; return this.b; } } property b { get { return field; } set(value) { field = value + 1; } } } writeLn(new G().a);", "6")]
+    [InlineData("class Celsius extends Number { property kelvin { get { return this + 273.0; } } } writeLn(new Celsius(1.5).kelvin);", "Celsius:274.5")]
+    [InlineData("var field = 9; class F { property a { get { return field; } set(value) { var field = value; } } } var f = new F(); f.a = 1; writeLn([f.a, field]);", "[null, 9]")]
+    [InlineData("class A { property() { return 1; } } var property = 2; writeLn([new A().property(), property]);", "[1, 2]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -543,6 +565,12 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class N { static operator +(a, b) { return 1; } } writeLn(-new N());", "WL3001")]
     [InlineData("class A {} class B extends A {} new B(1);", "WL2006")]
     [InlineData("class A { constructor() {} } class B extends A {} new B(1);", "WL2006")]
+    [InlineData("class R { property a { get { return 1; } } } new R().a = 2;", "WL3001")]
+    [InlineData("class R { property a { set(v) { } } } writeLn(new R().a);", "WL3006")]
+    [InlineData("class R { property a { get { return 1; } } } new R().a();", "WL3001")]
+    [InlineData("class S { static property a { get { return 1; } } } S.a = 2;", "WL3001")]
+    [InlineData("class S { static property a { get { return 1; } } } S.a();", "WL3001")]
+    [InlineData("class S { static property a { set(v) { } } } writeLn(S.a);", "WL3006")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

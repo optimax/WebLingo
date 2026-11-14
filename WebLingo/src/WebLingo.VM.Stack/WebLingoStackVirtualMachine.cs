@@ -462,6 +462,7 @@ public sealed class WebLingoStackVirtualMachine
                             var name = names[ins.A];
                             if (!WebLingoMembers.TryGet(slots[sp - 1], name.Member, name.Text, heap, ins.B != 0, out var member, out error))
                             {
+                                sp = PendAccessor(error, member, slots[sp - 1], slots, sp, 1, false);
                                 break;
                             }
                             slots[sp - 1] = member;
@@ -471,7 +472,12 @@ public sealed class WebLingoStackVirtualMachine
                         case WebLingoStackOpCode.SetMember:
                         {
                             var value = slots[sp - 1];
-                            if (!WebLingoMembers.TrySet(slots[sp - 2], names[ins.A].Text, value, heap, out error)) break;
+                            if (!WebLingoMembers.TrySet(slots[sp - 2], names[ins.A].Text, value, heap, out error, out callee))
+                            {
+                                // A setter gives the value assigned, which an assignment whose value is not kept drops.
+                                sp = PendAccessor(error, callee, slots[sp - 2], slots, sp, 2, ins.B == 0);
+                                break;
+                            }
                             sp -= 2;
                             if (ins.B == 1) slots[sp++] = value;
                             pc++;
@@ -496,7 +502,7 @@ public sealed class WebLingoStackVirtualMachine
                             if (target.Kind is WebLingoValueKind.Class or WebLingoValueKind.Module)
                             {
                                 // A static member, called as any function is (section 3.7).
-                                if (!WebLingoMembers.TryGet(target, name.Member, name.Text, heap, false, out callee, out error)) break;
+                                if (!WebLingoMembers.TryGetStaticCallee(target, name.Member, name.Text, heap, out callee, out error)) break;
                                 self = WebLingoValue.Null;
                                 firstArgument = first;
                                 argumentCount = ins.B;
@@ -580,6 +586,7 @@ public sealed class WebLingoStackVirtualMachine
                         {
                             if (!WebLingoMembers.TryGetSuper(slots[sp - 2], slots[sp - 1], names[ins.A].Text, heap, out var bound, out error))
                             {
+                                sp = PendAccessor(error, bound, slots[sp - 1], slots, sp, 2, false);
                                 break;
                             }
                             sp--;
@@ -1105,7 +1112,10 @@ public sealed class WebLingoStackVirtualMachine
                         _operator = WebLingoValue.Null;
                         if (sp == slots.Length) slots = Grown(frame, slots);
                         sp = BelowOperands(slots, sp, _operatorCount, callee);
-                        self = WebLingoValue.Null;
+                        // Or another call it left here: a property's getter or setter, on its target.
+                        self = _pendingSelf;
+                        _pendingSelf = WebLingoValue.Null;
+                        if (_discards) frames = Discarding(frames, depth + 1);
                         firstArgument = sp - _operatorCount;
                         argumentCount = _operatorCount;
                         constructed = WebLingoValue.Null;
@@ -1115,6 +1125,7 @@ public sealed class WebLingoStackVirtualMachine
                     if (depth + 1 < frames.Length && frames[depth + 1] is { } unpushed)
                     {
                         unpushed.DisposeChain = null;
+                        unpushed.DiscardResult = false;
                         unpushed.Task = WebLingoValue.Null;
                         unpushed.Closure[3] = WebLingoValue.Null;
                         unpushed.FirstRun = false;
@@ -1432,6 +1443,45 @@ public sealed class WebLingoStackVirtualMachine
         {
             _operator = callee;
             _operatorCount = count;
+        }
+
+        /// <summary>What a pending call runs on, a property's target; and whether its result is dropped (section 3.7).</summary>
+        private WebLingoValue _pendingSelf;
+        private bool _discards;
+
+        /// <summary>
+        /// A property's getter, or its setter, that a member's read or assignment failed with
+        /// (<see cref="WebLingoMembers.Getter"/>, <see cref="WebLingoMembers.Setter"/>): pending, called on
+        /// <paramref name="self"/>, the operation's <paramref name="consumed"/> operands on top of the stack giving way
+        /// to the setter's argument, the value on top; the stack's new top, or its old one for another failure
+        /// (section 3.7).
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private int PendAccessor(WebLingoRuntimeError? error, WebLingoValue accessor, WebLingoValue self, WebLingoValue[] slots, int sp,
+            int consumed, bool discards)
+        {
+            var setter = ReferenceEquals(error, WebLingoMembers.Setter);
+            if (!setter && !ReferenceEquals(error, WebLingoMembers.Getter)) return sp;
+            Pend(accessor, setter ? 1 : 0);
+            _pendingSelf = self;
+            _discards = discards;
+            if (setter) slots[sp - consumed] = slots[sp - 1];
+            return sp - consumed + _operatorCount;
+        }
+
+        /// <summary>
+        /// Makes the frame at <paramref name="depth"/>, which the call about to be made runs in, drop its result: a
+        /// disposal with no methods left, which pushes nothing when it returns; the frames, grown if it is past them.
+        /// </summary>
+        private Frame[] Discarding(Frame[] frames, int depth)
+        {
+            _discards = false;
+            if (depth == frames.Length) Array.Resize(ref frames, frames.Length * 2);
+            var frame = frames[depth] ??= new Frame();
+            frame.DisposeChain = [];
+            frame.DisposeNext = 0;
+            frame.DiscardResult = true;
+            return frames;
         }
 
         /// <summary>The callee put below the call's operands on the stack, as a call's callee is, the stack one slot deeper.</summary>

@@ -438,6 +438,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             if (!WebLingoMembers.TryGet(registers[ins.B], name.Member, name.Text, heap, ins.D != 0, out var member,
                                     out error))
                             {
+                                PendAccessor(error, member, registers[ins.B], default, ins.A);
                                 break;
                             }
                             registers[ins.A] = member;
@@ -445,7 +446,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             continue;
                         }
                         case WebLingoOpCode.SetMember:
-                            if (!WebLingoMembers.TrySet(registers[ins.A], names[ins.B].Text, registers[ins.C], heap, out error)) break;
+                            if (!WebLingoMembers.TrySet(registers[ins.A], names[ins.B].Text, registers[ins.C], heap, out error, out callee))
+                            {
+                                // A setter gives the value assigned, which its result, written where the value is, keeps.
+                                PendAccessor(error, callee, registers[ins.A], registers[ins.C], ins.C);
+                                break;
+                            }
                             pc++;
                             continue;
                         case WebLingoOpCode.CallMethod:
@@ -468,7 +474,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             if (target.Kind is WebLingoValueKind.Class or WebLingoValueKind.Module)
                             {
                                 // A static member, called as any function is (section 3.7).
-                                if (!WebLingoMembers.TryGet(target, name.Member, name.Text, heap, false, out callee, out error)) break;
+                                if (!WebLingoMembers.TryGetStaticCallee(target, name.Member, name.Text, heap, out callee, out error)) break;
                                 self = WebLingoValue.Null;
                                 arguments = registers;
                                 firstArgument = ins.C + 1;
@@ -554,6 +560,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             if (!WebLingoMembers.TryGetSuper(registers[ins.B], registers[ins.C], names[ins.D].Text, heap, out var bound,
                                     out error))
                             {
+                                PendAccessor(error, bound, registers[ins.C], default, ins.A);
                                 break;
                             }
                             registers[ins.A] = bound;
@@ -1051,10 +1058,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 failed:
                     if (_operator.Kind == WebLingoValueKind.Function)
                     {
-                        // A class's operator, which the operation found: called with its two operands (section 3.7).
+                        // A class's operator, which the operation found: called with its two operands (section 3.7); or
+                        // another call it left here, a property's getter or setter on its target.
                         callee = _operator;
                         _operator = WebLingoValue.Null;
-                        self = WebLingoValue.Null;
+                        self = _pendingSelf;
+                        _pendingSelf = WebLingoValue.Null;
                         arguments = _operands;
                         firstArgument = 0;
                         argumentCount = _operatorCount;
@@ -1386,6 +1395,24 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             _operator = callee;
             _operatorCount = count;
             _operatorResult = result;
+        }
+
+        /// <summary>What a pending call runs on: a property's target (section 3.7).</summary>
+        private WebLingoValue _pendingSelf;
+
+        /// <summary>
+        /// A property's getter, or its setter, with <paramref name="value"/>, that a member's read or assignment failed
+        /// with (<see cref="WebLingoMembers.Getter"/>, <see cref="WebLingoMembers.Setter"/>): pending, called on the
+        /// property's target, its result going to <paramref name="result"/> (section 3.7); nothing for another failure.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void PendAccessor(WebLingoRuntimeError? error, WebLingoValue accessor, WebLingoValue self, WebLingoValue value, int result)
+        {
+            var setter = ReferenceEquals(error, WebLingoMembers.Setter);
+            if (!setter && !ReferenceEquals(error, WebLingoMembers.Getter)) return;
+            Pend(accessor, setter ? 1 : 0, result);
+            _operands[0] = value;
+            _pendingSelf = self;
         }
 
         /// <summary>The name of the operator a class may declare for an operation, or null for one it may not.</summary>

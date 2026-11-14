@@ -99,7 +99,7 @@ public sealed class WebLingoTextBuilder
             else if (collection.Kind == WebLingoValueKind.Instance)
             {
                 var (name, value) = _heap.FieldAt(collection, next);
-                _text.Append(name).Append(": ");
+                _text.Append(name.StartsWith("field:", StringComparison.Ordinal) ? name[6..] : name).Append(": ");
                 item = value;
             }
             else

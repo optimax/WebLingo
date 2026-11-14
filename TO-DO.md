@@ -18,7 +18,7 @@
 
 2026-11-13: waits for the design of "Building Classes at Run Time".
 
-## [QUESTION] Building Classes at Run Time
+## Building Classes at Run Time
 
 `new Class()`, which a program names and gives methods while it runs, after which it acts as a declared class does (A9 of "Classes of Values, Extensions", and A5 of "Classes of Values, Extensions, Continued": design it now, with what "Adding Methods at Run Time" describes, and `extends Class`). One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
 
@@ -40,7 +40,7 @@ A4: (a)
 
 **Q5, `extends Class`: (a) WL3001 still, `new Class(…)` being how a program makes a class; (b) a class extending `Class` makes classes, `new Meta("Point")`, its methods becoming theirs as static ones, as a metaclass does.**
 
-A5:
+A5: We need to be careful here. Let's fully lay out how this might work. Create an example of a class created programmatically at run time, with a method being added to it, a static method, a field, a static field, a property (get, set), a static property (get, set), and a const. Then create an instance of this class and call all its members to exercise them.
 
 ## [QUESTION] Task Combinators
 
@@ -52,19 +52,19 @@ A5:
 
 **Q1, `Task.all(values)`, an array of values, tasks or not, gives a task that completes with an array of their results, in their order, once all have; when one faults: (a) it faults at once with that exception, as JavaScript's `Promise.all` does, the others going on, observed; (b) once all are done, with the first exception in their order.**
 
-A1:
+A1: (a)
 
 **Q2, `Task.any(values)`: (a) the first to complete, with its result, or faulting with its exception (JavaScript's `Promise.race`); (b) the first to complete with a result, faulting only if all fault, with an error holding their exceptions (JavaScript's `Promise.any`).**
 
-A2:
+A2: (a). Is `Task` and `Promise` essentially the same thing?
 
 **Q3, a timeout: (a) `Task.timeout(task, milliseconds)`, a task that gives the task's result, or faults with a `TimeoutError` (a new class extending `Error`, with a code of its own) if it takes longer, the task itself going on; (b) the same as a method of tasks, `t.timeout(milliseconds)`.**
 
-A3:
+A3: (a)
 
 **Q4, where they live: (a) static methods of `Task`, as section 3.8 names them; (b) a standard module, `std:tasks`, once modules exist.**
 
-A4:
+A4: (a) in module `std:tasks`, once it exists, so both (a) and (b) I guess.
 
 ## [QUESTION] Modules, Quoted Parameters
 
@@ -72,7 +72,7 @@ A6 of "Modules, Continued" asked whether a shell removes the quotes of `value="1
 
 **Q1, a parameter given as a string when it looks like another literal: (a) quotes, as A8 has it, which a shell must be asked to keep (`'value="10"'` in bash), and which Windows PowerShell 5.1 cannot pass; (b) a flag before it, `weblingo run script.wl --string value=10`; (c) every parameter a string, which the script converts itself (`new Integer(value)`).**
 
-A1:
+A1: (c)
 
 ## [IDLE] Modules
 
@@ -94,11 +94,11 @@ The module system: `import`, static and dynamic, `export`, `param`, a script's p
 
 **Q1, a module imported again with other values, `import a from "box" { size: 1 };` here and `{ size: 2 }` there: (a) it runs once, with the values of the import that ran it first, a later import's values unused, as "once per execution" has it; (b) it runs once for each set of values, each import with other values getting an instance of its own, as a template's component is rendered once per call; (c) an error, a module with parameters being imported once.**
 
-A1:
+A1: (b). It looks to me like a sneaky way of introducing generics (the same module instantiated iwth different parameters).
 
 **Q2, an import's values: (a) a map literal only, `{ size: 10 }`, whose names the compiler checks against the module's parameters, a missing or an extra one an error at compile time (a new code, WL2016); (b) any expression giving a map, checked when the import runs.**
 
-A2:
+A2: (a) for static imports, (b) for dynamic.
 
 ## [QUESTION] Modules: Dynamic Imports
 
@@ -110,7 +110,7 @@ A2:
 
 **Q1, when to build the VMs' linking of a module compiled while the program runs: (a) now, as this part, before the standard modules and properties; (b) with M0.12's components, which need it too, dynamic imports landing with them.**
 
-A1:
+A1: (a)
 
 ## [IDLE] Modules: A Script's Parameters
 
@@ -210,7 +210,7 @@ A follow-up to "Static Members Callable on Instances". Added by Claude, 2026-11-
 
 **Q1, `p.count = 5`, where `count` is a static field of `p`'s class: (a) it assigns a field of the instance, which then shadows the static, as built; (b) it assigns the static field, as Java does.**
 
-A1:
+A1: (b) if the static field already exists.
 
 ## [DEFER] Adding Methods at Run Time
 
@@ -245,7 +245,7 @@ If text that rebuilds a value (round-trip text) is wanted, it is a serialization
 
 It is deferred: nothing needs it yet, and it can be added later, if it proves necessary, without changing `write`'s text or any program.
 
-## [IDLE] Properties
+## [WORKING] Properties
 
 With getters and setters.
 
@@ -272,6 +272,8 @@ Q5, text: `write` writes an instance's fields, as now, and not its properties, w
 A5: Yes. That's what toString() overriding is for. How would it write the `field` of a property though? Presumably as property name.
 
 2026-11-14 (Claude): answered, and recorded as approved in the specification, section 3.7 ("Properties"), A5's `field` written under the property's name, as A5 presumes. The implementation, on both VMs, waits behind the tasks above it.
+
+Done (Claude, 2026-11-14): on both VMs, with conformance tests; the choices the answers leave open are recorded as Proposed in the specification, section 15.2 ("Properties"), among them that a static property is reached through its class only, while "Static Members Through Instances, Continued" is open, and that a variable named `field` declared around a property does not reach into its accessors. The specification's section 3.7 wrote WS3001 and WS3006 for this task, and section 3.9 WS3001, which the renaming had missed: now WL3001 and WL3006. Checks: the Release build, without warnings, the 1,605 tests, the benchmark against `main`'s (no workload slower beyond the machine's noise, `objects` within 0.2 percent on both VMs, once an assignment looked its class up once), and the CLI on the samples, on Windows only; Linux not tried.
 
 ## [QUESTION] Native Code Extensions
 

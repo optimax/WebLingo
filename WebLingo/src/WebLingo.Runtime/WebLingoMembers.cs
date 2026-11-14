@@ -39,6 +39,29 @@ public static class WebLingoMembers
     /// <c>null</c> for a <c>null</c> target or a member it does not have (section 3.7). An instance's field is its
     /// value, and its method a function bound to it.
     /// </summary>
+    /// <summary>
+    /// What <see cref="TryGet"/> fails with when the member is a property's getter, given as its result, which the VM
+    /// calls on the target (section 3.7); <see cref="Setter"/>, what <see cref="TrySet"/> fails with for its setter.
+    /// </summary>
+    public static readonly WebLingoRuntimeError Getter = new(WebLingoDiagnosticCodes.InvalidOperation, "A property's getter, to call.");
+    public static readonly WebLingoRuntimeError Setter = new(WebLingoDiagnosticCodes.InvalidOperation, "A property's setter, to call.");
+
+    /// <summary>A property read on a class's instance: its getter, or WL3006 for one that has only a setter (section 3.7).</summary>
+    private static bool TryGetProperty(WebLingoValue target, WebLingoValue classValue, string name, WebLingoHeap heap,
+        out WebLingoValue getter, out WebLingoRuntimeError? error)
+    {
+        error = null;
+        if (heap.TryGetAccessor(classValue, false, name, out getter))
+        {
+            error = Getter;
+            return true;
+        }
+        if (!heap.TryGetAccessor(classValue, true, name, out _)) return false;
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.NoSuchMember,
+            $"'{name}' of {WebLingoValueFormatter.Describe(target, heap)} can only be assigned: its property has no getter.");
+        return true;
+    }
+
     public static bool TryGet(WebLingoValue target, WebLingoMember member, string name, WebLingoHeap heap, bool optional, out WebLingoValue result,
         out WebLingoRuntimeError? error)
     {
@@ -59,6 +82,7 @@ public static class WebLingoMembers
                 return heap.TryAllocateBoundMethod(target, classMethod, out result, out error);
             }
             if (heap.TryGetStatic(collectionClass, name, out result)) return true;
+            if (TryGetProperty(target, collectionClass, name, heap, out result, out error)) return false;
         }
         if (target.Kind == WebLingoValueKind.Instance)
         {
@@ -70,6 +94,7 @@ public static class WebLingoMembers
             }
             // Its class's static member, which its own members shadow (section 3.7).
             if (heap.TryGetStatic(heap.ClassOf(target), name, out result)) return true;
+            if (TryGetProperty(target, heap.ClassOf(target), name, heap, out result, out error)) return false;
             // An instance holding a value has that value's members too, its string's length (section 3.7).
             if (heap.IsHolding(target)) return TryGet(heap.Held(target), member, name, heap, optional, out result, out error);
             if (optional) return true;
@@ -100,6 +125,12 @@ public static class WebLingoMembers
             // A static member, the class's own or its base's (section 3.7).
             error = null;
             if (heap.TryGetStatic(target, name, out result)) return true;
+            if (heap.TryGetStatic(target, "get:" + name, out result) && result.Kind == WebLingoValueKind.Function)
+            {
+                // A static property's getter, which the VM calls (section 3.7).
+                error = Getter;
+                return false;
+            }
             if (TryGetValueMethod(target, member, name, heap, out var objectToString))
             {
                 return heap.TryAllocateBoundMethod(target, objectToString, out result, out error);
@@ -112,6 +143,11 @@ public static class WebLingoMembers
         {
             // Every value has Object's toString() and equal(), and its kind's class's extensions (section 3.7).
             return heap.TryAllocateBoundMethod(target, objectMethod, out result, out error);
+        }
+        if (ExtendedClassOf(target, heap) is { Kind: WebLingoValueKind.Class } valueClass
+            && TryGetProperty(target, valueClass, name, heap, out result, out error))
+        {
+            return false; // Its kind's class's property, which an extension gave it (section 3.7).
         }
         if (target.Kind == WebLingoValueKind.String && member == WebLingoMember.Length)
         {
@@ -153,8 +189,17 @@ public static class WebLingoMembers
     /// own or its base's, which it declares (WL3006 otherwise; section 3.7). A method's name is not a field's, and
     /// nothing else has fields to assign (WL3001).
     /// </summary>
-    public static bool TrySet(WebLingoValue target, string name, WebLingoValue value, WebLingoHeap heap, out WebLingoRuntimeError? error)
+    public static bool TrySet(WebLingoValue target, string name, WebLingoValue value, WebLingoHeap heap, out WebLingoRuntimeError? error) =>
+        TrySet(target, name, value, heap, out error, out _);
+
+    /// <summary>
+    /// <see cref="TrySet"/>, failing with <see cref="Setter"/> for a property's setter, given as <paramref name="setter"/>,
+    /// which the VM calls on the target with the value (section 3.7).
+    /// </summary>
+    public static bool TrySet(WebLingoValue target, string name, WebLingoValue value, WebLingoHeap heap, out WebLingoRuntimeError? error,
+        out WebLingoValue setter)
     {
+        setter = WebLingoValue.Null;
         if (target.Kind == WebLingoValueKind.Module)
         {
             // An export is its module's to change (section 3.9).
@@ -166,35 +211,69 @@ public static class WebLingoMembers
         {
             error = null;
             if (heap.TrySetStatic(target, name, value, out var isMethod)) return true;
-            if (!isMethod) return heap.TryAddStatic(target, name, value, out error); // A new static member (section 3.7).
+            if (!isMethod)
+            {
+                // A static property's setter, which the VM calls with the value (section 3.7); else a new static member.
+                if (heap.TryGetStatic(target, "set:" + name, out setter) && setter.Kind == WebLingoValueKind.Function)
+                {
+                    error = Setter;
+                    return false;
+                }
+                setter = WebLingoValue.Null;
+                if (heap.TryGetStatic(target, "get:" + name, out _))
+                {
+                    error = NoSetter(target, name, heap);
+                    return false;
+                }
+                return heap.TryAddStatic(target, name, value, out error);
+            }
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
                 $"'{name}' is a static method of {WebLingoValueFormatter.Describe(target, heap)}, and cannot be assigned.");
             return false;
         }
         if (IsClassedCollection(target, heap, out var collectionClass))
         {
-            if (heap.TryGetMethod(collectionClass, name, out _))
-            {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"'{name}' is a method of {WebLingoValueFormatter.Describe(target, heap)}, and cannot be assigned.");
-                return false;
-            }
-            return heap.TrySetField(target, name, value, out error);
+            var collectionAssignee = heap.FindAssignee(collectionClass, name, out setter);
+            if (collectionAssignee == WebLingoHeap.Assignee.Field) return heap.TrySetField(target, name, value, out error);
+            error = NotAField(collectionAssignee, target, name, heap);
+            return false;
         }
         if (target.Kind != WebLingoValueKind.Instance)
         {
+            if (ExtendedClassOf(target, heap) is { Kind: WebLingoValueKind.Class } valueClass
+                && heap.FindAssignee(valueClass, name, out setter) is var valueAssignee
+                    and (WebLingoHeap.Assignee.Setter or WebLingoHeap.Assignee.ReadOnly))
+            {
+                // Its kind's class's property, which an extension gave it (section 3.7).
+                error = NotAField(valueAssignee, target, name, heap);
+                return false;
+            }
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
                 $"Only an instance's fields can be assigned, not a member of {WebLingoValueFormatter.Describe(target, heap)}.");
             return false;
         }
-        if (heap.TryGetMethod(heap.ClassOf(target), name, out _))
-        {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'{name}' is a method of {WebLingoValueFormatter.Describe(target, heap)}, and cannot be assigned.");
-            return false;
-        }
-        return heap.TrySetField(target, name, value, out error);
+        var assignee = heap.FindAssignee(heap.ClassOf(target), name, out setter);
+        if (assignee == WebLingoHeap.Assignee.Field) return heap.TrySetField(target, name, value, out error);
+        error = NotAField(assignee, target, name, heap);
+        return false;
     }
+
+    /// <summary>
+    /// Why assigning <c>x.name</c> on a class's value assigns no field: a method, which cannot be assigned (WL3001), a
+    /// property's setter, which the VM calls (<see cref="Setter"/>), or a property without one (WL3001; section 3.7).
+    /// </summary>
+    private static WebLingoRuntimeError NotAField(WebLingoHeap.Assignee assignee, WebLingoValue target, string name, WebLingoHeap heap) =>
+        assignee switch
+        {
+            WebLingoHeap.Assignee.Setter => Setter,
+            WebLingoHeap.Assignee.ReadOnly => NoSetter(target, name, heap),
+            _ => new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"'{name}' is a method of {WebLingoValueFormatter.Describe(target, heap)}, and cannot be assigned.")
+        };
+
+    private static WebLingoRuntimeError NoSetter(WebLingoValue target, string name, WebLingoHeap heap) =>
+        new(WebLingoDiagnosticCodes.InvalidOperation,
+            $"'{name}' of {WebLingoValueFormatter.Describe(target, heap)} cannot be assigned: its property has no setter.");
 
     /// <summary>
     /// What <c>super</c> names, in a method of <paramref name="classValue"/>: its base's method <paramref name="name"/>, or
@@ -215,6 +294,13 @@ public static class WebLingoMembers
         }
         else if (!heap.TryGetMethod(baseClass, name, out closure))
         {
+            if (heap.TryGetAccessor(baseClass, false, name, out closure))
+            {
+                // super.name of the base's property: its getter, which the VM calls on this (section 3.7).
+                bound = closure;
+                error = Getter;
+                return false;
+            }
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.NoSuchMember,
                 $"{Capitalized(WebLingoValueFormatter.Describe(baseClass, heap))} has no method '{name}'.");
             return false;
@@ -259,6 +345,11 @@ public static class WebLingoMembers
         if (isMethod) return true;
         // Its class's static member, called as any function is, which its own members shadow (section 3.7).
         if (heap.TryGetStatic(heap.ClassOf(instance), name, out callee)) return true;
+        if (heap.TryGetAccessor(heap.ClassOf(instance), false, name, out _))
+        {
+            error = IsProperty(instance, name, heap);
+            return false;
+        }
         error = NoSuchMember(instance, name, heap);
         return false;
     }
@@ -293,16 +384,39 @@ public static class WebLingoMembers
     /// </summary>
     public static bool TryGetValueMethod(WebLingoValue target, WebLingoMember member, string name, WebLingoHeap heap, out WebLingoValue method)
     {
-        if (heap.Extended && target.Kind != WebLingoValueKind.Null)
-        {
-            var index = ValueClassOf(target.Kind);
-            var classValue = index >= 0 && heap.ValueClasses is { } classes && classes[index].Kind == WebLingoValueKind.Class
-                ? classes[index]
-                : heap.ObjectClass;
-            if (classValue.Kind == WebLingoValueKind.Class && heap.TryGetMethod(classValue, name, out method)) return true;
-        }
+        var classValue = ExtendedClassOf(target, heap);
+        if (classValue.Kind == WebLingoValueKind.Class && heap.TryGetMethod(classValue, name, out method)) return true;
         return TryGetObjectMethod(member, name, heap, out method);
     }
+
+    /// <summary>
+    /// The class whose extensions a value that is not an instance has, once an <c>extend</c> has run: its kind's, or
+    /// <c>Object</c> if the program has not made that one; <c>null</c> before, and for <c>null</c> (section 3.7).
+    /// </summary>
+    private static WebLingoValue ExtendedClassOf(WebLingoValue target, WebLingoHeap heap)
+    {
+        if (!heap.Extended || target.Kind == WebLingoValueKind.Null) return WebLingoValue.Null;
+        var index = ValueClassOf(target.Kind);
+        return index >= 0 && heap.ValueClasses is { } classes && classes[index].Kind == WebLingoValueKind.Class
+            ? classes[index]
+            : heap.ObjectClass;
+    }
+
+    /// <summary>
+    /// What <c>C.name(…)</c> calls on a class, or a module: its static member, or its export (section 3.7); a static
+    /// property is WL3001, read before it is called.
+    /// </summary>
+    public static bool TryGetStaticCallee(WebLingoValue target, WebLingoMember member, string name, WebLingoHeap heap, out WebLingoValue callee,
+        out WebLingoRuntimeError? error)
+    {
+        if (TryGet(target, member, name, heap, false, out callee, out error)) return true;
+        if (ReferenceEquals(error, Getter)) error = IsProperty(target, name, heap);
+        return false;
+    }
+
+    private static WebLingoRuntimeError IsProperty(WebLingoValue target, string name, WebLingoHeap heap) =>
+        new(WebLingoDiagnosticCodes.InvalidOperation,
+            $"'{name}' of {WebLingoValueFormatter.Describe(target, heap)} is a property: read it, then call what it gives.");
 
     /// <summary>
     /// The operator a class declares (<c>static operator +(a, b)</c>, a static method named <c>operator+</c>), that an
