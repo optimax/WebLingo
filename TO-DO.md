@@ -34,7 +34,7 @@ A6:
 
 A7:
 
-## [IDLE] Typed Catches
+## [WORKING] Typed Catches
 
 A `catch` that catches only some exceptions (A7 of "M0.10 Syntax: Static Members, `Object` and Exceptions"; specification, section 3.7), on both VMs. Its syntax, and how a `catch` names what it catches, will be proposed as questions once exceptions are implemented. Added by Claude, 2026-11-13.
 
@@ -74,6 +74,14 @@ A7: (a).
 
 2026-11-13: answered ("Typed Catches Syntax: Classes of Values"); next, but for extending `Array`, `Map` and `Set`, which waits for "Classes of Values, Continued", and the equality a catch whose name is not a class uses, `==` until then (Q1 there).
 
+
+Done (Claude, 2026-11-13): `catch (KeyError e)`, several catches tried in order, the last of which may catch anything, dotted names, an exception none catches going on after the `finally`; `x is Point`; every value's class (`5 is Integer`, `catch (String e)`), `null` having none; every value's `equal`; and every runtime error an instance of its kind's class (`IndexError`, `KeyError`, …), on both VMs. One new operation, `IsInstance`. Choices of mine, in section 15.2 as proposed (row "Typed catches and classes of values"): a catch's class is evaluated when an exception reaches it; a catch-everything before the last is WS1001; the built-in classes are added to a program that names them, every runtime error's to one with a `try` or a `using`; the kinds of values' classes are sealed, `Array`, `Map` and `Set` too until "Classes That Extend Array, Map and Set"; a catch whose name is not a class compares with `==` until Q1 of "Classes of Values, Continued" is answered. Two conformance cases changed for decisions of yours: `n.equal(5)` is no longer WS3006, and a caught index error is an `IndexError`. Every new conformance case gives the same result on both VMs. Build and 1,238 tests pass on Windows; Linux not tried.
+
+## [IDLE] Classes That Extend Array, Map and Set
+
+A1 of "Typed Catches Syntax: Classes of Values": classes may extend `Array`, `Map` and `Set` (specification, section 3.7, "Classes of values"), on both VMs. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for the answers to "Classes of Values, Continued".
 ## [QUESTION] Asynchrony: `async` and `await`
 
 A15 of "M0.11: Templates": asynchrony is designed first, before templates. WebLingo's own operation model (WS-P007), worker-affine executions (WS-H012) and worker-local heaps (WS-P013) are approved; how a program writes asynchrony is not. One decision each, answerable with "yes" or a letter. Once they are answered, its implementation becomes tasks of its own, before M0.11. Added by Claude, 2026-11-13.
@@ -84,27 +92,27 @@ A1: Yes.
 
 **Q2, where `await` may stand: (a) in an `async` function, and at the top level of a script or a template; (b) only in an `async` function.**
 
-A2: (a)
+A2: (a). The top level of a script/module is its executable block. A script/module becomes an instance of `Module`, which has an `exec()` function. Would that work? 
 
 **Q3, when an `async` function starts: (a) at once, when it is called, running until its first `await`, as in C# and JavaScript; (b) only when something awaits its task.**
 
-A3:
+A3: (a)
 
 **Q4, concurrency: an execution's tasks run on its one worker, one at a time, switching only at `await`, so that no two run at once and nothing needs a lock (WS-H012, WS-P013). Agreed?**
 
-A4:
+A4: How about a real thread pool?
 
 **Q5, what `await` takes: (a) only a task, anything else being WS3001; (b) any value, a value that is not a task giving itself.**
 
-A5:
+A5: (b) and awaiting a plain value still yields.
 
 **Q6, a task is a value of its own kind, of the built-in class `Task` (section 3.2), with nothing but `await` for now; `Task.all`, `Task.any` and timeouts come when they are needed. Agreed?**
 
-A6:
+A6: OK. Add a TO-DO.
 
 **Q7, a task's exception that nothing awaits: (a) it is lost; (b) when the execution ends, the first such exception stops it, as an uncaught one does, so that none goes unnoticed.**
 
-A7:
+A7: 
 
 **Q8, where tasks come from, besides `async` functions: the host's operations (files, network, database: WS-P004, WS-P009, WS-P011) give tasks, and the standard library has `delay(milliseconds)`, for tests. Agreed?**
 

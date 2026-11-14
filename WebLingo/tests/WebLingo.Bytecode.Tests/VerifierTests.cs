@@ -97,6 +97,7 @@ public sealed class VerifierTests
     [InlineData(WsOpCode.LoadConstant, 3, 0, 0)]
     [InlineData(WsOpCode.Dispose, 3, 0, 0)]
     [InlineData(WsOpCode.ToText, 0, 3, 0)]
+    [InlineData(WsOpCode.IsInstance, 0, 1, 3)]
     public void ARegisterOutOfRangeIsRejected(WsOpCode opCode, int a, int b, int c)
     {
         AssertRejected(Module(registers: 3, locals: 3, I(opCode, a, b, c), I(WsOpCode.Return)), 0, "register");

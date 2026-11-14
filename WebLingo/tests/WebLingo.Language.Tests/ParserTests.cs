@@ -113,10 +113,27 @@ public sealed class ParserTests
         var tree = Parse("try { f(); } catch (e) { throw; } finally { g(); }");
         Assert.Empty(tree.Diagnostics);
         var statement = Assert.IsType<WsTrySyntax>(Assert.Single(tree.Root.Statements));
-        Assert.Equal(("e", new WsSourceSpan(20, 1)), (statement.CatchName, statement.CatchNameSpan));
-        Assert.Null(Assert.IsType<WsThrowSyntax>(Assert.Single(statement.Catch!.Statements)).Value);
+        var handler = Assert.Single(statement.Catches);
+        Assert.Equal(("e", new WsSourceSpan(20, 1)), (handler.Name, handler.NameSpan));
+        Assert.Null(handler.Class);
+        Assert.Null(Assert.IsType<WsThrowSyntax>(Assert.Single(handler.Body.Statements)).Value);
         Assert.Single(statement.Finally!.Statements);
-        Assert.Null(Assert.IsType<WsTrySyntax>(Parse("try {} finally {}").Root.Statements[0]).Catch);
+        Assert.Empty(Assert.IsType<WsTrySyntax>(Parse("try {} finally {}").Root.Statements[0]).Catches);
+    }
+
+    [Fact]
+    public void TypedCatchesNameTheirClassesByDottedNames()
+    {
+        var tree = Parse("try {} catch (KeyError e) {} catch (errors.NotFound n) {} catch (e) {} var t = x is a.B && y;");
+        Assert.Empty(tree.Diagnostics);
+        var statement = Assert.IsType<WsTrySyntax>(tree.Root.Statements[0]);
+        Assert.Equal("KeyError", Assert.IsType<WsNameSyntax>(statement.Catches[0].Class).Name);
+        var dotted = Assert.IsType<WsMemberAccessSyntax>(statement.Catches[1].Class);
+        Assert.Equal(("errors", "NotFound", "n"), (Assert.IsType<WsNameSyntax>(dotted.Target).Name, dotted.Name, statement.Catches[1].Name));
+        Assert.Null(statement.Catches[2].Class);
+        var declaration = Assert.IsType<WsVariableDeclarationSyntax>(tree.Root.Statements[1]);
+        var and = Assert.IsType<WsBinaryExpressionSyntax>(declaration.Initializer);
+        Assert.IsType<WsMemberAccessSyntax>(Assert.IsType<WsIsExpressionSyntax>(and.Left).Class);
     }
 
     [Fact]
@@ -252,6 +269,8 @@ public sealed class ParserTests
     [InlineData("try x;")]
     [InlineData("try {} finally x;")]
     [InlineData("throw")]
+    [InlineData("try {} catch (e) {} catch (Error f) {}")]
+    [InlineData("var b = x is 5;")]
     public void MalformedStatementsGiveOneDiagnosticEach(string source)
     {
         var diagnostic = Assert.Single(Parse(source).Diagnostics);

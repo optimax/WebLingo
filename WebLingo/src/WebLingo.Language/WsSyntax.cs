@@ -67,8 +67,18 @@ public sealed record WsUsingSyntax(string Name, WsSourceSpan NameSpan, WsExpress
 /// <c>try { body } catch (name) { … } finally { … }</c>, with a <c>catch</c>, a <c>finally</c>, or both (section 3.7).
 /// </summary>
 public sealed record WsTrySyntax(
-    WsBlockSyntax Body, string? CatchName, WsSourceSpan CatchNameSpan, WsBlockSyntax? Catch, WsBlockSyntax? Finally,
-    WsSourceSpan Span) : WsStatementSyntax(Span);
+    WsBlockSyntax Body, IReadOnlyList<WsCatchSyntax> Catches, WsBlockSyntax? Finally, WsSourceSpan Span) : WsStatementSyntax(Span);
+
+/// <summary>
+/// A <c>catch</c>: the class it catches, a name or a dotted name, or null for any exception; the variable it declares;
+/// and its body (section 3.7, "Typed catches").
+/// </summary>
+public sealed record WsCatchSyntax(WsExpressionSyntax? Class, string Name, WsSourceSpan NameSpan, WsBlockSyntax Body,
+    WsSourceSpan Span) : WsSyntaxNode(Span);
+
+/// <summary><c>value is Class</c>, the class a name or a dotted name (section 3.7).</summary>
+public sealed record WsIsExpressionSyntax(WsExpressionSyntax Value, WsExpressionSyntax Class, WsSourceSpan Span)
+    : WsExpressionSyntax(Span);
 
 /// <summary><c>throw value;</c>, or <c>throw;</c>, which throws the exception its <c>catch</c> caught again (section 3.7).</summary>
 public sealed record WsThrowSyntax(WsExpressionSyntax? Value, WsSourceSpan Span) : WsStatementSyntax(Span);

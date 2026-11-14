@@ -1,3 +1,4 @@
+using WebLingo.Core;
 namespace WebLingo.Bytecode;
 
 /// <summary>What both verifiers check of a module's classes (specification, section 3.7).</summary>
@@ -49,6 +50,31 @@ internal static class WsClassTables
                 {
                     return $"Class {i} ('{info.Name}'): static '{method.Name}', function {method.Function}, is not a function without 'this'.";
                 }
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The first fault of a module's tables of built-in classes, or null: the kinds of values', none or one for each kind,
+    /// each -1 or a class; and the runtime errors', each a class, with a code (section 3.7).
+    /// </summary>
+    public static string? CheckRoles(int classCount, IReadOnlyList<int>? valueClasses, IReadOnlyList<WsErrorClass>? errorClasses)
+    {
+        if (valueClasses is null || errorClasses is null) return "The module has no tables of built-in classes.";
+        if (valueClasses.Count != 0 && valueClasses.Count != (int)WsValueClass.Class + 1)
+        {
+            return $"The module has {valueClasses.Count} classes of values, not one for each kind.";
+        }
+        foreach (var index in valueClasses)
+        {
+            if (index < -1 || index >= classCount) return $"A class of values, {index}, is not -1 or one of its classes.";
+        }
+        foreach (var (code, index) in errorClasses)
+        {
+            if (string.IsNullOrEmpty(code) || index < 0 || index >= classCount)
+            {
+                return $"A runtime error's class, {index}, is not one of its classes, or has no code.";
             }
         }
         return null;

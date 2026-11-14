@@ -60,6 +60,15 @@ public sealed class WsHeap
     /// </summary>
     public WsValue DefaultToString { get; set; }
 
+    /// <summary>The class <c>Object</c>, once the program has made it, whose methods every value has (section 3.7).</summary>
+    public WsValue ObjectClass { get; set; }
+
+    /// <summary>
+    /// Seals a class, a kind of value's (section 3.7, "Classes of values"): no class extends it, and <c>new</c> makes
+    /// none of its values.
+    /// </summary>
+    public void SealClass(WsValue classValue) => Get<ClassObject>(classValue, WsValueKind.Class).Sealed = true;
+
     /// <summary>Removes the roots added last, which must be <paramref name="roots"/>: a call's frame, as it returns.</summary>
     public void RemoveLastRoots(WsValue[] roots)
     {
@@ -180,7 +189,13 @@ public sealed class WsHeap
                     $"{Capitalized(WsValueFormatter.Describe(baseClass, this))} cannot be extended: only a class can.");
                 return false;
             }
-            all = new Dictionary<string, WsValue>(Get<ClassObject>(baseClass, WsValueKind.Class).Methods, StringComparer.Ordinal);
+            var baseObject = Get<ClassObject>(baseClass, WsValueKind.Class);
+            if (baseObject.Sealed)
+            {
+                error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation, $"The class {baseObject.Name} cannot be extended.");
+                return false;
+            }
+            all = new Dictionary<string, WsValue>(baseObject.Methods, StringComparer.Ordinal);
             foreach (var (methodName, closure) in methods) all[methodName] = closure;
         }
         // Its disposal: its own dispose method, if it declares one, then its base's disposal (section 3.7).
@@ -273,8 +288,17 @@ public sealed class WsHeap
         Get<ClassObject>(value, WsValueKind.Class).Methods.TryGetValue(name, out closure);
 
     /// <summary>A new instance of a class, without fields yet.</summary>
-    public bool TryAllocateInstance(WsValue classValue, out WsValue instance, out WsRuntimeError? error) =>
-        TryAllocate(new InstanceObject(classValue), WsValueKind.Instance, 0, out instance, out error);
+    public bool TryAllocateInstance(WsValue classValue, out WsValue instance, out WsRuntimeError? error)
+    {
+        var classObject = Get<ClassObject>(classValue, WsValueKind.Class);
+        if (classObject.Sealed)
+        {
+            instance = WsValue.Null;
+            error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation, $"'new' cannot make a value of the class {classObject.Name}.");
+            return false;
+        }
+        return TryAllocate(new InstanceObject(classValue), WsValueKind.Instance, 0, out instance, out error);
+    }
 
     public WsValue ClassOf(WsValue instance) => Get<InstanceObject>(instance, WsValueKind.Instance).Class;
 
@@ -601,6 +625,7 @@ public sealed class WsHeap
     {
         public WsValue Base { get; init; }
         public WsValue[] DisposeChain { get; init; } = [];
+        public bool Sealed { get; set; }
         public Dictionary<string, WsValue> StaticMethods { get; init; } = new(StringComparer.Ordinal);
         public Dictionary<string, WsValue> StaticFields { get; init; } = new(StringComparer.Ordinal);
     }

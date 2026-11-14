@@ -61,6 +61,10 @@ public sealed class WsStackBytecodeVerifier
         {
             return Fail($"The module's Object class, {module.ObjectClass}, is not -1 or one of its classes.");
         }
+        if (WsClassTables.CheckRoles(module.Classes.Count, module.ValueClasses, module.ErrorClasses) is { } rolesError)
+        {
+            return Fail(rolesError);
+        }
         var result = VerifyFunction(module, module.EntryPoint);
         for (var i = 0; i < module.Functions.Count && result.IsValid; i++)
         {
@@ -228,6 +232,7 @@ public sealed class WsStackBytecodeVerifier
             case WsStackOpCode.Throw:
             case WsStackOpCode.Rethrow:
             case WsStackOpCode.ToText:
+            case WsStackOpCode.IsInstance:
                 return Unused(a, b);
             case WsStackOpCode.GetIndex:
                 return (a is 0 or 1 ? null : $"its A is {a}, not 0 or 1.") ?? Unused(b);
@@ -402,6 +407,7 @@ public sealed class WsStackBytecodeVerifier
         WsStackOpCode.Throw => (1, 0),
         WsStackOpCode.Rethrow => (2, 0),
         WsStackOpCode.ToText => (1, 1),
+        WsStackOpCode.IsInstance => (2, 1),
         WsStackOpCode.New => (instruction.A + 1, 1),
         WsStackOpCode.SetMember => (2, instruction.B),
         WsStackOpCode.NewArray or WsStackOpCode.NewSet => (instruction.A, 1),

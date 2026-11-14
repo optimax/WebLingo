@@ -168,6 +168,8 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             heap.AddRoots(frame.Registers);
             heap.AddRoots(_errorClass);
             heap.AddRoots(_objectClass);
+            heap.AddRoots(_valueClasses);
+            heap.AddRoots(_errorClasses);
 
             var code = frame.Code;
             var registers = frame.Registers;
@@ -441,10 +443,10 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                                 if (isMethod && name.Member == WsMember.Dispose) goto dispose;
                                 goto call;
                             }
-                            if (name.Member == WsMember.ToString && heap.DefaultToString.Kind == WsValueKind.Function)
+                            if (WsMembers.TryGetObjectMethod(name.Member, name.Text, heap, out var objectMethod))
                             {
-                                // Every value has Object's toString() (section 3.7).
-                                callee = heap.DefaultToString;
+                                // Every value has Object's toString() and equal() (section 3.7).
+                                callee = objectMethod;
                                 self = target;
                                 arguments = registers;
                                 firstArgument = ins.C + 1;
@@ -467,13 +469,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             var baseClass = ins.D == 1 ? registers[ins.C] : WsValue.Null;
                             if (!TryMakeClass(module.Classes[ins.B], baseClass, registers, cells, out var made, out error)) break;
                             registers[ins.A] = made;
-                            if (ins.B == module.ErrorClass) _errorClass[0] = made;
-                            if (ins.B == module.ObjectClass)
-                            {
-                                _objectClass[0] = made;
-                                heap.TryGetMethod(made, "toString", out var defaultToString);
-                                heap.DefaultToString = defaultToString;
-                            }
+                            if (_builtin[ins.B]) Remember(ins.B, made);
                             pc++;
                             continue;
                         }
@@ -595,6 +591,10 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             constructed = WsValue.Null;
                             goto call;
                         }
+                        case WsOpCode.IsInstance:
+                            registers[ins.A] = WsValue.FromBoolean(WsMembers.IsInstance(registers[ins.B], registers[ins.C], heap, _valueClasses));
+                            pc++;
+                            continue;
                         case WsOpCode.ToText:
                             _text = new TextCall(new WsTextBuilder(heap, registers[ins.B], true), null, ins.A);
                             goto text;
@@ -1105,6 +1105,61 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         private static bool NeedsText(WsValue value) =>
             value.Kind is WsValueKind.Instance or WsValueKind.Array or WsValueKind.Map or WsValueKind.Set;
 
+        /// <summary>The kinds of values' classes, by <c>WsValueClass</c>, once the module has made them (section 3.7); a root.</summary>
+        private readonly WsValue[] _valueClasses = new WsValue[(int)WsValueClass.Class + 1];
+
+        /// <summary>The kinds of runtime errors' classes, as <c>module.ErrorClasses</c> lists them, once made; a root.</summary>
+        private readonly WsValue[] _errorClasses = new WsValue[module.ErrorClasses.Count];
+
+        /// <summary>For each class of the module, whether it is a built-in one that the VM keeps when it makes it.</summary>
+        private readonly bool[] _builtin = BuiltinClasses(module);
+
+        private static bool[] BuiltinClasses(WsCompiledModule module)
+        {
+            var builtin = new bool[module.Classes.Count];
+            if (module.ErrorClass >= 0) builtin[module.ErrorClass] = true;
+            if (module.ObjectClass >= 0) builtin[module.ObjectClass] = true;
+            foreach (var index in module.ValueClasses)
+            {
+                if (index >= 0) builtin[index] = true;
+            }
+            foreach (var (_, index) in module.ErrorClasses) builtin[index] = true;
+            return builtin;
+        }
+
+        /// <summary>A built-in class the module has made: <c>Object</c>, <c>Error</c>, a kind of value's, or of runtime error's.</summary>
+        private void Remember(int index, WsValue made)
+        {
+            if (index == module.ErrorClass) _errorClass[0] = made;
+            if (index == module.ObjectClass)
+            {
+                _objectClass[0] = made;
+                heap.ObjectClass = made;
+                heap.TryGetMethod(made, "toString", out var defaultToString);
+                heap.DefaultToString = defaultToString;
+            }
+            for (var i = 0; i < module.ValueClasses.Count; i++)
+            {
+                if (module.ValueClasses[i] != index) continue;
+                _valueClasses[i] = made;
+                heap.SealClass(made); // For now, no class extends one, nor does new make one (section 3.7).
+            }
+            for (var i = 0; i < module.ErrorClasses.Count; i++)
+            {
+                if (module.ErrorClasses[i].Class == index) _errorClasses[i] = made;
+            }
+        }
+
+        /// <summary>The class a runtime error of this code becomes: its kind's, or Error.</summary>
+        private WsValue ErrorClassFor(string code)
+        {
+            for (var i = 0; i < module.ErrorClasses.Count; i++)
+            {
+                if (module.ErrorClasses[i].Code == code && _errorClasses[i].Kind == WsValueKind.Class) return _errorClasses[i];
+            }
+            return _errorClass[0];
+        }
+
         private long OriginOf(WsFunction function, int pc)
         {
             for (var i = 0; i < module.Functions.Count; i++)
@@ -1131,7 +1186,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                 exception = _thrown;
                 return true;
             }
-            if (!WsExceptions.TryMakeError(heap, _errorClass[0], _thrownError, out exception)) return false;
+            if (!WsExceptions.TryMakeError(heap, ErrorClassFor(_thrownError.Code), _thrownError, out exception)) return false;
             _thrown = exception;
             _thrownError = null;
             return true;

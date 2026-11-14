@@ -49,7 +49,9 @@ public sealed class WsStackCodeGenerator
             Functions = functions,
             Classes = WsClassTable.Of(program),
             ErrorClass = program.ErrorClass,
-            ObjectClass = program.ObjectClass
+            ObjectClass = program.ObjectClass,
+            ValueClasses = program.ValueClasses,
+            ErrorClasses = ErrorClassesOf(program)
         };
     }
 
@@ -74,6 +76,13 @@ public sealed class WsStackCodeGenerator
             Captures = captures,
             Handlers = generator._handlers
         };
+    }
+
+    private static List<WsErrorClass> ErrorClassesOf(WsIrProgram program)
+    {
+        var classes = new List<WsErrorClass>();
+        foreach (var (code, index) in program.ErrorClasses) classes.Add(new WsErrorClass(code, index));
+        return classes;
     }
 
     /// <summary>What the functions of one module share: its constants.</summary>
@@ -281,6 +290,11 @@ public sealed class WsStackCodeGenerator
                 return;
             case WsIrLoadBuiltin builtin:
                 Emit(WsStackOpCode.LoadBuiltin, builtin.Span, builtin.Builtin);
+                return;
+            case WsIrIs test:
+                EmitValue(test.Value);
+                EmitValue(test.Class);
+                Emit(WsStackOpCode.IsInstance, test.Span);
                 return;
             case WsIrToText text:
                 EmitValue(text.Value);
@@ -627,6 +641,7 @@ public sealed class WsStackCodeGenerator
             WsStackOpCode.Dispose => (1, 0),
             WsStackOpCode.Throw => (1, 0),
             WsStackOpCode.ToText => (1, 1),
+            WsStackOpCode.IsInstance => (2, 1),
             WsStackOpCode.Rethrow => (2, 0),
             WsStackOpCode.New => (a + 1, 1),
             WsStackOpCode.SetMember => (2, b),

@@ -6,7 +6,7 @@ namespace WebLingo.Runtime;
 /// once, when it loads a module, so that it does not compare names as it runs; a name that is no member of any value
 /// is <see cref="Unknown"/>, and is kept for the message of its error.
 /// </summary>
-public enum WsMember : byte { Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString }
+public enum WsMember : byte { Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal }
 
 /// <summary>A member's name as a module's constant gives it, and the member it names.</summary>
 public readonly record struct WsMemberName(WsMember Member, string Text);
@@ -29,6 +29,7 @@ public static class WsMembers
         "add" => WsMember.Add,
         "dispose" => WsMember.Dispose,
         "toString" => WsMember.ToString,
+        "equal" => WsMember.Equal,
         _ => WsMember.Unknown
     };
 
@@ -63,18 +64,18 @@ public static class WsMembers
             // A static member, the class's own or its base's (section 3.7).
             error = null;
             if (heap.TryGetStatic(target, name, out result)) return true;
-            if (member == WsMember.ToString && heap.DefaultToString.Kind == WsValueKind.Function)
+            if (TryGetObjectMethod(member, name, heap, out var classMethod))
             {
-                return heap.TryAllocateBoundMethod(target, heap.DefaultToString, out result, out error);
+                return heap.TryAllocateBoundMethod(target, classMethod, out result, out error);
             }
             if (optional) return true;
             error = NoSuchMember(target, name, heap);
             return false;
         }
-        if (member == WsMember.ToString && heap.DefaultToString.Kind == WsValueKind.Function)
+        if (TryGetObjectMethod(member, name, heap, out var objectMethod))
         {
-            // Every value has toString(), Object's, which gives its text (section 3.7).
-            return heap.TryAllocateBoundMethod(target, heap.DefaultToString, out result, out error);
+            // Every value has Object's toString() and equal() (section 3.7).
+            return heap.TryAllocateBoundMethod(target, objectMethod, out result, out error);
         }
         if (target.Kind == WsValueKind.String && member == WsMember.Length)
         {
@@ -207,6 +208,57 @@ public static class WsMembers
             $"{Capitalized(WsValueFormatter.Describe(target, heap))} has no method 'dispose', and cannot be disposed.");
         return false;
     }
+
+    /// <summary>
+    /// <c>Object</c>'s <c>toString()</c> or <c>equal()</c>, which every value has (section 3.7); false for another
+    /// member, or before the program has made <c>Object</c>.
+    /// </summary>
+    public static bool TryGetObjectMethod(WsMember member, string name, WsHeap heap, out WsValue method)
+    {
+        method = WsValue.Null;
+        return member is WsMember.ToString or WsMember.Equal && heap.ObjectClass.Kind == WsValueKind.Class
+            && heap.TryGetMethod(heap.ObjectClass, name, out method);
+    }
+
+    /// <summary>
+    /// <c>value is type</c> (section 3.7): an instance's class, or a value's kind's class (<paramref name="valueClasses"/>,
+    /// by <see cref="WsValueClass"/>), is <paramref name="type"/> or extends it; <c>null</c> is of no class, and every
+    /// other value is an <c>Object</c>, its kind's class made or not. A type that is not a class is compared with
+    /// <c>==</c>, which runs no code.
+    /// </summary>
+    public static bool IsInstance(WsValue value, WsValue type, WsHeap heap, WsValue[] valueClasses)
+    {
+        if (type.Kind != WsValueKind.Class)
+        {
+            WsOperators.TryCompare(WsComparisonOperator.Equal, value, type, heap, out var equal, out _);
+            return equal.AsBoolean;
+        }
+        if (value.Kind == WsValueKind.Null) return false;
+        var kind = ValueClassOf(value.Kind);
+        var current = value.Kind == WsValueKind.Instance ? heap.ClassOf(value)
+            : kind >= 0 && kind < valueClasses.Length ? valueClasses[kind] : WsValue.Null;
+        if (current.Kind != WsValueKind.Class) return type == heap.ObjectClass;
+        for (; current.Kind == WsValueKind.Class; current = heap.ClassBase(current))
+        {
+            if (current == type) return true;
+        }
+        return false;
+    }
+
+    /// <summary>A kind of value's class, as <see cref="WsValueClass"/> numbers it, or -1 for an instance's or <c>null</c>.</summary>
+    public static int ValueClassOf(WsValueKind kind) => kind switch
+    {
+        WsValueKind.Boolean => (int)WsValueClass.Boolean,
+        WsValueKind.Int64 => (int)WsValueClass.Integer,
+        WsValueKind.Binary64 => (int)WsValueClass.Number,
+        WsValueKind.String => (int)WsValueClass.String,
+        WsValueKind.Array => (int)WsValueClass.Array,
+        WsValueKind.Map => (int)WsValueClass.Map,
+        WsValueKind.Set => (int)WsValueClass.Set,
+        WsValueKind.Function or WsValueKind.Builtin or WsValueKind.BoundMethod => (int)WsValueClass.Function,
+        WsValueKind.Class => (int)WsValueClass.Class,
+        _ => -1
+    };
 
     /// <summary>Whether the member is a method of the value: an array's <c>push</c> and <c>pop</c>, a map's <c>has</c> and <c>remove</c>.</summary>
     private static bool IsMethod(WsValue target, WsMember member) =>

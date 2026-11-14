@@ -333,17 +333,29 @@ public sealed class WsParser : IWsParser
         var body = ParseRequiredBlock("'{', which begins the 'try' block");
         if (body is null) return new WsBlockSyntax([], SpanFrom(start));
         _statementHasError = false;
-        string? catchName = null;
-        var catchNameSpan = new WsSourceSpan(Current.Span.Start, 0);
-        WsBlockSyntax? catchBody = null;
-        if (Current.Kind == WsTokenKind.Catch)
+        var catches = new List<WsCatchSyntax>();
+        var catchesAny = false;
+        while (Current.Kind == WsTokenKind.Catch)
         {
-            Advance();
+            // catch (e), or catch (Class e), the class a name or a dotted name (section 3.7).
+            var catchStart = Current.Span.Start;
+            var keyword = Advance();
+            if (catchesAny && !_statementHasError)
+            {
+                Report(WsDiagnosticCodes.UnexpectedToken, "A 'catch' that catches every exception must be the last.", keyword.Span);
+            }
             Expect(WsTokenKind.OpenParen, "'('");
-            (catchName, catchNameSpan) = ExpectName();
+            WsExpressionSyntax? caught = null;
+            if (Current.Kind == WsTokenKind.Identifier && Peek(1).Kind is WsTokenKind.Identifier or WsTokenKind.Dot)
+            {
+                caught = ParseDottedName();
+            }
+            catchesAny |= caught is null;
+            var (catchName, catchNameSpan) = ExpectName();
             Expect(WsTokenKind.CloseParen, "')'");
-            catchBody = ParseRequiredBlock("'{', which begins the 'catch' block");
+            var catchBody = ParseRequiredBlock("'{', which begins the 'catch' block");
             if (catchBody is null) return body;
+            catches.Add(new WsCatchSyntax(caught, catchName, catchNameSpan, catchBody, SpanFrom(catchStart)));
             _statementHasError = false;
         }
         WsBlockSyntax? finallyBody = null;
@@ -353,12 +365,32 @@ public sealed class WsParser : IWsParser
             finallyBody = ParseRequiredBlock("'{', which begins the 'finally' block");
             if (finallyBody is null) return body;
         }
-        if (catchBody is null && finallyBody is null)
+        if (catches.Count == 0 && finallyBody is null)
         {
             ReportUnexpected("'catch' or 'finally'");
             return body;
         }
-        return new WsTrySyntax(body, catchName, catchNameSpan, catchBody, finallyBody, SpanFrom(start));
+        return new WsTrySyntax(body, catches, finallyBody, SpanFrom(start));
+    }
+
+    /// <summary>A name, or a dotted name, <c>a.b.C</c>: how a typed catch and <c>is</c> name a class (section 3.7).</summary>
+    private WsExpressionSyntax ParseDottedName()
+    {
+        var first = Current;
+        if (first.Kind != WsTokenKind.Identifier)
+        {
+            if (!_statementHasError) ReportUnexpected("a class's name");
+            return new WsErrorExpressionSyntax(new WsSourceSpan(first.Span.Start, 0));
+        }
+        Advance();
+        WsExpressionSyntax name = new WsNameSyntax(first.Text, first.Span);
+        while (Current.Kind == WsTokenKind.Dot && Peek(1).Kind == WsTokenKind.Identifier)
+        {
+            Advance();
+            var member = Advance();
+            name = new WsMemberAccessSyntax(name, member.Text, member.Span, SpanFrom(first.Span.Start));
+        }
+        return name;
     }
 
     /// <summary>A block that a statement needs, which must begin here; null, reported, if it does not.</summary>
@@ -598,9 +630,28 @@ public sealed class WsParser : IWsParser
     private WsExpressionSyntax ParseEquality() =>
         ParseLeftAssociative(ParseRelational, WsTokenKind.EqualEqual, WsTokenKind.BangEqual);
 
-    private WsExpressionSyntax ParseRelational() =>
-        ParseLeftAssociative(ParseAdditive, WsTokenKind.Less, WsTokenKind.LessEqual, WsTokenKind.Greater,
-            WsTokenKind.GreaterEqual);
+    /// <summary>The comparisons <c>&lt; &lt;= &gt; &gt;=</c>, and <c>is</c>, whose class is a name or a dotted name (section 3.7).</summary>
+    private WsExpressionSyntax ParseRelational()
+    {
+        var left = ParseAdditive();
+        while (true)
+        {
+            if (Current.Kind == WsTokenKind.Is)
+            {
+                Advance();
+                var type = ParseDottedName();
+                left = new WsIsExpressionSyntax(left, type, Between(left.Span, type.Span));
+                continue;
+            }
+            if (Current.Kind is not (WsTokenKind.Less or WsTokenKind.LessEqual or WsTokenKind.Greater or WsTokenKind.GreaterEqual))
+            {
+                return left;
+            }
+            var op = Advance();
+            var right = ParseAdditive();
+            left = new WsBinaryExpressionSyntax(BinaryOperatorOf(op.Kind), left, right, op.Span, Between(left.Span, right.Span));
+        }
+    }
 
     /// <summary>One level of left-associative binary operators (specification, section 3.5, "Precedence").</summary>
     private WsExpressionSyntax ParseLeftAssociative(Func<WsExpressionSyntax> operand, params WsTokenKind[] operators)
@@ -976,7 +1027,7 @@ public sealed class WsParser : IWsParser
             if (statement is WsTrySyntax tryStatement)
             {
                 statements.Push(tryStatement.Body);
-                if (tryStatement.Catch is { } catchBlock) statements.Push(catchBlock);
+                foreach (var catchClause in tryStatement.Catches) statements.Push(catchClause.Body);
                 if (tryStatement.Finally is { } finallyBlock) statements.Push(finallyBlock);
             }
             if (statement is WsClassDeclarationSyntax classDeclaration)
@@ -1031,6 +1082,7 @@ public sealed class WsParser : IWsParser
                         pending.Push((binary.Left, depth + 1));
                         pending.Push((binary.Right, depth + 1));
                         break;
+                    case WsIsExpressionSyntax test: pending.Push((test.Value, depth + 1)); break;
                     case WsAssignmentExpressionSyntax assignment: pending.Push((assignment.Value, depth + 1)); break;
                     case WsFunctionExpressionSyntax functionExpression:
                         statements.Push(functionExpression.Body);

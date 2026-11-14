@@ -41,6 +41,9 @@ public sealed class WsBinder
     /// <summary>The built-in class <c>Error</c>, bound once a program needs it (section 3.7).</summary>
     private WsBoundClassDeclaration? _error;
 
+    /// <summary>The built-in classes the program uses, in the order they are made, each after the class it extends.</summary>
+    private readonly List<(string Name, WsBoundClassDeclaration Declaration)> _builtinClasses = [];
+
     /// <summary>
     /// <c>Error</c>, which extends <c>Object</c>: <c>new Error(message)</c>, with the fields <c>message</c> and
     /// <c>code</c>, <c>null</c> for one a program throws; a runtime error a handler catches becomes one, its code set
@@ -69,12 +72,20 @@ public sealed class WsBinder
     public WsBoundProgram Bind(WsCompilationUnitSyntax unit)
     {
         var statements = BindStatements(unit.Statements);
-        if (_error is not null) statements.Insert(0, _error);
-        if (_object is not null) statements.Insert(0, _object); // Made first, before the program's own classes.
+        // The built-in classes the program uses are made first, before its own.
+        var builtins = new List<WsBoundStatement>();
+        var builtinClasses = new List<(string, WsBoundClass)>();
+        foreach (var (name, declaration) in _builtinClasses)
+        {
+            builtins.Add(declaration);
+            builtinClasses.Add((name, declaration.Class));
+        }
+        statements.InsertRange(0, builtins);
         return new WsBoundProgram(statements, _function.Locals, _builtinsInOrder)
         {
             ErrorClass = _error?.Class,
-            ObjectClass = _object?.Class
+            ObjectClass = _object?.Class,
+            BuiltinClasses = builtinClasses
         };
     }
 
@@ -301,22 +312,28 @@ public sealed class WsBinder
             }
             case WsTrySyntax tryStatement:
             {
-                UseError(); // A runtime error its handlers catch becomes an Error.
+                UseError(); // A runtime error its handlers catch becomes an Error, of its kind's class.
                 var body = BindStatement(tryStatement.Body);
-                WsBoundCatch? handler = null;
-                if (tryStatement.Catch is { } catchBlock)
+                var catches = new List<WsBoundCatch>();
+                WsLocalSymbol? caughtValue = null;
+                WsLocalSymbol? caughtOrigin = null;
+                if (tryStatement.Catches.Count > 0)
                 {
+                    caughtValue = DeclareHidden("catch exception", tryStatement.Span);
+                    caughtOrigin = DeclareHidden("catch origin", tryStatement.Span);
+                }
+                foreach (var catchClause in tryStatement.Catches)
+                {
+                    // Its class is evaluated where the try is, when an exception reaches it (section 3.7).
+                    var caught = catchClause.Class is null ? null : BindExpression(catchClause.Class);
                     _scope = new Scope(_scope, _function);
-                    var value = DeclareHidden("catch exception", tryStatement.CatchNameSpan);
-                    var origin = DeclareHidden("catch origin", tryStatement.CatchNameSpan);
-                    var name = tryStatement.CatchName ?? "";
-                    var variable = Declare(name, WsDeclarationKind.Var, tryStatement.CatchNameSpan, null)
-                        ?? DeclareHidden(name, tryStatement.CatchNameSpan);
-                    _function.Catches.Add((value, origin));
-                    var statements = BindStatements(catchBlock.Statements);
+                    var variable = Declare(catchClause.Name, WsDeclarationKind.Var, catchClause.NameSpan, null)
+                        ?? DeclareHidden(catchClause.Name, catchClause.NameSpan);
+                    _function.Catches.Add((caughtValue!, caughtOrigin!));
+                    var statements = BindStatements(catchClause.Body.Statements);
                     _function.Catches.RemoveAt(_function.Catches.Count - 1);
                     _scope = _scope.Parent!;
-                    handler = new WsBoundCatch(variable, value, origin, new WsBoundBlock(statements, catchBlock.Span));
+                    catches.Add(new WsBoundCatch(caught, variable, new WsBoundBlock(statements, catchClause.Body.Span)));
                 }
                 WsBoundFinally? cleanup = null;
                 if (tryStatement.Finally is { } finallyBlock)
@@ -328,7 +345,7 @@ public sealed class WsBinder
                     _function.Finallys.RemoveAt(_function.Finallys.Count - 1);
                     cleanup = new WsBoundFinally(value, origin, statements);
                 }
-                return new WsBoundTry(body, handler, cleanup, tryStatement.Span);
+                return new WsBoundTry(body, catches, caughtValue, caughtOrigin, cleanup, tryStatement.Span);
             }
             case WsThrowSyntax throwStatement:
             {
@@ -583,7 +600,7 @@ public sealed class WsBinder
             case WsMemberAccessSyntax { Target: WsSuperSyntax } superMember:
                 return BindSuper(superMember.Name, superMember.Span);
             case WsMemberAccessSyntax member:
-                if (member.Name == "toString") UseObject(); // Every value has Object's (section 3.7).
+                if (member.Name is "toString" or "equal") UseObject(); // Every value has Object's (section 3.7).
                 return new WsBoundMember(BindExpression(member.Target), member.Name, member.Span) { IsOptional = member.IsOptional };
             case WsMemberAssignmentSyntax field:
                 return new WsBoundMemberAssignment(BindExpression(field.Target.Target), field.Target.Name, BindExpression(field.Value),
@@ -599,6 +616,8 @@ public sealed class WsBinder
                 Report(WsDiagnosticCodes.ThisOutsideMethod,
                     "'super' is either called, 'super(…)', or names a member of the base class, 'super.name'.", expression.Span);
                 return new WsBoundError(expression.Span);
+            case WsIsExpressionSyntax test:
+                return new WsBoundIs(BindExpression(test.Value), BindExpression(test.Class), test.Span);
             case WsThisSyntax self:
             {
                 var local = LookupLocal("this");
@@ -705,7 +724,7 @@ public sealed class WsBinder
         if (calleeSyntax is WsMemberAccessSyntax member)
         {
             // A method, called on its target (specification, section 3.6); every value has Object's toString() (section 3.7).
-            if (member.Name == "toString") UseObject();
+            if (member.Name is "toString" or "equal") UseObject();
             return new WsBoundMethodCall(BindExpression(member.Target), member.Name, arguments, call.Span);
         }
         if (calleeSyntax is WsIntegerLiteralSyntax or WsBinary64LiteralSyntax or WsBooleanLiteralSyntax
@@ -762,8 +781,44 @@ public sealed class WsBinder
         {
             "Object" => UseObject(),
             "Error" => UseError(),
+            _ when WsPrelude.IsValueClass(name) || WsPrelude.IsErrorClass(name) => UseBuiltinClass(name),
             _ => null
         };
+    }
+
+    /// <summary>
+    /// A built-in class besides <c>Object</c> and <c>Error</c>, a kind of value's or of runtime error's (section 3.7):
+    /// bound, in the scope around the program's, and made where the program begins, once something uses it.
+    /// </summary>
+    private WsLocalSymbol UseBuiltinClass(string name)
+    {
+        foreach (var (builtin, declaration) in _builtinClasses)
+        {
+            if (builtin == name) return declaration.Local;
+        }
+        var isError = WsPrelude.IsErrorClass(name);
+        var baseLocal = isError ? UseError() : UseObject();
+        foreach (var (builtin, declaration) in _builtinClasses)
+        {
+            if (builtin == name) return declaration.Local; // UseError() makes every runtime error's class.
+        }
+        return BindBuiltinClass(name, WsPrelude.Source(name), baseLocal);
+    }
+
+    /// <summary>Binds a built-in class from its source, extending <paramref name="baseLocal"/>, or nothing if null.</summary>
+    private WsLocalSymbol BindBuiltinClass(string name, string source, WsLocalSymbol? baseLocal, bool inPrelude = false)
+    {
+        var local = new WsLocalSymbol(name, WsDeclarationKind.Class, _main.Locals.Count, default, _main);
+        _main.Locals.Add(local);
+        _prelude.Locals.Add(name, local);
+        var syntax = (WsClassDeclarationSyntax)new WsParser(source, name).ParseCompilationUnit().Root.Statements[0];
+        var (outerScope, outerFunction, outerClass) = (_scope, _function, _class);
+        (_scope, _function, _inPrelude) = (_prelude, _main, inPrelude);
+        var baseClass = baseLocal is null ? null : Reference(baseLocal, default);
+        var declaration = new WsBoundClassDeclaration(local, BindClass(syntax, local, baseClass, []), default);
+        (_scope, _function, _class, _inPrelude) = (outerScope, outerFunction, outerClass, false);
+        _builtinClasses.Add((name, declaration));
+        return local;
     }
 
     /// <summary>
@@ -773,15 +828,10 @@ public sealed class WsBinder
     private WsLocalSymbol UseError()
     {
         if (_error is not null) return _error.Local;
-        var objectLocal = UseObject();
-        var local = new WsLocalSymbol("Error", WsDeclarationKind.Class, _main.Locals.Count, default, _main);
-        _main.Locals.Add(local);
-        _prelude.Locals.Add("Error", local);
-        var syntax = (WsClassDeclarationSyntax)new WsParser(ErrorSource, "Error").ParseCompilationUnit().Root.Statements[0];
-        var (outerScope, outerFunction, outerClass) = (_scope, _function, _class);
-        (_scope, _function) = (_prelude, _main);
-        _error = new WsBoundClassDeclaration(local, BindClass(syntax, local, Reference(objectLocal, default), []), default);
-        (_scope, _function, _class) = (outerScope, outerFunction, outerClass);
+        var local = BindBuiltinClass("Error", ErrorSource, UseObject());
+        _error = _builtinClasses[^1].Declaration;
+        // Its runtime errors become instances of their kinds' classes, which the program has too.
+        foreach (var (name, _) in WsPrelude.ErrorClasses) BindBuiltinClass(name, WsPrelude.Source(name), local);
         return local;
     }
 
@@ -792,14 +842,8 @@ public sealed class WsBinder
     private WsLocalSymbol UseObject()
     {
         if (_object is not null) return _object.Local;
-        var local = new WsLocalSymbol("Object", WsDeclarationKind.Class, _main.Locals.Count, default, _main);
-        _main.Locals.Add(local);
-        _prelude.Locals.Add("Object", local);
-        var syntax = (WsClassDeclarationSyntax)new WsParser(ObjectSource, "Object").ParseCompilationUnit().Root.Statements[0];
-        var (outerScope, outerFunction, outerClass) = (_scope, _function, _class);
-        (_scope, _function, _inPrelude) = (_prelude, _main, true);
-        _object = new WsBoundClassDeclaration(local, BindClass(syntax, local, null, []), default);
-        (_scope, _function, _class, _inPrelude) = (outerScope, outerFunction, outerClass, false);
+        var local = BindBuiltinClass("Object", ObjectSource, null, inPrelude: true);
+        _object = _builtinClasses[^1].Declaration;
         return local;
     }
 

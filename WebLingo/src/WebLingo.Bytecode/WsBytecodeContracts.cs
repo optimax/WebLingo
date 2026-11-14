@@ -151,6 +151,12 @@ public enum WsOpCode : byte
     /// <c>toString()</c>; section 3.7).
     /// </summary>
     ToText,
+    /// <summary>
+    /// A = destination, B = a value, C = a class: whether the value is an instance of the class, or of a class extending
+    /// it, its kind's class for a value that is not an instance; a C that is not a class, whether the value is equal to
+    /// it (<c>is</c>, and typed catches; section 3.7).
+    /// </summary>
+    IsInstance,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
@@ -214,6 +220,9 @@ public sealed record WsClassInfo(string Name, int Constructor, IReadOnlyList<WsC
     public IReadOnlyList<string> StaticFields { get; init; } = [];
 }
 
+/// <summary>A class of a module's that a runtime error of a code becomes, when a handler catches it (section 3.7).</summary>
+public readonly record struct WsErrorClass(string Code, int Class);
+
 /// <summary>A method of a class: its name, and the module's function that is its body.</summary>
 public readonly record struct WsClassMethod(string Name, int Function);
 
@@ -238,6 +247,13 @@ public sealed record WsCompiledModule(
     public int ErrorClass { get; init; } = -1;
     /// <summary>The class of <see cref="Classes"/> that is <c>Object</c>, whose <c>toString()</c> every value has, or -1.</summary>
     public int ObjectClass { get; init; } = -1;
+    /// <summary>
+    /// The classes of <see cref="Classes"/> that are the kinds of values', by <see cref="WsValueClass"/>, -1 for one the
+    /// module has not; empty if it has none of them (section 3.7, "Classes of values").
+    /// </summary>
+    public IReadOnlyList<int> ValueClasses { get; init; } = [];
+    /// <summary>The classes of <see cref="Classes"/> that runtime errors become, by their codes (section 3.7).</summary>
+    public IReadOnlyList<WsErrorClass> ErrorClasses { get; init; } = [];
 
     /// <summary>The smallest valid module: it returns at once.</summary>
     public static WsCompiledModule Empty(string name) =>

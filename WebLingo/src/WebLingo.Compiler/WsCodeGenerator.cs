@@ -60,7 +60,9 @@ public sealed class WsCodeGenerator
             Functions = functions,
             Classes = WsClassTable.Of(program),
             ErrorClass = program.ErrorClass,
-            ObjectClass = program.ObjectClass
+            ObjectClass = program.ObjectClass,
+            ValueClasses = program.ValueClasses,
+            ErrorClasses = ErrorClassesOf(program)
         };
     }
 
@@ -84,6 +86,13 @@ public sealed class WsCodeGenerator
             Captures = captures,
             Handlers = generator._handlers
         };
+    }
+
+    private static List<WsErrorClass> ErrorClassesOf(WsIrProgram program)
+    {
+        var classes = new List<WsErrorClass>();
+        foreach (var (code, index) in program.ErrorClasses) classes.Add(new WsErrorClass(code, index));
+        return classes;
     }
 
     /// <summary>What the functions of one module share: its constants.</summary>
@@ -330,6 +339,22 @@ public sealed class WsCodeGenerator
                 Emit(new WsInstruction(WsOpCode.Move, destination, store.Local), store.Span);
                 return destination;
             }
+            case WsIrIs test:
+            {
+                var mark = _nextRegister;
+                var value = EmitExpression(test.Value, null);
+                if (value < _locals && Assigns(test.Class, value))
+                {
+                    var copy = Allocate();
+                    Emit(new WsInstruction(WsOpCode.Move, copy, value), test.Value.Span);
+                    value = copy;
+                }
+                var type = EmitExpression(test.Class, null);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.IsInstance, destination, value, type), test.Span);
+                return destination;
+            }
             case WsIrToText text:
             {
                 var mark = _nextRegister;
@@ -535,6 +560,7 @@ public sealed class WsCodeGenerator
         WsIrStoreLocal store => store.Local == local || Assigns(store.Value, local),
         WsIrUnary unary => Assigns(unary.Operand, local),
         WsIrToText text => Assigns(text.Value, local),
+        WsIrIs test => Assigns(test.Value, local) || Assigns(test.Class, local),
         WsIrBinary binary => Assigns(binary.Left, local) || Assigns(binary.Right, local),
         WsIrLogical logical => Assigns(logical.Left, local) || Assigns(logical.Right, local),
         WsIrCallBuiltin call => AnyAssigns(call.Arguments, local),

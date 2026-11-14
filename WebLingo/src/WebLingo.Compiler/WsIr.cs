@@ -22,6 +22,10 @@ public sealed record WsIrProgram(
     public int ErrorClass { get; init; } = -1;
     /// <summary>The class of <see cref="Classes"/> that is <c>Object</c>, or -1 (section 3.7).</summary>
     public int ObjectClass { get; init; } = -1;
+    /// <summary>The kinds of values' classes, by <c>WsValueClass</c>, -1 for one the program has not; empty if none.</summary>
+    public IReadOnlyList<int> ValueClasses { get; init; } = [];
+    /// <summary>The kinds of runtime errors' classes, by their codes.</summary>
+    public IReadOnlyList<(string Code, int Class)> ErrorClasses { get; init; } = [];
 }
 
 /// <summary>A class: its constructor's function, or -1 if it has none, and its methods' (section 3.7).</summary>
@@ -151,6 +155,9 @@ public sealed record WsIrLoadLocal(int Local, WsSourceSpan Span) : WsIrExpressio
 public sealed record WsIrStoreLocal(int Local, WsIrExpression Value, WsSourceSpan Span) : WsIrExpression(Span);
 
 public sealed record WsIrUnary(WsUnaryOperator Operator, WsIrExpression Operand, WsSourceSpan Span) : WsIrExpression(Span);
+
+/// <summary><c>value is Class</c>: the value, then the class, evaluated (section 3.7).</summary>
+public sealed record WsIrIs(WsIrExpression Value, WsIrExpression Class, WsSourceSpan Span) : WsIrExpression(Span);
 
 /// <summary>The text of a value, an instance as its fields, as <c>Object</c>'s <c>toString()</c> gives it (section 3.7).</summary>
 public sealed record WsIrToText(WsIrExpression Value, WsSourceSpan Span) : WsIrExpression(Span);

@@ -75,6 +75,7 @@ public static class WsDisassembler
             WsOpCode.Dispose => $"Dispose {Register(function, a)}",
             WsOpCode.Throw => $"Throw {Register(function, a)}",
             WsOpCode.ToText => $"ToText {Register(function, a)}, {Register(function, b)}",
+            WsOpCode.IsInstance => $"IsInstance {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
             WsOpCode.Rethrow => $"Rethrow {Register(function, a)}, {Register(function, b)}",
             WsOpCode.MakeClass => $"MakeClass {Register(function, a)}, class{b}" + (d == 1 ? $" extends {Register(function, c)}" : ""),
             WsOpCode.GetSuper => $"GetSuper {Register(function, a)}, {Register(function, b)}, {Register(function, c)}, {Constant(module, d)}",

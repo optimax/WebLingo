@@ -149,6 +149,8 @@ public enum WsStackOpCode : byte
     Rethrow,
     /// <summary>Pops a value and pushes its text, as the register bytecode's <c>ToText</c> gives it.</summary>
     ToText,
+    /// <summary>Pops a class, then a value, and pushes whether the value is an instance of it, as <c>IsInstance</c> does.</summary>
+    IsInstance,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);
@@ -193,4 +195,8 @@ public sealed record WsStackModule(
     public int ErrorClass { get; init; } = -1;
     /// <summary>The class of <see cref="Classes"/> that is <c>Object</c>, or -1 (section 3.7).</summary>
     public int ObjectClass { get; init; } = -1;
+    /// <summary>The kinds of values' classes, as the register bytecode's module has them.</summary>
+    public IReadOnlyList<int> ValueClasses { get; init; } = [];
+    /// <summary>The classes runtime errors become, by their codes.</summary>
+    public IReadOnlyList<WsErrorClass> ErrorClasses { get; init; } = [];
 }

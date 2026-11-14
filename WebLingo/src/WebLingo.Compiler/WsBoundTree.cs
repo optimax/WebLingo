@@ -13,6 +13,8 @@ public sealed record WsBoundProgram(
     public WsBoundClass? ErrorClass { get; init; }
     /// <summary>The built-in class <c>Object</c>, among the program's classes if it uses it, or null (section 3.7).</summary>
     public WsBoundClass? ObjectClass { get; init; }
+    /// <summary>Every built-in class the program uses, by its name, <c>Object</c> and <c>Error</c> included.</summary>
+    public IReadOnlyList<(string Name, WsBoundClass Class)> BuiltinClasses { get; init; } = [];
 }
 
 /// <summary>
@@ -101,14 +103,19 @@ public sealed record WsBoundUsing(WsLocalSymbol Local, WsBoundExpression Value, 
     public required WsLocalSymbol ExceptionOrigin { get; init; }
 }
 
-/// <summary>A <c>catch</c>: its variable, the hidden locals its handler receives the exception and where it was thrown in, and its body.</summary>
-public sealed record WsBoundCatch(WsLocalSymbol Variable, WsLocalSymbol Value, WsLocalSymbol Origin, WsBoundStatement Body);
+/// <summary>
+/// A <c>catch</c>: the class it catches, evaluated when an exception reaches it, or null for any exception; its
+/// variable; and its body. Its <c>try</c>'s hidden locals receive the exception and where it was thrown (section 3.7).
+/// </summary>
+public sealed record WsBoundCatch(WsBoundExpression? Class, WsLocalSymbol Variable, WsBoundStatement Body);
 
 /// <summary>A <c>finally</c>: its body, and the hidden locals its handler keeps an exception in while it runs it.</summary>
 public sealed record WsBoundFinally(WsLocalSymbol Value, WsLocalSymbol Origin, WsBoundStatement Body);
 
 /// <summary><c>try</c>, with a <c>catch</c>, a <c>finally</c>, or both (section 3.7).</summary>
-public sealed record WsBoundTry(WsBoundStatement Body, WsBoundCatch? Catch, WsBoundFinally? Finally, WsSourceSpan Span)
+public sealed record WsBoundTry(
+    WsBoundStatement Body, IReadOnlyList<WsBoundCatch> Catches, WsLocalSymbol? CatchValue, WsLocalSymbol? CatchOrigin,
+    WsBoundFinally? Finally, WsSourceSpan Span)
     : WsBoundStatement(Span);
 
 /// <summary><c>throw value;</c> (section 3.7).</summary>
@@ -139,6 +146,9 @@ public sealed record WsBoundLocalReference(WsLocalSymbol Local, WsSourceSpan Spa
 /// The text of a value, as <c>write</c> writes it, an instance as its class's name and its fields: what <c>Object</c>'s
 /// <c>toString()</c> gives; nothing but <c>Object</c> writes it (section 3.7).
 /// </summary>
+/// <summary><c>value is Class</c> (section 3.7).</summary>
+public sealed record WsBoundIs(WsBoundExpression Value, WsBoundExpression Class, WsSourceSpan Span) : WsBoundExpression(Span);
+
 public sealed record WsBoundToText(WsBoundExpression Value, WsSourceSpan Span) : WsBoundExpression(Span);
 
 public sealed record WsBoundUnary(WsUnaryOperator Operator, WsBoundExpression Operand, WsSourceSpan Span)

@@ -18,19 +18,29 @@ public sealed class WsLowerer
     private int _errorClass = -1;
     private WsBoundClass? _objectBound;
     private int _objectClass = -1;
+    private IReadOnlyList<(string Name, WsBoundClass Class)> _builtinBound = [];
+    private int[] _valueClasses = [];
+    private readonly List<(string Code, int Class)> _errorClasses = [];
 
     private WsLowerer() { }
 
     public static WsIrProgram Lower(WsBoundProgram program)
     {
-        var lowerer = new WsLowerer { _errorBound = program.ErrorClass, _objectBound = program.ObjectClass };
+        var lowerer = new WsLowerer
+        {
+            _errorBound = program.ErrorClass,
+            _objectBound = program.ObjectClass,
+            _builtinBound = program.BuiltinClasses
+        };
         var statements = lowerer.LowerBlock(program.Statements);
         return new WsIrProgram(statements, Names(program.Locals), program.Builtins)
         {
             Functions = lowerer._functions!,
             Classes = lowerer._classes,
             ErrorClass = lowerer._errorClass,
-            ObjectClass = lowerer._objectClass
+            ObjectClass = lowerer._objectClass,
+            ValueClasses = lowerer._valueClasses,
+            ErrorClasses = lowerer._errorClasses
         };
     }
 
@@ -68,6 +78,10 @@ public sealed class WsLowerer
                 var index = LowerClass(declaration.Class);
                 if (ReferenceEquals(declaration.Class, _errorBound)) _errorClass = index;
                 if (ReferenceEquals(declaration.Class, _objectBound)) _objectClass = index;
+                foreach (var (name, builtin) in _builtinBound)
+                {
+                    if (ReferenceEquals(declaration.Class, builtin)) Remember(name, index);
+                }
                 var made = new WsIrMakeClass(index, declaration.Span)
                 {
                     Base = declaration.Class.Base is null ? null : LowerExpression(declaration.Class.Base)
@@ -97,6 +111,25 @@ public sealed class WsLowerer
         local.IsCaptured
             ? new WsIrEvaluate(new WsIrStoreCell(local.Index, value, span), span)
             : new WsIrInitializeLocal(local.Index, value, span);
+
+    /// <summary>A built-in class's index, if it is a kind of value's, or of runtime error's (section 3.7).</summary>
+    private void Remember(string name, int index)
+    {
+        foreach (var (valueClass, kind) in WsPrelude.ValueClasses)
+        {
+            if (valueClass != name) continue;
+            if (_valueClasses.Length == 0)
+            {
+                _valueClasses = new int[WsPrelude.ValueClasses.Length];
+                for (var i = 0; i < _valueClasses.Length; i++) _valueClasses[i] = -1;
+            }
+            _valueClasses[(int)kind] = index;
+        }
+        foreach (var (errorClass, code) in WsPrelude.ErrorClasses)
+        {
+            if (errorClass == name) _errorClasses.Add((code, index));
+        }
+    }
 
     private int LowerClass(WsBoundClass declaration)
     {
@@ -181,15 +214,29 @@ public sealed class WsLowerer
             case WsBoundTry tryStatement:
             {
                 WsIrCatch? handler = null;
-                if (tryStatement.Catch is { } catchPart)
+                if (tryStatement.Catches.Count > 0)
                 {
-                    var variable = catchPart.Variable;
-                    var span = variable.DeclarationSpan;
-                    var body = new List<WsIrStatement>();
-                    if (variable.IsCaptured) body.Add(new WsIrNewCell(variable.Index, span));
-                    body.Add(Initialize(variable, new WsIrLoadLocal(catchPart.Value.Index, span), span));
-                    body.Add(LowerStatement(catchPart.Body));
-                    handler = new WsIrCatch(catchPart.Value.Index, catchPart.Origin.Index, body);
+                    // The catches, tried in turn: each a test of its class, but one without a class, which catches
+                    // anything, and a last one throwing again what none of them catches, after the finally (section 3.7).
+                    var value = tryStatement.CatchValue!.Index;
+                    var origin = tryStatement.CatchOrigin!.Index;
+                    WsIrStatement chain = new WsIrRethrow(value, origin, tryStatement.Span);
+                    for (var i = tryStatement.Catches.Count - 1; i >= 0; i--)
+                    {
+                        var catchPart = tryStatement.Catches[i];
+                        var variable = catchPart.Variable;
+                        var span = variable.DeclarationSpan;
+                        var body = new List<WsIrStatement>();
+                        if (variable.IsCaptured) body.Add(new WsIrNewCell(variable.Index, span));
+                        body.Add(Initialize(variable, new WsIrLoadLocal(value, span), span));
+                        body.Add(LowerStatement(catchPart.Body));
+                        var block = new WsIrBlock(body, span);
+                        chain = catchPart.Class is null
+                            ? block
+                            : new WsIrIf(new WsIrIs(new WsIrLoadLocal(value, span), LowerExpression(catchPart.Class), span), block,
+                                chain, span);
+                    }
+                    handler = new WsIrCatch(value, origin, [chain]);
                 }
                 var cleanup = tryStatement.Finally is { } finallyPart
                     ? new WsIrFinally(finallyPart.Value.Index, finallyPart.Origin.Index, LowerStatement(finallyPart.Body))
@@ -239,6 +286,8 @@ public sealed class WsLowerer
                 return new WsIrLoadCapture(capture.Index, capture.Span);
             case WsBoundUnary unary:
                 return new WsIrUnary(unary.Operator, LowerExpression(unary.Operand), unary.Span);
+            case WsBoundIs test:
+                return new WsIrIs(LowerExpression(test.Value), LowerExpression(test.Class), test.Span);
             case WsBoundToText text:
                 return new WsIrToText(LowerExpression(text.Value), text.Span);
             case WsBoundBinary binary:
