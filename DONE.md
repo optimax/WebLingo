@@ -1721,3 +1721,23 @@ A1: (b). It looks to me like a sneaky way of introducing generics (the same modu
 A2: (a) for static imports, (b) for dynamic.
 
 Done (Claude, 2026-11-14, `02ae50c`): recorded as approved in the specification, section 3.9 ("Parameters"), with the new code WL2016 (section 8.4); on both VMs, with tests in `ModuleTests` (`WebLingo.VM.Tests`); its choices recorded as Proposed in section 15.2 ("Modules"), among them that a value left out counts as different from one given, even the default, and that the program's own parameters are their defaults until "Modules: A Script's Parameters" gives them values. The dynamic import's runtime check is built, for "Modules: Dynamic Imports" to use. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Converting Strings to Values
+
+A follow-up to A1 of "Modules, Quoted Parameters": a script's parameters are strings, which a script converts itself; `new Integer("10")` is WL3001 now, `new` on a class of values taking only a value of its kind (specification, section 15.2, "Classes holding a value"). Added by Claude, 2026-11-14.
+
+**Q1, converting a string: (a) `new Integer("10")`, `new Number("1.5")` and `new Boolean("true")` read a string as a literal of their kind, WL3001 for one that is not; (b) static methods of their own, `Integer.parse("10")`, `Number.parse("1.5")` and `Boolean.parse("true")`, `new` taking a value of its kind alone, as now.**
+
+A1: It could be both. `Integer.parse("10")` is good. But also `Integer("10")` could effectively mean:
+
+```
+class Integer {
+    var __value = 0;
+    
+    constructor (stringValue) {
+        __value = Integer.parse(stringValue);
+    }
+}
+```
+
+Done (Claude, 2026-11-14, `dee6093`): both, recorded as approved in the specification, section 3.7 ("Classes of values"): `Integer.parse("10")`, `Number.parse("1.5")` and `Boolean.parse("true")`, and `new Integer("10")` and the like reading a string the same way, as A1's constructor does, on both VMs, with conformance tests; their choices recorded as Proposed in section 15.2 ("Classes holding a value"), among them that a number may have a sign, and nothing around it, not even a space. A1 writes `Integer("10")`, which is read as `new Integer("10")`: a class called without `new` stays WL2005 (section 3.7, "Instances"). A1's code block had taken the place of the line "## [IDLE] Modules", the heading of the task after it, which is restored. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.

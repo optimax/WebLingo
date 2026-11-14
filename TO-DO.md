@@ -8,26 +8,6 @@
 
 2026-11-14: waits for the design of how standard modules are packaged, which A5 of "Native Code Extensions" makes native extensions, installed as other native modules are.
 
-## [WORKING] Converting Strings to Values
-
-A follow-up to A1 of "Modules, Quoted Parameters": a script's parameters are strings, which a script converts itself; `new Integer("10")` is WL3001 now, `new` on a class of values taking only a value of its kind (specification, section 15.2, "Classes holding a value"). Added by Claude, 2026-11-14.
-
-**Q1, converting a string: (a) `new Integer("10")`, `new Number("1.5")` and `new Boolean("true")` read a string as a literal of their kind, WL3001 for one that is not; (b) static methods of their own, `Integer.parse("10")`, `Number.parse("1.5")` and `Boolean.parse("true")`, `new` taking a value of its kind alone, as now.**
-
-A1: It could be both. `Integer.parse("10")` is good. But also `Integer("10")` could effectively mean:
-
-```
-class Integer {
-    var __value = 0;
-    
-    constructor (stringValue) {
-        __value = Integer.parse(stringValue);
-    }
-}
-```
-
-Done (Claude, 2026-11-14): both, recorded as approved in the specification, section 3.7 ("Classes of values"): `Integer.parse("10")`, `Number.parse("1.5")` and `Boolean.parse("true")`, and `new Integer("10")` and the like reading a string the same way, as A1's constructor does, on both VMs, with conformance tests; their choices recorded as Proposed in section 15.2 ("Classes holding a value"), among them that a number may have a sign, and nothing around it, not even a space. A1 writes `Integer("10")`, which is read as `new Integer("10")`: a class called without `new` stays WL2005 (section 3.7, "Instances"). A1's code block had taken the place of the line "## [IDLE] Modules", the heading of the task after it, which is restored. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## [IDLE] Modules
 
 The module system: `import`, static and dynamic, `export`, `param`, a script's parameters, and the standard library and the built-ins as modules (specification, section 3.9), on both VMs, before M0.12's templates, which build on it. Added by Claude, 2026-11-13.
