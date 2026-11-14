@@ -20,20 +20,6 @@ If text that rebuilds a value (round-trip text) is wanted, it is a serialization
 
 It is deferred: nothing needs it yet, and it can be added later, if it proves necessary, without changing `write`'s text or any program.
 
-## [WORKING] Interpolation Formats
-
-A format after an interpolation's colon, `{price:0.00}`, as A11 of "Multi-line Strings" has it (specification, section 3.5, "Strings"); until it is built, a format is WL1001. Its language needs a decision, and alignment, which C# writes beside it, one; each answerable with a letter. Added by Claude, 2026-11-14.
-
-Q1, the format's language: (a) .NET's numeric format strings, standard and custom (`N2`, `0.00`, `X4`, `E3`), with the invariant culture, for integers and numbers, a format given any other value being WL3001; (b) a small language of WebLingo's own, which the specification lists, so that another toolchain (Native C#) need not copy .NET's; (c) (a) now, and the subset WebLingo keeps written into the specification as it is used.
-
-A1: (c)
-
-Q2, alignment, as C# writes it, `{name,10}` and `{name,-10}`, the value padded with spaces to that width, on the left or the right: (a) yes; (b) no, not now.
-
-A2: (a)
-
-Done (Claude, 2026-11-14): `{price:N2}`, `{name,10}` and `{name,-10}`, and both, `{price,10:N2}`, on both VMs and in pages' blocks. Recorded as approved in the specification, section 3.5 ("Strings"), and its decision register, with the formats in use so far, the subset A1 asks for: the standard `D`, `E`, `F`, `N` and `X`, and custom formats of `0`, `#`, `.`, `,` and `;`; and with .NET 10's rounding, which another toolchain must copy, a standard format rounding an exact half to even (`{0.125:F2}` is `0.12`) and a custom one away from zero (`{0.125:0.00}` is `0.13`). The details are Proposed in section 15.2 ("Interpolation formats and alignments"), and the formatting is in the portability inventory. The parser writes such an interpolation as a call of the hidden class's built-in method, `<text>.<format>(value, width, format)`, which the runtime runs (`WebLingoInterpolationFormat`), so neither VM's `Run` changed and no benchmark was needed. Guessed: an alignment is any expression giving an integer, not only a literal, as C# would need, at most 999,999 either way; it pads in Unicode scalar values, as `length` counts them; `null` with a format writes nothing, as C# writes it; a value of a class extending `Integer` or `Number` is formatted as the value it holds; a format is its text as it stands, without escapes, an empty one, or a standard one with a precision above 999, being WL1012. Checks: the Release build, without warnings, the full test suite (2,084 tests), and the CLI on the samples and a script of formats, and `welp` on `samples/SimpleWebsite`, on Windows only; Linux not tried.
-
 ## [IDLE] Native Modules
 
 Native modules as the specification, section 3.9 ("Native modules"), has them, approved 14 November 2026: `IWebLingoNativeModule` and `IWebLingoNativeRegistry`, a module's functions and classes; an assembly loaded, into the host's context, from a configured scheme's folder only; a module imported by its scheme or by a path within such a folder, statically and while the program runs, its exports known to the compiler; and `std:system`'s built-ins moved into a native module in the `std` scheme's folder; on both VMs. Added by Claude, 2026-11-14.
