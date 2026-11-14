@@ -48,7 +48,8 @@ public sealed class WsStackCodeGenerator
         {
             Functions = functions,
             Classes = WsClassTable.Of(program),
-            ErrorClass = program.ErrorClass
+            ErrorClass = program.ErrorClass,
+            ObjectClass = program.ObjectClass
         };
     }
 
@@ -280,6 +281,10 @@ public sealed class WsStackCodeGenerator
                 return;
             case WsIrLoadBuiltin builtin:
                 Emit(WsStackOpCode.LoadBuiltin, builtin.Span, builtin.Builtin);
+                return;
+            case WsIrToText text:
+                EmitValue(text.Value);
+                Emit(WsStackOpCode.ToText, text.Span);
                 return;
             case WsIrUnary unary:
                 EmitValue(unary.Operand);
@@ -621,6 +626,7 @@ public sealed class WsStackCodeGenerator
             WsStackOpCode.GetSuper => (2, 1),
             WsStackOpCode.Dispose => (1, 0),
             WsStackOpCode.Throw => (1, 0),
+            WsStackOpCode.ToText => (1, 1),
             WsStackOpCode.Rethrow => (2, 0),
             WsStackOpCode.New => (a + 1, 1),
             WsStackOpCode.SetMember => (2, b),

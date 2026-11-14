@@ -50,6 +50,10 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         {
             return Fail($"The module's Error class, {module.ErrorClass}, is not -1 or one of its classes.");
         }
+        if (module.ObjectClass < -1 || module.ObjectClass >= module.Classes.Count)
+        {
+            return Fail($"The module's Object class, {module.ObjectClass}, is not -1 or one of its classes.");
+        }
         var result = VerifyFunction(module, module.EntryPoint);
         for (var i = 0; i < module.Functions.Count && result.IsValid; i++)
         {
@@ -119,6 +123,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             case WsOpCode.Move:
             case WsOpCode.Negate:
             case WsOpCode.Plus:
+            case WsOpCode.ToText:
                 return Register(function, a, "destination") ?? Register(function, b, "operand") ?? Unused(c, d);
             case WsOpCode.Add:
             case WsOpCode.Subtract:
@@ -491,6 +496,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             case WsOpCode.Negate:
             case WsOpCode.Plus:
             case WsOpCode.Not:
+            case WsOpCode.ToText:
                 return Unwritten(instruction.B, state, locals);
             case WsOpCode.JumpIfFalse:
             case WsOpCode.JumpIfTrue:
@@ -612,7 +618,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
 
     private static int? Writes(WsInstruction instruction) => instruction.OpCode switch
     {
-        WsOpCode.LoadConstant or WsOpCode.Move or WsOpCode.Negate or WsOpCode.Plus or WsOpCode.Add or WsOpCode.Subtract
+        WsOpCode.LoadConstant or WsOpCode.Move or WsOpCode.Negate or WsOpCode.Plus or WsOpCode.ToText or WsOpCode.Add or WsOpCode.Subtract
             or WsOpCode.Multiply or WsOpCode.Divide or WsOpCode.CallBuiltin or WsOpCode.LoadNull or WsOpCode.LoadBoolean
             or WsOpCode.Not or WsOpCode.Equal or WsOpCode.NotEqual or WsOpCode.Less or WsOpCode.LessOrEqual
             or WsOpCode.Greater or WsOpCode.GreaterOrEqual or WsOpCode.NewCell or WsOpCode.BoxRegister or WsOpCode.CopyCell

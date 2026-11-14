@@ -16,18 +16,21 @@ public sealed class WsLowerer
     private readonly List<WsIrClass> _classes = [];
     private WsBoundClass? _errorBound;
     private int _errorClass = -1;
+    private WsBoundClass? _objectBound;
+    private int _objectClass = -1;
 
     private WsLowerer() { }
 
     public static WsIrProgram Lower(WsBoundProgram program)
     {
-        var lowerer = new WsLowerer { _errorBound = program.ErrorClass };
+        var lowerer = new WsLowerer { _errorBound = program.ErrorClass, _objectBound = program.ObjectClass };
         var statements = lowerer.LowerBlock(program.Statements);
         return new WsIrProgram(statements, Names(program.Locals), program.Builtins)
         {
             Functions = lowerer._functions!,
             Classes = lowerer._classes,
-            ErrorClass = lowerer._errorClass
+            ErrorClass = lowerer._errorClass,
+            ObjectClass = lowerer._objectClass
         };
     }
 
@@ -64,6 +67,7 @@ public sealed class WsLowerer
             {
                 var index = LowerClass(declaration.Class);
                 if (ReferenceEquals(declaration.Class, _errorBound)) _errorClass = index;
+                if (ReferenceEquals(declaration.Class, _objectBound)) _objectClass = index;
                 var made = new WsIrMakeClass(index, declaration.Span)
                 {
                     Base = declaration.Class.Base is null ? null : LowerExpression(declaration.Class.Base)
@@ -235,6 +239,8 @@ public sealed class WsLowerer
                 return new WsIrLoadCapture(capture.Index, capture.Span);
             case WsBoundUnary unary:
                 return new WsIrUnary(unary.Operator, LowerExpression(unary.Operand), unary.Span);
+            case WsBoundToText text:
+                return new WsIrToText(LowerExpression(text.Value), text.Span);
             case WsBoundBinary binary:
                 var left = LowerExpression(binary.Left);
                 var right = LowerExpression(binary.Right);

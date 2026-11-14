@@ -11,6 +11,8 @@ public sealed record WsBoundProgram(
 {
     /// <summary>The built-in class <c>Error</c>, among the program's classes if it uses it, or null (section 3.7).</summary>
     public WsBoundClass? ErrorClass { get; init; }
+    /// <summary>The built-in class <c>Object</c>, among the program's classes if it uses it, or null (section 3.7).</summary>
+    public WsBoundClass? ObjectClass { get; init; }
 }
 
 /// <summary>
@@ -132,6 +134,12 @@ public sealed record WsBoundNullLiteral(WsSourceSpan Span) : WsBoundExpression(S
 public sealed record WsBoundStringLiteral(string Value, WsSourceSpan Span) : WsBoundExpression(Span);
 
 public sealed record WsBoundLocalReference(WsLocalSymbol Local, WsSourceSpan Span) : WsBoundExpression(Span);
+
+/// <summary>
+/// The text of a value, as <c>write</c> writes it, an instance as its class's name and its fields: what <c>Object</c>'s
+/// <c>toString()</c> gives; nothing but <c>Object</c> writes it (section 3.7).
+/// </summary>
+public sealed record WsBoundToText(WsBoundExpression Value, WsSourceSpan Span) : WsBoundExpression(Span);
 
 public sealed record WsBoundUnary(WsUnaryOperator Operator, WsBoundExpression Operand, WsSourceSpan Span)
     : WsBoundExpression(Span);

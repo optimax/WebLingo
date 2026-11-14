@@ -59,7 +59,8 @@ public sealed class WsCodeGenerator
         {
             Functions = functions,
             Classes = WsClassTable.Of(program),
-            ErrorClass = program.ErrorClass
+            ErrorClass = program.ErrorClass,
+            ObjectClass = program.ObjectClass
         };
     }
 
@@ -329,6 +330,15 @@ public sealed class WsCodeGenerator
                 Emit(new WsInstruction(WsOpCode.Move, destination, store.Local), store.Span);
                 return destination;
             }
+            case WsIrToText text:
+            {
+                var mark = _nextRegister;
+                var operand = EmitExpression(text.Value, null);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.ToText, destination, operand), text.Span);
+                return destination;
+            }
             case WsIrUnary unary:
             {
                 var mark = _nextRegister;
@@ -524,6 +534,7 @@ public sealed class WsCodeGenerator
     {
         WsIrStoreLocal store => store.Local == local || Assigns(store.Value, local),
         WsIrUnary unary => Assigns(unary.Operand, local),
+        WsIrToText text => Assigns(text.Value, local),
         WsIrBinary binary => Assigns(binary.Left, local) || Assigns(binary.Right, local),
         WsIrLogical logical => Assigns(logical.Left, local) || Assigns(logical.Right, local),
         WsIrCallBuiltin call => AnyAssigns(call.Arguments, local),

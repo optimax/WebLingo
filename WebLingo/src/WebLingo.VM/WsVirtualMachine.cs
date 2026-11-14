@@ -134,6 +134,22 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         public bool Holds;
         public WsRuntimeError? HeldError;
         public long HeldOrigin;
+        /// <summary>For a toString() that a text being built waits for: that text (section 3.7).</summary>
+        public TextCall? Text;
+    }
+
+    /// <summary>
+    /// A text being built (section 3.7), and what it is for: a <c>ToText</c>'s result, or a built-in that writes it,
+    /// whose result goes where <see cref="Destination"/> says; and whether its VM keeps its values as roots, as it
+    /// does while a toString() it waits for runs.
+    /// </summary>
+    private sealed class TextCall(WsTextBuilder builder, IWsBuiltinFunction? builtin, int destination)
+    {
+        public WsTextBuilder Builder { get; } = builder;
+        public IWsBuiltinFunction? Builtin { get; } = builtin;
+        /// <summary>The register its result goes to.</summary>
+        public int Destination { get; } = destination;
+        public bool Rooted { get; set; }
     }
 
     private sealed class Execution(WsCompiledModule module, WsInstruction[] entryCode, WsInstruction[][] codes,
@@ -151,6 +167,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             };
             heap.AddRoots(frame.Registers);
             heap.AddRoots(_errorClass);
+            heap.AddRoots(_objectClass);
 
             var code = frame.Code;
             var registers = frame.Registers;
@@ -358,6 +375,12 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             pc++;
                             continue;
                         case WsOpCode.CallBuiltin:
+                            if (_texts is not null && _texts[ins.B] && ins.D == 1 && NeedsText(registers[ins.C]))
+                            {
+                                // A built-in that writes text, of a value that may hold an instance whose toString() must run.
+                                _text = new TextCall(new WsTextBuilder(heap, registers[ins.C], false), builtins[ins.B], ins.A);
+                                goto text;
+                            }
                             error = CallBuiltin(builtins[ins.B], registers, ins);
                             if (error is not null) break;
                             pc++;
@@ -418,6 +441,18 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                                 if (isMethod && name.Member == WsMember.Dispose) goto dispose;
                                 goto call;
                             }
+                            if (name.Member == WsMember.ToString && heap.DefaultToString.Kind == WsValueKind.Function)
+                            {
+                                // Every value has Object's toString() (section 3.7).
+                                callee = heap.DefaultToString;
+                                self = target;
+                                arguments = registers;
+                                firstArgument = ins.C + 1;
+                                argumentCount = ins.D;
+                                resultRegister = ins.A;
+                                constructed = WsValue.Null;
+                                goto call;
+                            }
                             if (!WsMembers.TryCall(target, name.Member, name.Text, registers, ins.C + 1, ins.D, heap,
                                     out var result, out error))
                             {
@@ -433,6 +468,12 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             if (!TryMakeClass(module.Classes[ins.B], baseClass, registers, cells, out var made, out error)) break;
                             registers[ins.A] = made;
                             if (ins.B == module.ErrorClass) _errorClass[0] = made;
+                            if (ins.B == module.ObjectClass)
+                            {
+                                _objectClass[0] = made;
+                                heap.TryGetMethod(made, "toString", out var defaultToString);
+                                heap.DefaultToString = defaultToString;
+                            }
                             pc++;
                             continue;
                         }
@@ -554,6 +595,9 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             constructed = WsValue.Null;
                             goto call;
                         }
+                        case WsOpCode.ToText:
+                            _text = new TextCall(new WsTextBuilder(heap, registers[ins.B], true), null, ins.A);
+                            goto text;
                         case WsOpCode.Throw:
                             _thrown = registers[ins.A];
                             _thrownError = null;
@@ -574,6 +618,11 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             heap.RemoveLastRoots(registers);
                             Array.Clear(registers, 0, frame.Function.RegisterCount); // So that nothing stays reachable.
                             if (frame.DisposeChain is not null) goto disposed;
+                            if (frame.Text is not null)
+                            {
+                                _returned = result;
+                                goto texted;
+                            }
                             frame.Closure[0] = WsValue.Null;
                             if (frame.Constructed.Kind == WsValueKind.Instance) result = frame.Constructed;
                             frame.Constructed = WsValue.Null;
@@ -610,10 +659,17 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                     if (callee.Kind == WsValueKind.Builtin)
                     {
                         var builtin = builtins[callee.Handle];
-                        var builtinResult = WsValue.Null;
-                        error = builtin.Arity != argumentCount
-                            ? WrongArgumentCount(builtin.Name, builtin.Arity, argumentCount)
-                            : CallBuiltin(builtin, arguments, firstArgument, argumentCount, out builtinResult);
+                        if (builtin.Arity != argumentCount)
+                        {
+                            error = WrongArgumentCount(builtin.Name, builtin.Arity, argumentCount);
+                            goto failed;
+                        }
+                        if (_texts is not null && _texts[callee.Handle] && argumentCount == 1 && NeedsText(arguments[firstArgument]))
+                        {
+                            _text = new TextCall(new WsTextBuilder(heap, arguments[firstArgument], false), builtin, resultRegister);
+                            goto text;
+                        }
+                        error = CallBuiltin(builtin, arguments, firstArgument, argumentCount, out var builtinResult);
                         if (error is not null) goto failed;
                         registers[resultRegister] = builtinResult;
                         pc++;
@@ -736,7 +792,76 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         continue;
                     }
 
+                text:
+                    // A text being built, for ToText or a built-in that writes text, at pc: it goes on until it is done,
+                    // or until an instance's toString() must run, as a call this instruction makes (section 3.7).
+                    {
+                        var building = _text!;
+                        _text = null;
+                        if (!building.Builder.TryBuild(out var instance, out var method))
+                        {
+                            if (!building.Rooted)
+                            {
+                                heap.AddRoots(building.Builder.Roots);
+                                building.Rooted = true;
+                            }
+                            if (depth + 1 == frames.Length) Array.Resize(ref frames, frames.Length * 2);
+                            (frames[depth + 1] ??= new Frame()).Text = building;
+                            callee = method;
+                            self = instance;
+                            arguments = registers;
+                            firstArgument = 0;
+                            argumentCount = 0;
+                            resultRegister = 0;
+                            constructed = WsValue.Null;
+                            goto call;
+                        }
+                        if (building.Rooted) heap.RemoveLastRoots(building.Builder.Roots);
+                        if (!heap.TryAllocateString(building.Builder.Text, out var written, out error)) goto failed;
+                        if (building.Builtin is { } writer)
+                        {
+                            error = CallBuiltin(writer, [written], 0, 1, out written);
+                            if (error is not null) goto failed;
+                        }
+                        registers[building.Destination] = written;
+                        pc++;
+                        continue;
+                    }
+
+                texted:
+                    // A toString() that a text waits for has returned, its frame let go of: its string goes into the
+                    // text, which goes on, at the instruction it is for; anything but a string is WS3001 (section 3.7).
+                    {
+                        var building = frame.Text!;
+                        frame.Text = null;
+                        frame.Closure[0] = WsValue.Null;
+                        frame = frames[--depth];
+                        code = frame.Code;
+                        registers = frame.Registers;
+                        cells = frame.Cells;
+                        pc = frame.Pc - 1;
+                        if (_returned.Kind != WsValueKind.String)
+                        {
+                            if (building.Rooted) heap.RemoveLastRoots(building.Builder.Roots);
+                            error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                                $"'toString()' gave {WsValueFormatter.Describe(_returned, heap)}, not a string, to be written.");
+                            _returned = WsValue.Null;
+                            goto failed;
+                        }
+                        building.Builder.Supply(heap.GetString(_returned));
+                        _returned = WsValue.Null;
+                        _text = building;
+                        goto text;
+                    }
+
                 failed:
+                    // A call that failed before its frame was pushed leaves nothing in that frame: no disposal, no text.
+                    if (depth + 1 < frames.Length && frames[depth + 1] is { } unpushed)
+                    {
+                        unpushed.DisposeChain = null;
+                        if (unpushed.Text is { Rooted: true } stale) heap.RemoveLastRoots(stale.Builder.Roots);
+                        unpushed.Text = null;
+                    }
                     // A runtime error: one that cannot be caught stops the program, and any other is thrown (section 3.7).
                     if (!WsExceptions.IsCatchable(error!.Code))
                     {
@@ -775,6 +900,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         heap.RemoveLastRoots(frame.Closure);
                         heap.RemoveLastRoots(registers);
                         Array.Clear(registers, 0, frame.Function.RegisterCount);
+                        if (frame.Text is { Rooted: true } waiting) heap.RemoveLastRoots(waiting.Builder.Roots);
                         Release(frame);
                         frame = frames[--depth];
                         code = frame.Code;
@@ -947,6 +1073,38 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         /// <summary>The class Error, once the module has made it, which a caught runtime error becomes (section 3.7); a root.</summary>
         private readonly WsValue[] _errorClass = new WsValue[1];
 
+        /// <summary>The class Object, once the module has made it, whose toString() every value has (section 3.7); a root.</summary>
+        private readonly WsValue[] _objectClass = new WsValue[1];
+
+        /// <summary>
+        /// For each built-in, whether it writes text (<see cref="IWsTextBuiltin"/>), and so is given a value's text with
+        /// the toString() its instances override run; null if no class of the module overrides toString(), as then the
+        /// formatter alone gives every text (section 3.7).
+        /// </summary>
+        private readonly bool[]? _texts = TextBuiltins(module, builtins);
+
+        /// <summary>A text to build, on its way to the code that builds it; and what a toString() a text waits for gave.</summary>
+        private TextCall? _text;
+        private WsValue _returned;
+
+        private static bool[]? TextBuiltins(WsCompiledModule module, IWsBuiltinFunction[] builtins)
+        {
+            var overrides = false;
+            for (var i = 0; i < module.Classes.Count && !overrides; i++)
+            {
+                if (i == module.ObjectClass) continue;
+                foreach (var method in module.Classes[i].Methods) overrides |= method.Name == "toString";
+            }
+            if (!overrides) return null;
+            var texts = new bool[builtins.Length];
+            for (var i = 0; i < builtins.Length; i++) texts[i] = builtins[i] is IWsTextBuiltin;
+            return texts;
+        }
+
+        /// <summary>Whether a value's text may hold an instance's, which its class's toString() may give.</summary>
+        private static bool NeedsText(WsValue value) =>
+            value.Kind is WsValueKind.Instance or WsValueKind.Array or WsValueKind.Map or WsValueKind.Set;
+
         private long OriginOf(WsFunction function, int pc)
         {
             for (var i = 0; i < module.Functions.Count; i++)
@@ -1016,6 +1174,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             frame.Closure[2] = WsValue.Null;
             frame.Holds = false;
             frame.HeldError = null;
+            frame.Text = null;
         }
 
         /// <summary>A frame an exception leaves keeps nothing: its closure, its instance, a disposal, a kept exception.</summary>
@@ -1028,6 +1187,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             frame.DisposeChain = null;
             frame.Holds = false;
             frame.HeldError = null;
+            frame.Text = null;
         }
 
         private static WsRuntimeError WrongArgumentCount(string name, int arity, int count) =>

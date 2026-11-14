@@ -28,10 +28,15 @@ public sealed class WsBinder
     private WsBoundClassDeclaration? _object;
 
     /// <summary>
-    /// <c>Object</c>, which every class without <c>extends</c> extends: its one method, <c>equal(other)</c>, gives
-    /// <c>this == other</c>, and any class may override it (section 3.7).
+    /// <c>Object</c>, which every class without <c>extends</c> extends: <c>equal(other)</c> gives <c>this == other</c>,
+    /// and <c>toString()</c> the text <c>write</c> writes, an instance's class and fields; any class may override them
+    /// (section 3.7).
     /// </summary>
-    private const string ObjectSource = "class Object { equal(other) { return this == other; } }";
+    private const string ObjectSource =
+        "class Object { equal(other) { return this == other; } toString() { return toText(this); } }";
+
+    /// <summary>Whether <c>Object</c> is being bound, whose <c>toString()</c> calls <c>toText</c>, which nothing else has.</summary>
+    private bool _inPrelude;
 
     /// <summary>The built-in class <c>Error</c>, bound once a program needs it (section 3.7).</summary>
     private WsBoundClassDeclaration? _error;
@@ -66,7 +71,11 @@ public sealed class WsBinder
         var statements = BindStatements(unit.Statements);
         if (_error is not null) statements.Insert(0, _error);
         if (_object is not null) statements.Insert(0, _object); // Made first, before the program's own classes.
-        return new WsBoundProgram(statements, _function.Locals, _builtinsInOrder) { ErrorClass = _error?.Class };
+        return new WsBoundProgram(statements, _function.Locals, _builtinsInOrder)
+        {
+            ErrorClass = _error?.Class,
+            ObjectClass = _object?.Class
+        };
     }
 
     /// <summary>A block's statements, in the current scope, its function declarations declared first.</summary>
@@ -574,6 +583,7 @@ public sealed class WsBinder
             case WsMemberAccessSyntax { Target: WsSuperSyntax } superMember:
                 return BindSuper(superMember.Name, superMember.Span);
             case WsMemberAccessSyntax member:
+                if (member.Name == "toString") UseObject(); // Every value has Object's (section 3.7).
                 return new WsBoundMember(BindExpression(member.Target), member.Name, member.Span) { IsOptional = member.IsOptional };
             case WsMemberAssignmentSyntax field:
                 return new WsBoundMemberAssignment(BindExpression(field.Target.Target), field.Target.Name, BindExpression(field.Value),
@@ -675,6 +685,10 @@ public sealed class WsBinder
         var calleeSyntax = call.Callee;
         while (calleeSyntax is WsParenthesizedExpressionSyntax parenthesized) calleeSyntax = parenthesized.Expression;
         if (calleeSyntax is WsErrorExpressionSyntax) return new WsBoundError(call.Span);
+        if (_inPrelude && calleeSyntax is WsNameSyntax { Name: "toText" } && arguments.Count == 1)
+        {
+            return new WsBoundToText(arguments[0], call.Span);
+        }
         if (calleeSyntax is WsSuperSyntax)
         {
             if (_class is { InConstructor: false })
@@ -690,7 +704,8 @@ public sealed class WsBinder
         }
         if (calleeSyntax is WsMemberAccessSyntax member)
         {
-            // A method, called on its target (specification, section 3.6).
+            // A method, called on its target (specification, section 3.6); every value has Object's toString() (section 3.7).
+            if (member.Name == "toString") UseObject();
             return new WsBoundMethodCall(BindExpression(member.Target), member.Name, arguments, call.Span);
         }
         if (calleeSyntax is WsIntegerLiteralSyntax or WsBinary64LiteralSyntax or WsBooleanLiteralSyntax
@@ -782,9 +797,9 @@ public sealed class WsBinder
         _prelude.Locals.Add("Object", local);
         var syntax = (WsClassDeclarationSyntax)new WsParser(ObjectSource, "Object").ParseCompilationUnit().Root.Statements[0];
         var (outerScope, outerFunction, outerClass) = (_scope, _function, _class);
-        (_scope, _function) = (_prelude, _main);
+        (_scope, _function, _inPrelude) = (_prelude, _main, true);
         _object = new WsBoundClassDeclaration(local, BindClass(syntax, local, null, []), default);
-        (_scope, _function, _class) = (outerScope, outerFunction, outerClass);
+        (_scope, _function, _class, _inPrelude) = (outerScope, outerFunction, outerClass, false);
         return local;
     }
 

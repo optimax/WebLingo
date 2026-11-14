@@ -24,13 +24,15 @@ Classes, with single inheritance and no exposed prototype chain (specification, 
 
 
 
-## [IDLE] M0.10.7: `toString()`
+## [WORKING] M0.10.7: `toString()`
 
 `Object`'s `toString()` (A3 of "M0.10 Syntax: Static Members, `Object` and Exceptions"; specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
 
 2026-11-13: waits for the answers to "M0.10 Syntax: `toString()` and Disposal That Throws".
 
 2026-11-13: answered; next.
+
+Done (Claude, 2026-11-13): every value's `toString()`, `Object`'s giving the text `write` writes, which a class may override; `write`, `writeLn` and a `toString()` of `Object`'s then write what the override gives, wherever the instance is, and anything but a string is WS3001 (A1 to A4). The VMs run an override as a call on their own stacks, the text being built with a stack of its own that waits for it (`WsTextBuilder`); one new operation, `ToText`, which only `Object` uses. A program that overrides no `toString()` writes as before, and the benchmark's times did not change beyond the noise. Choices of mine, in section 15.2 as proposed (row "`toString()`"): `null.toString()` is `"null"` and `Point.toString()` `"class Point"`; a `toString()` with parameters is WS2006 where the text is written; `Object`'s `toString()` writes an instance that holds itself as `Name {…}`. Every new conformance case gives the same result on both VMs. Build and 1,206 tests pass on Windows; Linux not tried.
 
 ## [IDLE] Typed Catches
 

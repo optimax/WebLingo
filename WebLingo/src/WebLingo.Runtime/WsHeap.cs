@@ -43,6 +43,23 @@ public sealed class WsHeap
     /// <summary>Registers values the collector must keep, and everything they refer to, until they are removed.</summary>
     public void AddRoots(WsValue[] roots) => _roots.Add(roots);
 
+    /// <summary>Roots that grow and shrink, as a text being built holds them (<see cref="WsTextBuilder"/>), last added first removed.</summary>
+    private readonly List<List<WsValue>> _listRoots = [];
+
+    public void AddRoots(List<WsValue> roots) => _listRoots.Add(roots);
+
+    public void RemoveLastRoots(List<WsValue> roots)
+    {
+        if (_listRoots.Count == 0 || _listRoots[^1] != roots) throw new InvalidOperationException("The roots are not the last added.");
+        _listRoots.RemoveAt(_listRoots.Count - 1);
+    }
+
+    /// <summary>
+    /// <c>Object</c>'s <c>toString()</c>, once the program has made <c>Object</c>: what every value that is not an
+    /// instance has as its <c>toString</c>, and what a class that does not override it has (section 3.7).
+    /// </summary>
+    public WsValue DefaultToString { get; set; }
+
     /// <summary>Removes the roots added last, which must be <paramref name="roots"/>: a call's frame, as it returns.</summary>
     public void RemoveLastRoots(WsValue[] roots)
     {
@@ -440,6 +457,10 @@ public sealed class WsHeap
         var marked = new bool[_objects.Count];
         var pending = new Stack<int>();
         foreach (var roots in _roots)
+        {
+            foreach (var value in roots) Mark(value, marked, pending);
+        }
+        foreach (var roots in _listRoots)
         {
             foreach (var value in roots) Mark(value, marked, pending);
         }

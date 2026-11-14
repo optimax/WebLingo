@@ -145,6 +145,12 @@ public enum WsOpCode : byte
     /// throws it again from there (<c>throw;</c>, and the end of a <c>finally</c>'s handler; section 3.7).
     /// </summary>
     Rethrow,
+    /// <summary>
+    /// A = destination, B = a value: its text, as <c>write</c> writes it, an instance as its class's name and its
+    /// fields, the instances in it whose class overrides <c>toString()</c> as that gives (<c>Object</c>'s
+    /// <c>toString()</c>; section 3.7).
+    /// </summary>
+    ToText,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
@@ -230,6 +236,8 @@ public sealed record WsCompiledModule(
     /// becomes (section 3.7), or -1 if the module has none.
     /// </summary>
     public int ErrorClass { get; init; } = -1;
+    /// <summary>The class of <see cref="Classes"/> that is <c>Object</c>, whose <c>toString()</c> every value has, or -1.</summary>
+    public int ObjectClass { get; init; } = -1;
 
     /// <summary>The smallest valid module: it returns at once.</summary>
     public static WsCompiledModule Empty(string name) =>

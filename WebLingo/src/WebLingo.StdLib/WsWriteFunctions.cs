@@ -6,7 +6,7 @@ namespace WebLingo.StdLib;
 /// break, and gives <c>null</c>. The CLI host registers it (specification, sections 8.4 and 15.2); it is here so that
 /// every host and every test registers the same one, each with its own output.
 /// </summary>
-public sealed class WsWriteFunction(IWsTextOutput output) : IWsBuiltinFunction
+public sealed class WsWriteFunction(IWsTextOutput output) : IWsTextBuiltin
 {
     public string Name => "write";
     public int Arity => 1;
@@ -21,7 +21,7 @@ public sealed class WsWriteFunction(IWsTextOutput output) : IWsBuiltinFunction
 }
 
 /// <summary><c>writeLn(value)</c>: as <c>write</c>, then a line break, LF on every platform.</summary>
-public sealed class WsWriteLnFunction(IWsTextOutput output) : IWsBuiltinFunction
+public sealed class WsWriteLnFunction(IWsTextOutput output) : IWsTextBuiltin
 {
     public string Name => "writeLn";
     public int Arity => 1;

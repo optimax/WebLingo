@@ -53,6 +53,13 @@ public interface IWsBuiltinFunction
     bool TryInvoke(WsValue[] arguments, WsHeap heap, out WsValue result, out WsRuntimeError? error);
 }
 
+/// <summary>
+/// A built-in that writes its argument as text, as <c>write</c> does: a VM gives it the text of its argument, as a
+/// string, when the argument holds an instance whose class overrides <c>toString()</c>, having run that method
+/// (specification, section 3.7); otherwise the argument itself, whose text <see cref="WsValueFormatter"/> gives.
+/// </summary>
+public interface IWsTextBuiltin : IWsBuiltinFunction;
+
 /// <summary>The runtime services a host gives an execution; M0.6 has its built-ins.</summary>
 public interface IWsRuntimeServices
 {

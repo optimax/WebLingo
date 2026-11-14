@@ -6,7 +6,7 @@ namespace WebLingo.Runtime;
 /// once, when it loads a module, so that it does not compare names as it runs; a name that is no member of any value
 /// is <see cref="Unknown"/>, and is kept for the message of its error.
 /// </summary>
-public enum WsMember : byte { Unknown, Length, Push, Pop, Has, Remove, Add, Dispose }
+public enum WsMember : byte { Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString }
 
 /// <summary>A member's name as a module's constant gives it, and the member it names.</summary>
 public readonly record struct WsMemberName(WsMember Member, string Text);
@@ -28,6 +28,7 @@ public static class WsMembers
         "remove" => WsMember.Remove,
         "add" => WsMember.Add,
         "dispose" => WsMember.Dispose,
+        "toString" => WsMember.ToString,
         _ => WsMember.Unknown
     };
 
@@ -61,9 +62,19 @@ public static class WsMembers
         {
             // A static member, the class's own or its base's (section 3.7).
             error = null;
-            if (heap.TryGetStatic(target, name, out result) || optional) return true;
+            if (heap.TryGetStatic(target, name, out result)) return true;
+            if (member == WsMember.ToString && heap.DefaultToString.Kind == WsValueKind.Function)
+            {
+                return heap.TryAllocateBoundMethod(target, heap.DefaultToString, out result, out error);
+            }
+            if (optional) return true;
             error = NoSuchMember(target, name, heap);
             return false;
+        }
+        if (member == WsMember.ToString && heap.DefaultToString.Kind == WsValueKind.Function)
+        {
+            // Every value has toString(), Object's, which gives its text (section 3.7).
+            return heap.TryAllocateBoundMethod(target, heap.DefaultToString, out result, out error);
         }
         if (target.Kind == WsValueKind.String && member == WsMember.Length)
         {
