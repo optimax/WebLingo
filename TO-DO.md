@@ -134,35 +134,6 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 
 2026-11-13: M0.13 now, after M0.12, templates (specification, section 9); waits for M0.12.
 
-## [WORKING] Adding Methods at Run Time
-
-`extend` (see "Classes of Values, Extensions") adds methods to a class as a declaration, written once in the source, its methods having `this` as a class's do. This task would add a way to do the same while the program runs, for a method, or a class to give it to, that is known only then: chosen by a condition, built by a factory, or named by data. Discussed with the owner, 2026-11-13; added by Claude the same day.
-
-Again, ensure that the implementation is the same for declared classes as well as those instantiated at runtime.
-
-What it needs:
-
-- **A function with a receiver.** A method is a function whose first, hidden parameter is `this` (specification, section 15.2, "Classes"), and a plain function expression has none (`this` in one is WL2009, unless a method around it lends its own). One way: a function expression may declare `this` as its first parameter, `function (this, prefix) { return prefix + this.x; }`, the parameter bound by a call's target (`p.describe("x = ")`), or given as an argument when the function is called directly (`describe(p, "x = ")`).
-- **A way to attach it.** A built-in method of classes, `Point.addMethod("describe", describe)`, after which every instance of `Point`, and of its subclasses, has `describe`, with `this` bound, replacing a method of that name as an extension's does (the owner chose replacing for `extend`, 2026-11-13).
-
-Its cost: a class's members could change at any point of a run, so the same call could mean different things at different times, and the VMs could no longer gather a class's methods once, when it is made.
-
-It is deferred: it can be added later, if it proves necessary, since `extend` already covers methods known when the program is written, and nothing in this design would change what programs without it do. When it is taken up, these are the owner's to decide:
-
-**Q1: a function with a receiver, `function (this, a) { … }`, its first parameter named `this`, bound by a call's target, or given as the first argument of a direct call. Agreed?**
-
-A1:  Yes.
-
-**Q2: attaching it: (a) a built-in method of every class, `Point.addMethod("describe", f)`; (b) a statement, `extend Point with describe = f;`.**
-
-A2: (a)
-
-**Q3: may a method attached at run time be removed again (`Point.removeMethod("describe")`)? (a) no; (b) yes.**
-
-A3: (b)
-
-Done (Claude, 2026-11-14): A1 and A2 were built with "Extending the Classes of Values: `Class`, Making Classes" (`d009021`), `addMethod` since named `setMethod`; A3, `Point.removeMethod(name)`, on both VMs, with conformance tests, recorded as approved in the specification, section 3.7, its choices in section 15.2 ("Classes made while the program runs"): it gives whether the class had the method, and removes a declared method as one given while the program runs, both being a class's own methods alike. That declared classes and classes made while the program runs share one implementation is "Internals on Par with Script", below. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## Native Code Extensions
 
 Make it possible to install and bind native (C# on CLR, later Native C#) code as (external) modules extending the library available to scripts (like Python does for C).
