@@ -9,8 +9,7 @@ public static class WsExceptions
 {
     /// <summary>
     /// Whether a disposal goes on after one of its dispose methods throws: its next methods run, each once, and the
-    /// exception is thrown again after the last, a later one replacing it. Section 3.4 proposes it; the owner has been
-    /// asked, and this is the one place to change if the answer is that the disposal stops there.
+    /// exception is thrown again after the last, a later one replacing it (approved, section 3.7, 13 November 2026).
     /// </summary>
     public static readonly bool DisposalGoesOn = true;
 
