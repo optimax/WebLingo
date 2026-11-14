@@ -88,11 +88,13 @@ A16: (a).
 
 2026-11-14: those are done, and the module system it needs too; split into the parts the specification defines in section 9 ("M0.12 parts"), each a task below. Waits for them.
 
-## [IDLE] M0.12.5: Template Output's Workload
+## [WORKING] M0.12.5: Template Output's Workload
 
 A benchmark workload of template output (specification, sections 5.6 and 9, M0.12.5), the third of those "Both VMs, for now" waits for. Added by Claude, 2026-11-14.
 
 2026-11-14: waits for "M0.12.1: Pages".
+
+Done (Claude, 2026-11-14): `templates`, a page (`benchmarks/WebLingo.Benchmarks/Workloads/templates.wlp`) that writes a table of 10,000 rows, each with text, an escaped string and integer, and a raw integer, compiled by the template compiler for either VM, its expected output built in C#, its line breaks read as LF so that it writes the same on every platform. Measured twice, alternately: the register VM 6.1 to 6.7 ms, the stack VM 6.4 to 6.5 ms, 280,010 and 400,015 instructions, from 40 instructions of code (135 bytes) and 58 (104 bytes); writing and escaping text takes most of the time, so the VMs are close here. Recorded in the specification, section 5.6 ("Template output"). I/O-bound work, the last workload "Both VMs, for now" waits for, needs the platform layer. Checks: the Release build, without warnings, the full test suite, the benchmark, and both command lines, on Windows only; Linux not tried.
 
 ## [IDLE] M0.13: WBC
 

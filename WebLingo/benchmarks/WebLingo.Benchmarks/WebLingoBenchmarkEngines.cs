@@ -1,7 +1,9 @@
 using WebLingo.Bytecode;
 using WebLingo.Compiler;
+using WebLingo.Core;
 using WebLingo.Runtime;
 using WebLingo.VM;
+using WebLingo.Templates;
 using WebLingo.VM.Stack;
 namespace WebLingo.Benchmarks;
 
@@ -37,7 +39,10 @@ public sealed class WebLingoRegisterEngine : IWebLingoBenchmarkEngine
 
     public IWebLingoBenchmarkProgram Compile(string source, string name, WebLingoCompilerOptions options)
     {
-        var compiled = new WebLingoCompiler(options).Compile(source, name);
+        // A page (section 13) through the template compiler; a script through the WebLingo compiler.
+        var compiled = name.EndsWith(".wlp", StringComparison.Ordinal)
+            ? new WebLingoTemplateCompiler(options).Compile(new WebLingoSourceText(source, name))
+            : new WebLingoCompiler(options).Compile(source, name);
         if (compiled.Module is not { } module)
         {
             throw new InvalidOperationException($"{name} does not compile: {string.Join("; ", compiled.Diagnostics)}");
@@ -94,7 +99,9 @@ public sealed class WebLingoStackEngine : IWebLingoBenchmarkEngine
 
     public IWebLingoBenchmarkProgram Compile(string source, string name, WebLingoCompilerOptions options)
     {
-        var compiled = new WebLingoStackCompiler(options).Compile(source, name);
+        var compiled = name.EndsWith(".wlp", StringComparison.Ordinal)
+            ? new WebLingoTemplateCompiler(options).CompileForStack(new WebLingoSourceText(source, name))
+            : new WebLingoStackCompiler(options).Compile(source, name);
         if (compiled.Module is not { } module)
         {
             throw new InvalidOperationException($"{name} does not compile: {string.Join("; ", compiled.Diagnostics)}");

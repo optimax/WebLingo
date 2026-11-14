@@ -31,7 +31,7 @@ public static class WebLingoBenchmark
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(runs, 1);
         ArgumentOutOfRangeException.ThrowIfNegative(warmUps);
-        var program = engine.Compile(workload.Source, workload.Name + ".wl", Options);
+        var program = engine.Compile(workload.Source, workload.FileName, Options);
         for (var i = 0; i < warmUps; i++) Run(engine, workload, program);
 
         var times = new TimeSpan[runs];
@@ -57,10 +57,10 @@ public static class WebLingoBenchmark
     private static long Run(IWebLingoBenchmarkEngine engine, WebLingoWorkload workload, IWebLingoBenchmarkProgram program)
     {
         var output = new WebLingoCollectedOutput();
-        var context = new WebLingoExecutionContext(new WebLingoWorkerId(0))
-        {
-            Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output))
-        };
+        // The built-ins a page calls besides (section 13), which a script does not.
+        var services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output));
+        foreach (var builtin in WebLingoTemplateBuiltins.Create(output)) services.Register(builtin);
+        var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services };
         var result = program.Run(context);
         if (!result.Succeeded)
         {

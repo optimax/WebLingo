@@ -1,0 +1,6 @@
+<%# Template output: a page's text, and values written escaped and as they stand, row after row. %>
+<table>
+<% for (var i = 0; i < 10000; i = i + 1) { %>
+<tr><td><%= i %></td><td><%= "<item & " + i.toString() + ">" %></td><td><%- i * 2 %></td></tr>
+<% } %>
+</table>

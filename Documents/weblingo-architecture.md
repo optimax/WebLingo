@@ -440,6 +440,8 @@ Implementation complexity, in lines of source, the stack VM's against the regist
 
 **Async suspension** (M0.11.1, 13 November 2026), the second of them, measured as part 4 was: `async` starts 100 tasks, each awaiting 1,000 times, so that 100,000 suspensions and resumptions take turns through the scheduler. The register VM took 5.4 to 6.4 ms over two runs, the stack VM 7.0 to 10.5 ms, running 701,913 and 1,403,221 instructions, from 34 instructions of code (108 bytes) and 59 (108 bytes); both allocated 77 KB of .NET's heap, a waiting frame being kept as it is, not copied. Template output and I/O-bound work are still to come.
 
+**Template output** (M0.12.5, 14 November 2026), the third of them, measured as part 4 was: `templates`, a page (`templates.wlp`, compiled by the template compiler), writes a table of 10,000 rows, each its text, an integer and a string written escaped, and an integer written as it stands. The register VM took 6.1 to 6.7 ms over two runs, the stack VM 6.4 to 6.5 ms, running 280,010 and 400,015 instructions, from 40 instructions of code (135 bytes) and 58 (104 bytes); both allocated 14.8 MB of .NET's heap, the page's text and the strings the writes make. Writing and escaping text, the same for both, takes most of the time, so the two VMs are close here, the register VM's fewer instructions counting for less. I/O-bound work is still to come, with the platform layer.
+
 ---
 
 ## 6. Hosting architecture (WL-H001–WL-H014)
@@ -963,7 +965,7 @@ Proposed central props:
 | M0.9 | Collections: arrays, maps and sets (§3.2), with indexing, `length` and member access (§3.3), and `foreach` (§3.5) | Implemented (13 November 2026), in parts M0.9.1 to M0.9.6 (below), on both VMs, on Windows |
 | M0.10 | Classes, `dispose()` and `using` (§3.2, §3.4, WL-L011) | Implemented (13 November 2026), in parts M0.10.1 to M0.10.7 (below), on both VMs, on Windows; typed catches, `is` and the classes of values implemented too (13 November 2026), but for extending `Array`, `Map` and `Set` |
 | M0.11 | Asynchrony: `async`, `await` and tasks (§3.8) | Implemented (13 November 2026), in parts M0.11.1 and M0.11.2 (below), on both VMs, on Windows |
-| M0.12 | `.wlp` templates: includes, layouts and parameterized components, together (§13, WL-T001 to WL-T008) | Its contracts decided in part (§13, "Contracts", 13 November 2026); after M0.11, and the module system it needs (`import` and `param`), both done; in parts M0.12.1 to M0.12.5 (below, 14 November 2026), M0.12.1 to M0.12.4 implemented (14 November 2026), on both VMs, on Windows, `samples/SimpleWebsite` running through `welp` |
+| M0.12 | `.wlp` templates: includes, layouts and parameterized components, together (§13, WL-T001 to WL-T008) | Its contracts decided in part (§13, "Contracts", 13 November 2026); after M0.11, and the module system it needs (`import` and `param`), both done; in parts M0.12.1 to M0.12.5 (below, 14 November 2026), all implemented (14 November 2026), on both VMs, on Windows, `samples/SimpleWebsite` running through `welp`; what WL-T007 and WL-T008 ask of a host (dependency invalidation, application generations, cancellation and streaming to a response) waits for hosting |
 | M0.13 | WBC, the bytecode's binary format (§5.1, §5.3) | After M0.12 |
 
 **M0.7 parts** (12 November 2026), each landing on its own with its conformance tests, which `WebLingo.Conformance.Tests` runs beside §8.6's:
@@ -1004,7 +1006,7 @@ Proposed central props:
 2. **M0.12.2, includes:** `<% include "/includes/header.wlp"; %>`, textual, resolved and compiled with the page, and a cycle of them an error of the templates' range (WL5001 on). Implemented (14 November 2026), on both VMs.
 3. **M0.12.3, components:** `param` in a component, `renderComponent(path, values)`, a task, the component found and compiled when it runs, as `Module.import(…)` finds and compiles a module (§3.9), and a missing one's error. Implemented (14 November 2026), on both VMs.
 4. **M0.12.4, layouts:** `<% layout "/layouts/main.wlp", { title: … }; %>`, `renderBody()`, a layout's own layout, and a cycle of them. Implemented (14 November 2026), on both VMs.
-5. **M0.12.5, template output's benchmark workload** (§5.6), the third of the workloads "Both VMs, for now" waits for.
+5. **M0.12.5, template output's benchmark workload** (§5.6), the third of the workloads "Both VMs, for now" waits for. Implemented (14 November 2026), on both VMs, and measured (§5.6, "Template output").
 
 **Extending the classes of values** (§3.7, 13 November 2026), in parts, each landing on its own with its conformance tests, on both VMs:
 
@@ -1027,7 +1029,7 @@ Proposed central props:
 
 **After M0.8** (order approved by the owner, 13 November 2026): M0.9, then M0.10, M0.11, M0.12 and M0.13, as the table gives them (asynchrony put before templates on 13 November 2026, the owner asking for it to be designed first). Each needs syntax, or a format, that this specification does not give yet, which is decided feature by feature before it is built; and each is built on both VMs (§5.6, "Both VMs, for now").
 
-**Immediate next activity:** M0.12.5, template output's benchmark workload (above). The compiler and both VMs cover M0.6's subset, the language of §3.5 to §3.9, and pages, their includes, components and layouts (§13, M0.12.1 to M0.12.4).
+**Immediate next activity:** the owner's questions open in `TO-DO.md`; M0.13 waits for the choice between the VMs (WL-BC002), which waits for I/O-bound work. The compiler and both VMs cover M0.6's subset, the language of §3.5 to §3.9, and pages, their includes, components and layouts (§13, M0.12).
 
 ---
 
