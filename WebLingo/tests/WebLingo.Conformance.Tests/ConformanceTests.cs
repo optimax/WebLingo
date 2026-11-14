@@ -449,6 +449,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("async function after(ms, v) { await delay(ms); return v; } async function fails(ms, m) { await delay(ms); throw m; } try { await Task.any([after(3, 1), fails(1, \"first\")]); } catch (e) { writeLn(e); }", "first")]
     [InlineData("async function after(ms, v) { await delay(ms); return v; } async function fails(ms, m) { await delay(ms); throw m; } writeLn([await Task.timeout(after(1, \"in time\"), 50), await Task.timeout(7, 0)]); try { await Task.timeout(after(50, \"late\"), 2); } catch (TimeoutError e) { writeLn([e.code, e is Error]); }", "[\"in time\", 7]\n[\"WL3010\", true]")]
     [InlineData("async function after(ms, v) { await delay(ms); return v; } async function fails(ms, m) { await delay(ms); throw m; } writeLn(await Task.all([Task.any([after(2, \"x\")]), Task.timeout(after(1, \"y\"), 50)]));", "[\"x\", \"y\"]")]
+    [InlineData("writeLn([Integer.parse(\"10\"), Integer.parse(\"-7\"), Integer.parse(\"+007\"), Number.parse(\"1.5\"), Number.parse(\"10\"), Number.parse(\"-1e3\"), Number.parse(\"Infinity\"), Boolean.parse(\"true\"), Integer.parse(\"-9223372036854775808\")]);", "[10, -7, 7, 1.5, 10.0, -1000.0, Infinity, true, -9223372036854775808]")]
+    [InlineData("class Celsius extends Number {} writeLn([new Integer(\"10\"), new Number(\"2.5\"), new Boolean(\"false\"), new Celsius(\"21.5\")]);", "[10, 2.5, false, Celsius:21.5]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -639,6 +641,17 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class P {} P.all([]);", "WL3006")]
     [InlineData("async function late() { await delay(50); return 1; } var t = Task.timeout(late(), 2); await delay(60);", "WL3010")]
     [InlineData("async function late() { await delay(50); return 1; } await Task.timeout(late(), 2);", "WL3010")]
+    [InlineData("Integer.parse(\"abc\");", "WL3001")]
+    [InlineData("Integer.parse(\"1.5\");", "WL3001")]
+    [InlineData("Integer.parse(\" 1\");", "WL3001")]
+    [InlineData("Integer.parse(\"9223372036854775808\");", "WL3002")]
+    [InlineData("Number.parse(\"1.\");", "WL3001")]
+    [InlineData("Number.parse(\"1e400\");", "WL3001")]
+    [InlineData("Boolean.parse(\"True\");", "WL3001")]
+    [InlineData("Integer.parse(5);", "WL3001")]
+    [InlineData("Integer.parse();", "WL2006")]
+    [InlineData("new Integer(\"x\");", "WL3001")]
+    [InlineData("String.parse(\"x\");", "WL3006")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

@@ -9,7 +9,7 @@
 | System.Linq | Not used | Kept out of the portable core's source (tests use it) |
 | `BitConverter.DoubleToInt64Bits` / `Int64BitsToDouble` | Portable target | binary64 values and constants are kept as their IEEE 754 bits |
 | Invariant number formatting (`long.ToString`, `double.ToString("R")` with `CultureInfo.InvariantCulture`) | Planned | The text `write` writes for a number (`WebLingoValueFormatter`). The Native C# runtime must give the same text, exactly: the shortest decimal that reads back as the same binary64, in .NET's exponent style (`1E+21`, `1.5E-07`). Relying on .NET for it until then is approved (12 November 2026) |
-| Invariant number parsing (`double.Parse` with `NumberStyles.Float` and `CultureInfo.InvariantCulture`) | Planned | The lexer's binary64 literals (`WebLingoLexer`). The Native C# runtime must give the same value: the binary64 nearest to the decimal, as IEEE 754 rounds it |
+| Invariant number parsing (`double.Parse` with `NumberStyles.Float` and `CultureInfo.InvariantCulture`) | Planned | The lexer's binary64 literals (`WebLingoLexer`), and `Number.parse` (`WebLingoConversions`, `WebLingo.Runtime`). The Native C# runtime must give the same value: the binary64 nearest to the decimal, as IEEE 754 rounds it |
 | `System.Text.StringBuilder` | Planned | The disassembler, the lexer's string literals, the text of an array (`WebLingoValueFormatter`), and `WebLingoCollectedOutput` (`WebLingo.StdLib`), which collects a script's output for tests and hosts |
 | `volatile` fields | Planned | `WebLingoCancellationSignal`, set by the host, read by the VM |
 | `ref readonly` locals and `in` parameters | Planned | The VMs read their instructions where they are, without copying them |

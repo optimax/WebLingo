@@ -9,7 +9,7 @@ namespace WebLingo.Runtime;
 public enum WebLingoMember : byte
 {
     Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, SetMethod, SetProperty, SetStaticProperty, SetConstant,
-    All, Any, Timeout,
+    All, Any, Timeout, Parse,
     /// <summary>The names every value, or every class, has (section 3.7), last, so that one comparison finds them.</summary>
     ClassName, InstanceOf, Parent
 }
@@ -44,6 +44,7 @@ public static class WebLingoMembers
         "all" => WebLingoMember.All,
         "any" => WebLingoMember.Any,
         "timeout" => WebLingoMember.Timeout,
+        "parse" => WebLingoMember.Parse,
         "__className" => WebLingoMember.ClassName,
         "__instanceOf" => WebLingoMember.InstanceOf,
         "__parent" => WebLingoMember.Parent,
@@ -667,7 +668,17 @@ public static class WebLingoMembers
         target.Kind == WebLingoValueKind.Class
         && (member is WebLingoMember.SetMethod or WebLingoMember.SetProperty or WebLingoMember.SetStaticProperty or WebLingoMember.SetConstant
             || (member is WebLingoMember.All or WebLingoMember.Any or WebLingoMember.Timeout && heap.ValueClasses is { } classes
-                && classes[(int)WebLingoValueClass.Task] == target));
+                && classes[(int)WebLingoValueClass.Task] == target)
+            || (member == WebLingoMember.Parse && ParsedKind(target, heap) != WebLingoValueKind.Null));
+
+    /// <summary>The kind <c>parse</c> reads a string as, for <c>Integer</c>, <c>Number</c> and <c>Boolean</c>; null's for any other class.</summary>
+    private static WebLingoValueKind ParsedKind(WebLingoValue target, WebLingoHeap heap)
+    {
+        if (heap.ValueClasses is not { } classes) return WebLingoValueKind.Null;
+        if (classes[(int)WebLingoValueClass.Integer] == target) return WebLingoValueKind.Int64;
+        if (classes[(int)WebLingoValueClass.Number] == target) return WebLingoValueKind.Binary64;
+        return classes[(int)WebLingoValueClass.Boolean] == target ? WebLingoValueKind.Boolean : WebLingoValueKind.Null;
+    }
 
     /// <summary>
     /// Calls a method, <c>x.name(…)</c>, with the <paramref name="count"/> arguments from
@@ -714,6 +725,18 @@ public static class WebLingoMembers
             if (member is WebLingoMember.All or WebLingoMember.Any or WebLingoMember.Timeout)
             {
                 return TryCombine(member, name, values, first, count, heap, out result, out error);
+            }
+            if (member == WebLingoMember.Parse)
+            {
+                // Integer.parse("10"), Number.parse("1.5") and Boolean.parse("true") (section 3.7).
+                if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+                if (values[first].Kind == WebLingoValueKind.String)
+                {
+                    return WebLingoConversions.TryParse(ParsedKind(target, heap), heap.GetString(values[first]), out result, out error);
+                }
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"'parse' reads a string, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                return false;
             }
             return TryCallClassMethod(target, member, name, values, first, count, heap, out error);
         }

@@ -269,6 +269,11 @@ public sealed class WebLingoHeap
         error = null;
         result = kind == WebLingoValueKind.Binary64 && value.Kind == WebLingoValueKind.Int64 ? WebLingoValue.FromBinary64(value.AsInt64) : value;
         if (result.Kind == kind) return true;
+        if (value.Kind == WebLingoValueKind.String && kind is WebLingoValueKind.Int64 or WebLingoValueKind.Binary64 or WebLingoValueKind.Boolean)
+        {
+            // A string read as a literal of the class's kind, as its parse reads it (section 3.7).
+            return WebLingoConversions.TryParse(kind, GetString(value), out result, out error);
+        }
         if (kind == WebLingoValueKind.Function && result.Kind is WebLingoValueKind.Builtin or WebLingoValueKind.BoundMethod) return true;
         error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
             $"The class {className} holds {KindName(kind)}, not {WebLingoValueFormatter.Describe(value, this)}.");
