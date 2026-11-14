@@ -26,7 +26,7 @@ public sealed class WebLingoModuleLoader(WebLingoCompilerOptions options) : IWeb
     public bool TryResolve(string importer, string path, out string name, out string? error)
     {
         name = "";
-        if (path.StartsWith("std:", StringComparison.Ordinal))
+        if (path.StartsWith("std:", StringComparison.Ordinal) && !(Resolver is null && options.Native is { } host && host.Names(path)))
         {
             name = path;
             error = path == "std:system" ? null : "there is no such standard module";

@@ -11,8 +11,8 @@ namespace WebLingo.Cli;
 /// assembly and import it. An assembly is loaded once, into the host's own context, and never unloaded; its one public
 /// class implementing <see cref="IWebLingoNativeModule"/> registers its functions, each then one of the host's built-ins,
 /// named <c>scheme:module.function</c>, which no script can name. <c>std:system</c> a command line loads itself, its
-/// functions the host's built-ins by their own names (<see cref="WebLingoCommandLine"/>); any other <c>std</c> module is
-/// none yet.
+/// functions the host's built-ins by their own names (<see cref="WebLingoCommandLine"/>); any other <c>std</c> module, such
+/// as <c>std:tasks</c>, is imported as any native module is.
 /// </summary>
 public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, string> schemes, WebLingoBuiltinRegistry builtins)
     : IWebLingoNativeResolver
@@ -21,7 +21,6 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
 
     private readonly Dictionary<string, WebLingoNativeModuleInfo> _loaded = new(StringComparer.Ordinal);
 
-    /// <summary>A configured scheme's path, but <c>std</c>'s, or an assembly's; any other is a file's, as a script's import is.</summary>
     /// <summary>A native module's functions, as the host's built-ins, by the names it exports them by.</summary>
     public IReadOnlyList<IWebLingoBuiltinFunction> FunctionsOf(WebLingoNativeModuleInfo module)
     {
@@ -48,8 +47,12 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
     private sealed class RenamedText(string name, IWebLingoBuiltinFunction function)
         : Renamed(name, function), IWebLingoTextBuiltin;
 
+    /// <summary>
+    /// A configured scheme's path, but <c>std:system</c>, which the compiler makes itself, or an assembly's; any other is a
+    /// file's, as a script's import is.
+    /// </summary>
     public bool Names(string path) =>
-        (TrySplit(path, out var scheme, out _) && scheme != "std" && schemes.ContainsKey(scheme))
+        (TrySplit(path, out var scheme, out _) && path != "std:system" && schemes.ContainsKey(scheme))
         || path.EndsWith(Extension, StringComparison.OrdinalIgnoreCase);
 
     public bool TryResolve(string importer, string path, [NotNullWhen(true)] out WebLingoNativeModuleInfo? module, out string? error)
@@ -94,7 +97,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         if (_loaded.TryGetValue(name, out module)) return true;
         if (!File.Exists(file))
         {
-            error = "there is no such native module";
+            error = name.StartsWith("std:", StringComparison.Ordinal) ? "there is no such standard module" : "there is no such native module";
             return false;
         }
         if (!TryLoad(name, file, out module, out error)) return false;

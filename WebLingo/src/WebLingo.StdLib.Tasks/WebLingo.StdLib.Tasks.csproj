@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- std:tasks, a standard module, a native module installed with the runtime as std/tasks.dll (section 3.9). -->
+  <PropertyGroup><OutputType>Library</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../WebLingo.Core/WebLingo.Core.csproj" />
+    <ProjectReference Include="../WebLingo.Runtime/WebLingo.Runtime.csproj" />
+  </ItemGroup>
+</Project>

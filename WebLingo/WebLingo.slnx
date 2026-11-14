@@ -12,6 +12,7 @@
   <Project Path="src/WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />
   <Project Path="src/WebLingo.Hosting.AspNetCore/WebLingo.Hosting.AspNetCore.csproj" />
   <Project Path="src/WebLingo.StdLib/WebLingo.StdLib.csproj" />
+  <Project Path="src/WebLingo.StdLib.Tasks/WebLingo.StdLib.Tasks.csproj" />
   <Project Path="src/WebLingo.Cli/WebLingo.Cli.csproj" />
   <Project Path="src/WebLingo.Pages.Cli/WebLingo.Pages.Cli.csproj" />
   <Project Path="benchmarks/WebLingo.Benchmarks/WebLingo.Benchmarks.csproj" />

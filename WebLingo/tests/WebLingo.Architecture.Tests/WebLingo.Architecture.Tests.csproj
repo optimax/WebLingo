@@ -13,6 +13,7 @@
     <ProjectReference Include="../../src/WebLingo.Templates/WebLingo.Templates.csproj" />
     <ProjectReference Include="../../src/WebLingo.Language/WebLingo.Language.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib/WebLingo.StdLib.csproj" />
+    <ProjectReference Include="../../src/WebLingo.StdLib.Tasks/WebLingo.StdLib.Tasks.csproj" />
     <ProjectReference Include="../../src/WebLingo.Platform.Abstractions/WebLingo.Platform.Abstractions.csproj" />
     <ProjectReference Include="../../src/WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />
   </ItemGroup>

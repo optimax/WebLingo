@@ -94,6 +94,26 @@ public sealed class NativeModuleTests : IDisposable
         Assert.StartsWith("'lib' is not a scheme, name=folder, or is given twice.", error);
     }
 
+    [Theory]
+    // std:tasks, a standard module installed as std/tasks.dll: Task's combinators as its exports (sections 3.8 and 3.9).
+    [InlineData("import { all, any, timeout } from \"std:tasks\"; writeLn([await all([1, delay(1), 3]), await any([delay(5), 2]), "
+        + "await timeout(7, 100)]);", "[[1, null, 3], 2, 7]")]
+    [InlineData("import tasks from \"std:tasks\"; writeLn([tasks, await tasks.all([])]);", "[module std:tasks, []]")]
+    [InlineData("import { all } from \"std:tasks\"; var messages = []; try { all(5); } catch (e) { messages.push(e.message); } "
+        + "try { Task.all(5); } catch (e) { messages.push(e.message); } writeLn(messages[0] == messages[1]);", "true")]
+    [InlineData("import { timeout } from \"std:tasks\"; try { await timeout(delay(50), 1); } catch (e) { writeLn(e.code); }", "WL3010")]
+    public void StdTasksGivesTasksCombinators(string source, string printed)
+    {
+        Assert.Equal(("", printed + "\n", ""), Run(source));
+    }
+
+    [Fact]
+    public void AStandardModuleThatIsNotInstalledIsReported()
+    {
+        Assert.Equal("WL2015: The module 'std:nothing' cannot be imported: there is no such standard module.",
+            Run("import n from \"std:nothing\";").Diagnostics);
+    }
+
     [Fact]
     public void StdSystemIsANativeModuleThatAnotherImplementationMayReplace()
     {
@@ -108,7 +128,7 @@ public sealed class NativeModuleTests : IDisposable
         Directory.CreateDirectory(empty);
         var (exit, _, error) = Weblingo(["run", "--scheme", "std=" + empty, script]);
         Assert.Equal(WebLingoCommandLine.FileUnreadable, exit);
-        Assert.StartsWith($"std:system cannot be loaded from {empty}: there is no such native module.", error);
+        Assert.StartsWith($"std:system cannot be loaded from {empty}: there is no such standard module.", error);
 
         // Another implementation of std:system: its functions are the built-ins every module sees, and std:system's exports.
         var other = Path.Combine(_folder, "other");
@@ -137,7 +157,10 @@ public sealed class NativeModuleTests : IDisposable
     private (string Diagnostics, string Output, string Error) Run(string source)
     {
         var name = Path.Combine(_folder, "program.wl");
-        var schemes = new Dictionary<string, string>(StringComparer.Ordinal) { ["native"] = _native };
+        var schemes = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["native"] = _native, ["std"] = Path.Combine(AppContext.BaseDirectory, "std")
+        };
 
         var registerOutput = new WebLingoCollectedOutput();
         var (registerOptions, registerServices) = Options(schemes, registerOutput);

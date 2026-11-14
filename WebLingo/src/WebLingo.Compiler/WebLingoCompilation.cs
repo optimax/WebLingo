@@ -103,7 +103,8 @@ public sealed class WebLingoCompilation
             {
                 if (statement is not WebLingoImportSyntax import || import.Path.Length == 0) continue;
                 string? error;
-                if (import.Path.StartsWith("std:", StringComparison.Ordinal))
+                // A standard module the compiler makes itself, std:system; any other is native, if the host has it (section 3.9).
+                if (import.Path.StartsWith("std:", StringComparison.Ordinal) && !(options.Native?.Names(import.Path) ?? false))
                 {
                     // A standard module, named by the scheme std:, never a path (section 3.9).
                     if (StandardModules.Contains(import.Path))
