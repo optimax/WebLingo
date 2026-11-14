@@ -864,6 +864,23 @@ public sealed class ConformanceTests : IDisposable
     }
 
     [Fact]
+    public void TheCliGivesAScriptItsParameters()
+    {
+        const string script = "param size;\nparam name = \"x\";\nwriteLn([size, name, Integer.parse(size) * 2]);";
+        var (exit, output, error) = Weblingo("run", script, "size=10", "name=Ann");
+        Assert.Equal((WebLingoCommandLine.Success, "[\"10\", \"Ann\", 20]\n"), (exit, output));
+        (exit, output, _) = Weblingo("run", script, "size=10");
+        Assert.Equal((WebLingoCommandLine.Success, "[\"10\", \"x\", 20]\n"), (exit, output));
+        (exit, _, error) = Weblingo("run", script);
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "program.wl(1,1): error WL2016:"), (exit, FirstLineStart(error)));
+        (exit, _, error) = Weblingo("run", script, "size=1", "colour=red");
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "program.wl(1,1): error WL2016:"), (exit, FirstLineStart(error)));
+        Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("run", script, "size").Exit);
+        Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("run", script, "size=1", "size=2").Exit);
+        Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("run", script, "=1").Exit);
+    }
+
+    [Fact]
     public void AModuleThatCannotBeFoundIsWL2015()
     {
         var (exit, output, error) = Weblingo("run", "import x from \"none\";");
@@ -880,13 +897,13 @@ public sealed class ConformanceTests : IDisposable
         Assert.Equal("Hello, WebLingo!\nHello, modules!\n2 greetings\n", output.ToString());
     }
 
-    private (int Exit, string Output, string Error) Weblingo(string command, string source)
+    private (int Exit, string Output, string Error) Weblingo(string command, string source, params string[] parameters)
     {
         var path = Path.Combine(_folder, "program.wl");
         File.WriteAllText(path, source);
         var output = new StringWriter();
         var error = new StringWriter();
-        var exit = WebLingoCommandLine.Run([command, path], output, error);
+        var exit = WebLingoCommandLine.Run([command, path, .. parameters], output, error);
         // Diagnostics name the file as it was given; show only its name, so the expectations hold on every machine.
         return (exit, output.ToString(), error.ToString().Replace(path, "program.wl", StringComparison.Ordinal));
     }

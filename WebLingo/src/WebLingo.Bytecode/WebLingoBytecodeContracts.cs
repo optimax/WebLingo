@@ -288,7 +288,7 @@ public readonly record struct WebLingoCapture(bool FromLocal, int Index);
 /// </summary>
 public sealed record WebLingoUnitInfo(string Name, int Function, IReadOnlyList<string> Exports)
 {
-    /// <summary>Its parameters (section 3.9), whose values its function takes as one map; none for the program's own file.</summary>
+    /// <summary>Its parameters (section 3.9), whose values its function takes as one map; none for the program's own file, which the module lists.</summary>
     public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];
 }
 
@@ -321,6 +321,12 @@ public sealed record WebLingoCompiledModule(
     /// of files, whose entry point takes the values its parameters are given, imports it, and gives its instance.
     /// </summary>
     public bool IsImport { get; init; }
+
+    /// <summary>
+    /// The program's own parameters (section 3.9), which its host gives values; with some, its entry point takes one
+    /// parameter, the map of their values.
+    /// </summary>
+    public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];
 
     /// <summary>The smallest valid module: it returns at once.</summary>
     public static WebLingoCompiledModule Empty(string name) =>

@@ -122,19 +122,20 @@ public sealed class WebLingoBinder
         _importTargets = modules[0].Imports;
         _moduleSources = modules;
         var units = new List<WebLingoBoundUnit>();
-        // An import's top level: the values its file is given, its one parameter, first (section 3.9).
-        var importedValues = isImport ? DeclareHidden("values", default) : null;
+        // An import's top level, or a program's with parameters: the values given, its one parameter, first (section 3.9).
+        var mainParameters = ParametersOf(modules[0].Root);
+        var importedValues = isImport || mainParameters.Count > 0 ? DeclareHidden("values", default) : null;
         // A program that imports, itself included, has a table of its files.
         var mainInstance = modules.Count > 1 || modules[0].Imports.Count > 0 ? DeclareHidden("module", default) : null;
-        var mainParameters = ParametersOf(modules[0].Root);
-        var statements = BindProgramParameters(mainParameters);
+        var programParameters = new List<WebLingoModuleParameter>();
+        var statements = BindProgramParameters(mainParameters, importedValues, programParameters);
         statements.AddRange(BindStatements(AfterParameters(modules[0].Root, mainParameters.Count)));
-        if (importedValues is not null)
+        if (isImport)
         {
             // It imports its file, the program's second, with the values given, which the import checks when it runs, and
             // gives its instance (section 3.9).
             var imported = DeclareHidden("import", default);
-            statements.Add(new WebLingoBoundImport(1, imported, default) { Values = Reference(importedValues, default) });
+            statements.Add(new WebLingoBoundImport(1, imported, default) { Values = Reference(importedValues!, default) });
             statements.Add(new WebLingoBoundReturn(Reference(imported, default), default));
             _main.Awaits = true;
         }
@@ -198,6 +199,7 @@ public sealed class WebLingoBinder
             BuiltinClasses = builtinClasses,
             IsAsync = _main.Awaits,
             IsImport = isImport,
+            Parameters = programParameters,
             Units = units
         };
     }
@@ -235,24 +237,20 @@ public sealed class WebLingoBinder
     }
 
     /// <summary>
-    /// The program's own parameters (section 3.9): each a constant of its default, nothing giving the program values yet;
-    /// one without a default is WL2016.
+    /// The program's own parameters (section 3.9): each a constant of the value its host gives it, from the map its top
+    /// level takes, or of its default; the host's values are checked when the program starts.
     /// </summary>
-    private List<WebLingoBoundStatement> BindProgramParameters(List<WebLingoParamSyntax> parameters)
+    private List<WebLingoBoundStatement> BindProgramParameters(List<WebLingoParamSyntax> parameters, WebLingoLocalSymbol? values,
+        List<WebLingoModuleParameter> declared)
     {
         var statements = new List<WebLingoBoundStatement>();
         foreach (var parameter in parameters)
         {
-            if (parameter.Default is not { } given)
-            {
-                Report(WebLingoDiagnosticCodes.ModuleParameter,
-                    $"'{parameter.Name}' is a parameter of the program, which nothing gives it: give it a default.", parameter.NameSpan);
-                continue;
-            }
-            var value = BindExpression(given);
+            var value = parameter.Default is { } given ? BindExpression(given) : null;
             if (Declare(parameter.Name, WebLingoDeclarationKind.Const, parameter.NameSpan, null) is { } local)
             {
-                statements.Add(new WebLingoBoundVariableDeclaration(local, value, parameter.Span));
+                statements.Add(new WebLingoBoundModuleParameter(local, values!, parameter.Name, value, parameter.Span));
+                declared.Add(new WebLingoModuleParameter(parameter.Name, parameter.Default is not null));
             }
         }
         return statements;

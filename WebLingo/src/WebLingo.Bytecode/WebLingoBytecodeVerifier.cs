@@ -34,7 +34,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             if (import.Arity < 0) return Fail($"Import {i} ('{import.Name}') has a negative arity.");
         }
         if (module.Functions is null) return Fail("The module has no function table.");
-        if (module.EntryPoint is { } main && (main.ParameterCount != (module.IsImport ? 1 : 0) || main.Captures is not { Count: 0 } || main.HasThis))
+        if (module.EntryPoint is { } main && (main.ParameterCount != (module.IsImport || module.Parameters is { Count: > 0 } ? 1 : 0) || main.Captures is not { Count: 0 } || main.HasThis))
         {
             return Fail("The entry point takes no parameters and captures nothing.");
         }

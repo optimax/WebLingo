@@ -31,15 +31,51 @@ public static class WebLingoCommandLine
             output.WriteLine(Version);
             return Success;
         }
-        if (args.Length == 2 && args[0] is "run" or "check") return RunFile(args[0] == "run", args[1], output, error);
+        if (args.Length == 2 && args[0] == "check") return RunFile(false, args[1], new Dictionary<string, string>(), output, error);
+        if (args.Length >= 2 && args[0] == "run")
+        {
+            if (TryParameters(args, out var parameters, out var wrong)) return RunFile(true, args[1], parameters, output, error);
+            error.WriteLine($"'{wrong}' is not a parameter's value, name=value, or is given twice.");
+        }
 
-        output.WriteLine("Usage: weblingo --version | run <file.wl> | check <file.wl>");
-        output.WriteLine("  run    compiles the file and runs it");
+        output.WriteLine("Usage: weblingo --version | run <file.wl> [name=value …] | check <file.wl>");
+        output.WriteLine("  run    compiles the file and runs it, giving its parameters the values after it, each a string");
         output.WriteLine("  check  compiles the file and reports its errors, without running it");
         return args.Length == 0 ? Success : UsageError;
     }
 
-    private static int RunFile(bool run, string path, TextWriter output, TextWriter error)
+    /// <summary>
+    /// A script's parameters, after its path: each <c>name=value</c>, its name a name, its value a string, every name given
+    /// once (section 3.9); false, with the first argument that is not one, otherwise.
+    /// </summary>
+    private static bool TryParameters(string[] args, out Dictionary<string, string> parameters, out string wrong)
+    {
+        parameters = new Dictionary<string, string>(StringComparer.Ordinal);
+        wrong = "";
+        for (var i = 2; i < args.Length; i++)
+        {
+            var equals = args[i].IndexOf('=', StringComparison.Ordinal);
+            var name = equals > 0 ? args[i][..equals] : "";
+            if (name.Length == 0 || !IsName(name) || !parameters.TryAdd(name, args[i][(equals + 1)..]))
+            {
+                wrong = args[i];
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool IsName(string text)
+    {
+        if (char.IsAsciiDigit(text[0])) return false;
+        foreach (var c in text)
+        {
+            if (!char.IsAsciiLetterOrDigit(c) && c != '_') return false;
+        }
+        return true;
+    }
+
+    private static int RunFile(bool run, string path, IReadOnlyDictionary<string, string> parameters, TextWriter output, TextWriter error)
     {
         string source;
         try
@@ -65,7 +101,12 @@ public static class WebLingoCommandLine
         if (compiled.Module is null) return CompilationFailed;
         if (!run) return Success;
 
-        var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services, Clock = new SystemClock(new DotNetClock()) };
+        var context = new WebLingoExecutionContext(new WebLingoWorkerId(0))
+        {
+            Services = services,
+            Clock = new SystemClock(new DotNetClock()),
+            Parameters = parameters
+        };
         // The VM imports modules while the program runs as the compiler imports them, with the same resolver (section 3.9).
         var result = new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(options) }.Execute(compiled.Module, context);
         output.Flush();

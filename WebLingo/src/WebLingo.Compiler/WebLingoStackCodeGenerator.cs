@@ -29,7 +29,7 @@ public sealed class WebLingoStackCodeGenerator
     public static WebLingoStackModule? Generate(WebLingoIrProgram program, string moduleName, List<WebLingoDiagnostic> diagnostics)
     {
         var module = new ModuleState();
-        var main = GenerateFunction(module, "main", program.IsImport ? 1 : 0, program.LocalNames, [], program.Statements, diagnostics);
+        var main = GenerateFunction(module, "main", program.IsImport || program.Parameters.Count > 0 ? 1 : 0, program.LocalNames, [], program.Statements, diagnostics);
         var functions = new List<WebLingoStackFunction>();
         foreach (var function in program.Functions)
         {
@@ -59,7 +59,8 @@ public sealed class WebLingoStackCodeGenerator
             ObjectClass = program.ObjectClass,
             ValueClasses = program.ValueClasses,
             ErrorClasses = ErrorClassesOf(program),
-            IsImport = program.IsImport
+            IsImport = program.IsImport,
+            Parameters = program.Parameters
         };
     }
 

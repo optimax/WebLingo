@@ -19,6 +19,8 @@ public sealed record WebLingoBoundProgram(
     public bool IsAsync { get; init; }
     /// <summary>Whether it is an import's (section 3.9), whose top level takes its file's values, imports it, and gives its instance.</summary>
     public bool IsImport { get; init; }
+    /// <summary>Its own parameters (section 3.9), whose values its top level takes as one map, its host giving them.</summary>
+    public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];
     /// <summary>Its files, if it imports others, its own first (section 3.9); empty if it imports none.</summary>
     public IReadOnlyList<WebLingoBoundUnit> Units { get; init; } = [];
 }

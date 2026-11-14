@@ -19,6 +19,12 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     public WebLingoResourceBudget Resources { get; init; } = WebLingoResourceBudget.Default;
     /// <summary>The host's clock, which <c>delay</c>'s timers wait on; without one, the execution runs in virtual time (section 3.8).</summary>
     public IWebLingoExecutionClock? Clock { get; init; }
+
+    /// <summary>
+    /// The values its host gives the program's parameters (<c>param name;</c>, section 3.9), each a string, as
+    /// <c>weblingo run script.wl name=value</c> gives them; none by default.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Parameters { get; init; } = new Dictionary<string, string>();
 }
 
 /// <summary>

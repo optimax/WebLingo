@@ -229,4 +229,7 @@ public sealed record WebLingoStackModule(
 
     /// <summary>Whether it is an import's, as <see cref="WebLingoCompiledModule.IsImport"/> says (section 3.9).</summary>
     public bool IsImport { get; init; }
+
+    /// <summary>The program's own parameters, as <see cref="WebLingoCompiledModule.Parameters"/> says (section 3.9).</summary>
+    public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];
 }

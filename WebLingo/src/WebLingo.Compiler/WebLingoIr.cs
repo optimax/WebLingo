@@ -32,6 +32,8 @@ public sealed record WebLingoIrProgram(
     public bool IsAsync { get; init; }
     /// <summary>Whether it is an import's, whose top level takes one parameter (section 3.9).</summary>
     public bool IsImport { get; init; }
+    /// <summary>Its own parameters, whose values its top level takes as one map (section 3.9).</summary>
+    public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];
 }
 
 /// <summary>A class: its constructor's function, or -1 if it has none, and its methods' (section 3.7).</summary>

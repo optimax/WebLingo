@@ -117,7 +117,6 @@ public sealed class ModuleTests
     [InlineData("import a from \"box\" { size: 1, colour: \"red\" };", WebLingoDiagnosticCodes.ModuleParameter)]
     [InlineData("import a from \"box\" { size: 1, size: 2 };", WebLingoDiagnosticCodes.DuplicateDeclaration)]
     [InlineData("import a from \"plain\" { size: 1 };", WebLingoDiagnosticCodes.ModuleParameter)]
-    [InlineData("param n = 5; param m; writeLn(n);", WebLingoDiagnosticCodes.ModuleParameter)]
     [InlineData("function f() { param x; }", WebLingoDiagnosticCodes.UnexpectedToken)]
     [InlineData("writeLn(1); param x = 1;", WebLingoDiagnosticCodes.UnexpectedToken)]
     [InlineData("param n = 5; n = 6;", WebLingoDiagnosticCodes.AssignmentToConstant)]
@@ -162,6 +161,7 @@ public sealed class ModuleTests
     [InlineData("await Module.import(\"broken\");", WebLingoDiagnosticCodes.UnexpectedToken)]
     [InlineData("await Module.import(5);", WebLingoDiagnosticCodes.InvalidOperation)]
     [InlineData("await Module.import(\"thrower\");", WebLingoDiagnosticCodes.UncaughtException)]
+    [InlineData("param n = 5; param m; writeLn(n);", WebLingoDiagnosticCodes.ModuleParameter)]
     public void AModuleImportedWhileTheProgramRunsIsCheckedThen(string main, string code)
     {
         var files = new Dictionary<string, string>

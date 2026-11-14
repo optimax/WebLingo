@@ -63,7 +63,8 @@ public sealed class WebLingoLowerer
             ValueClasses = lowerer._valueClasses,
             ErrorClasses = lowerer._errorClasses,
             IsAsync = program.IsAsync,
-            IsImport = program.IsImport
+            IsImport = program.IsImport,
+            Parameters = program.Parameters
         };
     }
 

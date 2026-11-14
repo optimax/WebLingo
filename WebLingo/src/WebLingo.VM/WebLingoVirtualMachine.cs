@@ -191,6 +191,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             _scheduler = new WebLingoScheduler(heap, context.Clock);
             heap.Scheduler = _scheduler;
             heap.ValueClasses = _valueClasses;
+            if (module.Parameters.Count > 0 && !TryGiveParameters(frame.Registers)) return _ended!;
             if (module.EntryPoint.IsAsync && !TryStartMain(frame)) return _ended!;
 
             var code = frame.Code;
@@ -1528,6 +1529,41 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             _operands[0] = values;
             Pend(_unitClosures[unit], info.Parameters.Count > 0 ? 1 : 0, result);
             return WebLingoValue.Null;
+        }
+
+        /// <summary>
+        /// The values the host gives the program's parameters, a map of strings in the entry point's first register: each a
+        /// parameter's, and every parameter without a default given (WL2016 otherwise, which ends the execution as it starts).
+        /// </summary>
+        private bool TryGiveParameters(WebLingoValue[] first)
+        {
+            var entries = new WebLingoValue[2 * context.Parameters.Count];
+            var count = 0;
+            WebLingoRuntimeError? error = null;
+            foreach (var (name, value) in context.Parameters)
+            {
+                var declared = false;
+                foreach (var parameter in module.Parameters) declared |= parameter.Name == name;
+                if (!declared)
+                {
+                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.ModuleParameter, $"'{name}' is not a parameter of the program.");
+                    break;
+                }
+                if (!heap.TryAllocateString(name, out entries[2 * count], out error)
+                    || !heap.TryAllocateString(value, out entries[2 * count + 1], out error))
+                {
+                    break;
+                }
+                count++;
+            }
+            foreach (var parameter in module.Parameters)
+            {
+                if (error is not null || parameter.HasDefault || context.Parameters.ContainsKey(parameter.Name)) continue;
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.ModuleParameter, $"The program's parameter '{parameter.Name}' is not given.");
+            }
+            if (error is null && heap.TryAllocateMap(entries, 0, count, out first[0], out error)) return true;
+            _ended = Failure(error!.Code, error.Message, new WebLingoSourceSpan(0, 0));
+            return false;
         }
 
         /// <summary>The program's file of that name, by its index in its table of files, or -1.</summary>
