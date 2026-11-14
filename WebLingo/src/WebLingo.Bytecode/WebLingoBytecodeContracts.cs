@@ -290,6 +290,12 @@ public sealed record WebLingoUnitInfo(string Name, int Function, IReadOnlyList<s
 {
     /// <summary>Its parameters (section 3.9), whose values its function takes as one map; none for the program's own file, which the module lists.</summary>
     public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];
+
+    /// <summary>
+    /// Whether it is a native module (section 3.9), which, as a standard module, has no function and no parameters, its
+    /// exports the built-ins its <c>MakeModule</c> is given.
+    /// </summary>
+    public bool IsNative { get; init; }
 }
 
 public sealed record WebLingoCompiledModule(

@@ -29,6 +29,9 @@ public sealed record WebLingoModuleSource(string Name, WebLingoCompilationUnitSy
 {
     /// <summary>Whether it is a standard module, which the compiler makes itself, without a file (section 3.9).</summary>
     public bool IsStandard { get; init; }
+
+    /// <summary>A native module, whose exports are the host's built-ins, made without a file (section 3.9); or null.</summary>
+    public WebLingoNativeModuleInfo? Native { get; init; }
 }
 
 public sealed record WebLingoCompilerOptions(IReadOnlyList<WebLingoBuiltinDeclaration> Builtins)
@@ -43,6 +46,9 @@ public sealed record WebLingoCompilerOptions(IReadOnlyList<WebLingoBuiltinDeclar
     /// compiler's, which reads a layout as a page (section 13); null for the WebLingo parser.
     /// </summary>
     public Func<string, string, WebLingoSyntaxTree>? Parse { get; init; }
+
+    /// <summary>How the host finds the native modules a program imports, or null for a host that has none (section 3.9).</summary>
+    public IWebLingoNativeResolver? Native { get; init; }
 }
 
 /// <summary>A name the binder resolved. Symbols are compared by identity.</summary>

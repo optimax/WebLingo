@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- A native module the tests load (specification, section 3.9, "Native modules"): not a test project of its own. -->
+  <PropertyGroup><OutputType>Library</OutputType><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/WebLingo.Runtime/WebLingo.Runtime.csproj" />
+  </ItemGroup>
+</Project>

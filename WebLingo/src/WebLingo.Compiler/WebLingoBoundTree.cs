@@ -32,8 +32,11 @@ public sealed record WebLingoBoundProgram(
 public sealed record WebLingoBoundUnit(string Name, WebLingoBoundFunction? Function,
     IReadOnlyList<(string Name, WebLingoLocalSymbol Local)> Exports, WebLingoLocalSymbol Instance)
 {
-    /// <summary>For a standard module, <c>std:system</c>: the built-ins it exports, and no function (section 3.9).</summary>
+    /// <summary>For a standard module, <c>std:system</c>, or a native one: the built-ins it exports, and no function (section 3.9).</summary>
     public IReadOnlyList<WebLingoBuiltinSymbol>? Builtins { get; init; }
+
+    /// <summary>A native module's names for <see cref="Builtins"/>, which it exports them by; null for a standard module's.</summary>
+    public IReadOnlyList<string>? BuiltinNames { get; init; }
 
     /// <summary>Its parameters (section 3.9), whose values its function takes as one map.</summary>
     public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];

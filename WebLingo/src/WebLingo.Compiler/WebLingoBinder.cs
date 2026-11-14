@@ -155,6 +155,20 @@ public sealed class WebLingoBinder
                 units.Add(new WebLingoBoundUnit(module.Name, null, [], DeclareHidden(module.Name, default)) { Builtins = exported });
                 continue;
             }
+            if (module.Native is { } native)
+            {
+                // A native module: its functions, the host's built-ins, its exports, made where the program begins (section 3.9).
+                var functions = new List<WebLingoBuiltinSymbol>();
+                var names = new List<string>();
+                foreach (var export in native.Exports)
+                {
+                    functions.Add(UseBuiltin(new WebLingoBuiltinDeclaration(export.Builtin, export.Arity)));
+                    names.Add(export.Name);
+                }
+                var nativeInstance = DeclareHidden(module.Name, default);
+                units.Add(new WebLingoBoundUnit(module.Name, null, [], nativeInstance) { Builtins = functions, BuiltinNames = names });
+                continue;
+            }
             var (outerFunction, outerScope) = (_function, _scope);
             _source = module.Name;
             _importTargets = module.Imports;
@@ -266,7 +280,7 @@ public sealed class WebLingoBinder
     /// </summary>
     private WebLingoBoundExpression? BindImportValues(WebLingoImportSyntax import, int unit)
     {
-        var parameters = _moduleSources[unit].IsStandard ? [] : ParametersOf(_moduleSources[unit].Root);
+        var parameters = _moduleSources[unit].IsStandard || _moduleSources[unit].Native is not null ? [] : ParametersOf(_moduleSources[unit].Root);
         if (import.Values is null && parameters.Count == 0) return null;
         var entries = new List<(string, WebLingoBoundExpression)>();
         var given = new HashSet<string>(StringComparer.Ordinal);

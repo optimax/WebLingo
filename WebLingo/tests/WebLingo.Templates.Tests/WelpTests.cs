@@ -71,8 +71,8 @@ public sealed class WelpTests : IDisposable
 
         output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.UsageError, WebLingoPagesCommandLine.Run(["page.wlp"], output, new StringWriter()));
-        Assert.StartsWith("Usage: welp --version | run [--root <folder>] <file.wlp> [name=value …] | check [--root <folder>] <file.wlp>",
-            output.ToString());
+        Assert.StartsWith("Usage: welp --version | run [--root <folder>] [--scheme <name>=<folder> …] <file.wlp> [name=value …] | "
+            + "check [--root <folder>] [--scheme <name>=<folder> …] <file.wlp>", output.ToString());
         Assert.Contains("  --root the application's root", output.ToString());
 
         output = new StringWriter();

@@ -52,7 +52,7 @@ dotnet run --project benchmarks/WebLingo.Benchmarks -c Release
 
 The last command times the VM on the benchmark's workloads (`benchmarks/WebLingo.Benchmarks/Workloads`), and writes the results as a table.
 
-`weblingo run <file>` compiles a script and runs it; `weblingo check <file>` compiles it and reports its errors without running it. Errors go to standard error as `file(line,column): error CODE: message`. The exit code is 0 on success, 1 for compilation errors, 2 for a usage error, 3 for a runtime error, and 4 for a file that cannot be read. `welp run [--root <folder>] <page.wlp>` and `welp check [--root <folder>] <page.wlp>` do the same for a page, the page being written to standard output.
+`weblingo run <file>` compiles a script and runs it; `weblingo check <file>` compiles it and reports its errors without running it. A script imports a native module, an assembly in a folder its host is configured with, by a scheme, `import db from "native:sqlite";`, or by the assembly's path within such a folder: `weblingo run --scheme native=C:/WebLingo/native script.wl`, or a `weblingo.json` in the script's folder, `{ "schemes": { "native": "C:/WebLingo/native" } }`, names the folders. Errors go to standard error as `file(line,column): error CODE: message`. The exit code is 0 on success, 1 for compilation errors, 2 for a usage error, 3 for a runtime error, and 4 for a file that cannot be read. `welp run [--root <folder>] <page.wlp>` and `welp check [--root <folder>] <page.wlp>` do the same for a page, the page being written to standard output.
 
 ## Architecture
 

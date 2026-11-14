@@ -68,7 +68,7 @@ public sealed class WebLingoStackCodeGenerator
     private static List<WebLingoUnitInfo> UnitsOf(WebLingoIrProgram program)
     {
         var units = new List<WebLingoUnitInfo>();
-        foreach (var unit in program.Units) units.Add(new WebLingoUnitInfo(unit.Name, unit.Function, unit.Exports) { Parameters = unit.Parameters });
+        foreach (var unit in program.Units) units.Add(new WebLingoUnitInfo(unit.Name, unit.Function, unit.Exports) { Parameters = unit.Parameters, IsNative = unit.IsNative });
         return units;
     }
 

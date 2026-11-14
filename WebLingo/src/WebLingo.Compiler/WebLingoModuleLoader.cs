@@ -32,6 +32,14 @@ public sealed class WebLingoModuleLoader(WebLingoCompilerOptions options) : IWeb
             error = path == "std:system" ? null : "there is no such standard module";
             return error is null;
         }
+        if (Resolver is null && options.Native is { } native && native.Names(path))
+        {
+            // A native module, by its scheme or its assembly's path, compiled as an import of its name (section 3.9).
+            if (!native.TryResolve(importer, path, out var module, out error)) return false;
+            name = module.Name;
+            _sources[name] = "";
+            return true;
+        }
         if ((Resolver ?? options.Resolver) is not { } resolver)
         {
             error = "this host finds no modules";

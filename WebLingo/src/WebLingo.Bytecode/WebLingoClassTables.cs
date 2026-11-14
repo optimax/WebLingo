@@ -71,7 +71,7 @@ internal static class WebLingoClassTables
         {
             var unit = units[i];
             if (unit is null || string.IsNullOrEmpty(unit.Name) || unit.Exports is null) return $"File {i} is missing or has no name.";
-            var standard = unit.Name.StartsWith("std:", StringComparison.Ordinal);
+            var standard = unit.Name.StartsWith("std:", StringComparison.Ordinal) || unit.IsNative;
             if (unit.Parameters is null || ((i == 0 || standard) && unit.Parameters.Count > 0))
             {
                 return $"File {i} ('{unit.Name}') has parameters it cannot be given.";

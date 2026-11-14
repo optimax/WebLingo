@@ -78,6 +78,7 @@ public sealed class WebLingoCompilation
         (string Name, WebLingoSyntaxTree Tree)? imported)
     {
         var indexes = new Dictionary<string, int>(StringComparer.Ordinal) { [mainName] = 0 };
+        var natives = new Dictionary<string, WebLingoNativeModuleInfo>(StringComparer.Ordinal);
         var roots = new List<(string Name, WebLingoCompilationUnitSyntax Root, Dictionary<WebLingoImportSyntax, int> Imports)>
         {
             (mainName, main.Root, new Dictionary<WebLingoImportSyntax, int>())
@@ -86,6 +87,11 @@ public sealed class WebLingoCompilation
         {
             // An import's file, the program's second (section 3.9).
             indexes.Add(file.Name, 1);
+            if (options.Native is { } native && native.Names(file.Name) && native.TryResolve(file.Name, file.Name, out var module, out _))
+            {
+                // A native module imported while the program runs, by its name (section 3.9).
+                natives.Add(file.Name, module);
+            }
             foreach (var diagnostic in file.Tree.Diagnostics) diagnostics.Add(diagnostic with { Source = file.Name });
             roots.Add((file.Name, file.Tree.Root, new Dictionary<WebLingoImportSyntax, int>()));
         }
@@ -113,6 +119,22 @@ public sealed class WebLingoCompilation
                     }
                     error = "there is no such standard module";
                 }
+                else if (options.Native is { } native && native.Names(import.Path))
+                {
+                    // A native module, by its scheme or by its assembly's path, its exports the host's built-ins (section 3.9).
+                    if (native.TryResolve(name, import.Path, out var module, out error))
+                    {
+                        if (!indexes.TryGetValue(module.Name, out var index))
+                        {
+                            index = roots.Count;
+                            indexes.Add(module.Name, index);
+                            natives.Add(module.Name, module);
+                            roots.Add((module.Name, new WebLingoCompilationUnitSyntax([], default), new Dictionary<WebLingoImportSyntax, int>()));
+                        }
+                        imports[import] = index;
+                        continue;
+                    }
+                }
                 else if (options.Resolver is not { } resolver)
                 {
                     error = "this host finds no modules";
@@ -138,7 +160,10 @@ public sealed class WebLingoCompilation
         }
         foreach (var (name, root, imports) in roots)
         {
-            modules.Add(new WebLingoModuleSource(name, root, imports) { IsStandard = StandardModules.Contains(name) });
+            modules.Add(new WebLingoModuleSource(name, root, imports)
+            {
+                IsStandard = StandardModules.Contains(name), Native = natives.GetValueOrDefault(name)
+            });
         }
     }
 

@@ -243,6 +243,8 @@ public sealed record WebLingoIrRegisterUnit(int Unit, WebLingoIrExpression Closu
 public sealed record WebLingoIrUnit(string Name, int Function, IReadOnlyList<string> Exports)
 {
     public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];
+    /// <summary>Whether it is a native module, without a function, its exports the host's built-ins (section 3.9).</summary>
+    public bool IsNative { get; init; }
 }
 
 public sealed record WebLingoIrLoadBuiltin(int Builtin, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);

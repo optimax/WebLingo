@@ -42,14 +42,14 @@ public sealed class WebLingoLowerer
             var function = unit.Function is null ? -1 : lowerer.LowerUnit(unit, i);
             var exports = new List<string>();
             foreach (var (name, _) in unit.Exports) exports.Add(name);
-            foreach (var builtin in unit.Builtins ?? []) exports.Add(builtin.Name);
-            units.Add(new WebLingoIrUnit(unit.Name, function, exports) { Parameters = unit.Parameters });
+            for (var j = 0; j < (unit.Builtins?.Count ?? 0); j++) exports.Add(unit.BuiltinNames?[j] ?? unit.Builtins![j].Name);
+            units.Add(new WebLingoIrUnit(unit.Name, function, exports) { Parameters = unit.Parameters, IsNative = unit.BuiltinNames is not null });
             if (function >= 0) prologue.Add(new WebLingoIrRegisterUnit(i, new WebLingoIrMakeClosure(function, default), default));
         }
         if (program.Units.Count > 0) prologue.Add(MakeModule(program.Units[0], 0));
         for (var i = 1; i < program.Units.Count; i++)
         {
-            // A standard module, made with the program's own instance, before any import (section 3.9).
+            // A standard or native module, made with the program's own instance, before any import (section 3.9).
             if (program.Units[i].Builtins is { } builtins) prologue.Add(MakeModule(program.Units[i], i));
         }
         var statements = lowerer.LowerBlock(program.Statements, prologue);

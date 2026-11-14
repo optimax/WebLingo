@@ -8,7 +8,7 @@
 
 2026-11-14: waits for the design of how standard modules are packaged, which A5 of "Native Code Extensions" makes native extensions, installed as other native modules are.
 
-2026-11-14: the packaging is decided (A6 of "Native Code Extensions, Continued"): a standard module is a native module, in the `std` scheme's folder. Waits for "Native Modules".
+2026-11-14: the packaging is decided (A6 of "Native Code Extensions, Continued"): a standard module is a native module, in the `std` scheme's folder. Waits for "Native Modules, Part 3: Standard Modules as Native Modules".
 
 ## [IDLE] M0.13: WBC
 
@@ -78,23 +78,49 @@ A10:
 
 A11:
 
-## [QUESTION] Native Modules
+## [IDLE] Native Modules
 
 Native modules as the specification, section 3.9 ("Native modules"), has them, approved 14 November 2026: `IWebLingoNativeModule` and `IWebLingoNativeRegistry`, a module's functions and classes; an assembly loaded, into the host's context, from a configured scheme's folder only; a module imported by its scheme or by a path within such a folder, statically and while the program runs, its exports known to the compiler; and `std:system`'s built-ins moved into a native module in the `std` scheme's folder; on both VMs. Added by Claude, 2026-11-14.
 
 Section 3.9 leaves three decisions open that the work needs, one each, answerable with a letter.
 
-**Q1, how a host is configured with its schemes, `native` and the others, each naming a folder: (a) a file, `weblingo.json`, in the program's folder, `{ "schemes": { "native": "C:/WebLingo/native" } }`; (b) the command line, `weblingo run --scheme native=C:/WebLingo/native script.wl`, a host under a web server having a configuration of its own; (c) both, the command line over the file.**
+Q1, how a host is configured with its schemes, `native` and the others, each naming a folder: (a) a file, `weblingo.json`, in the program's folder, `{ "schemes": { "native": "C:/WebLingo/native" } }`; (b) the command line, `weblingo run --scheme native=C:/WebLingo/native script.wl`, a host under a web server having a configuration of its own; (c) both, the command line over the file.
 
-A1:
+A1: (c)
 
-**Q2, the `std` scheme's folder: (a) a folder beside the runtime's program, `std/`, which a host's configuration may point elsewhere; (b) configured as any other scheme is, with no default.**
+Q2, the `std` scheme's folder: (a) a folder beside the runtime's program, `std/`, which a host's configuration may point elsewhere; (b) configured as any other scheme is, with no default.
 
-A2:
+A2: (a)
 
-**Q3, which built-in classes become a standard module's native classes now (A2 of "Native Code Extensions, Continued"): (a) the ones the VMs implement (`Array`, `Map`, `Set`, `Task`, `Module`, `Class`, `Function`), their methods (`push`, `has`, `forget`, `setMethod`, …) native functions, those written in WebLingo (`Object`, `Error`, the runtime errors' classes) staying so; (b) all of them, `Object` and `Error` too; (c) none yet: native classes first, for native modules, and the built-in classes moved by a task of their own, measured, since the VMs reach their methods directly now.**
+Q3, which built-in classes become a standard module's native classes now (A2 of "Native Code Extensions, Continued"): (a) the ones the VMs implement (`Array`, `Map`, `Set`, `Task`, `Module`, `Class`, `Function`), their methods (`push`, `has`, `forget`, `setMethod`, …) native functions, those written in WebLingo (`Object`, `Error`, the runtime errors' classes) staying so; (b) all of them, `Object` and `Error` too; (c) none yet: native classes first, for native modules, and the built-in classes moved by a task of their own, measured, since the VMs reach their methods directly now.
 
-A3:
+A3: (a) but - like (c) says - measure the impact on performance. 
+
+2026-11-14 (Claude): the answers recorded as approved in the specification, section 3.9 ("Native modules"), and its decision register; split into the parts section 9 defines ("Native modules"), each a task below. Waits for them.
+
+## [WORKING] Native Modules, Part 1: Native Functions
+
+`IWebLingoNativeModule` and `IWebLingoNativeRegistry`, a module's functions; a host's schemes, from `weblingo.json` and `--scheme`; an assembly loaded from a scheme's folder only, into the host's context; a native module imported by its scheme, or by a path within a scheme's folder, statically and while the program runs (specification, sections 3.9 and 9, "Native modules", part 1), on both VMs. Added by Claude, 2026-11-14.
+
+Done (Claude, 2026-11-14): a native module's assembly, in a configured scheme's folder, registers its functions with `IWebLingoNativeRegistry`, each then one of the host's built-ins; a script imports the module by its scheme, `import t from "native:test";`, or by the assembly's path within a scheme's folder, statically or with `Module.import`, on both VMs; `weblingo` and `welp` take their schemes from `weblingo.json`, in the program's folder, and `--scheme name=folder`, which comes before the file's. Tested with a native module of the tests' own (`tests/WebLingo.Native.TestModule`), on both VMs and through `weblingo`. Guessed, and recorded as Proposed in the specification, section 15.2 ("Native modules"): a scheme's name is two or more letters and digits, so that a drive letter is never one; an import path ending in `.dll` names an assembly; an unconfigured scheme's path is a file's; a module that cannot be found, loaded or registered is WL2015; `weblingo.json` holds only `"schemes"`, anything else stopping the command (exit 4); a malformed `--scheme` is a usage error (exit 2). `std:` stays the compiler's own until part 3. Checks: the Release build, without warnings, the full test suite, and both command lines on the samples, on Windows only; Linux not tried.
+
+## [IDLE] Native Modules, Part 2: Native Classes
+
+A native module's classes, `registry.Class(…)`, their constructors, methods and static members native functions, made by the heap's own methods (specification, sections 3.7, 3.9 and 9, "Native modules", part 2), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for "Native Modules, Part 1: Native Functions".
+
+## [IDLE] Native Modules, Part 3: Standard Modules as Native Modules
+
+`std:system`'s built-ins in a native module installed with the runtime, in `std/` beside its program, the `std` scheme configurable as any other (specification, sections 3.9 and 9, "Native modules", part 3), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for "Native Modules, Part 1: Native Functions".
+
+## [IDLE] Native Modules, Part 4: The Built-in Classes as Native Classes
+
+`Array`, `Map`, `Set`, `Task`, `Module`, `Class` and `Function` as a standard module's native classes, their methods native functions, measured against the VMs' own on the benchmark, as A3 of "Native Modules" asks (specification, sections 3.9 and 9, "Native modules", part 4), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for parts 2 and 3.
 
 ## [IDLE] I/O-Bound Workload
 

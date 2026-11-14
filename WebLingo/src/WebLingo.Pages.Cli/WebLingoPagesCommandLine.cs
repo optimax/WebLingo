@@ -27,15 +27,22 @@ public static class WebLingoPagesCommandLine
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
+        // welp run|check [--root <folder>] [--scheme name=folder]… <page.wlp> …: --root taken out, among the options before
+        // the page, the rest what weblingo's command line takes.
         string? root = null;
-        if (args.Length >= 2 && args[0] is "run" or "check" && args[1] == "--root")
+        var rest = new List<string>(args);
+        for (var at = 1; args.Length >= 2 && args[0] is "run" or "check" && at < rest.Count && rest[at].StartsWith("--", StringComparison.Ordinal);)
         {
-            // welp run --root <folder> <page.wlp> …: the option, then what weblingo's command line takes.
-            if (args.Length < 4) return WebLingoCommandLine.Run(Pages(null), ["--root"], output, error);
-            root = args[2];
-            args = [args[0], .. args[3..]];
+            if (rest[at] != "--root")
+            {
+                at += 2;
+                continue;
+            }
+            if (root is not null || at + 2 >= rest.Count) return WebLingoCommandLine.Run(Pages(null), ["--root"], output, error);
+            root = rest[at + 1];
+            rest.RemoveRange(at, 2);
         }
-        return WebLingoCommandLine.Run(Pages(root), args, output, error);
+        return WebLingoCommandLine.Run(Pages(root), [.. rest], output, error);
     }
 
     private static WebLingoCommandLineCompilation Compile(WebLingoSourceText page, WebLingoCompilerOptions options, string? root)

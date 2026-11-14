@@ -37,17 +37,46 @@ public static class WebLingoCommandLine
             output.WriteLine(program.Version);
             return Success;
         }
-        if (args.Length == 2 && args[0] == "check") return RunFile(program, false, args[1], new Dictionary<string, string>(), output, error);
-        if (args.Length >= 2 && args[0] == "run")
+        if (args.Length >= 2 && args[0] is "run" or "check")
         {
-            if (TryParameters(args, out var parameters, out var wrong)) return RunFile(program, true, args[1], parameters, output, error);
-            error.WriteLine($"'{wrong}' is not a parameter's value, name=value, or is given twice.");
+            // run|check [--scheme name=folder]… file [name=value …]: the schemes over weblingo.json's (section 3.9).
+            var schemes = new Dictionary<string, string>(StringComparer.Ordinal);
+            var at = 1;
+            string? wrong = null;
+            while (wrong is null && at < args.Length && args[at] == "--scheme")
+            {
+                var equals = at + 1 < args.Length ? args[at + 1].IndexOf('=', StringComparison.Ordinal) : -1;
+                if (equals > 0 && WebLingoSchemes.IsName(args[at + 1][..equals]) && equals + 1 < args[at + 1].Length
+                    && schemes.TryAdd(args[at + 1][..equals], args[at + 1][(equals + 1)..]))
+                {
+                    at += 2;
+                    continue;
+                }
+                wrong = $"'{(at + 1 < args.Length ? args[at + 1] : "")}' is not a scheme, name=folder, or is given twice.";
+            }
+            if (wrong is null && at < args.Length)
+            {
+                if (args[0] == "check")
+                {
+                    if (at + 1 == args.Length) return RunFile(program, false, args[at], new Dictionary<string, string>(), schemes, output, error);
+                }
+                else if (TryParameters(args, at + 1, out var parameters, out var value))
+                {
+                    return RunFile(program, true, args[at], parameters, schemes, output, error);
+                }
+                else
+                {
+                    wrong = $"'{value}' is not a parameter's value, name=value, or is given twice.";
+                }
+            }
+            if (wrong is not null) error.WriteLine(wrong);
         }
 
-        var file = program.Options + "<file" + program.Extension + ">";
+        var file = program.Options + "[--scheme <name>=<folder> …] <file" + program.Extension + ">";
         output.WriteLine($"Usage: {program.Name} --version | run {file} [name=value …] | check {file}");
-        output.WriteLine("  run    compiles the file and runs it, giving its parameters the values after it, each a string");
-        output.WriteLine("  check  compiles the file and reports its errors, without running it");
+        output.WriteLine("  run       compiles the file and runs it, giving its parameters the values after it, each a string");
+        output.WriteLine("  check     compiles the file and reports its errors, without running it");
+        output.WriteLine("  --scheme  names a folder of native modules, over weblingo.json's, in the file's folder");
         foreach (var line in program.OptionsHelp) output.WriteLine(line);
         return args.Length == 0 ? Success : UsageError;
     }
@@ -56,11 +85,11 @@ public static class WebLingoCommandLine
     /// A script's parameters, after its path: each <c>name=value</c>, its name a name, its value a string, every name given
     /// once (section 3.9); false, with the first argument that is not one, otherwise.
     /// </summary>
-    private static bool TryParameters(string[] args, out Dictionary<string, string> parameters, out string wrong)
+    private static bool TryParameters(string[] args, int first, out Dictionary<string, string> parameters, out string wrong)
     {
         parameters = new Dictionary<string, string>(StringComparer.Ordinal);
         wrong = "";
-        for (var i = 2; i < args.Length; i++)
+        for (var i = first; i < args.Length; i++)
         {
             var equals = args[i].IndexOf('=', StringComparison.Ordinal);
             var name = equals > 0 ? args[i][..equals] : "";
@@ -84,7 +113,7 @@ public static class WebLingoCommandLine
     }
 
     private static int RunFile(WebLingoCommandLineProgram program, bool run, string path, IReadOnlyDictionary<string, string> parameters,
-        TextWriter output, TextWriter error)
+        IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error)
     {
         string source;
         try
@@ -105,8 +134,14 @@ public static class WebLingoCommandLine
         var declarations = new List<WebLingoBuiltinDeclaration>();
         foreach (var builtin in services.Builtins) declarations.Add(new WebLingoBuiltinDeclaration(builtin.Name, builtin.Arity));
 
+        if (!WebLingoSchemes.TryLoad(path, givenSchemes, out var schemes, out var wrongConfiguration))
+        {
+            error.WriteLine(wrongConfiguration);
+            return FileUnreadable;
+        }
         var resolver = new FileResolver(path);
-        var options = new WebLingoCompilerOptions(declarations) { Resolver = resolver };
+        var native = new WebLingoNativeModuleLoader(schemes, services);
+        var options = new WebLingoCompilerOptions(declarations) { Resolver = resolver, Native = native };
         var compilation = program.Compile(text, options);
         var compiled = compilation.Result;
         foreach (var diagnostic in compiled.Diagnostics) error.WriteLine(Format(TextOf(diagnostic), diagnostic));
