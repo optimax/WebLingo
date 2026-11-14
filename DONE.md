@@ -1339,3 +1339,9 @@ Done (Claude, 2026-11-13, `fb8815d`): on both VMs, with their conformance tests;
 `new Function(f)`, `new Function()`, and classes extending `Function`, whose instances are functions with methods of their own (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
 
 Done (Claude, 2026-11-13, `ab81414`): on both VMs, with their conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Classes holding a value"): `new Function()` is an instance of `Function` holding a function that does nothing, written `Function:function`. Checks: the Release build, without warnings, the 1,492 tests, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Extending the Classes of Values: Operators
+
+`static operator +(a, b) { … }`, and `-`, `*`, `/` and the comparisons, which a class may declare (A3 of "Classes of Values, Extensions, Continued"; specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
+
+Done (Claude, 2026-11-13, `185690f`): on both VMs, with their conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Operators"), among them that `==` and `!=`, and unary operators, are not declared. Checks: the Release build, without warnings, the 1,520 tests, and the CLI on the samples, on Windows only; Linux not tried.
