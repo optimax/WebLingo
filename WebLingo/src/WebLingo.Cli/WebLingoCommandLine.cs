@@ -24,21 +24,28 @@ public static class WebLingoCommandLine
 
     public const string Version = "WebLingo M0.6 (pre-alpha)";
 
-    public static int Run(string[] args, TextWriter output, TextWriter error)
+    /// <summary><c>weblingo</c>: scripts, <c>.wl</c> files, compiled by the WebLingo compiler.</summary>
+    public static WebLingoCommandLineProgram Scripts { get; } =
+        new("weblingo", Version, ".wl", _ => [], (file, options) => new WebLingoCompiler(options).Compile(file.Text, file.Name));
+
+    public static int Run(string[] args, TextWriter output, TextWriter error) => Run(Scripts, args, output, error);
+
+    public static int Run(WebLingoCommandLineProgram program, string[] args, TextWriter output, TextWriter error)
     {
         if (args.Length == 1 && args[0] is "--version" or "version")
         {
-            output.WriteLine(Version);
+            output.WriteLine(program.Version);
             return Success;
         }
-        if (args.Length == 2 && args[0] == "check") return RunFile(false, args[1], new Dictionary<string, string>(), output, error);
+        if (args.Length == 2 && args[0] == "check") return RunFile(program, false, args[1], new Dictionary<string, string>(), output, error);
         if (args.Length >= 2 && args[0] == "run")
         {
-            if (TryParameters(args, out var parameters, out var wrong)) return RunFile(true, args[1], parameters, output, error);
+            if (TryParameters(args, out var parameters, out var wrong)) return RunFile(program, true, args[1], parameters, output, error);
             error.WriteLine($"'{wrong}' is not a parameter's value, name=value, or is given twice.");
         }
 
-        output.WriteLine("Usage: weblingo --version | run <file.wl> [name=value …] | check <file.wl>");
+        var file = "<file" + program.Extension + ">";
+        output.WriteLine($"Usage: {program.Name} --version | run {file} [name=value …] | check {file}");
         output.WriteLine("  run    compiles the file and runs it, giving its parameters the values after it, each a string");
         output.WriteLine("  check  compiles the file and reports its errors, without running it");
         return args.Length == 0 ? Success : UsageError;
@@ -75,7 +82,8 @@ public static class WebLingoCommandLine
         return true;
     }
 
-    private static int RunFile(bool run, string path, IReadOnlyDictionary<string, string> parameters, TextWriter output, TextWriter error)
+    private static int RunFile(WebLingoCommandLineProgram program, bool run, string path, IReadOnlyDictionary<string, string> parameters,
+        TextWriter output, TextWriter error)
     {
         string source;
         try
@@ -90,13 +98,15 @@ public static class WebLingoCommandLine
         }
 
         var text = new WebLingoSourceText(source, path);
-        var services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(new TextWriterOutput(output)));
+        var textOutput = new TextWriterOutput(output);
+        var services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(textOutput));
+        foreach (var builtin in program.Builtins(textOutput)) services.Register(builtin);
         var declarations = new List<WebLingoBuiltinDeclaration>();
         foreach (var builtin in services.Builtins) declarations.Add(new WebLingoBuiltinDeclaration(builtin.Name, builtin.Arity));
 
         var resolver = new FileResolver(path);
         var options = new WebLingoCompilerOptions(declarations) { Resolver = resolver };
-        var compiled = new WebLingoCompiler(options).Compile(source, path);
+        var compiled = program.Compile(text, options);
         foreach (var diagnostic in compiled.Diagnostics) error.WriteLine(Format(TextOf(diagnostic), diagnostic));
         if (compiled.Module is null) return CompilationFailed;
         if (!run) return Success;

@@ -27,18 +27,25 @@ public sealed class WebLingoCompilation
     public bool HasErrors => LoweredProgram is null;
 
     public static WebLingoCompilation Create(string source, string sourceName, WebLingoCompilerOptions options) =>
-        Create(source, sourceName, options, null);
+        Create(new WebLingoParser(source, sourceName).ParseCompilationUnit(), sourceName, options, null);
+
+    /// <summary>
+    /// A program whose own file another reader parsed, such as a template compiler (specification, section 13), named as its
+    /// source text is.
+    /// </summary>
+    public static WebLingoCompilation Create(WebLingoSyntaxTree syntaxTree, WebLingoCompilerOptions options) =>
+        Create(syntaxTree, syntaxTree.Source.Name, options, null);
 
     /// <summary>
     /// The file <paramref name="name"/>, which the host's resolver finds, compiled as an import (section 3.9): a program of
     /// its own, whose top level imports it, with the values it is given, and whose second file it is.
     /// </summary>
     public static WebLingoCompilation CreateImport(string name, string source, WebLingoCompilerOptions options) =>
-        Create("", "import " + name, options, (name, source));
+        Create(new WebLingoParser("", "import " + name).ParseCompilationUnit(), "import " + name, options, (name, source));
 
-    private static WebLingoCompilation Create(string source, string sourceName, WebLingoCompilerOptions options, (string Name, string Source)? imported)
+    private static WebLingoCompilation Create(WebLingoSyntaxTree syntaxTree, string sourceName, WebLingoCompilerOptions options,
+        (string Name, string Source)? imported)
     {
-        var syntaxTree = new WebLingoParser(source, sourceName).ParseCompilationUnit();
         var modules = new List<WebLingoModuleSource>();
         var found = new List<WebLingoDiagnostic>(syntaxTree.Diagnostics);
         Gather(syntaxTree, sourceName, options, modules, found, imported);

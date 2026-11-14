@@ -1,5 +1,6 @@
 using WebLingo.Bytecode;
 using WebLingo.Core;
+using WebLingo.Language;
 namespace WebLingo.Compiler;
 
 public sealed record WebLingoStackCompilationResult(WebLingoStackModule? Module, IReadOnlyList<WebLingoDiagnostic> Diagnostics);
@@ -14,6 +15,10 @@ public sealed class WebLingoStackCompiler(WebLingoCompilerOptions options)
 {
     public WebLingoStackCompilationResult Compile(string source, string sourceName) =>
         Generate(WebLingoCompilation.Create(source, sourceName, options), sourceName);
+
+    /// <summary>A program whose own file another reader parsed, such as a template compiler (specification, section 13).</summary>
+    public WebLingoStackCompilationResult Compile(WebLingoSyntaxTree syntaxTree) =>
+        Generate(WebLingoCompilation.Create(syntaxTree, options), syntaxTree.Source.Name);
 
     /// <summary>The file <paramref name="name"/>, whose text is <paramref name="source"/>, compiled as an import (section 3.9).</summary>
     public WebLingoStackCompilationResult CompileImport(string name, string source) =>

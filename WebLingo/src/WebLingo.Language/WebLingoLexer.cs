@@ -13,7 +13,20 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
     private const string LargestInteger = "9223372036854775807";
 
     private readonly List<WebLingoDiagnostic> _diagnostics = [];
+    private readonly string? _end;
     private int _position;
+
+    /// <summary>
+    /// A lexer of the code that starts at <paramref name="start"/> and ends where <paramref name="end"/> stands as a token
+    /// would, outside strings and comments, such as a template's block, which <c>%&gt;</c> ends (specification, section 13).
+    /// There it gives its <see cref="WebLingoTokenKind.EndOfFile"/>, spanning <paramref name="end"/>; at the end of the
+    /// text, an empty one.
+    /// </summary>
+    public WebLingoLexer(string source, int start, string end) : this(source)
+    {
+        _position = start;
+        _end = end;
+    }
 
     public IReadOnlyList<WebLingoDiagnostic> Diagnostics => _diagnostics;
 
@@ -38,6 +51,10 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
         SkipWhitespaceAndComments();
         var start = _position;
         if (start >= source.Length) return new WebLingoToken(WebLingoTokenKind.EndOfFile, "", new WebLingoSourceSpan(source.Length, 0));
+        if (_end is not null && source.AsSpan(start).StartsWith(_end, StringComparison.Ordinal))
+        {
+            return new WebLingoToken(WebLingoTokenKind.EndOfFile, _end, new WebLingoSourceSpan(start, _end.Length));
+        }
         var c = source[start];
         if (IsIdentifierStart(c)) return ReadIdentifierOrKeyword(start);
         if (IsDigit(c)) return ReadNumericLiteral(start);

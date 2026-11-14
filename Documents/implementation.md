@@ -16,9 +16,9 @@ WebLingo is a JavaScript-inspired, native-oriented, cross-platform **server-side
 - The compiler, VM, runtime and hosting are written first in C# on .NET 10. The long-term goal is to compile that same C# code with the project's independent Native C# compiler, so that WebLingo runs without .NET and without a rewrite in C++. Native C# and WebLingo are separate languages and runtime systems.
 - The engine and the platform services are independent of IIS, ASP.NET Core, FastCGI, Kestrel, Windows and Linux. IIS, through an ASP.NET Core adapter, is the first deployment target; FastCGI and a standalone HTTP host are architectural targets.
 
-The current state (specification, sections 9 and 15): a compiler and two VMs, a register VM and a stack VM, for M0.6's subset and the language of the specification's sections 3.5 to 3.8 (statements, collections, classes and exceptions, and asynchrony), whose register VM the `weblingo` CLI runs; templates, hosting and the platform layer are not implemented yet. `samples/HelloWorld` and `samples/Arithmetic` run; `samples/SimpleWebsite` waits for templates.
+The current state (specification, sections 9 and 15): a compiler and two VMs, a register VM and a stack VM, for M0.6's subset and the language of the specification's sections 3.5 to 3.8 (statements, collections, classes and exceptions, and asynchrony), whose register VM the `weblingo` CLI runs; and pages (`.wlp`, section 13, M0.12.1), which `welp`, WebLingo Pages' command line, runs, but not yet their includes, layouts and components; hosting and the platform layer are not implemented yet. `samples/HelloWorld`, `samples/Arithmetic` and `samples/Modules` run; `samples/SimpleWebsite` waits for includes, layouts and components.
 
-**Names** (specification, section 1): the project is **WebLingo** (formerly WebScript), its intended domain `weblingo.dev`, the solution `WebLingo.slnx`, the project and namespace roots `WebLingo`, and the CLI executable `weblingo`. Scripts and modules are `.wl` files, templates `.wlp` files; specification IDs (`WL-L011`, `WL-BC002`) and diagnostic codes (`WL1001`) have the prefix `WL`, and type names in source the prefix `WebLingo` (`WebLingoLexer`, `WebLingoToken`), each type in a file of its name. WebScript's `.ws`, `.wsp`, `WS` and `Ws` were renamed so on 14 November 2026, the owner's decision, with nothing kept for backward compatibility.
+**Names** (specification, section 1): the project is **WebLingo** (formerly WebScript), its intended domain `weblingo.dev`, the solution `WebLingo.slnx`, the project and namespace roots `WebLingo`, the CLI executable `weblingo`, and WebLingo Pages', the technology of templates for web servers (specification, section 13), `welp`. Scripts and modules are `.wl` files, templates `.wlp` files; specification IDs (`WL-L011`, `WL-BC002`) and diagnostic codes (`WL1001`) have the prefix `WL`, and type names in source the prefix `WebLingo` (`WebLingoLexer`, `WebLingoToken`), each type in a file of its name. WebScript's `.ws`, `.wsp`, `WS` and `Ws` were renamed so on 14 November 2026, the owner's decision, with nothing kept for backward compatibility.
 
 ------
 
@@ -75,13 +75,15 @@ WebLingo.202611121500.zip
 
 - **The portable core:** `WebLingo.Core`, `WebLingo.Language`, `WebLingo.Bytecode`, `WebLingo.Compiler`, `WebLingo.Runtime`, `WebLingo.VM`, `WebLingo.VM.Stack`, `WebLingo.Templates`, `WebLingo.StdLib`, `WebLingo.Platform.Abstractions`, and `WebLingo.Hosting.Abstractions`: eleven.
 - **The adapters to .NET:** `WebLingo.Platform.DotNet` (the .NET implementation of the platform abstraction layer, the PAL) and `WebLingo.Hosting.AspNetCore` (the host for IIS).
-- **The command line:** `WebLingo.Cli`, which builds `weblingo`.
+- **The command lines:** `WebLingo.Cli`, which builds `weblingo`, and `WebLingo.Pages.Cli`, which builds `welp`, WebLingo Pages' command line, sharing `weblingo`'s code (`WebLingoCommandLine`, given a `WebLingoCommandLineProgram`), and so referencing `WebLingo.Cli`.
 - **The benchmark:** `WebLingo.Benchmarks`, in `benchmarks/`, a console program that times the VMs on fixed workloads with `Stopwatch` (the specification's section 5.6, WL-BC002). It is a tool, not part of the product, and uses no package. Its workloads are `.wl` files in its `Workloads/` folder, embedded in it, each with the output every VM must give (`WebLingoWorkloads`); a VM is added to it as an `IWebLingoBenchmarkEngine`.
-- **The tests:** `WebLingo.Language.Tests` (lexer, parser, source text), `WebLingo.Compiler.Tests` (binder, lowering, and both code generators), `WebLingo.Bytecode.Tests` (both verifiers, with fuzz tests), `WebLingo.Runtime.Tests` (values, arithmetic, formatting, `write` and `writeLn`), `WebLingo.VM.Tests` (execution on both VMs, runtime errors, budgets, the VMs' arithmetic against the runtime's, and the benchmark's workloads on every VM it measures), `WebLingo.Conformance.Tests` (the specification's section 8.6, end to end through the CLI; every conformance program on the stack VM, against the register VM's result; and fuzz tests of malformed source and bytecode), and `WebLingo.Architecture.Tests` (contracts, and the dependency rules checked on the built assemblies).
+- **The tests:** `WebLingo.Language.Tests` (lexer, parser, source text), `WebLingo.Compiler.Tests` (binder, lowering, and both code generators), `WebLingo.Bytecode.Tests` (both verifiers, with fuzz tests), `WebLingo.Runtime.Tests` (values, arithmetic, formatting, `write` and `writeLn`), `WebLingo.VM.Tests` (execution on both VMs, runtime errors, budgets, the VMs' arithmetic against the runtime's, and the benchmark's workloads on every VM it measures), `WebLingo.Templates.Tests` (pages: the template parser and compiler, each page on both VMs, and `welp` end to end), `WebLingo.Conformance.Tests` (the specification's section 8.6, end to end through the CLI; every conformance program on the stack VM, against the register VM's result; and fuzz tests of malformed source and bytecode), and `WebLingo.Architecture.Tests` (contracts, and the dependency rules checked on the built assemblies).
 
 ## The Pipeline
 
 The compiler's stages are separate classes (specification, section 8.8): `WebLingoLexer` and `WebLingoParser` in `WebLingo.Language` give a `WebLingoSyntaxTree`; in `WebLingo.Compiler`, `WebLingoBinder` resolves names into a bound tree (`WebLingoBoundTree.cs`, `WebLingoSymbols.cs`), and `WebLingoLowerer` reduces it to the lowered IR (`WebLingoIr.cs`), a tree neither register- nor stack-shaped (WL-BC002). `WebLingoCompilation` runs them in order and stops at the first stage that reports an error; a program that imports others (specification, section 3.9) is parsed file by file first, each file found by the host's `IWebLingoSourceResolver` (`WebLingoCompilerOptions.Resolver`), and bound as one program, each imported file's top level an `async` function of its own. The host's built-ins reach the compiler as `WebLingoCompilerOptions`. `WebLingoCodeGenerator` turns the IR into a module of the in-memory bytecode (`WebLingo.Bytecode`, `WebLingoBytecodeContracts.cs`), and `WebLingoCompiler` runs the whole compiler, checking its own output with `WebLingoBytecodeVerifier`. `WebLingoDisassembler` shows a module as text. For the comparison of the two kinds of VM (WL-BC002, the specification's section 5.6), the same IR also goes to `WebLingoStackCodeGenerator`, which generates the stack bytecode (`WebLingoStackBytecodeContracts.cs`, in `WebLingo.Bytecode`, since the compiler may not depend on a VM), and `WebLingoStackCompiler` runs the whole compiler for it, checking its output with `WebLingoStackBytecodeVerifier`.
+
+A page (`.wlp`, specification, section 13) is read by `WebLingoTemplateParser` (`WebLingo.Templates`) into the parser's tokens: each run of its text, and each `<%= … %>` and `<%- … %>`, a call of a built-in that writes it (`WebLingoTemplateWriters`, `WebLingo.Core`, names them so that no program can), and each `<% … %>` its code, which `WebLingoLexer` reads up to its `%>`. `WebLingoTemplateCompiler` compiles the tree with `WebLingoCompiler` or `WebLingoStackCompiler`, declaring those built-ins, and a host that runs pages registers them (`WebLingoTemplateBuiltins`, `WebLingo.StdLib`), as `welp` does. Nothing in the language's own stages knows of templates: they take tokens, or a parsed tree, from another reader.
 
 The verifier must reject a malformed module, never throw or run out of memory on one: its dataflow check keeps state only at block starts, as bit sets, within fixed bounds (`MaxStateWords`, `MaxSteps`). Keep it so when operations are added, and add each one to the fuzz test's range.
 
@@ -192,13 +194,14 @@ dotnet test WebLingo.slnx -c Release --no-build
 dotnet test tests/WebLingo.Language.Tests -c Release --no-build --filter "FullyQualifiedName~LexerTests"
 dotnet run --project src/WebLingo.Cli -c Release --no-build -- --version
 dotnet run --project src/WebLingo.Cli -c Release --no-build -- run samples/Arithmetic/arithmetic.wl
+dotnet run --project src/WebLingo.Pages.Cli -c Release --no-build -- run page.wlp
 dotnet run --project benchmarks/WebLingo.Benchmarks -c Release --no-build
 ```
 
 The benchmark (section 3) writes a Markdown table: each workload's median and fastest time on each VM, the instructions a run executes, what it allocates, and its code's size. Its times are only comparable when they come from one run of it, in Release, on an otherwise idle machine; `--runs`, `--warm-ups` and `--workload` change what it runs. It turns .NET's tiered compilation off (`TieredCompilation` in its project), so that every method is fully optimized from its first call and no VM is timed while .NET still compiles it.
 
 - The solution is small: build all of it rather than one project, and run the complete test suite after a change, which today takes seconds. When the suite grows, run targeted test classes during active development and the complete suite before a task is done.
-- Each behavior in the specification's conformance table (section 8.6) has a test in `WebLingo.Conformance.Tests`, which runs programs through the CLI as files; a new conformance case goes there too. Template tests go into `WebLingo.Templates.Tests` once that project exists (specification, section 13).
+- Each behavior in the specification's conformance table (section 8.6) has a test in `WebLingo.Conformance.Tests`, which runs programs through the CLI as files; a new conformance case goes there too. Template tests go into `WebLingo.Templates.Tests` (specification, section 13), which runs each page on both VMs and `welp` end to end.
 - A new portable project gets its row of allowed references in `DependencyTests` (`WebLingo.Architecture.Tests`), from the specification's section 8.3.
 - A test of malformed input checks the diagnostic's code and span, not only that compilation failed.
 - Tests must pass on Windows and on Linux: no hard-coded `\` or `\r\n`, drive letters, absolute paths, or culture-dependent formatting and parsing.
@@ -210,7 +213,7 @@ These are the checks that `TO-DO-INSTRUCTIONS.md` runs after each task and calls
 
 - the Release build of the whole solution, with no warnings (warnings are errors here);
 - the complete test suite;
-- when the task changes what the `weblingo` CLI does, the CLI run on the samples and the programs the task affects.
+- when the task changes what the `weblingo` CLI or `welp` does, the CLI run on the samples and the programs the task affects, and `welp` on the pages it affects.
 
 Only Windows is tried locally. Linux is tried by CI, on a push, which needs the user's go-ahead (and see section 11), so a task's notes say that Linux was not tried.
 
@@ -271,7 +274,7 @@ The scaffold's `WebLingoSourceSpan` and lexer positions are .NET string indices,
 In addition to the list in `AGENTS.md`, section 13, do not change these without explicit approval:
 
 - any Approved decision in the specification's decision register, or the status of a Proposed or Provisional one
-- the names: WebLingo, `weblingo`, the `.wl` and `.wlp` extensions, the `WebLingo` namespace roots, the `WL` prefixes of specification IDs and diagnostic codes, and the `WebLingo` prefix of type names
+- the names: WebLingo, `weblingo`, WebLingo Pages, `welp`, the `.wl` and `.wlp` extensions, the `WebLingo` namespace roots, the `WL` prefixes of specification IDs and diagnostic codes, and the `WebLingo` prefix of type names
 - the implementation strategy: C# on .NET 10 first, Native C# later, no rewrite in another language
 - the target framework, `net10.0`, and `global.json`
 - the choice between a register VM and a stack VM, and the WBC binary format: do not freeze either

@@ -33,6 +33,17 @@ public sealed class WebLingoParser : IWebLingoParser
         _diagnostics.AddRange(lexerDiagnostics);
     }
 
+    /// <summary>
+    /// Parses tokens that another reader of <paramref name="source"/> gave, such as a template's (specification, section 13),
+    /// ending with an <see cref="WebLingoTokenKind.EndOfFile"/>, with the diagnostics it reported.
+    /// </summary>
+    public WebLingoParser(WebLingoSourceText source, IReadOnlyList<WebLingoToken> tokens, IEnumerable<WebLingoDiagnostic> diagnostics)
+    {
+        _source = source;
+        _tokens = tokens;
+        _diagnostics.AddRange(diagnostics);
+    }
+
     private WebLingoToken Current => _tokens[_index];
 
     public WebLingoSyntaxTree ParseCompilationUnit()

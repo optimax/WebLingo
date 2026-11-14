@@ -85,4 +85,7 @@ public static class WebLingoDiagnosticCodes
     public const string BytecodeVerificationFailure = "WL4001";
     /// <summary>A program too large for the bytecode, such as one needing more registers than a function has (proposed).</summary>
     public const string ProgramTooLarge = "WL4002";
+
+    /// <summary>A template's block, <c>&lt;%</c>, with no closing <c>%&gt;</c> (proposed, section 13; the templates' range approved).</summary>
+    public const string UnterminatedTemplateBlock = "WL5001";
 }

@@ -185,6 +185,26 @@ public sealed class LexerTests
         Assert.Empty(diagnostics);
     }
 
+    [Theory]
+    // Code that a delimiter ends, as %> ends a template's block (section 13): where it stands as a token would, outside
+    // strings and comments, the lexer gives its end, spanning the delimiter; at the end of the text, an empty one.
+    [InlineData("<% a %> b", 2, 1, 5, 2)]
+    [InlineData("<% a%>", 2, 1, 4, 2)]
+    [InlineData("<% \"%>\" %>", 2, 1, 8, 2)]
+    [InlineData("<% /* %> */ %>", 2, 0, 12, 2)]
+    [InlineData("<% // %>\n a %>", 2, 1, 12, 2)]
+    [InlineData("<% a", 2, 1, 4, 0)]
+    public void ALexerMayStopAtADelimiter(string text, int start, int count, int end, int length)
+    {
+        var lexer = new WebLingoLexer(text, start, "%>");
+        var tokens = new List<WebLingoToken>();
+        WebLingoToken token;
+        while ((token = lexer.NextToken()).Kind != WebLingoTokenKind.EndOfFile) tokens.Add(token);
+        Assert.Equal(count, tokens.Count);
+        Assert.Equal(new WebLingoSourceSpan(end, length), token.Span);
+        Assert.Empty(lexer.Diagnostics);
+    }
+
     [Fact]
     public void OptionalAccessAndSetsHaveTheirTokens()
     {

@@ -88,7 +88,7 @@ A16: (a).
 
 2026-11-14: those are done, and the module system it needs too; split into the parts the specification defines in section 9 ("M0.12 parts"), each a task below. Waits for them.
 
-## [QUESTION] M0.12.1: Pages
+## [WORKING] M0.12.1: Pages
 
 `.wlp` pages: their text, `<% … %>`, `<%= … %>`, `<%- … %>` and `<%# … %>`, statements across blocks, escaping, `null` and line breaks, compiled through the WebLingo compiler into a program that writes the page, in `WebLingo.Templates`, with `WebLingo.Templates.Tests`, and `welp run page.wlp` in `WebLingo.Pages.Cli` (specification, section 13, "Contracts", and section 9, M0.12.1), on both VMs. Added by Claude, 2026-11-14.
 
@@ -96,9 +96,11 @@ Its syntax needs one decision first, which section 13 leaves open; answerable wi
 
 **Q1, `%>` inside a block's code, in a string or a comment (`<% var end = "%>"; %>`): (a) it ends the block wherever it stands, as in classic ASP, a string writing it as `"%" + ">"`; (b) the template compiler reads a block's code as WebLingo's tokens, so that `%>` in a string or a comment does not end it.**
 
-A1:
+A1: (b)
 
-## [QUESTION] M0.12.2: Includes
+Done (Claude, 2026-11-14): A1 recorded as approved in the specification, section 13 ("Contracts", "A block's end"), and its decision register. A page is read by `WebLingoTemplateParser` into the WebLingo parser's tokens, and compiled by `WebLingoTemplateCompiler`, for either VM; `welp run`, `welp check` and `welp --version`, in `WebLingo.Pages.Cli`, share `weblingo`'s command line; `WebLingo.Templates.Tests` runs each page on both VMs, and `welp` end to end. Guessed, and recorded as Proposed in section 15.2 ("Pages"): a `<%#` block, which holds no code, ends at its first `%>`; a line of several statement or comment blocks, and spaces, writes nothing too; a block without its `%>` is WL5001, the first of the templates' range, and `<%= %>` without an expression WL1001; a page takes parameters (`welp run page.wlp name=value`) and imports modules, as a script does. A consequence of A1 worth knowing: `<% // a note %>` comments out its own `%>`, so the page's text after it is read as code, and reported as such. Checks: the Release build, without warnings, the full test suite, and both command lines on the samples and on a page, on Windows only; Linux not tried.
+
+## M0.12.2: Includes
 
 `<% include "/includes/header.wlp"; %>`, textual, resolved and compiled with the page, a cycle of them an error of the templates' range, WL5001 on (specification, section 13, "Contracts", and section 9, M0.12.2), on both VMs. Added by Claude, 2026-11-14.
 
@@ -106,7 +108,7 @@ Section 13 has a path starting with `/` be "from the application's root", which 
 
 **Q1, the application's root under `welp`: (a) the folder of the page it is given; (b) the current folder; (c) an option, `welp run --root site page.wlp`, the page's folder when it is left out.**
 
-A1:
+A1: (c), with site root under web server.
 
 ## [IDLE] M0.12.3: Components
 
@@ -134,49 +136,49 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 
 2026-11-13: M0.13 now, after M0.12, templates (specification, section 9); waits for M0.12.
 
-## [QUESTION] Native Code Extensions, Continued
+## Native Code Extensions, Continued
 
 The details A1 of "Native Code Extensions" asks to discuss, and one point between A2 and A4 (specification, section 3.9, "Native modules"). One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-14.
 
 **Q1, what a native module gives: an assembly with one public class implementing `IWebLingoNativeModule`, whose `Register(IWebLingoNativeRegistry registry)` gives its exports, each a function with a name, an arity, and a delegate that takes the call's arguments, as `WebLingoValue`s, with the execution's heap, and gives a value, or a task for asynchronous work, as the host's built-ins (`IWebLingoBuiltinFunction`) do now. Agreed?**
 
-A1:
+A1: OK
 
 **Q2, a native module's classes: (a) none at first, functions only, classes coming later; (b) classes from the start, each declared by the module with its methods as native functions (`registry.Class("Connection", …)`).**
 
-A2:
+A2: (b). That's how built-in classes should be implemented.
 
 **Q3, loading one on .NET (adapter-only, section 7.14): (a) each in an `AssemblyLoadContext` of its own, so that two modules may depend on different versions of one library, and a reload can unload it with its application's generation (WL-H004); (b) into the host's own context, simpler, and never unloaded.**
 
-A3:
+A3: (b), for now
 
 **Q4, a scheme's folder (A2, A3): (a) the module's assembly in it, `native/sqlite.dll`, its dependencies beside it; (b) a folder of its own for each module, `native/sqlite/sqlite.dll`, its dependencies inside it.**
 
-A4:
+A4: (a)
 
 **Q5, A2's explicit paths and A4's concern, a script that writes an assembly and imports it: (a) a native module loads only from a configured scheme's folder, an explicit path too, which scripts cannot write to (section 7.13's capabilities); (b) explicit paths anywhere, the host's filesystem capability alone keeping scripts from writing assemblies where they can be loaded from.**
 
-A5:
+A5: (a)
 
 **Q6, the standard modules as native ones (A5): (a) now: `std:system`'s built-ins moved into a native module installed with the runtime, in the `std` scheme's folder; (b) with the first standard module that is not the host's built-ins (`std:fs`, `std:tasks`).**
 
-A6:
+A6: (a)
 
-## [QUESTION] Arrow Notation, Continued
+## Arrow Notation, Continued
 
 What JavaScript's arrow functions have beyond "Arrow Notation", which made `(a, b) => { … }` the same as `function (a, b) { … }` (specification, section 3.5). One decision each, answerable with a letter. Added by Claude, 2026-11-14.
 
 **Q1, an expression for a body, `(a, b) => a + b`, giving its value, as `(a, b) => { return a + b; }` does: (a) yes; (b) no, a block always.**
 
-A1:
+A1: (a)
 
 **Q2, one parameter without parentheses, `x => { … }` (and `x => x * 2`, with Q1's (a)): (a) yes; (b) no, parentheses always.**
 
-A2:
+A2: (a)
 
 **Q3, `async (x) => { … }`, the same as `async function (x) { … }`: (a) yes; (b) no.**
 
-A3:
+A3: (a)
 
 ## [DEFER] Serialization: Text That Rebuilds a Value
 
@@ -185,5 +187,29 @@ What `write` writes is for people to read, and does not reliably rebuild a value
 If text that rebuilds a value (round-trip text) is wanted, it is a serialization feature: a way to write a value, and to read it back into an equal one, that does not depend on its class's constructor (a rebuilt instance gets its fields set directly, as a runtime error's `Error` already does, specification, section 15.2, "Exceptions"). It deserves a design of its own, rather than borrowing call syntax for `write`'s text. Such a design would decide, among other things: its format (JSON, a WebLingo literal form, or both); how a class is named in it, and found again when it is read (a class in another module, or one renamed since); whether a class may shape its own serialized form, as `toString()` shapes its text; what cannot be serialized (functions, closures, tasks, native resources) and what reading one then does; cycles and shared references; and the security of reading text from outside (no code runs, and no class is made, that the reader did not allow).
 
 It is deferred: nothing needs it yet, and it can be added later, if it proves necessary, without changing `write`'s text or any program.
+
+## Multi-line Strings
+
+WebLingo's string literals end at their line (WL1010, specification, section 3.5, "Strings"), and the language needs strings that span lines too: SQL, HTML fragments, messages and test data. The owner decided so, 2026-11-14, in a chat with Claude, while weighing how a template's `<% … %>` block ends ("`%>` inside a block's code"): if the template compiler reads a block's code as WebLingo's tokens, an unclosed multi-line string, like an unclosed `/* */` comment, runs on over the blocks and the text after it, so its diagnostic should name both where it opened and the `<%` of the block it is in, and its closing delimiter should be one that ordinary text rarely holds. Added by Claude, 2026-11-14.
+
+**Q1, the delimiter: (a) three double quotes, `"""…"""`, as C# 11 and Python write them, with more quotes (`""""…""""`) for a string that holds three; (b) backticks, `` `…` ``, as JavaScript writes them.**
+
+A1: (a), with alternative three single quotes `'''`.
+
+**Q2, escapes in a multi-line string: (a) none, a raw string, `\` being a character like any other (good for regular expressions and Windows paths); (b) the same escapes as an ordinary string's.**
+
+A2: (a). 
+
+**Q3, indentation: the whitespace before the closing delimiter's column is removed from every line, as C# does, so that a string indented with the code around it does not keep that indentation; and the line breaks just after the opening delimiter and just before the closing one are not part of the string. Agreed?**
+
+A3: Yes.
+
+**Q4, line breaks inside a multi-line string are always LF (`\n`), whether the source file's lines end in CRLF, LF or CR, so that a program gives the same string on every platform. Agreed?**
+
+A4: Yes,
+
+**Q5, interpolation (`"Hello, {name}"`), a separate feature: (a) not now; (b) not now, but the delimiter chosen in Q1 leaves room for it (C# writes `$"""…{name}…"""`, JavaScript `` `…${name}…` ``); (c) designed together with multi-line strings.**
+
+A5: (c), but also needed for single line strings.
 
 # END-OF-TO-DO

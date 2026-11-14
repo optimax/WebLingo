@@ -15,7 +15,22 @@ var result = a + b;
 writeLn(result);   // 30
 ```
 
-Every variable is initialized where it is declared, and a name means nothing before its declaration (both are compile-time errors); integer overflow is a runtime error. `.wlp` templates come later, so `samples/SimpleWebsite` does not run yet; `samples/HelloWorld` and `samples/Arithmetic` do.
+Every variable is initialized where it is declared, and a name means nothing before its declaration (both are compile-time errors); integer overflow is a runtime error. `samples/HelloWorld`, `samples/Arithmetic` and `samples/Modules` run.
+
+## Pages
+
+WebLingo Pages are `.wlp` templates, compiled by the template compiler (`WebLingo.Templates`) into WebLingo, and run by `welp`, their command line (`src/WebLingo.Pages.Cli`). A page's text is written as it stands; `<% … %>` holds statements, which may span several blocks, the text between them in their body; `<%= x %>` writes `x`'s text escaped for HTML, `<%- x %>` as it stands, and either nothing for `null`; and `<%# … %>` is a comment. A line holding only `<% … %>` blocks and spaces writes nothing, not even its line break:
+
+```html
+<% param who = "you & me"; %>
+<ul>
+<% foreach (var i in [1, 2]) { %>
+  <li>Item <%= i %> for <%= who %></li>
+<% } %>
+</ul>
+```
+
+writes `<ul>`, then `<li>Item 1 for you &amp; me</li>` and the same for 2, each on a line of its own, then `</ul>`. Includes, layouts and components come next, so `samples/SimpleWebsite` does not run yet.
 
 ## Prerequisites
 
@@ -31,16 +46,17 @@ dotnet test WebLingo.slnx -c Release
 dotnet run --project src/WebLingo.Cli -- run samples/Arithmetic/arithmetic.wl
 dotnet run --project src/WebLingo.Cli -- check samples/Arithmetic/arithmetic.wl
 dotnet run --project src/WebLingo.Cli -- --version
+dotnet run --project src/WebLingo.Pages.Cli -- run page.wlp
 dotnet run --project benchmarks/WebLingo.Benchmarks -c Release
 ```
 
 The last command times the VM on the benchmark's workloads (`benchmarks/WebLingo.Benchmarks/Workloads`), and writes the results as a table.
 
-`weblingo run <file>` compiles a script and runs it; `weblingo check <file>` compiles it and reports its errors without running it. Errors go to standard error as `file(line,column): error CODE: message`. The exit code is 0 on success, 1 for compilation errors, 2 for a usage error, 3 for a runtime error, and 4 for a file that cannot be read.
+`weblingo run <file>` compiles a script and runs it; `weblingo check <file>` compiles it and reports its errors without running it. Errors go to standard error as `file(line,column): error CODE: message`. The exit code is 0 on success, 1 for compilation errors, 2 for a usage error, 3 for a runtime error, and 4 for a file that cannot be read. `welp run <page.wlp>` and `welp check <page.wlp>` do the same for a page, the page being written to standard output.
 
 ## Architecture
 
-See [`Documents/weblingo-architecture.md`](../Documents/weblingo-architecture.md) at the repository root; section 15 has M0.6's status, and the choices made where the specification is silent, all still proposed. The VM instruction architecture remains provisional (WL-BC002): there are a register VM, which `weblingo` runs, and a stack VM, both from the same lowered IR, which the benchmark (`benchmarks/WebLingo.Benchmarks`) compares. Includes, layouts, and parameterized components are **all mandatory** for the first template-capable release; they are not implemented yet.
+See [`Documents/weblingo-architecture.md`](../Documents/weblingo-architecture.md) at the repository root; section 15 has M0.6's status, and the choices made where the specification is silent, all still proposed. The VM instruction architecture remains provisional (WL-BC002): there are a register VM, which `weblingo` runs, and a stack VM, both from the same lowered IR, which the benchmark (`benchmarks/WebLingo.Benchmarks`) compares. Includes, layouts, and parameterized components are **all mandatory** for the first template-capable release; pages are implemented, and they are not yet.
 
 ## Verification status
 
