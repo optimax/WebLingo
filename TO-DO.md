@@ -40,49 +40,89 @@ A5:
 
 2026-11-13: waits for "M0.11: Asynchrony".
 
-## Modules: `import` and `param`
+## [DONE] Modules: `import` and `param`
 
 The language's module system, which A3 of "M0.11 Syntax: Templates, Continued" makes `import`, and A4's `param` as a keyword of the language, a module's parameter; A2 of "Asynchrony, Continued" makes a script, or a module, an instance of `Module`. Templates (M0.12) need both. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
 
-**Q1, importing: (a) `import db from "lib/db.ws";`, a statement at a module's top level, naming the module's instance; (b) `var db = Module.import("lib/db.ws");`, an expression, anywhere.**
+Q1, importing: (a) `import db from "lib/db.ws";`, a statement at a module's top level, naming the module's instance; (b) `var db = Module.import("lib/db.ws");`, an expression, anywhere.
 
 A1: (c) both. (a) is static, known at compile time, (b) is dynamic, only at runtime.
 
-**Q2, when a module runs: once per execution, the first time it is imported; every later import gets the same instance, already run. Agreed?**
+Q2, when a module runs: once per execution, the first time it is imported; every later import gets the same instance, already run. Agreed?
 
 A2: Yes.
 
-**Q3, exports: (a) every top-level declaration of a module is a member of its instance; (b) only those marked `export` (`export function f() { … }`).**
+Q3, exports: (a) every top-level declaration of a module is a member of its instance; (b) only those marked `export` (`export function f() { … }`).
 
 A3: (b).
 
-**Q4, paths: as A9 of "M0.11: Templates" has it for the language: from the importing file's folder, `./` that folder, `/` the drive's root; and `.ws` may be left out. Agreed?**
+Q4, paths: as A9 of "M0.11: Templates" has it for the language: from the importing file's folder, `./` that folder, `/` the drive's root; and `.ws` may be left out. Agreed?
 
 A4: Yes.
 
-**Q5, cycles: a module that imports itself, directly or through others: (a) a compile-time error; (b) allowed, the second import getting the instance as it is so far, as JavaScript does.**
+Q5, cycles: a module that imports itself, directly or through others: (a) a compile-time error; (b) allowed, the second import getting the instance as it is so far, as JavaScript does.
 
 A5: (b).
 
-**Q6, `param` in the language: `param name;` and `param size = 10;` declare a module's parameters, at its top level, before its other statements, each a `const` of it; an importer gives them, `import db from "lib/db.ws" { size: 10 };`, and a template's caller gives a component's or a layout's. Agreed?**
+Q6, `param` in the language: `param name;` and `param size = 10;` declare a module's parameters, at its top level, before its other statements, each a `const` of it; an importer gives them, `import db from "lib/db.ws" { size: 10 };`, and a template's caller gives a component's or a layout's. Agreed?
 
 A6: Yes.
 
-**Q7, a parameter without a default that is not given: (a) an error, where the module is imported, of a new code; (b) `null`.**
+Q7, a parameter without a default that is not given: (a) an error, where the module is imported, of a new code; (b) `null`.
 
 A7: (a).
 
-**Q8, a script's parameters from the command line: `weblingo run script.ws size=10 name=Ann`, each value read as a WebLingo literal if it is one (`10`, `true`), as a string otherwise. Agreed?**
+Q8, a script's parameters from the command line: `weblingo run script.ws size=10 name=Ann`, each value read as a WebLingo literal if it is one (`10`, `true`), as a string otherwise. Agreed?
 
 A8: Yes. But, `weblingo run script.ws value="10"` reads as `String(value)`.
 
-**Q9, when imports are compiled: (a) with the importing program, so that a program is complete before it runs; (b) when they run, as `renderComponent` finds its component.**
+Q9, when imports are compiled: (a) with the importing program, so that a program is complete before it runs; (b) when they run, as `renderComponent` finds its component.
 
 A9: Static imports can be resolved at compile time so they can be compiled right away. Dynamic imports compiled at the time of executing `Module.import(...)`.
 
-**Q10, the standard library: it becomes modules imported by name (`import fs from "std/fs";`), while `write`, `writeLn` and the like stay built-ins of every program. Agreed?**
+Q10, the standard library: it becomes modules imported by name (`import fs from "std/fs";`), while `write`, `writeLn` and the like stay built-ins of every program. Agreed?
 
 A10: Well, even built-ins should be treated like they belong to modules, so maybe `write` and `writeLn` are in `system`, but `system` is always implicitly imported by all modules.
+
+Done (Claude, 2026-11-13): recorded as approved in the specification, section 3.9, a new section. What the answers leave open is asked in "Modules, Continued"; the implementation is the task "Modules".
+
+## [QUESTION] Modules, Continued
+
+Follow-ups to "Modules: `import` and `param`" (specification, section 3.9). One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
+
+**Q1, `Module.import(path)`: a module's top level is `async` (`exec()`), so it gives a task, which completes with the instance once the module has run, `var db = await Module.import("lib/db.ws");`. Agreed?**
+
+A1:
+
+**Q2, when a static import's module runs: (a) before the importing module's top level, in the order of its imports, each awaited, so that the importer begins with its imports run, as JavaScript's do; (b) where its `import` stands, in order with the statements around it.**
+
+A2:
+
+**Q3, a module's lifetime under a host: A2 runs a module once per execution, and section 2.3 once per application generation: (a) once per execution, a request's, its instance the request's own; (b) once per application generation, its instance shared by the requests, which then cannot change it, since a heap is one worker's (WS-P013).**
+
+A3:
+
+**Q4, `export` marks a `function`, `class`, `var` or `const` declaration at a module's top level, and an importer reads an exported `var` as it is when read (`db.count`); assigning it: (a) WS3001, an export being the module's to change; (b) allowed, as a member is assigned.**
+
+A4:
+
+**Q5, importing names: (a) only the instance, `import util from "lib/util.ws";`, then `util.f()`; (b) names too, `import { f, g } from "lib/util.ws";`, as JavaScript does.**
+
+A5:
+
+**Q6, a quoted parameter (A8): a shell removes the quotes of `value="10"`, so `weblingo` gets `value=10`, an integer: (a) quotes that reach it make a string, `value='"10"'` in a shell; (b) `weblingo run script.ws --string value=10` makes a string, whatever the value looks like.**
+
+A6:
+
+**Q7, the standard modules' names: (a) `system` and `std/fs`, as A10 and Q10 name them; (b) every one under `std/`, `std/system` among them.**
+
+A7:
+
+## [IDLE] Modules
+
+The module system: `import`, static and dynamic, `export`, `param`, a script's parameters, and the standard library and the built-ins as modules (specification, section 3.9), on both VMs, before M0.12's templates, which build on it. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for the answers to "Modules, Continued", and for "Extending the Classes of Values", above it.
 
 ## [IDLE] M0.12: Templates
 

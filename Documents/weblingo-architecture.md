@@ -33,6 +33,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | Collections | Arrays, maps and sets, with indexing, members, `length`, `foreach`, identity, text, set literals and optional access (§3.6) | Approved (13 November 2026) |
 | Classes and disposal | Classes, instances, fields, `this`, methods, inheritance, `x?.name`, text, `dispose()` and `destructor()`, disposal once and chained, `using`, static members, `Object` and `equal()`, exceptions, `toString()`, a disposal that throws, typed catches, and the classes of values (§3.7) | Approved (13 November 2026) |
 | Asynchrony | `async` functions, `await` of any value, tasks of the class `Task`, exceptions nothing awaits, the end of an execution, frames kept on the heap, cancellation, `async` disposal, templates' `await`, one worker per execution, scripts as `Module`s, and `t.forget()` (§3.8) | Approved (13 November 2026) |
+| Modules | `import`, static and dynamic; a module run once per execution; `export`; paths; cycles; `param`; a script's parameters; the standard library and the built-ins as modules (§3.9) | Approved (13 November 2026) |
 | Templates (M0.12) | The language is independent of templates; a template compiler extends the language's, with a program of its own; text, statements across blocks, escaping, `null`, line breaks, `include`, layouts and their parameters, components found at run time and their declared parameters, and codes WS5001 on (§13, "Contracts"); the technology's name, `import`, default values, and asynchrony, which comes first, still open | Approved (13 November 2026) |
 | M0.1 | Mandatory semicolons; no automatic semicolon insertion | Approved |
 | M0.1 | Numeric categories int64, IEEE binary64, decimal128 | Approved |
@@ -287,6 +288,21 @@ How a program writes asynchrony, on WebLingo's own operation model (WS-P007), ap
 - **`using`.** A `dispose()` may be `async`, and `using` awaits it; in a function that is not `async`, where it cannot wait, an `async` `dispose()` is WS3001, at the end of the `using`. `x.dispose()` on an instance whose disposal has an `async` method gives a task, which completes, with `null`, once the last of its methods has run, so that `await x.dispose();` waits for it (approved 13 November 2026).
 - **Templates.** A template's body may `await` anywhere, as an `async` function's may, and `renderComponent(…)` gives a task, which the page awaits (§13).
 - **Concurrency.** An execution's tasks run on its one worker, one at a time, switching only at `await`, so that no two run at once and nothing needs a lock (WS-H012, WS-P013); many executions, a server's requests, run at once on a pool of workers. Parallel work within one program will come later, as workers with heaps of their own that exchange copied messages (WS-P013's explicit transfer).
+
+### 3.9 Modules — approved 13 November 2026
+
+The module system, `import`, `export` and `param`, approved by the owner on 13 November 2026, but for the points that say they are still open. Templates build on it (§13, "Contracts").
+
+- **Modules.** A script, or a module, is a `.ws` file, and an instance of the built-in class `Module`, whose top level is the body of its `async` method `exec()` (§3.8).
+- **Importing.** `import db from "lib/db.ws";` imports a module statically, at a module's top level: it is resolved, and compiled, with the importing program. `Module.import("lib/db.ws")` imports one dynamically, anywhere, its path known only when it runs: the module is compiled then. Either gives the module's instance.
+- **Running once.** A module runs once per execution, the first time it is imported; every later import gets the same instance, already run.
+- **Exports.** Only the declarations a module marks `export` (`export function f() { … }`) are members of its instance.
+- **Paths.** A path is from the importing file's folder, `./` being that folder and `/` the drive's root, as for the language proper in §13 ("Includes"); `.ws` may be left out.
+- **Cycles.** A module may import itself, directly or through others: the second import gets the instance as it is so far, as JavaScript does.
+- **Parameters.** `param name;` and `param size = 10;` declare a module's parameters, at its top level, before its other statements, each a `const` of it: `param` is a keyword of the language. An importer gives them, `import db from "lib/db.ws" { size: 10 };`, and a template's caller gives a component's or a layout's (§13). A parameter without a default that is not given is an error, where the module is imported, of a code of its own.
+- **A script's parameters.** `weblingo run script.ws size=10 name=Ann` gives a script its parameters, each value read as a WebLingo literal if it is one (`10`, `true`), as a string otherwise; a quoted value is a string, so `value="10"` gives `"10"`.
+- **The standard library.** Its parts are modules imported by name (`import fs from "std/fs";`). The built-ins belong to modules too: `write` and `writeLn` are `system`'s, which every module imports implicitly.
+- **Still open:** what `Module.import(…)` gives while the module runs, when a static import's module runs, a module's lifetime under a host (§2.3), assigning an export, importing names, a quoted parameter in a shell, and the standard modules' names.
 
 ---
 
@@ -972,7 +988,7 @@ Proposed central props:
 
 **After M0.8** (order approved by the owner, 13 November 2026): M0.9, then M0.10, M0.11, M0.12 and M0.13, as the table gives them (asynchrony put before templates on 13 November 2026, the owner asking for it to be designed first). Each needs syntax, or a format, that this specification does not give yet, which is decided feature by feature before it is built; and each is built on both VMs (§5.6, "Both VMs, for now").
 
-**Immediate next activity:** the module system (`import` and `param`), and what extending `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class` means, for the owner's decision; then M0.12, templates. The compiler and both VMs cover M0.6's subset and the language of §3.5 to §3.8.
+**Immediate next activity:** extending the classes of values (§3.7), and the module system (§3.9), the rest of both for the owner's decision; then M0.12, templates. The compiler and both VMs cover M0.6's subset and the language of §3.5 to §3.8.
 
 ---
 
@@ -1189,7 +1205,7 @@ The owner's answers to what sections 2.2 and 13 left open, approved on 13 Novemb
 - **Line breaks.** A line holding only a `<% … %>` block, and spaces, writes nothing, not even its line break, so that statements leave no blank lines.
 - **Includes.** `<% include "/includes/header.wsp"; %>` is a statement whose path is a string literal, resolved and compiled with the page. It is textual: the included template sees the variables where it is included, as if its text stood there. A path starting with `/` is from the application's root, any other from the including file's folder. In the language proper, `/` is the drive's root, `./` the current folder, and `xyz/abc` the current folder's `xyz` subfolder, and so on. `import`, for what has a scope of its own, is the language's module system, for `.ws` files and templates alike, designed as a task of its own.
 - **Layouts.** `<% layout "/layouts/main.wsp", { title: "Products" }; %>`: at most one for a page, given the values the layout reads as its parameters, which it declares as a component does, a missing or an extra one being an error, so that the page's body runs, and streams, where the layout calls `renderBody()` (WS-T003). A layout may itself have a layout, and so on; a cycle of them is a compile-time error.
-- **Components.** `renderComponent(path, { product: p })` is a built-in: its path is any string, and the component is found and compiled when it runs. A component declares its parameters each with a statement of its own, as `var` declares a variable, `<% param product; param size = 10; %>`, each then a variable of it, a missing one an error, an extra one an error, a default making one optional, any expression, evaluated when the parameter is missing. Whether `param` is a keyword of the language itself, a module's parameter, is asked with the module system. A component is compiled on first use and kept, recompiled when its file changes, in the application's generation (WS-T004, WS-T007); a missing one is a runtime error, WS5xxx, which a catch may catch.
+- **Components.** `renderComponent(path, { product: p })` is a built-in: its path is any string, and the component is found and compiled when it runs. A component declares its parameters each with a statement of its own, as `var` declares a variable, `<% param product; param size = 10; %>`, each then a variable of it, a missing one an error, an extra one an error, a default making one optional, any expression, evaluated when the parameter is missing. `param` is a keyword of the language itself, a module's parameter (§3.9). A component is compiled on first use and kept, recompiled when its file changes, in the application's generation (WS-T004, WS-T007); a missing one is a runtime error, WS5xxx, which a catch may catch.
 - **Asynchrony.** `async` and `await` are designed first, before templates (section 13's examples use `await`): §3.8.
 - **Errors.** Template errors (a cycle of includes or layouts, a missing file, a path outside the application, a component's parameters) have a range of codes of their own, WS5001 on.
 
