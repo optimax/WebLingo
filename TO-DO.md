@@ -2,42 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [DONE] Classes of Values, Continued
-
-Follow-ups to "Typed Catches Syntax: Classes of Values". One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
-
-NOTE: It should be possible to extend a class via `extends` as expected, but also via assigning a method or a property of a class directly, which is the same as declaring those as `static`.
-
-Q1, a catch whose name is not a class (A5, "Is there a problem with that?"): no problem, but for one point: `A.equal(e)` runs the program's own `equal` when `A` is an instance whose class overrides it, while the VM is searching for a handler, so that a catch could fail or have side effects, which A3 wanted to avoid. (a) `==`, which runs no code, and differs only for such instances; (b) `A.equal(e)`, as you write, an exception it throws replacing the one being caught.
-
-A1: (b)
-
-Q2, `Function` and `Class`: (a) like `Boolean`, `Integer`, `Number` and `String`: no class extends them, and `new` makes none; (b) classes may extend them.
-
-A2: I am taking back whatever I said that makes you think "`Boolean`, `Integer`, `Number` and `String`: no class extends them". They should essentially be like any other class and it should be possible to extend them with new methods, for example.
-
-Q3, extending `Array`, `Map` and `Set`: `class Stack extends Array { top() { return this[this.length - 1]; } }`; `new Stack()` is an empty array of class `Stack`: indexed, with `length`, `push` and `pop`, visited by `foreach`, `is Array` and `is Stack`, with its own methods. Agreed?
-
-A3: Sure.
-
-Q4, fields on such an instance: (a) allowed, as on any instance; (b) none: only methods.
-
-A4: (a)
-
-Q5, `new Array()`, `new Map()` and `new Set()` make empty ones, as `[]`, `{}` and `#{}` do. Agreed?
-
-A5: Yes.
-
-Q6, the text of a derived array: (a) `Stack [1, 2]`, its class's name before it, as an instance's is; (b) `[1, 2]`, as any array's.
-
-A6: (a). The text of an instance must agree with its literal representation, if available.
-
-Q7, the classes' names: `Integer`, `String` and the rest are in scope everywhere, as `Object` and `Error` are, and a program may declare a name of its own over one. Agreed?
-
-A7: Sure.
-
-Done (Claude, 2026-11-13): recorded as approved in the specification, section 3.7 ("Classes of values", "Typed catches" and "Static members", the NOTE among them). What A2 leaves open, what extending `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class` means, is asked in "Classes of Values, Further".
-
 ## [QUESTION] Classes of Values, Further
 
 A2 of "Classes of Values, Continued": `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class` are to be like any other class, and extendable, with new methods for example. What that means needs deciding. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
@@ -66,32 +30,6 @@ A1 of "Typed Catches Syntax: Classes of Values": classes may extend `Array`, `Ma
 
 2026-11-13: answered; next, with A1's `A.equal(e)` for a catch whose name is not a class, and the NOTE's static members by assignment.
 
-## [DONE] Asynchrony, Continued
-
-Follow-ups to "Asynchrony: `async` and `await`". One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
-
-Q1, concurrency (A4, "How about a real thread pool?"): the approved hosting design runs each execution on one worker (WS-H012), with a heap of its own that no other thread touches (WS-P013), while many executions, a server's requests, run at once on a pool of workers, and blocking I/O runs on a bounded pool of its own (section 6.10), so a server already uses its cores. Tasks of one execution running on several threads at once would share its heap, which needs locks around every object, or a collector that runs beside the program, and makes every program open to data races. (a) Keep one worker per execution, its tasks taking turns at `await`, and add parallel work later as workers with heaps of their own that exchange copied messages (WS-P013's explicit transfer), as JavaScript's workers do; (b) a thread pool for one execution's tasks, their heap shared under locks, changing WS-H012 and WS-P013.
-
-A1: (a)
-
-Q2, scripts as modules (A2, "Would that work?"): it would. A script's or a module's top level becomes the body of an `async` method, `exec()`, of an instance of a built-in class `Module`, which the host calls and awaits; the module's exports would be its instance's members. It belongs with `import` ("M0.11 Syntax: Templates, Continued", Q3). (a) Adopt it now, as what a script is; (b) decide it with `import`, when the module system is designed.
-
-A2: (a)
-
-Q3, forgetting a task (A7's opting out): (a) `t.forget()`, a method of the task, after which nothing reports its exception; (b) a statement, `forget t;`; (c) a function, `Task.forget(t)`.
-
-A3: (a).
-
-Q4, an `async` `dispose()` in a function that is not `async` (A12), where `using` cannot wait for it: (a) WS3001, at the end of the `using`; (b) the disposal starts, and is not waited for, as if forgotten.
-
-A4: (a)
-
-Q5, its milestone: asynchrony comes before templates, so (a) it is M0.11, templates becoming M0.12 and WBC M0.13; (b) it is a part of M0.10, M0.10.8; (c) another, which you give.
-
-A5: (a)
-
-Done (Claude, 2026-11-13): recorded as approved in the specification, section 3.8, its decision register, and section 9, where asynchrony is M0.11, templates M0.12 and WBC M0.13.
-
 ## [IDLE] Default Parameter Values
 
 `function f(a, b = 1) { … }`, for functions, methods and constructors (A5 of "M0.11 Syntax: Templates, Continued"; specification, section 3.5), on both VMs. Added by Claude, 2026-11-13.
@@ -109,49 +47,6 @@ Done (Claude, 2026-11-13): recorded as approved in the specification, section 3.
 `Task.all`, `Task.any` and timeouts (A6 of "Asynchrony: `async` and `await`"; specification, section 3.8). Added by Claude, 2026-11-13.
 
 2026-11-13: waits for "M0.11: Asynchrony".
-
-## [DONE] M0.11 Syntax: Templates, Continued
-
-Follow-ups to "M0.11: Templates": what its answers leave open. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
-
-Q1, the technology's name, WebLingo with templates in a web server: (a) WebLingo Pages, as you suggest; (b) WebLingo Server Pages; (c) another, which you give.
-
-A1: (a)
-
-Q2, its command-line program, beside `weblingo`: (a) `wlpages`; (b) `weblingo-pages`; (c) another, which you give. Its project would be `WebLingo.Pages.Cli`, beside `WebLingo.Cli`.
-
-A2: `welp`.
-
-Q3, `import`: (a) the language's module system, for `.ws` files and templates alike (section 2.3 plans modules), designed as a task of its own, since a general-purpose language needs one; (b) for templates only: `<% import "/x.wsp"; %>`, a template run in a scope of its own.
-
-A3: (a)
-
-Q4, default values in a component's parameters: `<%@ params product, size = 10 %>`, a default being any expression, evaluated when the parameter is missing. Agreed?
-
-A4: Yes. It should be possible to specify each parameter separately, like var declarations, so \
-
-```
-<%
-  param product;
-  param size = 10;
-%>
-```
-
-Why couldn't we have `param` as a regular keyword in the language (like `var`), specifying a parameter to a module?
-
-Q5, functions too: `function f(a, b = 1) { … }`, by the same rule, so that functions and components agree: (a) yes; (b) components only.
-
-A5:  Yes, functions too.
-
-Q6, a layout's parameters: a layout declares them as a component does, `<%@ params title %>`, and is given them by the page's `layout` statement, a missing or an extra one being an error. Agreed?
-
-A6: Yes, but as in A4.
-
-Q7, components found at run time (A13): each is compiled on first use and kept, recompiled when its file changes, in the application's generation (WS-T004, WS-T007); a missing one is a runtime error, WS5xxx, which a catch may catch. Agreed?
-
-A7: Yes.
-
-Done (Claude, 2026-11-13): recorded as approved in the specification, section 13 ("Contracts") and section 3.5 (functions' default values). A4's question, `param` as a keyword of the language, is asked with the module system in "Modules: `import` and `param`"; functions' default values are the task "Default Parameter Values".
 
 ## [QUESTION] Modules: `import` and `param`
 
