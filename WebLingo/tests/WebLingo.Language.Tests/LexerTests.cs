@@ -170,6 +170,21 @@ public sealed class LexerTests
         Assert.Empty(diagnostics);
     }
 
+    [Theory]
+    [InlineData("(a) => {}", new[] { WebLingoTokenKind.OpenParen, WebLingoTokenKind.Identifier, WebLingoTokenKind.CloseParen,
+        WebLingoTokenKind.Arrow, WebLingoTokenKind.OpenBrace, WebLingoTokenKind.CloseBrace })]
+    [InlineData("a==>b", new[] { WebLingoTokenKind.Identifier, WebLingoTokenKind.EqualEqual, WebLingoTokenKind.Greater,
+        WebLingoTokenKind.Identifier })]
+    [InlineData("a = >b", new[] { WebLingoTokenKind.Identifier, WebLingoTokenKind.Equals, WebLingoTokenKind.Greater,
+        WebLingoTokenKind.Identifier })]
+    public void AnArrowIsOneToken(string text, WebLingoTokenKind[] kinds)
+    {
+        // => is one token, after == is taken (section 3.5).
+        var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);
+        Assert.Equal(kinds.Append(WebLingoTokenKind.EndOfFile), tokens.Select(t => t.Kind));
+        Assert.Empty(diagnostics);
+    }
+
     [Fact]
     public void OptionalAccessAndSetsHaveTheirTokens()
     {

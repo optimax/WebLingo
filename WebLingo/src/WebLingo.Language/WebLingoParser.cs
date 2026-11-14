@@ -686,9 +686,11 @@ public sealed class WebLingoParser : IWebLingoParser
     /// <summary>A function's parameters and body, after <c>function</c> and its name, if it has one.</summary>
     /// <remarks>
     /// A function that is not a method may take a receiver, <c>this</c> as its first parameter, without a default
-    /// (<paramref name="receiver"/>; section 3.7).
+    /// (<paramref name="receiver"/>; section 3.7). An arrow function's parameters end at <paramref name="arrowClose"/>, the
+    /// index of their <c>)</c>, which <c>=&gt;</c> follows (section 3.5), where they resume after an error in them.
     /// </remarks>
-    private (IReadOnlyList<WebLingoParameterSyntax> Parameters, WebLingoBlockSyntax Body) ParseFunctionRest(bool receiver = false)
+    private (IReadOnlyList<WebLingoParameterSyntax> Parameters, WebLingoBlockSyntax Body) ParseFunctionRest(bool receiver = false,
+        int arrowClose = -1)
     {
         _statementHasError = false;
         var parameters = new List<WebLingoParameterSyntax>();
@@ -728,7 +730,9 @@ public sealed class WebLingoParser : IWebLingoParser
                 Advance();
             }
         }
+        if (arrowClose >= 0 && _index < arrowClose && _statementHasError) _index = arrowClose;
         Expect(WebLingoTokenKind.CloseParen, "')'");
+        if (arrowClose >= 0) Expect(WebLingoTokenKind.Arrow, "'=>'");
         var bodyStart = Current.Span.Start;
         if (Current.Kind != WebLingoTokenKind.OpenBrace)
         {
@@ -1147,6 +1151,20 @@ public sealed class WebLingoParser : IWebLingoParser
                 var arguments = ParseElements(WebLingoTokenKind.CloseParen, "')'");
                 return new WebLingoNewExpressionSyntax(target, arguments, SpanFrom(token.Span.Start));
             }
+            case WebLingoTokenKind.OpenParen when ArrowClose() is var close and >= 0:
+            {
+                // (a, b) => { … }: a function expression, as function (a, b) { … } is, a receiver included (section 3.5).
+                if (!EnterRecursion()) return new WebLingoErrorExpressionSyntax(token.Span);
+                try
+                {
+                    var (parameters, body) = ParseFunctionRest(receiver: true, arrowClose: close);
+                    return new WebLingoFunctionExpressionSyntax(parameters, body, SpanFrom(token.Span.Start));
+                }
+                finally
+                {
+                    _recursionDepth--;
+                }
+            }
             case WebLingoTokenKind.OpenParen:
                 Advance();
                 var inner = ParseExpression();
@@ -1392,6 +1410,26 @@ public sealed class WebLingoParser : IWebLingoParser
     }
 
     private WebLingoToken Peek(int ahead) => _tokens[Math.Min(_index + ahead, _tokens.Count - 1)];
+
+    /// <summary>
+    /// The index of the <c>)</c> that matches the <c>(</c> here, if <c>=&gt;</c> follows it, so that the parentheses hold
+    /// an arrow function's parameters (section 3.5); -1 otherwise, for a parenthesized expression.
+    /// </summary>
+    private int ArrowClose()
+    {
+        var depth = 0;
+        for (var i = _index; i < _tokens.Count; i++)
+        {
+            var kind = _tokens[i].Kind;
+            if (kind == WebLingoTokenKind.OpenParen) depth++;
+            else if (kind == WebLingoTokenKind.CloseParen && --depth == 0)
+            {
+                return i + 1 < _tokens.Count && _tokens[i + 1].Kind == WebLingoTokenKind.Arrow ? i : -1;
+            }
+            else if (kind == WebLingoTokenKind.EndOfFile) return -1;
+        }
+        return -1;
+    }
 
     private WebLingoToken Advance()
     {

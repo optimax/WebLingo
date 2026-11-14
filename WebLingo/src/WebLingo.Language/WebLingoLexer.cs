@@ -48,6 +48,7 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
             ('<', '=') => WebLingoTokenKind.LessEqual, ('>', '=') => WebLingoTokenKind.GreaterEqual,
             ('&', '&') => WebLingoTokenKind.AmpAmp, ('|', '|') => WebLingoTokenKind.PipePipe, ('#', '{') => WebLingoTokenKind.HashBrace,
             ('?', '[') => WebLingoTokenKind.QuestionBracket, ('?', '.') => WebLingoTokenKind.QuestionDot,
+            ('=', '>') => WebLingoTokenKind.Arrow,
             _ => WebLingoTokenKind.Bad
         };
         if (pair != WebLingoTokenKind.Bad)

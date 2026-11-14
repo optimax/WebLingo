@@ -135,6 +135,11 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A { static let x = 1; }", "WL1001", 1, 18)]
     [InlineData("class A { const X; }", "WL1006", 1, 17)]
     [InlineData("class A { const X = 1; const X = 2; }", "WL2002", 1, 30)]
+    [InlineData("var f = (1) => { return 2; };", "WL1001", 1, 10)]
+    [InlineData("var f = (a) => a + 1;", "WL1001", 1, 16)]
+    [InlineData("var f = (this = 1) => { };", "WL1001", 1, 15)]
+    [InlineData("var f = (a, a) => { return a; };", "WL2002", 1, 13)]
+    [InlineData("var f = (a = 1, b) => { };", "WL1001", 1, 17)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -463,6 +468,11 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var log = []; class A { constructor(x) { this.x = x; } sum(y) { return this.x + y; } property twice { get { return this.x * 2; } } static make() { return new A(1); } static var count = 3; static const MAX = 9; dispose() { log.push(\"A gone\"); } } var B = new Class(\"B\"); B.setMethod(\"constructor\", function (this, x) { this.x = x; }); B.setMethod(\"sum\", function (this, y) { return this.x + y; }); B.setProperty(\"twice\", function (this) { return this.x * 2; }, null); B.make = function () { return new B(1); }; B.count = 3; B.setConstant(\"MAX\", 9); B.setMethod(\"dispose\", function (this) { log.push(\"B gone\"); }); foreach (var C in [A, B]) { var c = new C(5); log.push([c.sum(1), c.twice, C.make().x, C.count, C.MAX, c is C]); c.dispose(); log.push(c.toString()); } writeLn(log);", "[[6, 10, 1, 3, 9, true], \"A gone\", \"A {x: 5}\", [6, 10, 1, 3, 9, true], \"B gone\", \"B {x: 5}\"]")]
     [InlineData("class A { constructor(x) { this.x = x; } describe() { return \"A\" + this.x.toString(); } } class D extends A { describe() { return \"D/\" + super.describe(); } } var E = new Class(\"E\", A); E.setMethod(\"describe\", function (this) { return \"E/A\" + this.x.toString(); }); writeLn([new D(1).describe(), new E(2).describe(), new E(3) is A, D.__parent == E.__parent]);", "[\"D/A1\", \"E/A2\", true, true]")]
     [InlineData("class K { static const X = 1; } extend K { static X() { return 2; } } var before = K.X(); K.X = 5; K.X = 6; writeLn([before, K.X]);", "[2, 6]")]
+    [InlineData("var add = (a, b) => { return a + b; }; var none = () => { return \"none\"; }; writeLn([add(2, 3), none(), none]);", "[5, \"none\", function]")]
+    [InlineData("var g = (a, b = 10) => { return a + b; }; var k = 5; var h = (x) => { return x + k; }; k = 6; writeLn([g(1), g(1, 2), h(1)]);", "[11, 3, 7]")]
+    [InlineData("var P = new Class(\"P\"); P.setMethod(\"sum\", (this) => { return this.x + this.y; }); var p = new P(); p.x = 1; p.y = 2; var describe = (this, prefix) => { return prefix + this.x.toString(); }; writeLn([p.sum(), describe(p, \"x = \")]);", "[3, \"x = 1\"]")]
+    [InlineData("class A { constructor() { this.v = 7; } get() { var f = () => { return this.v; }; return f(); } } writeLn(new A().get());", "7")]
+    [InlineData("writeLn([((x) => { return x * 2; })(21), (1 + 2) * 3, ((4))]);", "[42, 9, 4]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));

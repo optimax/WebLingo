@@ -162,7 +162,7 @@ A5:
 
 A6:
 
-## Arrow Notation
+## [WORKING] Arrow Notation
 
 ```
 function (this) { return this.x + this.y; }
@@ -173,6 +173,24 @@ should be equivalent to
 ```
 (this) => { return this.x + this.y; }
 ```
+
+Done (Claude, 2026-11-14): `(parameters) => { … }` is a function expression, parsed into the very syntax `function (parameters) { … }` is, so that the two are the same from the binder on, on both VMs: its parameters are a function's, defaults and a receiver, `(this) => { … }`, included, and inside a method it sees the method's `this`, as any function expression does. Recorded in the specification, section 3.5, as the owner's request, its details as Proposed in section 15.2 ("Functions and calls"). What JavaScript's arrows have besides, an expression for a body, a parameter without parentheses, and `async`, is asked in "Arrow Notation, Continued", below; until then `=>` takes a block. With lexer and conformance tests. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [QUESTION] Arrow Notation, Continued
+
+What JavaScript's arrow functions have beyond "Arrow Notation", which made `(a, b) => { … }` the same as `function (a, b) { … }` (specification, section 3.5). One decision each, answerable with a letter. Added by Claude, 2026-11-14.
+
+**Q1, an expression for a body, `(a, b) => a + b`, giving its value, as `(a, b) => { return a + b; }` does: (a) yes; (b) no, a block always.**
+
+A1:
+
+**Q2, one parameter without parentheses, `x => { … }` (and `x => x * 2`, with Q1's (a)): (a) yes; (b) no, parentheses always.**
+
+A2:
+
+**Q3, `async (x) => { … }`, the same as `async function (x) { … }`: (a) yes; (b) no.**
+
+A3:
 
 ## [DEFER] Serialization: Text That Rebuilds a Value
 
