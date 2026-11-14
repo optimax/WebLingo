@@ -263,7 +263,7 @@ public sealed class ParserTests
     [InlineData("using (r = 1) {}")]
     [InlineData("using (var r 1) {}")]
     [InlineData("using (var r = 1 {}")]
-    [InlineData("class A { static const x = 1; }")]
+    [InlineData("class A { static let x = 1; }")]
     [InlineData("class A { static 5 }")]
     [InlineData("try {} catch e {}")]
     [InlineData("try x;")]

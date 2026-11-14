@@ -445,13 +445,14 @@ public sealed class WebLingoParser : IWebLingoParser
         or WebLingoTokenKind.Slash or WebLingoTokenKind.Less or WebLingoTokenKind.LessEqual or WebLingoTokenKind.Greater or WebLingoTokenKind.GreaterEqual;
 
     /// <summary>
-    /// <c>static var name = value;</c>, after its <c>static</c>: a field of a class itself (section 3.7). <c>const</c> or
-    /// <c>let</c> in place of <c>var</c> is reported, and read as <c>var</c>; a field without a value is WL1006, and
-    /// none.
+    /// <c>static var name = value;</c>, after its <c>static</c>: a field of a class itself, or with <c>const</c> a constant
+    /// (section 3.7). <c>let</c> in place of <c>var</c> is reported, and read as <c>var</c>; a field without a value is
+    /// WL1006, and none.
     /// </summary>
     private WebLingoStaticFieldSyntax? ParseStaticField(int start)
     {
-        if (Current.Kind != WebLingoTokenKind.Var && !_statementHasError) ReportUnexpected("'var'");
+        var isConstant = Current.Kind == WebLingoTokenKind.Const;
+        if (Current.Kind == WebLingoTokenKind.Let && !_statementHasError) ReportUnexpected("'var' or 'const'");
         Advance();
         var (name, nameSpan) = ExpectName();
         WebLingoExpressionSyntax? value = null;
@@ -463,10 +464,12 @@ public sealed class WebLingoParser : IWebLingoParser
         else if (!_statementHasError)
         {
             Report(WebLingoDiagnosticCodes.MissingInitializer,
-                $"'{name}' needs a value where it is declared: 'static var {name} = …;'.", nameSpan);
+                $"'{name}' needs a value where it is declared: 'static {(isConstant ? "const" : "var")} {name} = …;'.", nameSpan);
         }
         ExpectSemicolon();
-        return value is null || name.Length == 0 ? null : new WebLingoStaticFieldSyntax(name, nameSpan, value, SpanFrom(start));
+        return value is null || name.Length == 0
+            ? null
+            : new WebLingoStaticFieldSyntax(name, nameSpan, value, SpanFrom(start)) { IsConstant = isConstant };
     }
 
     /// <summary>

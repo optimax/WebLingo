@@ -163,6 +163,12 @@ public sealed record WebLingoBoundContinue(WebLingoSourceSpan Span) : WebLingoBo
 
 public abstract record WebLingoBoundExpression(WebLingoSourceSpan Span);
 
+/// <summary>
+/// A static constant's value (<c>static const name = value;</c>, section 3.7), which only a class's or an extension's
+/// static fields hold: set as the class's built-in <c>setConstant</c> sets one, so that it cannot be assigned after.
+/// </summary>
+public sealed record WebLingoBoundStaticConstant(WebLingoBoundExpression Value, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);
+
 public sealed record WebLingoBoundIntegerLiteral(long Value, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);
 
 public sealed record WebLingoBoundBinary64Literal(double Value, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);

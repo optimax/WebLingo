@@ -538,28 +538,75 @@ public sealed class WebLingoHeap
     }
 
     /// <summary>
-    /// Assigns a static field, the class's own or its base's, as <see cref="TryGetStatic"/> finds it; false if there is
-    /// none of that name, or if the name is a static method's (<paramref name="isMethod"/>).
+    /// Assigns a static field, the class's own or its base's, as <see cref="TryGetStatic"/> finds it, or replaces a static
+    /// method there with the value, as a static field (section 3.7); false if there is none of that name, or if it is a
+    /// constant (<paramref name="isConstant"/>).
     /// </summary>
-    public bool TrySetStatic(WebLingoValue classValue, string name, WebLingoValue value, out bool isMethod)
+    public bool TrySetStatic(WebLingoValue classValue, string name, WebLingoValue value, out bool isConstant)
     {
-        isMethod = false;
+        isConstant = false;
         for (var current = classValue; current.Kind == WebLingoValueKind.Class;)
         {
             var target = Get<ClassObject>(current, WebLingoValueKind.Class);
             if (target.StaticFields.ContainsKey(name))
             {
+                isConstant = target.Constants?.Contains(name) == true;
+                if (isConstant) return false;
                 target.StaticFields[name] = value;
                 return true;
             }
-            if (target.StaticMethods.ContainsKey(name))
+            if (target.StaticMethods.Remove(name))
             {
-                isMethod = true;
-                return false;
+                target.StaticFields[name] = value;
+                return true;
             }
             current = target.Base;
         }
         return false;
+    }
+
+    /// <summary>
+    /// <c>Point.setConstant(name, value)</c>: a static member that cannot be assigned, the class's own, given the first
+    /// time, replaced after, in place of a static field or method of its name (section 3.7).
+    /// </summary>
+    public bool TrySetConstant(WebLingoValue classValue, string name, WebLingoValue value, out WebLingoRuntimeError? error)
+    {
+        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        var before = Size(target);
+        target.StaticMethods.Remove(name);
+        target.StaticFields[name] = value;
+        (target.Constants ??= new HashSet<string>(StringComparer.Ordinal)).Add(name);
+        var grown = Size(target) - before;
+        if (!TryReserve(grown, out error)) return false;
+        Units += grown;
+        return true;
+    }
+
+    /// <summary>
+    /// <c>Point.setProperty(name, getter, setter)</c>, or with <paramref name="isStatic"/> <c>setStaticProperty</c>: a
+    /// property's getter and setter, given the first time, replaced after, <c>null</c> for none (section 3.7).
+    /// </summary>
+    public bool TrySetProperty(WebLingoValue classValue, string name, WebLingoValue getter, WebLingoValue setter, bool isStatic,
+        out WebLingoRuntimeError? error)
+    {
+        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        var members = isStatic ? target.StaticMethods : target.OwnMethods;
+        var before = Size(target);
+        foreach (var (prefix, accessor) in new[] { ("get:", getter), ("set:", setter) })
+        {
+            if (accessor.Kind == WebLingoValueKind.Null) members.Remove(prefix + name);
+            else members[prefix + name] = accessor;
+        }
+        if (!isStatic)
+        {
+            // Its instances, and its subclasses', find the property once they gather their methods anew.
+            _classVersion++;
+            Extended = true;
+        }
+        var grown = Size(target) - before;
+        if (!TryReserve(grown, out error)) return false;
+        Units += grown;
+        return true;
     }
 
     /// <summary>
@@ -1110,6 +1157,8 @@ public sealed class WebLingoHeap
         public bool DefaultConstructor { get; set; }
         /// <summary>Whether it is <c>Class</c>, whose <c>new</c> makes a class (section 3.7).</summary>
         public bool MakesClasses { get; set; }
+        /// <summary>Its static fields that are constants, which cannot be assigned; null for none (section 3.7).</summary>
+        public HashSet<string>? Constants { get; set; }
         /// <summary>Its properties' getters and setters, its own and its bases', by the property's name; null for none (section 3.7).</summary>
         public Dictionary<string, WebLingoValue>? Getters { get; set; }
         public Dictionary<string, WebLingoValue>? Setters { get; set; }

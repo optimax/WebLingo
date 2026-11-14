@@ -131,6 +131,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("function f(this = 1) { }", "WL1001", 1, 17)]
     [InlineData("class B { m() { return 1; } } class A extends B { m() { var f = function (this) { return super.m(); }; return f(this); } }", "WL2009", 1, 90)]
     [InlineData("function f(this, a) { return a; } f(1);", "WL2006", 1, 35)]
+    [InlineData("class A { static const x; }", "WL1006", 1, 24)]
+    [InlineData("class A { static let x = 1; }", "WL1001", 1, 18)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -430,6 +432,12 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A {} class B extends A {} var n = null; writeLn([B.__parent, new B().__instanceOf, 5.__instanceOf, \"s\".__instanceOf, [].__instanceOf, null.__instanceOf, n?.__instanceOf]);", "[class A, class B, class Integer, class String, class Array, null, null]")]
     [InlineData("Integer.__className = \"Double\"; writeLn([Integer, 5.__instanceOf, new Class(\"P\").__className]);", "[class Double, class Double, \"P\"]")]
     [InlineData("var C = new Class(\"C\"); C.__className = null; writeLn([C, C.__className, new C()]);", "[class, null, class {}]")]
+    [InlineData("var Point = new Class(\"Point\"); Point.addMethod(\"constructor\", function (this, x, y) { this.x = x; this.y = y; }); Point.setProperty(\"sum\", function (this) { return this.x + this.y; }, function (this, value) { this.x = value; this.y = 0; }); var p = new Point(3, 4); var before = p.sum; p.sum = 10; Point.setProperty(\"sum\", function (this) { return 100; }, null); writeLn([before, p, p.sum]);", "[7, Point {x: 10, y: 0}, 100]")]
+    [InlineData("var Point = new Class(\"Point\"); Point.addMethod(\"constructor\", function (this, x, y) { this.x = x; this.y = y; }); Point.setStaticProperty(\"unit\", function () { return Point.unitValue; }, function (value) { Point.unitValue = value; }); Point.unitValue = 1; var before = Point.unit; Point.unit = 5; writeLn([before, Point.unit, Point.unitValue]);", "[1, 5, 5]")]
+    [InlineData("var Point = new Class(\"Point\"); Point.addMethod(\"constructor\", function (this, x, y) { this.x = x; this.y = y; }); Point.setConstant(\"dimensions\", 2); var before = Point.dimensions; Point.setConstant(\"dimensions\", 3); writeLn([before, Point.dimensions, new Point(1, 2).dimensions]);", "[2, 3, 3]")]
+    [InlineData("class K { static const max = 10; static make() { return 1; } } var before = [K.max, K.make()]; K.make = function () { return 2; }; extend K { static const min = 1; } writeLn([before, K.make(), K.min, new K().max]);", "[[10, 1], 2, 1, 10]")]
+    [InlineData("class A { property v { get { return 1; } } } class B extends A {} A.setProperty(\"v\", function (this) { return 2; }, null); writeLn([new A().v, new B().v]);", "[2, 2]")]
+    [InlineData("extend Integer {} Integer.setProperty(\"doubled\", function (this) { return this * 2; }, null); writeLn(4.doubled);", "8")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -507,7 +515,6 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A {} using (var a = new A()) {}", "WL3006")]
     [InlineData("class A { dispose() {} } new A().dispose(1);", "WL2006")]
     [InlineData("class A { dispose(x) {} } using (var a = new A()) {}", "WL2006")]
-    [InlineData("class A { static m() {} } A.m = 1;", "WL3001")]
     [InlineData("class A { static var n = 1; } writeLn(new A().m);", "WL3006")]
     [InlineData("class A { static m(x) {} } A.m();", "WL2006")]
     [InlineData("class A { m() { return super.m(); } } new A().m();", "WL3006")]
@@ -603,6 +610,13 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A {} var C = new Class(\"C\"); C.__parent = A;", "WL3001")]
     [InlineData("var C = new Class(\"C\"); C.__className = 5;", "WL3001")]
     [InlineData("var C = new Class(\"C\"); var c = new C(); writeLn(c.__className);", "WL3006")]
+    [InlineData("class K { static const max = 10; } K.max = 1;", "WL3001")]
+    [InlineData("var C = new Class(\"C\"); C.setConstant(\"n\", 1); C.n = 2;", "WL3001")]
+    [InlineData("var C = new Class(\"C\"); C.setProperty(\"p\", 5, null);", "WL3001")]
+    [InlineData("var C = new Class(\"C\"); C.setProperty(\"p\", null);", "WL2006")]
+    [InlineData("var C = new Class(\"C\"); C.setConstant(\"a b\", 1);", "WL3001")]
+    [InlineData("var C = new Class(\"C\"); C.setProperty(\"p\", function (this) { return 1; }, null); new C().p = 1;", "WL3001")]
+    [InlineData("var C = new Class(\"C\"); C.setStaticProperty(\"p\", null, function (v) {}); writeLn(C.p);", "WL3006")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

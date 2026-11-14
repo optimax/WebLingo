@@ -220,7 +220,11 @@ public sealed class WebLingoBinder
             _scope = new Scope(_scope, _function);
             _scope.Locals.Add("this", _noThis);
             var values = new List<(string, WebLingoBoundExpression, WebLingoSourceSpan)>();
-            foreach (var field in fields) values.Add((field.Name, BindExpression(field.Value), field.NameSpan));
+            foreach (var field in fields)
+            {
+                var value = BindExpression(field.Value);
+                values.Add((field.Name, field.IsConstant ? new WebLingoBoundStaticConstant(value, value.Span) : value, field.NameSpan));
+            }
             _scope = _scope.Parent!;
             statics.Add(statement, values);
         }

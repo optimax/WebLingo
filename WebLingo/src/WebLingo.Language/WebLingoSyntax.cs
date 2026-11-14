@@ -120,7 +120,11 @@ public sealed record WebLingoMethodSyntax(
 
 /// <summary><c>static var name = value;</c>, a field of a class itself, set when the class is made (section 3.7).</summary>
 public sealed record WebLingoStaticFieldSyntax(string Name, WebLingoSourceSpan NameSpan, WebLingoExpressionSyntax Value, WebLingoSourceSpan Span)
-    : WebLingoSyntaxNode(Span);
+    : WebLingoSyntaxNode(Span)
+{
+    /// <summary>Whether it is <c>static const</c>, a constant, which cannot be assigned (section 3.7).</summary>
+    public bool IsConstant { get; init; }
+}
 
 /// <summary><c>class Name { members }</c>, in scope throughout its block, as a function is (section 3.7).</summary>
 public sealed record WebLingoClassDeclarationSyntax(

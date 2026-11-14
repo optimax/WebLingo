@@ -8,7 +8,7 @@ namespace WebLingo.Runtime;
 /// </summary>
 public enum WebLingoMember : byte
 {
-    Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, AddMethod,
+    Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, AddMethod, SetProperty, SetStaticProperty, SetConstant,
     /// <summary>The names every value, or every class, has (section 3.7), last, so that one comparison finds them.</summary>
     ClassName, InstanceOf, Parent
 }
@@ -37,6 +37,9 @@ public static class WebLingoMembers
         "equal" => WebLingoMember.Equal,
         "forget" => WebLingoMember.Forget,
         "addMethod" => WebLingoMember.AddMethod,
+        "setProperty" => WebLingoMember.SetProperty,
+        "setStaticProperty" => WebLingoMember.SetStaticProperty,
+        "setConstant" or "static:const" => WebLingoMember.SetConstant,
         "__className" => WebLingoMember.ClassName,
         "__instanceOf" => WebLingoMember.InstanceOf,
         "__parent" => WebLingoMember.Parent,
@@ -227,26 +230,27 @@ public static class WebLingoMembers
         if (target.Kind == WebLingoValueKind.Class)
         {
             error = null;
-            if (heap.TrySetStatic(target, name, value, out var isMethod)) return true;
-            if (!isMethod)
+            // A static field, or a static method, which the value replaces (section 3.7); not a constant.
+            if (heap.TrySetStatic(target, name, value, out var isConstant)) return true;
+            if (isConstant)
             {
-                // A static property's setter, which the VM calls with the value (section 3.7); else a new static member.
-                if (heap.TryGetStatic(target, "set:" + name, out setter) && setter.Kind == WebLingoValueKind.Function)
-                {
-                    error = Setter;
-                    return false;
-                }
-                setter = WebLingoValue.Null;
-                if (heap.TryGetStatic(target, "get:" + name, out _))
-                {
-                    error = NoSetter(target, name, heap);
-                    return false;
-                }
-                return heap.TryAddStatic(target, name, value, out error);
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"'{name}' is a constant of {WebLingoValueFormatter.Describe(target, heap)}, and cannot be assigned.");
+                return false;
             }
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'{name}' is a static method of {WebLingoValueFormatter.Describe(target, heap)}, and cannot be assigned.");
-            return false;
+            // A static property's setter, which the VM calls with the value (section 3.7); else a new static member.
+            if (heap.TryGetStatic(target, "set:" + name, out setter) && setter.Kind == WebLingoValueKind.Function)
+            {
+                error = Setter;
+                return false;
+            }
+            setter = WebLingoValue.Null;
+            if (heap.TryGetStatic(target, "get:" + name, out _))
+            {
+                error = NoSetter(target, name, heap);
+                return false;
+            }
+            return heap.TryAddStatic(target, name, value, out error);
         }
         if (IsClassedCollection(target, heap, out var collectionClass))
         {
@@ -568,6 +572,46 @@ public static class WebLingoMembers
         return true;
     }
 
+    /// <summary>
+    /// A class's built-in method (section 3.7): <c>addMethod(name, f)</c>, <c>setProperty(name, getter, setter)</c>,
+    /// <c>setStaticProperty(name, getter, setter)</c> and <c>setConstant(name, value)</c>, each giving <c>null</c>. A name
+    /// is a string that is a name; a method a function, and a getter or a setter a function or <c>null</c> (WL3001
+    /// otherwise).
+    /// </summary>
+    private static bool TryCallClassMethod(WebLingoValue target, WebLingoMember member, string name, WebLingoValue[] values, int first,
+        int count, WebLingoHeap heap, out WebLingoRuntimeError? error)
+    {
+        var arity = member switch
+        {
+            WebLingoMember.SetProperty or WebLingoMember.SetStaticProperty => 3,
+            _ => 2
+        };
+        if (count != arity) return WrongArgumentCount(name, arity, count, out error);
+        if (values[first].Kind != WebLingoValueKind.String || !IsName(heap.GetString(values[first])))
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"A member's name is a name, letters, digits and '_', not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+            return false;
+        }
+        var memberName = heap.GetString(values[first]);
+        if (member == WebLingoMember.SetConstant) return heap.TrySetConstant(target, memberName, values[first + 1], out error);
+        for (var i = 1; i < arity; i++)
+        {
+            var function = values[first + i];
+            if (function.Kind == WebLingoValueKind.Function || (function.Kind == WebLingoValueKind.Null && member != WebLingoMember.AddMethod))
+            {
+                continue;
+            }
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, member == WebLingoMember.AddMethod
+                ? $"A method is a function, not {WebLingoValueFormatter.Describe(function, heap)}."
+                : $"A property's getter or setter is a function, or null, not {WebLingoValueFormatter.Describe(function, heap)}.");
+            return false;
+        }
+        return member == WebLingoMember.AddMethod
+            ? heap.TryAddMethod(target, memberName, values[first + 1], out error)
+            : heap.TrySetProperty(target, memberName, values[first + 1], values[first + 2], member == WebLingoMember.SetStaticProperty, out error);
+    }
+
     /// <summary>Whether a string is a name, as a program writes one: ASCII letters, digits and <c>_</c>, not first a digit.</summary>
     private static bool IsName(string text)
     {
@@ -587,11 +631,13 @@ public static class WebLingoMembers
         || IsClassMethod(target, member);
 
     /// <summary>
-    /// Whether <c>x.name(…)</c> calls a class's built-in method, <c>addMethod</c>, which a class has when it has no
-    /// static member of that name (section 3.7).
+    /// Whether <c>x.name(…)</c> calls a class's built-in method, <c>addMethod</c>, <c>setProperty</c>,
+    /// <c>setStaticProperty</c> or <c>setConstant</c>, which a class has when it has no static member of that name; a
+    /// <c>static const</c> calls <c>setConstant</c> by a name no program can declare (section 3.7).
     /// </summary>
     public static bool IsClassMethod(WebLingoValue target, WebLingoMember member) =>
-        target.Kind == WebLingoValueKind.Class && member == WebLingoMember.AddMethod;
+        target.Kind == WebLingoValueKind.Class && member is WebLingoMember.AddMethod or WebLingoMember.SetProperty
+            or WebLingoMember.SetStaticProperty or WebLingoMember.SetConstant;
 
     /// <summary>
     /// Calls a method, <c>x.name(…)</c>, with the <paramref name="count"/> arguments from
@@ -633,25 +679,7 @@ public static class WebLingoMembers
             result = WebLingoValue.FromBoolean(removed);
             return true;
         }
-        if (IsClassMethod(target, member))
-        {
-            // Point.addMethod(name, f): a method given while the program runs (section 3.7).
-            if (count != 2) return WrongArgumentCount(name, 2, count, out error);
-            var method = values[first + 1];
-            if (values[first].Kind != WebLingoValueKind.String || !IsName(heap.GetString(values[first])))
-            {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"A method's name is a name, letters, digits and '_', not {WebLingoValueFormatter.Describe(values[first], heap)}.");
-                return false;
-            }
-            if (method.Kind != WebLingoValueKind.Function)
-            {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"A method is a function, not {WebLingoValueFormatter.Describe(method, heap)}.");
-                return false;
-            }
-            return heap.TryAddMethod(target, heap.GetString(values[first]), method, out error);
-        }
+        if (IsClassMethod(target, member)) return TryCallClassMethod(target, member, name, values, first, count, heap, out error);
         if (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
         {
             // t.forget(): nothing reports its exception, if it faults (section 3.8).

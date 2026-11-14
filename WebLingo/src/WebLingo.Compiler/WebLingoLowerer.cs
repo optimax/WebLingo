@@ -159,7 +159,7 @@ public sealed class WebLingoLowerer
             foreach (var (name, value, span) in declaration.Class.StaticFields)
             {
                 WebLingoIrExpression target = local.IsCaptured ? new WebLingoIrLoadCell(local.Index, span) : new WebLingoIrLoadLocal(local.Index, span);
-                lowered.Add(new WebLingoIrEvaluate(new WebLingoIrStoreMember(target, name, LowerExpression(value), span), span));
+                lowered.Add(SetStatic(target, name, value, span));
             }
         }
         foreach (var statement in block)
@@ -170,8 +170,7 @@ public sealed class WebLingoLowerer
             lowered.Add(new WebLingoIrExtend(LowerExpression(extension.Target), LowerClass(extension.Class), extension.Span));
             foreach (var (name, value, span) in extension.Class.StaticFields)
             {
-                lowered.Add(new WebLingoIrEvaluate(new WebLingoIrStoreMember(LowerExpression(extension.Target), name, LowerExpression(value), span),
-                    span));
+                lowered.Add(SetStatic(LowerExpression(extension.Target), name, value, span));
             }
         }
         foreach (var statement in block)
@@ -186,6 +185,15 @@ public sealed class WebLingoLowerer
     }
 
     /// <summary>A class made where its block begins, a built-in one remembered by its role (section 3.7).</summary>
+    /// <summary>
+    /// A class's static field set where its block begins, or a static constant set by the class's built-in
+    /// <c>setConstant</c>, under a name no program can declare, so that no static member of a program's hides it.
+    /// </summary>
+    private WebLingoIrStatement SetStatic(WebLingoIrExpression target, string name, WebLingoBoundExpression value, WebLingoSourceSpan span) =>
+        new WebLingoIrEvaluate(value is WebLingoBoundStaticConstant constant
+            ? new WebLingoIrCallMethod(target, "static:const", [new WebLingoIrStringConstant(name, span), LowerExpression(constant.Value)], span)
+            : new WebLingoIrStoreMember(target, name, LowerExpression(value), span), span);
+
     private WebLingoIrStatement LowerClassDeclaration(WebLingoBoundClassDeclaration declaration)
     {
         var index = LowerClass(declaration.Class);
