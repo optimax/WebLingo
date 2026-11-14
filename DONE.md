@@ -1897,7 +1897,7 @@ Done (Claude, 2026-11-14, `07e94bb`): `(parameters) => { … }` is a function ex
 
 Its syntax needs one decision first, which section 13 leaves open; answerable with a letter.
 
-**Q1, `%>` inside a block's code, in a string or a comment (`<% var end = "%>"; %>`): (a) it ends the block wherever it stands, as in classic ASP, a string writing it as `"%" + ">"`; (b) the template compiler reads a block's code as WebLingo's tokens, so that `%>` in a string or a comment does not end it.**
+Q1, `%>` inside a block's code, in a string or a comment (`<% var end = "%>"; %>`): (a) it ends the block wherever it stands, as in classic ASP, a string writing it as `"%" + ">"`; (b) the template compiler reads a block's code as WebLingo's tokens, so that `%>` in a string or a comment does not end it.
 
 A1: (b)
 
@@ -1909,7 +1909,7 @@ Done (Claude, 2026-11-14, `224b1f9`): A1 recorded as approved in the specificati
 
 Section 13 has a path starting with `/` be "from the application's root", which a host gives; `welp` needs a decision of its own, answerable with a letter.
 
-**Q1, the application's root under `welp`: (a) the folder of the page it is given; (b) the current folder; (c) an option, `welp run --root site page.wlp`, the page's folder when it is left out.**
+Q1, the application's root under `welp`: (a) the folder of the page it is given; (b) the current folder; (c) an option, `welp run --root site page.wlp`, the page's folder when it is left out.
 
 A1: (c), with site root under web server.
 
