@@ -1,3 +1,4 @@
+using WebLingo.Core;
 using WebLingo.Runtime;
 namespace WebLingo.StdLib;
 
@@ -38,7 +39,35 @@ public sealed class WsWriteLnFunction(IWsTextOutput output) : IWsTextBuiltin
 /// <summary>The standard library's built-ins, each writing to the one output.</summary>
 public static class WsStandardBuiltins
 {
-    public static IWsBuiltinFunction[] Create(IWsTextOutput output) => [new WsWriteFunction(output), new WsWriteLnFunction(output)];
+    public static IWsBuiltinFunction[] Create(IWsTextOutput output) =>
+        [new WsWriteFunction(output), new WsWriteLnFunction(output), new WsDelayFunction()];
+}
+
+/// <summary>
+/// <c>delay(milliseconds)</c>: a task that completes, with <c>null</c>, once that time has passed, on the host's clock,
+/// or in virtual time (specification, section 3.8); for tests.
+/// </summary>
+public sealed class WsDelayFunction : IWsBuiltinFunction
+{
+    public string Name => "delay";
+    public int Arity => 1;
+
+    public bool TryInvoke(WsValue[] arguments, WsHeap heap, out WsValue result, out WsRuntimeError? error)
+    {
+        result = WsValue.Null;
+        if (arguments[0].Kind != WsValueKind.Int64 || arguments[0].AsInt64 < 0)
+        {
+            error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                $"'delay' takes a number of milliseconds, an integer of 0 or more, not {WsValueFormatter.Describe(arguments[0], heap)}.");
+            return false;
+        }
+        if (heap.Scheduler is not { } scheduler)
+        {
+            error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation, "'delay' needs a VM that runs tasks.");
+            return false;
+        }
+        return scheduler.TryDelay(arguments[0].AsInt64, out result, out error);
+    }
 }
 
 /// <summary>Collects output, for tests and for hosts that send output elsewhere afterwards.</summary>

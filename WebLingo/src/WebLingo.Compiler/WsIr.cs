@@ -26,6 +26,8 @@ public sealed record WsIrProgram(
     public IReadOnlyList<int> ValueClasses { get; init; } = [];
     /// <summary>The kinds of runtime errors' classes, by their codes.</summary>
     public IReadOnlyList<(string Code, int Class)> ErrorClasses { get; init; } = [];
+    /// <summary>Whether its top level awaits, which makes it an <c>async</c> function (section 3.8).</summary>
+    public bool IsAsync { get; init; }
 }
 
 /// <summary>A class: its constructor's function, or -1 if it has none, and its methods' (section 3.7).</summary>
@@ -50,6 +52,8 @@ public sealed record WsIrFunction(
     public bool HasThis { get; init; }
     /// <summary>How many of its last parameters have default values, and so may be left out (section 3.5).</summary>
     public int OptionalCount { get; init; }
+    /// <summary>Whether it is <c>async</c> (section 3.8).</summary>
+    public bool IsAsync { get; init; }
 }
 
 /// <summary>
@@ -163,6 +167,9 @@ public sealed record WsIrLoadLocal(int Local, WsSourceSpan Span) : WsIrExpressio
 public sealed record WsIrStoreLocal(int Local, WsIrExpression Value, WsSourceSpan Span) : WsIrExpression(Span);
 
 public sealed record WsIrUnary(WsUnaryOperator Operator, WsIrExpression Operand, WsSourceSpan Span) : WsIrExpression(Span);
+
+/// <summary><c>await value</c>: suspends the <c>async</c> function until the value, or a task's result, is there (section 3.8).</summary>
+public sealed record WsIrAwait(WsIrExpression Value, WsSourceSpan Span) : WsIrExpression(Span);
 
 /// <summary><c>value is Class</c>: the value, then the class, evaluated (section 3.7).</summary>
 public sealed record WsIrIs(WsIrExpression Value, WsIrExpression Class, WsSourceSpan Span) : WsIrExpression(Span);

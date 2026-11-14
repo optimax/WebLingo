@@ -40,7 +40,8 @@ public sealed class WsLowerer
             ErrorClass = lowerer._errorClass,
             ObjectClass = lowerer._objectClass,
             ValueClasses = lowerer._valueClasses,
-            ErrorClasses = lowerer._errorClasses
+            ErrorClasses = lowerer._errorClasses,
+            IsAsync = program.IsAsync
         };
     }
 
@@ -173,7 +174,8 @@ public sealed class WsLowerer
             function.Span)
         {
             HasThis = function.HasThis,
-            OptionalCount = optional
+            OptionalCount = optional,
+            IsAsync = function.IsAsync
         };
         return index;
     }
@@ -297,6 +299,8 @@ public sealed class WsLowerer
                 return new WsIrLoadCapture(capture.Index, capture.Span);
             case WsBoundUnary unary:
                 return new WsIrUnary(unary.Operator, LowerExpression(unary.Operand), unary.Span);
+            case WsBoundAwait awaited:
+                return new WsIrAwait(LowerExpression(awaited.Value), awaited.Span);
             case WsBoundIs test:
                 return new WsIrIs(LowerExpression(test.Value), LowerExpression(test.Class), test.Span);
             case WsBoundToText text:

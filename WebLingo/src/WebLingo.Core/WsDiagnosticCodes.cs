@@ -53,6 +53,8 @@ public static class WsDiagnosticCodes
     public const string JumpOutOfFinally = "WS2012";
     /// <summary>A class that extends itself, directly or through others (proposed).</summary>
     public const string ClassExtendsItself = "WS2013";
+    /// <summary><c>await</c> outside an <c>async</c> function and a script's top level (proposed, section 3.8).</summary>
+    public const string AwaitOutsideAsync = "WS2014";
 
     /// <summary>Invalid operation.</summary>
     public const string InvalidOperation = "WS3001";
@@ -70,6 +72,8 @@ public static class WsDiagnosticCodes
     public const string NoSuchKey = "WS3007";
     /// <summary>An exception a program threw, which nothing caught (approved, section 3.7).</summary>
     public const string UncaughtException = "WS3008";
+    /// <summary>A program waiting for a task that nothing will complete, such as two that await each other (proposed, section 3.8).</summary>
+    public const string Deadlock = "WS3009";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WS4001";

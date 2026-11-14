@@ -101,6 +101,18 @@ public sealed class StackCodeGeneratorTests
 
     private static WsStackInstruction I(WsStackOpCode opCode, int a = 0, int b = 0) => new(opCode, a, b);
 
+    [Fact]
+    public void AnAsyncFunctionAwaitsAndATopLevelThatAwaitsIsAsync()
+    {
+        var module = Generate("async function f(x) { return await x; } writeLn(f(1));");
+        Assert.False(module.EntryPoint.IsAsync);
+        var f = Assert.Single(module.Functions);
+        Assert.True(f.IsAsync);
+        Assert.Equal(new[] { WsStackOpCode.LoadLocal, WsStackOpCode.Await, WsStackOpCode.ReturnValue, WsStackOpCode.Return },
+            f.Code.Select(i => i.OpCode).ToArray());
+        Assert.True(Generate("await 1;").EntryPoint.IsAsync);
+    }
+
     private static WsStackModule Generate(string source)
     {
         var compiled = new WsStackCompiler(Options).Compile(source, "test.ws");

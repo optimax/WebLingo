@@ -6,7 +6,7 @@ namespace WebLingo.Runtime;
 /// once, when it loads a module, so that it does not compare names as it runs; a name that is no member of any value
 /// is <see cref="Unknown"/>, and is kept for the message of its error.
 /// </summary>
-public enum WsMember : byte { Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal }
+public enum WsMember : byte { Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget }
 
 /// <summary>A member's name as a module's constant gives it, and the member it names.</summary>
 public readonly record struct WsMemberName(WsMember Member, string Text);
@@ -30,6 +30,7 @@ public static class WsMembers
         "dispose" => WsMember.Dispose,
         "toString" => WsMember.ToString,
         "equal" => WsMember.Equal,
+        "forget" => WsMember.Forget,
         _ => WsMember.Unknown
     };
 
@@ -300,6 +301,7 @@ public static class WsMembers
         WsValueKind.Set => (int)WsValueClass.Set,
         WsValueKind.Function or WsValueKind.Builtin or WsValueKind.BoundMethod => (int)WsValueClass.Function,
         WsValueKind.Class => (int)WsValueClass.Class,
+        WsValueKind.Task => (int)WsValueClass.Task,
         _ => -1
     };
 
@@ -307,7 +309,8 @@ public static class WsMembers
     private static bool IsMethod(WsValue target, WsMember member) =>
         (target.Kind == WsValueKind.Array && member is WsMember.Push or WsMember.Pop)
         || (target.Kind == WsValueKind.Map && member is WsMember.Has or WsMember.Remove)
-        || (target.Kind == WsValueKind.Set && member is WsMember.Add or WsMember.Has or WsMember.Remove);
+        || (target.Kind == WsValueKind.Set && member is WsMember.Add or WsMember.Has or WsMember.Remove)
+        || (target.Kind == WsValueKind.Task && member == WsMember.Forget);
 
     /// <summary>
     /// Calls a method, <c>x.name(…)</c>, with the <paramref name="count"/> arguments from
@@ -347,6 +350,14 @@ public static class WsMembers
             if (count != 1) return WrongArgumentCount(name, 1, count, out error);
             if (!heap.TryRemoveFromMap(target, values[first], out var removed, out error)) return false;
             result = WsValue.FromBoolean(removed);
+            return true;
+        }
+        if (target.Kind == WsValueKind.Task && member == WsMember.Forget)
+        {
+            // t.forget(): nothing reports its exception, if it faults (section 3.8).
+            if (count != 0) return WrongArgumentCount(name, 0, count, out error);
+            heap.GetTask(target).Forgotten = true;
+            error = null;
             return true;
         }
         if (target.Kind == WsValueKind.Set && member is WsMember.Add or WsMember.Has or WsMember.Remove)

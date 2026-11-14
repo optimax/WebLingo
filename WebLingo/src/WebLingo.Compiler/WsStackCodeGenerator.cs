@@ -38,13 +38,18 @@ public sealed class WsStackCodeGenerator
             var name = function.Name.Length == 0 ? "function" : function.Name;
             var generated = GenerateFunction(module, name, function.ParameterCount, function.LocalNames, captures, function.Body,
                 diagnostics);
-            if (generated is not null) functions.Add(generated with { HasThis = function.HasThis, OptionalCount = function.OptionalCount });
+            if (generated is not null) functions.Add(generated with
+            {
+                HasThis = function.HasThis,
+                OptionalCount = function.OptionalCount,
+                IsAsync = function.IsAsync
+            });
         }
         if (main is null || functions.Count != program.Functions.Count) return null;
 
         var imports = new WsImport[program.Builtins.Count];
         foreach (var builtin in program.Builtins) imports[builtin.Index] = new WsImport(builtin.Name, builtin.Arity);
-        return new WsStackModule(moduleName, module.Constants, imports, main)
+        return new WsStackModule(moduleName, module.Constants, imports, main with { IsAsync = program.IsAsync })
         {
             Functions = functions,
             Classes = WsClassTable.Of(program),
@@ -300,6 +305,10 @@ public sealed class WsStackCodeGenerator
                 return;
             case WsIrLoadBuiltin builtin:
                 Emit(WsStackOpCode.LoadBuiltin, builtin.Span, builtin.Builtin);
+                return;
+            case WsIrAwait awaited:
+                EmitValue(awaited.Value);
+                Emit(WsStackOpCode.Await, awaited.Span);
                 return;
             case WsIrIs test:
                 EmitValue(test.Value);
@@ -653,6 +662,7 @@ public sealed class WsStackCodeGenerator
             WsStackOpCode.ToText => (1, 1),
             WsStackOpCode.IsInstance => (2, 1),
             WsStackOpCode.JumpIfGiven => (0, 0),
+            WsStackOpCode.Await => (1, 1),
             WsStackOpCode.Rethrow => (2, 0),
             WsStackOpCode.New => (a + 1, 1),
             WsStackOpCode.SetMember => (2, b),

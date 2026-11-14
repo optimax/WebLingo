@@ -162,6 +162,11 @@ public enum WsOpCode : byte
     /// not the missing value the VM put in its place, nor a cell holding it (default values; section 3.5).
     /// </summary>
     JumpIfGiven,
+    /// <summary>
+    /// A = destination, B = a value: suspends the <c>async</c> function, letting other tasks run, until the value, or a
+    /// task's result once it completes, goes to A, or the task's exception is thrown here (section 3.8).
+    /// </summary>
+    Await,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
@@ -205,6 +210,8 @@ public sealed record WsFunction(
     /// the VM puts a missing value in their place, which <see cref="WsOpCode.JumpIfGiven"/> tells.
     /// </summary>
     public int OptionalCount { get; init; }
+    /// <summary>Whether it is <c>async</c>: its call gives a task, and it may <c>Await</c> (section 3.8).</summary>
+    public bool IsAsync { get; init; }
     /// <summary>
     /// Its protected regions, innermost first, which an exception raised in it, or in a call it makes, looks through for
     /// the first that holds the instruction it was raised at (section 3.7; section 5.4's table-driven regions).

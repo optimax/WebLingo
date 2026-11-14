@@ -25,6 +25,7 @@ public sealed class StackVmTests
         nameof(ConformanceTests.BooleansAndNumbersDoNotMix),
         nameof(ConformanceTests.CallsAreCheckedAtRunTime),
         nameof(ConformanceTests.MembersAndIndexesAreCheckedAtRunTime),
+        nameof(ConformanceTests.AsynchronyErrorsAreReported),
     ];
 
     public static TheoryData<string> ConformancePrograms
@@ -125,7 +126,7 @@ public sealed class StackVmTests
     }
 
     private static readonly WsCompilerOptions Options =
-        new([new WsBuiltinDeclaration("write", 1), new WsBuiltinDeclaration("writeLn", 1)]);
+        new([new WsBuiltinDeclaration("write", 1), new WsBuiltinDeclaration("writeLn", 1), new WsBuiltinDeclaration("delay", 1)]);
 
     /// <summary>What a program gives: its diagnostics, its output, and its runtime error, each as text.</summary>
     private sealed record Outcome(string[] Diagnostics, string Output, string Error)

@@ -97,7 +97,11 @@ public sealed record WsParameterSyntax(string Name, WsSourceSpan Span) : WsSynta
 /// <summary><c>function name(parameters) { body }</c>, in scope throughout its block (specification, section 3.5).</summary>
 public sealed record WsFunctionDeclarationSyntax(
     string Name, WsSourceSpan NameSpan, IReadOnlyList<WsParameterSyntax> Parameters, WsBlockSyntax Body, WsSourceSpan Span)
-    : WsStatementSyntax(Span);
+    : WsStatementSyntax(Span)
+{
+    /// <summary>Whether it is <c>async</c>: its call gives a task, and it may <c>await</c> (section 3.8).</summary>
+    public bool IsAsync { get; init; }
+}
 
 /// <summary>A method of a class, or its <c>constructor</c>: a name, parameters and a body (section 3.7).</summary>
 public sealed record WsMethodSyntax(
@@ -109,6 +113,9 @@ public sealed record WsMethodSyntax(
 
     /// <summary>Whether it is <c>static</c>: a method of the class itself, without <c>this</c> (section 3.7).</summary>
     public bool IsStatic { get; init; }
+
+    /// <summary>Whether it is <c>async</c> (section 3.8).</summary>
+    public bool IsAsync { get; init; }
 }
 
 /// <summary><c>static var name = value;</c>, a field of a class itself, set when the class is made (section 3.7).</summary>
@@ -134,7 +141,14 @@ public abstract record WsExpressionSyntax(WsSourceSpan Span) : WsSyntaxNode(Span
 
 /// <summary><c>function (parameters) { body }</c>, a function value.</summary>
 public sealed record WsFunctionExpressionSyntax(IReadOnlyList<WsParameterSyntax> Parameters, WsBlockSyntax Body, WsSourceSpan Span)
-    : WsExpressionSyntax(Span);
+    : WsExpressionSyntax(Span)
+{
+    /// <summary>Whether it is <c>async</c> (section 3.8).</summary>
+    public bool IsAsync { get; init; }
+}
+
+/// <summary><c>await value</c>: the value, or a task's result once it completes (section 3.8).</summary>
+public sealed record WsAwaitExpressionSyntax(WsExpressionSyntax Operand, WsSourceSpan Span) : WsExpressionSyntax(Span);
 
 public sealed record WsIntegerLiteralSyntax(long Value, WsSourceSpan Span) : WsExpressionSyntax(Span);
 

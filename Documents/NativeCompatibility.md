@@ -5,7 +5,7 @@
 | Basic C# classes, structs, primitives | Portable target | Verify Native C# compiler support |
 | Exceptions, delegates, generics | Planned | Inventory changes with compiler maturity. The VM catches a built-in's exception and reports it as a runtime error; the core's own code reports errors as results, not exceptions |
 | C# records, pattern matching, switch expressions, string interpolation | Planned | Used throughout the compiler, bytecode, runtime and VM (M0.6) |
-| System.Collections.Generic (`List<T>`, `Dictionary<TKey, TValue>`, `Stack<T>`, `HashSet<T>`) | Planned | Compiler, verifier, VM (M0.6) |
+| System.Collections.Generic (`List<T>`, `Dictionary<TKey, TValue>`, `Stack<T>`, `HashSet<T>`, `Queue<T>`) | Planned | Compiler, verifier, VM (M0.6); `Queue<T>` holds the tasks ready to resume (`WsScheduler`, M0.11.1) |
 | System.Linq | Not used | Kept out of the portable core's source (tests use it) |
 | `BitConverter.DoubleToInt64Bits` / `Int64BitsToDouble` | Portable target | binary64 values and constants are kept as their IEEE 754 bits |
 | Invariant number formatting (`long.ToString`, `double.ToString("R")` with `CultureInfo.InvariantCulture`) | Planned | The text `write` writes for a number (`WsValueFormatter`). The Native C# runtime must give the same text, exactly: the shortest decimal that reads back as the same binary64, in .NET's exponent style (`1E+21`, `1.5E-07`). Relying on .NET for it until then is approved (12 November 2026) |
@@ -24,7 +24,7 @@
 | System.IO.Path | Adapted | Paths and their separators are the PAL's, not the platform's |
 | System.Console | Adapted | A host's (the CLI's), never the core's |
 | System.Environment | Adapted | The core must not depend on the platform, its line ending among others |
-| OS threads (`Thread`, `ThreadPool`) | Adapted | Adapter-only (§7.14) |
+| OS threads (`Thread`, `ThreadPool`) | Adapted | Adapter-only (§7.14); the CLI's clock sleeps while an execution waits for a timer (`Thread.Sleep`, M0.11.1) |
 | P/Invoke | Adapted | Adapter-only (§7.14) |
 | ASP.NET Core | Adapted | Hosting adapter only |
 | ADO.NET | Adapted | Future database adapters only |

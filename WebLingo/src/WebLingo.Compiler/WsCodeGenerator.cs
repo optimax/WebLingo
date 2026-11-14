@@ -49,13 +49,18 @@ public sealed class WsCodeGenerator
             var name = function.Name.Length == 0 ? "function" : function.Name;
             var generated = GenerateFunction(module, name, function.ParameterCount, function.LocalNames, captures, function.Body,
                 diagnostics);
-            if (generated is not null) functions.Add(generated with { HasThis = function.HasThis, OptionalCount = function.OptionalCount });
+            if (generated is not null) functions.Add(generated with
+            {
+                HasThis = function.HasThis,
+                OptionalCount = function.OptionalCount,
+                IsAsync = function.IsAsync
+            });
         }
         if (main is null || functions.Count != program.Functions.Count) return null;
 
         var imports = new WsImport[program.Builtins.Count];
         foreach (var builtin in program.Builtins) imports[builtin.Index] = new WsImport(builtin.Name, builtin.Arity);
-        return new WsCompiledModule(moduleName, module.Constants, imports, main)
+        return new WsCompiledModule(moduleName, module.Constants, imports, main with { IsAsync = program.IsAsync })
         {
             Functions = functions,
             Classes = WsClassTable.Of(program),
@@ -358,6 +363,15 @@ public sealed class WsCodeGenerator
                 Emit(new WsInstruction(WsOpCode.Move, destination, store.Local), store.Span);
                 return destination;
             }
+            case WsIrAwait awaited:
+            {
+                var mark = _nextRegister;
+                var operand = EmitExpression(awaited.Value, null);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.Await, destination, operand), awaited.Span);
+                return destination;
+            }
             case WsIrIs test:
             {
                 var mark = _nextRegister;
@@ -579,6 +593,7 @@ public sealed class WsCodeGenerator
         WsIrStoreLocal store => store.Local == local || Assigns(store.Value, local),
         WsIrUnary unary => Assigns(unary.Operand, local),
         WsIrToText text => Assigns(text.Value, local),
+        WsIrAwait awaited => Assigns(awaited.Value, local),
         WsIrIs test => Assigns(test.Value, local) || Assigns(test.Class, local),
         WsIrBinary binary => Assigns(binary.Left, local) || Assigns(binary.Right, local),
         WsIrLogical logical => Assigns(logical.Left, local) || Assigns(logical.Right, local),

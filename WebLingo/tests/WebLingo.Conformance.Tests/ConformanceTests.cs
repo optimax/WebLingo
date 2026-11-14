@@ -104,6 +104,11 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("foreach (var x of [1]) writeLn(x);", "WS1001", 1, 16)]
     [InlineData("foreach (var (k, k) in {}) writeLn(k);", "WS2002", 1, 18)]
     [InlineData("foreach (var x in [1]) {} writeLn(x);", "WS2001", 1, 35)]
+    [InlineData("function g() { await 1; }", "WS2014", 1, 16)]
+    [InlineData("var f = function () { await 1; };", "WS2014", 1, 23)]
+    [InlineData("async function f() { var g = function () { await 1; }; }", "WS2014", 1, 44)]
+    [InlineData("class A { async constructor() {} }", "WS1001", 1, 17)]
+    [InlineData("var async = 1;", "WS1001", 1, 5)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -299,6 +304,23 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var m = {a: 1, b: 2, c: 3}; var n = 0; foreach (var (k, v) in m) { m.remove(k); n = n + 1; } writeLn(n < 4); writeLn(m.length < 3);", "true\ntrue")]
     [InlineData("var m = {x: 1}; foreach (var (k, v) in m) { var g = function () { return [k, v]; }; writeLn(g()); }", "[\"x\", 1]")]
     [InlineData("var m = {}; for (var i = 0; i < 100; i = i + 1) m[i] = i * i; for (var i = 0; i < 100; i = i + 2) m.remove(i); writeLn(m.length); writeLn(m[99]);", "50\n9801")]
+    [InlineData("async function w(n, d) { writeLn(n + \"<\"); await delay(d); writeLn(n + \">\"); return d; } var a = w(\"a\", 20); var b = w(\"b\", 10); writeLn(a is Task); writeLn(await a + await b);", "a<\nb<\ntrue\nb>\na>\n30")]
+    [InlineData("async function f() { writeLn(\"f1\"); await null; writeLn(\"f2\"); } var t = f(); writeLn(\"main\"); writeLn(await 5); await t;", "f1\nmain\nf2\n5")]
+    [InlineData("async function bad() { await null; throw new Error(\"no\"); } try { await bad(); } catch (e) { writeLn(e.message); }", "no")]
+    [InlineData("async function ix() { return [1][5]; } try { await ix(); } catch (IndexError e) { writeLn(e.code); }", "WS3005")]
+    [InlineData("async function bad() { throw \"x\"; } bad().forget(); var t = bad(); t.forget(); writeLn(\"ok\");", "ok")]
+    [InlineData("class A { constructor() { this.k = 1; } async m(x) { await null; return x + this.k; } } writeLn(await new A().m(41)); var h = async function (x) { return x * 2; }; writeLn(await h(4));", "42\n8")]
+    [InlineData("async function f() { await null; writeLn(\"never\"); } f(); writeLn(\"end\");", "end")]
+    [InlineData("async function f() { return 3; } var t = f(); writeLn(await t); writeLn(await t); writeLn(t);", "3\n3\ntask")]
+    [InlineData("writeLn(delay(0) is Task); writeLn(5 is Task); writeLn(delay(0) is Object); writeLn([delay(1)]);", "true\nfalse\ntrue\n[task]")]
+    [InlineData("async function count(n) { var total = 0; for (var i = 0; i < n; i = i + 1) { total = total + await i; } return total; } writeLn(await count(5));", "10")]
+    [InlineData("async function inner(x) { await delay(1); return x + 1; } async function outer() { var a = await inner(1); return await inner(a); } writeLn(await outer());", "3")]
+    [InlineData("async function f() { try { await delay(1); throw \"e\"; } finally { writeLn(\"fin\"); } } try { await f(); } catch (e) { writeLn(\"caught \" + e); }", "fin\ncaught e")]
+    [InlineData("class R { dispose() { writeLn(\"disposed\"); } } async function f() { using (var r = new R()) { await null; writeLn(\"in\"); } } await f();", "in\ndisposed")]
+    [InlineData("var fs = []; async function f(n) { await delay(n); fs.push(function () { return n; }); } await f(2); await f(1); foreach (var g in fs) write(g()); writeLn(null);", "21null")]
+    [InlineData("async function f() { var m = {a: [1, 2]}; foreach (var (k, v) in m) { foreach (var x in v) { await null; write(k + x.toString()); } } } await f(); writeLn(null);", "a1a2null")]
+    [InlineData("var order = []; async function t(n, d) { await delay(d); order.push(n); } var all = [t(1, 30), t(2, 10), t(3, 20), t(4, 10)]; foreach (var x in all) await x; writeLn(order);", "[2, 4, 3, 1]")]
+    [InlineData("async function f() { await null; return \"late\"; } var t = f(); writeLn(\"early\"); writeLn(await t);", "early\nlate")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -442,6 +464,47 @@ public sealed class ConformanceTests : IDisposable
         var (exit, _, error) = Weblingo("run", source);
         Assert.Equal(WsCommandLine.RuntimeFailed, exit);
         Assert.Contains($"error {code}:", error);
+    }
+
+    [Theory]
+    [InlineData("async function f() { throw \"lost\"; } f(); writeLn(\"end\");", "WS3008")]
+    [InlineData("async function f() { await null; throw new Error(\"x\"); } await f();", "WS3008")]
+    [InlineData("async function f() { return [1][3]; } await f();", "WS3005")]
+    [InlineData("async function f() { await delay(1); return [1][3]; } f(); await delay(5);", "WS3005")]
+    [InlineData("var other = null; async function a() { await null; await other; } var ta = a(); async function b() { await ta; } other = b(); await ta;", "WS3009")]
+    [InlineData("async function forever() { await forever(); } await forever();", "WS3003")]
+    [InlineData("delay(-1);", "WS3001")]
+    [InlineData("delay(1.5);", "WS3001")]
+    [InlineData("delay(0).forget(1);", "WS2006")]
+    [InlineData("var n = 5; n.forget();", "WS3006")]
+    [InlineData("class T extends Task {}", "WS3001")]
+    [InlineData("var t = new Task();", "WS3001")]
+    [InlineData("var m = {}; m[delay(0)] = 1;", "WS3001")]
+    [InlineData("class R { async dispose() {} } using (var r = new R()) {}", "WS3001")]
+    [InlineData("class P { async toString() { return \"p\"; } } writeLn(new P());", "WS3001")]
+    [InlineData("class P { async toString() { await null; return \"p\"; } } writeLn([new P()]);", "WS3001")]
+    public void AsynchronyErrorsAreReported(string source, string code)
+    {
+        var (exit, _, error) = Weblingo("run", source);
+        Assert.Equal(WsCommandLine.RuntimeFailed, exit);
+        Assert.Contains($"error {code}:", error);
+    }
+
+    [Fact]
+    public void ADelayWaitsOnTheClock()
+    {
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
+        Assert.Equal((WsCommandLine.Success, "1\n2\n", ""), Weblingo("run", "writeLn(1); await delay(60); writeLn(2);"));
+        Assert.True(System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds >= 60);
+    }
+
+    [Fact]
+    public void AFaultNothingAwaitedIsReportedWhereItWasThrown()
+    {
+        var (exit, output, error) = Weblingo("run", "async function f() {\n    throw \"lost\";\n}\nf();\nwriteLn(\"end\");");
+        Assert.Equal(WsCommandLine.RuntimeFailed, exit);
+        Assert.Equal("end\n", output);
+        Assert.Equal("program.ws(2,5): error WS3008:", FirstLineStart(error));
     }
 
     [Fact]

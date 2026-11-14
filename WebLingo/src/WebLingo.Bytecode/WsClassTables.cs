@@ -62,7 +62,7 @@ internal static class WsClassTables
     public static string? CheckRoles(int classCount, IReadOnlyList<int>? valueClasses, IReadOnlyList<WsErrorClass>? errorClasses)
     {
         if (valueClasses is null || errorClasses is null) return "The module has no tables of built-in classes.";
-        if (valueClasses.Count != 0 && valueClasses.Count != (int)WsValueClass.Class + 1)
+        if (valueClasses.Count != 0 && valueClasses.Count != (int)WsValueClass.Task + 1)
         {
             return $"The module has {valueClasses.Count} classes of values, not one for each kind.";
         }

@@ -97,6 +97,19 @@ public sealed class CodeGeneratorTests
         Assert.Equal(WsDiagnosticCodes.ProgramTooLarge, Assert.Single(result.Diagnostics).Code);
     }
 
+    [Fact]
+    public void AnAsyncFunctionAwaitsAndATopLevelThatAwaitsIsAsync()
+    {
+        var module = Generate("async function f(x) { return await x; } writeLn(f(1));");
+        Assert.False(module.EntryPoint.IsAsync);
+        var f = Assert.Single(module.Functions);
+        Assert.True(f.IsAsync);
+        Assert.Equal(new[] { WsOpCode.Await, WsOpCode.ReturnValue, WsOpCode.Return }, f.Code.Select(i => i.OpCode).ToArray());
+        Assert.Equal((1, 0), (f.Code[0].A, f.Code[0].B));
+        Assert.True(Generate("await 1;").EntryPoint.IsAsync);
+        Assert.Contains("Await r0, r0", Instructions("await 1;"));
+    }
+
     private static WsCompiledModule Generate(string source)
     {
         var result = new WsCompiler(BinderTests.WithWrite).Compile(source, "test.ws");

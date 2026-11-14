@@ -17,6 +17,8 @@ public sealed record WsExecutionContext(WsWorkerId OwnerWorkerId)
     /// <summary>How many instructions the execution may run before it is stopped (WS3003).</summary>
     public long InstructionBudget { get; init; } = long.MaxValue;
     public WsResourceBudget Resources { get; init; } = WsResourceBudget.Default;
+    /// <summary>The host's clock, which <c>delay</c>'s timers wait on; without one, the execution runs in virtual time (section 3.8).</summary>
+    public IWsExecutionClock? Clock { get; init; }
 }
 
 /// <summary>

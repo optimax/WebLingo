@@ -14,5 +14,6 @@ public enum WsValueClass
     Map,
     Set,
     Function,
-    Class
+    Class,
+    Task
 }

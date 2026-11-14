@@ -85,7 +85,8 @@ public sealed class WsBinder
         {
             ErrorClass = _error?.Class,
             ObjectClass = _object?.Class,
-            BuiltinClasses = builtinClasses
+            BuiltinClasses = builtinClasses,
+            IsAsync = _main.Awaits
         };
     }
 
@@ -130,7 +131,7 @@ public sealed class WsBinder
         {
             if (statement is WsFunctionDeclarationSyntax function)
             {
-                var bound = BindFunction(function.Name, function.Parameters, function.Body, function.Span);
+                var bound = BindFunction(function.Name, function.Parameters, function.Body, function.Span, isAsync: function.IsAsync);
                 if (declared.TryGetValue(function, out var local))
                 {
                     statements.Add(new WsBoundFunctionDeclaration(local, bound, function.Span));
@@ -446,7 +447,7 @@ public sealed class WsBinder
             }
             _class = new ClassContext(local, hasBase, isConstructor);
             var function = BindFunction(isConstructor ? declaration.Name : method.Name, method.Parameters, method.Body,
-                method.Span, isMethod: true);
+                method.Span, isMethod: true, isAsync: method.IsAsync);
             _class = outerClass;
             if (!names.Add(method.Name))
             {
@@ -467,7 +468,8 @@ public sealed class WsBinder
         foreach (var method in staticSyntax)
         {
             _class = null; // No 'super' in a static method.
-            var function = BindFunction(method.Name, method.Parameters, method.Body, method.Span, isStatic: true);
+            var function = BindFunction(method.Name, method.Parameters, method.Body, method.Span, isStatic: true,
+                isAsync: method.IsAsync);
             _class = outerClass;
             if (staticNames.Add(method.Name)) staticMethods.Add((method.Name, function));
             else Report(WsDiagnosticCodes.DuplicateDeclaration, $"'{method.Name}' is already declared in this class.", method.NameSpan);
@@ -485,11 +487,11 @@ public sealed class WsBinder
     /// <c>this</c>, which only a method declares (section 3.7).
     /// </summary>
     private WsBoundFunction BindFunction(string name, IReadOnlyList<WsParameterSyntax> parameters, WsBlockSyntax body,
-        WsSourceSpan span, bool isMethod = false, bool isStatic = false)
+        WsSourceSpan span, bool isMethod = false, bool isStatic = false, bool isAsync = false)
     {
         var outerFunction = _function;
         var outerScope = _scope;
-        _function = new FunctionContext(outerFunction, name);
+        _function = new FunctionContext(outerFunction, name) { IsAsync = isAsync };
         _scope = new Scope(outerScope, _function);
         if (isMethod) Declare("this", WsDeclarationKind.Parameter, span, null);
         if (isStatic) _scope.Locals.Add("this", _noThis); // An outer method's 'this' is not a static method's (WS2009).
@@ -506,7 +508,8 @@ public sealed class WsBinder
             statements, span)
         {
             HasThis = isMethod,
-            Defaults = defaults
+            Defaults = defaults,
+            IsAsync = isAsync
         };
         _function = outerFunction;
         _scope = outerScope;
@@ -636,6 +639,17 @@ public sealed class WsBinder
                 Report(WsDiagnosticCodes.ThisOutsideMethod,
                     "'super' is either called, 'super(…)', or names a member of the base class, 'super.name'.", expression.Span);
                 return new WsBoundError(expression.Span);
+            case WsAwaitExpressionSyntax awaited:
+            {
+                // In an async function, or at the program's top level, which then becomes one (section 3.8).
+                if (_function == _main) _main.Awaits = true;
+                else if (!_function.IsAsync)
+                {
+                    Report(WsDiagnosticCodes.AwaitOutsideAsync,
+                        "'await' is only allowed in an async function, or at a script's top level.", awaited.Span);
+                }
+                return new WsBoundAwait(BindExpression(awaited.Operand), awaited.Span);
+            }
             case WsIsExpressionSyntax test:
                 UseObject(); // A name that is not a class calls equal(), Object's for a value that is not an instance.
                 return new WsBoundIs(BindExpression(test.Value), BindExpression(test.Class), test.Span);
@@ -649,8 +663,8 @@ public sealed class WsBinder
                 return new WsBoundError(self.Span);
             }
             case WsFunctionExpressionSyntax function:
-                return new WsBoundFunctionExpression(BindFunction("", function.Parameters, function.Body, function.Span),
-                    function.Span);
+                return new WsBoundFunctionExpression(
+                    BindFunction("", function.Parameters, function.Body, function.Span, isAsync: function.IsAsync), function.Span);
             case WsErrorExpressionSyntax error:
                 return new WsBoundError(error.Span);
             default:
@@ -894,6 +908,10 @@ public sealed class WsBinder
         public List<WsBoundCapture> Captures { get; } = [];
         public Dictionary<WsLocalSymbol, int> CaptureIndexes { get; } = [];
         public int LoopDepth { get; set; }
+        /// <summary>Whether it is <c>async</c>, where <c>await</c> may stand, as at a script's top level (section 3.8).</summary>
+        public bool IsAsync { get; set; }
+        /// <summary>Whether it awaits: for the program's top level, which is then an <c>async</c> function.</summary>
+        public bool Awaits { get; set; }
         /// <summary>The hidden locals of the <c>catch</c> blocks being bound, innermost last, which <c>throw;</c> throws from.</summary>
         public List<(WsLocalSymbol Value, WsLocalSymbol Origin)> Catches { get; } = [];
         /// <summary>The loop depth where each <c>finally</c> block being bound begins, innermost last (WS2012).</summary>

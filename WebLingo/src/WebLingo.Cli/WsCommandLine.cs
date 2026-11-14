@@ -1,5 +1,7 @@
 using WebLingo.Compiler;
 using WebLingo.Core;
+using WebLingo.Platform.Abstractions;
+using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
 using WebLingo.VM;
@@ -61,7 +63,7 @@ public static class WsCommandLine
         if (compiled.Module is null) return CompilationFailed;
         if (!run) return Success;
 
-        var context = new WsExecutionContext(new WsWorkerId(0)) { Services = services };
+        var context = new WsExecutionContext(new WsWorkerId(0)) { Services = services, Clock = new SystemClock(new DotNetClock()) };
         var result = new WsVirtualMachine().Execute(compiled.Module, context);
         output.Flush();
         if (result.Succeeded) return Success;
@@ -80,6 +82,30 @@ public static class WsCommandLine
             _ => "info"
         };
         return $"{source.Name}({location.Line},{location.Column}): {severity} {diagnostic.Code}: {diagnostic.Message}";
+    }
+
+    /// <summary>
+    /// The clock an execution's timers (<c>delay</c>) wait on (specification, section 3.8): the platform's monotonic clock,
+    /// in milliseconds, the thread sleeping while the execution has nothing else to run.
+    /// </summary>
+    private sealed class SystemClock(IWsClock clock) : IWsExecutionClock
+    {
+        public long Milliseconds
+        {
+            get
+            {
+                var (ticks, frequency) = (clock.GetMonotonicTicks(), clock.MonotonicFrequency);
+                return ticks / frequency * 1000 + ticks % frequency * 1000 / frequency;
+            }
+        }
+
+        public void WaitUntil(long milliseconds)
+        {
+            for (var now = Milliseconds; now < milliseconds; now = Milliseconds)
+            {
+                Thread.Sleep((int)Math.Min(milliseconds - now, int.MaxValue));
+            }
+        }
     }
 
     /// <summary>Script output to a text writer as it is written, line breaks LF on every platform.</summary>

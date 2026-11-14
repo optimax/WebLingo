@@ -60,6 +60,15 @@ public sealed class WsHeap
     /// </summary>
     public WsValue DefaultToString { get; set; }
 
+    /// <summary>The execution's tasks, which its VM runs, and which <c>delay</c> adds a timer to (section 3.8).</summary>
+    public WsScheduler? Scheduler { get; set; }
+
+    /// <summary>A new task, pending (section 3.8).</summary>
+    public bool TryAllocateTask(out WsValue task, out WsRuntimeError? error) =>
+        TryAllocate(new WsTask(), WsValueKind.Task, 2, out task, out error);
+
+    public WsTask GetTask(WsValue task) => Get<WsTask>(task, WsValueKind.Task);
+
     /// <summary>The class <c>Object</c>, once the program has made it, whose methods every value has (section 3.7).</summary>
     public WsValue ObjectClass { get; set; }
 
@@ -539,6 +548,12 @@ public sealed class WsHeap
         {
             foreach (var value in roots) Mark(value, marked, pending);
         }
+        if (Scheduler is not null)
+        {
+            var scheduled = new List<WsValue>();
+            Scheduler.CopyRoots(scheduled);
+            foreach (var value in scheduled) Mark(value, marked, pending);
+        }
         while (pending.Count > 0)
         {
             switch (_objects[pending.Pop()])
@@ -564,6 +579,18 @@ public sealed class WsHeap
                 case InstanceObject instance:
                     Mark(instance.Class, marked, pending);
                     for (var i = 0; i < instance.Count; i++) Mark(instance.At(i).Value, marked, pending);
+                    break;
+                case WsTask task:
+                    Mark(task.Result, marked, pending);
+                    Mark(task.Exception, marked, pending);
+                    foreach (var waiter in task.Waiters) Mark(waiter, marked, pending);
+                    if (task.FrameRoots is not null)
+                    {
+                        foreach (var roots in task.FrameRoots)
+                        {
+                            foreach (var value in roots) Mark(value, marked, pending);
+                        }
+                    }
                     break;
                 case BoundMethodObject bound:
                     Mark(bound.Instance, marked, pending);
@@ -594,7 +621,8 @@ public sealed class WsHeap
     private static void Mark(WsValue value, bool[] marked, Stack<int> pending)
     {
         if (value.Kind is not (WsValueKind.String or WsValueKind.Function or WsValueKind.Cell or WsValueKind.Array
-            or WsValueKind.Map or WsValueKind.Set or WsValueKind.Class or WsValueKind.Instance or WsValueKind.BoundMethod))
+            or WsValueKind.Map or WsValueKind.Set or WsValueKind.Class or WsValueKind.Instance or WsValueKind.BoundMethod
+            or WsValueKind.Task))
         {
             return;
         }
@@ -620,6 +648,7 @@ public sealed class WsHeap
         ClassObject classObject => Size(classObject),
         InstanceObject instance => instance.Count,
         BoundMethodObject => 2,
+        WsTask => 2,
         _ => 0
     };
 

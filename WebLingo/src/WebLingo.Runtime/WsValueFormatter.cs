@@ -39,6 +39,7 @@ public static class WsValueFormatter
         WsValueKind.Instance => $"instance#{value.Handle}",
         WsValueKind.BoundMethod => "function",
         WsValueKind.Missing => "missing",
+        WsValueKind.Task => "task",
         WsValueKind.Boolean => value.AsBoolean ? "true" : "false",
         WsValueKind.Int64 => value.AsInt64.ToString(CultureInfo.InvariantCulture),
         _ => FormatBinary64(value.AsBinary64)
@@ -57,6 +58,7 @@ public static class WsValueFormatter
         WsValueKind.Instance => "an instance",
         WsValueKind.Map => "a map",
         WsValueKind.Set => "a set",
+        WsValueKind.Task => "a task",
         _ => $"the number {Format(value)}"
     };
 

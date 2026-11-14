@@ -121,7 +121,8 @@ public sealed class WsStackBytecodeVerifier
         var code = function.Code;
         for (var i = 0; i < code.Count; i++)
         {
-            var error = CheckOperands(module, function, code[i]);
+            var error = CheckOperands(module, function, code[i])
+                ?? (code[i].OpCode == WsStackOpCode.Await && !function.IsAsync ? "an await in a function that is not async." : null);
             if (error is not null) return Fail($"Instruction {i} ({code[i].OpCode}): {error}", i);
             if (!EndsPath(code[i].OpCode) && i == code.Count - 1)
             {
@@ -239,6 +240,7 @@ public sealed class WsStackBytecodeVerifier
             case WsStackOpCode.Rethrow:
             case WsStackOpCode.ToText:
             case WsStackOpCode.IsInstance:
+            case WsStackOpCode.Await:
                 return Unused(a, b);
             case WsStackOpCode.GetIndex:
                 return (a is 0 or 1 ? null : $"its A is {a}, not 0 or 1.") ?? Unused(b);
@@ -415,6 +417,7 @@ public sealed class WsStackBytecodeVerifier
         WsStackOpCode.ToText => (1, 1),
         WsStackOpCode.IsInstance => (2, 1),
         WsStackOpCode.JumpIfGiven => (0, 0),
+        WsStackOpCode.Await => (1, 1),
         WsStackOpCode.New => (instruction.A + 1, 1),
         WsStackOpCode.SetMember => (2, instruction.B),
         WsStackOpCode.NewArray or WsStackOpCode.NewSet => (instruction.A, 1),

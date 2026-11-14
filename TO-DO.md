@@ -8,27 +8,27 @@ Follow-ups to "Classes of Values, Further". One decision each, answerable with "
 
 **Q1, writing an instance of a class extending a kind of value (A2): (a) `Celsius:21.5`; (b) `Celsius(21.5)`, as it is made, without `new`; and the collections the same way, `Stack:[1, 2]` or `Stack([1, 2])`, in place of `Stack [1, 2]`, so that every classed value is written alike.**
 
-A1:
+A1: (b).
 
 **Q2, `extend`'s reach: (a) the class itself, everywhere, from when the `extend` runs: every instance and subclass, made before or after, has the new methods; (b) only code where the extension is in scope, as C#'s extension methods are.**
 
-A2:
+A2: (a).
 
 **Q3, when an `extend` runs: (a) it is hoisted with its block's classes, and runs when the block begins, after they are made; (b) where it stands, in order with the statements around it.**
 
-A3:
+A3: (a)
 
 **Q4, an extension's method whose name the class has already: (a) an error, WS3001 when the `extend` runs; (b) it replaces the class's own, as a subclass's would.**
 
-A4:
+A4: (b)
 
 **Q5, what an `extend` block may hold: (a) methods only; (b) methods and static members, `static` as in a class.**
 
-A5:
+A5: (b) 
 
 **Q6, arithmetic on a boxed value: `new Celsius(21.5) + 1` is (a) a plain number, `22.5`; (b) a `Celsius`, its class kept.**
 
-A6:
+A6: (b)
 
 **Q7, the held value: a class extending `Number` gives it by its constructor's `super(value)`, as `new Number(value)` makes one; a class without a constructor passes its arguments on, so `new Celsius(21.5)` holds `21.5`. Agreed?**
 
@@ -62,6 +62,8 @@ A9:
 
 `async` functions, methods and function expressions, `await`, tasks, their exceptions, `t.forget()`, the end of an execution, `delay()`, and a benchmark workload (specification, sections 3.8 and 9), on both VMs. Added by Claude, 2026-11-13.
 
+Done (Claude, 2026-11-13): on both VMs, with their conformance tests, and the benchmark's `async` workload (specification, section 5.6). The choices the specification leaves open are recorded as Proposed in its section 15.2 ("Asynchrony"), among them two codes, WS2014 (`await` outside an `async` function) and WS3009 (a task that nothing can complete); until M0.11.2, a disposal whose dispose method is `async` is WS3001 when it begins. Checks: the Release build, without warnings, the 1,363 tests, and the CLI on the samples and on programs that await, on Windows only; Linux not tried.
+
 ## [IDLE] M0.11.2: Asynchronous Disposal
 
 An `async` `dispose()`, which `using` awaits, and WS3001 where it cannot (specification, section 3.8), on both VMs. Added by Claude, 2026-11-13.
@@ -74,7 +76,7 @@ An `async` `dispose()`, which `using` awaits, and WS3001 where it cannot (specif
 
 2026-11-13: waits for "M0.11: Asynchrony".
 
-## [QUESTION] Modules: `import` and `param`
+## Modules: `import` and `param`
 
 The language's module system, which A3 of "M0.11 Syntax: Templates, Continued" makes `import`, and A4's `param` as a keyword of the language, a module's parameter; A2 of "Asynchrony, Continued" makes a script, or a module, an instance of `Module`. Templates (M0.12) need both. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
 
@@ -112,11 +114,11 @@ A8: Yes. But, `weblingo run script.ws value="10"` reads as `String(value)`.
 
 **Q9, when imports are compiled: (a) with the importing program, so that a program is complete before it runs; (b) when they run, as `renderComponent` finds its component.**
 
-A9:
+A9: Static imports can be resolved at compile time so they can be compiled right away. Dynamic imports compiled at the time of executing `Module.import(...)`.
 
 **Q10, the standard library: it becomes modules imported by name (`import fs from "std/fs";`), while `write`, `writeLn` and the like stay built-ins of every program. Agreed?**
 
-A10:
+A10: Well, even built-ins should be treated like they belong to modules, so maybe `write` and `writeLn` are in `system`, but `system` is always implicitly imported by all modules.
 
 ## [IDLE] M0.12: Templates
 
@@ -207,5 +209,30 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 ## Static Members Callable on Instances
 
 Let's make sure that class static members are accessible through instance references (unless shadowed by the instance member) as well as class references. 
+
+## [DEFER] Adding Methods at Run Time
+
+`extend` (see "Classes of Values, Extensions") adds methods to a class as a declaration, written once in the source, its methods having `this` as a class's do. This task would add a way to do the same while the program runs, for a method, or a class to give it to, that is known only then: chosen by a condition, built by a factory, or named by data. Discussed with the owner, 2026-11-13; added by Claude the same day.
+
+What it needs:
+
+- **A function with a receiver.** A method is a function whose first, hidden parameter is `this` (specification, section 15.2, "Classes"), and a plain function expression has none (`this` in one is WS2009, unless a method around it lends its own). One way: a function expression may declare `this` as its first parameter, `function (this, prefix) { return prefix + this.x; }`, the parameter bound by a call's target (`p.describe("x = ")`), or given as an argument when the function is called directly (`describe(p, "x = ")`).
+- **A way to attach it.** A built-in method of classes, `Point.addMethod("describe", describe)`, after which every instance of `Point`, and of its subclasses, has `describe`, with `this` bound, replacing a method of that name as an extension's does (the owner chose replacing for `extend`, 2026-11-13).
+
+Its cost: a class's members could change at any point of a run, so the same call could mean different things at different times, and the VMs could no longer gather a class's methods once, when it is made.
+
+It is deferred: it can be added later, if it proves necessary, since `extend` already covers methods known when the program is written, and nothing in this design would change what programs without it do. When it is taken up, these are the owner's to decide:
+
+**Q1: a function with a receiver, `function (this, a) { … }`, its first parameter named `this`, bound by a call's target, or given as the first argument of a direct call. Agreed?**
+
+A1: 
+
+**Q2: attaching it: (a) a built-in method of every class, `Point.addMethod("describe", f)`; (b) a statement, `extend Point with describe = f;`.**
+
+A2: 
+
+**Q3: may a method attached at run time be removed again (`Point.removeMethod("describe")`)? (a) no; (b) yes.**
+
+A3: 
 
 # END-OF-TO-DO

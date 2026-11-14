@@ -111,7 +111,8 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         var code = function.Code;
         for (var i = 0; i < code.Count; i++)
         {
-            var error = CheckOperands(module, function, code[i]);
+            var error = CheckOperands(module, function, code[i])
+                ?? (code[i].OpCode == WsOpCode.Await && !function.IsAsync ? "an await in a function that is not async." : null);
             if (error is not null) return Fail($"Instruction {i} ({code[i].OpCode}): {error}", i);
             if (!EndsPath(code[i].OpCode) && i == code.Count - 1)
             {
@@ -132,6 +133,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             case WsOpCode.Negate:
             case WsOpCode.Plus:
             case WsOpCode.ToText:
+            case WsOpCode.Await:
                 return Register(function, a, "destination") ?? Register(function, b, "operand") ?? Unused(c, d);
             case WsOpCode.Add:
             case WsOpCode.Subtract:
@@ -509,6 +511,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             case WsOpCode.Plus:
             case WsOpCode.Not:
             case WsOpCode.ToText:
+            case WsOpCode.Await:
                 return Unwritten(instruction.B, state, locals);
             case WsOpCode.JumpIfFalse:
             case WsOpCode.JumpIfTrue:
@@ -636,7 +639,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
 
     private static int? Writes(WsInstruction instruction) => instruction.OpCode switch
     {
-        WsOpCode.LoadConstant or WsOpCode.Move or WsOpCode.Negate or WsOpCode.Plus or WsOpCode.ToText or WsOpCode.IsInstance or WsOpCode.Add or WsOpCode.Subtract
+        WsOpCode.LoadConstant or WsOpCode.Move or WsOpCode.Negate or WsOpCode.Plus or WsOpCode.ToText or WsOpCode.IsInstance or WsOpCode.Await or WsOpCode.Add or WsOpCode.Subtract
             or WsOpCode.Multiply or WsOpCode.Divide or WsOpCode.CallBuiltin or WsOpCode.LoadNull or WsOpCode.LoadBoolean
             or WsOpCode.Not or WsOpCode.Equal or WsOpCode.NotEqual or WsOpCode.Less or WsOpCode.LessOrEqual
             or WsOpCode.Greater or WsOpCode.GreaterOrEqual or WsOpCode.NewCell or WsOpCode.BoxRegister or WsOpCode.CopyCell

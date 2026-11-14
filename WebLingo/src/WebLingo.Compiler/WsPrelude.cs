@@ -13,7 +13,7 @@ internal static class WsPrelude
     [
         ("Boolean", WsValueClass.Boolean), ("Integer", WsValueClass.Integer), ("Number", WsValueClass.Number),
         ("String", WsValueClass.String), ("Array", WsValueClass.Array), ("Map", WsValueClass.Map), ("Set", WsValueClass.Set),
-        ("Function", WsValueClass.Function), ("Class", WsValueClass.Class)
+        ("Function", WsValueClass.Function), ("Class", WsValueClass.Class), ("Task", WsValueClass.Task)
     ];
 
     public static readonly (string Name, string Code)[] ErrorClasses =

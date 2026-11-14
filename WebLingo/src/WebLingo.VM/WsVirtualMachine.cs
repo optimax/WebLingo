@@ -113,10 +113,10 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         public WsValue[] Registers = [];
         /// <summary>The closure it runs as, and, for a disposal, the instance disposed: the frame's roots.</summary>
         /// <summary>
-        /// The frame's roots: the closure it runs as; for a disposal, the instance disposed; and an exception a disposal
-        /// keeps while its next methods run (section 3.7).
+        /// The frame's roots: the closure it runs as; for a disposal, the instance disposed; an exception a disposal keeps
+        /// while its next methods run (section 3.7); and an <c>async</c> function's task (section 3.8).
         /// </summary>
-        public readonly WsValue[] Closure = new WsValue[3];
+        public readonly WsValue[] Closure = new WsValue[4];
         public WsValue[] Cells = [];
         /// <summary>The next instruction, while the frame waits for a call it made to return.</summary>
         public int Pc;
@@ -136,6 +136,15 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         public long HeldOrigin;
         /// <summary>For a toString() that a text being built waits for: that text (section 3.7).</summary>
         public TextCall? Text;
+        /// <summary>
+        /// For an <c>async</c> function's frame: its task, its fourth root too; whether it still runs on its caller's stack,
+        /// before its first <c>await</c>; and, while it waits, where its <c>await</c>'s value goes (section 3.8).
+        /// </summary>
+        public WsValue Task;
+        public bool FirstRun;
+        /// <summary>The roots a waiting frame's task holds: its registers and its closure, made once (section 3.8).</summary>
+        public WsValue[][]? WaitingRoots;
+        public int AwaitDestination;
     }
 
     /// <summary>
@@ -165,11 +174,16 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                 Code = entryCode,
                 Registers = new WsValue[module.EntryPoint.RegisterCount]
             };
-            heap.AddRoots(frame.Registers);
             heap.AddRoots(_errorClass);
             heap.AddRoots(_objectClass);
             heap.AddRoots(_valueClasses);
             heap.AddRoots(_errorClasses);
+            heap.AddRoots(_main);
+            heap.AddRoots(frame.Registers);
+            heap.AddRoots(frame.Closure);
+            _scheduler = new WsScheduler(heap, context.Clock);
+            heap.Scheduler = _scheduler;
+            if (module.EntryPoint.IsAsync && !TryStartMain(frame)) return _ended!;
 
             var code = frame.Code;
             var registers = frame.Registers;
@@ -634,6 +648,11 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         case WsOpCode.ToText:
                             _text = new TextCall(new WsTextBuilder(heap, registers[ins.B], true), null, ins.A);
                             goto text;
+                        case WsOpCode.Await:
+                            _awaited = registers[ins.B];
+                            frame.AwaitDestination = ins.A;
+                            frame.Pc = pc + 1;
+                            goto awaiting;
                         case WsOpCode.Throw:
                             _thrown = registers[ins.A];
                             _thrownError = null;
@@ -649,10 +668,15 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         case WsOpCode.ReturnValue:
                         {
                             var result = ins.OpCode == WsOpCode.ReturnValue ? registers[ins.A] : WsValue.Null;
-                            if (depth == 0) return WsExecutionResult.Success with { Instructions = executed };
+                            if (depth == 0 && frame.Task.Kind != WsValueKind.Task) return Finish(executed);
                             heap.RemoveLastRoots(frame.Closure);
                             heap.RemoveLastRoots(registers);
                             Array.Clear(registers, 0, frame.Function.RegisterCount); // So that nothing stays reachable.
+                            if (frame.Task.Kind == WsValueKind.Task)
+                            {
+                                _returned = result;
+                                goto asyncReturned;
+                            }
                             if (frame.DisposeChain is not null) goto disposed;
                             if (frame.Text is not null)
                             {
@@ -738,6 +762,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             goto failed;
                         }
 
+                        if (function.IsAsync && !heap.TryAllocateTask(out _newTask, out error)) goto failed;
                         frame.Pc = pc + 1;
                         if (++depth == frames.Length) Array.Resize(ref frames, frames.Length * 2);
                         var called = frames[depth] ??= new Frame();
@@ -756,6 +781,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         called.Closure[0] = callee;
                         called.ResultRegister = resultRegister;
                         called.Constructed = constructed;
+                        if (function.IsAsync) Started(called);
                         heap.AddRoots(calledRegisters);
                         heap.AddRoots(called.Closure);
 
@@ -873,13 +899,20 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                     // A toString() that a text waits for has returned, its frame let go of: its string goes into the
                     // text, which goes on, at the instruction it is for; anything but a string is WS3001 (section 3.7).
                     {
-                        var building = frame.Text!;
+                        _text = frame.Text!;
                         frame.Text = null;
                         frame.Closure[0] = WsValue.Null;
                         frame = frames[--depth];
                         code = frame.Code;
                         registers = frame.Registers;
                         cells = frame.Cells;
+                    }
+
+                textGiven:
+                    // What a toString() gave (_returned), for the text (_text) of the instruction that called it.
+                    {
+                        var building = _text!;
+                        _text = null;
                         pc = frame.Pc - 1;
                         if (_returned.Kind != WsValueKind.String)
                         {
@@ -894,6 +927,55 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         _text = building;
                         goto text;
                     }
+
+                asyncReturned:
+                    // An async function has returned: its task is done, with its result. Still on its caller's stack, its call
+                    // gives the task; resumed by the scheduler, nothing runs below it (section 3.8).
+                    Completed(frame);
+                    if (!frame.FirstRun) goto schedule;
+                    goto asyncGave;
+
+                faulted:
+                    // An exception leaves an async function: its task faults with it, for whatever awaits it. Still on its
+                    // caller's stack, its call gives the task; resumed by the scheduler, nothing runs below it (section 3.8).
+                    Faulted(frame);
+                    if (!frame.FirstRun) goto schedule;
+                    goto asyncGave;
+
+                awaiting:
+                    // await: the async function's frame leaves the stack, kept by its task until the scheduler resumes it
+                    // with what the await gives. Still on its caller's stack, its call gives the task (section 3.8).
+                    Suspend(frame);
+                    frames[depth] = null!; // The frame is the task's now; this depth's next call gets a new one.
+                    if (!frame.FirstRun) goto schedule;
+
+                asyncGave:
+                    // An async function's first run has ended, at its first await, its return or its exception: its call
+                    // gives its task, to where the call's result goes, or to the text whose toString() it is.
+                    _text = Gave(frame, frames[depth - 1]);
+                    frame = frames[--depth];
+                    code = frame.Code;
+                    registers = frame.Registers;
+                    cells = frame.Cells;
+                    if (_text is not null) goto textGiven;
+                    pc = frame.Pc;
+                    continue;
+
+                schedule:
+                    // Nothing runs on the VM's stack: the next ready task resumes where it awaited, or the execution ends.
+                    if (!TryResume(frames, cancellation, executed)) return _ended!;
+                    depth = 0;
+                    frame = frames[0];
+                    code = frame.Code;
+                    registers = frame.Registers;
+                    cells = frame.Cells;
+                    if (_resumedThrowing)
+                    {
+                        pc = frame.Pc - 1;
+                        goto throwing;
+                    }
+                    pc = frame.Pc;
+                    continue;
 
                 failed:
                     // A call that failed before its frame was pushed leaves nothing in that frame: no disposal, no text.
@@ -937,6 +1019,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             Array.Clear(registers, 0, frame.Function.RegisterCount);
                             goto nextDisposal;
                         }
+                        if (frame.Task.Kind == WsValueKind.Task) goto faulted;
                         if (depth == 0) return Uncaught(executed);
                         heap.RemoveLastRoots(frame.Closure);
                         heap.RemoveLastRoots(registers);
@@ -1088,6 +1171,11 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                 var (index, _) = heap.GetClosure(method);
                 var function = module.Functions[index];
                 if (function.ParameterCount != 1) return WrongArgumentCount(function.Name, function.ParameterCount - 1, 0);
+                if (function.IsAsync)
+                {
+                    return new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                        $"'{function.Name}' is async, and a disposal does not await it yet.");
+                }
             }
             return null;
         }
@@ -1124,6 +1212,167 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         /// </summary>
         private readonly bool[]? _texts = TextBuiltins(module, builtins);
 
+        /// <summary>The execution's tasks (section 3.8), made when it starts; the program's own task, if its top level awaits, a root.</summary>
+        private WsScheduler _scheduler = null!;
+        private readonly WsValue[] _main = new WsValue[1];
+
+        /// <summary>What an <c>await</c> waits for, on its way to the code that suspends the frame.</summary>
+        private WsValue _awaited;
+
+        /// <summary>What a failure to start, or the scheduler, ends the execution with (section 3.8).</summary>
+        private WsExecutionResult? _ended;
+
+        /// <summary>A task made for an async function's call, on its way to the function's frame.</summary>
+        private WsValue _newTask;
+
+        /// <summary>Whether the frame the scheduler resumed throws, at its await, rather than being given a value.</summary>
+        private bool _resumedThrowing;
+
+        /// <summary>A top level that awaits: an async function itself, whose task is the program's (section 3.8).</summary>
+        private bool TryStartMain(Frame frame)
+        {
+            if (!heap.TryAllocateTask(out var task, out var error))
+            {
+                _ended = Failure(error!.Code, error.Message, new WsSourceSpan(0, 0));
+                return false;
+            }
+            _main[0] = frame.Task = frame.Closure[3] = task;
+            return true;
+        }
+
+        /// <summary>An async function's frame, about to run: its task, made for its call, which the call gives (section 3.8).</summary>
+        private void Started(Frame called)
+        {
+            called.Task = called.Closure[3] = _newTask;
+            called.FirstRun = true;
+            _newTask = WsValue.Null;
+        }
+
+        /// <summary>An async function has returned (<see cref="_returned"/>): its task is done, and is what its call gives.</summary>
+        private void Completed(Frame frame)
+        {
+            var task = frame.Task;
+            frame.Task = WsValue.Null;
+            frame.Closure[0] = WsValue.Null;
+            frame.Closure[3] = WsValue.Null;
+            _scheduler.Complete(task, _returned);
+            _returned = task;
+        }
+
+        /// <summary>An exception leaves an async function: its frame let go of, its task faults, and is what its call gives.</summary>
+        private void Faulted(Frame frame)
+        {
+            heap.RemoveLastRoots(frame.Closure);
+            heap.RemoveLastRoots(frame.Registers);
+            Array.Clear(frame.Registers, 0, frame.Function.RegisterCount);
+            var task = frame.Task;
+            frame.Task = WsValue.Null;
+            frame.Closure[0] = WsValue.Null;
+            frame.Closure[3] = WsValue.Null;
+            _scheduler.Fault(task, _thrown, _thrownError, _origin);
+            _thrown = WsValue.Null;
+            _thrownError = null;
+            _returned = task;
+        }
+
+        /// <summary>
+        /// await: the frame's roots let go of, the frame kept by its task, with the values it holds, until what it awaits
+        /// (<see cref="_awaited"/>) completes; the task is what its call gives, if it is still on its caller's stack.
+        /// </summary>
+        private void Suspend(Frame frame)
+        {
+            heap.RemoveLastRoots(frame.Closure);
+            heap.RemoveLastRoots(frame.Registers);
+            var waiting = heap.GetTask(frame.Task);
+            waiting.Frame = frame;
+            var roots = frame.WaitingRoots;
+            if (roots is null || roots[0] != frame.Registers) frame.WaitingRoots = roots = [frame.Registers, frame.Closure];
+            waiting.FrameRoots = roots;
+            _scheduler.Await(frame.Task, _awaited);
+            _awaited = WsValue.Null;
+            _returned = frame.Task;
+        }
+
+        /// <summary>
+        /// An async function's first run has ended: its call gives its task (<see cref="_returned"/>) to its caller, or,
+        /// for a toString() a text waits for, to that text, which this gives.
+        /// </summary>
+        private TextCall? Gave(Frame frame, Frame caller)
+        {
+            frame.FirstRun = false;
+            var text = frame.Text;
+            frame.Text = null;
+            if (text is null)
+            {
+                caller.Registers[frame.ResultRegister] = _returned;
+                _returned = WsValue.Null;
+            }
+            return text;
+        }
+
+        /// <summary>
+        /// Nothing runs on the VM's stack (section 3.8): the next ready task's frame resumes, at depth 0, its await given
+        /// a value, or about to throw (<see cref="_resumedThrowing"/>), while timers complete, in order, when nothing is
+        /// ready. False, with the end in <see cref="_ended"/>, once the top level is done, cancelled, or waits for what
+        /// nothing will complete.
+        /// </summary>
+        private bool TryResume(Frame[] frames, WsCancellationSignal? cancellation, long executed)
+        {
+            while (true)
+            {
+                if (_main[0].Kind != WsValueKind.Task || heap.GetTask(_main[0]).State != WsTaskState.Pending)
+                {
+                    _ended = Finish(executed);
+                    return false;
+                }
+                if (cancellation is not null && cancellation.IsCancellationRequested)
+                {
+                    _ended = Failure(WsDiagnosticCodes.Cancelled, "The program was cancelled.", new WsSourceSpan(0, 0))
+                        with { Instructions = executed };
+                    return false;
+                }
+                if (_scheduler.TryTakeReady(out var resumption))
+                {
+                    var resumed = heap.GetTask(resumption.Task);
+                    var frame = (Frame)resumed.Frame!;
+                    resumed.Frame = null;
+                    resumed.FrameRoots = null;
+                    frames[0] = frame;
+                    heap.AddRoots(frame.Registers);
+                    heap.AddRoots(frame.Closure);
+                    _resumedThrowing = resumption.Throws;
+                    if (resumption.Throws) (_thrown, _thrownError, _origin) = (resumption.Value, resumption.Error, resumption.Origin);
+                    else frame.Registers[frame.AwaitDestination] = resumption.Value;
+                    return true;
+                }
+                if (!_scheduler.TryAdvanceTime())
+                {
+                    _ended = Failure(WsDiagnosticCodes.Deadlock, "The program waits for a task that nothing will complete.",
+                        new WsSourceSpan(0, 0)) with { Instructions = executed };
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// The execution's end: the top level's exception, if it faulted; else the first fault nothing awaited; else success
+        /// (section 3.8).
+        /// </summary>
+        private WsExecutionResult Finish(long executed)
+        {
+            if (_main[0].Kind == WsValueKind.Task && heap.GetTask(_main[0]) is { State: WsTaskState.Faulted } main)
+            {
+                (_thrown, _thrownError, _origin) = (main.Exception, main.Error, main.Origin);
+                return Uncaught(executed);
+            }
+            if (_scheduler.TryFindUnobserved(out var faulted))
+            {
+                (_thrown, _thrownError, _origin) = (faulted.Exception, faulted.Error, faulted.Origin);
+                return Uncaught(executed);
+            }
+            return WsExecutionResult.Success with { Instructions = executed };
+        }
+
         /// <summary>A text to build, on its way to the code that builds it; and what a toString() a text waits for gave.</summary>
         private TextCall? _text;
         private WsValue _returned;
@@ -1147,7 +1396,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             value.Kind is WsValueKind.Instance or WsValueKind.Array or WsValueKind.Map or WsValueKind.Set;
 
         /// <summary>The kinds of values' classes, by <c>WsValueClass</c>, once the module has made them (section 3.7); a root.</summary>
-        private readonly WsValue[] _valueClasses = new WsValue[(int)WsValueClass.Class + 1];
+        private readonly WsValue[] _valueClasses = new WsValue[(int)WsValueClass.Task + 1];
 
         /// <summary>The kinds of runtime errors' classes, as <c>module.ErrorClasses</c> lists them, once made; a root.</summary>
         private readonly WsValue[] _errorClasses = new WsValue[module.ErrorClasses.Count];
@@ -1298,6 +1547,9 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             frame.Closure[0] = WsValue.Null;
             frame.Closure[1] = WsValue.Null;
             frame.Closure[2] = WsValue.Null;
+            frame.Closure[3] = WsValue.Null;
+            frame.Task = WsValue.Null;
+            frame.FirstRun = false;
             frame.Constructed = WsValue.Null;
             frame.DisposeChain = null;
             frame.Holds = false;

@@ -384,6 +384,16 @@ public sealed class VerifierTests
         _ => random.Next(8) == 0 ? random.Next(-3, 100) : random.Next(0, 3)
     };
 
+    [Fact]
+    public void AnAwaitIsOnlyInAnAsyncFunction()
+    {
+        var module = Module(registers: 2, locals: 0, I(WsOpCode.LoadNull, 0), I(WsOpCode.Await, 1, 0), I(WsOpCode.Return));
+        AssertRejected(module, 1, "not async");
+        Assert.Equal(Valid, Verify(module with { EntryPoint = module.EntryPoint with { IsAsync = true } }));
+        AssertRejected(Module(registers: 2, locals: 0, I(WsOpCode.Await, 1, 0), I(WsOpCode.Return)) is var unread
+            ? unread with { EntryPoint = unread.EntryPoint with { IsAsync = true } } : unread, 0, "register 0");
+    }
+
     private static WsInstruction I(WsOpCode opCode, int a = 0, int b = 0, int c = 0, int d = 0) => new(opCode, a, b, c, d);
 
     private static WsCompiledModule Module(int registers, int locals, params WsInstruction[] code) =>

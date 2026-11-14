@@ -15,6 +15,8 @@ public sealed record WsBoundProgram(
     public WsBoundClass? ObjectClass { get; init; }
     /// <summary>Every built-in class the program uses, by its name, <c>Object</c> and <c>Error</c> included.</summary>
     public IReadOnlyList<(string Name, WsBoundClass Class)> BuiltinClasses { get; init; } = [];
+    /// <summary>Whether its top level awaits, which makes it an <c>async</c> function itself (section 3.8).</summary>
+    public bool IsAsync { get; init; }
 }
 
 /// <summary>
@@ -35,6 +37,8 @@ public sealed record WsBoundFunction(
     public bool HasThis { get; init; }
     /// <summary>Its parameters' default values, but <c>this</c>'s, null for one that has none (section 3.5).</summary>
     public IReadOnlyList<WsBoundExpression?> Defaults { get; init; } = [];
+    /// <summary>Whether it is <c>async</c>: its call gives a task, and it may <c>await</c> (section 3.8).</summary>
+    public bool IsAsync { get; init; }
 }
 
 public abstract record WsBoundStatement(WsSourceSpan Span);
@@ -148,6 +152,9 @@ public sealed record WsBoundLocalReference(WsLocalSymbol Local, WsSourceSpan Spa
 /// The text of a value, as <c>write</c> writes it, an instance as its class's name and its fields: what <c>Object</c>'s
 /// <c>toString()</c> gives; nothing but <c>Object</c> writes it (section 3.7).
 /// </summary>
+/// <summary><c>await value</c> (section 3.8).</summary>
+public sealed record WsBoundAwait(WsBoundExpression Value, WsSourceSpan Span) : WsBoundExpression(Span);
+
 /// <summary><c>value is Class</c> (section 3.7).</summary>
 public sealed record WsBoundIs(WsBoundExpression Value, WsBoundExpression Class, WsSourceSpan Span) : WsBoundExpression(Span);
 

@@ -150,6 +150,99 @@ public sealed class StackVirtualMachineTests
         (source, context) => new WsStackVirtualMachine().Execute(Compile(source), context),
     ];
 
+    /// <summary>A host's clock that only moves when the execution waits on it, recording each wait.</summary>
+    private sealed class SteppedClock(Action? onWait = null) : IWsExecutionClock
+    {
+        public long Milliseconds { get; private set; }
+        public List<long> Waits { get; } = [];
+
+        public void WaitUntil(long milliseconds)
+        {
+            Waits.Add(milliseconds);
+            Milliseconds = milliseconds;
+            onWait?.Invoke();
+        }
+    }
+
+    [Fact]
+    public void DelaysWaitOnTheHostsClock()
+    {
+        foreach (var vm in BothVms)
+        {
+            var output = new WsCollectedOutput();
+            var clock = new SteppedClock();
+            var result = vm("writeLn(0); await delay(30); writeLn(1); var a = delay(10); var b = delay(5); await a; writeLn(2);",
+                Context(output) with { Clock = clock });
+            Assert.True(result.Succeeded, result.Error?.Message);
+            Assert.Equal(new[] { "0", "1", "2" }, output.Lines);
+            Assert.Equal(new long[] { 30, 35, 40 }, clock.Waits);
+        }
+    }
+
+    [Fact]
+    public void CancellationEndsAnExecutionWhoseTasksWait()
+    {
+        foreach (var vm in BothVms)
+        {
+            var output = new WsCollectedOutput();
+            var signal = new WsCancellationSignal();
+            var context = Context(output) with { Clock = new SteppedClock(signal.Cancel), Cancellation = signal };
+            var result = vm("writeLn(0); await delay(5); writeLn(1);", context);
+            Assert.Equal(WsDiagnosticCodes.Cancelled, result.Error!.Code);
+            Assert.Equal(new[] { "0" }, output.Lines);
+        }
+    }
+
+    [Fact]
+    public void WaitingFramesKeepTheirValuesThroughCollections()
+    {
+        const string source =
+            "async function keep(tag) { var mine = tag + \"!\"; var held = [mine, {k: mine}]; await delay(10); " +
+            "return held[0] + held[1][\"k\"] + mine; } " +
+            "async function churn() { var s = \"\"; for (var i = 0; i < 40; i = i + 1) { " +
+            "for (var j = 0; j < 500; j = j + 1) s = \"abcdefghij\" + \"klmnopqrst\"; await null; } return s.length; } " +
+            "var k = keep(\"a\"); var c = churn(); writeLn(await c); writeLn(await k);";
+        foreach (var vm in BothVms)
+        {
+            var output = new WsCollectedOutput();
+            var context = Context(output) with { Resources = new WsResourceBudget(65535, MaxHeapUnits: 20_000) };
+            var result = vm(source, context);
+            Assert.True(result.Succeeded, result.Error?.Message);
+            Assert.Equal(new[] { "20", "a!a!a!" }, output.Lines);
+        }
+    }
+
+    [Fact]
+    public void ManyTasksWaitAtOnce()
+    {
+        const string source =
+            "var total = 0; async function add(n) { await delay(n); total = total + n; } var tasks = []; " +
+            "for (var i = 0; i < 2000; i = i + 1) tasks.push(add(i)); foreach (var t in tasks) await t; writeLn(total);";
+        foreach (var vm in BothVms)
+        {
+            var output = new WsCollectedOutput();
+            var result = vm(source, Context(output));
+            Assert.True(result.Succeeded, result.Error?.Message);
+            Assert.Equal(new[] { "1999000" }, output.Lines);
+        }
+    }
+
+    [Fact]
+    public void AnAwaitInAFunctionThatIsNotAsyncIsNotRun()
+    {
+        var module = new WsStackModule("await", [], [],
+            new WsStackFunction("main", 0, 1, [
+                new WsStackInstruction(WsStackOpCode.LoadNull), new WsStackInstruction(WsStackOpCode.Await),
+                new WsStackInstruction(WsStackOpCode.ReturnValue)
+            ]));
+        var result = new WsStackVirtualMachine().Execute(module, new WsExecutionContext(new WsWorkerId(0)));
+        Assert.Equal(WsDiagnosticCodes.BytecodeVerificationFailure, result.Error!.Code);
+        Assert.Contains("not async", result.Error.Message);
+        var accepted = new WsStackVirtualMachine().Execute(module with { EntryPoint = module.EntryPoint with { IsAsync = true } },
+            new WsExecutionContext(new WsWorkerId(0)));
+        Assert.True(accepted.Succeeded, accepted.Error?.Message);
+    }
+
     [Fact]
     public void AModuleThatFailsVerificationIsNotRun()
     {
@@ -213,7 +306,7 @@ public sealed class StackVirtualMachineTests
     }
 
     private static readonly WsCompilerOptions WithWrite =
-        new([new WsBuiltinDeclaration("write", 1), new WsBuiltinDeclaration("writeLn", 1)]);
+        new([new WsBuiltinDeclaration("write", 1), new WsBuiltinDeclaration("writeLn", 1), new WsBuiltinDeclaration("delay", 1)]);
 
     private static WsStackModule Compile(string source)
     {

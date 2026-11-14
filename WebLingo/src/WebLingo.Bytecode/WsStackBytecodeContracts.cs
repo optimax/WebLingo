@@ -153,6 +153,8 @@ public enum WsStackOpCode : byte
     IsInstance,
     /// <summary>A = target instruction, B = a parameter's local: jumps there if the caller gave the parameter.</summary>
     JumpIfGiven,
+    /// <summary>Pops a value and suspends the <c>async</c> function, then pushes what <c>await</c> gives, as the register bytecode's <c>Await</c>.</summary>
+    Await,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);
@@ -177,6 +179,8 @@ public sealed record WsStackFunction(
     public bool HasThis { get; init; }
     /// <summary>How many of its last parameters may be left out, as the register bytecode's.</summary>
     public int OptionalCount { get; init; }
+    /// <summary>Whether it is <c>async</c> (section 3.8).</summary>
+    public bool IsAsync { get; init; }
     /// <summary>Its protected regions, innermost first, as the register bytecode's (section 3.7).</summary>
     public IReadOnlyList<WsStackHandler> Handlers { get; init; } = [];
 }

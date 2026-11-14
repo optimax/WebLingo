@@ -89,6 +89,11 @@ public sealed class WsParser : IWsParser
             return new WsThrowSyntax(thrown, SpanFrom(start));
         }
         if (Current.Kind == WsTokenKind.Function && Peek(1).Kind == WsTokenKind.Identifier) return ParseFunctionDeclaration(start);
+        if (Current.Kind == WsTokenKind.Async && Peek(1).Kind == WsTokenKind.Function && Peek(2).Kind == WsTokenKind.Identifier)
+        {
+            Advance();
+            return ParseFunctionDeclaration(start, isAsync: true);
+        }
         if (Current.Kind == WsTokenKind.Return)
         {
             Advance();
@@ -266,6 +271,8 @@ public sealed class WsParser : IWsParser
                     continue;
                 }
             }
+            var isAsync = Current.Kind == WsTokenKind.Async && Peek(1).Kind is WsTokenKind.Identifier or WsTokenKind.Function;
+            if (isAsync) Advance();
             if (Current.Kind == WsTokenKind.Function) Advance();
             if (Current.Kind != WsTokenKind.Identifier)
             {
@@ -278,6 +285,10 @@ public sealed class WsParser : IWsParser
             {
                 Report(WsDiagnosticCodes.UnexpectedToken, "A constructor cannot be static.", methodName.Span);
             }
+            if (isAsync && methodName.Text == "constructor" && !_statementHasError)
+            {
+                Report(WsDiagnosticCodes.UnexpectedToken, "A constructor cannot be async.", methodName.Span);
+            }
             if (!EnterRecursion()) return Made();
             try
             {
@@ -286,7 +297,8 @@ public sealed class WsParser : IWsParser
                 methods.Add(new WsMethodSyntax(methodName.Text, methodName.Span, parameters, body, SpanFrom(memberStart))
                 {
                     CallsSuper = _superCalls != superCalls,
-                    IsStatic = isStatic
+                    IsStatic = isStatic,
+                    IsAsync = isAsync
                 });
             }
             finally
@@ -474,12 +486,12 @@ public sealed class WsParser : IWsParser
             : new WsForSyntax(init, condition, step, body, SpanFrom(start));
     }
 
-    private WsStatementSyntax ParseFunctionDeclaration(int start)
+    private WsStatementSyntax ParseFunctionDeclaration(int start, bool isAsync = false)
     {
         Advance();
         var name = Advance();
         var (parameters, body) = ParseFunctionRest();
-        return new WsFunctionDeclarationSyntax(name.Text, name.Span, parameters, body, SpanFrom(start));
+        return new WsFunctionDeclarationSyntax(name.Text, name.Span, parameters, body, SpanFrom(start)) { IsAsync = isAsync };
     }
 
     /// <summary>A function's parameters and body, after <c>function</c> and its name, if it has one.</summary>
@@ -729,6 +741,21 @@ public sealed class WsParser : IWsParser
 
     private WsExpressionSyntax ParseUnary()
     {
+        if (Current.Kind == WsTokenKind.Await)
+        {
+            // await value, a prefix as the unary operators are (section 3.8).
+            if (!EnterRecursion()) return new WsErrorExpressionSyntax(new WsSourceSpan(Current.Span.Start, 0));
+            try
+            {
+                var keyword = Advance();
+                var awaited = ParseUnary();
+                return new WsAwaitExpressionSyntax(awaited, Between(keyword.Span, awaited.Span));
+            }
+            finally
+            {
+                _recursionDepth--;
+            }
+        }
         if (Current.Kind is not (WsTokenKind.Minus or WsTokenKind.Plus or WsTokenKind.Bang)) return ParseCall();
         if (!EnterRecursion()) return new WsErrorExpressionSyntax(new WsSourceSpan(Current.Span.Start, 0));
         try
@@ -828,13 +855,16 @@ public sealed class WsParser : IWsParser
                 Advance();
                 return new WsStringLiteralSyntax(token.StringValue!, token.Span);
             case WsTokenKind.Function:
+            case WsTokenKind.Async when Peek(1).Kind == WsTokenKind.Function:
             {
+                var isAsync = token.Kind == WsTokenKind.Async;
                 Advance();
+                if (isAsync) Advance();
                 if (!EnterRecursion()) return new WsErrorExpressionSyntax(token.Span);
                 try
                 {
                     var (parameters, body) = ParseFunctionRest();
-                    return new WsFunctionExpressionSyntax(parameters, body, SpanFrom(token.Span.Start));
+                    return new WsFunctionExpressionSyntax(parameters, body, SpanFrom(token.Span.Start)) { IsAsync = isAsync };
                 }
                 finally
                 {
@@ -1114,6 +1144,7 @@ public sealed class WsParser : IWsParser
                         pending.Push((binary.Right, depth + 1));
                         break;
                     case WsIsExpressionSyntax test: pending.Push((test.Value, depth + 1)); break;
+                    case WsAwaitExpressionSyntax awaited: pending.Push((awaited.Operand, depth + 1)); break;
                     case WsAssignmentExpressionSyntax assignment: pending.Push((assignment.Value, depth + 1)); break;
                     case WsFunctionExpressionSyntax functionExpression:
                         statements.Push(functionExpression.Body);
