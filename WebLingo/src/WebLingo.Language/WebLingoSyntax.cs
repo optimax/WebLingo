@@ -154,7 +154,21 @@ public sealed record WebLingoExtendSyntax(WebLingoExpressionSyntax Target, IRead
 /// a module's instance, or names it exports, at a module's top level (section 3.9).
 /// </summary>
 public sealed record WebLingoImportSyntax(string? Name, WebLingoSourceSpan NameSpan, IReadOnlyList<WebLingoImportedNameSyntax> Names,
-    string Path, WebLingoSourceSpan PathSpan, WebLingoSourceSpan Span) : WebLingoStatementSyntax(Span);
+    string Path, WebLingoSourceSpan PathSpan, WebLingoSourceSpan Span) : WebLingoStatementSyntax(Span)
+{
+    /// <summary>The values it gives the module's parameters, <c>{ size: 10 }</c> after its path; null for none (section 3.9).</summary>
+    public IReadOnlyList<WebLingoImportValueSyntax>? Values { get; init; }
+}
+
+/// <summary>A value an import gives a module's parameter, <c>size: 10</c>.</summary>
+public sealed record WebLingoImportValueSyntax(string Name, WebLingoSourceSpan NameSpan, WebLingoExpressionSyntax Value);
+
+/// <summary>
+/// <c>param name;</c> or <c>param size = 10;</c>: a module's parameter, a constant of it, which its import gives, at its
+/// top level, before its other statements (section 3.9).
+/// </summary>
+public sealed record WebLingoParamSyntax(string Name, WebLingoSourceSpan NameSpan, WebLingoExpressionSyntax? Default, WebLingoSourceSpan Span)
+    : WebLingoStatementSyntax(Span);
 
 /// <summary>A name an import takes from a module's exports.</summary>
 public sealed record WebLingoImportedNameSyntax(string Name, WebLingoSourceSpan Span);

@@ -179,9 +179,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             heap.AddRoots(_valueClasses);
             heap.AddRoots(_errorClasses);
             heap.AddRoots(_main);
-            _modules = new WebLingoValue[module.Units.Count];
+            _modules = new WebLingoModuleTable(module.Units.Count, heap);
             _unitClosures = new WebLingoValue[module.Units.Count];
-            heap.AddRoots(_modules);
             heap.AddRoots(_unitClosures);
             heap.AddRoots(frame.Registers);
             heap.AddRoots(frame.Closure);
@@ -539,14 +538,14 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             pc++;
                             continue;
                         case WebLingoOpCode.Import:
-                            registers[ins.A] = Imported(ins.B);
+                            // A file's instance, for the values given its parameters; else its function runs, as a call, whose
+                            // task the code awaits, or the values are wrong (section 3.9).
+                            registers[ins.A] = Imported(ins.B, ins.D == 1 ? registers[ins.C] : WebLingoValue.Null, ins.A, out error);
                             if (registers[ins.A].Kind == WebLingoValueKind.Module)
                             {
                                 pc++;
                                 continue;
                             }
-                            // Its first import: its function runs, as a call, whose task the code awaits (section 3.9).
-                            Pend(_unitClosures[ins.B], 0, ins.A);
                             break;
                         case WebLingoOpCode.Hold:
                             // hold(this, value): the built-in classes' constructors' (section 3.7).
@@ -1448,7 +1447,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// The program's files' instances, once each has begun to run, and the closures of their functions, which run them
         /// (section 3.9); roots.
         /// </summary>
-        private WebLingoValue[] _modules = [];
+        private WebLingoModuleTable _modules = null!;
         private WebLingoValue[] _unitClosures = [];
 
         /// <summary>A file's instance, from then on the one its imports get (section 3.9).</summary>
@@ -1457,12 +1456,23 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         {
             var info = module.Units[unit];
             if (!heap.TryAllocateModule(info.Name, info.Exports, values, first, count, out made, out error)) return false;
-            _modules[unit] = made;
+            _modules.Made(unit, made);
             return true;
         }
 
-        /// <summary>What <c>Import</c> gives at once: a file's instance, if it has begun to run; else null, its function to run.</summary>
-        private WebLingoValue Imported(int unit) => _modules[unit];
+        /// <summary>
+        /// What <c>Import</c> gives at once: a file's instance, if it has begun to run for those values; else null, its
+        /// function's call pending, given the values if it has parameters, its result to go to <paramref name="result"/>.
+        /// </summary>
+        private WebLingoValue Imported(int unit, WebLingoValue values, int result, out WebLingoRuntimeError? error)
+        {
+            var info = module.Units[unit];
+            if (!_modules.TryFind(unit, info.Name, info.Parameters, values, out var instance, out error)) return WebLingoValue.Null;
+            if (instance.Kind == WebLingoValueKind.Module) return instance;
+            _operands[0] = values;
+            Pend(_unitClosures[unit], info.Parameters.Count > 0 ? 1 : 0, result);
+            return WebLingoValue.Null;
+        }
 
         /// <summary>What an <c>await</c> waits for, on its way to the code that suspends the frame.</summary>
         private WebLingoValue _awaited;

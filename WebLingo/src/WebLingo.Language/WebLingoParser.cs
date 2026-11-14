@@ -80,6 +80,7 @@ public sealed class WebLingoParser : IWebLingoParser
         if (Current.Kind == WebLingoTokenKind.Foreach) return ParseForEach(start);
         if (Current.Kind is WebLingoTokenKind.Class or WebLingoTokenKind.Extend) return ParseClass(start);
         if (Current.Kind == WebLingoTokenKind.Import) return ParseImport(start);
+        if (Current.Kind == WebLingoTokenKind.Param) return ParseParam(start);
         if (Current.Kind == WebLingoTokenKind.Export) return ParseExport(start);
         if (Current.Kind == WebLingoTokenKind.Using) return ParseUsing(start);
         if (Current.Kind == WebLingoTokenKind.Try) return ParseTry(start);
@@ -420,8 +421,39 @@ public sealed class WebLingoParser : IWebLingoParser
         var pathSpan = Current.Span;
         if (Current.Kind == WebLingoTokenKind.StringLiteral) path = Advance().StringValue!;
         else if (!_statementHasError) ReportUnexpected("the module's path, a string");
+        List<WebLingoImportValueSyntax>? values = null;
+        if (Current.Kind == WebLingoTokenKind.OpenBrace)
+        {
+            // The values it gives the module's parameters, a map literal's entries, each a name or a string (section 3.9).
+            Advance();
+            values = [];
+            while (Current.Kind is WebLingoTokenKind.Identifier or WebLingoTokenKind.StringLiteral)
+            {
+                var key = Advance();
+                Expect(WebLingoTokenKind.Colon, "':'");
+                values.Add(new WebLingoImportValueSyntax(key.StringValue ?? key.Text, key.Span, ParseExpression()));
+                if (Current.Kind != WebLingoTokenKind.Comma) break;
+                Advance();
+            }
+            Expect(WebLingoTokenKind.CloseBrace, "'}'");
+        }
         ExpectSemicolon();
-        return new WebLingoImportSyntax(name, nameSpan, names, path, pathSpan, SpanFrom(start));
+        return new WebLingoImportSyntax(name, nameSpan, names, path, pathSpan, SpanFrom(start)) { Values = values };
+    }
+
+    /// <summary><c>param name;</c> or <c>param size = 10;</c>: a module's parameter (section 3.9).</summary>
+    private WebLingoStatementSyntax ParseParam(int start)
+    {
+        Advance();
+        var (name, nameSpan) = ExpectName();
+        WebLingoExpressionSyntax? value = null;
+        if (Current.Kind == WebLingoTokenKind.Equals)
+        {
+            Advance();
+            value = ParseExpression();
+        }
+        ExpectSemicolon();
+        return new WebLingoParamSyntax(name, nameSpan, value, SpanFrom(start));
     }
 
     /// <summary><c>export</c> before a <c>var</c>, <c>const</c>, <c>function</c> or <c>class</c> declaration (section 3.9).</summary>

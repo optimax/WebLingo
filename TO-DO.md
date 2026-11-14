@@ -8,15 +8,23 @@
 
 2026-11-14: waits for the design of how standard modules are packaged, which A5 of "Native Code Extensions" makes native extensions, installed as other native modules are.
 
-## [QUESTION] Converting Strings to Values
+## Converting Strings to Values
 
 A follow-up to A1 of "Modules, Quoted Parameters": a script's parameters are strings, which a script converts itself; `new Integer("10")` is WL3001 now, `new` on a class of values taking only a value of its kind (specification, section 15.2, "Classes holding a value"). Added by Claude, 2026-11-14.
 
 **Q1, converting a string: (a) `new Integer("10")`, `new Number("1.5")` and `new Boolean("true")` read a string as a literal of their kind, WL3001 for one that is not; (b) static methods of their own, `Integer.parse("10")`, `Number.parse("1.5")` and `Boolean.parse("true")`, `new` taking a value of its kind alone, as now.**
 
-A1:
+A1: It could be both. `Integer.parse("10")` is good. But also `Integer("10")` could effectively mean:
 
-## [IDLE] Modules
+```
+class Integer {
+    var __value = 0;
+    
+    constructor (stringValue) {
+        __value = Integer.parse(stringValue);
+    }
+}
+```
 
 The module system: `import`, static and dynamic, `export`, `param`, a script's parameters, and the standard library and the built-ins as modules (specification, section 3.9), on both VMs, before M0.12's templates, which build on it. Added by Claude, 2026-11-13.
 
@@ -26,7 +34,7 @@ The module system: `import`, static and dynamic, `export`, `param`, a script's p
 
 2026-11-14: split into the parts the specification defines in section 9 ("Modules"), each a task below. Waits for them.
 
-## Modules: Parameters
+## [WORKING] Modules: Parameters
 
 `param`, the values an importer gives, and a missing one's error (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
 
@@ -41,6 +49,8 @@ A1: (b). It looks to me like a sneaky way of introducing generics (the same modu
 **Q2, an import's values: (a) a map literal only, `{ size: 10 }`, whose names the compiler checks against the module's parameters, a missing or an extra one an error at compile time (a new code, WL2016); (b) any expression giving a map, checked when the import runs.**
 
 A2: (a) for static imports, (b) for dynamic.
+
+Done (Claude, 2026-11-14): recorded as approved in the specification, section 3.9 ("Parameters"), with the new code WL2016 (section 8.4); on both VMs, with tests in `ModuleTests` (`WebLingo.VM.Tests`); its choices recorded as Proposed in section 15.2 ("Modules"), among them that a value left out counts as different from one given, even the default, and that the program's own parameters are their defaults until "Modules: A Script's Parameters" gives them values. The dynamic import's runtime check is built, for "Modules: Dynamic Imports" to use. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
 
 ## Modules: Dynamic Imports
 

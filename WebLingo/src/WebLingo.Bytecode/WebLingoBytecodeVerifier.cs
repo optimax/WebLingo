@@ -59,7 +59,8 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             return Fail(rolesError);
         }
         if (WebLingoClassTables.CheckUnits(module.Units,
-                index => index >= 0 && index < methods.Count && methods[index] is { IsAsync: true, ParameterCount: 0, HasThis: false })
+                (index, parameters) => index >= 0 && index < methods.Count
+                    && methods[index] is { IsAsync: true, HasThis: false } unit && unit.ParameterCount == parameters)
             is { } unitsError)
         {
             return Fail(unitsError);
@@ -291,7 +292,11 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                 }
                 return Unused(d);
             case WebLingoOpCode.Import:
-                return Register(function, a, "destination") ?? Index(b, module.Units.Count, "file") ?? Unused(c, d);
+                // D is 1 when C holds the values it gives the file's parameters, which a file that has some is always given.
+                return Register(function, a, "destination") ?? Index(b, module.Units.Count, "file")
+                    ?? (d == 1 ? Register(function, c, "values")
+                        : d == 0 && c == 0 ? null : $"its values' flag, {d}, is not 0 or 1, or C, {c}, is not 0 without them.")
+                    ?? (d == 0 && module.Units[b].Parameters.Count > 0 ? $"file {b} has parameters, and is given no values." : null);
             case WebLingoOpCode.RegisterUnit:
                 return (a >= 1 && a < module.Units.Count ? null : $"its file, {a}, is not one the program imports.")
                     ?? Register(function, b, "closure") ?? Unused(c, d);
@@ -540,6 +545,8 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             case WebLingoOpCode.Dispose:
             case WebLingoOpCode.Throw:
                 return Unwritten(instruction.A, state, locals);
+            case WebLingoOpCode.Import:
+                return instruction.D == 1 ? Unwritten(instruction.C, state, locals) : -1;
             case WebLingoOpCode.Rethrow:
             {
                 var exception = Unwritten(instruction.A, state, locals);

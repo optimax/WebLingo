@@ -60,10 +60,11 @@ internal static class WebLingoClassTables
     /// each -1 or a class; and the runtime errors', each a class, with a code (section 3.7).
     /// </summary>
     /// <summary>
-    /// A program's files (section 3.9): the program's first, without a function of its own; each other's an
-    /// <c>async</c> function without parameters; every export named.
+    /// A program's files (section 3.9): the program's first, without a function of its own, nor parameters; each other's
+    /// an <c>async</c> function taking one parameter, its parameters' values, if it has some, else none; every export
+    /// and parameter named.
     /// </summary>
-    public static string? CheckUnits(IReadOnlyList<WebLingoUnitInfo>? units, Func<int, bool> isUnitFunction)
+    public static string? CheckUnits(IReadOnlyList<WebLingoUnitInfo>? units, Func<int, int, bool> isUnitFunction)
     {
         if (units is null) return "The module has no table of files.";
         for (var i = 0; i < units.Count; i++)
@@ -71,7 +72,15 @@ internal static class WebLingoClassTables
             var unit = units[i];
             if (unit is null || string.IsNullOrEmpty(unit.Name) || unit.Exports is null) return $"File {i} is missing or has no name.";
             var standard = unit.Name.StartsWith("std:", StringComparison.Ordinal);
-            if (i == 0 || standard ? unit.Function != -1 : !isUnitFunction(unit.Function))
+            if (unit.Parameters is null || ((i == 0 || standard) && unit.Parameters.Count > 0))
+            {
+                return $"File {i} ('{unit.Name}') has parameters it cannot be given.";
+            }
+            foreach (var parameter in unit.Parameters)
+            {
+                if (parameter is null || string.IsNullOrEmpty(parameter.Name)) return $"File {i} ('{unit.Name}') has a parameter without a name.";
+            }
+            if (i == 0 || standard ? unit.Function != -1 : !isUnitFunction(unit.Function, unit.Parameters.Count > 0 ? 1 : 0))
             {
                 return $"File {i} ('{unit.Name}'): its function, {unit.Function}, is not one that runs a file.";
             }

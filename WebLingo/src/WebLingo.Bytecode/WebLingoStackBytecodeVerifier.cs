@@ -66,7 +66,8 @@ public sealed class WebLingoStackBytecodeVerifier
             return Fail(rolesError);
         }
         if (WebLingoClassTables.CheckUnits(module.Units,
-                index => index >= 0 && index < methods.Count && methods[index] is { IsAsync: true, ParameterCount: 0, HasThis: false })
+                (index, parameters) => index >= 0 && index < methods.Count
+                    && methods[index] is { IsAsync: true, HasThis: false } unit && unit.ParameterCount == parameters)
             is { } unitsError)
         {
             return Fail(unitsError);
@@ -167,7 +168,10 @@ public sealed class WebLingoStackBytecodeVerifier
             case WebLingoStackOpCode.LoadBuiltin:
                 return Index(a, module.Imports.Count, "import") ?? Unused(b);
             case WebLingoStackOpCode.Import:
-                return Index(a, module.Units.Count, "file") ?? Unused(b);
+                // B is 1 when the values it gives the file's parameters are on the stack, which a file that has some is always given.
+                return Index(a, module.Units.Count, "file")
+                    ?? (b is 0 or 1 ? null : $"its values' flag, {b}, is not 0 or 1.")
+                    ?? (b == 0 && module.Units[a].Parameters.Count > 0 ? $"file {a} has parameters, and is given no values." : null);
             case WebLingoStackOpCode.RegisterUnit:
                 return (a >= 1 && a < module.Units.Count ? null : $"its file, {a}, is not one the program imports.") ?? Unused(b);
             case WebLingoStackOpCode.MakeModule:
@@ -427,7 +431,7 @@ public sealed class WebLingoStackBytecodeVerifier
         WebLingoStackOpCode.Dispose => (1, 0),
         WebLingoStackOpCode.Extend => (1, 0),
         WebLingoStackOpCode.Hold => (2, 1),
-        WebLingoStackOpCode.Import => (0, 1),
+        WebLingoStackOpCode.Import => (instruction.B, 1),
         WebLingoStackOpCode.RegisterUnit => (1, 0),
         WebLingoStackOpCode.MakeModule => (instruction.B, 1),
         WebLingoStackOpCode.Throw => (1, 0),

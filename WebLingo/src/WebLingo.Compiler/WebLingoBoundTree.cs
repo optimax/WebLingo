@@ -30,10 +30,24 @@ public sealed record WebLingoBoundUnit(string Name, WebLingoBoundFunction? Funct
 {
     /// <summary>For a standard module, <c>std:system</c>: the built-ins it exports, and no function (section 3.9).</summary>
     public IReadOnlyList<WebLingoBuiltinSymbol>? Builtins { get; init; }
+
+    /// <summary>Its parameters (section 3.9), whose values its function takes as one map.</summary>
+    public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];
 }
 
+/// <summary>
+/// A module's parameter, a constant of it: the value of its name in the map its function is given, or its default
+/// (section 3.9).
+/// </summary>
+public sealed record WebLingoBoundModuleParameter(WebLingoLocalSymbol Local, WebLingoLocalSymbol Values, string Name,
+    WebLingoBoundExpression? Default, WebLingoSourceSpan Span) : WebLingoBoundStatement(Span);
+
 /// <summary>An import: the program's file <paramref name="Unit"/>'s instance, run if it has not been, into a local (section 3.9).</summary>
-public sealed record WebLingoBoundImport(int Unit, WebLingoLocalSymbol Local, WebLingoSourceSpan Span) : WebLingoBoundStatement(Span);
+public sealed record WebLingoBoundImport(int Unit, WebLingoLocalSymbol Local, WebLingoSourceSpan Span) : WebLingoBoundStatement(Span)
+{
+    /// <summary>The values it gives the module's parameters, a map, for a module that has some (section 3.9).</summary>
+    public WebLingoBoundExpression? Values { get; init; }
+}
 
 /// <summary>
 /// Where a function's capture comes from when its closure is made: a local of the function that makes it

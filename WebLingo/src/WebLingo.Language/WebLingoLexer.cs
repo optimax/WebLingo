@@ -138,6 +138,7 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
             "super" => WebLingoTokenKind.Super,
             "using" => WebLingoTokenKind.Using,
             "static" => WebLingoTokenKind.Static,
+            "param" => WebLingoTokenKind.Param,
             "try" => WebLingoTokenKind.Try,
             "catch" => WebLingoTokenKind.Catch,
             "finally" => WebLingoTokenKind.Finally,

@@ -178,9 +178,8 @@ public sealed class WebLingoStackVirtualMachine
             heap.AddRoots(_valueClasses);
             heap.AddRoots(_errorClasses);
             heap.AddRoots(_main);
-            _modules = new WebLingoValue[module.Units.Count];
+            _modules = new WebLingoModuleTable(module.Units.Count, heap);
             _unitClosures = new WebLingoValue[module.Units.Count];
-            heap.AddRoots(_modules);
             heap.AddRoots(_unitClosures);
             heap.AddRoots(frame.Slots);
             heap.AddRoots(frame.Closure);
@@ -563,15 +562,14 @@ public sealed class WebLingoStackVirtualMachine
                             pc++;
                             continue;
                         case WebLingoStackOpCode.Import:
-                            slots[sp] = Imported(ins.A);
-                            if (slots[sp].Kind == WebLingoValueKind.Module)
+                            // A file's instance, for the values given its parameters; else its function runs, as a call, whose
+                            // task the code awaits, or the values are wrong (section 3.9).
+                            sp = Imported(ins.A, ins.B, slots, sp, out error);
+                            if (error is null && _operator.Kind != WebLingoValueKind.Function)
                             {
-                                sp++;
                                 pc++;
                                 continue;
                             }
-                            // Its first import: its function runs, as a call, whose task the code awaits (section 3.9).
-                            Pend(_unitClosures[ins.A], 0);
                             break;
                         case WebLingoStackOpCode.Hold:
                             // hold(this, value): the built-in classes' constructors' (section 3.7).
@@ -1538,7 +1536,7 @@ public sealed class WebLingoStackVirtualMachine
         /// The program's files' instances, once each has begun to run, and the closures of their functions, which run them
         /// (section 3.9); roots.
         /// </summary>
-        private WebLingoValue[] _modules = [];
+        private WebLingoModuleTable _modules = null!;
         private WebLingoValue[] _unitClosures = [];
 
         /// <summary>A file's instance, from then on the one its imports get (section 3.9).</summary>
@@ -1547,12 +1545,30 @@ public sealed class WebLingoStackVirtualMachine
         {
             var info = module.Units[unit];
             if (!heap.TryAllocateModule(info.Name, info.Exports, values, first, count, out made, out error)) return false;
-            _modules[unit] = made;
+            _modules.Made(unit, made);
             return true;
         }
 
-        /// <summary>What <c>Import</c> gives at once: a file's instance, if it has begun to run; else null, its function to run.</summary>
-        private WebLingoValue Imported(int unit) => _modules[unit];
+        /// <summary>
+        /// <c>Import</c>: a file's instance pushed, in place of the values given its parameters (with
+        /// <paramref name="hasValues"/> 1, on top of the stack), if it has begun to run for them; else its function's call
+        /// pending, the values left where they are, its one argument, if it has parameters; the stack's new top.
+        /// </summary>
+        private int Imported(int unit, int hasValues, WebLingoValue[] slots, int sp, out WebLingoRuntimeError? error)
+        {
+            var info = module.Units[unit];
+            var values = hasValues == 1 ? slots[sp - 1] : WebLingoValue.Null;
+            if (!_modules.TryFind(unit, info.Name, info.Parameters, values, out var instance, out error)) return sp;
+            if (instance.Kind == WebLingoValueKind.Module)
+            {
+                if (hasValues == 1) slots[sp - 1] = instance;
+                else slots[sp++] = instance;
+                return sp;
+            }
+            if (hasValues == 1 && info.Parameters.Count == 0) sp--; // An empty map, for a file without parameters.
+            Pend(_unitClosures[unit], info.Parameters.Count > 0 ? 1 : 0);
+            return sp;
+        }
 
         /// <summary>What an <c>await</c> waits for, on its way to the code that suspends the frame.</summary>
         private WebLingoValue _awaited;

@@ -95,6 +95,52 @@ public sealed class ModuleTests
         }
     }
 
+    [Fact]
+    public void AModuleRunsOnceForEachSetOfValuesItsParametersAreGiven()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["main.wl"] = "import a from \"box\" { size: 1 }; import b from \"box\" { size: 2, label: \"big\" }; " +
+                          "import c from \"box\" { size: 1 }; import d, { describe } from \"box\" { \"size\": 1, label: \"box\" }; " +
+                          "import n from \"nested\" { n: 3 }; " +
+                          "writeLn([a.describe(), b.describe(), a == c, a == d, b.made, describe(), n.inner.describe()]);",
+            ["box.wl"] = "param size; param label = \"box\"; writeLn(\"running \" + label + \" \" + size.toString()); " +
+                         "export function describe() { return label + \":\" + size.toString(); } export var made = size * 2;",
+            ["nested.wl"] = "param n; import box from \"box\" { size: n * 10 }; export var inner = box;",
+        };
+        AssertBoth(files, "running box 1\nrunning big 2\nrunning box 1\nrunning box 30\n" +
+                          "[\"box:1\", \"big:2\", true, false, 4, \"box:1\", \"box:30\"]\n");
+    }
+
+    [Theory]
+    [InlineData("import a from \"box\";", WebLingoDiagnosticCodes.ModuleParameter)]
+    [InlineData("import a from \"box\" { size: 1, colour: \"red\" };", WebLingoDiagnosticCodes.ModuleParameter)]
+    [InlineData("import a from \"box\" { size: 1, size: 2 };", WebLingoDiagnosticCodes.DuplicateDeclaration)]
+    [InlineData("import a from \"plain\" { size: 1 };", WebLingoDiagnosticCodes.ModuleParameter)]
+    [InlineData("param n = 5; param m; writeLn(n);", WebLingoDiagnosticCodes.ModuleParameter)]
+    [InlineData("function f() { param x; }", WebLingoDiagnosticCodes.UnexpectedToken)]
+    [InlineData("writeLn(1); param x = 1;", WebLingoDiagnosticCodes.UnexpectedToken)]
+    [InlineData("param n = 5; n = 6;", WebLingoDiagnosticCodes.AssignmentToConstant)]
+    [InlineData("import a from \"setter\" { size: 1 };", WebLingoDiagnosticCodes.AssignmentToConstant)]
+    public void AModulesParametersAreCheckedWhereItIsImported(string main, string code)
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["main.wl"] = main,
+            ["box.wl"] = "param size; param label = \"box\";",
+            ["plain.wl"] = "export var n = 1;",
+            ["setter.wl"] = "param size; size = 2;",
+        };
+        foreach (var run in BothVms) Assert.Equal(code, run(files, "main.wl").Diagnostics[0].Code);
+    }
+
+    [Fact]
+    public void AProgramsOwnParametersAreItsDefaultsForNow()
+    {
+        var files = new Dictionary<string, string> { ["main.wl"] = "param n = 5; param s = \"x\"; writeLn([n, s]);" };
+        AssertBoth(files, "[5, \"x\"]\n");
+    }
+
     [Theory]
     [InlineData("{ import m from \"m\"; }", WebLingoDiagnosticCodes.UnexpectedToken)]
     [InlineData("function f() { export var x = 1; }", WebLingoDiagnosticCodes.UnexpectedToken)]

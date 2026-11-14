@@ -284,7 +284,11 @@ public readonly record struct WebLingoCapture(bool FromLocal, int Index);
 /// A module of a program, a file (section 3.9): its name, the function that runs it, its top level (-1 for the program
 /// itself, the entry point), and the names it exports, in the order its instance's cells are given.
 /// </summary>
-public sealed record WebLingoUnitInfo(string Name, int Function, IReadOnlyList<string> Exports);
+public sealed record WebLingoUnitInfo(string Name, int Function, IReadOnlyList<string> Exports)
+{
+    /// <summary>Its parameters (section 3.9), whose values its function takes as one map; none for the program's own file.</summary>
+    public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];
+}
 
 public sealed record WebLingoCompiledModule(
     string Name, IReadOnlyList<WebLingoConstant> Constants, IReadOnlyList<WebLingoImport> Imports, WebLingoFunction EntryPoint)

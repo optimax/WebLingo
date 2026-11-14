@@ -78,7 +78,7 @@ public static class WebLingoDisassembler
             WebLingoOpCode.Await => $"Await {Register(function, a)}, {Register(function, b)}",
             WebLingoOpCode.Extend => $"Extend {Register(function, a)}, class{b}",
             WebLingoOpCode.Hold => $"Hold {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
-            WebLingoOpCode.Import => $"Import {Register(function, a)}, file{b}",
+            WebLingoOpCode.Import => d == 1 ? $"Import {Register(function, a)}, file{b}, {Register(function, c)}" : $"Import {Register(function, a)}, file{b}",
             WebLingoOpCode.MakeModule => $"MakeModule {Register(function, a)}, file{b}, {Register(function, c)}+{d}",
             WebLingoOpCode.RegisterUnit => $"RegisterUnit file{a}, {Register(function, b)}",
             WebLingoOpCode.IsInstance => $"IsInstance {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",

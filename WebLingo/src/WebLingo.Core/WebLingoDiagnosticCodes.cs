@@ -57,6 +57,8 @@ public static class WebLingoDiagnosticCodes
     public const string AwaitOutsideAsync = "WL2014";
     /// <summary>A module an import names that cannot be found or read (section 3.9).</summary>
     public const string ModuleNotFound = "WL2015";
+    /// <summary>A module's parameter that its import does not give, or a value given for one it does not declare (proposed, section 3.9).</summary>
+    public const string ModuleParameter = "WL2016";
 
     /// <summary>Invalid operation.</summary>
     public const string InvalidOperation = "WL3001";

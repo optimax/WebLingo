@@ -120,10 +120,13 @@ public sealed class WebLingoBinder
     {
         _unitScope = _scope;
         _importTargets = modules[0].Imports;
+        _moduleSources = modules;
         var units = new List<WebLingoBoundUnit>();
         // A program that imports, itself included, has a table of its files.
         var mainInstance = modules.Count > 1 || modules[0].Imports.Count > 0 ? DeclareHidden("module", default) : null;
-        var statements = BindStatements(modules[0].Root.Statements);
+        var mainParameters = ParametersOf(modules[0].Root);
+        var statements = BindProgramParameters(mainParameters);
+        statements.AddRange(BindStatements(AfterParameters(modules[0].Root, mainParameters.Count)));
         if (mainInstance is not null) units.Add(new WebLingoBoundUnit(modules[0].Name, null, _exports, mainInstance));
         for (var i = 1; i < modules.Count; i++)
         {
@@ -142,14 +145,30 @@ public sealed class WebLingoBinder
             _function = new FunctionContext(_main, module.Name) { IsAsync = true, IsUnit = true };
             _scope = _unitScope = new Scope(_prelude, _function);
             _exports = [];
+            // A module with parameters takes their values as one map, its function's one parameter (section 3.9).
+            var parameters = ParametersOf(module.Root);
+            var values = parameters.Count > 0 ? DeclareHidden("values", default) : null;
             var instance = DeclareHidden("module", default);
-            var body = BindStatements(module.Root.Statements);
-            var function = new WebLingoBoundFunction(module.Name, 0, _function.Locals, _function.Captures, body, module.Root.Span)
+            var body = new List<WebLingoBoundStatement>();
+            var declared = new List<WebLingoModuleParameter>();
+            foreach (var parameter in parameters)
+            {
+                // A default is bound before its parameter is declared, as a variable's initializer is (section 3.1).
+                var value = parameter.Default is { } given ? BindExpression(given) : null;
+                if (Declare(parameter.Name, WebLingoDeclarationKind.Const, parameter.NameSpan, null) is { } local)
+                {
+                    body.Add(new WebLingoBoundModuleParameter(local, values!, parameter.Name, value, parameter.Span));
+                    declared.Add(new WebLingoModuleParameter(parameter.Name, parameter.Default is not null));
+                }
+            }
+            body.AddRange(BindStatements(AfterParameters(module.Root, parameters.Count)));
+            var function = new WebLingoBoundFunction(module.Name, values is null ? 0 : 1, _function.Locals, _function.Captures, body,
+                module.Root.Span)
             {
                 IsAsync = true,
                 Source = module.Name
             };
-            units.Add(new WebLingoBoundUnit(module.Name, function, _exports, instance));
+            units.Add(new WebLingoBoundUnit(module.Name, function, _exports, instance) { Parameters = declared });
             (_function, _scope, _source) = (outerFunction, outerScope, null);
         }
         // The built-in classes the program uses are made first, before its own.
@@ -169,6 +188,91 @@ public sealed class WebLingoBinder
             IsAsync = _main.Awaits,
             Units = units
         };
+    }
+
+    /// <summary>The program and the files it imports, by their index in its table of files (section 3.9).</summary>
+    private IReadOnlyList<WebLingoModuleSource> _moduleSources = [];
+
+    /// <summary>A file's parameters: its <c>param</c> statements, which come first, before its other statements (section 3.9).</summary>
+    private static List<WebLingoParamSyntax> ParametersOf(WebLingoCompilationUnitSyntax root)
+    {
+        var parameters = new List<WebLingoParamSyntax>();
+        foreach (var statement in root.Statements)
+        {
+            if (statement is not WebLingoParamSyntax parameter) break;
+            parameters.Add(parameter);
+        }
+        return parameters;
+    }
+
+    private static List<WebLingoStatementSyntax> AfterParameters(WebLingoCompilationUnitSyntax root, int count)
+    {
+        var rest = new List<WebLingoStatementSyntax>();
+        for (var i = count; i < root.Statements.Count; i++) rest.Add(root.Statements[i]);
+        return rest;
+    }
+
+    /// <summary>
+    /// The program's own parameters (section 3.9): each a constant of its default, nothing giving the program values yet;
+    /// one without a default is WL2016.
+    /// </summary>
+    private List<WebLingoBoundStatement> BindProgramParameters(List<WebLingoParamSyntax> parameters)
+    {
+        var statements = new List<WebLingoBoundStatement>();
+        foreach (var parameter in parameters)
+        {
+            if (parameter.Default is not { } given)
+            {
+                Report(WebLingoDiagnosticCodes.ModuleParameter,
+                    $"'{parameter.Name}' is a parameter of the program, which nothing gives it: give it a default.", parameter.NameSpan);
+                continue;
+            }
+            var value = BindExpression(given);
+            if (Declare(parameter.Name, WebLingoDeclarationKind.Const, parameter.NameSpan, null) is { } local)
+            {
+                statements.Add(new WebLingoBoundVariableDeclaration(local, value, parameter.Span));
+            }
+        }
+        return statements;
+    }
+
+    /// <summary>
+    /// The values an import gives its module's parameters, a map (section 3.9): each a parameter's, and every parameter
+    /// without a default given (WL2016 otherwise, at compile time); null for a module without parameters given none.
+    /// </summary>
+    private WebLingoBoundExpression? BindImportValues(WebLingoImportSyntax import, int unit)
+    {
+        var parameters = _moduleSources[unit].IsStandard ? [] : ParametersOf(_moduleSources[unit].Root);
+        if (import.Values is null && parameters.Count == 0) return null;
+        var entries = new List<(string, WebLingoBoundExpression)>();
+        var given = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var value in import.Values ?? [])
+        {
+            var bound = BindExpression(value.Value);
+            var declares = false;
+            foreach (var parameter in parameters) declares |= parameter.Name == value.Name;
+            if (!declares)
+            {
+                Report(WebLingoDiagnosticCodes.ModuleParameter, $"'{value.Name}' is not a parameter of \"{import.Path}\".", value.NameSpan);
+            }
+            else if (!given.Add(value.Name))
+            {
+                Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{value.Name}' is given twice.", value.NameSpan);
+            }
+            else
+            {
+                entries.Add((value.Name, bound));
+            }
+        }
+        foreach (var parameter in parameters)
+        {
+            if (parameter.Default is null && !given.Contains(parameter.Name))
+            {
+                Report(WebLingoDiagnosticCodes.ModuleParameter,
+                    $"\"{import.Path}\"'s parameter '{parameter.Name}' is not given: '{{ {parameter.Name}: … }}' after its path.", import.PathSpan);
+            }
+        }
+        return new WebLingoBoundMapLiteral(entries, import.Span);
     }
 
     /// <summary>A block's statements, in the current scope, its function declarations declared first.</summary>
@@ -314,7 +418,7 @@ public sealed class WebLingoBinder
                     alias.ImportName = imported.Name;
                 }
             }
-            imports.Add(import, new WebLingoBoundImport(unit, instance, import.Span));
+            imports.Add(import, new WebLingoBoundImport(unit, instance, import.Span) { Values = BindImportValues(import, unit) });
             if (_function == _main) _main.Awaits = true; // Its imports are awaited (section 3.9).
         }
         return statements;
@@ -574,6 +678,10 @@ public sealed class WebLingoBinder
                 return new WebLingoBoundBlock(BindStatements([declaration]), declaration.Span);
             case WebLingoExtendSyntax extension:
                 return new WebLingoBoundBlock(BindStatements([extension]), extension.Span);
+            case WebLingoParamSyntax parameter:
+                Report(WebLingoDiagnosticCodes.UnexpectedToken, "'param' stands at a module's top level, before its other statements.",
+                    parameter.Span);
+                return new WebLingoBoundBlock([], parameter.Span);
             default:
                 throw new InvalidOperationException($"Unknown statement {statement.GetType().Name}.");
         }

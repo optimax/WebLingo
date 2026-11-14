@@ -66,7 +66,7 @@ public sealed class WebLingoStackCodeGenerator
     private static List<WebLingoUnitInfo> UnitsOf(WebLingoIrProgram program)
     {
         var units = new List<WebLingoUnitInfo>();
-        foreach (var unit in program.Units) units.Add(new WebLingoUnitInfo(unit.Name, unit.Function, unit.Exports));
+        foreach (var unit in program.Units) units.Add(new WebLingoUnitInfo(unit.Name, unit.Function, unit.Exports) { Parameters = unit.Parameters });
         return units;
     }
 
@@ -329,7 +329,8 @@ public sealed class WebLingoStackCodeGenerator
                 Emit(WebLingoStackOpCode.Await, awaited.Span);
                 return;
             case WebLingoIrImport import:
-                Emit(WebLingoStackOpCode.Import, import.Span, import.Unit);
+                if (import.Values is { } values) EmitValue(values);
+                Emit(WebLingoStackOpCode.Import, import.Span, import.Unit, import.Values is null ? 0 : 1);
                 return;
             case WebLingoIrMakeModule made:
                 // Its exports.
@@ -691,7 +692,7 @@ public sealed class WebLingoStackCodeGenerator
             WebLingoStackOpCode.Dispose => (1, 0),
             WebLingoStackOpCode.Extend => (1, 0),
             WebLingoStackOpCode.Hold => (2, 1),
-            WebLingoStackOpCode.Import => (0, 1),
+            WebLingoStackOpCode.Import => (b, 1),
             WebLingoStackOpCode.RegisterUnit => (1, 0),
             WebLingoStackOpCode.MakeModule => (b, 1),
             WebLingoStackOpCode.Throw => (1, 0),

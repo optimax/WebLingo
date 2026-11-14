@@ -209,7 +209,11 @@ public sealed record WebLingoIrStoreCapture(int Capture, WebLingoIrExpression Va
 public sealed record WebLingoIrMakeClosure(int Function, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
 
 /// <summary>The program's file <paramref name="Unit"/>'s instance, or the task of running it (section 3.9).</summary>
-public sealed record WebLingoIrImport(int Unit, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
+public sealed record WebLingoIrImport(int Unit, WebLingoSourceSpan Span) : WebLingoIrExpression(Span)
+{
+    /// <summary>The values it gives the module's parameters, a map, for a module that has some (section 3.9).</summary>
+    public WebLingoIrExpression? Values { get; init; }
+}
 
 /// <summary>
 /// The program's file <paramref name="Unit"/>'s instance, its exports those values: a file's, the cells of its locals,
@@ -222,7 +226,10 @@ public sealed record WebLingoIrMakeModule(int Unit, IReadOnlyList<WebLingoIrExpr
 public sealed record WebLingoIrRegisterUnit(int Unit, WebLingoIrExpression Closure, WebLingoSourceSpan Span) : WebLingoIrStatement(Span);
 
 /// <summary>A file of the program: its name, its function (-1 for the program's own), and its exports' names.</summary>
-public sealed record WebLingoIrUnit(string Name, int Function, IReadOnlyList<string> Exports);
+public sealed record WebLingoIrUnit(string Name, int Function, IReadOnlyList<string> Exports)
+{
+    public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];
+}
 
 public sealed record WebLingoIrLoadBuiltin(int Builtin, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
 

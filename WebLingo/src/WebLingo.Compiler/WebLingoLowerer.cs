@@ -43,7 +43,7 @@ public sealed class WebLingoLowerer
             var exports = new List<string>();
             foreach (var (name, _) in unit.Exports) exports.Add(name);
             foreach (var builtin in unit.Builtins ?? []) exports.Add(builtin.Name);
-            units.Add(new WebLingoIrUnit(unit.Name, function, exports));
+            units.Add(new WebLingoIrUnit(unit.Name, function, exports) { Parameters = unit.Parameters });
             if (function >= 0) prologue.Add(new WebLingoIrRegisterUnit(i, new WebLingoIrMakeClosure(function, default), default));
         }
         if (program.Units.Count > 0) prologue.Add(MakeModule(program.Units[0], 0));
@@ -88,7 +88,8 @@ public sealed class WebLingoLowerer
         body.Add(new WebLingoIrReturn(LowerExpression(new WebLingoBoundLocalReference(unit.Instance, default)), default));
         var captures = new List<WebLingoIrCapture>();
         foreach (var capture in function.Captures) captures.Add(new WebLingoIrCapture(capture.FromLocal, capture.Index));
-        _functions[functionIndex] = new WebLingoIrFunction(function.Name, 0, Names(function.Locals), captures, body, function.Span)
+        _functions[functionIndex] = new WebLingoIrFunction(function.Name, function.ParameterCount, Names(function.Locals), captures, body,
+            function.Span)
         {
             IsAsync = true,
             Source = function.Source
@@ -116,6 +117,7 @@ public sealed class WebLingoLowerer
                 WebLingoBoundFunctionDeclaration function => function.Local,
                 WebLingoBoundClassDeclaration declaration => declaration.Local,
                 WebLingoBoundImport import => import.Local,
+                WebLingoBoundModuleParameter parameter => parameter.Local,
                 _ => null
             };
             if (local is { IsCaptured: true }) lowered.Add(new WebLingoIrNewCell(local.Index, statement.Span));
@@ -135,9 +137,14 @@ public sealed class WebLingoLowerer
         }
         foreach (var statement in block)
         {
+            // A module's parameters, before its imports, which may give them on (section 3.9).
+            if (statement is WebLingoBoundModuleParameter parameter) lowered.Add(LowerModuleParameter(parameter));
+        }
+        foreach (var statement in block)
+        {
             if (statement is not WebLingoBoundImport import) continue;
-            lowered.Add(Initialize(import.Local, new WebLingoIrAwait(new WebLingoIrImport(import.Unit, import.Span), import.Span),
-                import.Span));
+            var imported = new WebLingoIrImport(import.Unit, import.Span) { Values = import.Values is { } values ? LowerExpression(values) : null };
+            lowered.Add(Initialize(import.Local, new WebLingoIrAwait(imported, import.Span), import.Span));
         }
         foreach (var statement in block)
         {
@@ -176,7 +183,7 @@ public sealed class WebLingoLowerer
         foreach (var statement in block)
         {
             if (statement is not (WebLingoBoundFunctionDeclaration or WebLingoBoundClassDeclaration or WebLingoBoundExtension
-                or WebLingoBoundImport))
+                or WebLingoBoundImport or WebLingoBoundModuleParameter))
             {
                 lowered.Add(LowerStatement(statement));
             }
@@ -184,7 +191,20 @@ public sealed class WebLingoLowerer
         return lowered;
     }
 
-    /// <summary>A class made where its block begins, a built-in one remembered by its role (section 3.7).</summary>
+    /// <summary>
+    /// A module's parameter: its value in the map the module's function is given, which its import checked, or its default
+    /// (section 3.9).
+    /// </summary>
+    private WebLingoIrStatement LowerModuleParameter(WebLingoBoundModuleParameter parameter)
+    {
+        var span = parameter.Span;
+        var values = LowerExpression(new WebLingoBoundLocalReference(parameter.Values, span));
+        var name = new WebLingoIrStringConstant(parameter.Name, span);
+        var given = Initialize(parameter.Local, new WebLingoIrIndex(values, name, span), span);
+        var otherwise = Initialize(parameter.Local, parameter.Default is { } value ? LowerExpression(value) : new WebLingoIrNullConstant(span), span);
+        return new WebLingoIrIf(new WebLingoIrCallMethod(values, "has", [name], span), given, otherwise, span);
+    }
+
     /// <summary>
     /// A class's static field set where its block begins, or a static constant set by the class's built-in
     /// <c>setConstant</c>, under a name no program can declare, so that no static member of a program's hides it.
@@ -194,6 +214,7 @@ public sealed class WebLingoLowerer
             ? new WebLingoIrCallMethod(target, "static:const", [new WebLingoIrStringConstant(name, span), LowerExpression(constant.Value)], span)
             : new WebLingoIrStoreMember(target, name, LowerExpression(value), span), span);
 
+    /// <summary>A class made where its block begins, a built-in one remembered by its role (section 3.7).</summary>
     private WebLingoIrStatement LowerClassDeclaration(WebLingoBoundClassDeclaration declaration)
     {
         var index = LowerClass(declaration.Class);

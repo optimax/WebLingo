@@ -77,7 +77,7 @@ public sealed class WebLingoCodeGenerator
     private static List<WebLingoUnitInfo> UnitsOf(WebLingoIrProgram program)
     {
         var units = new List<WebLingoUnitInfo>();
-        foreach (var unit in program.Units) units.Add(new WebLingoUnitInfo(unit.Name, unit.Function, unit.Exports));
+        foreach (var unit in program.Units) units.Add(new WebLingoUnitInfo(unit.Name, unit.Function, unit.Exports) { Parameters = unit.Parameters });
         return units;
     }
 
@@ -462,8 +462,9 @@ public sealed class WebLingoCodeGenerator
             }
             case WebLingoIrImport import:
             {
+                var values = import.Values is { } given ? EmitExpression(given, null) : 0;
                 var destination = target ?? Allocate();
-                Emit(new WebLingoInstruction(WebLingoOpCode.Import, destination, import.Unit), import.Span);
+                Emit(new WebLingoInstruction(WebLingoOpCode.Import, destination, import.Unit, values, import.Values is null ? 0 : 1), import.Span);
                 return destination;
             }
             case WebLingoIrMakeModule made:
