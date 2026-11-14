@@ -31,7 +31,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WS-002.3 | `var` mutable, `const` immutable; both block-scoped, in scope from their declaration to the end of the block; no `let` declaration keyword | Approved |
 | Statements, operators and literals | The syntax M0.7 implements (§3.5): blocks, `true`, `false` and `null`, comparisons and logic, `if`, loops, `foreach`, strings, and functions, hoisted in their block; a hoisted function reading a variable before its declaration has run is a runtime error (WS2004) | Approved (12 November 2026; the hoisted function's read, 13 November 2026) |
 | Collections | Arrays, maps and sets, with indexing, members, `length`, `foreach`, identity, text, set literals and optional access (§3.6) | Approved (13 November 2026) |
-| Classes and disposal | Classes, instances, fields, `this`, methods, inheritance, `x?.name`, text, `dispose()` and `destructor()`, disposal once and chained, `using`, static members, `Object` and `equal()`, and exceptions (§3.7); the details of `toString()` still open | Approved (13 November 2026) |
+| Classes and disposal | Classes, instances, fields, `this`, methods, inheritance, `x?.name`, text, `dispose()` and `destructor()`, disposal once and chained, `using`, static members, `Object` and `equal()`, exceptions, and `toString()` (§3.7); whether a disposal goes on when one of its methods throws still open | Approved (13 November 2026) |
 | M0.1 | Mandatory semicolons; no automatic semicolon insertion | Approved |
 | M0.1 | Numeric categories int64, IEEE binary64, decimal128 | Approved |
 | M0.1 | String indexing and `length` count Unicode scalar values | Approved |
@@ -247,7 +247,8 @@ The syntax and meaning of classes, the disposal protocol and `using` (§3.2, §3
 - **Static members.** `static name(…) { … }` declares a method of the class itself, called as `Name.name(…)`, and `static var count = 0;` a field of the class, `Name.count`, set when the class is declared. In a static method, `this` is WS2009. `B.name` finds A's static member when B has none of its own, as C# does.
 - **`x?.name`** gives `null` when `x` is `null`, and when it has no member `name`, as `x?[k]` does for a missing key (§3.6).
 - **Equality.** An instance is equal only to itself (§3.2), so two instances with equal fields are not equal: `==` stays identity for instances, and `a.equal(b)` runs only where a program calls it. Only instances have `equal`.
-- **`Object`.** A class without `extends` extends `Object`, a built-in class with no fields and two methods, which a class may override: `equal(other)`, which gives `this == other`, and `toString()`, whose details are still open. `new Object()` makes a plain instance.
+- **`Object`.** A class without `extends` extends `Object`, a built-in class with no fields and two methods, which a class may override: `equal(other)`, which gives `this == other`, and `toString()` (see below). `new Object()` makes a plain instance.
+- **`toString()`.** Every value has `toString()`, which gives the text `write` writes (`Point {x: 1, y: 2}`, and `n.toString()` is `"5"` when `n` is 5), so that `"n = " + n.toString()` joins a number to a string. A class may override it: `write`, `writeLn` and a template's `<%= %>` then write what it returns, wherever the instance is, inside an array or a map too; a `toString()` that returns anything but a string is WS3001 where it is written.
 - **Text.** `write` writes an instance as its class's name and its fields, `Point {x: 1, y: 2}`, in no defined order, one it is already writing as `Point {…}`.
 - **`destructor()`.** A class may declare `dispose()` or `destructor()`, which are the same method (§3.4); both in one class is a compile-time error, WS2011. Callers always call `dispose()`.
 - **Disposing once.** The runtime runs an object's disposal at most once; a second `dispose()` does nothing and gives `null` (§3.4).
@@ -903,7 +904,7 @@ Proposed central props:
 | M0.7 | Conformance suite expansion: the language of §3.5, in parts M0.7.1 to M0.7.6 (below), each with its conformance tests | Implemented (12 November 2026), on Windows; `foreach` waits for collections |
 | M0.8 | Windows/Linux CI and portability validation | Started (12 November 2026): the CI workflow builds and tests on Windows and Linux (first run passed: CI run 1, 12 November 2026, commit `5229806`); tests check the portable core's assemblies against the dependency rules (§8.3) and the portability inventory (WS-P016) |
 | M0.9 | Collections: arrays, maps and sets (§3.2), with indexing, `length` and member access (§3.3), and `foreach` (§3.5) | Implemented (13 November 2026), in parts M0.9.1 to M0.9.6 (below), on both VMs, on Windows |
-| M0.10 | Classes, `dispose()` and `using` (§3.2, §3.4, WS-L011) | In progress: M0.10.1 to M0.10.6 implemented (13 November 2026), on both VMs, on Windows; M0.10.7, `toString()`, waits for its details |
+| M0.10 | Classes, `dispose()` and `using` (§3.2, §3.4, WS-L011) | In progress: M0.10.1 to M0.10.6 implemented (13 November 2026), on both VMs, on Windows; M0.10.7, `toString()`, approved and next |
 | M0.11 | `.wsp` templates: includes, layouts and parameterized components, together (§13, WS-T001 to WS-T008) | After M0.10 |
 | M0.12 | WBC, the bytecode's binary format (§5.1, §5.3) | After M0.11 |
 
@@ -924,7 +925,7 @@ Proposed central props:
 4. **M0.10.4:** static members. Implemented (13 November 2026), on both VMs.
 5. **M0.10.5:** `Object` and `equal()`. Implemented (13 November 2026), on both VMs.
 6. **M0.10.6:** exceptions: `throw`, `try`, `catch` and `finally`, `Error`, runtime errors as exceptions, and `using` when one leaves it. Implemented (13 November 2026), on both VMs.
-7. **M0.10.7:** `toString()`, once its details are decided.
+7. **M0.10.7:** `toString()`.
 
 **M0.9 parts** (13 November 2026), each landing on its own with its conformance tests, on both VMs (§5.6, "Both VMs, for now"):
 
@@ -937,7 +938,7 @@ Proposed central props:
 
 **After M0.8** (order approved by the owner, 13 November 2026): M0.9, then M0.10, M0.11 and M0.12, as the table gives them. Each needs syntax, or a format, that this specification does not give yet, which is decided feature by feature before it is built; and each is built on both VMs (§5.6, "Both VMs, for now").
 
-**Immediate next activity:** M0.10.7 once `toString()`'s details are decided, and typed catches once their syntax is; then M0.11. The compiler and both VMs cover M0.6's subset, the language of §3.5 and §3.6, and that of §3.7 but for `toString()`.
+**Immediate next activity:** M0.10.7, and typed catches once their syntax is decided; then M0.11. The compiler and both VMs cover M0.6's subset, the language of §3.5 and §3.6, and that of §3.7 but for `toString()`.
 
 ---
 
