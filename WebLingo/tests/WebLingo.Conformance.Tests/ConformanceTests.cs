@@ -139,7 +139,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var f = x => ;", "WL1001", 1, 14)]
     [InlineData("var s = \"\"\"\n  a\n\";", "WL1011", 1, 9)]
     [InlineData("var s = $\"{}\";", "WL1001", 1, 12)]
-    [InlineData("var s = $\"{1:0.0}\";", "WL1001", 1, 13)]
+    [InlineData("var s = $\"{1:}\";", "WL1012", 1, 13)]
+    [InlineData("var s = $\"{1:N1000}\";", "WL1012", 1, 13)]
+    [InlineData("var s = $\"{1,}\";", "WL1001", 1, 14)]
+    [InlineData("var s = $\"{1,2,3}\";", "WL1001", 1, 15)]
     [InlineData("var s = $\"{1 2}\";", "WL1001", 1, 14)]
     [InlineData("var s = \"\"\"\n  a\n b\n  \"\"\";", "WL1012", 3, 1)]
     [InlineData("var f = async (a) => ;", "WL1001", 1, 22)]
@@ -490,6 +493,12 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var n = 2; writeLn($$\"\"\"\n  { \"n\": {{n}}, \"s\": \"{{\"x\" + n.toString()}}\" }\n  \"\"\");", "{ \"n\": 2, \"s\": \"x2\" }")]
     [InlineData("writeLn([$\"{$\"[{1}]\"}\", $\"\", $\"a\", $\"{\"b\"}\"]);", "[\"[1]\", \"\", \"a\", \"b\"]")]
     [InlineData("var Text = 5; writeLn($\"{Text}\");", "5")]
+    [InlineData("var price = 1234.5; writeLn($\"{price:N2}|{42:D5}|{255:X4}|{1.5:0.00}|{12345.678:E3}|{-7:0;(0)}|{0.125:F2}|{0.125:0.00}\");", "1,234.50|00042|00FF|1.50|1.235E+004|(7)|0.12|0.13")]
+    [InlineData("writeLn($\"[{\"ab\",5}][{\"ab\",-5}][{1.5,6:F2}][{null,3}][{null:N2}][{\"abc\",2}]\");", "[   ab][ab   ][  1.50][   ][][abc]")]
+    [InlineData("var w = 4; writeLn($\"[{7,w}][{7,-w}][{[1, 2],8}][{7, 0}]\");", "[   7][7   ][  [1, 2]][7]")]
+    [InlineData("class C extends Number {} class I extends Integer {} writeLn($\"{new C(2.5):F3} {new I(5):D2}\");", "2.500 05")]
+    [InlineData("var p = 1234.5; writeLn($$\"\"\"{\"p\": {{p,8:F1}}, \"q\": \"{{\"x\",-3}}\"}\"\"\");", "{\"p\":   1234.5, \"q\": \"x  \"}")]
+    [InlineData("class P { toString() { return \"a P\"; } } writeLn($\"[{new P(),5}]\");", "[  a P]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -703,6 +712,22 @@ public sealed class ConformanceTests : IDisposable
         var (exit, _, error) = Weblingo("run", source);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Contains($"error {code}:", error);
+    }
+
+    [Theory]
+    [InlineData("writeLn($\"{\"a\":N2}\");", "WL3001", 1, 12)]
+    [InlineData("writeLn($\"{true:N2}\");", "WL3001", 1, 12)]
+    [InlineData("writeLn($\"{1.5:X}\");", "WL3001", 1, 12)]
+    [InlineData("writeLn($\"{1,\"a\"}\");", "WL3001", 1, 12)]
+    [InlineData("writeLn($\"{1,1.5}\");", "WL3001", 1, 12)]
+    [InlineData("writeLn($\"{1,1000000}\");", "WL3001", 1, 12)]
+    [InlineData("writeLn($\"{1,-1000000}\");", "WL3001", 1, 12)]
+    public void InterpolationFormatsAreCheckedAtRunTime(string source, string code, int line, int column)
+    {
+        // A format given a value it does not apply to, and an alignment that is not an integer, or too wide (section 3.5).
+        var (exit, _, error) = Weblingo("run", source);
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
+        Assert.Contains($"({line},{column}): error {code}:", error);
     }
 
     [Theory]

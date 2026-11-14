@@ -11,6 +11,8 @@ public enum WebLingoMember : byte
     Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, SetMethod, SetProperty, SetStaticProperty, SetConstant,
     RemoveMethod,
     All, Any, Timeout, Parse,
+    /// <summary>An interpolation's format and alignment, a built-in method of every class that no program can name (section 3.5).</summary>
+    Format,
     /// <summary>The names every value, or every class, has (section 3.7), last, so that one comparison finds them.</summary>
     ClassName, InstanceOf, Parent
 }
@@ -47,6 +49,7 @@ public static class WebLingoMembers
         "any" => WebLingoMember.Any,
         "timeout" => WebLingoMember.Timeout,
         "parse" => WebLingoMember.Parse,
+        WebLingoInterpolation.Format => WebLingoMember.Format,
         "__className" => WebLingoMember.ClassName,
         "__instanceOf" => WebLingoMember.InstanceOf,
         "__parent" => WebLingoMember.Parent,
@@ -666,14 +669,18 @@ public static class WebLingoMembers
     /// <c>setStaticProperty</c> or <c>setConstant</c>, which a class has when it has no static member of that name; a
     /// <c>static const</c> calls <c>setConstant</c> by a name no program can declare (section 3.7).
     /// </summary>
-    /// <remarks><c>Task</c> has <c>all</c>, <c>any</c> and <c>timeout</c> besides (section 3.8).</remarks>
+    /// <remarks>
+    /// <c>Task</c> has <c>all</c>, <c>any</c> and <c>timeout</c> besides (section 3.8); and every class an interpolation's
+    /// <c>&lt;format&gt;</c>, which only the parser writes, on the class it writes values by (section 3.5).
+    /// </remarks>
     public static bool IsClassMethod(WebLingoValue target, WebLingoMember member, WebLingoHeap heap) =>
         target.Kind == WebLingoValueKind.Class
         && (member is WebLingoMember.SetMethod or WebLingoMember.SetProperty or WebLingoMember.SetStaticProperty or WebLingoMember.SetConstant
                 or WebLingoMember.RemoveMethod
             || (member is WebLingoMember.All or WebLingoMember.Any or WebLingoMember.Timeout && heap.ValueClasses is { } classes
                 && classes[(int)WebLingoValueClass.Task] == target)
-            || (member == WebLingoMember.Parse && ParsedKind(target, heap) != WebLingoValueKind.Null));
+            || (member == WebLingoMember.Parse && ParsedKind(target, heap) != WebLingoValueKind.Null)
+            || member == WebLingoMember.Format);
 
     /// <summary>The kind <c>parse</c> reads a string as, for <c>Integer</c>, <c>Number</c> and <c>Boolean</c>; null's for any other class.</summary>
     private static WebLingoValueKind ParsedKind(WebLingoValue target, WebLingoHeap heap)
@@ -741,6 +748,12 @@ public static class WebLingoMembers
                 error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
                     $"'parse' reads a string, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
                 return false;
+            }
+            if (member == WebLingoMember.Format)
+            {
+                // An interpolation's value, with its alignment and its format, which only the parser writes (section 3.5).
+                if (count != 3) return WrongArgumentCount(name, 3, count, out error);
+                return WebLingoInterpolationFormat.TryFormat(values[first], values[first + 1], values[first + 2], heap, out result, out error);
             }
             if (member == WebLingoMember.RemoveMethod)
             {

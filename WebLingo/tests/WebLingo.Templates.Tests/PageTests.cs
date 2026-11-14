@@ -87,6 +87,7 @@ public sealed class PageTests
 
     [Theory]
     [InlineData("<% var who = \"Ann\"; %><%= $\"<b>{who}</b>\" %>", "&lt;b&gt;Ann&lt;/b&gt;")]
+    [InlineData("<% var price = 1234.5; %><td><%= $\"{price,10:N2}\" %></td>", "<td>  1,234.50</td>")]
     [InlineData("<%- \"\"\"\n  <ul>\n    <li>%></li>\n  </ul>\n  \"\"\" %>", "<ul>\n  <li>%></li>\n</ul>")]
     public void APagesBlocksTakeMultiLineAndInterpolatedStrings(string page, string written)
     {

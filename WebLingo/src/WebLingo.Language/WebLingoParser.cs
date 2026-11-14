@@ -19,7 +19,7 @@ public sealed class WebLingoParser : IWebLingoParser
     /// The class an interpolated string's values are written by, <c>&lt;text&gt;.of(value)</c>, which the binder makes,
     /// named so that no program can name it (section 3.5).
     /// </summary>
-    public const string InterpolationText = "<text>";
+    public const string InterpolationText = WebLingoInterpolation.Text;
 
     private readonly WebLingoSourceText _source;
     private readonly IReadOnlyList<WebLingoToken> _tokens;
@@ -1309,7 +1309,8 @@ public sealed class WebLingoParser : IWebLingoParser
             _statementHasError = true;
             return;
         }
-        var found = Current.Kind == WebLingoTokenKind.EndOfFile ? "the end of the file" : $"'{Current.Text}'";
+        // An interpolation's code ends at its '}', which its end stands for (ParseInterpolation).
+        var found = Current.Kind == WebLingoTokenKind.EndOfFile && Current.Text.Length == 0 ? "the end of the file" : $"'{Current.Text}'";
         Report(WebLingoDiagnosticCodes.UnexpectedToken, $"Expected {expected}, found {found}.", Current.Span);
     }
 
@@ -1478,7 +1479,10 @@ public sealed class WebLingoParser : IWebLingoParser
     /// <summary>
     /// An interpolated string (section 3.5), parsed into the syntax a program could write but for the class's name: its
     /// text and its values joined by <c>+</c>, each value written by <c>&lt;text&gt;.of(value)</c>, a string for any value,
-    /// so that nothing after the parser tells it apart. An interpolation's code is parsed as an expression of its own.
+    /// so that nothing after the parser tells it apart. An interpolation's code is parsed as an expression of its own. One
+    /// with an alignment, a format, or both, is written by the class's built-in method, which no program can name,
+    /// <c>&lt;text&gt;.&lt;format&gt;(value, width, format)</c>: given a format, the value itself, which it formats; else
+    /// the value's text, which <c>of</c> gives, and <c>null</c> for the format.
     /// </summary>
     private WebLingoExpressionSyntax ParseInterpolated(WebLingoToken token)
     {
@@ -1492,13 +1496,25 @@ public sealed class WebLingoParser : IWebLingoParser
             }
             else
             {
-                if (part.Format is { } format)
-                {
-                    Report(WebLingoDiagnosticCodes.UnexpectedToken, "A format after ':' in an interpolation is not yet available.", format);
-                }
-                var value = ParseInterpolation(part);
+                var (value, width) = ParseInterpolation(part);
+                var format = part.Format is { } formatSpan ? ReadFormat(formatSpan) : null;
                 var text = new WebLingoNameSyntax(InterpolationText, part.Span);
-                piece = new WebLingoCallExpressionSyntax(new WebLingoMemberAccessSyntax(text, "of", part.Span, part.Span), [value], part.Span);
+                if (width is null && format is null)
+                {
+                    piece = new WebLingoCallExpressionSyntax(new WebLingoMemberAccessSyntax(text, "of", part.Span, part.Span), [value], part.Span);
+                }
+                else
+                {
+                    var written = format is not null
+                        ? value
+                        : new WebLingoCallExpressionSyntax(new WebLingoMemberAccessSyntax(text, "of", part.Span, part.Span), [value], part.Span);
+                    WebLingoExpressionSyntax formatValue = format is null
+                        ? new WebLingoNullLiteralSyntax(part.Span)
+                        : new WebLingoStringLiteralSyntax(format, part.Format!.Value);
+                    var method = new WebLingoMemberAccessSyntax(text, WebLingoInterpolation.Format, part.Span, part.Span);
+                    piece = new WebLingoCallExpressionSyntax(method,
+                        [written, width ?? new WebLingoIntegerLiteralSyntax(0, part.Span), formatValue], part.Span);
+                }
             }
             result = result is null
                 ? piece
@@ -1508,13 +1524,16 @@ public sealed class WebLingoParser : IWebLingoParser
         return result ?? new WebLingoStringLiteralSyntax("", token.Span);
     }
 
-    /// <summary>An interpolation's code, parsed by a parser of its own, as one expression and nothing after it.</summary>
-    private WebLingoExpressionSyntax ParseInterpolation(WebLingoInterpolationPart part)
+    /// <summary>
+    /// An interpolation's code, parsed by a parser of its own, as one expression, then, after a comma, its alignment, another,
+    /// and nothing after them.
+    /// </summary>
+    private (WebLingoExpressionSyntax Value, WebLingoExpressionSyntax? Width) ParseInterpolation(WebLingoInterpolationPart part)
     {
         if (part.Code!.Count == 0)
         {
             Report(WebLingoDiagnosticCodes.UnexpectedToken, "An interpolation needs an expression.", part.Span);
-            return new WebLingoErrorExpressionSyntax(part.Span);
+            return (new WebLingoErrorExpressionSyntax(part.Span), null);
         }
         var tokens = new List<WebLingoToken>(part.Code)
         {
@@ -1522,9 +1541,43 @@ public sealed class WebLingoParser : IWebLingoParser
         };
         var parser = new WebLingoParser(_source, tokens, []);
         var value = parser.ParseExpression();
-        if (parser.Current.Kind != WebLingoTokenKind.EndOfFile) parser.ReportUnexpected("'}', which ends the interpolation");
+        WebLingoExpressionSyntax? width = null;
+        if (parser.Current.Kind == WebLingoTokenKind.Comma)
+        {
+            parser.Advance();
+            width = parser.ParseExpression();
+        }
+        if (parser.Current.Kind != WebLingoTokenKind.EndOfFile)
+        {
+            parser.ReportUnexpected(width is null ? "',', an alignment, or '}', which ends the interpolation" : "'}', which ends the interpolation");
+        }
         _diagnostics.AddRange(parser._diagnostics);
-        return value;
+        return (value, width);
+    }
+
+    /// <summary>
+    /// A format, the text after an interpolation's <c>:</c>, as it stands: not empty, and a standard format's precision, a
+    /// letter's digits (<c>N2</c>), at most <see cref="WebLingoInterpolation.MaxPrecision"/> (WL1012 otherwise).
+    /// </summary>
+    private string? ReadFormat(WebLingoSourceSpan span)
+    {
+        var format = _source.Text.Substring(span.Start + 1, span.Length - 1);
+        if (format.Length == 0)
+        {
+            Report(WebLingoDiagnosticCodes.MalformedString, "A format after ':' cannot be empty.", span);
+            return null;
+        }
+        var digits = format.AsSpan(1);
+        var precision = digits.TrimStart('0');
+        if (char.IsAsciiLetter(format[0]) && digits.Length > 0 && !digits.ContainsAnyExcept("0123456789")
+            && (precision.Length > 3
+                || (precision.Length > 0 && int.Parse(precision, System.Globalization.CultureInfo.InvariantCulture) > WebLingoInterpolation.MaxPrecision)))
+        {
+            Report(WebLingoDiagnosticCodes.MalformedString,
+                $"A standard format's precision is at most {WebLingoInterpolation.MaxPrecision}.", span);
+            return null;
+        }
+        return format;
     }
 
     /// <summary>

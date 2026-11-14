@@ -324,6 +324,45 @@ public sealed class WriteTests
     }
 }
 
+public sealed class InterpolationFormatTests
+{
+    private static string Format(WebLingoHeap heap, WebLingoValue value, long width, string? format)
+    {
+        var formatValue = WebLingoValue.Null;
+        if (format is not null) Assert.True(heap.TryAllocateString(format, out formatValue, out _));
+        Assert.True(WebLingoInterpolationFormat.TryFormat(value, WebLingoValue.FromInt64(width), formatValue, heap, out var result, out var error),
+            error?.Message);
+        return heap.GetString(result);
+    }
+
+    [Fact]
+    public void AnAlignmentCountsUnicodeScalarValues()
+    {
+        // A character outside the BMP is one, as length counts it (section 3.3).
+        var heap = new WebLingoHeap();
+        Assert.True(heap.TryAllocateString("😀", out var text, out _));
+        Assert.Equal("  😀", Format(heap, text, 3, null));
+        Assert.Equal("😀  ", Format(heap, text, -3, null));
+    }
+
+    [Fact]
+    public void AFormatDoesNotDependOnTheCulture()
+    {
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
+            var heap = new WebLingoHeap();
+            Assert.Equal("1,234.50", Format(heap, WebLingoValue.FromBinary64(1234.5), 0, "N2"));
+            Assert.Equal("-1,000", Format(heap, WebLingoValue.FromInt64(-1000), 0, "N0"));
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+        }
+    }
+}
+
 public sealed class QuoteTests
 {
     [Theory]
