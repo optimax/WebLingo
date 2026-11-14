@@ -727,6 +727,37 @@ public sealed class ConformanceTests : IDisposable
         Assert.InRange(rejected, 1, 5_000);
     }
 
+    [Fact]
+    public void ModulesAreFoundFromTheirImporter()
+    {
+        Directory.CreateDirectory(Path.Combine(_folder, "lib"));
+        File.WriteAllText(Path.Combine(_folder, "lib", "util.wl"), "export function twice(x) { return x * 2; }");
+        File.WriteAllText(Path.Combine(_folder, "lib", "db.wl"),
+            "import { twice } from \"./util\";\nexport var n = twice(2);\nexport function f() {\n    return [1][3];\n}");
+        var (exit, output, error) = Weblingo("run", "import db from \"lib/db.wl\";\nwriteLn(db.n);\ndb.f();");
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "4\n"), (exit, output));
+        // An imported file is named by its path from the current folder, which the test's folder is somewhere below.
+        var folder = Path.GetRelativePath(Directory.GetCurrentDirectory(), _folder).Replace('\\', '/') + "/";
+        Assert.Equal("lib/db.wl(4,12): error WL3005:", FirstLineStart(error.Replace(folder, "", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void AModuleThatCannotBeFoundIsWL2015()
+    {
+        var (exit, output, error) = Weblingo("run", "import x from \"none\";");
+        Assert.Equal((WebLingoCommandLine.CompilationFailed, ""), (exit, output));
+        Assert.Equal("program.wl(1,15): error WL2015:", FirstLineStart(error));
+    }
+
+    [Fact]
+    public void TheModulesSampleRuns()
+    {
+        var sample = Path.Combine(SolutionFolder(), "samples", "Modules", "main.wl");
+        var output = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", sample], output, new StringWriter()));
+        Assert.Equal("Hello, WebLingo!\nHello, modules!\n2 greetings\n", output.ToString());
+    }
+
     private (int Exit, string Output, string Error) Weblingo(string command, string source)
     {
         var path = Path.Combine(_folder, "program.wl");

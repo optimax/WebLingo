@@ -79,6 +79,8 @@ public sealed class WebLingoParser : IWebLingoParser
         if (Current.Kind == WebLingoTokenKind.For) return ParseFor(start);
         if (Current.Kind == WebLingoTokenKind.Foreach) return ParseForEach(start);
         if (Current.Kind is WebLingoTokenKind.Class or WebLingoTokenKind.Extend) return ParseClass(start);
+        if (Current.Kind == WebLingoTokenKind.Import) return ParseImport(start);
+        if (Current.Kind == WebLingoTokenKind.Export) return ParseExport(start);
         if (Current.Kind == WebLingoTokenKind.Using) return ParseUsing(start);
         if (Current.Kind == WebLingoTokenKind.Try) return ParseTry(start);
         if (Current.Kind == WebLingoTokenKind.Throw)
@@ -338,6 +340,60 @@ public sealed class WebLingoParser : IWebLingoParser
         }
         Expect(WebLingoTokenKind.CloseBrace, "'}'");
         return Made();
+    }
+
+    /// <summary>
+    /// <c>import db from "path";</c>, <c>import { f, g } from "path";</c>, or <c>import db, { f } from "path";</c>
+    /// (section 3.9): <c>from</c> is a keyword only here.
+    /// </summary>
+    private WebLingoStatementSyntax ParseImport(int start)
+    {
+        Advance();
+        string? name = null;
+        var nameSpan = default(WebLingoSourceSpan);
+        var names = new List<WebLingoImportedNameSyntax>();
+        if (Current.Kind == WebLingoTokenKind.Identifier && !(Current.Text == "from" && Peek(1).Kind == WebLingoTokenKind.StringLiteral))
+        {
+            (name, nameSpan) = ExpectName();
+            if (Current.Kind == WebLingoTokenKind.Comma && Peek(1).Kind == WebLingoTokenKind.OpenBrace) Advance();
+        }
+        if (Current.Kind == WebLingoTokenKind.OpenBrace)
+        {
+            Advance();
+            while (Current.Kind == WebLingoTokenKind.Identifier)
+            {
+                var imported = Advance();
+                names.Add(new WebLingoImportedNameSyntax(imported.Text, imported.Span));
+                if (Current.Kind != WebLingoTokenKind.Comma) break;
+                Advance();
+            }
+            Expect(WebLingoTokenKind.CloseBrace, "'}'");
+        }
+        if (name is null && names.Count == 0 && !_statementHasError) ReportUnexpected("a name, or '{' and the names to import");
+        if (Current is { Kind: WebLingoTokenKind.Identifier, Text: "from" }) Advance();
+        else if (!_statementHasError) ReportUnexpected("'from'");
+        var path = "";
+        var pathSpan = Current.Span;
+        if (Current.Kind == WebLingoTokenKind.StringLiteral) path = Advance().StringValue!;
+        else if (!_statementHasError) ReportUnexpected("the module's path, a string");
+        ExpectSemicolon();
+        return new WebLingoImportSyntax(name, nameSpan, names, path, pathSpan, SpanFrom(start));
+    }
+
+    /// <summary><c>export</c> before a <c>var</c>, <c>const</c>, <c>function</c> or <c>class</c> declaration (section 3.9).</summary>
+    private WebLingoStatementSyntax ParseExport(int start)
+    {
+        var keyword = Advance();
+        var declares = Current.Kind is WebLingoTokenKind.Var or WebLingoTokenKind.Const or WebLingoTokenKind.Let
+            or WebLingoTokenKind.Function or WebLingoTokenKind.Class
+            || (Current.Kind == WebLingoTokenKind.Async && Peek(1).Kind == WebLingoTokenKind.Function);
+        if (!declares && !_statementHasError)
+        {
+            Report(WebLingoDiagnosticCodes.UnexpectedToken,
+                "'export' stands before a declaration: 'var', 'const', 'function' or 'class'.", keyword.Span);
+        }
+        var declaration = ParseStatement();
+        return declares ? new WebLingoExportSyntax(declaration, SpanFrom(start)) : declaration;
     }
 
     /// <summary>The operators a class may declare: arithmetic's and the orderings, not <c>==</c> (section 3.7).</summary>
@@ -1115,6 +1171,7 @@ public sealed class WebLingoParser : IWebLingoParser
             if (statement is WebLingoDoWhileSyntax doLoop) statements.Push(doLoop.Body);
             if (statement is WebLingoForEachSyntax forEachLoop) statements.Push(forEachLoop.Body);
             if (statement is WebLingoUsingSyntax usingStatement) statements.Push(usingStatement.Body);
+            if (statement is WebLingoExportSyntax exported) statements.Push(exported.Declaration);
             if (statement is WebLingoTrySyntax tryStatement)
             {
                 statements.Push(tryStatement.Body);

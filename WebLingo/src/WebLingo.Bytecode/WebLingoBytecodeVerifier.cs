@@ -58,6 +58,12 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
         {
             return Fail(rolesError);
         }
+        if (WebLingoClassTables.CheckUnits(module.Units,
+                index => index >= 0 && index < methods.Count && methods[index] is { IsAsync: true, ParameterCount: 0, HasThis: false })
+            is { } unitsError)
+        {
+            return Fail(unitsError);
+        }
         var result = VerifyFunction(module, module.EntryPoint);
         for (var i = 0; i < module.Functions.Count && result.IsValid; i++)
         {
@@ -285,6 +291,18 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                     return $"its elements, registers {b} to {(long)b + c - 1}, are not all in the function's {function.RegisterCount}.";
                 }
                 return Unused(d);
+            case WebLingoOpCode.Import:
+                return Register(function, a, "destination") ?? Index(b, module.Units.Count, "file") ?? Unused(c, d);
+            case WebLingoOpCode.RegisterUnit:
+                return (a >= 1 && a < module.Units.Count ? null : $"its file, {a}, is not one the program imports.")
+                    ?? Register(function, b, "closure") ?? Unused(c, d);
+            case WebLingoOpCode.MakeModule:
+                if ((Register(function, a, "destination") ?? Index(b, module.Units.Count, "file")) is { } moduleError) return moduleError;
+                if (d != module.Units[b].Exports.Count) return $"its cell count, {d}, is not file {b}'s {module.Units[b].Exports.Count} exports.";
+                if (d == 0) return Unused(c);
+                return c < 0 || c > function.RegisterCount - d
+                    ? $"its cells, registers {c} to {(long)c + d - 1}, are not all in the function's {function.RegisterCount}."
+                    : null;
             case WebLingoOpCode.NewMap:
                 if (Register(function, a, "destination") is { } mapError) return mapError;
                 if (c < 0 || c > WebLingoFunction.MaxRegisters) return $"its entry count, {c}, is not 0 to {WebLingoFunction.MaxRegisters}.";
@@ -609,6 +627,15 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                     if (entry >= 0) return entry;
                 }
                 return -1;
+            case WebLingoOpCode.RegisterUnit:
+                return Unwritten(instruction.B, state, locals);
+            case WebLingoOpCode.MakeModule:
+                for (var i = 0; i < instruction.D; i++)
+                {
+                    var cell = Unwritten(instruction.C + i, state, locals);
+                    if (cell >= 0) return cell;
+                }
+                return -1;
             case WebLingoOpCode.NewArray:
             case WebLingoOpCode.NewSet:
                 for (var i = 0; i < instruction.C; i++)
@@ -652,7 +679,8 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
 
     private static int? Writes(WebLingoInstruction instruction) => instruction.OpCode switch
     {
-        WebLingoOpCode.LoadConstant or WebLingoOpCode.Move or WebLingoOpCode.Negate or WebLingoOpCode.Plus or WebLingoOpCode.ToText or WebLingoOpCode.IsInstance or WebLingoOpCode.Hold or WebLingoOpCode.Await or WebLingoOpCode.Add or WebLingoOpCode.Subtract
+        WebLingoOpCode.LoadConstant or WebLingoOpCode.Move or WebLingoOpCode.Negate or WebLingoOpCode.Plus or WebLingoOpCode.ToText or WebLingoOpCode.IsInstance or WebLingoOpCode.Hold or WebLingoOpCode.Await or WebLingoOpCode.Import
+            or WebLingoOpCode.MakeModule or WebLingoOpCode.Add or WebLingoOpCode.Subtract
             or WebLingoOpCode.Multiply or WebLingoOpCode.Divide or WebLingoOpCode.CallBuiltin or WebLingoOpCode.LoadNull or WebLingoOpCode.LoadBoolean
             or WebLingoOpCode.Not or WebLingoOpCode.Equal or WebLingoOpCode.NotEqual or WebLingoOpCode.Less or WebLingoOpCode.LessOrEqual
             or WebLingoOpCode.Greater or WebLingoOpCode.GreaterOrEqual or WebLingoOpCode.NewCell or WebLingoOpCode.BoxRegister or WebLingoOpCode.CopyCell

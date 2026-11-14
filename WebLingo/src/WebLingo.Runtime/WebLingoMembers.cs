@@ -76,6 +76,18 @@ public static class WebLingoMembers
             error = NoSuchMember(target, name, heap);
             return false;
         }
+        if (target.Kind == WebLingoValueKind.Module && heap.TryGetExport(target, name, out var cell))
+        {
+            // An export, as it is when read; one its module has not set yet is read before its initialization (section 3.9).
+            if (heap.TryReadCell(cell, out result))
+            {
+                error = null;
+                return true;
+            }
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.ReadBeforeInitialization,
+                $"'{name}' of {WebLingoValueFormatter.Describe(target, heap)} is read before its module has set it.");
+            return false;
+        }
         if (target.Kind == WebLingoValueKind.Class)
         {
             // A static member, the class's own or its base's (section 3.7).
@@ -136,6 +148,13 @@ public static class WebLingoMembers
     /// </summary>
     public static bool TrySet(WebLingoValue target, string name, WebLingoValue value, WebLingoHeap heap, out WebLingoRuntimeError? error)
     {
+        if (target.Kind == WebLingoValueKind.Module)
+        {
+            // An export is its module's to change (section 3.9).
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"'{name}' of {WebLingoValueFormatter.Describe(target, heap)} cannot be assigned: an export is its module's to change.");
+            return false;
+        }
         if (target.Kind == WebLingoValueKind.Class)
         {
             error = null;
@@ -343,6 +362,7 @@ public static class WebLingoMembers
         WebLingoValueKind.Function or WebLingoValueKind.Builtin or WebLingoValueKind.BoundMethod => (int)WebLingoValueClass.Function,
         WebLingoValueKind.Class => (int)WebLingoValueClass.Class,
         WebLingoValueKind.Task => (int)WebLingoValueClass.Task,
+        WebLingoValueKind.Module => (int)WebLingoValueClass.Module,
         _ => -1
     };
 

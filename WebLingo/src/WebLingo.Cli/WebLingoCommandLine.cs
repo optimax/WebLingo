@@ -58,8 +58,10 @@ public static class WebLingoCommandLine
         var declarations = new List<WebLingoBuiltinDeclaration>();
         foreach (var builtin in services.Builtins) declarations.Add(new WebLingoBuiltinDeclaration(builtin.Name, builtin.Arity));
 
-        var compiled = new WebLingoCompiler(new WebLingoCompilerOptions(declarations)).Compile(source, path);
-        foreach (var diagnostic in compiled.Diagnostics) error.WriteLine(Format(text, diagnostic));
+        var resolver = new FileResolver(path);
+        var options = new WebLingoCompilerOptions(declarations) { Resolver = resolver };
+        var compiled = new WebLingoCompiler(options).Compile(source, path);
+        foreach (var diagnostic in compiled.Diagnostics) error.WriteLine(Format(TextOf(diagnostic), diagnostic));
         if (compiled.Module is null) return CompilationFailed;
         if (!run) return Success;
 
@@ -67,8 +69,62 @@ public static class WebLingoCommandLine
         var result = new WebLingoVirtualMachine().Execute(compiled.Module, context);
         output.Flush();
         if (result.Succeeded) return Success;
-        error.WriteLine(Format(text, result.Error!));
+        error.WriteLine(Format(TextOf(result.Error!), result.Error!));
         return RuntimeFailed;
+
+        // A diagnostic's file: a module the program imports, or the program's own (section 3.9).
+        WebLingoSourceText TextOf(WebLingoDiagnostic diagnostic) =>
+            diagnostic.Source is { } name && resolver.Texts.TryGetValue(name, out var imported) ? imported : text;
+    }
+
+    /// <summary>
+    /// The files a program imports (specification, section 3.9): a path from the importing file's folder, <c>./</c>
+    /// being that folder and <c>/</c> the drive's root, <c>.wl</c> added to one without an extension. A file is named
+    /// by its path from the current folder, with <c>/</c> between its folders, and the program's own by the path it was
+    /// given, so that each is one module however many import it.
+    /// </summary>
+    private sealed class FileResolver(string mainPath) : IWebLingoSourceResolver
+    {
+        private readonly string _mainFull = Path.GetFullPath(mainPath);
+
+        /// <summary>The imported files' texts, by name, for their diagnostics.</summary>
+        public Dictionary<string, WebLingoSourceText> Texts { get; } = new(StringComparer.Ordinal);
+
+        public bool TryResolve(string importer, string path, out string name, out string source, out string? error)
+        {
+            name = "";
+            source = "";
+            error = null;
+            try
+            {
+                var importerFull = importer == mainPath ? _mainFull : Path.GetFullPath(importer);
+                var full = path.StartsWith('/')
+                    ? Path.Combine(Path.GetPathRoot(importerFull) ?? "", path.TrimStart('/'))
+                    : Path.Combine(Path.GetDirectoryName(importerFull) ?? "", path);
+                full = Path.GetFullPath(full);
+                if (Path.GetExtension(full).Length == 0) full += ".wl";
+                if (full == _mainFull)
+                {
+                    name = mainPath;
+                    return true;
+                }
+                name = Path.GetRelativePath(Directory.GetCurrentDirectory(), full).Replace('\\', '/');
+                if (Texts.TryGetValue(name, out var known))
+                {
+                    source = known.Text;
+                    return true;
+                }
+                source = File.ReadAllText(full);
+                Texts.Add(name, new WebLingoSourceText(source, name));
+                return true;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException
+                                                  or NotSupportedException)
+            {
+                error = exception is FileNotFoundException or DirectoryNotFoundException ? "there is no such file" : exception.Message;
+                return false;
+            }
+        }
     }
 
     /// <summary>A diagnostic as a line: <c>file(line,column): error CODE: message</c>.</summary>

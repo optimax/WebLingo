@@ -1,0 +1,147 @@
+using WebLingo.Compiler;
+using WebLingo.Core;
+using WebLingo.Runtime;
+using WebLingo.StdLib;
+using WebLingo.VM.Stack;
+using Xunit;
+namespace WebLingo.VM.Tests;
+
+/// <summary>
+/// Programs of several files (specification, section 3.9): imports, exports, the order modules run in, cycles, and
+/// the files errors name, on both VMs, their files found by a resolver of the test's own.
+/// </summary>
+public sealed class ModuleTests
+{
+    [Fact]
+    public void ImportsRunEachModuleOnceAndFirst()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["main.wl"] = "import db from \"lib/db\"; import { twice, Point } from \"lib/util.wl\"; writeLn(\"main\"); " +
+                          "writeLn(db.count); db.bump(); writeLn(db.count); writeLn(twice(21)); writeLn(new Point(1, 2)); " +
+                          "writeLn([db is Module, db]);",
+            ["lib/db.wl"] = "import { twice } from \"util.wl\"; writeLn(\"db\"); export var count = twice(1); " +
+                            "export function bump() { count = count + 1; }",
+            ["lib/util.wl"] = "writeLn(\"util\"); export function twice(x) { return x * 2; } " +
+                              "export class Point { constructor(x, y) { this.x = x; this.y = y; } }",
+        };
+        AssertBoth(files, "util\ndb\nmain\n2\n3\n42\nPoint {x: 1, y: 2}\n[true, module lib/db.wl]\n");
+    }
+
+    [Fact]
+    public void ACycleGetsTheInstanceAsItIsSoFar()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["a.wl"] = "import b from \"b\"; writeLn(\"a: \" + b.fromB); export var fromA = \"A\"; writeLn(b.later());",
+            ["b.wl"] = "import a from \"a\"; export var fromB = \"B\"; export function later() { return a.fromA; } " +
+                       "try { writeLn(a.fromA); } catch (e) { writeLn(e.code); }",
+            ["self.wl"] = "import me from \"self\"; export var x = 1; writeLn(me.x);",
+        };
+        AssertBoth(files, "WL2004\na: B\nA\n", "a.wl");
+        AssertBoth(files, "1\n", "self.wl");
+    }
+
+    [Fact]
+    public void AnExportIsItsModulesToChange()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["main.wl"] = "import m from \"m\"; import { n } from \"m\"; try { m.n = 2; } catch (e) { writeLn(e.code); } " +
+                          "writeLn([n, m.n, m?.missing]); try { writeLn(m.missing); } catch (e) { writeLn(e.code); }",
+            ["m.wl"] = "export var n = 1; var hidden = 2;",
+        };
+        AssertBoth(files, "WL3001\n[1, 1, null]\nWL3006\n");
+    }
+
+    [Fact]
+    public void AnErrorNamesTheFileItIsIn()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["main.wl"] = "import r from \"lib/r\";\nr.f();",
+            ["lib/r.wl"] = "export function f() {\n    return [1][5];\n}",
+            ["broken.wl"] = "import b from \"lib/b\";",
+            ["lib/b.wl"] = "export var y = 1 +;",
+            ["missing.wl"] = "writeLn(1);\nimport x from \"nowhere\";",
+        };
+        foreach (var run in BothVms)
+        {
+            var (diagnostics, _, error) = run(files, "main.wl");
+            Assert.Empty(diagnostics);
+            Assert.Equal((WebLingoDiagnosticCodes.IndexOutOfRange, "lib/r.wl"), (error!.Code, error.Source));
+            Assert.Equal(2, new WebLingoSourceText(files["lib/r.wl"]).GetLocation(error.Span.Start).Line);
+            (diagnostics, _, _) = run(files, "broken.wl");
+            Assert.Equal((WebLingoDiagnosticCodes.UnexpectedToken, "lib/b.wl"), (diagnostics[0].Code, diagnostics[0].Source));
+            (diagnostics, _, _) = run(files, "missing.wl");
+            Assert.Equal((WebLingoDiagnosticCodes.ModuleNotFound, null), (diagnostics[0].Code, diagnostics[0].Source));
+        }
+    }
+
+    [Theory]
+    [InlineData("{ import m from \"m\"; }", WebLingoDiagnosticCodes.UnexpectedToken)]
+    [InlineData("function f() { export var x = 1; }", WebLingoDiagnosticCodes.UnexpectedToken)]
+    [InlineData("import { n } from \"m\"; n = 2;", WebLingoDiagnosticCodes.AssignmentToConstant)]
+    [InlineData("import m from \"m\"; import m from \"m\";", WebLingoDiagnosticCodes.DuplicateDeclaration)]
+    [InlineData("import m from \"r\";", WebLingoDiagnosticCodes.ReturnOutsideFunction)]
+    public void ImportsAndExportsStandAtTheTopLevel(string main, string code)
+    {
+        var files = new Dictionary<string, string> { ["main.wl"] = main, ["m.wl"] = "export var n = 1;", ["r.wl"] = "return 1;" };
+        foreach (var run in BothVms) Assert.Equal(code, run(files, "main.wl").Diagnostics[0].Code);
+    }
+
+    private static void AssertBoth(Dictionary<string, string> files, string expected, string main = "main.wl")
+    {
+        foreach (var run in BothVms)
+        {
+            var (diagnostics, output, error) = run(files, main);
+            Assert.Empty(diagnostics);
+            Assert.True(error is null, error?.Message);
+            Assert.Equal(expected, output);
+        }
+    }
+
+    private delegate (IReadOnlyList<WebLingoDiagnostic> Diagnostics, string Output, WebLingoDiagnostic? Error) Runner(
+        Dictionary<string, string> files, string main);
+
+    private static Runner[] BothVms =>
+    [
+        (files, main) =>
+        {
+            var output = new WebLingoCollectedOutput();
+            var compiled = new WebLingoCompiler(Options(files)).Compile(files[main], main);
+            var result = compiled.Module is { } module ? new WebLingoVirtualMachine().Execute(module, Context(output)) : null;
+            return (compiled.Diagnostics, output.Text, result?.Error);
+        },
+        (files, main) =>
+        {
+            var output = new WebLingoCollectedOutput();
+            var compiled = new WebLingoStackCompiler(Options(files)).Compile(files[main], main);
+            var result = compiled.Module is { } module ? new WebLingoStackVirtualMachine().Execute(module, Context(output)) : null;
+            return (compiled.Diagnostics, output.Text, result?.Error);
+        },
+    ];
+
+    private static WebLingoCompilerOptions Options(Dictionary<string, string> files) =>
+        new([new WebLingoBuiltinDeclaration("write", 1), new WebLingoBuiltinDeclaration("writeLn", 1)])
+        {
+            Resolver = new MemoryResolver(files)
+        };
+
+    private static WebLingoExecutionContext Context(IWebLingoTextOutput output) =>
+        new(new WebLingoWorkerId(0)) { Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output)) };
+
+    /// <summary>Files by their paths from one folder, an import's path from its importer's folder, <c>.wl</c> optional.</summary>
+    private sealed class MemoryResolver(Dictionary<string, string> files) : IWebLingoSourceResolver
+    {
+        public bool TryResolve(string importer, string path, out string name, out string source, out string? error)
+        {
+            var folder = importer.Contains('/') ? importer[..importer.LastIndexOf('/')] + "/" : "";
+            name = folder + path.Replace("./", "", StringComparison.Ordinal);
+            if (!name.EndsWith(".wl", StringComparison.Ordinal)) name += ".wl";
+            error = files.TryGetValue(name, out source!) ? null : "there is no such file";
+            source ??= "";
+            return error is null;
+        }
+    }
+}

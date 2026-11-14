@@ -177,6 +177,18 @@ public enum WebLingoOpCode : byte
     /// class's kind (WL3001 otherwise): the built-in classes' constructors' (section 3.7).
     /// </summary>
     Hold,
+    /// <summary>
+    /// A = destination, B = a module of the program's: its instance, if it has begun to run, or else what calling its
+    /// function gives, a task, which the code then awaits (section 3.9).
+    /// </summary>
+    Import,
+    /// <summary>
+    /// A = destination, B = a module of the program's, C = first register, D = count: the module's instance, its exports
+    /// the cells in those registers, from then on its instance (section 3.9).
+    /// </summary>
+    MakeModule,
+    /// <summary>A = a module the program imports, B = register holding the closure of its function, which runs it.</summary>
+    RegisterUnit,
 }
 
 public readonly record struct WebLingoInstruction(WebLingoOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
@@ -211,6 +223,8 @@ public sealed record WebLingoFunction(
 
     /// <summary>How many arguments it takes, into its first registers.</summary>
     public int ParameterCount { get; init; }
+    /// <summary>The file its spans are in, when it is not the program's own: a module it imports (section 3.9).</summary>
+    public string? Source { get; init; }
     /// <summary>The cells a closure of it captures, from the function that makes the closure.</summary>
     public IReadOnlyList<WebLingoCapture> Captures { get; init; } = [];
     /// <summary>A method's or a constructor's: its first parameter is <c>this</c>, which its caller gives (section 3.7).</summary>
@@ -266,6 +280,12 @@ public readonly record struct WebLingoClassMethod(string Name, int Function);
 public readonly record struct WebLingoCapture(bool FromLocal, int Index);
 
 /// <summary>An in-memory module: its constants, the built-ins it imports, the function it runs, and its other functions.</summary>
+/// <summary>
+/// A module of a program, a file (section 3.9): its name, the function that runs it, its top level (-1 for the program
+/// itself, the entry point), and the names it exports, in the order its instance's cells are given.
+/// </summary>
+public sealed record WebLingoUnitInfo(string Name, int Function, IReadOnlyList<string> Exports);
+
 public sealed record WebLingoCompiledModule(
     string Name, IReadOnlyList<WebLingoConstant> Constants, IReadOnlyList<WebLingoImport> Imports, WebLingoFunction EntryPoint)
 {
@@ -273,6 +293,8 @@ public sealed record WebLingoCompiledModule(
     public IReadOnlyList<WebLingoFunction> Functions { get; init; } = [];
     /// <summary>The classes the module declares, which <see cref="WebLingoOpCode.MakeClass"/> refers to by index.</summary>
     public IReadOnlyList<WebLingoClassInfo> Classes { get; init; } = [];
+    /// <summary>The files of a program that imports others, the program's first; empty for one that imports none (section 3.9).</summary>
+    public IReadOnlyList<WebLingoUnitInfo> Units { get; init; } = [];
     /// <summary>
     /// The class of <see cref="Classes"/> that is <c>Error</c>, whose instances a runtime error a handler catches
     /// becomes (section 3.7), or -1 if the module has none.

@@ -304,6 +304,24 @@ public sealed class WebLingoHeap
         return target.Constructor;
     }
 
+    /// <summary>
+    /// A module's instance (section 3.9): its name, and its exports, each a cell of its top level's, read as it is when
+    /// read, from the <paramref name="count"/> values from <paramref name="first"/> on.
+    /// </summary>
+    public bool TryAllocateModule(string name, IReadOnlyList<string> exports, WebLingoValue[] values, int first, int count,
+        out WebLingoValue module, out WebLingoRuntimeError? error)
+    {
+        var made = new ModuleObject(name);
+        for (var i = 0; i < count; i++) made.Exports[exports[i]] = values[first + i];
+        return TryAllocate(made, WebLingoValueKind.Module, count, out module, out error);
+    }
+
+    public string ModuleName(WebLingoValue module) => Get<ModuleObject>(module, WebLingoValueKind.Module).Name;
+
+    /// <summary>The cell an export of a module is, by its name.</summary>
+    public bool TryGetExport(WebLingoValue module, string name, out WebLingoValue cell) =>
+        Get<ModuleObject>(module, WebLingoValueKind.Module).Exports.TryGetValue(name, out cell);
+
     public void MarkCollectionClass(WebLingoValue classValue, WebLingoValueKind kind)
     {
         var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
@@ -793,6 +811,9 @@ public sealed class WebLingoHeap
                     foreach (var method in classObject.StaticMethods.Values) Mark(method, marked, pending);
                     foreach (var field in classObject.StaticFields.Values) Mark(field, marked, pending);
                     break;
+                case ModuleObject module:
+                    foreach (var cell in module.Exports.Values) Mark(cell, marked, pending);
+                    break;
                 case InstanceObject instance:
                     Mark(instance.Class, marked, pending);
                     Mark(instance.Value, marked, pending);
@@ -840,7 +861,7 @@ public sealed class WebLingoHeap
     {
         if (value.Kind is not (WebLingoValueKind.String or WebLingoValueKind.Function or WebLingoValueKind.Cell or WebLingoValueKind.Array
             or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Class or WebLingoValueKind.Instance or WebLingoValueKind.BoundMethod
-            or WebLingoValueKind.Task))
+            or WebLingoValueKind.Task or WebLingoValueKind.Module))
         {
             return;
         }
@@ -867,6 +888,7 @@ public sealed class WebLingoHeap
         InstanceObject instance => instance.Count,
         BoundMethodObject => 2,
         WebLingoTask => 2,
+        ModuleObject module => module.Exports.Count,
         _ => 0
     };
 
@@ -962,6 +984,13 @@ public sealed class WebLingoHeap
     /// <summary>A class's units: one, and one for each method of its own and static member.</summary>
     private static int Size(ClassObject classObject) =>
         classObject.OwnMethods.Count + classObject.StaticMethods.Count + classObject.StaticFields.Count + 1;
+
+    /// <summary>A module's instance: its name, and its exports' cells, by name (section 3.9).</summary>
+    private sealed class ModuleObject(string name)
+    {
+        public string Name { get; } = name;
+        public Dictionary<string, WebLingoValue> Exports { get; } = new(StringComparer.Ordinal);
+    }
 
     private sealed record BoundMethodObject(WebLingoValue Instance, WebLingoValue Closure, bool Disposes);
 

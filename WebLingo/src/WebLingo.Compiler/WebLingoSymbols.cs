@@ -6,9 +6,24 @@ namespace WebLingo.Compiler;
 public sealed record WebLingoBuiltinDeclaration(string Name, int Arity);
 
 /// <summary>What the compiler needs from its host: the built-in functions scripts may call.</summary>
+/// <summary>
+/// The host's way to find the modules a program imports (section 3.9): from the importing file's name and a path as the
+/// import writes it, the module's name, which identifies it, and its source; or why it cannot.
+/// </summary>
+public interface IWebLingoSourceResolver
+{
+    bool TryResolve(string importer, string path, out string name, out string source, out string? error);
+}
+
+/// <summary>A file of a program, parsed, and the module each of its imports names, by its index among the program's.</summary>
+public sealed record WebLingoModuleSource(string Name, WebLingoCompilationUnitSyntax Root, IReadOnlyDictionary<WebLingoImportSyntax, int> Imports);
+
 public sealed record WebLingoCompilerOptions(IReadOnlyList<WebLingoBuiltinDeclaration> Builtins)
 {
     public static WebLingoCompilerOptions Empty { get; } = new([]);
+
+    /// <summary>How the host finds the files a program imports, or null for a host that finds none (section 3.9).</summary>
+    public IWebLingoSourceResolver? Resolver { get; init; }
 }
 
 /// <summary>A name the binder resolved. Symbols are compared by identity.</summary>
@@ -36,6 +51,9 @@ public sealed class WebLingoLocalSymbol(string name, WebLingoDeclarationKind kin
     public int? FunctionArity { get; init; }
     /// <summary>For a function declared by name: how many of its parameters a call must give, the others having defaults.</summary>
     public int? FunctionMinArity { get; set; }
+    /// <summary>For a name an import takes (<c>import { f } from …</c>): the local holding the module, read as its member.</summary>
+    public WebLingoLocalSymbol? ImportOf { get; set; }
+    public string? ImportName { get; set; }
     public bool IsConstant => Kind is WebLingoDeclarationKind.Const or WebLingoDeclarationKind.Function or WebLingoDeclarationKind.Class;
 }
 

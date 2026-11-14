@@ -162,6 +162,12 @@ public enum WebLingoStackOpCode : byte
     Extend,
     /// <summary>Pops a value, then an instance, which holds it, as the register bytecode's <c>Hold</c>, and pushes null.</summary>
     Hold,
+    /// <summary>A = a module of the program's: pushes its instance, or what calling its function gives, as <c>Import</c>.</summary>
+    Import,
+    /// <summary>A = a module of the program's, B = count: pops that many cells, its exports, and pushes its instance.</summary>
+    MakeModule,
+    /// <summary>A = a module the program imports: pops the closure of its function, which runs it.</summary>
+    RegisterUnit,
 }
 
 public readonly record struct WebLingoStackInstruction(WebLingoStackOpCode OpCode, int A = 0, int B = 0);
@@ -178,6 +184,8 @@ public sealed record WebLingoStackFunction(
 {
     /// <summary>How many arguments it takes, into its first locals.</summary>
     public int ParameterCount { get; init; }
+    /// <summary>The file its spans are in, when it is not the program's own: a module it imports (section 3.9).</summary>
+    public string? Source { get; init; }
     /// <summary>The cells a closure of it captures, from the function that makes the closure.</summary>
     public IReadOnlyList<WebLingoCapture> Captures { get; init; } = [];
     /// <summary>The slots its frame needs: its locals and its operand stack.</summary>
@@ -206,6 +214,8 @@ public sealed record WebLingoStackModule(
     public IReadOnlyList<WebLingoStackFunction> Functions { get; init; } = [];
     /// <summary>The classes the module declares, which <see cref="WebLingoStackOpCode.MakeClass"/> refers to by index.</summary>
     public IReadOnlyList<WebLingoClassInfo> Classes { get; init; } = [];
+    /// <summary>The files of a program that imports others, the program's first; empty for one that imports none (section 3.9).</summary>
+    public IReadOnlyList<WebLingoUnitInfo> Units { get; init; } = [];
     /// <summary>The class of <see cref="Classes"/> that is <c>Error</c>, or -1 (section 3.7).</summary>
     public int ErrorClass { get; init; } = -1;
     /// <summary>The class of <see cref="Classes"/> that is <c>Object</c>, or -1 (section 3.7).</summary>

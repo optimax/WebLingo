@@ -55,6 +55,8 @@ public static class WebLingoDiagnosticCodes
     public const string ClassExtendsItself = "WL2013";
     /// <summary><c>await</c> outside an <c>async</c> function and a script's top level (proposed, section 3.8).</summary>
     public const string AwaitOutsideAsync = "WL2014";
+    /// <summary>A module an import names that cannot be found or read (section 3.9).</summary>
+    public const string ModuleNotFound = "WL2015";
 
     /// <summary>Invalid operation.</summary>
     public const string InvalidOperation = "WL3001";

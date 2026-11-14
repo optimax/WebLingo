@@ -145,6 +145,19 @@ public sealed record WebLingoExtendSyntax(WebLingoExpressionSyntax Target, IRead
     public IReadOnlyList<WebLingoStaticFieldSyntax> StaticFields { get; init; } = [];
 }
 
+/// <summary>
+/// <c>import db from "lib/db.wl";</c>, <c>import { f, g } from "lib/util.wl";</c>, or both, <c>import db, { f } from …;</c>:
+/// a module's instance, or names it exports, at a module's top level (section 3.9).
+/// </summary>
+public sealed record WebLingoImportSyntax(string? Name, WebLingoSourceSpan NameSpan, IReadOnlyList<WebLingoImportedNameSyntax> Names,
+    string Path, WebLingoSourceSpan PathSpan, WebLingoSourceSpan Span) : WebLingoStatementSyntax(Span);
+
+/// <summary>A name an import takes from a module's exports.</summary>
+public sealed record WebLingoImportedNameSyntax(string Name, WebLingoSourceSpan Span);
+
+/// <summary><c>export</c> before a <c>var</c>, <c>const</c>, <c>function</c> or <c>class</c> at a module's top level (section 3.9).</summary>
+public sealed record WebLingoExportSyntax(WebLingoStatementSyntax Declaration, WebLingoSourceSpan Span) : WebLingoStatementSyntax(Span);
+
 /// <summary><c>return value;</c>, or <c>return;</c>, which gives <c>null</c>.</summary>
 public sealed record WebLingoReturnSyntax(WebLingoExpressionSyntax? Value, WebLingoSourceSpan Span) : WebLingoStatementSyntax(Span);
 

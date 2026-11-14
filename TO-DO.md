@@ -2,13 +2,13 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [QUESTION] WSHI
+## WSHI
 
 A follow-up to "Rename WebScript's Leftovers to WebLingo". Added by Claude, 2026-11-14.
 
 **Q1, WSHI, the host-neutral interface's name (specification, sections 6.2, 6.6 and 6.8), WebScript's: (a) WLHI; (b) WSHI, as it is.**
 
-A1:
+A1: (a) WLHI, but you need to define it first (fully spelled out) in the spec, and describe what it is.
 
 ## [IDLE] Extending the Classes of Values
 
@@ -99,6 +99,38 @@ The module system: `import`, static and dynamic, `export`, `param`, a script's p
 2026-11-13: waits for the answers to "Modules, Continued", and for "Extending the Classes of Values", above it.
 
 2026-11-14: answered, but for how a parameter is given as a string ("Modules, Quoted Parameters"), which only a script's parameters wait for.
+
+2026-11-14: split into the parts the specification defines in section 9 ("Modules"), each a task below. Waits for them.
+
+## [WORKING] Modules: Static Imports and Exports
+
+`import db from "lib/db.wl";`, `import { f, g } from "lib/util.wl";`, `export`, a module's instance, each module run once, its imports first, cycles, the host finding the files, and diagnostics and runtime errors naming their file (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
+
+Done (Claude, 2026-11-14): on both VMs, with conformance tests through the CLI, `ModuleTests` (`WebLingo.VM.Tests`), and a sample, `samples/Modules`; its choices are recorded as Proposed in the specification, section 15.2 ("Modules"), among them a new code, WL2015, for a module that cannot be found. Checks: the Release build, without warnings, the 1,540 tests, the benchmark against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [IDLE] Modules: Parameters
+
+`param`, the values an importer gives, and a missing one's error (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for "Modules: Static Imports and Exports".
+
+## [IDLE] Modules: Dynamic Imports
+
+`await Module.import(path)`, a module compiled when it runs (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for "Modules: Parameters".
+
+## [IDLE] Modules: Standard Modules
+
+The scheme `std:`, and `std:system`, which every module imports, with `write` and `writeLn` (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for "Modules: Dynamic Imports".
+
+## [IDLE] Modules: A Script's Parameters
+
+`weblingo run script.wl name=value` (specification, sections 3.9 and 9). Added by Claude, 2026-11-14.
+
+2026-11-14: waits for "Modules, Quoted Parameters", and for "Modules: Standard Modules".
 
 ## [IDLE] M0.12: Templates
 

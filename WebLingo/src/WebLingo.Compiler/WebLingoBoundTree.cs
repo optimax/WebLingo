@@ -17,7 +17,19 @@ public sealed record WebLingoBoundProgram(
     public IReadOnlyList<(string Name, WebLingoBoundClass Class)> BuiltinClasses { get; init; } = [];
     /// <summary>Whether its top level awaits, which makes it an <c>async</c> function itself (section 3.8).</summary>
     public bool IsAsync { get; init; }
+    /// <summary>Its files, if it imports others, its own first (section 3.9); empty if it imports none.</summary>
+    public IReadOnlyList<WebLingoBoundUnit> Units { get; init; } = [];
 }
+
+/// <summary>
+/// A file of a program (section 3.9): its name, its top level as a function (null for the program's own), the locals it
+/// exports, by name, and the local holding its instance.
+/// </summary>
+public sealed record WebLingoBoundUnit(string Name, WebLingoBoundFunction? Function,
+    IReadOnlyList<(string Name, WebLingoLocalSymbol Local)> Exports, WebLingoLocalSymbol Instance);
+
+/// <summary>An import: the program's file <paramref name="Unit"/>'s instance, run if it has not been, into a local (section 3.9).</summary>
+public sealed record WebLingoBoundImport(int Unit, WebLingoLocalSymbol Local, WebLingoSourceSpan Span) : WebLingoBoundStatement(Span);
 
 /// <summary>
 /// Where a function's capture comes from when its closure is made: a local of the function that makes it
@@ -39,6 +51,8 @@ public sealed record WebLingoBoundFunction(
     public IReadOnlyList<WebLingoBoundExpression?> Defaults { get; init; } = [];
     /// <summary>Whether it is <c>async</c>: its call gives a task, and it may <c>await</c> (section 3.8).</summary>
     public bool IsAsync { get; init; }
+    /// <summary>The file it is in, when it is not the program's own (section 3.9).</summary>
+    public string? Source { get; init; }
 }
 
 public abstract record WebLingoBoundStatement(WebLingoSourceSpan Span);

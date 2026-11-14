@@ -32,10 +32,25 @@ public sealed class WebLingoLowerer
             _objectBound = program.ObjectClass,
             _builtinBound = program.BuiltinClasses
         };
-        var statements = lowerer.LowerBlock(program.Statements);
+        // A program that imports others: each file's function, whose closure the program registers, before its own
+        // instance and its imports (section 3.9).
+        var units = new List<WebLingoIrUnit>();
+        var prologue = new List<WebLingoIrStatement>();
+        for (var i = 0; i < program.Units.Count; i++)
+        {
+            var unit = program.Units[i];
+            var function = unit.Function is null ? -1 : lowerer.LowerUnit(unit, i);
+            var exports = new List<string>();
+            foreach (var (name, _) in unit.Exports) exports.Add(name);
+            units.Add(new WebLingoIrUnit(unit.Name, function, exports));
+            if (function >= 0) prologue.Add(new WebLingoIrRegisterUnit(i, new WebLingoIrMakeClosure(function, default), default));
+        }
+        if (program.Units.Count > 0) prologue.Add(MakeModule(program.Units[0], 0));
+        var statements = lowerer.LowerBlock(program.Statements, prologue);
         return new WebLingoIrProgram(statements, Names(program.Locals), program.Builtins)
         {
             Functions = lowerer._functions!,
+            Units = units,
             Classes = lowerer._classes,
             ErrorClass = lowerer._errorClass,
             ObjectClass = lowerer._objectClass,
@@ -43,6 +58,35 @@ public sealed class WebLingoLowerer
             ErrorClasses = lowerer._errorClasses,
             IsAsync = program.IsAsync
         };
+    }
+
+    /// <summary>A file's instance, made where its function begins, its exports its cells (section 3.9).</summary>
+    private static WebLingoIrStatement MakeModule(WebLingoBoundUnit unit, int index)
+    {
+        var cells = new List<int>();
+        foreach (var (_, local) in unit.Exports) cells.Add(local.Index);
+        return Initialize(unit.Instance, new WebLingoIrMakeModule(index, cells, default), default);
+    }
+
+    /// <summary>
+    /// A file's function (section 3.9): its instance, then its imports, then its top level, giving its instance, which
+    /// its importers await.
+    /// </summary>
+    private int LowerUnit(WebLingoBoundUnit unit, int index)
+    {
+        var function = unit.Function!;
+        var functionIndex = _functions.Count;
+        _functions.Add(null);
+        var body = LowerBlock(function.Body, [MakeModule(unit, index)]);
+        body.Add(new WebLingoIrReturn(LowerExpression(new WebLingoBoundLocalReference(unit.Instance, default)), default));
+        var captures = new List<WebLingoIrCapture>();
+        foreach (var capture in function.Captures) captures.Add(new WebLingoIrCapture(capture.FromLocal, capture.Index));
+        _functions[functionIndex] = new WebLingoIrFunction(function.Name, 0, Names(function.Locals), captures, body, function.Span)
+        {
+            IsAsync = true,
+            Source = function.Source
+        };
+        return functionIndex;
     }
 
     private static string[] Names(IReadOnlyList<WebLingoLocalSymbol> locals)
@@ -53,7 +97,8 @@ public sealed class WebLingoLowerer
     }
 
     /// <summary>A block's statements, after the cells of its captured locals and the closures of its functions.</summary>
-    private List<WebLingoIrStatement> LowerBlock(IReadOnlyList<WebLingoBoundStatement> block)
+    private List<WebLingoIrStatement> LowerBlock(IReadOnlyList<WebLingoBoundStatement> block,
+        IReadOnlyList<WebLingoIrStatement>? prologue = null)
     {
         var lowered = new List<WebLingoIrStatement>();
         foreach (var statement in block)
@@ -63,9 +108,29 @@ public sealed class WebLingoLowerer
                 WebLingoBoundVariableDeclaration declaration => declaration.Local,
                 WebLingoBoundFunctionDeclaration function => function.Local,
                 WebLingoBoundClassDeclaration declaration => declaration.Local,
+                WebLingoBoundImport import => import.Local,
                 _ => null
             };
             if (local is { IsCaptured: true }) lowered.Add(new WebLingoIrNewCell(local.Index, statement.Span));
+        }
+        // A file's instance, and its imports, each awaited, before its functions and classes, whose bases they may be;
+        // and before those, the built-in classes, which the files it imports use (section 3.9).
+        var madeFirst = new HashSet<WebLingoBoundClassDeclaration>();
+        if (prologue is not null)
+        {
+            foreach (var statement in block)
+            {
+                if (statement is not WebLingoBoundClassDeclaration declaration || !IsBuiltin(declaration.Class)) continue;
+                lowered.Add(LowerClassDeclaration(declaration));
+                madeFirst.Add(declaration);
+            }
+            lowered.AddRange(prologue);
+        }
+        foreach (var statement in block)
+        {
+            if (statement is not WebLingoBoundImport import) continue;
+            lowered.Add(Initialize(import.Local, new WebLingoIrAwait(new WebLingoIrImport(import.Unit, import.Span), import.Span),
+                import.Span));
         }
         foreach (var statement in block)
         {
@@ -74,20 +139,9 @@ public sealed class WebLingoLowerer
                 lowered.Add(Initialize(function.Local, new WebLingoIrMakeClosure(LowerFunction(function.Function), function.Span),
                     function.Span));
             }
-            if (statement is WebLingoBoundClassDeclaration declaration)
+            if (statement is WebLingoBoundClassDeclaration declaration && !madeFirst.Contains(declaration))
             {
-                var index = LowerClass(declaration.Class);
-                if (ReferenceEquals(declaration.Class, _errorBound)) _errorClass = index;
-                if (ReferenceEquals(declaration.Class, _objectBound)) _objectClass = index;
-                foreach (var (name, builtin) in _builtinBound)
-                {
-                    if (ReferenceEquals(declaration.Class, builtin)) Remember(name, index);
-                }
-                var made = new WebLingoIrMakeClass(index, declaration.Span)
-                {
-                    Base = declaration.Class.Base is null ? null : LowerExpression(declaration.Class.Base)
-                };
-                lowered.Add(Initialize(declaration.Local, made, declaration.Span));
+                lowered.Add(LowerClassDeclaration(declaration));
             }
         }
         foreach (var statement in block)
@@ -115,12 +169,39 @@ public sealed class WebLingoLowerer
         }
         foreach (var statement in block)
         {
-            if (statement is not (WebLingoBoundFunctionDeclaration or WebLingoBoundClassDeclaration or WebLingoBoundExtension))
+            if (statement is not (WebLingoBoundFunctionDeclaration or WebLingoBoundClassDeclaration or WebLingoBoundExtension
+                or WebLingoBoundImport))
             {
                 lowered.Add(LowerStatement(statement));
             }
         }
         return lowered;
+    }
+
+    /// <summary>A class made where its block begins, a built-in one remembered by its role (section 3.7).</summary>
+    private WebLingoIrStatement LowerClassDeclaration(WebLingoBoundClassDeclaration declaration)
+    {
+        var index = LowerClass(declaration.Class);
+        if (ReferenceEquals(declaration.Class, _errorBound)) _errorClass = index;
+        if (ReferenceEquals(declaration.Class, _objectBound)) _objectClass = index;
+        foreach (var (name, builtin) in _builtinBound)
+        {
+            if (ReferenceEquals(declaration.Class, builtin)) Remember(name, index);
+        }
+        var made = new WebLingoIrMakeClass(index, declaration.Span)
+        {
+            Base = declaration.Class.Base is null ? null : LowerExpression(declaration.Class.Base)
+        };
+        return Initialize(declaration.Local, made, declaration.Span);
+    }
+
+    private bool IsBuiltin(WebLingoBoundClass bound)
+    {
+        foreach (var (_, builtin) in _builtinBound)
+        {
+            if (ReferenceEquals(bound, builtin)) return true;
+        }
+        return false;
     }
 
     private static WebLingoIrStatement Initialize(WebLingoLocalSymbol local, WebLingoIrExpression value, WebLingoSourceSpan span) =>
@@ -195,7 +276,8 @@ public sealed class WebLingoLowerer
         {
             HasThis = function.HasThis,
             OptionalCount = optional,
-            IsAsync = function.IsAsync
+            IsAsync = function.IsAsync,
+            Source = function.Source
         };
         return index;
     }

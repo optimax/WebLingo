@@ -59,10 +59,33 @@ internal static class WebLingoClassTables
     /// The first fault of a module's tables of built-in classes, or null: the kinds of values', none or one for each kind,
     /// each -1 or a class; and the runtime errors', each a class, with a code (section 3.7).
     /// </summary>
+    /// <summary>
+    /// A program's files (section 3.9): the program's first, without a function of its own; each other's an
+    /// <c>async</c> function without parameters; every export named.
+    /// </summary>
+    public static string? CheckUnits(IReadOnlyList<WebLingoUnitInfo>? units, Func<int, bool> isUnitFunction)
+    {
+        if (units is null) return "The module has no table of files.";
+        for (var i = 0; i < units.Count; i++)
+        {
+            var unit = units[i];
+            if (unit is null || string.IsNullOrEmpty(unit.Name) || unit.Exports is null) return $"File {i} is missing or has no name.";
+            if (i == 0 ? unit.Function != -1 : !isUnitFunction(unit.Function))
+            {
+                return $"File {i} ('{unit.Name}'): its function, {unit.Function}, is not one that runs a file.";
+            }
+            foreach (var name in unit.Exports)
+            {
+                if (string.IsNullOrEmpty(name)) return $"File {i} ('{unit.Name}') exports a name that is empty.";
+            }
+        }
+        return null;
+    }
+
     public static string? CheckRoles(int classCount, IReadOnlyList<int>? valueClasses, IReadOnlyList<WebLingoErrorClass>? errorClasses)
     {
         if (valueClasses is null || errorClasses is null) return "The module has no tables of built-in classes.";
-        if (valueClasses.Count != 0 && valueClasses.Count != (int)WebLingoValueClass.Task + 1)
+        if (valueClasses.Count != 0 && valueClasses.Count != (int)WebLingoValueClass.Module + 1)
         {
             return $"The module has {valueClasses.Count} classes of values, not one for each kind.";
         }

@@ -16,6 +16,8 @@ public sealed record WebLingoIrProgram(
     IReadOnlyList<WebLingoIrStatement> Statements, IReadOnlyList<string> LocalNames, IReadOnlyList<WebLingoBuiltinSymbol> Builtins)
 {
     public IReadOnlyList<WebLingoIrFunction> Functions { get; init; } = [];
+    /// <summary>Its files, if it imports others, its own first (section 3.9).</summary>
+    public IReadOnlyList<WebLingoIrUnit> Units { get; init; } = [];
     /// <summary>Every class the program declares, at any depth, which <see cref="WebLingoIrMakeClass"/> refers to by index.</summary>
     public IReadOnlyList<WebLingoIrClass> Classes { get; init; } = [];
     /// <summary>The class of <see cref="Classes"/> that is <c>Error</c>, or -1 (section 3.7).</summary>
@@ -51,6 +53,8 @@ public sealed record WebLingoIrFunction(
     string Name, int ParameterCount, IReadOnlyList<string> LocalNames, IReadOnlyList<WebLingoIrCapture> Captures,
     IReadOnlyList<WebLingoIrStatement> Body, WebLingoSourceSpan Span)
 {
+    /// <summary>The file it is in, when it is not the program's own (section 3.9).</summary>
+    public string? Source { get; init; }
     /// <summary>A method's or a constructor's, whose first parameter is <c>this</c>.</summary>
     public bool HasThis { get; init; }
     /// <summary>How many of its last parameters have default values, and so may be left out (section 3.5).</summary>
@@ -203,6 +207,18 @@ public sealed record WebLingoIrStoreCapture(int Capture, WebLingoIrExpression Va
 
 /// <summary>A new closure of the program's function <paramref name="Function"/>.</summary>
 public sealed record WebLingoIrMakeClosure(int Function, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
+
+/// <summary>The program's file <paramref name="Unit"/>'s instance, or the task of running it (section 3.9).</summary>
+public sealed record WebLingoIrImport(int Unit, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
+
+/// <summary>The program's file <paramref name="Unit"/>'s instance, its exports the cells of those locals (section 3.9).</summary>
+public sealed record WebLingoIrMakeModule(int Unit, IReadOnlyList<int> Locals, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
+
+/// <summary>A file the program imports given the closure of its function, which runs it (section 3.9).</summary>
+public sealed record WebLingoIrRegisterUnit(int Unit, WebLingoIrExpression Closure, WebLingoSourceSpan Span) : WebLingoIrStatement(Span);
+
+/// <summary>A file of the program: its name, its function (-1 for the program's own), and its exports' names.</summary>
+public sealed record WebLingoIrUnit(string Name, int Function, IReadOnlyList<string> Exports);
 
 public sealed record WebLingoIrLoadBuiltin(int Builtin, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
 

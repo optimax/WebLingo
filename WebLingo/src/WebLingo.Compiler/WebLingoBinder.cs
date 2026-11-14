@@ -69,9 +69,49 @@ public sealed class WebLingoBinder
 
     public IReadOnlyList<WebLingoDiagnostic> Diagnostics => _diagnostics;
 
-    public WebLingoBoundProgram Bind(WebLingoCompilationUnitSyntax unit)
+    /// <summary>The file being bound, when it is not the program's own (section 3.9), whose diagnostics name it.</summary>
+    private string? _source;
+
+    /// <summary>The top-level scope of the file being bound, where imports and exports stand, and what it exports.</summary>
+    private Scope? _unitScope;
+    private List<(string Name, WebLingoLocalSymbol Local)> _exports = [];
+    private IReadOnlyDictionary<WebLingoImportSyntax, int> _importTargets = new Dictionary<WebLingoImportSyntax, int>();
+
+    public WebLingoBoundProgram Bind(WebLingoCompilationUnitSyntax unit) =>
+        Bind([new WebLingoModuleSource("program", unit, new Dictionary<WebLingoImportSyntax, int>())]);
+
+    /// <summary>
+    /// A program and the files it imports (section 3.9): its own top level as now, each other file's as an <c>async</c>
+    /// function of the scope around it, which sees the built-in classes, but none of the program's names.
+    /// </summary>
+    public WebLingoBoundProgram Bind(IReadOnlyList<WebLingoModuleSource> modules)
     {
-        var statements = BindStatements(unit.Statements);
+        _unitScope = _scope;
+        _importTargets = modules[0].Imports;
+        var units = new List<WebLingoBoundUnit>();
+        // A program that imports, itself included, has a table of its files.
+        var mainInstance = modules.Count > 1 || modules[0].Imports.Count > 0 ? DeclareHidden("module", default) : null;
+        var statements = BindStatements(modules[0].Root.Statements);
+        if (mainInstance is not null) units.Add(new WebLingoBoundUnit(modules[0].Name, null, _exports, mainInstance));
+        for (var i = 1; i < modules.Count; i++)
+        {
+            var module = modules[i];
+            var (outerFunction, outerScope) = (_function, _scope);
+            _source = module.Name;
+            _importTargets = module.Imports;
+            _function = new FunctionContext(_main, module.Name) { IsAsync = true, IsUnit = true };
+            _scope = _unitScope = new Scope(_prelude, _function);
+            _exports = [];
+            var instance = DeclareHidden("module", default);
+            var body = BindStatements(module.Root.Statements);
+            var function = new WebLingoBoundFunction(module.Name, 0, _function.Locals, _function.Captures, body, module.Root.Span)
+            {
+                IsAsync = true,
+                Source = module.Name
+            };
+            units.Add(new WebLingoBoundUnit(module.Name, function, _exports, instance));
+            (_function, _scope, _source) = (outerFunction, outerScope, null);
+        }
         // The built-in classes the program uses are made first, before its own.
         var builtins = new List<WebLingoBoundStatement>();
         var builtinClasses = new List<(string, WebLingoBoundClass)>();
@@ -86,13 +126,18 @@ public sealed class WebLingoBinder
             ErrorClass = _error?.Class,
             ObjectClass = _object?.Class,
             BuiltinClasses = builtinClasses,
-            IsAsync = _main.Awaits
+            IsAsync = _main.Awaits,
+            Units = units
         };
     }
 
     /// <summary>A block's statements, in the current scope, its function declarations declared first.</summary>
     private List<WebLingoBoundStatement> BindStatements(IReadOnlyList<WebLingoStatementSyntax> syntax)
     {
+        // A file's top level may export its declarations and import other files (section 3.9).
+        var exported = new HashSet<WebLingoStatementSyntax>();
+        var imports = new Dictionary<WebLingoImportSyntax, WebLingoBoundImport>();
+        if (HasModuleStatements(syntax)) syntax = DeclareModuleStatements(syntax, exported, imports);
         var declared = new Dictionary<WebLingoStatementSyntax, WebLingoLocalSymbol>();
         foreach (var statement in syntax)
         {
@@ -165,10 +210,91 @@ public sealed class WebLingoBinder
                 statements.Add(new WebLingoBoundExtension(targets[extended], bound, extended.Span));
                 continue;
             }
+            if (statement is WebLingoImportSyntax import)
+            {
+                if (imports.TryGetValue(import, out var boundImport)) statements.Add(boundImport);
+                continue;
+            }
             statements.Add(BindStatement(statement));
         }
+        foreach (var statement in exported) Export(statement, statements, declared);
         OrderClasses(statements);
         return statements;
+    }
+
+    private static bool HasModuleStatements(IReadOnlyList<WebLingoStatementSyntax> syntax)
+    {
+        foreach (var statement in syntax)
+        {
+            if (statement is WebLingoImportSyntax or WebLingoExportSyntax) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// A file's imports and exports (section 3.9), at its top level only: an import declares its names, constants, the
+    /// module's instance under its own name, or a hidden one; an export is its declaration, noted to be exported once
+    /// bound. Gives the statements with each export's declaration in its place.
+    /// </summary>
+    private List<WebLingoStatementSyntax> DeclareModuleStatements(IReadOnlyList<WebLingoStatementSyntax> syntax,
+        HashSet<WebLingoStatementSyntax> exported, Dictionary<WebLingoImportSyntax, WebLingoBoundImport> imports)
+    {
+        var atTop = _scope == _unitScope;
+        var statements = new List<WebLingoStatementSyntax>();
+        foreach (var statement in syntax)
+        {
+            if (statement is WebLingoExportSyntax export)
+            {
+                if (atTop) exported.Add(export.Declaration);
+                else Report(WebLingoDiagnosticCodes.UnexpectedToken, "'export' stands at a module's top level.", export.Span);
+                statements.Add(export.Declaration);
+                continue;
+            }
+            statements.Add(statement);
+            if (statement is not WebLingoImportSyntax import) continue;
+            if (!atTop)
+            {
+                Report(WebLingoDiagnosticCodes.UnexpectedToken, "'import' stands at a module's top level.", import.Span);
+                continue;
+            }
+            if (!_importTargets.TryGetValue(import, out var unit)) continue; // Its module was not found, which is reported.
+            var instance = import.Name is { } name
+                ? Declare(name, WebLingoDeclarationKind.Const, import.NameSpan, null)
+                : DeclareHidden("import " + import.Path, import.Span);
+            if (instance is null) continue;
+            foreach (var imported in import.Names)
+            {
+                if (Declare(imported.Name, WebLingoDeclarationKind.Const, imported.Span, null) is { } alias)
+                {
+                    alias.ImportOf = instance;
+                    alias.ImportName = imported.Name;
+                }
+            }
+            imports.Add(import, new WebLingoBoundImport(unit, instance, import.Span));
+            if (_function == _main) _main.Awaits = true; // Its imports are awaited (section 3.9).
+        }
+        return statements;
+    }
+
+    /// <summary>An exported declaration's local, in a cell, which the file's instance reads (section 3.9).</summary>
+    private void Export(WebLingoStatementSyntax declaration, List<WebLingoBoundStatement> statements,
+        Dictionary<WebLingoStatementSyntax, WebLingoLocalSymbol> declared)
+    {
+        var local = declared.GetValueOrDefault(declaration);
+        if (local is null && declaration is WebLingoVariableDeclarationSyntax variable)
+        {
+            foreach (var bound in statements)
+            {
+                if (bound is WebLingoBoundVariableDeclaration { Local: var candidate } && candidate.Name == variable.Name
+                    && _scope.Locals.TryGetValue(variable.Name, out var inScope) && inScope == candidate)
+                {
+                    local = candidate;
+                }
+            }
+        }
+        if (local is null) return;
+        local.IsCaptured = true;
+        _exports.Add((local.Name, local));
     }
 
     /// <summary>
@@ -320,7 +446,7 @@ public sealed class WebLingoBinder
             case WebLingoReturnSyntax returnStatement:
             {
                 var value = returnStatement.Value is null ? null : BindExpression(returnStatement.Value);
-                if (_function.Parent is null)
+                if (_function.Parent is null || _function.IsUnit)
                 {
                     Report(WebLingoDiagnosticCodes.ReturnOutsideFunction, "'return' is only allowed in a function.", statement.Span);
                 }
@@ -594,7 +720,8 @@ public sealed class WebLingoBinder
         {
             HasThis = isMethod,
             Defaults = defaults,
-            IsAsync = isAsync
+            IsAsync = isAsync,
+            Source = _source
         };
         _function = outerFunction;
         _scope = outerScope;
@@ -764,7 +891,13 @@ public sealed class WebLingoBinder
 
     private WebLingoBoundExpression BindName(WebLingoNameSyntax name)
     {
-        if (LookupLocal(name.Name) is { } local) return Reference(local, name.Span);
+        if (LookupLocal(name.Name) is { } local)
+        {
+            // A name an import takes is its module's export, read as it is when read (section 3.9).
+            return local.ImportOf is { } module
+                ? new WebLingoBoundMember(Reference(module, name.Span), local.ImportName!, name.Span)
+                : Reference(local, name.Span);
+        }
         if (_hostBuiltins.TryGetValue(name.Name, out var builtin)) return new WebLingoBoundBuiltinReference(UseBuiltin(builtin), name.Span);
         Report(WebLingoDiagnosticCodes.UndefinedIdentifier, $"'{name.Name}' is not defined.", name.Span);
         return new WebLingoBoundError(name.Span);
@@ -979,7 +1112,7 @@ public sealed class WebLingoBinder
     }
 
     private void Report(string code, string message, WebLingoSourceSpan span) =>
-        _diagnostics.Add(new WebLingoDiagnostic(code, WebLingoDiagnosticSeverity.Error, message, span));
+        _diagnostics.Add(new WebLingoDiagnostic(code, WebLingoDiagnosticSeverity.Error, message, span) { Source = _source });
 
     /// <summary>A block's scope, chained through Parent; <see cref="Function"/> owns the locals declared in it.</summary>
     private sealed class Scope(Scope? parent, FunctionContext function)
@@ -1010,6 +1143,8 @@ public sealed class WebLingoBinder
         public bool IsAsync { get; set; }
         /// <summary>Whether it awaits: for the program's top level, which is then an <c>async</c> function.</summary>
         public bool Awaits { get; set; }
+        /// <summary>Whether it is a file's top level, an imported module's (section 3.9), where <c>return</c> may not stand.</summary>
+        public bool IsUnit { get; init; }
         /// <summary>The hidden locals of the <c>catch</c> blocks being bound, innermost last, which <c>throw;</c> throws from.</summary>
         public List<(WebLingoLocalSymbol Value, WebLingoLocalSymbol Origin)> Catches { get; } = [];
         /// <summary>The loop depth where each <c>finally</c> block being bound begins, innermost last (WL2012).</summary>

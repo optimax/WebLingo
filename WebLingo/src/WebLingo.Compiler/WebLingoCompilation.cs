@@ -29,14 +29,62 @@ public sealed class WebLingoCompilation
     public static WebLingoCompilation Create(string source, string sourceName, WebLingoCompilerOptions options)
     {
         var syntaxTree = new WebLingoParser(source, sourceName).ParseCompilationUnit();
-        if (syntaxTree.HasErrors) return new WebLingoCompilation(syntaxTree, null, null, syntaxTree.Diagnostics);
+        var modules = new List<WebLingoModuleSource>();
+        var found = new List<WebLingoDiagnostic>(syntaxTree.Diagnostics);
+        Gather(syntaxTree, sourceName, options, modules, found);
+        if (syntaxTree.HasErrors || found.Count > syntaxTree.Diagnostics.Count) return new WebLingoCompilation(syntaxTree, null, null, found);
 
         var binder = new WebLingoBinder(options);
-        var boundProgram = binder.Bind(syntaxTree.Root);
+        var boundProgram = binder.Bind(modules);
         var diagnostics = new List<WebLingoDiagnostic>(syntaxTree.Diagnostics);
         diagnostics.AddRange(binder.Diagnostics);
         if (binder.Diagnostics.Count > 0) return new WebLingoCompilation(syntaxTree, boundProgram, null, diagnostics);
 
         return new WebLingoCompilation(syntaxTree, boundProgram, WebLingoLowerer.Lower(boundProgram), diagnostics);
+    }
+
+    /// <summary>
+    /// The program's files (section 3.9): its own, then each file an import names at a file's top level, found by the
+    /// host's resolver, parsed once however many import it, in the order they are first named. A file that cannot be
+    /// found is WL2015, and a file's syntax errors are reported, each naming its file.
+    /// </summary>
+    private static void Gather(WebLingoSyntaxTree main, string mainName, WebLingoCompilerOptions options,
+        List<WebLingoModuleSource> modules, List<WebLingoDiagnostic> diagnostics)
+    {
+        var indexes = new Dictionary<string, int>(StringComparer.Ordinal) { [mainName] = 0 };
+        var roots = new List<(string Name, WebLingoCompilationUnitSyntax Root, Dictionary<WebLingoImportSyntax, int> Imports)>
+        {
+            (mainName, main.Root, new Dictionary<WebLingoImportSyntax, int>())
+        };
+        for (var i = 0; i < roots.Count; i++)
+        {
+            var (name, root, imports) = roots[i];
+            var source = i == 0 ? null : name;
+            foreach (var statement in root.Statements)
+            {
+                if (statement is not WebLingoImportSyntax import || import.Path.Length == 0) continue;
+                string? error;
+                if (options.Resolver is not { } resolver)
+                {
+                    error = "this host finds no modules";
+                }
+                else if (resolver.TryResolve(name, import.Path, out var resolved, out var text, out error))
+                {
+                    if (!indexes.TryGetValue(resolved, out var index))
+                    {
+                        index = roots.Count;
+                        indexes.Add(resolved, index);
+                        var tree = new WebLingoParser(text, resolved).ParseCompilationUnit();
+                        foreach (var diagnostic in tree.Diagnostics) diagnostics.Add(diagnostic with { Source = resolved });
+                        roots.Add((resolved, tree.Root, new Dictionary<WebLingoImportSyntax, int>()));
+                    }
+                    imports[import] = index;
+                    continue;
+                }
+                diagnostics.Add(new WebLingoDiagnostic(WebLingoDiagnosticCodes.ModuleNotFound, WebLingoDiagnosticSeverity.Error,
+                    $"The module '{import.Path}' cannot be imported: {error}.", import.PathSpan) { Source = source });
+            }
+        }
+        foreach (var (name, root, imports) in roots) modules.Add(new WebLingoModuleSource(name, root, imports));
     }
 }

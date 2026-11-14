@@ -53,7 +53,8 @@ public sealed class WebLingoCodeGenerator
             {
                 HasThis = function.HasThis,
                 OptionalCount = function.OptionalCount,
-                IsAsync = function.IsAsync
+                IsAsync = function.IsAsync,
+                Source = function.Source
             });
         }
         if (main is null || functions.Count != program.Functions.Count) return null;
@@ -64,11 +65,20 @@ public sealed class WebLingoCodeGenerator
         {
             Functions = functions,
             Classes = WebLingoClassTable.Of(program),
+            Units = UnitsOf(program),
             ErrorClass = program.ErrorClass,
             ObjectClass = program.ObjectClass,
             ValueClasses = program.ValueClasses,
             ErrorClasses = ErrorClassesOf(program)
         };
+    }
+
+    /// <summary>The program's files, if it imports others (section 3.9).</summary>
+    private static List<WebLingoUnitInfo> UnitsOf(WebLingoIrProgram program)
+    {
+        var units = new List<WebLingoUnitInfo>();
+        foreach (var unit in program.Units) units.Add(new WebLingoUnitInfo(unit.Name, unit.Function, unit.Exports));
+        return units;
     }
 
     private static WebLingoFunction? GenerateFunction(ModuleState module, string name, int parameterCount,
@@ -160,6 +170,14 @@ public sealed class WebLingoCodeGenerator
             case WebLingoIrThrow throwStatement:
                 Emit(new WebLingoInstruction(WebLingoOpCode.Throw, EmitExpression(throwStatement.Value, null)), throwStatement.Span);
                 break;
+            case WebLingoIrRegisterUnit registered:
+            {
+                var mark = _nextRegister;
+                var closure = EmitExpression(registered.Closure, null);
+                _nextRegister = mark;
+                Emit(new WebLingoInstruction(WebLingoOpCode.RegisterUnit, registered.Unit, closure), registered.Span);
+                break;
+            }
             case WebLingoIrExtend extension:
                 Emit(new WebLingoInstruction(WebLingoOpCode.Extend, EmitExpression(extension.Target, null), extension.Class), extension.Span);
                 break;
@@ -440,6 +458,24 @@ public sealed class WebLingoCodeGenerator
                 _nextRegister = mark; // The operation reads its operands before it writes its destination.
                 var destination = target ?? Allocate();
                 Emit(new WebLingoInstruction(OpCodeOf(binary.Operator), destination, left, right), binary.Span);
+                return destination;
+            }
+            case WebLingoIrImport import:
+            {
+                var destination = target ?? Allocate();
+                Emit(new WebLingoInstruction(WebLingoOpCode.Import, destination, import.Unit), import.Span);
+                return destination;
+            }
+            case WebLingoIrMakeModule made:
+            {
+                // Its exports' cells, as they are, in consecutive registers.
+                var mark = _nextRegister;
+                var first = _nextRegister;
+                foreach (var local in made.Locals) Emit(new WebLingoInstruction(WebLingoOpCode.Move, Allocate(), local), made.Span);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WebLingoInstruction(WebLingoOpCode.MakeModule, destination, made.Unit, made.Locals.Count == 0 ? 0 : first,
+                    made.Locals.Count), made.Span);
                 return destination;
             }
             case WebLingoIrNewArray array:

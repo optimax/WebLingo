@@ -42,7 +42,8 @@ public sealed class WebLingoStackCodeGenerator
             {
                 HasThis = function.HasThis,
                 OptionalCount = function.OptionalCount,
-                IsAsync = function.IsAsync
+                IsAsync = function.IsAsync,
+                Source = function.Source
             });
         }
         if (main is null || functions.Count != program.Functions.Count) return null;
@@ -53,11 +54,20 @@ public sealed class WebLingoStackCodeGenerator
         {
             Functions = functions,
             Classes = WebLingoClassTable.Of(program),
+            Units = UnitsOf(program),
             ErrorClass = program.ErrorClass,
             ObjectClass = program.ObjectClass,
             ValueClasses = program.ValueClasses,
             ErrorClasses = ErrorClassesOf(program)
         };
+    }
+
+    /// <summary>The program's files, if it imports others (section 3.9).</summary>
+    private static List<WebLingoUnitInfo> UnitsOf(WebLingoIrProgram program)
+    {
+        var units = new List<WebLingoUnitInfo>();
+        foreach (var unit in program.Units) units.Add(new WebLingoUnitInfo(unit.Name, unit.Function, unit.Exports));
+        return units;
     }
 
     private static WebLingoStackFunction? GenerateFunction(ModuleState module, string name, int parameterCount,
@@ -151,6 +161,10 @@ public sealed class WebLingoStackCodeGenerator
             case WebLingoIrThrow throwStatement:
                 EmitValue(throwStatement.Value);
                 Emit(WebLingoStackOpCode.Throw, throwStatement.Span);
+                break;
+            case WebLingoIrRegisterUnit registered:
+                EmitValue(registered.Closure);
+                Emit(WebLingoStackOpCode.RegisterUnit, registered.Span, registered.Unit);
                 break;
             case WebLingoIrExtend extension:
                 EmitValue(extension.Target);
@@ -313,6 +327,14 @@ public sealed class WebLingoStackCodeGenerator
             case WebLingoIrAwait awaited:
                 EmitValue(awaited.Value);
                 Emit(WebLingoStackOpCode.Await, awaited.Span);
+                return;
+            case WebLingoIrImport import:
+                Emit(WebLingoStackOpCode.Import, import.Span, import.Unit);
+                return;
+            case WebLingoIrMakeModule made:
+                // Its exports' cells, as they are.
+                foreach (var local in made.Locals) Emit(WebLingoStackOpCode.LoadLocal, made.Span, local);
+                Emit(WebLingoStackOpCode.MakeModule, made.Span, made.Unit, made.Locals.Count);
                 return;
             case WebLingoIrHold hold:
                 EmitValue(hold.Instance);
@@ -669,6 +691,9 @@ public sealed class WebLingoStackCodeGenerator
             WebLingoStackOpCode.Dispose => (1, 0),
             WebLingoStackOpCode.Extend => (1, 0),
             WebLingoStackOpCode.Hold => (2, 1),
+            WebLingoStackOpCode.Import => (0, 1),
+            WebLingoStackOpCode.RegisterUnit => (1, 0),
+            WebLingoStackOpCode.MakeModule => (b, 1),
             WebLingoStackOpCode.Throw => (1, 0),
             WebLingoStackOpCode.ToText => (1, 1),
             WebLingoStackOpCode.IsInstance => (2, 1),

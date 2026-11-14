@@ -23,6 +23,7 @@ public static class WebLingoValueFormatter
             WebLingoValueKind.Instance when heap.IsHolding(value) => Held(value, heap),
             WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Instance => FormatCollection(value, heap),
             WebLingoValueKind.Class => "class " + heap.ClassName(value),
+            WebLingoValueKind.Module => "module " + heap.ModuleName(value),
             _ => Format(value)
         };
     }
@@ -41,6 +42,7 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.BoundMethod => "function",
         WebLingoValueKind.Missing => "missing",
         WebLingoValueKind.Task => "task",
+        WebLingoValueKind.Module => $"module#{value.Handle}",
         WebLingoValueKind.Boolean => value.AsBoolean ? "true" : "false",
         WebLingoValueKind.Int64 => value.AsInt64.ToString(CultureInfo.InvariantCulture),
         _ => FormatBinary64(value.AsBinary64)
@@ -60,6 +62,7 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Map => "a map",
         WebLingoValueKind.Set => "a set",
         WebLingoValueKind.Task => "a task",
+        WebLingoValueKind.Module => "a module",
         _ => $"the number {Format(value)}"
     };
 
@@ -68,6 +71,7 @@ public static class WebLingoValueFormatter
     {
         WebLingoValueKind.Instance => $"an instance of {heap.ClassName(heap.ClassOf(value))}",
         WebLingoValueKind.Class => $"the class {heap.ClassName(value)}",
+        WebLingoValueKind.Module => $"the module {heap.ModuleName(value)}",
         _ => Describe(value)
     };
 

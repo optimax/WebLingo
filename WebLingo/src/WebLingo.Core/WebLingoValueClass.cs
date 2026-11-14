@@ -15,5 +15,6 @@ public enum WebLingoValueClass
     Set,
     Function,
     Class,
-    Task
+    Task,
+    Module
 }

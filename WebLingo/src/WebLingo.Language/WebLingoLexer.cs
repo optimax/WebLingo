@@ -146,6 +146,8 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
             "async" => WebLingoTokenKind.Async,
             "await" => WebLingoTokenKind.Await,
             "extend" => WebLingoTokenKind.Extend,
+            "import" => WebLingoTokenKind.Import,
+            "export" => WebLingoTokenKind.Export,
             "return" => WebLingoTokenKind.Return,
             _ => WebLingoTokenKind.Identifier
         };

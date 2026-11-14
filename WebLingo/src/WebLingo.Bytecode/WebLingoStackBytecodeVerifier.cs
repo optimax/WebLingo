@@ -65,6 +65,12 @@ public sealed class WebLingoStackBytecodeVerifier
         {
             return Fail(rolesError);
         }
+        if (WebLingoClassTables.CheckUnits(module.Units,
+                index => index >= 0 && index < methods.Count && methods[index] is { IsAsync: true, ParameterCount: 0, HasThis: false })
+            is { } unitsError)
+        {
+            return Fail(unitsError);
+        }
         var result = VerifyFunction(module, module.EntryPoint);
         for (var i = 0; i < module.Functions.Count && result.IsValid; i++)
         {
@@ -160,6 +166,13 @@ public sealed class WebLingoStackBytecodeVerifier
                 return Index(a, function.Code.Count, "target instruction") ?? Index(b, function.LocalCount, "local");
             case WebLingoStackOpCode.LoadBuiltin:
                 return Index(a, module.Imports.Count, "import") ?? Unused(b);
+            case WebLingoStackOpCode.Import:
+                return Index(a, module.Units.Count, "file") ?? Unused(b);
+            case WebLingoStackOpCode.RegisterUnit:
+                return (a >= 1 && a < module.Units.Count ? null : $"its file, {a}, is not one the program imports.") ?? Unused(b);
+            case WebLingoStackOpCode.MakeModule:
+                return Index(a, module.Units.Count, "file")
+                    ?? (b == module.Units[a].Exports.Count ? null : $"its cell count, {b}, is not file {a}'s {module.Units[a].Exports.Count} exports.");
             case WebLingoStackOpCode.MakeClass:
             case WebLingoStackOpCode.Extend:
             {
@@ -415,6 +428,9 @@ public sealed class WebLingoStackBytecodeVerifier
         WebLingoStackOpCode.Dispose => (1, 0),
         WebLingoStackOpCode.Extend => (1, 0),
         WebLingoStackOpCode.Hold => (2, 1),
+        WebLingoStackOpCode.Import => (0, 1),
+        WebLingoStackOpCode.RegisterUnit => (1, 0),
+        WebLingoStackOpCode.MakeModule => (instruction.B, 1),
         WebLingoStackOpCode.Throw => (1, 0),
         WebLingoStackOpCode.Rethrow => (2, 0),
         WebLingoStackOpCode.ToText => (1, 1),

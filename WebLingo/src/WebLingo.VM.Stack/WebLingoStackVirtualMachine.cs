@@ -178,6 +178,10 @@ public sealed class WebLingoStackVirtualMachine
             heap.AddRoots(_valueClasses);
             heap.AddRoots(_errorClasses);
             heap.AddRoots(_main);
+            _modules = new WebLingoValue[module.Units.Count];
+            _unitClosures = new WebLingoValue[module.Units.Count];
+            heap.AddRoots(_modules);
+            heap.AddRoots(_unitClosures);
             heap.AddRoots(frame.Slots);
             heap.AddRoots(frame.Closure);
             _scheduler = new WebLingoScheduler(heap, context.Clock);
@@ -213,15 +217,13 @@ public sealed class WebLingoStackVirtualMachine
                         if (executed >= budget)
                         {
                             return Failure(WebLingoDiagnosticCodes.BudgetExceeded,
-                                    $"The program ran {executed} instructions, its whole budget, and was stopped.",
-                                    SpanOf(frame.Function, pc))
+                                    $"The program ran {executed} instructions, its whole budget, and was stopped.", frame.Function, pc)
                                 with { Instructions = executed };
                         }
                         if (cancellation is not null && executed % CancellationInterval == 0
                             && cancellation.IsCancellationRequested)
                         {
-                            var span = SpanOf(frame.Function, pc);
-                            return Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled.", span)
+                            return Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled.", frame.Function, pc)
                                 with { Instructions = executed };
                         }
                         dueAt = Math.Min(budget, (executed / CancellationInterval + 1) * CancellationInterval);
@@ -491,7 +493,7 @@ public sealed class WebLingoStackVirtualMachine
                                 constructed = WebLingoValue.Null;
                                 goto call;
                             }
-                            if (target.Kind == WebLingoValueKind.Class)
+                            if (target.Kind is WebLingoValueKind.Class or WebLingoValueKind.Module)
                             {
                                 // A static member, called as any function is (section 3.7).
                                 if (!WebLingoMembers.TryGet(target, name.Member, name.Text, heap, false, out callee, out error)) break;
@@ -541,6 +543,26 @@ public sealed class WebLingoStackVirtualMachine
                             pc++;
                             continue;
                         }
+                        case WebLingoStackOpCode.RegisterUnit:
+                            _unitClosures[ins.A] = slots[--sp];
+                            pc++;
+                            continue;
+                        case WebLingoStackOpCode.MakeModule:
+                            if (!TryMakeModule(ins.A, slots, sp - ins.B, ins.B, out slots[sp - ins.B], out error)) break;
+                            sp -= ins.B - 1;
+                            pc++;
+                            continue;
+                        case WebLingoStackOpCode.Import:
+                            slots[sp] = Imported(ins.A);
+                            if (slots[sp].Kind == WebLingoValueKind.Module)
+                            {
+                                sp++;
+                                pc++;
+                                continue;
+                            }
+                            // Its first import: its function runs, as a call, whose task the code awaits (section 3.9).
+                            Pend(_unitClosures[ins.A], 0);
+                            break;
                         case WebLingoStackOpCode.Hold:
                             // hold(this, value): the built-in classes' constructors' (section 3.7).
                             if (!heap.TrySetHeld(slots[sp - 2], slots[sp - 1], out error)) break;
@@ -1082,13 +1104,10 @@ public sealed class WebLingoStackVirtualMachine
                         callee = _operator;
                         _operator = WebLingoValue.Null;
                         if (sp == slots.Length) slots = Grown(frame, slots);
-                        slots[sp] = slots[sp - 1];
-                        slots[sp - 1] = slots[sp - 2];
-                        slots[sp - 2] = callee;
-                        sp++;
+                        sp = BelowOperands(slots, sp, _operatorCount, callee);
                         self = WebLingoValue.Null;
-                        firstArgument = sp - 2;
-                        argumentCount = 2;
+                        firstArgument = sp - _operatorCount;
+                        argumentCount = _operatorCount;
                         constructed = WebLingoValue.Null;
                         goto call;
                     }
@@ -1105,7 +1124,7 @@ public sealed class WebLingoStackVirtualMachine
                     // A runtime error: one that cannot be caught stops the program, and any other is thrown (section 3.7).
                     if (!WebLingoExceptions.IsCatchable(error!.Code))
                     {
-                        return Failure(error.Code, error.Message, SpanOf(frame.Function, pc)) with { Instructions = executed };
+                        return Failure(error.Code, error.Message, frame.Function, pc) with { Instructions = executed };
                     }
                     _thrown = WebLingoValue.Null;
                     _thrownError = error;
@@ -1158,8 +1177,7 @@ public sealed class WebLingoStackVirtualMachine
                                                   or IndexOutOfRangeException)
             {
                 // Only bytecode the verifier cannot judge (a local of the wrong kind) gets here.
-                return Failure(WebLingoDiagnosticCodes.BytecodeVerificationFailure, $"The bytecode is invalid: {exception.Message}",
-                    SpanOf(frame.Function, pc)) with { Instructions = executed };
+                return Failure(WebLingoDiagnosticCodes.BytecodeVerificationFailure, $"The bytecode is invalid: {exception.Message}", frame.Function, pc) with { Instructions = executed };
             }
         }
 
@@ -1407,6 +1425,22 @@ public sealed class WebLingoStackVirtualMachine
         /// </summary>
         private WebLingoValue _operator;
         private readonly WebLingoValue[] _operands = new WebLingoValue[2];
+        private int _operatorCount = 2;
+
+        /// <summary>A call that an operation leaves to where its failure leads: a file's function, which an import runs.</summary>
+        private void Pend(WebLingoValue callee, int count)
+        {
+            _operator = callee;
+            _operatorCount = count;
+        }
+
+        /// <summary>The callee put below the call's operands on the stack, as a call's callee is, the stack one slot deeper.</summary>
+        private static int BelowOperands(WebLingoValue[] slots, int sp, int count, WebLingoValue callee)
+        {
+            for (var i = 0; i < count; i++) slots[sp - i] = slots[sp - i - 1];
+            slots[sp - count] = callee;
+            return sp + 1;
+        }
 
         /// <summary>The name of the operator a class may declare for an operation, or null for one it may not.</summary>
         private static string? OperatorName(WebLingoStackOpCode opCode) => opCode switch
@@ -1429,6 +1463,7 @@ public sealed class WebLingoStackVirtualMachine
             if (OperatorName(opCode) is not { } name || !WebLingoMembers.TryFindOperator(name, left, right, heap, out _operator)) return false;
             _operands[0] = left;
             _operands[1] = right;
+            _operatorCount = 2;
             return true;
         }
 
@@ -1444,6 +1479,26 @@ public sealed class WebLingoStackVirtualMachine
             heap.AddRoots(frame.Closure);
             return grown;
         }
+
+        /// <summary>
+        /// The program's files' instances, once each has begun to run, and the closures of their functions, which run them
+        /// (section 3.9); roots.
+        /// </summary>
+        private WebLingoValue[] _modules = [];
+        private WebLingoValue[] _unitClosures = [];
+
+        /// <summary>A file's instance, from then on the one its imports get (section 3.9).</summary>
+        private bool TryMakeModule(int unit, WebLingoValue[] values, int first, int count, out WebLingoValue made,
+            out WebLingoRuntimeError? error)
+        {
+            var info = module.Units[unit];
+            if (!heap.TryAllocateModule(info.Name, info.Exports, values, first, count, out made, out error)) return false;
+            _modules[unit] = made;
+            return true;
+        }
+
+        /// <summary>What <c>Import</c> gives at once: a file's instance, if it has begun to run; else null, its function to run.</summary>
+        private WebLingoValue Imported(int unit) => _modules[unit];
 
         /// <summary>What an <c>await</c> waits for, on its way to the code that suspends the frame.</summary>
         private WebLingoValue _awaited;
@@ -1649,7 +1704,7 @@ public sealed class WebLingoStackVirtualMachine
             value.Kind is WebLingoValueKind.Instance or WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set;
 
         /// <summary>The kinds of values' classes, by <c>WebLingoValueClass</c>, once the module has made them (section 3.7); a root.</summary>
-        private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.Task + 1];
+        private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.Module + 1];
 
         /// <summary>The kinds of runtime errors' classes, as <c>module.ErrorClasses</c> lists them, once made; a root.</summary>
         private readonly WebLingoValue[] _errorClasses = new WebLingoValue[module.ErrorClasses.Count];
@@ -1746,6 +1801,14 @@ public sealed class WebLingoStackVirtualMachine
             return owner is null || pc < 0 ? new WebLingoSourceSpan(0, 0) : SpanOf(owner, pc);
         }
 
+        /// <summary>The function an origin is in, or null.</summary>
+        private WebLingoStackFunction? OwnerOfOrigin(long origin)
+        {
+            var (function, _) = WebLingoExceptions.FromOrigin(origin);
+            return function == 0 ? module.EntryPoint
+                : function > 0 && function <= module.Functions.Count ? module.Functions[function - 1] : null;
+        }
+
         /// <summary>The exception being thrown as a value, a runtime error made an Error; false if it cannot be one.</summary>
         private bool TryTakeException(out WebLingoValue exception)
         {
@@ -1766,7 +1829,8 @@ public sealed class WebLingoStackVirtualMachine
             var (code, message) = _thrownError is { } error
                 ? (error.Code, error.Message)
                 : WebLingoExceptions.Uncaught(_thrown, _errorClass[0], heap);
-            return Failure(code, message, SpanOfOrigin(_origin)) with { Instructions = executed };
+            var failure = Failure(code, message, SpanOfOrigin(_origin)) with { Instructions = executed };
+            return OwnerOfOrigin(_origin)?.Source is { } source ? failure with { Error = failure.Error! with { Source = source } } : failure;
         }
 
         /// <summary>The first handler whose region holds the instruction, or -1.</summary>
@@ -1954,4 +2018,8 @@ public sealed class WebLingoStackVirtualMachine
 
     private static WebLingoExecutionResult Failure(string code, string message, WebLingoSourceSpan span) =>
         new(false, new WebLingoDiagnostic(code, WebLingoDiagnosticSeverity.Error, message, span));
+
+    /// <summary>A failure at an instruction of a function, naming the file the function is in, if not the program's (section 3.9).</summary>
+    private static WebLingoExecutionResult Failure(string code, string message, WebLingoStackFunction function, int pc) =>
+        new(false, new WebLingoDiagnostic(code, WebLingoDiagnosticSeverity.Error, message, SpanOf(function, pc)) { Source = function.Source });
 }

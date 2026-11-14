@@ -5,7 +5,7 @@ namespace WebLingo.Runtime;
 /// a BoundMethod (a method and the instance it runs on) refer to an object of a heap by
 /// handle; a Builtin is a host built-in, by its import index; a Cell is never a script's value, only a frame's.
 /// </summary>
-public enum WebLingoValueKind : byte { Null, Boolean, Int64, Binary64, String, Function, Builtin, Cell, Array, Map, Set, Class, Instance, BoundMethod, Missing, Task }
+public enum WebLingoValueKind : byte { Null, Boolean, Int64, Binary64, String, Function, Builtin, Cell, Array, Map, Set, Class, Instance, BoundMethod, Missing, Task, Module }
 
 /// <summary>
 /// A runtime value (specification, section 4.1): a kind and a 64-bit payload, 16 bytes in all. M0.6 has null,
