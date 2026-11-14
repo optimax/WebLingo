@@ -58,6 +58,7 @@ public static class WsMembers
             {
                 return heap.TryAllocateBoundMethod(target, classMethod, out result, out error);
             }
+            if (heap.TryGetStatic(collectionClass, name, out result)) return true;
         }
         if (target.Kind == WsValueKind.Instance)
         {
@@ -67,6 +68,8 @@ public static class WsMembers
             {
                 return heap.TryAllocateBoundMethod(target, method, out result, out error, member == WsMember.Dispose);
             }
+            // Its class's static member, which its own members shadow (section 3.7).
+            if (heap.TryGetStatic(heap.ClassOf(target), name, out result)) return true;
             // An instance holding a value has that value's members too, its string's length (section 3.7).
             if (heap.IsHolding(target)) return TryGet(heap.Held(target), member, name, heap, optional, out result, out error);
             if (optional) return true;
@@ -213,7 +216,7 @@ public static class WsMembers
         if (!IsClassedCollection(target, heap, out var classValue)) return false;
         if (heap.TryGetField(target, name, out callee)) return true;
         isMethod = heap.TryGetMethod(classValue, name, out callee);
-        return isMethod;
+        return isMethod || heap.TryGetStatic(classValue, name, out callee);
     }
 
     /// <summary>
@@ -228,6 +231,8 @@ public static class WsMembers
         if (heap.TryGetField(instance, name, out callee)) return true;
         isMethod = heap.TryGetMethod(heap.ClassOf(instance), name, out callee);
         if (isMethod) return true;
+        // Its class's static member, called as any function is, which its own members shadow (section 3.7).
+        if (heap.TryGetStatic(heap.ClassOf(instance), name, out callee)) return true;
         error = NoSuchMember(instance, name, heap);
         return false;
     }

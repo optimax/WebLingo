@@ -184,9 +184,19 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 
 2026-11-13: M0.13 now, after M0.12, templates (specification, section 9); waits for M0.12.
 
-## Static Members Callable on Instances
+## [WORKING] Static Members Callable on Instances
 
 Let's make sure that class static members are accessible through instance references (unless shadowed by the instance member) as well as class references. 
+
+Done (Claude, 2026-11-14): on both VMs, with their conformance tests; recorded in the specification, section 3.7 ("Static members"), and section 15.2 ("Static members"). What assigning one through an instance does is asked in "Static Members Through Instances, Continued". Checks: the Release build, without warnings, the 1,528 tests, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [QUESTION] Static Members Through Instances, Continued
+
+A follow-up to "Static Members Callable on Instances". Added by Claude, 2026-11-14.
+
+**Q1, `p.count = 5`, where `count` is a static field of `p`'s class: (a) it assigns a field of the instance, which then shadows the static, as built; (b) it assigns the static field, as Java does.**
+
+A1:
 
 ## [DEFER] Adding Methods at Run Time
 
@@ -221,8 +231,30 @@ If text that rebuilds a value (round-trip text) is wanted, it is a serialization
 
 It is deferred: nothing needs it yet, and it can be added later, if it proves necessary, without changing `write`'s text or any program.
 
-## Properties
+## [QUESTION] Properties
 
 With getters and setters.
+
+The design needs the owner's decisions first. One decision each, answerable with "yes" or a letter. Questions added by Claude, 2026-11-14.
+
+**Q1, declaring one: (a) `get area() { return this.w * this.h; }` and `set area(value) { … }` in a class, as JavaScript does; (b) a block, `property area { get { … } set(value) { … } }`, as C# groups them.**
+
+A1:
+
+**Q2, using one: `p.area` runs its getter, and `p.area = 5` its setter, with `5`; a property with only a getter cannot be assigned (WS3001), and one with only a setter cannot be read (WS3006). Agreed?**
+
+A2:
+
+**Q3, a property and a field of the same name: (a) the property wins, always, so a setter keeps its value in a field of another name (`this._area`), as in JavaScript; (b) a property's own field, `field` inside its getter and setter, as C# 14 has it, which nothing else can reach.**
+
+A3:
+
+**Q4, where else: static properties (`static get count() { … }`), properties in `extend` blocks, a subclass's replacing its base's, and `super.area` reading the base's, all as methods do. Agreed?**
+
+A4:
+
+**Q5, text: `write` writes an instance's fields, as now, and not its properties, which are computed. Agreed?**
+
+A5:
 
 # END-OF-TO-DO

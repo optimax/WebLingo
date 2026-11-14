@@ -383,6 +383,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class T { static operator +(a, b) { throw \"no\"; } } try { new T() + 1; } catch (e) { writeLn(e); }", "no")]
     [InlineData("class V { constructor(x) { this.x = x; } static operator +(a, b) { return new V(a.x + b.x); } static operator <(a, b) { return a.x < b.x; } } writeLn([1, 2, (new V(1) + new V(2)).x, [3, [4, (new V(5) + new V(6)).x]]]);", "[1, 2, 3, [3, [4, 11]]]")]
     [InlineData("class S { static operator >=(a, b) { return true; } static operator <=(a, b) { return false; } } writeLn([new S() >= 1, new S() <= 1, new S() == new S()]);", "[true, false, false]")]
+    [InlineData("class A { static var n = 1; static make(x) { return x * 2; } } var a = new A(); writeLn([a.n, a.make(4), A.n]);", "[1, 8, 1]")]
+    [InlineData("class A { static var n = 1; static m() { return \"static\"; } m() { return \"method\"; } } var a = new A(); a.n = 5; writeLn([a.n, A.n, a.m()]);", "[5, 1, \"method\"]")]
+    [InlineData("class A { static var n = 1; static f() { return 1; } } class B extends A {} var b = new B(); A.n = 2; writeLn([b.n, b?.n, b?.missing]); var g = b.f; writeLn(g == A.f);", "[2, 2, null]\ntrue")]
+    [InlineData("class A { static var k = \"s\"; } var a = new A(); a.k = function () { return \"field\"; }; writeLn(a.k()); class S extends Array { static var size = 3; } writeLn(new S().size);", "field\n3")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -461,7 +465,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A { dispose() {} } new A().dispose(1);", "WS2006")]
     [InlineData("class A { dispose(x) {} } using (var a = new A()) {}", "WS2006")]
     [InlineData("class A { static m() {} } A.m = 1;", "WS3001")]
-    [InlineData("class A { static var n = 1; } writeLn(new A().n);", "WS3006")]
+    [InlineData("class A { static var n = 1; } writeLn(new A().m);", "WS3006")]
     [InlineData("class A { static m(x) {} } A.m();", "WS2006")]
     [InlineData("class A { m() { return super.m(); } } new A().m();", "WS3006")]
     [InlineData("new Object().equal();", "WS2006")]
