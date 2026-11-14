@@ -913,3 +913,46 @@ Q6, the runtime errors' classes, each extending `Error`: `InitializationError` (
 A6: (a).
 
 Done (Claude, 2026-11-13, `31d35c3`): recorded as approved in the specification, section 3.7 ("Classes of values", "Equality", "Typed catches", "`is`" and the runtime errors' classes) and its decision register. A1's extending of `Array`, `Map` and `Set`, A5's question, and what is left of A1 are asked in "Classes of Values, Continued".
+
+## [DONE] Typed Catches
+
+A `catch` that catches only some exceptions (A7 of "M0.10 Syntax: Static Members, `Object` and Exceptions"; specification, section 3.7), on both VMs. Its syntax, and how a `catch` names what it catches, will be proposed as questions once exceptions are implemented. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for M0.10.6.
+
+2026-11-13: exceptions are implemented; the questions below, one decision each, answerable with "yes" or a letter.
+
+Q1, syntax: (a) `catch (e: NotFound) { … }`, the class after a colon; (b) `catch (NotFound e) { … }`, the class before the name, as C# and Java write it.
+
+A1: (b).
+
+Q2, several catches: a `try` may have several, `catch (e: A) { … } catch (e: B) { … } catch (e) { … }`. An exception goes to the first whose class it is an instance of, a class extending it included; a catch without a class catches any exception, and only the last may be one; an exception that none catches goes on outward, after the `finally`. Agreed?
+
+A2: Yes.
+
+Q3, what names the class: (a) any expression that gives a class, evaluated when an exception reaches the catch (`catch (e: errors.NotFound)`); (b) only a class's name, as it is in scope there.
+
+A3: A middle ground: allow dotted names only (a.b.C), with no calls or arbitrary expressions. That covers the `errors.NotFound` case and still has nothing that can fail or have side effects.
+
+Q4, a catch's class that is not a class when an exception reaches it (`var A = 5;` … `catch (e: A)`): (a) WS3001, which replaces the exception; (b) the catch does not match, and the exception goes on.
+
+A4: Can we make the internals such that any value is implicitly an instance of a class, in this case `Integer`?
+
+Q5, runtime errors' classes: (a) every runtime error is an `Error`, told apart by its `code`, as now; (b) each kind has a class of its own, extending `Error` (`TypeError` for WS3001, `IndexError` for WS3005, `KeyError` for WS3007, and so on), so that a catch can name one kind.
+
+A5: (b).
+
+Q6, a thrown value that is not an instance (`throw "x";`): (a) only a catch without a class catches it; (b) a catch may name a kind of value too (`catch (e: String)`), which needs names for the kinds.
+
+A6: (b), especially if we can make every value an instance of a class.
+
+Q7, the same test outside a catch: `x is Point`, true when `x` is an instance of `Point` or of a class extending it. (a) Add it now, with typed catches; (b) not now.
+
+A7: (a).
+
+2026-11-13: recorded as approved in the specification, section 3.7 ("Typed catches", "`is`", and the runtime errors' classes): A1, A2, A3 (dotted names), A5, A6 and A7. A4 asks whether every value could be an instance of a class: it can, and "Typed Catches Syntax: Classes of Values" proposes how, with Q4 asked again and the runtime errors' class names. Waits for those answers.
+
+2026-11-13: answered ("Typed Catches Syntax: Classes of Values"); next, but for extending `Array`, `Map` and `Set`, which waits for "Classes of Values, Continued", and the equality a catch whose name is not a class uses, `==` until then (Q1 there).
+
+
+Done (Claude, 2026-11-13, `f0fd61d`): `catch (KeyError e)`, several catches tried in order, the last of which may catch anything, dotted names, an exception none catches going on after the `finally`; `x is Point`; every value's class (`5 is Integer`, `catch (String e)`), `null` having none; every value's `equal`; and every runtime error an instance of its kind's class (`IndexError`, `KeyError`, …), on both VMs. One new operation, `IsInstance`. Choices of mine, in section 15.2 as proposed (row "Typed catches and classes of values"): a catch's class is evaluated when an exception reaches it; a catch-everything before the last is WS1001; the built-in classes are added to a program that names them, every runtime error's to one with a `try` or a `using`; the kinds of values' classes are sealed, `Array`, `Map` and `Set` too until "Classes That Extend Array, Map and Set"; a catch whose name is not a class compares with `==` until Q1 of "Classes of Values, Continued" is answered. Two conformance cases changed for decisions of yours: `n.equal(5)` is no longer WS3006, and a caught index error is an `IndexError`. Every new conformance case gives the same result on both VMs. Build and 1,238 tests pass on Windows; Linux not tried.
