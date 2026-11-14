@@ -617,6 +617,7 @@ public sealed class WsBinder
                     "'super' is either called, 'super(…)', or names a member of the base class, 'super.name'.", expression.Span);
                 return new WsBoundError(expression.Span);
             case WsIsExpressionSyntax test:
+                UseObject(); // A name that is not a class calls equal(), Object's for a value that is not an instance.
                 return new WsBoundIs(BindExpression(test.Value), BindExpression(test.Class), test.Span);
             case WsThisSyntax self:
             {

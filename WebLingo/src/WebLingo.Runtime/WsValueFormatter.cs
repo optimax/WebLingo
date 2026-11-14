@@ -151,7 +151,7 @@ public static class WsValueFormatter
             {
                 if (open.Contains(item.Handle))
                 {
-                    text.Append(item.Kind switch
+                    text.Append(ClassPrefix(item, heap)).Append(item.Kind switch
                     {
                         WsValueKind.Map => "{…}",
                         WsValueKind.Set => "#{…}",
@@ -171,7 +171,7 @@ public static class WsValueFormatter
     private static void Open(WsValue collection, StringBuilder text, HashSet<int> open, Stack<(WsValue, int)> pending,
         WsHeap heap)
     {
-        text.Append(collection.Kind switch
+        text.Append(ClassPrefix(collection, heap)).Append(collection.Kind switch
         {
             WsValueKind.Map => "{",
             WsValueKind.Set => "#{",
@@ -181,6 +181,16 @@ public static class WsValueFormatter
         open.Add(collection.Handle);
         pending.Push((collection, 0));
     }
+
+    /// <summary>
+    /// What comes before a collection that a class extending Array, Map or Set made: its class's name, as an instance's
+    /// comes before its fields (<c>Stack [1, 2]</c>; section 3.7).
+    /// </summary>
+    internal static string ClassPrefix(WsValue collection, WsHeap heap) =>
+        collection.Kind is WsValueKind.Array or WsValueKind.Map or WsValueKind.Set
+        && heap.ClassOfValue(collection) is { Kind: WsValueKind.Class } classValue
+            ? heap.ClassName(classValue) + " "
+            : "";
 
     /// <summary>A value in a collection that is not a collection itself: a string quoted, anything else as written.</summary>
     private static string Scalar(WsValue value, WsHeap heap) =>

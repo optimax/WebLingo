@@ -47,6 +47,17 @@ public static class WsMembers
             error = null;
             return true;
         }
+        if (IsClassedCollection(target, heap, out var collectionClass))
+        {
+            // A collection of a class extending Array, Map or Set: its fields, then its class's methods, then its own
+            // members, below (section 3.7).
+            error = null;
+            if (heap.TryGetField(target, name, out result)) return true;
+            if (heap.TryGetMethod(collectionClass, name, out var classMethod))
+            {
+                return heap.TryAllocateBoundMethod(target, classMethod, out result, out error);
+            }
+        }
         if (target.Kind == WsValueKind.Instance)
         {
             error = null;
@@ -64,9 +75,9 @@ public static class WsMembers
             // A static member, the class's own or its base's (section 3.7).
             error = null;
             if (heap.TryGetStatic(target, name, out result)) return true;
-            if (TryGetObjectMethod(member, name, heap, out var classMethod))
+            if (TryGetObjectMethod(member, name, heap, out var objectToString))
             {
-                return heap.TryAllocateBoundMethod(target, classMethod, out result, out error);
+                return heap.TryAllocateBoundMethod(target, objectToString, out result, out error);
             }
             if (optional) return true;
             error = NoSuchMember(target, name, heap);
@@ -123,11 +134,20 @@ public static class WsMembers
         {
             error = null;
             if (heap.TrySetStatic(target, name, value, out var isMethod)) return true;
-            error = isMethod
-                ? new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
-                    $"'{name}' is a static method of {WsValueFormatter.Describe(target, heap)}, and cannot be assigned.")
-                : NoSuchMember(target, name, heap);
+            if (!isMethod) return heap.TryAddStatic(target, name, value, out error); // A new static member (section 3.7).
+            error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                $"'{name}' is a static method of {WsValueFormatter.Describe(target, heap)}, and cannot be assigned.");
             return false;
+        }
+        if (IsClassedCollection(target, heap, out var collectionClass))
+        {
+            if (heap.TryGetMethod(collectionClass, name, out _))
+            {
+                error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                    $"'{name}' is a method of {WsValueFormatter.Describe(target, heap)}, and cannot be assigned.");
+                return false;
+            }
+            return heap.TrySetField(target, name, value, out error);
         }
         if (target.Kind != WsValueKind.Instance)
         {
@@ -168,6 +188,29 @@ public static class WsMembers
             return false;
         }
         return heap.TryAllocateBoundMethod(self, closure, out bound, out error);
+    }
+
+    /// <summary>Whether a value is a collection that a class extending Array, Map or Set made, and its class.</summary>
+    public static bool IsClassedCollection(WsValue value, WsHeap heap, out WsValue classValue)
+    {
+        classValue = value.Kind is WsValueKind.Array or WsValueKind.Map or WsValueKind.Set && value.HasClass
+            ? heap.ClassOfValue(value)
+            : WsValue.Null;
+        return classValue.Kind == WsValueKind.Class;
+    }
+
+    /// <summary>
+    /// What <c>x.name(…)</c> calls when <c>x</c> is a collection of a class extending Array, Map or Set: a field's
+    /// value, or a method of its class (<paramref name="isMethod"/>); false for anything else, its own members included.
+    /// </summary>
+    public static bool TryFindCollectionCallee(WsValue target, string name, WsHeap heap, out WsValue callee, out bool isMethod)
+    {
+        callee = WsValue.Null;
+        isMethod = false;
+        if (!IsClassedCollection(target, heap, out var classValue)) return false;
+        if (heap.TryGetField(target, name, out callee)) return true;
+        isMethod = heap.TryGetMethod(classValue, name, out callee);
+        return isMethod;
     }
 
     /// <summary>
@@ -224,7 +267,7 @@ public static class WsMembers
     /// <c>value is type</c> (section 3.7): an instance's class, or a value's kind's class (<paramref name="valueClasses"/>,
     /// by <see cref="WsValueClass"/>), is <paramref name="type"/> or extends it; <c>null</c> is of no class, and every
     /// other value is an <c>Object</c>, its kind's class made or not. A type that is not a class is compared with
-    /// <c>==</c>, which runs no code.
+    /// <c>==</c> here; a VM calls the type's <c>equal()</c> instead, once the program has <c>Object</c>.
     /// </summary>
     public static bool IsInstance(WsValue value, WsValue type, WsHeap heap, WsValue[] valueClasses)
     {
@@ -235,8 +278,8 @@ public static class WsMembers
         }
         if (value.Kind == WsValueKind.Null) return false;
         var kind = ValueClassOf(value.Kind);
-        var current = value.Kind == WsValueKind.Instance ? heap.ClassOf(value)
-            : kind >= 0 && kind < valueClasses.Length ? valueClasses[kind] : WsValue.Null;
+        var current = heap.ClassOfValue(value);
+        if (current.Kind != WsValueKind.Class && kind >= 0 && kind < valueClasses.Length) current = valueClasses[kind];
         if (current.Kind != WsValueKind.Class) return type == heap.ObjectClass;
         for (; current.Kind == WsValueKind.Class; current = heap.ClassBase(current))
         {

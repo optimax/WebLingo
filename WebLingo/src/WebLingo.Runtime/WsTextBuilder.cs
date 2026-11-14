@@ -52,10 +52,7 @@ public sealed class WsTextBuilder
             _started = true;
             switch (_value.Kind)
             {
-                case WsValueKind.Array or WsValueKind.Map or WsValueKind.Set:
-                    Open(_value);
-                    break;
-                case WsValueKind.Instance:
+                case WsValueKind.Array or WsValueKind.Map or WsValueKind.Set or WsValueKind.Instance:
                     if (!_asFields && Overrides(_value, out method))
                     {
                         instance = _value;
@@ -111,7 +108,7 @@ public sealed class WsTextBuilder
             }
             if (_open.Contains(item.Handle))
             {
-                _text.Append(item.Kind switch
+                _text.Append(WsValueFormatter.ClassPrefix(item, _heap)).Append(item.Kind switch
                 {
                     WsValueKind.Map => "{…}",
                     WsValueKind.Set => "#{…}",
@@ -120,7 +117,7 @@ public sealed class WsTextBuilder
                 });
                 continue;
             }
-            if (item.Kind == WsValueKind.Instance && Overrides(item, out method))
+            if (Overrides(item, out method))
             {
                 instance = item;
                 return false;
@@ -134,13 +131,17 @@ public sealed class WsTextBuilder
     public void Supply(string text) => _text.Append(text);
 
     /// <summary>Whether an instance's class overrides <c>Object</c>'s <c>toString()</c>, and with which method.</summary>
-    private bool Overrides(WsValue instance, out WsValue method) =>
-        _heap.TryGetMethod(_heap.ClassOf(instance), "toString", out method) && method.Kind == WsValueKind.Function
-        && method != _heap.DefaultToString;
+    private bool Overrides(WsValue instance, out WsValue method)
+    {
+        method = WsValue.Null;
+        var classValue = _heap.ClassOfValue(instance); // An instance's, or a collection's of a class extending one.
+        return classValue.Kind == WsValueKind.Class && _heap.TryGetMethod(classValue, "toString", out method)
+            && method.Kind == WsValueKind.Function && method != _heap.DefaultToString;
+    }
 
     private void Open(WsValue collection)
     {
-        _text.Append(collection.Kind switch
+        _text.Append(WsValueFormatter.ClassPrefix(collection, _heap)).Append(collection.Kind switch
         {
             WsValueKind.Map => "{",
             WsValueKind.Set => "#{",

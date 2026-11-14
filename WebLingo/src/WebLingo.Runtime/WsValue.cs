@@ -34,6 +34,16 @@ public readonly struct WsValue : IEquatable<WsValue>
     /// <summary>A value referring to an object of a <see cref="WsHeap"/> by its handle.</summary>
     public static WsValue FromHandle(WsValueKind kind, int handle) => new(kind, handle);
 
+    /// <summary>
+    /// A collection's handle, marked, with <paramref name="hasClass"/>, as one a class extending Array, Map or Set made,
+    /// so that its members are found without looking at the heap for plain ones (section 3.7).
+    /// </summary>
+    public static WsValue FromHandle(WsValueKind kind, int handle, bool hasClass) =>
+        new(kind, hasClass ? (uint)handle | (1L << 32) : handle);
+
+    /// <summary>For an array, a map or a set: whether a class extending Array, Map or Set made it.</summary>
+    public bool HasClass => (_bits >> 32) == 1;
+
     public bool AsBoolean => _bits != 0;
     public long AsInt64 => _bits;
     public double AsBinary64 => BitConverter.Int64BitsToDouble(_bits);

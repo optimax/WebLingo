@@ -8,11 +8,11 @@ A2 of "Classes of Values, Continued": `Boolean`, `Integer`, `Number`, `String`, 
 
 **Q1, new methods for a kind's values: (a) a block that adds methods to an existing class, `extend Integer { isEven() { return this % 2 == 0; } }`, after which `4.isEven()`, as C#'s extension methods and Swift's extensions do; (b) only subclasses, `class Even extends Integer { … }`; (c) both.**
 
-A1:
+A1: (c).
 
 **Q2, a subclass of `Integer`, `Number`, `String` or `Boolean`, if there are any: `new Celsius(21.5)` holds a number, which arithmetic, comparisons and `==` use, `is Number` and `is Celsius`, with its own methods and fields, written `Celsius 21.5`. Agreed?**
 
-A2:
+A2:  Yes. Maybe write those [class-name]:[value(s)], i.e. `Celsius:21.5`, or `Celsius(21.5)` i.e. the same way as constructing it, except without the `new`.
 
 **Q3, `new` on those classes: (a) `new Integer()` is `0`, `new String()` `""`, `new Boolean()` `false`, and `new Integer(5)` `5`; (b) WS3001, their values being made by literals.**
 
@@ -22,13 +22,15 @@ A3:
 
 A4:
 
-## [IDLE] Classes That Extend Array, Map and Set
+## [WORKING] Classes That Extend Array, Map and Set
 
 A1 of "Typed Catches Syntax: Classes of Values": classes may extend `Array`, `Map` and `Set` (specification, section 3.7, "Classes of values"), on both VMs. Added by Claude, 2026-11-13.
 
 2026-11-13: waits for the answers to "Classes of Values, Continued".
 
 2026-11-13: answered; next, with A1's `A.equal(e)` for a catch whose name is not a class, and the NOTE's static members by assignment.
+
+Done (Claude, 2026-11-13): `class Stack extends Array { … }`, and `Map` and `Set` likewise: `new Stack()` is an array of class `Stack`, with its methods and fields, written `Stack [1, 2]`; `new Array()`, `new Map()` and `new Set()` make empty ones; a catch, or `is`, whose name is not a class calls its `equal()` (A1); and assigning a class a member it has not declares a static one (the NOTE), on both VMs. No new operation: a classed collection's value is marked, so that plain collections cost nothing more (the first try, which looked at the heap, was 5 to 8% slower on `collections`; now within the noise). Choices of mine, in section 15.2 as proposed (row "Classes extending `Array`, `Map` and `Set`"): a member is a field, then a class's method, then the collection's own, so a class may override `push`, but `super.push(…)` is WS3006; the text shows no fields; `dispose()` and `using` do not apply to such a collection yet. `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class` stay sealed until "Classes of Values, Further" is answered. Two conformance cases removed for your decisions (`A.x = 1;` and `class S extends Array {}` no longer fail). Every new conformance case gives the same result on both VMs. Build and 1,252 tests pass on Windows; Linux not tried.
 
 ## [IDLE] Default Parameter Values
 
@@ -175,5 +177,11 @@ A16: (a).
 WBC, the bytecode's binary format, its writing and its reading, with verification (specification, sections 5.1, 5.3 and 5.5). Its encoding choices are proposed in the specification and not yet approved, and the format is the chosen VM's, so this waits for the choice between the VMs (WS-BC002) as well. Added by Claude, 2026-11-13.
 
 2026-11-13: waits for M0.11.
+
+## Static Members Callable on Instances
+
+Let's make sure that class static members are accessible through instance references (unless shadowed by the instance member) as well as class references. 
+
+
 
 # END-OF-TO-DO

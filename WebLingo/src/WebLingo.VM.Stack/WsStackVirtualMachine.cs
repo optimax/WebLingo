@@ -447,6 +447,17 @@ public sealed class WsStackVirtualMachine
                             var name = names[ins.A];
                             var first = sp - ins.B;
                             var target = slots[first - 1];
+                            if (target.HasClass && target.Kind is WsValueKind.Array or WsValueKind.Map or WsValueKind.Set
+                                && WsMembers.TryFindCollectionCallee(target, name.Text, heap, out callee, out var collectionMethod))
+                            {
+                                // A collection of a class extending Array, Map or Set: its field's function, or its class's
+                                // method, before its own members (section 3.7).
+                                self = collectionMethod ? target : WsValue.Null;
+                                firstArgument = first;
+                                argumentCount = ins.B;
+                                constructed = WsValue.Null;
+                                goto call;
+                            }
                             if (target.Kind == WsValueKind.Class)
                             {
                                 // A static member, called as any function is (section 3.7).
@@ -630,7 +641,20 @@ public sealed class WsStackVirtualMachine
                         }
                         case WsStackOpCode.IsInstance:
                         {
-                            var type = slots[--sp];
+                            var type = slots[sp - 1];
+                            if (type.Kind != WsValueKind.Class && TryGetEqual(type, out var equalMethod))
+                            {
+                                // A name that is not a class: type.equal(value) gives the answer (section 3.7). The value
+                                // moves up to be the argument, and the result goes where the value was.
+                                slots[sp - 1] = slots[sp - 2];
+                                callee = equalMethod;
+                                self = type;
+                                firstArgument = sp - 1;
+                                argumentCount = 1;
+                                constructed = WsValue.Null;
+                                goto call;
+                            }
+                            sp--;
                             slots[sp - 1] = WsValue.FromBoolean(WsMembers.IsInstance(slots[sp - 1], type, heap, _valueClasses));
                             pc++;
                             continue;
@@ -667,7 +691,7 @@ public sealed class WsStackVirtualMachine
                                 goto texted;
                             }
                             frame.Closure[0] = WsValue.Null;
-                            if (frame.Constructed.Kind == WsValueKind.Instance) result = frame.Constructed;
+                            if (frame.Constructed.Kind != WsValueKind.Null) result = frame.Constructed; // What new made: an instance, or a collection.
                             frame.Constructed = WsValue.Null;
 
                             frame = frames[--depth];
@@ -1187,12 +1211,31 @@ public sealed class WsStackVirtualMachine
             {
                 if (module.ValueClasses[i] != index) continue;
                 _valueClasses[i] = made;
-                heap.SealClass(made); // For now, no class extends one, nor does new make one (section 3.7).
+                // Array, Map and Set make collections, and classes extend them; the others, for now, neither (section 3.7).
+                if (i == (int)WsValueClass.Array) heap.MarkCollectionClass(made, WsValueKind.Array);
+                else if (i == (int)WsValueClass.Map) heap.MarkCollectionClass(made, WsValueKind.Map);
+                else if (i == (int)WsValueClass.Set) heap.MarkCollectionClass(made, WsValueKind.Set);
+                else heap.SealClass(made);
             }
             for (var i = 0; i < module.ErrorClasses.Count; i++)
             {
                 if (module.ErrorClasses[i].Class == index) _errorClasses[i] = made;
             }
+        }
+
+        /// <summary>
+        /// The <c>equal()</c> that <c>value is type</c> calls when the type is not a class: the type's own, an instance's or
+        /// a classed collection's class's, or <c>Object</c>'s (section 3.7); false before the program has <c>Object</c>.
+        /// </summary>
+        private bool TryGetEqual(WsValue type, out WsValue method)
+        {
+            var classValue = heap.ClassOfValue(type);
+            if (classValue.Kind == WsValueKind.Class && heap.TryGetMethod(classValue, "equal", out method)
+                && method.Kind == WsValueKind.Function)
+            {
+                return true;
+            }
+            return WsMembers.TryGetObjectMethod(WsMember.Equal, "equal", heap, out method);
         }
 
         /// <summary>The class a runtime error of this code becomes: its kind's, or Error.</summary>

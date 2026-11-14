@@ -69,6 +69,47 @@ public sealed class WsHeap
     /// </summary>
     public void SealClass(WsValue classValue) => Get<ClassObject>(classValue, WsValueKind.Class).Sealed = true;
 
+    /// <summary>
+    /// Marks a class as a kind of collection's, <c>Array</c>'s, <c>Map</c>'s or <c>Set</c>'s (section 3.7): <c>new</c>
+    /// makes an empty one, and a class that extends it makes collections of that kind, of its own class, with fields.
+    /// </summary>
+    public void MarkCollectionClass(WsValue classValue, WsValueKind kind)
+    {
+        var target = Get<ClassObject>(classValue, WsValueKind.Class);
+        target.Makes = kind;
+        target.IsCollectionClass = true;
+    }
+
+    /// <summary>
+    /// The class of an instance, or of a collection a class extending <c>Array</c>, <c>Map</c> or <c>Set</c> made;
+    /// <c>null</c> for any other value (section 3.7).
+    /// </summary>
+    public WsValue ClassOfValue(WsValue value) => value.Kind switch
+    {
+        WsValueKind.Instance => Get<InstanceObject>(value, WsValueKind.Instance).Class,
+        WsValueKind.Array when value.HasClass => Get<ArrayObject>(value, WsValueKind.Array).Instance?.Class ?? WsValue.Null,
+        WsValueKind.Map or WsValueKind.Set when value.HasClass =>
+            Get<MapObject>(value, value.Kind).Instance?.Class ?? WsValue.Null,
+        _ => WsValue.Null
+    };
+
+    /// <summary>Declares a static field of a class, a member it does not have, as assigning one does (section 3.7).</summary>
+    public bool TryAddStatic(WsValue classValue, string name, WsValue value, out WsRuntimeError? error)
+    {
+        if (!TryReserve(1, out error)) return false;
+        Get<ClassObject>(classValue, WsValueKind.Class).StaticFields[name] = value;
+        Units++;
+        return true;
+    }
+
+    /// <summary>The fields of an instance, or of a collection of a class that extends <c>Array</c>, <c>Map</c> or <c>Set</c>.</summary>
+    private InstanceObject Fields(WsValue value) => value.Kind switch
+    {
+        WsValueKind.Array => Get<ArrayObject>(value, WsValueKind.Array).Instance,
+        WsValueKind.Map or WsValueKind.Set => Get<MapObject>(value, value.Kind).Instance,
+        _ => Get<InstanceObject>(value, WsValueKind.Instance)
+    } ?? throw new ArgumentException("The collection has no class, and no fields.", nameof(value));
+
     /// <summary>Removes the roots added last, which must be <paramref name="roots"/>: a call's frame, as it returns.</summary>
     public void RemoveLastRoots(WsValue[] roots)
     {
@@ -181,6 +222,7 @@ public sealed class WsHeap
     {
         value = WsValue.Null;
         var all = methods;
+        var makes = WsValueKind.Instance;
         if (baseClass.Kind != WsValueKind.Null)
         {
             if (baseClass.Kind != WsValueKind.Class)
@@ -196,6 +238,7 @@ public sealed class WsHeap
                 return false;
             }
             all = new Dictionary<string, WsValue>(baseObject.Methods, StringComparer.Ordinal);
+            makes = baseObject.Makes;
             foreach (var (methodName, closure) in methods) all[methodName] = closure;
         }
         // Its disposal: its own dispose method, if it declares one, then its base's disposal (section 3.7).
@@ -216,6 +259,7 @@ public sealed class WsHeap
         {
             Base = baseClass,
             DisposeChain = disposeChain,
+            Makes = makes,
             StaticMethods = staticMethods ?? new Dictionary<string, WsValue>(StringComparer.Ordinal),
             StaticFields = fields
         };
@@ -297,18 +341,26 @@ public sealed class WsHeap
             error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation, $"'new' cannot make a value of the class {classObject.Name}.");
             return false;
         }
-        return TryAllocate(new InstanceObject(classValue), WsValueKind.Instance, 0, out instance, out error);
+        // A class extending Array, Map or Set makes a collection of its own class; Array, Map and Set, a plain one.
+        var own = classObject.IsCollectionClass ? null : new InstanceObject(classValue);
+        return classObject.Makes switch
+        {
+            WsValueKind.Array =>
+                TryAllocate(new ArrayObject([]) { Instance = own }, WsValueKind.Array, 0, out instance, out error, own is not null),
+            WsValueKind.Map or WsValueKind.Set =>
+                TryAllocate(new MapObject { Instance = own }, classObject.Makes, 0, out instance, out error, own is not null),
+            _ => TryAllocate(new InstanceObject(classValue), WsValueKind.Instance, 0, out instance, out error)
+        };
     }
 
     public WsValue ClassOf(WsValue instance) => Get<InstanceObject>(instance, WsValueKind.Instance).Class;
 
-    public bool TryGetField(WsValue instance, string name, out WsValue value) =>
-        Get<InstanceObject>(instance, WsValueKind.Instance).TryGet(name, out value);
+    public bool TryGetField(WsValue instance, string name, out WsValue value) => Fields(instance).TryGet(name, out value);
 
     /// <summary>Assigns a field, which exists from then on: a new one is one more unit, within the budget (WS3003).</summary>
     public bool TrySetField(WsValue instance, string name, WsValue value, out WsRuntimeError? error)
     {
-        var fields = Get<InstanceObject>(instance, WsValueKind.Instance);
+        var fields = Fields(instance);
         error = null;
         if (fields.TryGet(name, out _))
         {
@@ -321,11 +373,10 @@ public sealed class WsHeap
         return true;
     }
 
-    public int FieldCount(WsValue instance) => Get<InstanceObject>(instance, WsValueKind.Instance).Count;
+    public int FieldCount(WsValue instance) => Fields(instance).Count;
 
     /// <summary>An instance's field at a position from 0 to its count − 1, in no defined order.</summary>
-    public (string Name, WsValue Value) FieldAt(WsValue instance, int position) =>
-        Get<InstanceObject>(instance, WsValueKind.Instance).At(position);
+    public (string Name, WsValue Value) FieldAt(WsValue instance, int position) => Fields(instance).At(position);
 
     /// <summary>
     /// A method bound to an instance: a function that runs the method on it (section 3.7); with
@@ -500,6 +551,7 @@ public sealed class WsHeap
                     break;
                 case ArrayObject array:
                     foreach (var element in array.Elements) Mark(element, marked, pending);
+                    MarkFields(array.Instance, marked, pending);
                     break;
                 case ClassObject classObject:
                     Mark(classObject.Base, marked, pending);
@@ -524,6 +576,7 @@ public sealed class WsHeap
                         Mark(key, marked, pending);
                         Mark(value, marked, pending);
                     }
+                    MarkFields(map.Instance, marked, pending);
                     break;
             }
         }
@@ -550,12 +603,20 @@ public sealed class WsHeap
         pending.Push(value.Handle);
     }
 
+    /// <summary>A collection's class and fields, if a class extending Array, Map or Set made it.</summary>
+    private static void MarkFields(InstanceObject? fields, bool[] marked, Stack<int> pending)
+    {
+        if (fields is null) return;
+        Mark(fields.Class, marked, pending);
+        for (var i = 0; i < fields.Count; i++) Mark(fields.At(i).Value, marked, pending);
+    }
+
     private static long SizeOf(object item) => ObjectOverhead + item switch
     {
         string text => text.Length,
         Closure closure => closure.Cells.Length,
-        ArrayObject array => array.Elements.Count,
-        MapObject map => map.Count,
+        ArrayObject array => array.Elements.Count + (array.Instance?.Count ?? 0),
+        MapObject map => map.Count + (map.Instance?.Count ?? 0),
         ClassObject classObject => Size(classObject),
         InstanceObject instance => instance.Count,
         BoundMethodObject => 2,
@@ -575,7 +636,8 @@ public sealed class WsHeap
         return true;
     }
 
-    private bool TryAllocate(object item, WsValueKind kind, long content, out WsValue value, out WsRuntimeError? error)
+    private bool TryAllocate(object item, WsValueKind kind, long content, out WsValue value, out WsRuntimeError? error,
+        bool hasClass = false)
     {
         var units = content + ObjectOverhead;
         if (Units + units > _nextCollectionAt || Units + units > _maxUnits) Collect();
@@ -600,7 +662,7 @@ public sealed class WsHeap
             _objects.Add(item);
         }
         Units += units;
-        value = WsValue.FromHandle(kind, handle);
+        value = WsValue.FromHandle(kind, handle, hasClass);
         error = null;
         return true;
     }
@@ -619,13 +681,21 @@ public sealed class WsHeap
 
     private sealed record Closure(int Function, WsValue[] Cells);
 
-    private sealed record ArrayObject(List<WsValue> Elements);
+    private sealed record ArrayObject(List<WsValue> Elements)
+    {
+        /// <summary>Its class and fields, if a class extending Array made it (section 3.7).</summary>
+        public InstanceObject? Instance { get; init; }
+    }
 
     private sealed record ClassObject(string Name, WsValue Constructor, Dictionary<string, WsValue> Methods)
     {
         public WsValue Base { get; init; }
         public WsValue[] DisposeChain { get; init; } = [];
         public bool Sealed { get; set; }
+        /// <summary>What <c>new</c> makes: an instance, or a collection, for Array, Map, Set and the classes extending them.</summary>
+        public WsValueKind Makes { get; set; } = WsValueKind.Instance;
+        /// <summary>Whether it is Array, Map or Set itself, whose <c>new</c> makes a plain collection.</summary>
+        public bool IsCollectionClass { get; set; }
         public Dictionary<string, WsValue> StaticMethods { get; init; } = new(StringComparer.Ordinal);
         public Dictionary<string, WsValue> StaticFields { get; init; } = new(StringComparer.Ordinal);
     }
@@ -682,6 +752,9 @@ public sealed class WsHeap
     private sealed class MapObject
     {
         private readonly Dictionary<MapKey, int> _positions = [];
+
+        /// <summary>Its class and fields, if a class extending Map or Set made it (section 3.7).</summary>
+        public InstanceObject? Instance { get; init; }
         private readonly List<(MapKey Key, WsValue KeyValue, WsValue Value)> _entries = [];
 
         public int Count => _entries.Count;
