@@ -184,12 +184,6 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 
 2026-11-13: M0.13 now, after M0.12, templates (specification, section 9); waits for M0.12.
 
-## [WORKING] Static Members Callable on Instances
-
-Let's make sure that class static members are accessible through instance references (unless shadowed by the instance member) as well as class references. 
-
-Done (Claude, 2026-11-14): on both VMs, with their conformance tests; recorded in the specification, section 3.7 ("Static members"), and section 15.2 ("Static members"). What assigning one through an instance does is asked in "Static Members Through Instances, Continued". Checks: the Release build, without warnings, the 1,528 tests, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## [QUESTION] Static Members Through Instances, Continued
 
 A follow-up to "Static Members Callable on Instances". Added by Claude, 2026-11-14.

@@ -1345,3 +1345,9 @@ Done (Claude, 2026-11-13, `ab81414`): on both VMs, with their conformance tests;
 `static operator +(a, b) { … }`, and `-`, `*`, `/` and the comparisons, which a class may declare (A3 of "Classes of Values, Extensions, Continued"; specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
 
 Done (Claude, 2026-11-13, `185690f`): on both VMs, with their conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Operators"), among them that `==` and `!=`, and unary operators, are not declared. Checks: the Release build, without warnings, the 1,520 tests, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Static Members Callable on Instances
+
+Let's make sure that class static members are accessible through instance references (unless shadowed by the instance member) as well as class references. 
+
+Done (Claude, 2026-11-14, `9b9bf93`): on both VMs, with their conformance tests; recorded in the specification, section 3.7 ("Static members"), and section 15.2 ("Static members"). What assigning one through an instance does is asked in "Static Members Through Instances, Continued". Checks: the Release build, without warnings, the 1,528 tests, and the CLI on the samples, on Windows only; Linux not tried.
