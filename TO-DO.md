@@ -66,40 +66,6 @@ A5:
 
 2026-11-13: waits for "M0.11: Asynchrony".
 
-## [DONE] Modules, Continued
-
-Follow-ups to "Modules: `import` and `param`" (specification, section 3.9). One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
-
-Q1, `Module.import(path)`: a module's top level is `async` (`exec()`), so it gives a task, which completes with the instance once the module has run, `var db = await Module.import("lib/db.wl");`. Agreed?
-
-A1: Yes.
-
-Q2, when a static import's module runs: (a) before the importing module's top level, in the order of its imports, each awaited, so that the importer begins with its imports run, as JavaScript's do; (b) where its `import` stands, in order with the statements around it.
-
-A2: (a)
-
-Q3, a module's lifetime under a host: A2 runs a module once per execution, and section 2.3 once per application generation: (a) once per execution, a request's, its instance the request's own; (b) once per application generation, its instance shared by the requests, which then cannot change it, since a heap is one worker's (WL-P013).
-
-A3: (a)
-
-Q4, `export` marks a `function`, `class`, `var` or `const` declaration at a module's top level, and an importer reads an exported `var` as it is when read (`db.count`); assigning it: (a) WL3001, an export being the module's to change; (b) allowed, as a member is assigned.
-
-A4: (a)
-
-Q5, importing names: (a) only the instance, `import util from "lib/util.wl";`, then `util.f()`; (b) names too, `import { f, g } from "lib/util.wl";`, as JavaScript does.
-
-A5: (b), both forms allowed, really
-
-Q6, a quoted parameter (A8): a shell removes the quotes of `value="10"`, so `weblingo` gets `value=10`, an integer: (a) quotes that reach it make a string, `value='"10"'` in a shell; (b) `weblingo run script.wl --string value=10` makes a string, whatever the value looks like.
-
-A6: "a shell removes the quotes " Does it? Have you checked?
-
-Q7, the standard modules' names: (a) `system` and `std/fs`, as A10 and Q10 name them; (b) every one under `std/`, `std/system` among them; (c): standard (built-in) modules named by a scheme, std:fs and std:system, resolved by the compiler and runtime, never as paths.
-
-A7: (c)
-
-Done (Claude, 2026-11-14): recorded as approved in the specification, section 3.9, and A3 in section 2.3 too. A6 is answered in "Modules, Quoted Parameters", which asks it again.
-
 ## [QUESTION] Modules, Quoted Parameters
 
 A6 of "Modules, Continued" asked whether a shell removes the quotes of `value="10"`. Checked on 2026-11-14, with a program printing the arguments it gets: bash gives it `value=10`, and only `'value="10"'` keeps the quotes; Windows PowerShell 5.1 gives `value=10` for both `value="10"` and `'value="10"'`; and cmd.exe gives `value=10`. So A8's quotes rarely reach `weblingo`, and never from Windows PowerShell 5.1. Added by Claude, 2026-11-14.
