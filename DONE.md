@@ -2084,3 +2084,15 @@ Done (Claude, 2026-11-14, `c29614f`): a native module's assembly, in a configure
 2026-11-14: part 1 is done; this can begin.
 
 Done (Claude, 2026-11-14, `1556607`): `std:system` is a native module, `WebLingoSystemModule` in `WebLingo.StdLib`, installed as `std/system.dll` beside `weblingo` and `welp`; each loads it before it compiles, from the `std` scheme's folder, which `weblingo.json` or `--scheme std=folder` may point elsewhere, and gives its functions, by their own names, as the built-ins every module sees and `std:system` exports, so that another `system.dll` replaces them, as the tests show with the tests' own module. Guessed, and recorded as Proposed in the specification, section 15.2 ("Native modules"): a missing `std:system` stops the command (exit 4); a native module may register a function that writes text (`TextFunction`), given an instance's `toString()`; a native function reaches the execution's output through the heap (`WebLingoHeap.Output`, from `WebLingoExecutionContext.Output`). The tests and the benchmark still give the standard built-ins themselves, as a host may. Checks: the Release build, without warnings, the full test suite, and both command lines on the samples, on Windows only; Linux not tried.
+
+## [DONE] Standard Module `std:tasks`
+
+`Task.all`, `Task.any` and `Task.timeout` as the exports of a standard module, `std:tasks` (A4 of "Task Combinators"; specification, sections 3.8 and 3.9), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for the design of how standard modules are packaged, which A5 of "Native Code Extensions" makes native extensions, installed as other native modules are.
+
+2026-11-14: the packaging is decided (A6 of "Native Code Extensions, Continued"): a standard module is a native module, in the `std` scheme's folder. Waits for "Native Modules, Part 3: Standard Modules as Native Modules".
+
+2026-11-14: part 3 is done (`1556607`), `std:system` a native module; this can begin.
+
+Done (Claude, 2026-11-14, `c908bc9`): `import { all, any, timeout } from "std:tasks";` gives `Task.all`, `Task.any` and `Task.timeout`, the same tasks and the same errors, on both VMs: `std:tasks` is a native module, `WebLingoTasksModule`, in a project of its own, `WebLingo.StdLib.Tasks` (an assembly holds one module), installed as `std/tasks.dll` beside `std/system.dll`. A standard module other than `std:system` is now a native module of the `std` scheme; one that is not installed is still "there is no such standard module" (WL2015). Recorded in the specification, sections 3.8 and 15.2 ("Native modules"), and in `Documents/implementation.md`, whose portable core is now twelve projects, with the architecture tests' rules for the new one. Checks: the Release build, without warnings, the full test suite, and both command lines on the samples and on a script importing `std:tasks`, on Windows only; Linux not tried.

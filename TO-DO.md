@@ -2,18 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [WORKING] Standard Module `std:tasks`
-
-`Task.all`, `Task.any` and `Task.timeout` as the exports of a standard module, `std:tasks` (A4 of "Task Combinators"; specification, sections 3.8 and 3.9), on both VMs. Added by Claude, 2026-11-14.
-
-2026-11-14: waits for the design of how standard modules are packaged, which A5 of "Native Code Extensions" makes native extensions, installed as other native modules are.
-
-2026-11-14: the packaging is decided (A6 of "Native Code Extensions, Continued"): a standard module is a native module, in the `std` scheme's folder. Waits for "Native Modules, Part 3: Standard Modules as Native Modules".
-
-2026-11-14: part 3 is done (`1556607`), `std:system` a native module; this can begin.
-
-Done (Claude, 2026-11-14): `import { all, any, timeout } from "std:tasks";` gives `Task.all`, `Task.any` and `Task.timeout`, the same tasks and the same errors, on both VMs: `std:tasks` is a native module, `WebLingoTasksModule`, in a project of its own, `WebLingo.StdLib.Tasks` (an assembly holds one module), installed as `std/tasks.dll` beside `std/system.dll`. A standard module other than `std:system` is now a native module of the `std` scheme; one that is not installed is still "there is no such standard module" (WL2015). Recorded in the specification, sections 3.8 and 15.2 ("Native modules"), and in `Documents/implementation.md`, whose portable core is now twelve projects, with the architecture tests' rules for the new one. Checks: the Release build, without warnings, the full test suite, and both command lines on the samples and on a script importing `std:tasks`, on Windows only; Linux not tried.
-
 ## [IDLE] M0.13: WBC
 
 WBC, the bytecode's binary format, its writing and its reading, with verification (specification, sections 5.1, 5.3 and 5.5). Its encoding choices are proposed in the specification and not yet approved, and the format is the chosen VM's, so this waits for the choice between the VMs (WL-BC002) as well. Added by Claude, 2026-11-13.
