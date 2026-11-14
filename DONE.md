@@ -1667,3 +1667,29 @@ Done (Claude, 2026-11-14): its four parts have landed, on both VMs: making class
 2026-11-13: split into the parts the specification defines in section 9 ("Extending the classes of values"), each a task below. Waits for them.
 
 Done (Claude, 2026-11-14): every part section 9 defines has landed, on both VMs, the last of them `Class` (part 5, in four parts of its own, the last `123f46f`). Checks: those of each part, on Windows only; Linux not tried.
+
+## [DONE] Task Combinators
+
+`Task.all`, `Task.any` and timeouts (A6 of "Asynchrony: `async` and `await`"; specification, section 3.8). Added by Claude, 2026-11-13.
+
+2026-11-13: waits for "M0.11: Asynchrony".
+
+2026-11-14: M0.11 is done; what they do needs the owner's decisions first. One decision each, answerable with "yes" or a letter.
+
+**Q1, `Task.all(values)`, an array of values, tasks or not, gives a task that completes with an array of their results, in their order, once all have; when one faults: (a) it faults at once with that exception, as JavaScript's `Promise.all` does, the others going on, observed; (b) once all are done, with the first exception in their order.**
+
+A1: (a)
+
+**Q2, `Task.any(values)`: (a) the first to complete, with its result, or faulting with its exception (JavaScript's `Promise.race`); (b) the first to complete with a result, faulting only if all fault, with an error holding their exceptions (JavaScript's `Promise.any`).**
+
+A2: (a). Is `Task` and `Promise` essentially the same thing?
+
+**Q3, a timeout: (a) `Task.timeout(task, milliseconds)`, a task that gives the task's result, or faults with a `TimeoutError` (a new class extending `Error`, with a code of its own) if it takes longer, the task itself going on; (b) the same as a method of tasks, `t.timeout(milliseconds)`.**
+
+A3: (a)
+
+**Q4, where they live: (a) static methods of `Task`, as section 3.8 names them; (b) a standard module, `std:tasks`, once modules exist.**
+
+A4: (a) in module `std:tasks`, once it exists, so both (a) and (b) I guess.
+
+Done (Claude, 2026-11-14, `98bafad`): recorded as approved in the specification, section 3.8 ("Tasks"), with the new code WL3010 (section 8.4); `Task.all`, `Task.any` and `Task.timeout` on both VMs, with conformance tests, their choices recorded as Proposed in section 15.2 ("Asynchrony"), among them that `Task.any([])` is WL3001, and that a timeout's error is thrown from the `await` it reaches. `std:tasks` is "Standard Module `std:tasks`", below. A2's question: yes, a task is WebLingo's promise, much as a JavaScript `Promise` or a C# `Task` is: a value standing for a result that comes later. Unlike a `Promise`, a task is used only through `await`, with no `then`; its exception, if nothing awaits it, is reported when the execution ends, unless `t.forget()`; and every task of an execution runs on its one worker, switching only at `await`. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
