@@ -290,18 +290,19 @@ public sealed class WebLingoHeap
         Get<ClassObject>(Get<InstanceObject>(instance, WebLingoValueKind.Instance).Class, WebLingoValueKind.Class).Holds;
 
     /// <summary>
-    /// The constructor <c>new</c> runs: the class's own; but a class holding a value whose constructor is the one a class
-    /// declaring none gets passes its arguments on to its base's, as such a class does (section 3.7).
+    /// The constructor <c>new</c> runs (section 3.7): a class that declares none passes its arguments on to the nearest
+    /// base that declares one, as if its constructor called <c>super(…)</c> with them; with no such base, its own, which
+    /// takes none.
     /// </summary>
     public WebLingoValue ConstructorFor(WebLingoValue classValue)
     {
-        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
-        if (target.Holds == WebLingoValueKind.Null) return target.Constructor;
-        while (target.DefaultConstructor && target.Base.Kind == WebLingoValueKind.Class)
+        var own = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        for (var target = own; target.DefaultConstructor && target.Base.Kind == WebLingoValueKind.Class;)
         {
             target = Get<ClassObject>(target.Base, WebLingoValueKind.Class);
+            if (!target.DefaultConstructor) return target.Constructor;
         }
-        return target.Constructor;
+        return own.Constructor;
     }
 
     /// <summary>

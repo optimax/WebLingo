@@ -387,6 +387,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A { static var n = 1; static m() { return \"static\"; } m() { return \"method\"; } } var a = new A(); a.n = 5; writeLn([a.n, A.n, a.m()]);", "[5, 1, \"method\"]")]
     [InlineData("class A { static var n = 1; static f() { return 1; } } class B extends A {} var b = new B(); A.n = 2; writeLn([b.n, b?.n, b?.missing]); var g = b.f; writeLn(g == A.f);", "[2, 2, null]\ntrue")]
     [InlineData("class A { static var k = \"s\"; } var a = new A(); a.k = function () { return \"field\"; }; writeLn(a.k()); class S extends Array { static var size = 3; } writeLn(new S().size);", "field\n3")]
+    [InlineData("class A { constructor(x, y = 2) { this.x = x; this.y = y; } } class B extends A {} class C extends B { m() { return 1; } } writeLn([new B(5).x, new C(1, 3).y, new C(1).y]);", "[5, 3, 2]")]
+    [InlineData("class E extends Error {} var e = new E(\"bad\"); writeLn([e.message, e is Error]);", "[\"bad\", true]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -539,6 +541,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class C extends Number {} var c = new C(1); c();", "WL2005")]
     [InlineData("class N { static operator +(a, b) { return 1; } } writeLn(new N() > 1);", "WL3001")]
     [InlineData("class N { static operator +(a, b) { return 1; } } writeLn(-new N());", "WL3001")]
+    [InlineData("class A {} class B extends A {} new B(1);", "WL2006")]
+    [InlineData("class A { constructor() {} } class B extends A {} new B(1);", "WL2006")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

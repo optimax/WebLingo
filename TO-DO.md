@@ -18,15 +18,19 @@
 
 2026-11-13: waits for the design of "Building Classes at Run Time".
 
+## [WORKING] Classes of Values, Constructors
+
 What "Extending the Classes of Values: `Boolean`, `Integer`, `Number` and `String`" chose where the answers so far leave it open (specification, section 15.2, "Classes holding a value"). One decision each, answerable with a letter. Added by Claude, 2026-11-13.
 
-**Q1, A7's "a class without a constructor passes its arguments on": (a) for every class, so that `class B extends A {}` makes `new B(1)` run `A`'s constructor with `1` (it is WS2006 now, a class without a constructor taking none); (b) only for a class holding a value, as built.**
+Q1, A7's "a class without a constructor passes its arguments on": (a) for every class, so that `class B extends A {}` makes `new B(1)` run `A`'s constructor with `1` (it is WS2006 now, a class without a constructor taking none); (b) only for a class holding a value, as built.
 
 A1: Only if A defines a constructor that takes a parameter. In general, supplying a parameter where none is expected is an error. This is a special case that saves calling base(1).
 
-**Q2, an arithmetic result not of its class's kind, `count / 2` where `Count` extends `Integer`, a binary64: (a) a plain value, `1.5`, as built; (b) WS3001.**
+Q2, an arithmetic result not of its class's kind, `count / 2` where `Count` extends `Integer`, a binary64: (a) a plain value, `1.5`, as built; (b) WS3001.
 
 A2: (a)
+
+Done (Claude, 2026-11-14): recorded as approved in the specification, section 3.7 ("Instances" and "Classes of values"): every class without a constructor passes its arguments on to the nearest base that declares one, and with none takes none; on both VMs, with their conformance tests. This task's heading was lost from `TO-DO.md` in the commit `68f65d5`, and is restored. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
 
 ## [QUESTION] Building Classes at Run Time
 
@@ -38,11 +42,11 @@ A1: (a) AND (b), both.
 
 **Q2, a function with a receiver ("Adding Methods at Run Time", Q1): `function (this, prefix) { … }`, its first parameter named `this`, bound by a call's target (`p.describe("x = ")`), or given as the first argument when it is called directly (`describe(p, "x = ")`). Agreed?**
 
-A2:
+A2: Yes.
 
 **Q3, giving a class a method: (a) a built-in method of every class, `Point.addMethod("describe", f)`, after which its instances, and its subclasses', have it, replacing one of that name, as an extension's does; (b) a statement, `extend Point with describe = f;`.**
 
-A3:
+A3: (a),
 
 **Q4, its constructor: (a) a method like the others, `Point.addMethod("constructor", f)`, which `new Point(…)` runs; (b) one of its own, `Point.setConstructor(f)`.**
 
