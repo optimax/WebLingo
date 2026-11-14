@@ -267,6 +267,12 @@ public sealed class WebLingoParser : IWebLingoParser
         {
             var memberStart = Current.Span.Start;
             var isStatic = Current.Kind == WebLingoTokenKind.Static;
+            if (!isStatic && Current.Kind == WebLingoTokenKind.Const)
+            {
+                // const name = value; in a class: a constant of the class itself, as C#'s const is, so static (section 3.7).
+                if (ParseStaticField(memberStart) is { } constant) staticFields.Add(constant);
+                continue;
+            }
             if (isStatic)
             {
                 Advance();

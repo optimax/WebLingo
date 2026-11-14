@@ -133,6 +133,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("function f(this, a) { return a; } f(1);", "WL2006", 1, 35)]
     [InlineData("class A { static const x; }", "WL1006", 1, 24)]
     [InlineData("class A { static let x = 1; }", "WL1001", 1, 18)]
+    [InlineData("class A { const X; }", "WL1006", 1, 17)]
+    [InlineData("class A { const X = 1; const X = 2; }", "WL2002", 1, 30)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -456,6 +458,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A { hi() { return \"A\"; } } class B extends A { hi() { return \"B\"; } } var b = new B(); var before = b.hi(); var removed = [B.removeMethod(\"hi\"), B.removeMethod(\"hi\")]; writeLn([before, removed, b.hi()]);", "[\"B\", [true, false], \"A\"]")]
     [InlineData("var P = new Class(\"P\"); P.setMethod(\"describe\", function (this) { return \"p\"; }); var p = new P(); var before = p.describe(); P.removeMethod(\"describe\"); try { p.describe(); } catch (e) { writeLn([before, e.code]); }", "[\"p\", \"WL3006\"]")]
     [InlineData("class A { constructor(x) { this.x = x; } } class B extends A { constructor() { super(1); this.y = 2; } } B.removeMethod(\"constructor\"); writeLn(new B(5));", "B {x: 5}")]
+    [InlineData("class MathStuff { const PI = 3.14; static half() { return MathStuff.PI / 2; } } var m = new MathStuff(); writeLn([m.PI, MathStuff.PI, MathStuff.half()]);", "[3.14, 3.14, 1.57]")]
+    [InlineData("class K {} extend K { const MAX = 10; } writeLn([K.MAX, new K().MAX]);", "[10, 10]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -661,6 +665,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class C {} var p = new C(); p.count = 1; writeLn(C.count);", "WL3006")]
     [InlineData("class A {} A.removeMethod(5);", "WL3001")]
     [InlineData("class A {} A.removeMethod();", "WL2006")]
+    [InlineData("class MathStuff { const PI = 3.14; } MathStuff.PI = 3;", "WL3001")]
+    [InlineData("class MathStuff { const PI = 3.14; } new MathStuff().PI = 3;", "WL3001")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);
