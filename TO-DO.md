@@ -58,7 +58,7 @@ A3: (a) but - like (c) says - measure the impact on performance.
 
 2026-11-14 (Claude): the answers recorded as approved in the specification, section 3.9 ("Native modules"), and its decision register; split into the parts section 9 defines ("Native modules"), each a task below. Waits for them.
 
-## [IDLE] Native Modules, Part 4: The Built-in Classes as Native Classes
+## [QUESTION] Native Modules, Part 4: The Built-in Classes as Native Classes
 
 `Array`, `Map`, `Set`, `Task`, `Module`, `Class` and `Function` as a standard module's native classes, their methods native functions, measured against the VMs' own on the benchmark, as A3 of "Native Modules" asks (specification, sections 3.9 and 9, "Native modules", part 4), on both VMs. Added by Claude, 2026-11-14.
 
@@ -66,10 +66,50 @@ A3: (a) but - like (c) says - measure the impact on performance.
 
 2026-11-14: parts 2 and 3 are done. Native classes' members call their built-ins through members written in WebLingo, two calls for one ("Native Modules, Part 2: Native Classes", in `DONE.md`), so the built-in classes' methods, which the VMs reach directly now, will need a direct call in the VMs to be measured fairly.
 
-## [IDLE] I/O-Bound Workload
+2026-11-14 (Claude): part 2's native classes call their built-ins through members written in WebLingo, two calls for one, while the VMs call the built-in classes' methods directly now (`a.push(x)` is one step of `WebLingoMembers`, a runtime class). A3 of "Native Modules" asks that the move be measured; four decisions come first, each answerable with a letter.
+
+**Q1, the standard module that holds them: (a) `std:system`, which every module imports implicitly, so that their names stay in scope everywhere, as now; (b) a module of their own, `std:core`, imported implicitly as `std:system` is.**
+
+A1:
+
+**Q2, how the VMs call a built-in class's native method, `a.push(x)`: (a) directly, the class's method being the native function, which the VM gives the instance first, a change to `Run`'s calls, measured; (b) through a method written in WebLingo that calls it, as part 2's native classes do, `Run` unchanged, each native method two calls; (c) both, measured on the benchmark, the owner choosing on the numbers.**
+
+A2:
+
+**Q3, if the native methods measure slower than the VMs' own: (a) they land all the same, the numbers recorded, A3's (a) having chosen them; (b) the VMs keep their own, the native methods landing only when as fast, within the benchmark's noise; (c) nothing lands until the owner has seen the numbers.**
+
+A3:
+
+**Q4, the members that are not methods, `length`, indexing (`a[i]`) and `foreach`: (a) they stay the VMs' own, only methods becoming native; (b) native too, native classes getting properties and indexers, each getter and setter a native function.**
+
+A4:
+
+## [QUESTION] I/O-Bound Workload
 
 A benchmark workload of I/O-bound work (specification, section 5.6), the last of those "Both VMs, for now" waits for, after which the owner chooses between the VMs (WL-BC002), and M0.13 can begin. Scripts reach I/O through the platform layer (section 7: WL-P004's filesystem, synchronous and asynchronous, on WebLingo's own operation model, WL-P007) and a standard module, such as `std:fs` (section 3.9), a native module installed with the runtime. Added by Claude, 2026-11-14.
 
 2026-11-14: waits for "Native Modules", which standard modules are; its own contracts (the standard module's functions, and the capabilities, section 7.13, a host gives a script) will be asked then.
+
+2026-11-14 (Claude): native modules' functions and classes, which `std:fs` needs, are done; the platform layer has only a clock so far (`WebLingo.Platform.Abstractions`), its asynchronous operations being WebLingo's own (WL-P007, approved). `std:fs`'s contracts need five decisions, each answerable with a letter. The workload itself I would guess: a program that writes 1,000 small files and reads them back, one at a time, awaiting each, then all at once, with `Task.all`.
+
+**Q1, `std:fs`'s first functions: (a) whole files as text: `readText(path)`, `writeText(path, text)`, `appendText(path, text)`, `exists(path)` and `remove(path)`, none for folders yet; (b) (a), and folders: `list(path)`, `makeFolder(path)` and `removeFolder(path)`; (c) (b), and files opened as handles, a native class `File` (`File.open(path, mode)`, `read`, `write` and `dispose()`), as section 3.4's example has one.**
+
+A1:
+
+**Q2, synchronous and asynchronous, which WL-P004 asks for both: (a) each function in both forms, `readText(path)` and `readTextAsync(path)`, a task, as .NET names them; (b) asynchronous by default, `await fs.readText(path)`, a synchronous one named `readTextSync(path)`, as Node.js names them; (c) asynchronous only, for now.**
+
+A2:
+
+**Q3, text's encoding: (a) UTF-8 always, a byte order mark skipped when read and none written, malformed bytes an error; (b) UTF-8 by default, another encoding named by an optional argument.**
+
+A3:
+
+**Q4, the files a script may reach under `weblingo` (capabilities, section 7.13): (a) any the process may, capabilities coming with hosting; (b) those below the script's folder, unless the command line grants more (`--allow-fs folder`); (c) none, unless the command line grants them, `--allow-read folder` and `--allow-write folder`, as Deno does.**
+
+A4:
+
+**Q5, an I/O failure (a missing file, a path not granted): (a) a runtime error of a code of its own, WL3011, of a class `IOError` extending `Error`, which a catch may catch, its message naming the path as the script gave it, never the host's own paths; (b) WL3001, as another invalid operation is.**
+
+A5:
 
 # END-OF-TO-DO
