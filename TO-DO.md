@@ -36,12 +36,6 @@ A5: (a)
 
 2026-11-13: split into the parts the specification defines in section 9 ("Extending the classes of values"), each a task below. Waits for them.
 
-## [WORKING] Extending the Classes of Values: `extend`
-
-`extend` blocks: methods and static members given to a class, a program's or a kind of value's, hoisted with its block's classes, reaching every instance and subclass (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
-
-Done (Claude, 2026-11-13): on both VMs, with its conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Extensions"). Checks: the Release build, without warnings, the 1,450 tests, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## [IDLE] Extending the Classes of Values: `Boolean`, `Integer`, `Number` and `String`
 
 Classes extending them, whose instances hold a value, given by `super(value)`, which arithmetic, comparisons and `==` use, written `Celsius(21.5)`; and `new` on those classes (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.

@@ -1289,3 +1289,9 @@ Done (Claude, 2026-11-13, `fb78f7f`): recorded as approved in the specification,
 A collection of a class extending `Array`, `Map` or `Set` written `Stack([1, 2])`, in place of `Stack [1, 2]` (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
 
 Done (Claude, 2026-11-13, `2af1f42`): on both VMs, with its conformance tests. Checks: the Release build, without warnings, the 1,400 tests, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Extending the Classes of Values: `extend`
+
+`extend` blocks: methods and static members given to a class, a program's or a kind of value's, hoisted with its block's classes, reaching every instance and subclass (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
+
+Done (Claude, 2026-11-13, `6b05174`): on both VMs, with its conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Extensions"). Checks: the Release build, without warnings, the 1,450 tests, and the CLI on the samples, on Windows only; Linux not tried.
