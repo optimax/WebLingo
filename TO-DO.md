@@ -8,26 +8,6 @@
 
 2026-11-14: waits for the design of how standard modules are packaged, which A5 of "Native Code Extensions" makes native extensions, installed as other native modules are.
 
-## [IDLE] Modules
-
-The module system: `import`, static and dynamic, `export`, `param`, a script's parameters, and the standard library and the built-ins as modules (specification, section 3.9), on both VMs, before M0.12's templates, which build on it. Added by Claude, 2026-11-13.
-
-2026-11-13: waits for the answers to "Modules, Continued", and for "Extending the Classes of Values", above it.
-
-2026-11-14: answered, but for how a parameter is given as a string ("Modules, Quoted Parameters"), which only a script's parameters wait for.
-
-2026-11-14: split into the parts the specification defines in section 9 ("Modules"), each a task below. Waits for them.
-
-## [WORKING] Modules: A Script's Parameters
-
-`weblingo run script.wl name=value` (specification, sections 3.9 and 9). Added by Claude, 2026-11-14.
-
-2026-11-14: every parameter a string (A1 of "Modules, Quoted Parameters"); a script converting one waits for "Converting Strings to Values", which this part does not need.
-
-2026-11-14: waits for "Modules, Quoted Parameters", and for "Modules: Standard Modules".
-
-Done (Claude, 2026-11-14): on both VMs, with tests through the CLI and in `ModuleTests`; its choices recorded as Proposed in the specification, section 15.2 ("Modules"), in place of the program's parameters being their defaults: a value for no parameter, or a parameter without a default left out, is WL2016 as the program starts; an argument that is not `name=value`, or a name given twice, is a usage error (exit 2). The CLI's usage line says so: `run <file.wl> [name=value …]`. A `ModuleTests` case that took a program's parameter without a default for a compile error takes it for a runtime error now. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## [IDLE] M0.12: Templates
 
 `.wlp` templates, with includes, layouts and parameterized components together (specification, section 13, WL-T001 to WL-T008), in `WebLingo.Templates`, with `WebLingo.Templates.Tests`, on both VMs, and a benchmark workload for template output (section 5.6). Their open contracts (the include and component syntax, context-aware escaping) will be proposed as questions. Added by Claude, 2026-11-13.
