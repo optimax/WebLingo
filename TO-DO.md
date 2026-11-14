@@ -18,20 +18,6 @@
 
 2026-11-13: waits for the design of "Building Classes at Run Time".
 
-## [WORKING] Classes of Values, Constructors
-
-What "Extending the Classes of Values: `Boolean`, `Integer`, `Number` and `String`" chose where the answers so far leave it open (specification, section 15.2, "Classes holding a value"). One decision each, answerable with a letter. Added by Claude, 2026-11-13.
-
-Q1, A7's "a class without a constructor passes its arguments on": (a) for every class, so that `class B extends A {}` makes `new B(1)` run `A`'s constructor with `1` (it is WS2006 now, a class without a constructor taking none); (b) only for a class holding a value, as built.
-
-A1: Only if A defines a constructor that takes a parameter. In general, supplying a parameter where none is expected is an error. This is a special case that saves calling base(1).
-
-Q2, an arithmetic result not of its class's kind, `count / 2` where `Count` extends `Integer`, a binary64: (a) a plain value, `1.5`, as built; (b) WS3001.
-
-A2: (a)
-
-Done (Claude, 2026-11-14): recorded as approved in the specification, section 3.7 ("Instances" and "Classes of values"): every class without a constructor passes its arguments on to the nearest base that declares one, and with none takes none; on both VMs, with their conformance tests. This task's heading was lost from `TO-DO.md` in the commit `68f65d5`, and is restored. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## [QUESTION] Building Classes at Run Time
 
 `new Class()`, which a program names and gives methods while it runs, after which it acts as a declared class does (A9 of "Classes of Values, Extensions", and A5 of "Classes of Values, Extensions, Continued": design it now, with what "Adding Methods at Run Time" describes, and `extends Class`). One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
@@ -50,7 +36,7 @@ A3: (a),
 
 **Q4, its constructor: (a) a method like the others, `Point.addMethod("constructor", f)`, which `new Point(…)` runs; (b) one of its own, `Point.setConstructor(f)`.**
 
-A4:
+A4: (a)
 
 **Q5, `extends Class`: (a) WL3001 still, `new Class(…)` being how a program makes a class; (b) a class extending `Class` makes classes, `new Meta("Point")`, its methods becoming theirs as static ones, as a metaclass does.**
 

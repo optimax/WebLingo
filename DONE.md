@@ -1416,3 +1416,17 @@ Q1, WSHI, the host-neutral interface's name (specification, sections 6.2, 6.6 an
 A1: (a) WLHI, but you need to define it first (fully spelled out) in the spec, and describe what it is: : the full name in words, and a short paragraph in §6.2 saying which contracts make up the host interface, with references to §6.4, §6.6, §6.7 and §6.8.
 
 Done (Claude, 2026-11-14, `796e6c4`): WLHI, the WebLingo Host Interface, defined in the specification, section 6.2: what it is, and the contracts it is made of, the runtime's lifecycle (§6.4), a request's (§6.6), the HTTP request and response (§6.7), and the native ABI (§6.8); WSHI renamed WLHI everywhere but `DONE.md`.
+
+## [DONE] Classes of Values, Constructors
+
+What "Extending the Classes of Values: `Boolean`, `Integer`, `Number` and `String`" chose where the answers so far leave it open (specification, section 15.2, "Classes holding a value"). One decision each, answerable with a letter. Added by Claude, 2026-11-13.
+
+Q1, A7's "a class without a constructor passes its arguments on": (a) for every class, so that `class B extends A {}` makes `new B(1)` run `A`'s constructor with `1` (it is WS2006 now, a class without a constructor taking none); (b) only for a class holding a value, as built.
+
+A1: Only if A defines a constructor that takes a parameter. In general, supplying a parameter where none is expected is an error. This is a special case that saves calling base(1).
+
+Q2, an arithmetic result not of its class's kind, `count / 2` where `Count` extends `Integer`, a binary64: (a) a plain value, `1.5`, as built; (b) WS3001.
+
+A2: (a)
+
+Done (Claude, 2026-11-14, `e992b43`): recorded as approved in the specification, section 3.7 ("Instances" and "Classes of values"): every class without a constructor passes its arguments on to the nearest base that declares one, and with none takes none; on both VMs, with their conformance tests. This task's heading was lost from `TO-DO.md` in the commit `68f65d5`, and is restored. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
