@@ -2,6 +2,24 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
+## [DEFER] WSP — Web Server Pages
+
+DEFER and answer the NOTE below: Change the name of the templating compiler for web pages to WSP (`.wsp` extension) —Web Server Pages, by analogy to Active Server Pages. 
+
+NOTE: It would be nice to use WASP (Web _____ Server Pages) but we don't really want to use "Active" in this context, so propose something better. 
+
+QUESTION: Do we support COM objects in scripts yet so that "Active" would be justified? 
+
+2026-11-14 (Claude): deferred, as asked. The answers:
+
+The question: no. WebLingo has no COM, and nothing in the specification plans it. A script reaches native code only through native modules (section 3.9), assemblies loaded from a configured scheme's folder, and later through a foreign-function interface to C libraries, approved but not designed yet. COM is Windows's, and the portable core may depend on no platform (section 11), so COM objects could only come from a native module written for Windows, as an adapter (section 7.14), which none is. The "Active" of Active Server Pages came from Microsoft's ActiveX and Active Scripting, both COM, so it would not be justified.
+
+The note: proposals for WASP's A are in Q1, below. Two collisions to weigh first (a web search, 2026-11-14): `.wsp` is SharePoint's solution package (a CAB file, deployed with `Add-SPSolution`), found on the Windows servers where IIS, WebLingo's first target, runs; and Wasp is a full-stack web framework (wasp.sh), whose projects were defined in `main.wasp` files, now `main.wasp.ts`, so WASP above all would need the name check the specification asks for before a public launch (section 12.3, item 6). The rename would change the names in use, WebLingo Pages, `.wlp` and `welp` (sections 1 and 13), with `WebLingo.Pages.Cli` and the samples' pages; and `.wsp` was WebScript Pages' extension until the renaming of 14 November 2026, so that name would come back.
+
+**Q1, the word for WASP's A, "Web _ Server Pages": (a) Application, Web Application Server Pages: what pages are part of, an application with its modules, routes and generations (section 6), "application server" being the usual term; (b) Async, Web Async Server Pages: what sets them apart from classic ASP, a page that may await anywhere, its components tasks, its output streamed (sections 3.8 and 13); (c) Assembled, Web Assembled Server Pages: pages put together from includes, layouts and components (WL-T001); (d) none: WSP, as above.**
+
+A1:
+
 ## [IDLE] M0.13: WBC
 
 WBC, the bytecode's binary format, its writing and its reading, with verification (specification, sections 5.1, 5.3 and 5.5). Its encoding choices are proposed in the specification and not yet approved, and the format is the chosen VM's, so this waits for the choice between the VMs (WL-BC002) as well. Added by Claude, 2026-11-13.
