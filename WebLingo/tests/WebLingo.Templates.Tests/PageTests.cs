@@ -73,7 +73,7 @@ public sealed class PageTests
     public void APageThatDoesNotCompileIsReportedWhereItIsWrong(string page, string code, int line, int column)
     {
         var (diagnostics, _, _) = Render(page);
-        Assert.Contains($"{code} at {line},{column}:", diagnostics);
+        Assert.Contains($"{code} at page.wlp {line},{column}:", diagnostics);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class PageTests
     {
         var (_, written, error) = Render("<p>\n<%= [1][5] %>\n</p>");
         Assert.Equal("<p>\n", written);
-        Assert.StartsWith("WL3005 at 2,", error);
+        Assert.StartsWith("WL3005 at page.wlp 2,", error);
     }
 
     [Fact]
@@ -103,28 +103,113 @@ public sealed class PageTests
         Assert.Equal(escaped, WebLingoTemplateWriteFunction.Escape(text));
     }
 
+    [Theory]
+    // An include is textual: the template is read in its place, and sees the variables there, as its text would.
+    [InlineData("a<% include \"/h.wlp\"; %>c", "h.wlp=b", "abc")]
+    [InlineData("<% var name = \"Ann\"; %><% include \"/greet.wlp\"; %>", "greet.wlp=Hello, <%= name %>!", "Hello, Ann!")]
+    [InlineData("<% include \"/h.wlp\"; %><%= x * 3 %>", "h.wlp=<% var x = 2; %>", "6")]
+    [InlineData("<% foreach (var i in [1, 2]) { include \"/item.wlp\"; } %>", "item.wlp=<li><%= i %></li>", "<li>1</li><li>2</li>")]
+    [InlineData("<% include \"/h.wlp\"; include \"h\"; %>", "h.wlp=x", "xx")]
+    // A path starting with / is from the application's root, any other from the including file's folder.
+    [InlineData("<% include \"/inc/a.wlp\"; %>", "inc/a.wlp=a<% include \"b.wlp\"; %>|inc/b.wlp=b", "ab")]
+    [InlineData("<% include \"inc/a\"; %>", "inc/a.wlp=a<% include \"/b.wlp\"; %>|b.wlp=root b", "aroot b")]
+    // Each file's lines are its own: a line holding only an include writes nothing, the template its own lines.
+    [InlineData("<html>\n<% include \"/head.wlp\"; %>\n</html>", "head.wlp=<% var t = 1; %>\n<head><%= t %></head>\n", "<html>\n<head>1</head>\n</html>")]
+    // include is a name like any other where no string follows it.
+    [InlineData("<% var include = 2; %><%= include %>", "", "2")]
+    public void AnIncludeReadsTheTemplateInItsPlace(string page, string templates, string written)
+    {
+        Assert.Equal(("", written, ""), Render(page, Templates(templates)));
+    }
+
+    [Theory]
+    [InlineData("<% include \"/nope.wlp\"; %>", "", "WL5002 at page.wlp 1,12: The template '/nope.wlp' cannot be included: there is no such file.")]
+    [InlineData("<% include \"/h.wlp\" %>", "h.wlp=x", "WL1002 at page.wlp 1,20: A ';' is missing here.")]
+    [InlineData("<% include \"/a.wlp\"; %>", "a.wlp=<% include \"b.wlp\"; %>|b.wlp=<% include \"a.wlp\"; %>",
+        "WL5003 at b.wlp 1,12: Including 'a.wlp' makes a cycle: a.wlp includes b.wlp includes a.wlp.")]
+    [InlineData("<% include \"/page.wlp\"; %>", "", "WL5003 at page.wlp 1,12: Including '/page.wlp' makes a cycle: page.wlp includes page.wlp.")]
+    // An error in a template is reported in it, at its own line and column.
+    [InlineData("<p>\n<% include \"/h.wlp\"; %>", "h.wlp=line\n<%= y %>", "WL2001 at h.wlp 2,5: 'y' is not defined.")]
+    [InlineData("<% include \"/h.wlp\"; %>", "h.wlp=\n<% var x = 1;", "WL5001 at h.wlp 2,1: This block has no closing '%>'.")]
+    public void AnIncludeThatFailsIsReportedWhereItIs(string page, string templates, string diagnostic)
+    {
+        Assert.Equal(diagnostic, Render(page, Templates(templates)).Diagnostics);
+    }
+
+    [Fact]
+    public void ARuntimeErrorInATemplateIsReportedInIt()
+    {
+        var (_, written, error) = Render("<p>\n<% include \"/h.wlp\"; %>", Templates("h.wlp=before\n<%= [1][5] %>"));
+        Assert.Equal("<p>\nbefore\n", written);
+        Assert.StartsWith("WL3005 at h.wlp 2,", error);
+    }
+
+    [Fact]
+    public void IncludesNestAtMost64Deep()
+    {
+        var chain = new List<string>();
+        for (var i = 0; i < 70; i++) chain.Add($"t{i}.wlp=<% include \"t{i + 1}.wlp\"; %>");
+        chain.Add("t70.wlp=end");
+        var (diagnostics, _, _) = Render("<% include \"/t0.wlp\"; %>", Templates(string.Join("|", chain)));
+        Assert.Equal("WL5004 at t62.wlp 1,12: Includes nest too deeply here: at most 64.", diagnostics);
+    }
+
+    [Fact]
+    public void APageParsedWithoutAResolverIncludesNothing()
+    {
+        var tree = WebLingoTemplateParser.Parse(new WebLingoSourceText("<% include \"/h.wlp\"; %>", "page.wlp"));
+        Assert.Equal("The template '/h.wlp' cannot be included: this host finds no templates.", Assert.Single(tree.Diagnostics).Message);
+    }
+
     /// <summary>
-    /// A page compiled and run on both VMs, which must give the same: its diagnostics (each as its code, its line and
-    /// column, and its message), what it writes, and its runtime error, if any.
+    /// Templates in memory, each <c>name=text</c>, separated by <c>|</c>: a path starting with <c>/</c> names one from the
+    /// root, any other from the including file's folder, <c>.wlp</c> added to one without an extension.
     /// </summary>
-    private static (string Diagnostics, string Written, string Error) Render(string page)
+    private sealed class MemoryTemplates(Dictionary<string, string> texts) : IWebLingoSourceResolver
+    {
+        public bool TryResolve(string importer, string path, out string name, out string source, out string? error)
+        {
+            var folder = importer.LastIndexOf('/') is var slash and >= 0 ? importer[..(slash + 1)] : "";
+            name = path.StartsWith('/') ? path[1..] : folder + path;
+            if (!name.EndsWith(".wlp", StringComparison.Ordinal)) name += ".wlp";
+            error = texts.TryGetValue(name, out source!) ? null : "there is no such file";
+            return error is null;
+        }
+    }
+
+    private static MemoryTemplates Templates(string templates)
+    {
+        var texts = new Dictionary<string, string>(StringComparer.Ordinal) { ["page.wlp"] = "" };
+        foreach (var entry in templates.Split('|', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var equals = entry.IndexOf('=');
+            texts[entry[..equals]] = entry[(equals + 1)..];
+        }
+        return new MemoryTemplates(texts);
+    }
+
+    /// <summary>
+    /// A page compiled and run on both VMs, which must give the same: its diagnostics (each as its code, its file, line
+    /// and column, and its message), what it writes, and its runtime error, if any.
+    /// </summary>
+    private static (string Diagnostics, string Written, string Error) Render(string page, IWebLingoSourceResolver? templates = null)
     {
         var text = new WebLingoSourceText(page, "page.wlp");
-        var compiler = new WebLingoTemplateCompiler(Options);
+        var compiler = new WebLingoTemplateCompiler(Options, templates);
 
-        var registerCompiled = compiler.Compile(text);
+        var registerCompiled = compiler.Compile(text, out var files);
         var registerOutput = new WebLingoCollectedOutput();
         var registerResult = registerCompiled.Module is { } module
             ? new WebLingoVirtualMachine().Execute(module, Context(registerOutput))
             : null;
-        var register = (Describe(text, registerCompiled.Diagnostics), registerOutput.Text, Describe(text, registerResult?.Error));
+        var register = (Describe(files, registerCompiled.Diagnostics), registerOutput.Text, Describe(files, registerResult?.Error));
 
-        var stackCompiled = compiler.CompileForStack(text);
+        var stackCompiled = compiler.CompileForStack(text, out files);
         var stackOutput = new WebLingoCollectedOutput();
         var stackResult = stackCompiled.Module is { } stackModule
             ? new WebLingoStackVirtualMachine().Execute(stackModule, Context(stackOutput))
             : null;
-        var stack = (Describe(text, stackCompiled.Diagnostics), stackOutput.Text, Describe(text, stackResult?.Error));
+        var stack = (Describe(files, stackCompiled.Diagnostics), stackOutput.Text, Describe(files, stackResult?.Error));
 
         Assert.Equal(register, stack);
         return register;
@@ -140,17 +225,20 @@ public sealed class PageTests
         return new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services, InstructionBudget = 1_000_000 };
     }
 
-    private static string Describe(WebLingoSourceText text, IReadOnlyList<WebLingoDiagnostic> diagnostics)
+    private static string Describe(WebLingoTemplateFiles files, IReadOnlyList<WebLingoDiagnostic> diagnostics)
     {
         var lines = new List<string>();
-        foreach (var diagnostic in diagnostics) lines.Add(Describe(text, diagnostic));
+        foreach (var diagnostic in diagnostics) lines.Add(Describe(files, diagnostic));
         return string.Join(" | ", lines);
     }
 
-    private static string Describe(WebLingoSourceText text, WebLingoDiagnostic? diagnostic)
+    /// <summary>A diagnostic, a runtime error's located first, in the file it is in.</summary>
+    private static string Describe(WebLingoTemplateFiles files, WebLingoDiagnostic? diagnostic)
     {
         if (diagnostic is null) return "";
+        diagnostic = files.Locate(diagnostic);
+        var text = diagnostic.Source is { } name ? files.TextOf(name)! : files.Page;
         var location = text.GetLocation(diagnostic.Span.Start);
-        return $"{diagnostic.Code} at {location.Line},{location.Column}: {diagnostic.Message}";
+        return $"{diagnostic.Code} at {text.Name} {location.Line},{location.Column}: {diagnostic.Message}";
     }
 }

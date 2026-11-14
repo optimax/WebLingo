@@ -88,4 +88,10 @@ public static class WebLingoDiagnosticCodes
 
     /// <summary>A template's block, <c>&lt;%</c>, with no closing <c>%&gt;</c> (proposed, section 13; the templates' range approved).</summary>
     public const string UnterminatedTemplateBlock = "WL5001";
+    /// <summary>A template an include names that cannot be found or read, or that is outside the application's root (proposed, section 13).</summary>
+    public const string TemplateNotFound = "WL5002";
+    /// <summary>An include that makes a cycle: a template that includes itself, directly or through others (proposed, section 13).</summary>
+    public const string TemplateCycle = "WL5003";
+    /// <summary>Includes beyond their limits: nested too deeply, or too much text in all (proposed, section 13).</summary>
+    public const string TemplateTooLarge = "WL5004";
 }

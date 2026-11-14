@@ -30,7 +30,7 @@ WebLingo Pages are `.wlp` templates, compiled by the template compiler (`WebLing
 </ul>
 ```
 
-writes `<ul>`, then `<li>Item 1 for you &amp; me</li>` and the same for 2, each on a line of its own, then `</ul>`. Includes, layouts and components come next, so `samples/SimpleWebsite` does not run yet.
+writes `<ul>`, then `<li>Item 1 for you &amp; me</li>` and the same for 2, each on a line of its own, then `</ul>`. `<% include "/includes/header.wlp"; %>` reads a template in its place, as if its text stood there: a path starting with `/` is from the application's root, which `welp run --root site page.wlp` gives (the page's folder when it is left out), any other from the including file's folder. Layouts and components come next, so `samples/SimpleWebsite` does not run yet.
 
 ## Prerequisites
 
@@ -52,11 +52,11 @@ dotnet run --project benchmarks/WebLingo.Benchmarks -c Release
 
 The last command times the VM on the benchmark's workloads (`benchmarks/WebLingo.Benchmarks/Workloads`), and writes the results as a table.
 
-`weblingo run <file>` compiles a script and runs it; `weblingo check <file>` compiles it and reports its errors without running it. Errors go to standard error as `file(line,column): error CODE: message`. The exit code is 0 on success, 1 for compilation errors, 2 for a usage error, 3 for a runtime error, and 4 for a file that cannot be read. `welp run <page.wlp>` and `welp check <page.wlp>` do the same for a page, the page being written to standard output.
+`weblingo run <file>` compiles a script and runs it; `weblingo check <file>` compiles it and reports its errors without running it. Errors go to standard error as `file(line,column): error CODE: message`. The exit code is 0 on success, 1 for compilation errors, 2 for a usage error, 3 for a runtime error, and 4 for a file that cannot be read. `welp run [--root <folder>] <page.wlp>` and `welp check [--root <folder>] <page.wlp>` do the same for a page, the page being written to standard output.
 
 ## Architecture
 
-See [`Documents/weblingo-architecture.md`](../Documents/weblingo-architecture.md) at the repository root; section 15 has M0.6's status, and the choices made where the specification is silent, all still proposed. The VM instruction architecture remains provisional (WL-BC002): there are a register VM, which `weblingo` runs, and a stack VM, both from the same lowered IR, which the benchmark (`benchmarks/WebLingo.Benchmarks`) compares. Includes, layouts, and parameterized components are **all mandatory** for the first template-capable release; pages are implemented, and they are not yet.
+See [`Documents/weblingo-architecture.md`](../Documents/weblingo-architecture.md) at the repository root; section 15 has M0.6's status, and the choices made where the specification is silent, all still proposed. The VM instruction architecture remains provisional (WL-BC002): there are a register VM, which `weblingo` runs, and a stack VM, both from the same lowered IR, which the benchmark (`benchmarks/WebLingo.Benchmarks`) compares. Includes, layouts, and parameterized components are **all mandatory** for the first template-capable release; pages and their includes are implemented, and layouts and components are not yet.
 
 ## Verification status
 

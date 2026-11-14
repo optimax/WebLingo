@@ -25,8 +25,8 @@ public static class WebLingoCommandLine
     public const string Version = "WebLingo M0.6 (pre-alpha)";
 
     /// <summary><c>weblingo</c>: scripts, <c>.wl</c> files, compiled by the WebLingo compiler.</summary>
-    public static WebLingoCommandLineProgram Scripts { get; } =
-        new("weblingo", Version, ".wl", _ => [], (file, options) => new WebLingoCompiler(options).Compile(file.Text, file.Name));
+    public static WebLingoCommandLineProgram Scripts { get; } = new("weblingo", Version, ".wl", _ => [],
+        (file, options) => new WebLingoCommandLineCompilation(new WebLingoCompiler(options).Compile(file.Text, file.Name)));
 
     public static int Run(string[] args, TextWriter output, TextWriter error) => Run(Scripts, args, output, error);
 
@@ -44,10 +44,11 @@ public static class WebLingoCommandLine
             error.WriteLine($"'{wrong}' is not a parameter's value, name=value, or is given twice.");
         }
 
-        var file = "<file" + program.Extension + ">";
+        var file = program.Options + "<file" + program.Extension + ">";
         output.WriteLine($"Usage: {program.Name} --version | run {file} [name=value …] | check {file}");
         output.WriteLine("  run    compiles the file and runs it, giving its parameters the values after it, each a string");
         output.WriteLine("  check  compiles the file and reports its errors, without running it");
+        foreach (var line in program.OptionsHelp) output.WriteLine(line);
         return args.Length == 0 ? Success : UsageError;
     }
 
@@ -106,7 +107,8 @@ public static class WebLingoCommandLine
 
         var resolver = new FileResolver(path);
         var options = new WebLingoCompilerOptions(declarations) { Resolver = resolver };
-        var compiled = program.Compile(text, options);
+        var compilation = program.Compile(text, options);
+        var compiled = compilation.Result;
         foreach (var diagnostic in compiled.Diagnostics) error.WriteLine(Format(TextOf(diagnostic), diagnostic));
         if (compiled.Module is null) return CompilationFailed;
         if (!run) return Success;
@@ -121,12 +123,16 @@ public static class WebLingoCommandLine
         var result = new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(options) }.Execute(compiled.Module, context);
         output.Flush();
         if (result.Succeeded) return Success;
-        error.WriteLine(Format(TextOf(result.Error!), result.Error!));
+        var located = compilation.Locate(result.Error!);
+        error.WriteLine(Format(TextOf(located), located));
         return RuntimeFailed;
 
-        // A diagnostic's file: a module the program imports, or the program's own (section 3.9).
+        // A diagnostic's file: a module the program imports, a file the program's compiler read itself (a page's include,
+        // section 13), or the program's own (section 3.9).
         WebLingoSourceText TextOf(WebLingoDiagnostic diagnostic) =>
-            diagnostic.Source is { } name && resolver.Texts.TryGetValue(name, out var imported) ? imported : text;
+            diagnostic.Source is not { } name ? text
+            : resolver.Texts.TryGetValue(name, out var imported) ? imported
+            : compilation.TextOf(name) ?? text;
     }
 
     /// <summary>
