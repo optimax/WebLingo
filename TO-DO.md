@@ -2,25 +2,73 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## Classes of Values, Further
+## [DONE] Classes of Values, Further
 
 A2 of "Classes of Values, Continued": `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class` are to be like any other class, and extendable, with new methods for example. What that means needs deciding. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
 
-**Q1, new methods for a kind's values: (a) a block that adds methods to an existing class, `extend Integer { isEven() { return this % 2 == 0; } }`, after which `4.isEven()`, as C#'s extension methods and Swift's extensions do; (b) only subclasses, `class Even extends Integer { … }`; (c) both.**
+Q1, new methods for a kind's values: (a) a block that adds methods to an existing class, `extend Integer { isEven() { return this % 2 == 0; } }`, after which `4.isEven()`, as C#'s extension methods and Swift's extensions do; (b) only subclasses, `class Even extends Integer { … }`; (c) both.
 
 A1: (c).
 
-**Q2, a subclass of `Integer`, `Number`, `String` or `Boolean`, if there are any: `new Celsius(21.5)` holds a number, which arithmetic, comparisons and `==` use, `is Number` and `is Celsius`, with its own methods and fields, written `Celsius 21.5`. Agreed?**
+Q2, a subclass of `Integer`, `Number`, `String` or `Boolean`, if there are any: `new Celsius(21.5)` holds a number, which arithmetic, comparisons and `==` use, `is Number` and `is Celsius`, with its own methods and fields, written `Celsius 21.5`. Agreed?
 
 A2:  Yes. Maybe write those [class-name]:[value(s)], i.e. `Celsius:21.5`, or `Celsius(21.5)` i.e. the same way as constructing it, except without the `new`.
 
-**Q3, `new` on those classes: (a) `new Integer()` is `0`, `new String()` `""`, `new Boolean()` `false`, and `new Integer(5)` `5`; (b) WS3001, their values being made by literals.**
+Q3, `new` on those classes: (a) `new Integer()` is `0`, `new String()` `""`, `new Boolean()` `false`, and `new Integer(5)` `5`; (b) WS3001, their values being made by literals.
 
 A3: (a). So `var x = new Integer(42);` is the same as `var x = 42`.
 
-**Q4, `Function` and `Class`: (a) as (1) to (3) say for the others, a subclass of `Function` being a function with methods of its own; (b) new methods only, as (1) (a), with no subclasses.**
+Q4, `Function` and `Class`: (a) as (1) to (3) say for the others, a subclass of `Function` being a function with methods of its own; (b) new methods only, as (1) (a), with no subclasses.
 
 A4: (a).
+
+Done (Claude, 2026-11-13): recorded as approved in the specification, section 3.7 ("Classes of values"). A2's way of writing such an instance, and what `extend`, `new Function(…)` and `new Class(…)` need besides, are asked in "Classes of Values, Extensions"; the implementation is the task "Extending the Classes of Values".
+
+## [QUESTION] Classes of Values, Extensions
+
+Follow-ups to "Classes of Values, Further". One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
+
+**Q1, writing an instance of a class extending a kind of value (A2): (a) `Celsius:21.5`; (b) `Celsius(21.5)`, as it is made, without `new`; and the collections the same way, `Stack:[1, 2]` or `Stack([1, 2])`, in place of `Stack [1, 2]`, so that every classed value is written alike.**
+
+A1:
+
+**Q2, `extend`'s reach: (a) the class itself, everywhere, from when the `extend` runs: every instance and subclass, made before or after, has the new methods; (b) only code where the extension is in scope, as C#'s extension methods are.**
+
+A2:
+
+**Q3, when an `extend` runs: (a) it is hoisted with its block's classes, and runs when the block begins, after they are made; (b) where it stands, in order with the statements around it.**
+
+A3:
+
+**Q4, an extension's method whose name the class has already: (a) an error, WS3001 when the `extend` runs; (b) it replaces the class's own, as a subclass's would.**
+
+A4:
+
+**Q5, what an `extend` block may hold: (a) methods only; (b) methods and static members, `static` as in a class.**
+
+A5:
+
+**Q6, arithmetic on a boxed value: `new Celsius(21.5) + 1` is (a) a plain number, `22.5`; (b) a `Celsius`, its class kept.**
+
+A6:
+
+**Q7, the held value: a class extending `Number` gives it by its constructor's `super(value)`, as `new Number(value)` makes one; a class without a constructor passes its arguments on, so `new Celsius(21.5)` holds `21.5`. Agreed?**
+
+A7:
+
+**Q8, `Function`: `new Function(f)` is `f` itself, and `class Handler extends Function { constructor(f) { super(f); } }` makes a function that calls `f`, with `Handler`'s methods and fields; `new Function()` is a function that does nothing and gives `null`. Agreed?**
+
+A8:
+
+**Q9, `Class`: (a) `new Class()` and `extends Class` are WS3001, classes being made by `class` declarations, and `Class` takes new methods only by `extend`, which every class then has (`Point.describe()`); (b) as for the other kinds, with a design of its own to come.**
+
+A9:
+
+## [IDLE] Extending the Classes of Values
+
+`extend` blocks, and classes extending `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class`, with `new` on those classes ("Classes of Values, Further"; specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for the answers to "Classes of Values, Extensions".
 
 ## [IDLE] M0.11: Asynchrony
 
@@ -66,7 +114,7 @@ A6: Yes.
 
 **Q7, a parameter without a default that is not given: (a) an error, where the module is imported, of a new code; (b) `null`.**
 
-A7:
+A7: (a).
 
 **Q8, a script's parameters from the command line: `weblingo run script.ws size=10 name=Ann`, each value read as a WebLingo literal if it is one (`10`, `true`), as a string otherwise. Agreed?**
 
@@ -169,7 +217,5 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 ## Static Members Callable on Instances
 
 Let's make sure that class static members are accessible through instance references (unless shadowed by the instance member) as well as class references. 
-
-
 
 # END-OF-TO-DO
