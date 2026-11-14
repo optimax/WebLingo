@@ -22,6 +22,22 @@ public sealed class StackVerifierTests
     }
 
     [Fact]
+    public void AHandlersStackDepthIsNoDeeperThanItsRegions()
+    {
+        WsStackModule Protected(int depth) => Module(locals: 2, maxStack: 2,
+                I(WsStackOpCode.LoadNull), I(WsStackOpCode.Throw), I(WsStackOpCode.LoadLocal, 0), I(WsStackOpCode.ReturnValue)) with
+            {
+                EntryPoint = Module(locals: 2, maxStack: 2, I(WsStackOpCode.LoadNull), I(WsStackOpCode.Throw),
+                    I(WsStackOpCode.LoadLocal, 0), I(WsStackOpCode.ReturnValue)).EntryPoint with
+                {
+                    Handlers = [new WsStackHandler(0, 2, 2, 0, 1, depth)]
+                }
+            };
+        Assert.Equal(WsVerificationResult.Valid, Verify(Protected(0)));
+        AssertRejected(Protected(1), 0, "below its handler's");
+    }
+
+    [Fact]
     public void DisposePopsItsResource()
     {
         Assert.Equal(WsVerificationResult.Valid,

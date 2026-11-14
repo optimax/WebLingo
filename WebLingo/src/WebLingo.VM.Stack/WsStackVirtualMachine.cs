@@ -108,7 +108,11 @@ public sealed class WsStackVirtualMachine
         public WsStackInstruction[] Code = [];
         public WsValue[] Slots = [];
         /// <summary>The closure it runs as, and, for a disposal, the instance disposed: the frame's roots.</summary>
-        public readonly WsValue[] Closure = new WsValue[2];
+        /// <summary>
+        /// The frame's roots: the closure it runs as; for a disposal, the instance disposed; and an exception a disposal
+        /// keeps while its next methods run (section 3.7).
+        /// </summary>
+        public readonly WsValue[] Closure = new WsValue[3];
         public WsValue[] Cells = [];
         /// <summary>The next instruction, while the frame waits for a call it made to return.</summary>
         public int Pc;
@@ -122,6 +126,10 @@ public sealed class WsStackVirtualMachine
         /// </summary>
         public WsValue[]? DisposeChain;
         public int DisposeNext;
+        /// <summary>Whether a disposal keeps an exception one of its methods threw, its runtime error if it is one, and where it was thrown.</summary>
+        public bool Holds;
+        public WsRuntimeError? HeldError;
+        public long HeldOrigin;
         /// <summary>Whether the call's result is dropped, as a using's disposal drops it, rather than pushed.</summary>
         public bool DiscardResult;
     }
@@ -140,6 +148,7 @@ public sealed class WsStackVirtualMachine
                 Slots = new WsValue[module.EntryPoint.SlotCount]
             };
             heap.AddRoots(frame.Slots);
+            heap.AddRoots(_errorClass);
 
             var code = frame.Code;
             var slots = frame.Slots;
@@ -449,6 +458,7 @@ public sealed class WsStackVirtualMachine
                             if (!TryMakeClass(module.Classes[ins.A], baseClass, slots, cells, out var made, out error)) break;
                             sp -= ins.B;
                             slots[sp++] = made;
+                            if (ins.A == module.ErrorClass) _errorClass[0] = made;
                             pc++;
                             continue;
                         }
@@ -583,6 +593,20 @@ public sealed class WsStackVirtualMachine
                             constructed = WsValue.Null;
                             goto call;
                         }
+                        case WsStackOpCode.Throw:
+                            _thrown = slots[--sp];
+                            _thrownError = null;
+                            _origin = OriginOf(frame.Function, pc);
+                            goto throwing;
+                        case WsStackOpCode.Rethrow:
+                        {
+                            // 'throw;', or a finally's end: the exception again, from where it was first thrown.
+                            var origin = slots[--sp];
+                            _thrown = slots[--sp];
+                            _thrownError = null;
+                            _origin = origin.Kind == WsValueKind.Int64 ? origin.AsInt64 : OriginOf(frame.Function, pc);
+                            goto throwing;
+                        }
                         case WsStackOpCode.Return:
                         case WsStackOpCode.ReturnValue:
                         {
@@ -709,44 +733,101 @@ public sealed class WsStackVirtualMachine
 
                 disposed:
                     // A dispose method has returned: the instance's next one runs in the same frame, or the disposal is
-                    // done, and gives null, or nothing to a using (section 3.7).
+                    // done, and gives null, or nothing to a using; or, if one of its methods threw, that exception is
+                    // thrown again, from where the disposal was called (section 3.7).
                     {
-                        var chain = frame.DisposeChain!;
-                        if (frame.DisposeNext < chain.Length)
-                        {
-                            // The instance's next dispose method, in the same frame, its result dropped.
-                            var next = chain[frame.DisposeNext++];
-                            var (nextIndex, nextCells) = heap.GetClosure(next);
-                            var nextFunction = module.Functions[nextIndex];
-                            if (slots.Length < nextFunction.SlotCount) frame.Slots = slots = new WsValue[nextFunction.SlotCount];
-                            slots[0] = frame.Closure[1];
-                            frame.Function = nextFunction;
-                            frame.Code = code = codes[nextIndex];
-                            frame.Cells = cells = nextCells;
-                            frame.Closure[0] = next;
-                            heap.AddRoots(slots);
-                            heap.AddRoots(frame.Closure);
-                            sp = nextFunction.LocalCount;
-                            pc = 0;
-                            continue;
-                        }
+                        if (frame.DisposeNext < frame.DisposeChain!.Length) goto nextDisposal;
                         frame.DisposeChain = null;
                         frame.Closure[0] = WsValue.Null;
                         frame.Closure[1] = WsValue.Null;
                         var discard = frame.DiscardResult;
                         frame.DiscardResult = false;
+                        var held = frame.Holds;
+                        if (held) TakeHeld(frame);
                         frame = frames[--depth];
                         code = frame.Code;
                         slots = frame.Slots;
                         cells = frame.Cells;
                         sp = frame.Sp;
+                        if (held)
+                        {
+                            pc = frame.Pc - 1;
+                            goto throwing;
+                        }
                         pc = frame.Pc;
                         if (!discard) slots[sp++] = WsValue.Null;
                         continue;
                     }
 
+                nextDisposal:
+                    // The instance's next dispose method, in the same frame, whose roots were let go and slots cleared;
+                    // its result is dropped.
+                    {
+                        var next = frame.DisposeChain![frame.DisposeNext++];
+                        var (nextIndex, nextCells) = heap.GetClosure(next);
+                        var nextFunction = module.Functions[nextIndex];
+                        if (slots.Length < nextFunction.SlotCount) frame.Slots = slots = new WsValue[nextFunction.SlotCount];
+                        slots[0] = frame.Closure[1];
+                        frame.Function = nextFunction;
+                        frame.Code = code = codes[nextIndex];
+                        frame.Cells = cells = nextCells;
+                        frame.Closure[0] = next;
+                        heap.AddRoots(slots);
+                        heap.AddRoots(frame.Closure);
+                        sp = nextFunction.LocalCount;
+                        pc = 0;
+                        continue;
+                    }
+
                 failed:
-                    return Failure(error!.Code, error.Message, SpanOf(frame.Function, pc)) with { Instructions = executed };
+                    // A runtime error: one that cannot be caught stops the program, and any other is thrown (section 3.7).
+                    if (!WsExceptions.IsCatchable(error!.Code))
+                    {
+                        return Failure(error.Code, error.Message, SpanOf(frame.Function, pc)) with { Instructions = executed };
+                    }
+                    _thrown = WsValue.Null;
+                    _thrownError = error;
+                    _origin = OriginOf(frame.Function, pc);
+
+                throwing:
+                    // An exception, raised at pc: the first handler around it in this frame catches it; a disposal it
+                    // leaves goes on with its next method; otherwise the frame ends, and its caller's call is where it
+                    // goes on. One that nothing catches stops the program (section 3.7).
+                    {
+                        var handlers = frame.Function.Handlers;
+                        var found = FindHandler(handlers, pc);
+                        if (found >= 0)
+                        {
+                            if (!TryTakeException(out var exception)) return Uncaught(executed);
+                            var handler = handlers[found];
+                            sp = frame.Function.LocalCount + handler.Depth;
+                            slots[handler.Value] = exception;
+                            slots[handler.Origin] = WsValue.FromInt64(_origin);
+                            pc = handler.Target;
+                            continue;
+                        }
+                        if (WsExceptions.DisposalGoesOn && frame.DisposeChain is { } chain && frame.DisposeNext < chain.Length)
+                        {
+                            // Its next dispose method runs; the exception waits for the last, a later one replacing it.
+                            Hold(frame);
+                            heap.RemoveLastRoots(frame.Closure);
+                            heap.RemoveLastRoots(slots);
+                            Array.Clear(slots, 0, frame.Function.SlotCount);
+                            goto nextDisposal;
+                        }
+                        if (depth == 0) return Uncaught(executed);
+                        heap.RemoveLastRoots(frame.Closure);
+                        heap.RemoveLastRoots(slots);
+                        Array.Clear(slots, 0, frame.Function.SlotCount);
+                        Release(frame);
+                        frame = frames[--depth];
+                        code = frame.Code;
+                        slots = frame.Slots;
+                        cells = frame.Cells;
+                        sp = frame.Sp;
+                        pc = frame.Pc - 1; // The call it made.
+                        goto throwing;
+                    }
                 }
             }
             catch (Exception exception) when (exception is ArgumentException or InvalidOperationException
@@ -899,6 +980,99 @@ public sealed class WsStackVirtualMachine
             frame.DisposeNext = 1;
             frame.Closure[1] = instance;
             return frame;
+        }
+
+        // The exception being thrown, while the frames are searched for its handler: a value, or a runtime error not
+        // made a value yet, and where it was first thrown (WsExceptions.Origin).
+        private WsValue _thrown;
+        private WsRuntimeError? _thrownError;
+        private long _origin;
+
+        /// <summary>The class Error, once the module has made it, which a caught runtime error becomes (section 3.7); a root.</summary>
+        private readonly WsValue[] _errorClass = new WsValue[1];
+
+        private long OriginOf(WsStackFunction function, int pc)
+        {
+            for (var i = 0; i < module.Functions.Count; i++)
+            {
+                if (ReferenceEquals(module.Functions[i], function)) return WsExceptions.Origin(i + 1, pc);
+            }
+            return WsExceptions.Origin(0, pc);
+        }
+
+        /// <summary>Where an origin is in the source; nowhere if it names no function of the module.</summary>
+        private WsSourceSpan SpanOfOrigin(long origin)
+        {
+            var (function, pc) = WsExceptions.FromOrigin(origin);
+            var owner = function == 0 ? module.EntryPoint
+                : function > 0 && function <= module.Functions.Count ? module.Functions[function - 1] : null;
+            return owner is null || pc < 0 ? new WsSourceSpan(0, 0) : SpanOf(owner, pc);
+        }
+
+        /// <summary>The exception being thrown as a value, a runtime error made an Error; false if it cannot be one.</summary>
+        private bool TryTakeException(out WsValue exception)
+        {
+            if (_thrownError is null)
+            {
+                exception = _thrown;
+                return true;
+            }
+            if (!WsExceptions.TryMakeError(heap, _errorClass[0], _thrownError, out exception)) return false;
+            _thrown = exception;
+            _thrownError = null;
+            return true;
+        }
+
+        /// <summary>An exception that nothing caught: the program stops, reporting it where it was first thrown.</summary>
+        private WsExecutionResult Uncaught(long executed)
+        {
+            var (code, message) = _thrownError is { } error
+                ? (error.Code, error.Message)
+                : WsExceptions.Uncaught(_thrown, _errorClass[0], heap);
+            return Failure(code, message, SpanOfOrigin(_origin)) with { Instructions = executed };
+        }
+
+        /// <summary>The first handler whose region holds the instruction, or -1.</summary>
+        private static int FindHandler(IReadOnlyList<WsStackHandler> handlers, int pc)
+        {
+            for (var i = 0; i < handlers.Count; i++)
+            {
+                if (pc >= handlers[i].Start && pc < handlers[i].End) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>A disposal frame keeps the exception being thrown, to throw it again after its last method (section 3.7).</summary>
+        private void Hold(Frame frame)
+        {
+            frame.Holds = true;
+            frame.HeldError = _thrownError;
+            frame.HeldOrigin = _origin;
+            frame.Closure[2] = _thrown;
+        }
+
+        /// <summary>The exception a disposal frame kept becomes the one being thrown.</summary>
+        private void TakeHeld(Frame frame)
+        {
+            _thrown = frame.Closure[2];
+            _thrownError = frame.HeldError;
+            _origin = frame.HeldOrigin;
+            frame.Closure[2] = WsValue.Null;
+            frame.Holds = false;
+            frame.HeldError = null;
+        }
+
+        /// <summary>A frame an exception leaves keeps nothing: its closure, its instance, a disposal, a kept exception.</summary>
+        private static void Release(Frame frame)
+        {
+            frame.Closure[0] = WsValue.Null;
+            frame.Closure[1] = WsValue.Null;
+            frame.Closure[2] = WsValue.Null;
+            frame.Constructed = WsValue.Null;
+            frame.DisposeChain = null;
+            frame.Holds = false;
+            frame.HeldError = null;
+            frame.DiscardResult = false;
         }
 
         private static WsRuntimeError WrongArgumentCount(string name, int arity, int count) =>

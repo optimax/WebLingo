@@ -36,6 +36,25 @@ public sealed class VerifierTests
     }
 
     [Fact]
+    public void AHandlerIsReachedFromEachInstructionOfItsRegion()
+    {
+        // r2 is written inside the region, so the handler may not read it if the region begins before that write.
+        WsCompiledModule Protected(int start) => Module(registers: 4, locals: 4,
+                I(WsOpCode.LoadNull, 0), I(WsOpCode.LoadNull, 2), I(WsOpCode.Throw, 0), I(WsOpCode.ReturnValue, 2)) with
+            {
+                EntryPoint = Module(registers: 4, locals: 4, I(WsOpCode.LoadNull, 0), I(WsOpCode.LoadNull, 2),
+                    I(WsOpCode.Throw, 0), I(WsOpCode.ReturnValue, 2)).EntryPoint with { Handlers = [new WsHandler(start, 3, 3, 1, 3)] }
+            };
+        Assert.Equal(WsVerificationResult.Valid, Verify(Protected(2)));
+        AssertRejected(Protected(1), 3, "reads register 2");
+        var outside = Protected(2) with
+        {
+            EntryPoint = Protected(2).EntryPoint with { Handlers = [new WsHandler(2, 9, 3, 1, 3)] }
+        };
+        AssertRejected(outside, -1, "not within the code");
+    }
+
+    [Fact]
     public void AStaticMethodIsAFunctionWithoutThis()
     {
         var method = new WsFunction("m", 1, 1, [I(WsOpCode.Return)]) { HasThis = true, ParameterCount = 1 };

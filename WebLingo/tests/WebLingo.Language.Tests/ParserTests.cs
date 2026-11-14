@@ -108,6 +108,18 @@ public sealed class ParserTests
     }
 
     [Fact]
+    public void ATryHasACatchAndAFinally()
+    {
+        var tree = Parse("try { f(); } catch (e) { throw; } finally { g(); }");
+        Assert.Empty(tree.Diagnostics);
+        var statement = Assert.IsType<WsTrySyntax>(Assert.Single(tree.Root.Statements));
+        Assert.Equal(("e", new WsSourceSpan(20, 1)), (statement.CatchName, statement.CatchNameSpan));
+        Assert.Null(Assert.IsType<WsThrowSyntax>(Assert.Single(statement.Catch!.Statements)).Value);
+        Assert.Single(statement.Finally!.Statements);
+        Assert.Null(Assert.IsType<WsTrySyntax>(Parse("try {} finally {}").Root.Statements[0]).Catch);
+    }
+
+    [Fact]
     public void AClassHasStaticFieldsAndMethods()
     {
         var tree = Parse("class A { static var n = 1; static function f() {} static g(x) {} m() {} }");
@@ -236,6 +248,10 @@ public sealed class ParserTests
     [InlineData("using (var r = 1 {}")]
     [InlineData("class A { static const x = 1; }")]
     [InlineData("class A { static 5 }")]
+    [InlineData("try {} catch e {}")]
+    [InlineData("try x;")]
+    [InlineData("try {} finally x;")]
+    [InlineData("throw")]
     public void MalformedStatementsGiveOneDiagnosticEach(string source)
     {
         var diagnostic = Assert.Single(Parse(source).Diagnostics);

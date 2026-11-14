@@ -12,7 +12,7 @@ public static class WsExceptions
     /// exception is thrown again after the last, a later one replacing it. Section 3.4 proposes it; the owner has been
     /// asked, and this is the one place to change if the answer is that the disposal stops there.
     /// </summary>
-    public const bool DisposalGoesOn = true;
+    public static readonly bool DisposalGoesOn = true;
 
     /// <summary>
     /// Whether a handler may catch a runtime error of this code: every one but the execution's limits (WS3003), its
