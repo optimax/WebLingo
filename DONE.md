@@ -1400,3 +1400,9 @@ Q7, the standard modules' names: (a) `system` and `std/fs`, as A10 and Q10 name 
 A7: (c)
 
 Done (Claude, 2026-11-14, `f7e55ef`): recorded as approved in the specification, section 3.9, and A3 in section 2.3 too. A6 is answered in "Modules, Quoted Parameters", which asks it again.
+
+## [DONE] Modules: Static Imports and Exports
+
+`import db from "lib/db.wl";`, `import { f, g } from "lib/util.wl";`, `export`, a module's instance, each module run once, its imports first, cycles, the host finding the files, and diagnostics and runtime errors naming their file (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
+
+Done (Claude, 2026-11-14, `a17b034`): on both VMs, with conformance tests through the CLI, `ModuleTests` (`WebLingo.VM.Tests`), and a sample, `samples/Modules`; its choices are recorded as Proposed in the specification, section 15.2 ("Modules"), among them a new code, WL2015, for a module that cannot be found. Checks: the Release build, without warnings, the 1,540 tests, the benchmark against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.

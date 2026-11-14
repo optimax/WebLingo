@@ -102,12 +102,6 @@ The module system: `import`, static and dynamic, `export`, `param`, a script's p
 
 2026-11-14: split into the parts the specification defines in section 9 ("Modules"), each a task below. Waits for them.
 
-## [WORKING] Modules: Static Imports and Exports
-
-`import db from "lib/db.wl";`, `import { f, g } from "lib/util.wl";`, `export`, a module's instance, each module run once, its imports first, cycles, the host finding the files, and diagnostics and runtime errors naming their file (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
-
-Done (Claude, 2026-11-14): on both VMs, with conformance tests through the CLI, `ModuleTests` (`WebLingo.VM.Tests`), and a sample, `samples/Modules`; its choices are recorded as Proposed in the specification, section 15.2 ("Modules"), among them a new code, WL2015, for a module that cannot be found. Checks: the Release build, without warnings, the 1,540 tests, the benchmark against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## [IDLE] Modules: Parameters
 
 `param`, the values an importer gives, and a missing one's error (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
