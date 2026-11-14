@@ -37,6 +37,12 @@ public sealed record WebLingoCompilerOptions(IReadOnlyList<WebLingoBuiltinDeclar
 
     /// <summary>How the host finds the files a program imports, or null for a host that finds none (section 3.9).</summary>
     public IWebLingoSourceResolver? Resolver { get; init; }
+
+    /// <summary>
+    /// How a file a program imports is read, from its name and its text, when not by the WebLingo parser alone: a template
+    /// compiler's, which reads a layout as a page (section 13); null for the WebLingo parser.
+    /// </summary>
+    public Func<string, string, WebLingoSyntaxTree>? Parse { get; init; }
 }
 
 /// <summary>A name the binder resolved. Symbols are compared by identity.</summary>

@@ -1,1 +1,2 @@
+<% param title; %>
 <article class="card"><%= title %></article>

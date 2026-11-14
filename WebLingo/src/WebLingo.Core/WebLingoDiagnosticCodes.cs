@@ -98,4 +98,6 @@ public static class WebLingoDiagnosticCodes
     public const string ComponentNotFound = "WL5005";
     /// <summary>A component rendered with a value for a parameter it does not declare, or without one it needs (proposed, section 13).</summary>
     public const string ComponentParameter = "WL5006";
+    /// <summary>A layout statement where a page cannot have one: a second one, one after the page has done or written something, or one in an include (proposed, section 13).</summary>
+    public const string MisplacedLayout = "WL5007";
 }

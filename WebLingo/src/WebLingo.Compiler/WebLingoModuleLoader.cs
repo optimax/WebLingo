@@ -17,6 +17,12 @@ public sealed class WebLingoModuleLoader(WebLingoCompilerOptions options) : IWeb
     /// </summary>
     public Func<string, string, WebLingoSyntaxTree>? Parse { get; init; }
 
+    /// <summary>
+    /// What finds the files it loads, when not the options' resolver: a template compiler's components' (section 13), whose
+    /// own imports the options' resolver finds.
+    /// </summary>
+    public IWebLingoSourceResolver? Resolver { get; init; }
+
     public bool TryResolve(string importer, string path, out string name, out string? error)
     {
         name = "";
@@ -26,7 +32,7 @@ public sealed class WebLingoModuleLoader(WebLingoCompilerOptions options) : IWeb
             error = path == "std:system" ? null : "there is no such standard module";
             return error is null;
         }
-        if (options.Resolver is not { } resolver)
+        if ((Resolver ?? options.Resolver) is not { } resolver)
         {
             error = "this host finds no modules";
             return false;

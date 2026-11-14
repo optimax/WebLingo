@@ -195,6 +195,57 @@ public sealed class PageTests
         Assert.StartsWith(error, Render(page, Templates(templates)).Error);
     }
 
+    [Theory]
+    // A page's layout runs first, given the page's values, and the page's body runs where the layout calls renderBody().
+    [InlineData("<% layout \"/main.wlp\", { title: \"Products\" }; %>\n<h1>Products</h1>\n",
+        "main.wlp=<% param title; %>\n<html><title><%= title %></title>\n<% renderBody(); %>\n</html>\n",
+        "<html><title>Products</title>\n<h1>Products</h1>\n</html>\n")]
+    [InlineData("<% layout \"/l.wlp\"; %>body", "l.wlp=[<% renderBody(); %>]", "[body]")]
+    [InlineData("<% layout \"l\"; %><% var n = 2; %><%= n * 2 %>", "l.wlp=[<% renderBody(); %>]", "[4]")]
+    [InlineData("<% param who = \"x\"; %>\n<% layout \"/l.wlp\", { who: who, }; %>\nhi", "l.wlp=<% param who; %><%= who %>:<% renderBody(); %>", "x:hi")]
+    [InlineData("<% layout \"/l.wlp\"; %>x", "l.wlp=<% param title = \"Home\"; %><%= title %>:<% renderBody(); %>", "Home:x")]
+    [InlineData("<% layout \"/l.wlp\"; %>x", "l.wlp=<% renderBody(); renderBody(); %>", "xx")]
+    // A layout may have a layout of its own.
+    [InlineData("<% layout \"/l1.wlp\", { title: \"T\" }; %>body",
+        "l1.wlp=<% param title; %><% layout \"l2.wlp\", { t: title }; %><main><% renderBody(); %></main>|l2.wlp=<% param t; %><html><%= t %><% renderBody(); %></html>",
+        "<html>T<main>body</main></html>")]
+    // The body streams where the layout has it, waiting included.
+    [InlineData("<% layout \"/l.wlp\"; %>a<% await renderComponent(\"/c.wlp\"); %>b<% await delay(1); %>c", "l.wlp=[<% renderBody(); %>]|c.wlp=C",
+        "[aCbc]")]
+    public void ALayoutWrapsItsPage(string page, string templates, string written)
+    {
+        Assert.Equal(("", written, ""), Render(page, Templates(templates)));
+    }
+
+    [Theory]
+    [InlineData("<% layout \"/nope.wlp\"; %>", "", "WL5002 at page.wlp 1,11: The layout '/nope.wlp' cannot be used: there is no such file.")]
+    [InlineData("<% layout \"/a.wlp\"; %>", "a.wlp=<% layout \"b.wlp\"; %>A<% renderBody(); %>|b.wlp=<% layout \"a.wlp\"; %>B<% renderBody(); %>",
+        "WL5003 at page.wlp 1,11: Using the layout '/a.wlp' makes a cycle: page.wlp uses a.wlp uses b.wlp uses a.wlp.")]
+    [InlineData("<% layout \"/page.wlp\"; %>", "", "WL5003 at page.wlp 1,11: Using the layout '/page.wlp' makes a cycle: page.wlp uses page.wlp.")]
+    [InlineData("<% layout \"/l.wlp\", { title: 1, x: 2 }; %>", "l.wlp=<% param title; %>", "WL5006 at page.wlp 1,33: 'x' is not a parameter of 'l.wlp'.")]
+    [InlineData("<% layout \"/l.wlp\"; %>", "l.wlp=<% param title; %>", "WL5006 at page.wlp 1,11: 'l.wlp''s parameter 'title' is not given.")]
+    [InlineData("<p>\n<% layout \"/l.wlp\"; %>", "l.wlp=", "WL5007 at page.wlp 2,4: A page's layout comes before anything else the page does or writes, after its parameters and imports.")]
+    [InlineData("<% layout \"/l.wlp\"; layout \"/l.wlp\"; %>", "l.wlp=", "WL5007 at page.wlp 1,21: A page has at most one layout.")]
+    [InlineData("<% include \"/h.wlp\"; %>", "h.wlp=<% layout \"/l.wlp\"; %>|l.wlp=", "WL5007 at h.wlp 1,4: A layout is a page's own: a template it includes cannot have one.")]
+    [InlineData("<% layout \"/l.wlp\", x; %>", "l.wlp=", "WL1001 at page.wlp 1,21: Expected a layout's values, a map literal, found 'x'.")]
+    [InlineData("<% layout \"/l.wlp\" %>", "l.wlp=", "WL1002 at page.wlp 1,19: A ';' is missing here.")]
+    // renderBody() is a layout's; a layout does not see the page's variables.
+    [InlineData("<% renderBody(); %>", "", "WL2001 at page.wlp 1,4: 'renderBody' is not defined.")]
+    [InlineData("<% param secret = 1; %><% layout \"/l.wlp\"; %>", "l.wlp=<%= secret %>", "WL2001 at l.wlp 1,5: 'secret' is not defined.")]
+    public void ALayoutThatFailsIsReportedWhereItIs(string page, string templates, string diagnostic)
+    {
+        Assert.StartsWith(diagnostic, Render(page, Templates(templates)).Diagnostics);
+    }
+
+    [Fact]
+    public void ARuntimeErrorInALayoutIsReportedInIt()
+    {
+        var (_, written, error) = Render("<% layout \"/l.wlp\"; %>body", Templates("l.wlp=<% renderBody(); %>\n<%= [1][5] %>"));
+        // The layout's first line holds only a statement block, and so writes no line break.
+        Assert.Equal("body", written);
+        Assert.StartsWith("WL3005 at l.wlp 2,", error);
+    }
+
     [Fact]
     public void RenderComponentIsOnlyCalled()
     {

@@ -148,6 +148,42 @@ public sealed class WelpTests : IDisposable
         Assert.Contains("index.wlp(1,10): error WL5005: The component '/components/none.wlp' cannot be rendered: there is no such file.", error);
     }
 
+    [Fact]
+    public void TheSimpleWebsiteSampleRuns()
+    {
+        // A layout, an include and a component together; the sample's line breaks are as the checkout gives them.
+        var sample = Path.Combine(SolutionFolder(), "samples", "SimpleWebsite", "index.wlp");
+        var (exit, output, error) = Run(["run", sample]);
+        Assert.Equal((WebLingoCommandLine.Success, ""), (exit, error));
+        Assert.Equal("<!doctype html>\n<html><body><h1>Hello from WebLingo</h1>\n<article class=\"card\">Includes</article>\n"
+            + "<article class=\"card\">Layouts</article>\n<article class=\"card\">Components</article>\n<footer>Shared footer</footer>\n"
+            + "</body></html>\n", output.Replace("\r\n", "\n"));
+    }
+
+    [Fact]
+    public void APageWithALayoutRunsThroughWelp()
+    {
+        Write("site/layouts/main.wlp", "<% param title; %>\n<html><title><%= title %></title>\n<% renderBody(); %>\n</html>\n");
+        var page = Write("site/pages/index.wlp", "<% layout \"/layouts/main.wlp\", { title: \"A & B\" }; %>\n<h1>Body</h1>\n");
+        Assert.Equal((WebLingoCommandLine.Success, "<html><title>A &amp; B</title>\n<h1>Body</h1>\n</html>\n", ""),
+            Run(["run", "--root", Path.Combine(_folder, "site"), page]));
+
+        // An error in the layout names it.
+        Write("site/layouts/main.wlp", "<% param title; %>\n<%= nope %>");
+        var (exit, _, error) = Run(["check", "--root", Path.Combine(_folder, "site"), page]);
+        Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
+        Assert.EndsWith("layouts/main.wlp(2,5): error WL2001: 'nope' is not defined.", error.TrimEnd());
+    }
+
+    private static string SolutionFolder()
+    {
+        for (var folder = new DirectoryInfo(AppContext.BaseDirectory); folder is not null; folder = folder.Parent)
+        {
+            if (File.Exists(Path.Combine(folder.FullName, "WebLingo.slnx"))) return folder.FullName;
+        }
+        throw new InvalidOperationException("The solution folder was not found above the test's folder.");
+    }
+
     private string Write(string relative, string text)
     {
         var path = Path.Combine(_folder, relative);

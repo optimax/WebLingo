@@ -123,7 +123,9 @@ public sealed class WebLingoCompilation
                     {
                         index = roots.Count;
                         indexes.Add(resolved, index);
-                        var tree = new WebLingoParser(text, resolved).ParseCompilationUnit();
+                        var tree = options.Parse is { } parse
+                            ? parse(resolved, text)
+                            : new WebLingoParser(text, resolved).ParseCompilationUnit();
                         foreach (var diagnostic in tree.Diagnostics) diagnostics.Add(diagnostic with { Source = resolved });
                         roots.Add((resolved, tree.Root, new Dictionary<WebLingoImportSyntax, int>()));
                     }

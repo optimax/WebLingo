@@ -1,3 +1,6 @@
 <% layout "/layouts/main.wlp"; %>
 <h1>Hello from WebLingo</h1>
+<% foreach (var title in ["Includes", "Layouts", "Components"]) { %>
+<% await renderComponent("/components/card.wlp", { title: title }); %>
+<% } %>
 <% include "/includes/footer.wlp"; %>
