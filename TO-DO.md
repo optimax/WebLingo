@@ -98,11 +98,17 @@ A3: (a) but - like (c) says - measure the impact on performance.
 
 2026-11-14 (Claude): the answers recorded as approved in the specification, section 3.9 ("Native modules"), and its decision register; split into the parts section 9 defines ("Native modules"), each a task below. Waits for them.
 
-## [IDLE] Native Modules, Part 2: Native Classes
+## [QUESTION] Native Modules, Part 2: Native Classes
 
 A native module's classes, `registry.Class(…)`, their constructors, methods and static members native functions, made by the heap's own methods (specification, sections 3.7, 3.9 and 9, "Native modules", part 2), on both VMs. Added by Claude, 2026-11-14.
 
 2026-11-14: waits for "Native Modules, Part 1: Native Functions".
+
+2026-11-14: part 1 is done. A native class needs one decision that section 3.9 leaves open, answerable with a letter.
+
+**Q1, a native class's instance's own state, such as a database's connection, a .NET object no script may see: (a) an instance may hold one host object, opaque to scripts, which only its class's native methods reach (`heap.TryGetHostObject(instance, …)`), and which its `dispose()`, or the collector, releases; (b) only WebLingo's values, in its fields, the module keeping its host objects in a table of its own, an instance's field holding an integer that names one.**
+
+A1:
 
 ## Native Modules, Part 3: Standard Modules as Native Modules
 
