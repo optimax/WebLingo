@@ -58,12 +58,6 @@ A9:
 
 2026-11-13: M0.11 is split into the parts the specification defines in section 9 ("M0.11 parts"), each a task below. Waits for them.
 
-## [WORKING] M0.11.1: Tasks and `await`
-
-`async` functions, methods and function expressions, `await`, tasks, their exceptions, `t.forget()`, the end of an execution, `delay()`, and a benchmark workload (specification, sections 3.8 and 9), on both VMs. Added by Claude, 2026-11-13.
-
-Done (Claude, 2026-11-13): on both VMs, with their conformance tests, and the benchmark's `async` workload (specification, section 5.6). The choices the specification leaves open are recorded as Proposed in its section 15.2 ("Asynchrony"), among them two codes, WS2014 (`await` outside an `async` function) and WS3009 (a task that nothing can complete); until M0.11.2, a disposal whose dispose method is `async` is WS3001 when it begins. Checks: the Release build, without warnings, the 1,363 tests, and the CLI on the samples and on programs that await, on Windows only; Linux not tried.
-
 ## [IDLE] M0.11.2: Asynchronous Disposal
 
 An `async` `dispose()`, which `using` awaits, and WS3001 where it cannot (specification, section 3.8), on both VMs. Added by Claude, 2026-11-13.
