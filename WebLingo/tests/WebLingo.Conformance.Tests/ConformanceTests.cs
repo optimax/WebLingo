@@ -460,6 +460,9 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A { constructor(x) { this.x = x; } } class B extends A { constructor() { super(1); this.y = 2; } } B.removeMethod(\"constructor\"); writeLn(new B(5));", "B {x: 5}")]
     [InlineData("class MathStuff { const PI = 3.14; static half() { return MathStuff.PI / 2; } } var m = new MathStuff(); writeLn([m.PI, MathStuff.PI, MathStuff.half()]);", "[3.14, 3.14, 1.57]")]
     [InlineData("class K {} extend K { const MAX = 10; } writeLn([K.MAX, new K().MAX]);", "[10, 10]")]
+    [InlineData("var log = []; class A { constructor(x) { this.x = x; } sum(y) { return this.x + y; } property twice { get { return this.x * 2; } } static make() { return new A(1); } static var count = 3; static const MAX = 9; dispose() { log.push(\"A gone\"); } } var B = new Class(\"B\"); B.setMethod(\"constructor\", function (this, x) { this.x = x; }); B.setMethod(\"sum\", function (this, y) { return this.x + y; }); B.setProperty(\"twice\", function (this) { return this.x * 2; }, null); B.make = function () { return new B(1); }; B.count = 3; B.setConstant(\"MAX\", 9); B.setMethod(\"dispose\", function (this) { log.push(\"B gone\"); }); foreach (var C in [A, B]) { var c = new C(5); log.push([c.sum(1), c.twice, C.make().x, C.count, C.MAX, c is C]); c.dispose(); log.push(c.toString()); } writeLn(log);", "[[6, 10, 1, 3, 9, true], \"A gone\", \"A {x: 5}\", [6, 10, 1, 3, 9, true], \"B gone\", \"B {x: 5}\"]")]
+    [InlineData("class A { constructor(x) { this.x = x; } describe() { return \"A\" + this.x.toString(); } } class D extends A { describe() { return \"D/\" + super.describe(); } } var E = new Class(\"E\", A); E.setMethod(\"describe\", function (this) { return \"E/A\" + this.x.toString(); }); writeLn([new D(1).describe(), new E(2).describe(), new E(3) is A, D.__parent == E.__parent]);", "[\"D/A1\", \"E/A2\", true, true]")]
+    [InlineData("class K { static const X = 1; } extend K { static X() { return 2; } } var before = K.X(); K.X = 5; K.X = 6; writeLn([before, K.X]);", "[2, 6]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -667,6 +670,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A {} A.removeMethod();", "WL2006")]
     [InlineData("class MathStuff { const PI = 3.14; } MathStuff.PI = 3;", "WL3001")]
     [InlineData("class MathStuff { const PI = 3.14; } new MathStuff().PI = 3;", "WL3001")]
+    [InlineData("class Meta extends Class { constructor() { super(\"M\", 5); } } new Meta();", "WL3001")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

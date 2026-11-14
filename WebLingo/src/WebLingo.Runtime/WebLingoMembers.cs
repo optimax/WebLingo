@@ -257,7 +257,7 @@ public static class WebLingoMembers
                 error = NoSetter(target, name, heap);
                 return false;
             }
-            return heap.TryAddStatic(target, name, value, out error);
+            return heap.TryDeclareStatic(target, name, value, out error);
         }
         if (IsClassedCollection(target, heap, out var collectionClass))
         {

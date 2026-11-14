@@ -82,7 +82,11 @@ public sealed class WebLingoHeap
     /// Marks a class as a kind of collection's, <c>Array</c>'s, <c>Map</c>'s or <c>Set</c>'s (section 3.7): <c>new</c>
     /// makes an empty one, and a class that extends it makes collections of that kind, of its own class, with fields.
     /// </summary>
-    /// <summary>Whether an <c>extend</c> has run, so that a kind of value's class may have methods of its own (section 3.7).</summary>
+    /// <summary>
+    /// Whether a class whose methods values that are not instances reach, <c>Object</c> or a kind of value's, has been given
+    /// methods or lost some, by an <c>extend</c>, <c>setMethod</c> or the like, so that such a value may have methods of its
+    /// own (section 3.7).
+    /// </summary>
     public bool Extended { get; private set; }
 
     /// <summary>
@@ -92,39 +96,60 @@ public sealed class WebLingoHeap
     public WebLingoValue[]? ValueClasses { get; set; }
 
     /// <summary>
-    /// How many extensions have run: a class whose methods were gathered from its bases before the last gathers them
-    /// again when they are next looked up (section 3.7).
+    /// How many times the methods of a class that others extend have changed: a class whose methods were gathered from
+    /// its bases before the last change gathers them again when they are next looked up; a class that none extends is
+    /// marked to gather them again by itself (section 3.7).
     /// </summary>
     private int _classVersion;
 
     /// <summary>
-    /// <c>extend</c> (section 3.7): a class given methods and static members, each replacing one of its own of that name;
-    /// its instances and subclasses, made before or after, have the methods. Anything but a class is WL3001.
+    /// What an <c>extend</c> names, and a class's base: a class, else WL3001, before anything is given to it (section 3.7).
     /// </summary>
-    public bool TryExtendClass(WebLingoValue classValue, Dictionary<string, WebLingoValue> methods, Dictionary<string, WebLingoValue> staticMethods,
-        IReadOnlyList<string> staticFields, out WebLingoRuntimeError? error)
+    public bool TryCheckClass(WebLingoValue classValue, out WebLingoRuntimeError? error)
     {
-        if (classValue.Kind != WebLingoValueKind.Class)
-        {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+        error = classValue.Kind == WebLingoValueKind.Class
+            ? null
+            : new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
                 $"{Capitalized(WebLingoValueFormatter.Describe(classValue, this))} cannot be extended: only a class can.");
-            return false;
-        }
-        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
-        var before = Size(target);
-        foreach (var (name, closure) in methods) target.OwnMethods[name] = closure;
-        foreach (var (name, closure) in staticMethods)
+        return error is null;
+    }
+
+    /// <summary>
+    /// After a class's own methods change: its methods gathered anew when they are next looked up, and its subclasses'
+    /// too; and, for a class whose methods values that are not instances reach, those values given their class's methods
+    /// from then on (<see cref="Extended"/>, section 3.7).
+    /// </summary>
+    private void MethodsChanged(ClassObject target, WebLingoValue classValue)
+    {
+        Regather(target);
+        if (!Extended && ReachesValues(classValue)) Extended = true;
+    }
+
+    /// <summary>A class's methods, and its subclasses', gathered anew when they are next looked up.</summary>
+    private void Regather(ClassObject target)
+    {
+        if (target.HasSubclasses) _classVersion++;
+        else target.Version = -1;
+    }
+
+    /// <summary>Whether a class is <c>Object</c> or a kind of value's, whose methods values that are not instances have.</summary>
+    private bool ReachesValues(WebLingoValue classValue)
+    {
+        if (classValue == ObjectClass) return true;
+        if (ValueClasses is not { } classes) return false;
+        for (var i = 0; i < classes.Length; i++)
         {
-            target.StaticFields.Remove(name);
-            target.StaticMethods[name] = closure;
+            if (classes[i] == classValue) return true;
         }
-        foreach (var name in staticFields)
-        {
-            target.StaticMethods.Remove(name);
-            target.StaticFields.TryAdd(name, WebLingoValue.Null);
-        }
-        _classVersion++;
-        Extended = true;
+        return false;
+    }
+
+    /// <summary>
+    /// A class's units grown, or shrunk, by a change to its members since it had <paramref name="before"/>, within the
+    /// budget (WL3003).
+    /// </summary>
+    private bool TryGrow(ClassObject target, int before, out WebLingoRuntimeError? error)
+    {
         var grown = Size(target) - before;
         if (!TryReserve(grown, out error)) return false;
         Units += grown;
@@ -366,13 +391,32 @@ public sealed class WebLingoHeap
         _ => WebLingoValue.Null
     };
 
-    /// <summary>Declares a static field of a class, a member it does not have, as assigning one does (section 3.7).</summary>
-    public bool TryAddStatic(WebLingoValue classValue, string name, WebLingoValue value, out WebLingoRuntimeError? error)
+    /// <summary>
+    /// Declares a static field of a class, its own, holding <paramref name="value"/>, in place of a static method of its
+    /// own of that name, but keeping the value of a static field of its own of that name: assigning a class a member it
+    /// does not have, a class's declaration of a static field, and an <c>extend</c>'s, alike (section 3.7).
+    /// </summary>
+    public bool TryDeclareStatic(WebLingoValue classValue, string name, WebLingoValue value, out WebLingoRuntimeError? error)
     {
-        if (!TryReserve(1, out error)) return false;
-        Get<ClassObject>(classValue, WebLingoValueKind.Class).StaticFields[name] = value;
-        Units++;
-        return true;
+        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        var before = Size(target);
+        target.StaticMethods.Remove(name);
+        target.StaticFields.TryAdd(name, value);
+        return TryGrow(target, before, out error);
+    }
+
+    /// <summary>
+    /// Gives a class a static method, its own, in place of a static field, a constant included, or a static method of its
+    /// name: a class's declaration of a static method, an <c>extend</c>'s, and <c>setStaticProperty</c>'s getter and
+    /// setter, alike (section 3.7).
+    /// </summary>
+    public bool TrySetStaticMethod(WebLingoValue classValue, string name, WebLingoValue method, out WebLingoRuntimeError? error)
+    {
+        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        var before = Size(target);
+        if (target.StaticFields.Remove(name)) target.Constants?.Remove(name);
+        target.StaticMethods[name] = method;
+        return TryGrow(target, before, out error);
     }
 
     /// <summary>The fields of an instance, or of a collection of a class that extends <c>Array</c>, <c>Map</c> or <c>Set</c>.</summary>
@@ -477,59 +521,62 @@ public sealed class WebLingoHeap
     }
 
     /// <summary>
-    /// A class: its name, its constructor's closure (<c>null</c> if it has none), and its methods' closures by name,
-    /// each a function whose first parameter is <c>this</c> (section 3.7).
+    /// Makes a class, named, or unnamed for an empty name, and extending <paramref name="baseClass"/>, or no class, for
+    /// <c>Object</c> itself, with no members and no constructor of its own: the one way a class is made, by
+    /// <c>new Class(name, base)</c>, by a metaclass's <c>new</c>, and by a class's declaration, which then gives it its
+    /// members by the methods a program gives them by while it runs (section 3.7). A base that is not a class, or is
+    /// sealed, is WL3001.
     /// </summary>
-    public bool TryAllocateClass(string name, WebLingoValue constructor, Dictionary<string, WebLingoValue> methods, out WebLingoValue value,
-        out WebLingoRuntimeError? error) =>
-        TryAllocateClass(name, constructor, methods, WebLingoValue.Null, out value, out error);
-
-    /// <summary>
-    /// A class that extends <paramref name="baseClass"/> (<c>null</c> for none): its methods are the base's, with its
-    /// own in place of those it declares again (section 3.7). A base that is not a class is WL3001. Its static methods'
-    /// closures, by name, and its static fields, <c>null</c> until they are set, are its own.
-    /// </summary>
-    public bool TryAllocateClass(string name, WebLingoValue constructor, Dictionary<string, WebLingoValue> methods, WebLingoValue baseClass,
-        out WebLingoValue value, out WebLingoRuntimeError? error, Dictionary<string, WebLingoValue>? staticMethods = null,
-        IReadOnlyList<string>? staticFields = null, bool defaultConstructor = false)
+    public bool TryMakeClass(string name, WebLingoValue baseClass, out WebLingoValue value, out WebLingoRuntimeError? error)
     {
         value = WebLingoValue.Null;
-        var makes = WebLingoValueKind.Instance;
-        var holds = WebLingoValueKind.Null;
-        if (baseClass.Kind != WebLingoValueKind.Null)
+        error = null;
+        if (baseClass.Kind != WebLingoValueKind.Null && !TryCheckBase(WebLingoValue.Null, baseClass, out error)) return false;
+        var made = new ClassObject(name, WebLingoValue.Null, new Dictionary<string, WebLingoValue>(StringComparer.Ordinal))
         {
-            if (baseClass.Kind != WebLingoValueKind.Class)
-            {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"{Capitalized(WebLingoValueFormatter.Describe(baseClass, this))} cannot be extended: only a class can.");
-                return false;
-            }
-            var baseObject = Get<ClassObject>(baseClass, WebLingoValueKind.Class);
-            if (baseObject.Sealed)
-            {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"The class {baseObject.Name} cannot be extended.");
-                return false;
-            }
-            makes = baseObject.Makes;
-            holds = baseObject.Holds;
-        }
-        var fields = new Dictionary<string, WebLingoValue>(StringComparer.Ordinal);
-        if (staticFields is not null)
-        {
-            foreach (var field in staticFields) fields[field] = WebLingoValue.Null;
-        }
-        var made = new ClassObject(name, constructor, new Dictionary<string, WebLingoValue>(StringComparer.Ordinal))
-        {
-            Base = baseClass,
-            OwnMethods = new Dictionary<string, WebLingoValue>(methods, StringComparer.Ordinal),
-            Makes = makes,
-            Holds = holds,
-            DefaultConstructor = defaultConstructor,
-            StaticMethods = staticMethods ?? new Dictionary<string, WebLingoValue>(StringComparer.Ordinal),
-            StaticFields = fields
+            DefaultConstructor = true,
+            Version = -1
         };
-        Gather(made);
-        return TryAllocate(made, WebLingoValueKind.Class, Size(made), out value, out error);
+        if (!TryAllocate(made, WebLingoValueKind.Class, Size(made), out value, out error)) return false;
+        if (baseClass.Kind != WebLingoValueKind.Null) SetBase(made, baseClass);
+        return true;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="baseClass"/> may be the base of <paramref name="classValue"/>, <c>null</c> for a class not
+    /// made yet: a class, not sealed, and neither the class itself nor one extending it; WL3001 otherwise (section 3.7).
+    /// </summary>
+    private bool TryCheckBase(WebLingoValue classValue, WebLingoValue baseClass, out WebLingoRuntimeError? error)
+    {
+        if (!TryCheckClass(baseClass, out error)) return false;
+        var baseObject = Get<ClassObject>(baseClass, WebLingoValueKind.Class);
+        if (baseObject.Sealed)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"The class {baseObject.Name} cannot be extended.");
+            return false;
+        }
+        if (classValue.Kind != WebLingoValueKind.Class) return true;
+        for (var current = baseClass; current.Kind == WebLingoValueKind.Class; current = Get<ClassObject>(current, WebLingoValueKind.Class).Base)
+        {
+            if (current != classValue) continue;
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "A class cannot extend itself.");
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Gives a class its base, which it extends from then on, its instances made as the base's are, collections or
+    /// holding a value, and its methods gathered anew (section 3.7); <see cref="TryCheckBase"/> has allowed it.
+    /// </summary>
+    private void SetBase(ClassObject target, WebLingoValue baseClass)
+    {
+        var baseObject = Get<ClassObject>(baseClass, WebLingoValueKind.Class);
+        target.Base = baseClass;
+        target.Makes = baseObject.Makes;
+        target.Holds = baseObject.Holds;
+        baseObject.HasSubclasses = true;
+        Regather(target);
     }
 
     /// <summary>A class's static member, its own, or its base's if it has none of that name (section 3.7).</summary>
@@ -595,25 +642,23 @@ public sealed class WebLingoHeap
     /// property's getter and setter, given the first time, replaced after, <c>null</c> for none (section 3.7).
     /// </summary>
     public bool TrySetProperty(WebLingoValue classValue, string name, WebLingoValue getter, WebLingoValue setter, bool isStatic,
-        out WebLingoRuntimeError? error)
+        out WebLingoRuntimeError? error) =>
+        TrySetAccessor(classValue, "get:" + name, getter, isStatic, out error)
+        && TrySetAccessor(classValue, "set:" + name, setter, isStatic, out error);
+
+    /// <summary>
+    /// A property's getter or setter, a method, or a static method, named <c>get:name</c> or <c>set:name</c>, as a declared
+    /// property's is, given or, for <c>null</c>, removed as any method is (section 3.7).
+    /// </summary>
+    private bool TrySetAccessor(WebLingoValue classValue, string name, WebLingoValue accessor, bool isStatic, out WebLingoRuntimeError? error)
     {
-        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
-        var members = isStatic ? target.StaticMethods : target.OwnMethods;
-        var before = Size(target);
-        foreach (var (prefix, accessor) in new[] { ("get:", getter), ("set:", setter) })
+        if (accessor.Kind != WebLingoValueKind.Null)
         {
-            if (accessor.Kind == WebLingoValueKind.Null) members.Remove(prefix + name);
-            else members[prefix + name] = accessor;
+            return isStatic ? TrySetStaticMethod(classValue, name, accessor, out error) : TrySetMethod(classValue, name, accessor, out error);
         }
-        if (!isStatic)
-        {
-            // Its instances, and its subclasses', find the property once they gather their methods anew.
-            _classVersion++;
-            Extended = true;
-        }
-        var grown = Size(target) - before;
-        if (!TryReserve(grown, out error)) return false;
-        Units += grown;
+        error = null;
+        if (!isStatic) RemoveMethod(classValue, name);
+        else if (Get<ClassObject>(classValue, WebLingoValueKind.Class).StaticMethods.Remove(name)) Units--;
         return true;
     }
 
@@ -696,11 +741,7 @@ public sealed class WebLingoHeap
     /// </summary>
     private bool TryAllocateMetaclassInstance(WebLingoValue metaclass, out WebLingoValue made, out WebLingoRuntimeError? error)
     {
-        if (!TryAllocateClass("", WebLingoValue.Null, new Dictionary<string, WebLingoValue>(StringComparer.Ordinal), ObjectClass, out made,
-                out error, defaultConstructor: true))
-        {
-            return false;
-        }
+        if (!TryMakeClass("", ObjectClass, out made, out error)) return false;
         Get<ClassObject>(made, WebLingoValueKind.Class).Metaclass = metaclass;
         return true;
     }
@@ -722,25 +763,10 @@ public sealed class WebLingoHeap
             return false;
         }
         if (baseClass.Kind == WebLingoValueKind.Null) baseClass = ObjectClass;
-        if (baseClass.Kind != WebLingoValueKind.Class || Get<ClassObject>(baseClass, WebLingoValueKind.Class).Sealed)
-        {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"{Capitalized(WebLingoValueFormatter.Describe(baseClass, this))} cannot be extended.");
-            return false;
-        }
-        for (var current = baseClass; current.Kind == WebLingoValueKind.Class; current = Get<ClassObject>(current, WebLingoValueKind.Class).Base)
-        {
-            if (current != classValue) continue;
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "A class cannot extend itself.");
-            return false;
-        }
+        if (!TryCheckBase(classValue, baseClass, out error)) return false;
         var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
-        var baseObject = Get<ClassObject>(baseClass, WebLingoValueKind.Class);
         target.Name = name.Kind == WebLingoValueKind.String ? GetString(name) : "";
-        target.Base = baseClass;
-        target.Makes = baseObject.Makes;
-        target.Holds = baseObject.Holds;
-        _classVersion++;
+        SetBase(target, baseClass);
         return true;
     }
 
@@ -768,33 +794,41 @@ public sealed class WebLingoHeap
         }
         var text = name.Kind == WebLingoValueKind.String ? GetString(name) : "";
         if (baseClass.Kind == WebLingoValueKind.Null) baseClass = ObjectClass;
-        return TryAllocateClass(text, WebLingoValue.Null, new Dictionary<string, WebLingoValue>(StringComparer.Ordinal), baseClass, out result,
-            out error, defaultConstructor: true);
+        return TryMakeClass(text, baseClass, out result, out error);
     }
 
     /// <summary>
     /// <c>Point.setMethod(name, f)</c>: a class's method, which its instances, and its subclasses', made before or after,
-    /// then have, replacing one of that name as an extension's does; <c>constructor</c> its constructor, and
-    /// <c>destructor</c> its <c>dispose</c> (section 3.7).
+    /// then have, replacing one of that name; <c>constructor</c> its constructor, and <c>destructor</c> its
+    /// <c>dispose</c> (section 3.7). A class's declaration gives it its methods by it, a property's getter and setter
+    /// among them, and so do an <c>extend</c> and <c>setProperty</c>.
     /// </summary>
     public bool TrySetMethod(WebLingoValue classValue, string name, WebLingoValue method, out WebLingoRuntimeError? error)
     {
         var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
-        error = null;
         if (name == "constructor")
         {
-            target.Constructor = method;
-            target.DefaultConstructor = false;
+            GiveConstructor(classValue, method, false);
+            error = null;
             return true;
         }
         var before = Size(target);
         target.OwnMethods[name == "destructor" ? "dispose" : name] = method;
-        _classVersion++;
-        Extended = true;
-        var grown = Size(target) - before;
-        if (!TryReserve(grown, out error)) return false;
-        Units += grown;
-        return true;
+        MethodsChanged(target, classValue);
+        return TryGrow(target, before, out error);
+    }
+
+    /// <summary>
+    /// Gives a class its constructor, <c>setMethod("constructor", f)</c>'s and a declared one alike; with
+    /// <paramref name="isDefault"/>, the one a declared class that declares none gets, which only runs its base's, or,
+    /// <c>null</c>, none, as <c>removeMethod("constructor")</c> leaves it, <c>new</c> passing over either for a base's
+    /// (section 3.7).
+    /// </summary>
+    public void GiveConstructor(WebLingoValue classValue, WebLingoValue constructor, bool isDefault)
+    {
+        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        target.Constructor = constructor;
+        target.DefaultConstructor = isDefault;
     }
 
     /// <summary><c>Point.__className = name</c>: a class named, or renamed, or unnamed by an empty name (section 3.7).</summary>
@@ -811,12 +845,11 @@ public sealed class WebLingoHeap
         if (name == "constructor")
         {
             if (target.DefaultConstructor) return false;
-            target.Constructor = WebLingoValue.Null;
-            target.DefaultConstructor = true;
+            GiveConstructor(classValue, WebLingoValue.Null, true);
             return true;
         }
         if (!target.OwnMethods.Remove(name == "destructor" ? "dispose" : name)) return false;
-        _classVersion++;
+        MethodsChanged(target, classValue);
         Units--;
         return true;
     }
@@ -1259,6 +1292,8 @@ public sealed class WebLingoHeap
         public WebLingoValue Base { get; set; }
         public Dictionary<string, WebLingoValue> OwnMethods { get; init; } = new(StringComparer.Ordinal);
         public int Version { get; set; }
+        /// <summary>Whether a class has extended it, so that a change to its methods has every class gather theirs anew.</summary>
+        public bool HasSubclasses { get; set; }
         public WebLingoValue[] DisposeChain { get; set; } = [];
         public bool Sealed { get; set; }
         /// <summary>What <c>new</c> makes: an instance, or a collection, for Array, Map, Set and the classes extending them.</summary>

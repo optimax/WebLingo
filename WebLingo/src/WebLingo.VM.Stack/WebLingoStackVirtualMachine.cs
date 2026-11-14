@@ -2304,40 +2304,9 @@ public sealed class WebLingoStackVirtualMachine
         }
 
         /// <summary>
-        /// A class value: its constructor's and its methods' closures made now, kept as roots until the class holds
-        /// them, since making each may collect (section 3.7).
+        /// A class value, made as <c>new Class(name, base)</c> makes one, and given its members as a program gives them while
+        /// it runs, by the heap's same methods (section 3.7).
         /// </summary>
-        /// <summary>
-        /// <c>extend</c> (section 3.7): an extension's methods' and static methods' closures, made as their captures say,
-        /// given to the class <paramref name="target"/>, with its static fields' names.
-        /// </summary>
-        private bool TryExtendClass(WebLingoClassInfo info, WebLingoValue target, WebLingoValue[] slots, WebLingoValue[] cells, out WebLingoRuntimeError? error)
-        {
-            var closures = new WebLingoValue[info.Methods.Count + info.StaticMethods.Count];
-            heap.AddRoots(closures);
-            try
-            {
-                var methods = new Dictionary<string, WebLingoValue>(StringComparer.Ordinal);
-                for (var i = 0; i < info.Methods.Count; i++)
-                {
-                    if (!TryMakeClosure(info.Methods[i].Function, slots, cells, out closures[i], out error)) return false;
-                    methods[info.Methods[i].Name] = closures[i];
-                }
-                var statics = new Dictionary<string, WebLingoValue>(StringComparer.Ordinal);
-                for (var i = 0; i < info.StaticMethods.Count; i++)
-                {
-                    var slot = info.Methods.Count + i;
-                    if (!TryMakeClosure(info.StaticMethods[i].Function, slots, cells, out closures[slot], out error)) return false;
-                    statics[info.StaticMethods[i].Name] = closures[slot];
-                }
-                return heap.TryExtendClass(target, methods, statics, info.StaticFields, out error);
-            }
-            finally
-            {
-                heap.RemoveLastRoots(closures);
-            }
-        }
-
         private bool TryMakeClass(WebLingoClassInfo info, WebLingoValue baseClass, WebLingoValue[] slots, WebLingoValue[] cells, out WebLingoValue made,
             out WebLingoRuntimeError? error)
         {
@@ -2347,31 +2316,57 @@ public sealed class WebLingoStackVirtualMachine
                 error = null;
                 return true;
             }
-            made = WebLingoValue.Null;
-            var closures = new WebLingoValue[info.Methods.Count + info.StaticMethods.Count + 1];
-            heap.AddRoots(closures);
+            return heap.TryMakeClass(info.Name, baseClass, out made, out error) && TryGiveMembers(info, made, slots, cells, out error);
+        }
+
+        /// <summary><c>extend</c> (section 3.7): an extension's members given to the class <paramref name="target"/>, as a class's are.</summary>
+        private bool TryExtendClass(WebLingoClassInfo info, WebLingoValue target, WebLingoValue[] slots, WebLingoValue[] cells, out WebLingoRuntimeError? error) =>
+            heap.TryCheckClass(target, out error) && TryGiveMembers(info, target, slots, cells, out error);
+
+        /// <summary>
+        /// A class's members, its declaration's or an extension's, each a closure made as its captures say, given to the class
+        /// by the heap's method that gives a program's own while it runs: its constructor, its methods, a property's getter
+        /// and setter among them, its static methods, and its static fields, <c>null</c> until they are set (section 3.7).
+        /// The class, and each closure until the class holds it, are kept as roots, since making one may collect.
+        /// </summary>
+        private bool TryGiveMembers(WebLingoClassInfo info, WebLingoValue target, WebLingoValue[] slots, WebLingoValue[] cells,
+            out WebLingoRuntimeError? error)
+        {
+            var roots = new WebLingoValue[] { target, WebLingoValue.Null };
+            heap.AddRoots(roots);
             try
             {
-                if (info.Constructor != -1 && !TryMakeClosure(info.Constructor, slots, cells, out closures[0], out error)) return false;
-                var methods = new Dictionary<string, WebLingoValue>(StringComparer.Ordinal);
+                error = null;
+                if (info.Constructor != -1)
+                {
+                    if (!TryMakeClosure(info.Constructor, slots, cells, out roots[1], out error)) return false;
+                    heap.GiveConstructor(target, roots[1], info.DefaultConstructor);
+                }
                 for (var i = 0; i < info.Methods.Count; i++)
                 {
-                    if (!TryMakeClosure(info.Methods[i].Function, slots, cells, out closures[i + 1], out error)) return false;
-                    methods.Add(info.Methods[i].Name, closures[i + 1]);
+                    if (!TryMakeClosure(info.Methods[i].Function, slots, cells, out roots[1], out error)
+                        || !heap.TrySetMethod(target, info.Methods[i].Name, roots[1], out error))
+                    {
+                        return false;
+                    }
                 }
-                var statics = new Dictionary<string, WebLingoValue>(StringComparer.Ordinal);
                 for (var i = 0; i < info.StaticMethods.Count; i++)
                 {
-                    var slot = info.Methods.Count + 1 + i;
-                    if (!TryMakeClosure(info.StaticMethods[i].Function, slots, cells, out closures[slot], out error)) return false;
-                    statics.Add(info.StaticMethods[i].Name, closures[slot]);
+                    if (!TryMakeClosure(info.StaticMethods[i].Function, slots, cells, out roots[1], out error)
+                        || !heap.TrySetStaticMethod(target, info.StaticMethods[i].Name, roots[1], out error))
+                    {
+                        return false;
+                    }
                 }
-                return heap.TryAllocateClass(info.Name, closures[0], methods, baseClass, out made, out error, statics,
-                    info.StaticFields, info.DefaultConstructor);
+                for (var i = 0; i < info.StaticFields.Count; i++)
+                {
+                    if (!heap.TryDeclareStatic(target, info.StaticFields[i], WebLingoValue.Null, out error)) return false;
+                }
+                return true;
             }
             finally
             {
-                heap.RemoveLastRoots(closures);
+                heap.RemoveLastRoots(roots);
             }
         }
 
