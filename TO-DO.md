@@ -2,33 +2,67 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [QUESTION] Typed Catches Syntax: Classes of Values
+## [DONE] Typed Catches Syntax: Classes of Values
 
 Follow-ups to "Typed Catches": A4 asks whether every value can be an instance of a class, such as `Integer`. It can: each kind of value gets a built-in class, which `is` and a typed catch test by the value's kind, with nothing stored in the value and nothing slower. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
 
-**Q1, every value's class: each kind of value has a built-in class extending `Object`: `Boolean`, `Integer`, `Number` (binary64), `String`, `Array`, `Map`, `Set`, `Function` and `Class`, so that `5 is Integer` and `catch (String e)`; programs cannot extend them, nor make one with `new`. Agreed?**
+Q1, every value's class: each kind of value has a built-in class extending `Object`: `Boolean`, `Integer`, `Number` (binary64), `String`, `Array`, `Map`, `Set`, `Function` and `Class`, so that `5 is Integer` and `catch (String e)`; programs cannot extend them, nor make one with `new`. Agreed?
+
+A1: Yes, for value types. One should be able to extend arrays, maps, sets.
+
+Q2, binary64's class: (a) `Number`; (b) `Float`; (c) `Double`.
+
+A2: Yes.
+
+Q3, `null`: (a) a value of no class, so `null is Object` is false, and only a catch without a class catches it; (b) it has a class too, `Null`.
+
+A3: (a). WebLingo means to give every kind of value a class, except for `null`.
+
+Q4, `equal` on every value: "M0.10 Syntax: Static Members, `Object` and Exceptions" had only instances have it (A5). With every value an instance of a class extending `Object`: (a) every value has `Object`'s `equal`, giving `==` (`"a".equal("a")` is true); (b) still only instances of the program's classes.
+
+A4: (a).
+
+Q5, a catch's name that is not a class when an exception reaches it (`var A = 5;` … `catch (A e)`), asked again: (a) WS3001, which replaces the exception; (b) the catch does not match, and the exception goes on.
+
+A5: The catch should match, A.equals(5). Is there a problem with that?
+
+Q6, the runtime errors' classes, each extending `Error`: `InitializationError` (WS2004), `CallError` (WS2005), `ArgumentError` (WS2006), `TypeError` (WS3001), `OverflowError` (WS3002), `IndexError` (WS3005), `MemberError` (WS3006) and `KeyError` (WS3007): (a) these; (b) others, which you give.
+
+A6: (a).
+
+Done (Claude, 2026-11-13): recorded as approved in the specification, section 3.7 ("Classes of values", "Equality", "Typed catches", "`is`" and the runtime errors' classes) and its decision register. A1's extending of `Array`, `Map` and `Set`, A5's question, and what is left of A1 are asked in "Classes of Values, Continued".
+
+## [QUESTION] Classes of Values, Continued
+
+Follow-ups to "Typed Catches Syntax: Classes of Values". One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
+
+**Q1, a catch whose name is not a class (A5, "Is there a problem with that?"): no problem, but for one point: `A.equal(e)` runs the program's own `equal` when `A` is an instance whose class overrides it, while the VM is searching for a handler, so that a catch could fail or have side effects, which A3 wanted to avoid. (a) `==`, which runs no code, and differs only for such instances; (b) `A.equal(e)`, as you write, an exception it throws replacing the one being caught.**
 
 A1:
 
-**Q2, binary64's class: (a) `Number`; (b) `Float`; (c) `Double`.**
+**Q2, `Function` and `Class`: (a) like `Boolean`, `Integer`, `Number` and `String`: no class extends them, and `new` makes none; (b) classes may extend them.**
 
 A2:
 
-**Q3, `null`: (a) a value of no class, so `null is Object` is false, and only a catch without a class catches it; (b) it has a class too, `Null`.**
+**Q3, extending `Array`, `Map` and `Set`: `class Stack extends Array { top() { return this[this.length - 1]; } }`; `new Stack()` is an empty array of class `Stack`: indexed, with `length`, `push` and `pop`, visited by `foreach`, `is Array` and `is Stack`, with its own methods. Agreed?**
 
 A3:
 
-**Q4, `equal` on every value: "M0.10 Syntax: Static Members, `Object` and Exceptions" had only instances have it (A5). With every value an instance of a class extending `Object`: (a) every value has `Object`'s `equal`, giving `==` (`"a".equal("a")` is true); (b) still only instances of the program's classes.**
+**Q4, fields on such an instance: (a) allowed, as on any instance; (b) none: only methods.**
 
 A4:
 
-**Q5, a catch's name that is not a class when an exception reaches it (`var A = 5;` … `catch (A e)`), asked again: (a) WS3001, which replaces the exception; (b) the catch does not match, and the exception goes on.**
+**Q5, `new Array()`, `new Map()` and `new Set()` make empty ones, as `[]`, `{}` and `#{}` do. Agreed?**
 
 A5:
 
-**Q6, the runtime errors' classes, each extending `Error`: `InitializationError` (WS2004), `CallError` (WS2005), `ArgumentError` (WS2006), `TypeError` (WS3001), `OverflowError` (WS3002), `IndexError` (WS3005), `MemberError` (WS3006) and `KeyError` (WS3007): (a) these; (b) others, which you give.**
+**Q6, the text of a derived array: (a) `Stack [1, 2]`, its class's name before it, as an instance's is; (b) `[1, 2]`, as any array's.**
 
 A6:
+
+**Q7, the classes' names: `Integer`, `String` and the rest are in scope everywhere, as `Object` and `Error` are, and a program may declare a name of its own over one. Agreed?**
+
+A7:
 
 ## [IDLE] Typed Catches
 
@@ -68,17 +102,19 @@ A7: (a).
 
 2026-11-13: recorded as approved in the specification, section 3.7 ("Typed catches", "`is`", and the runtime errors' classes): A1, A2, A3 (dotted names), A5, A6 and A7. A4 asks whether every value could be an instance of a class: it can, and "Typed Catches Syntax: Classes of Values" proposes how, with Q4 asked again and the runtime errors' class names. Waits for those answers.
 
+2026-11-13: answered ("Typed Catches Syntax: Classes of Values"); next, but for extending `Array`, `Map` and `Set`, which waits for "Classes of Values, Continued", and the equality a catch whose name is not a class uses, `==` until then (Q1 there).
+
 ## [QUESTION] Asynchrony: `async` and `await`
 
 A15 of "M0.11: Templates": asynchrony is designed first, before templates. WebLingo's own operation model (WS-P007), worker-affine executions (WS-H012) and worker-local heaps (WS-P013) are approved; how a program writes asynchrony is not. One decision each, answerable with "yes" or a letter. Once they are answered, its implementation becomes tasks of its own, before M0.11. Added by Claude, 2026-11-13.
 
 **Q1, syntax: `async function f() { … }`, `async` methods and `async function (…) { … }`, whose call gives a task at once; `await t` waits for task `t`, giving its result, or throwing its exception. Agreed?**
 
-A1:
+A1: Yes.
 
 **Q2, where `await` may stand: (a) in an `async` function, and at the top level of a script or a template; (b) only in an `async` function.**
 
-A2:
+A2: (a)
 
 **Q3, when an `async` function starts: (a) at once, when it is called, running until its first `await`, as in C# and JavaScript; (b) only when something awaits its task.**
 
