@@ -426,6 +426,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class P { constructor() { this.x = 2; } } var f = function (this, n) { return this.x * n; }; var p = new P(); var q = new P(); q.x = 5; p.g = f; writeLn(p.g(q, 3));", "15")]
     [InlineData("var R = new Class(\"R\"); var log = []; R.addMethod(\"destructor\", function (this) { log.push(\"disposed\"); }); using (var r = new R()) { log.push(\"used\"); } writeLn(log);", "[\"used\", \"disposed\"]")]
     [InlineData("extend Integer { describe(prefix) { return prefix + this.toString(); } } Integer.addMethod(\"twice\", function (this) { return this * 2; }); writeLn([4.twice(), 4.describe(\"n = \")]);", "[8, \"n = 4\"]")]
+    [InlineData("var C = new Class(); var c = new C(); var before = [C.__className, C.toString()]; C.__className = \"Point\"; writeLn([before, C.__className, C, c, c.__instanceOf == C, C.__parent, Object.__parent]);", "[[null, \"class\"], \"Point\", class Point, Point {}, true, class Object, null]")]
+    [InlineData("class A {} class B extends A {} var n = null; writeLn([B.__parent, new B().__instanceOf, 5.__instanceOf, \"s\".__instanceOf, [].__instanceOf, null.__instanceOf, n?.__instanceOf]);", "[class A, class B, class Integer, class String, class Array, null, null]")]
+    [InlineData("Integer.__className = \"Double\"; writeLn([Integer, 5.__instanceOf, new Class(\"P\").__className]);", "[class Double, class Double, \"P\"]")]
+    [InlineData("var C = new Class(\"C\"); C.__className = null; writeLn([C, C.__className, new C()]);", "[class, null, class {}]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -595,6 +599,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var C = new Class(\"C\"); var m = C.addMethod;", "WL3001")]
     [InlineData("var C = new Class(\"C\"); new C(1);", "WL2006")]
     [InlineData("var f = function (this, a) { return a; }; f(1, 2, 3);", "WL2006")]
+    [InlineData("var C = new Class(\"C\"); var c = new C(); c.__instanceOf = 1;", "WL3001")]
+    [InlineData("class A {} var C = new Class(\"C\"); C.__parent = A;", "WL3001")]
+    [InlineData("var C = new Class(\"C\"); C.__className = 5;", "WL3001")]
+    [InlineData("var C = new Class(\"C\"); var c = new C(); writeLn(c.__className);", "WL3006")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

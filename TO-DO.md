@@ -20,13 +20,15 @@
 
 2026-11-14: designed (specification, section 3.7, "Classes of values"); split into the parts the specification defines in section 9 (part 5 of "Extending the classes of values"), each a task below. Waits for them.
 
-## [IDLE] Extending the Classes of Values: `Class`, Names
+## [WORKING] Extending the Classes of Values: `Class`, Names
 
 `Point.className`, `p.instanceOf` and `Point.parent` (specification, section 3.7, and part 5.2 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
 
 2026-11-14: waits for Q3 of "Building Classes at Run Time, Continued", and for "Extending the Classes of Values: `Class`, Making Classes".
 
 2026-11-14: both done; the names are `__className`, `__instanceOf` and `__parent` (A3 of "Building Classes at Run Time, Continued").
+
+Done (Claude, 2026-11-14): on both VMs, with conformance tests; the choices A3 leaves open are recorded as Proposed in the specification, section 15.2 ("Classes made while the program runs"): the three names come before a program's own members of those names, `__className` and `__parent` are a class's only, `null.__instanceOf` is `null`, assigning `null` to `__className` unnames a class, and `__instanceOf` and `__parent` cannot be assigned. Checks: the Release build, without warnings, the 1,669 tests, a timing of member reads and assignments against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
 
 ## [IDLE] Extending the Classes of Values: `Class`, Properties and Constants
 

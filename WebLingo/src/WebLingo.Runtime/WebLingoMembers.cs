@@ -6,7 +6,12 @@ namespace WebLingo.Runtime;
 /// once, when it loads a module, so that it does not compare names as it runs; a name that is no member of any value
 /// is <see cref="Unknown"/>, and is kept for the message of its error.
 /// </summary>
-public enum WebLingoMember : byte { Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, AddMethod }
+public enum WebLingoMember : byte
+{
+    Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, AddMethod,
+    /// <summary>The names every value, or every class, has (section 3.7), last, so that one comparison finds them.</summary>
+    ClassName, InstanceOf, Parent
+}
 
 /// <summary>A member's name as a module's constant gives it, and the member it names.</summary>
 public readonly record struct WebLingoMemberName(WebLingoMember Member, string Text);
@@ -32,6 +37,9 @@ public static class WebLingoMembers
         "equal" => WebLingoMember.Equal,
         "forget" => WebLingoMember.Forget,
         "addMethod" => WebLingoMember.AddMethod,
+        "__className" => WebLingoMember.ClassName,
+        "__instanceOf" => WebLingoMember.InstanceOf,
+        "__parent" => WebLingoMember.Parent,
         _ => WebLingoMember.Unknown
     };
 
@@ -72,6 +80,7 @@ public static class WebLingoMembers
             error = null;
             return true;
         }
+        if (member >= WebLingoMember.ClassName && TryGetName(target, member, heap, out result, out error)) return error is null;
         if (IsClassedCollection(target, heap, out var collectionClass))
         {
             // A collection of a class extending Array, Map or Set: its fields, then its class's methods, then its own
@@ -207,6 +216,7 @@ public static class WebLingoMembers
         out WebLingoValue setter)
     {
         setter = WebLingoValue.Null;
+        if (name.Length > 2 && name[0] == '_' && name[1] == '_' && TrySetName(target, name, value, heap, out error)) return error is null;
         if (target.Kind == WebLingoValueKind.Module)
         {
             // An export is its module's to change (section 3.9).
@@ -497,6 +507,67 @@ public static class WebLingoMembers
     };
 
     /// <summary>Whether the member is a method of the value: an array's <c>push</c> and <c>pop</c>, a map's <c>has</c> and <c>remove</c>.</summary>
+    /// <summary>
+    /// <c>x.__instanceOf</c>, a value's class, <c>null</c> for <c>null</c>; and a class's <c>__className</c>, its name,
+    /// <c>null</c> for an unnamed one, and <c>__parent</c>, its base, <c>null</c> for <c>Object</c>. They come before a
+    /// program's own members of those names (section 3.7). False for a member that is none of them there.
+    /// </summary>
+    private static bool TryGetName(WebLingoValue target, WebLingoMember member, WebLingoHeap heap, out WebLingoValue result,
+        out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        error = null;
+        if (member == WebLingoMember.InstanceOf)
+        {
+            result = ClassOfAny(target, heap);
+            return true;
+        }
+        if (target.Kind != WebLingoValueKind.Class) return false;
+        if (member == WebLingoMember.Parent)
+        {
+            result = heap.ClassBase(target);
+            return true;
+        }
+        if (heap.IsNamed(target)) heap.TryAllocateString(heap.ClassName(target), out result, out error);
+        return true;
+    }
+
+    /// <summary>
+    /// A value's class: an instance's, or a classed collection's, its own; any other value's, its kind's, or <c>Object</c>
+    /// for a kind whose class the program has not made; none for <c>null</c> (section 3.7).
+    /// </summary>
+    private static WebLingoValue ClassOfAny(WebLingoValue value, WebLingoHeap heap)
+    {
+        if (value.Kind == WebLingoValueKind.Null) return WebLingoValue.Null;
+        var own = heap.ClassOfValue(value);
+        if (own.Kind == WebLingoValueKind.Class) return own;
+        var index = ValueClassOf(value.Kind);
+        return index >= 0 && heap.ValueClasses is { } classes && classes[index].Kind == WebLingoValueKind.Class
+            ? classes[index]
+            : heap.ObjectClass;
+    }
+
+    /// <summary>
+    /// <c>x.name = v</c> for a name every value, or every class, has (section 3.7): a class's <c>__className</c> takes a
+    /// string, or <c>null</c> to unname it (WL3001 otherwise); <c>__instanceOf</c> and <c>__parent</c> cannot be
+    /// assigned (WL3001). False for a name that is none of them there.
+    /// </summary>
+    private static bool TrySetName(WebLingoValue target, string name, WebLingoValue value, WebLingoHeap heap, out WebLingoRuntimeError? error)
+    {
+        error = null;
+        var member = Find(name);
+        if (member < WebLingoMember.ClassName || (member != WebLingoMember.InstanceOf && target.Kind != WebLingoValueKind.Class)) return false;
+        if (member == WebLingoMember.ClassName && value.Kind is WebLingoValueKind.String or WebLingoValueKind.Null)
+        {
+            heap.RenameClass(target, value.Kind == WebLingoValueKind.String ? heap.GetString(value) : "");
+            return true;
+        }
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, member == WebLingoMember.ClassName
+            ? $"A class's name is a string, not {WebLingoValueFormatter.Describe(value, heap)}."
+            : $"'{name}' of {WebLingoValueFormatter.Describe(target, heap)} cannot be assigned.");
+        return true;
+    }
+
     /// <summary>Whether a string is a name, as a program writes one: ASCII letters, digits and <c>_</c>, not first a digit.</summary>
     private static bool IsName(string text)
     {

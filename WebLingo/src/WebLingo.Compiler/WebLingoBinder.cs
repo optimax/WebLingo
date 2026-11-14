@@ -919,6 +919,11 @@ public sealed class WebLingoBinder
                 return BindSuper(superMember.Name, superMember.Span);
             case WebLingoMemberAccessSyntax member:
                 if (member.Name is "toString" or "equal") UseObject(); // Every value has Object's (section 3.7).
+                if (member.Name == "__instanceOf")
+                {
+                    // A value's class, which its kind's is for one that is not an instance (section 3.7).
+                    foreach (var (name, _) in WebLingoPrelude.ValueClasses) UseBuiltinClass(name);
+                }
                 return new WebLingoBoundMember(BindExpression(member.Target), member.Name, member.Span) { IsOptional = member.IsOptional };
             case WebLingoMemberAssignmentSyntax field:
                 return new WebLingoBoundMemberAssignment(BindExpression(field.Target.Target), field.Target.Name, BindExpression(field.Value),

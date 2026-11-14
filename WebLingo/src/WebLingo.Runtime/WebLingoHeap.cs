@@ -687,6 +687,9 @@ public sealed class WebLingoHeap
         return true;
     }
 
+    /// <summary><c>Point.__className = name</c>: a class named, or renamed, or unnamed by an empty name (section 3.7).</summary>
+    public void RenameClass(WebLingoValue classValue, string name) => Get<ClassObject>(classValue, WebLingoValueKind.Class).Name = name;
+
     /// <summary>Whether a class has a name; one <c>new Class()</c> made has none (section 3.7).</summary>
     public bool IsNamed(WebLingoValue classValue) => Get<ClassObject>(classValue, WebLingoValueKind.Class).Name.Length > 0;
 
@@ -1085,6 +1088,8 @@ public sealed class WebLingoHeap
     {
         /// <summary>Its constructor's closure, which <c>addMethod("constructor", f)</c> may give it while the program runs.</summary>
         public WebLingoValue Constructor { get; set; } = Constructor;
+        /// <summary>Its name, empty for an unnamed class, which <c>__className</c> may change while the program runs.</summary>
+        public string Name { get; set; } = Name;
         public WebLingoValue Base { get; init; }
         public Dictionary<string, WebLingoValue> OwnMethods { get; init; } = new(StringComparer.Ordinal);
         public int Version { get; set; }
