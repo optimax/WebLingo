@@ -1579,3 +1579,9 @@ writeLn([u.save(), u is User]);                                    // ["saved Us
 A5 (again): (b). Then, an object instance must be able to point to its class: `p.instanceOf`, and class instance to its parent `Point.parent`  (->  `Object`).
 
 Done (Claude, 2026-11-14, `c485b03`): the design recorded as approved in the specification, section 3.7 ("Classes of values"), A9's `className` renaming any class, as A9 allows; the parts of its implementation defined in section 9 (part 5 of "Extending the classes of values"), each a task below "Extending the Classes of Values: `Class`". What A6 to A9 and A5 leave open is asked in "Building Classes at Run Time, Continued". Checks: the Release build, without warnings, and the full test suite, on Windows only; Linux not tried.
+
+## [DONE] Extending the Classes of Values: `Class`, Making Classes
+
+`new Class("Point")`, `new Class("Point", Shape)` and `new Class()`; functions with a receiver, `function (this, a) { … }`; and `Point.addMethod(name, f)`, a constructor included (specification, section 3.7, and part 5.1 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
+
+Done (Claude, 2026-11-14, `d009021`): on both VMs, with conformance tests; the choices the design leaves open are recorded as Proposed in the specification, section 15.2 ("Classes made while the program runs"), among them that a field holding a function with a receiver runs it on its first argument, not on the field's instance, as a field's function is called as any function is, and that `addMethod` takes a name only, so that no program names a property's accessor or an operator with it. Checks: the Release build, without warnings, the 1,653 tests, the benchmark against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
