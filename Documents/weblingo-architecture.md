@@ -952,6 +952,11 @@ Proposed central props:
 6. **M0.10.6:** exceptions: `throw`, `try`, `catch` and `finally`, `Error`, runtime errors as exceptions, and `using` when one leaves it. Implemented (13 November 2026), on both VMs.
 7. **M0.10.7:** `toString()`. Implemented (13 November 2026), on both VMs.
 
+**M0.11 parts** (13 November 2026), each landing on its own with its conformance tests, on both VMs:
+
+1. **M0.11.1:** tasks and `await`: `async` functions, methods and function expressions; `await` of any value, in them and at a script's top level; tasks (`Task`, `x is Task`), their exceptions, those nothing awaits, and `t.forget()`; the end of an execution; `delay(milliseconds)`; and a benchmark workload of asynchronous suspension (§5.6).
+2. **M0.11.2:** asynchronous disposal: an `async` `dispose()`, which `using` awaits, and WS3001 where it cannot.
+
 **M0.9 parts** (13 November 2026), each landing on its own with its conformance tests, on both VMs (§5.6, "Both VMs, for now"):
 
 1. **M0.9.1:** member access (`x.name`, `x.name(…)`) and indexing (`x[i]`, `x[i] = v`), with strings' `length` and indexing (§3.6). Implemented (13 November 2026), on both VMs.

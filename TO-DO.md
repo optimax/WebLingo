@@ -56,6 +56,18 @@ A9:
 
 2026-11-13: answered; it is M0.11 (specification, section 9), after the tasks above it.
 
+2026-11-13: M0.11 is split into the parts the specification defines in section 9 ("M0.11 parts"), each a task below. Waits for them.
+
+## [WORKING] M0.11.1: Tasks and `await`
+
+`async` functions, methods and function expressions, `await`, tasks, their exceptions, `t.forget()`, the end of an execution, `delay()`, and a benchmark workload (specification, sections 3.8 and 9), on both VMs. Added by Claude, 2026-11-13.
+
+## [IDLE] M0.11.2: Asynchronous Disposal
+
+An `async` `dispose()`, which `using` awaits, and WS3001 where it cannot (specification, section 3.8), on both VMs. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for M0.11.1.
+
 ## [IDLE] Task Combinators
 
 `Task.all`, `Task.any` and timeouts (A6 of "Asynchrony: `async` and `await`"; specification, section 3.8). Added by Claude, 2026-11-13.
@@ -96,7 +108,7 @@ A7: (a).
 
 **Q8, a script's parameters from the command line: `weblingo run script.ws size=10 name=Ann`, each value read as a WebLingo literal if it is one (`10`, `true`), as a string otherwise. Agreed?**
 
-A8:
+A8: Yes. But, `weblingo run script.ws value="10"` reads as `String(value)`.
 
 **Q9, when imports are compiled: (a) with the importing program, so that a program is complete before it runs; (b) when they run, as `renderComponent` finds its component.**
 
