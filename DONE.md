@@ -1327,3 +1327,9 @@ Done (Claude, 2026-11-13, `e871811`): recorded as approved in the specification,
 A classed value written as its class's name, a colon and its value, `Stack:[1, 2]`, in place of `Stack([1, 2])` (A4 of "Classes of Values, Extensions, Continued"; specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
 
 Done (Claude, 2026-11-13, `81b722b`): for collections, on both VMs, with their conformance tests; part 3 writes the other classed values so. Checks: the Release build, without warnings, the 1,450 tests, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Extending the Classes of Values: `Boolean`, `Integer`, `Number` and `String`
+
+Classes extending them, whose instances hold a value, given by `super(value)`, which arithmetic, comparisons and `==` use, written `Celsius(21.5)`; and `new` on those classes (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
+
+Done (Claude, 2026-11-13, `fb8815d`): on both VMs, with their conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Classes holding a value"), two of them asked in "Classes of Values, Constructors". Checks: the Release build, without warnings, the 1,476 tests, and the CLI on the samples, on Windows only; Linux not tried.
