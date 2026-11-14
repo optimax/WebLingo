@@ -1585,3 +1585,21 @@ Done (Claude, 2026-11-14, `c485b03`): the design recorded as approved in the spe
 `new Class("Point")`, `new Class("Point", Shape)` and `new Class()`; functions with a receiver, `function (this, a) { … }`; and `Point.addMethod(name, f)`, a constructor included (specification, section 3.7, and part 5.1 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
 
 Done (Claude, 2026-11-14, `d009021`): on both VMs, with conformance tests; the choices the design leaves open are recorded as Proposed in the specification, section 15.2 ("Classes made while the program runs"), among them that a field holding a function with a receiver runs it on its first argument, not on the field's instance, as a field's function is called as any function is, and that `addMethod` takes a name only, so that no program names a property's accessor or an operator with it. Checks: the Release build, without warnings, the 1,653 tests, the benchmark against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Building Classes at Run Time, Continued
+
+The follow-ups of "Building Classes at Run Time" (specification, section 3.7, "Classes of values"). One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-14.
+
+**Q1, replacing a declared class's static method (A6): (a) by assignment, `Point.origin = f;`, which then replaces a static method as it declares a new static member, assigning one being WL3001 no longer; (b) by a method of every class, `Point.setStaticMethod("origin", f)`, assignment staying WL3001.**
+
+A1: (a)
+
+**Q2, replacing a property or a constant (A7, A8: "a setter"): (a) its `add…` method again, `addProperty`, `addStaticProperty` or `addConstant` given a name the class has replacing that member, as `addMethod` replaces a method (A3); (b) `set…` methods of their own, `setProperty`, `setStaticProperty` and `setConstant`, an `add…` given a name the class has being WL3001.**
+
+A2: So, instead of add____ and set____, have just set____ with the semantics that it adds the first time, and replaces subsequently.
+
+**Q3, a program's own members named `className`, `instanceOf` or `parent` (a tree's `this.parent = node;` is common): (a) the program's own come first, a static member `className` or `parent` of a class, or a field or method `instanceOf` of an instance, hiding the built-in one there; (b) the built-in ones are reserved: declaring a static member `className` or `parent` is WL2002, and assigning a field `instanceOf` WL3001.**
+
+A3: Ugly, but effective: use `__className`, `__instanceOf`, and `__parent`.
+
+Done (Claude, 2026-11-14, `93f214e`): recorded as approved in the specification, section 3.7 ("Classes of values"), and in the parts of section 9 they change ("Extending the classes of values", parts 5.2 and 5.3). Whether `addMethod`, approved before A2, becomes `setMethod` too is asked in "Building Classes at Run Time: `addMethod`'s Name". Checks: the Release build, without warnings, and the full test suite, on Windows only; Linux not tried.
