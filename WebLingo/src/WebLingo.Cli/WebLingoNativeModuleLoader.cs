@@ -10,8 +10,9 @@ namespace WebLingo.Cli;
 /// assembly, from the importing file's folder, which must be in a scheme's folder too, so that no script can write an
 /// assembly and import it. An assembly is loaded once, into the host's own context, and never unloaded; its one public
 /// class implementing <see cref="IWebLingoNativeModule"/> registers its functions, each then one of the host's built-ins,
-/// named <c>scheme:module.function</c>, which no script can name. The <c>std</c> scheme's modules the compiler makes itself,
-/// for now (section 9, "Native modules", part 3).
+/// named <c>scheme:module.function</c>, which no script can name. <c>std:system</c> a command line loads itself, its
+/// functions the host's built-ins by their own names (<see cref="WebLingoCommandLine"/>); any other <c>std</c> module is
+/// none yet.
 /// </summary>
 public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, string> schemes, WebLingoBuiltinRegistry builtins)
     : IWebLingoNativeResolver
@@ -21,6 +22,32 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
     private readonly Dictionary<string, WebLingoNativeModuleInfo> _loaded = new(StringComparer.Ordinal);
 
     /// <summary>A configured scheme's path, but <c>std</c>'s, or an assembly's; any other is a file's, as a script's import is.</summary>
+    /// <summary>A native module's functions, as the host's built-ins, by the names it exports them by.</summary>
+    public IReadOnlyList<IWebLingoBuiltinFunction> FunctionsOf(WebLingoNativeModuleInfo module)
+    {
+        var functions = new List<IWebLingoBuiltinFunction>();
+        foreach (var export in module.Exports)
+        {
+            if (builtins.TryGetBuiltin(export.Builtin, out var function)) functions.Add(Named(export.Name, function));
+        }
+        return functions;
+    }
+
+    private static IWebLingoBuiltinFunction Named(string name, IWebLingoBuiltinFunction function) =>
+        function is IWebLingoTextBuiltin ? new RenamedText(name, function) : new Renamed(name, function);
+
+    private class Renamed(string name, IWebLingoBuiltinFunction function) : IWebLingoBuiltinFunction
+    {
+        public string Name => name;
+        public int Arity => function.Arity;
+
+        public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+            function.TryInvoke(arguments, heap, out result, out error);
+    }
+
+    private sealed class RenamedText(string name, IWebLingoBuiltinFunction function)
+        : Renamed(name, function), IWebLingoTextBuiltin;
+
     public bool Names(string path) =>
         (TrySplit(path, out var scheme, out _) && scheme != "std" && schemes.ContainsKey(scheme))
         || path.EndsWith(Extension, StringComparison.OrdinalIgnoreCase);
@@ -164,12 +191,17 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         public List<NativeFunction> Functions { get; } = [];
         public string? Error { get; private set; }
 
-        public void Function(string name, int arity, WebLingoNativeFunction function)
+        public void Function(string name, int arity, WebLingoNativeFunction function) => Add(name, arity, function, false);
+
+        public void TextFunction(string name, int arity, WebLingoNativeFunction function) => Add(name, arity, function, true);
+
+        private void Add(string name, int arity, WebLingoNativeFunction function, bool writesText)
         {
             if (Error is not null) return;
             if (!IsName(name)) Error = $"it registers a function named '{name}', which is not a name";
             else if (arity < 0) Error = $"it registers '{name}' with an arity of {arity}";
             else if (Functions.Exists(f => f.Export == name)) Error = $"it registers '{name}' twice";
+            else if (writesText) Functions.Add(new NativeTextFunction(module + "." + name, name, arity, function));
             else Functions.Add(new NativeFunction(module + "." + name, name, arity, function));
         }
 
@@ -184,8 +216,13 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         }
     }
 
+    /// <summary>A native module's function that writes text, given an instance's <c>toString()</c> (section 3.7).</summary>
+    private sealed class NativeTextFunction(string name, string export, int arity, WebLingoNativeFunction function)
+        : NativeFunction(name, export, arity, function), IWebLingoTextBuiltin;
+
     /// <summary>A native module's function, as one of the host's built-ins.</summary>
-    private sealed class NativeFunction(string name, string export, int arity, WebLingoNativeFunction function) : IWebLingoBuiltinFunction
+    private class NativeFunction(string name, string export, int arity, WebLingoNativeFunction function)
+        : IWebLingoBuiltinFunction
     {
         public string Name => name;
         public string Export => export;

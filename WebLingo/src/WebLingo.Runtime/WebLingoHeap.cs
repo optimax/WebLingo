@@ -63,6 +63,9 @@ public sealed class WebLingoHeap
     /// <summary>The execution's tasks, which its VM runs, and which <c>delay</c> adds a timer to (section 3.8).</summary>
     public WebLingoScheduler? Scheduler { get; set; }
 
+    /// <summary>Where the execution's text goes (<see cref="WebLingoExecutionContext.Output"/>), for native functions (section 3.9).</summary>
+    public IWebLingoTextOutput? Output { get; set; }
+
     /// <summary>A new task, pending (section 3.8).</summary>
     public bool TryAllocateTask(out WebLingoValue task, out WebLingoRuntimeError? error) =>
         TryAllocate(new WebLingoTask(), WebLingoValueKind.Task, 2, out task, out error);

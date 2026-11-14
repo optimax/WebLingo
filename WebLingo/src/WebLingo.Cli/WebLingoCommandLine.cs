@@ -128,19 +128,30 @@ public static class WebLingoCommandLine
         }
 
         var text = new WebLingoSourceText(source, path);
-        var textOutput = new TextWriterOutput(output);
-        var services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(textOutput));
-        foreach (var builtin in program.Builtins(textOutput)) services.Register(builtin);
-        var declarations = new List<WebLingoBuiltinDeclaration>();
-        foreach (var builtin in services.Builtins) declarations.Add(new WebLingoBuiltinDeclaration(builtin.Name, builtin.Arity));
-
         if (!WebLingoSchemes.TryLoad(path, givenSchemes, out var schemes, out var wrongConfiguration))
         {
             error.WriteLine(wrongConfiguration);
             return FileUnreadable;
         }
-        var resolver = new FileResolver(path);
+        var textOutput = new TextWriterOutput(output);
+        var services = new WebLingoBuiltinRegistry();
         var native = new WebLingoNativeModuleLoader(schemes, services);
+        // std:system, a native module installed with the runtime, in the std scheme's folder: its functions the host's
+        // built-ins, which every module sees, and which std:system exports (section 3.9).
+        if (!native.TryResolve(path, "std:system", out var system, out var why))
+        {
+            error.WriteLine($"std:system cannot be loaded from {schemes["std"]}: {why}.");
+            return FileUnreadable;
+        }
+        var hostBuiltins = new List<IWebLingoBuiltinFunction>(native.FunctionsOf(system));
+        hostBuiltins.AddRange(program.Builtins(textOutput));
+        var declarations = new List<WebLingoBuiltinDeclaration>();
+        foreach (var builtin in hostBuiltins)
+        {
+            services.Register(builtin);
+            declarations.Add(new WebLingoBuiltinDeclaration(builtin.Name, builtin.Arity));
+        }
+        var resolver = new FileResolver(path);
         var options = new WebLingoCompilerOptions(declarations) { Resolver = resolver, Native = native };
         var compilation = program.Compile(text, options);
         var compiled = compilation.Result;
@@ -152,6 +163,7 @@ public static class WebLingoCommandLine
         {
             Services = services,
             Clock = new SystemClock(new DotNetClock()),
+            Output = textOutput,
             Parameters = parameters
         };
         // The VM imports modules while the program runs as the compiler imports them, with the same resolver (section 3.9).

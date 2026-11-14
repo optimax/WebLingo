@@ -200,6 +200,7 @@ public sealed class WebLingoStackVirtualMachine
             heap.AddRoots(frame.Closure);
             _scheduler = new WebLingoScheduler(heap, context.Clock);
             heap.Scheduler = _scheduler;
+            heap.Output = context.Output;
             heap.ValueClasses = _valueClasses;
             if (module.Parameters.Count > 0 && !TryGiveParameters(frame.Slots)) return _ended!;
             if (module.EntryPoint.IsAsync && !TryStartMain(frame)) return _ended!;

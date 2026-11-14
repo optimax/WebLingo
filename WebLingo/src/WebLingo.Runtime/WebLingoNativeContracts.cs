@@ -16,6 +16,13 @@ public interface IWebLingoNativeRegistry
     /// given once; its arity, 0 or more; and the function.
     /// </summary>
     void Function(string name, int arity, WebLingoNativeFunction function);
+
+    /// <summary>
+    /// An exported function that writes its arguments as text, as <c>write</c> does: a VM gives it an argument's text, as a
+    /// string, when the argument holds an instance whose class overrides <c>toString()</c>, having run that method
+    /// (<see cref="IWebLingoTextBuiltin"/>, section 3.7).
+    /// </summary>
+    void TextFunction(string name, int arity, WebLingoNativeFunction function);
 }
 
 /// <summary>

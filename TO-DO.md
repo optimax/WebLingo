@@ -110,13 +110,15 @@ A native module's classes, `registry.Class(…)`, their constructors, methods an
 
 A1:
 
-## Native Modules, Part 3: Standard Modules as Native Modules
+## [WORKING] Native Modules, Part 3: Standard Modules as Native Modules
 
 `std:system`'s built-ins in a native module installed with the runtime, in `std/` beside its program, the `std` scheme configurable as any other (specification, sections 3.9 and 9, "Native modules", part 3), on both VMs. Added by Claude, 2026-11-14.
 
 2026-11-14: waits for "Native Modules, Part 1: Native Functions".
 
 2026-11-14: part 1 is done; this can begin.
+
+Done (Claude, 2026-11-14): `std:system` is a native module, `WebLingoSystemModule` in `WebLingo.StdLib`, installed as `std/system.dll` beside `weblingo` and `welp`; each loads it before it compiles, from the `std` scheme's folder, which `weblingo.json` or `--scheme std=folder` may point elsewhere, and gives its functions, by their own names, as the built-ins every module sees and `std:system` exports, so that another `system.dll` replaces them, as the tests show with the tests' own module. Guessed, and recorded as Proposed in the specification, section 15.2 ("Native modules"): a missing `std:system` stops the command (exit 4); a native module may register a function that writes text (`TextFunction`), given an instance's `toString()`; a native function reaches the execution's output through the heap (`WebLingoHeap.Output`, from `WebLingoExecutionContext.Output`). The tests and the benchmark still give the standard built-ins themselves, as a host may. Checks: the Release build, without warnings, the full test suite, and both command lines on the samples, on Windows only; Linux not tried.
 
 ## [IDLE] Native Modules, Part 4: The Built-in Classes as Native Classes
 

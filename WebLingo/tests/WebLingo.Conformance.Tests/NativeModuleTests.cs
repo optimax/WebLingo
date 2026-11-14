@@ -94,6 +94,34 @@ public sealed class NativeModuleTests : IDisposable
         Assert.StartsWith("'lib' is not a scheme, name=folder, or is given twice.", error);
     }
 
+    [Fact]
+    public void StdSystemIsANativeModuleThatAnotherImplementationMayReplace()
+    {
+        // weblingo loads std:system from std/system.dll, beside it unless the std scheme names another folder (section 3.9).
+        Assert.True(File.Exists(Path.Combine(AppContext.BaseDirectory, "std", "system.dll")));
+        var script = Path.Combine(_folder, "script.wl");
+        File.WriteAllText(script, "import s from \"std:system\"; writeLn([s, s.writeLn == writeLn]);");
+        Assert.Equal((WebLingoCommandLine.Success, "[module std:system, true]\n", ""), Weblingo(["run", script]));
+
+        // A std folder without system.dll: the command stops before it compiles anything.
+        var empty = Path.Combine(_folder, "empty");
+        Directory.CreateDirectory(empty);
+        var (exit, _, error) = Weblingo(["run", "--scheme", "std=" + empty, script]);
+        Assert.Equal(WebLingoCommandLine.FileUnreadable, exit);
+        Assert.StartsWith($"std:system cannot be loaded from {empty}: there is no such native module.", error);
+
+        // Another implementation of std:system: its functions are the built-ins every module sees, and std:system's exports.
+        var other = Path.Combine(_folder, "other");
+        Directory.CreateDirectory(other);
+        File.Copy(Path.Combine(_native, "test.dll"), Path.Combine(other, "system.dll"));
+        File.WriteAllText(script, "writeLn(1);");
+        Assert.Equal(WebLingoCommandLine.CompilationFailed, Weblingo(["check", "--scheme", "std=" + other, script]).Exit);
+        File.WriteAllText(script, "import { twice } from \"std:system\"; if (twice(2) == 4) { throws(); }");
+        (exit, _, error) = Weblingo(["run", "--scheme", "std=" + other, script]);
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
+        Assert.Contains("error WL3001: 'throws' failed: thrown by the test module", error);
+    }
+
     private static (int Exit, string Output, string Error) Weblingo(string[] args)
     {
         var output = new StringWriter();

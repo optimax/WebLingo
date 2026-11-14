@@ -10,4 +10,10 @@
     <ProjectReference Include="../WebLingo.Platform.DotNet/WebLingo.Platform.DotNet.csproj" />
     <ProjectReference Include="../WebLingo.Templates/WebLingo.Templates.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- std:system, a native module installed with the runtime, in std/ beside its program (section 3.9); and so beside
+         every program that references this one, welp and the tests among them. -->
+    <None Include="../WebLingo.StdLib/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.dll" Link="std/system.dll"
+          CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
 </Project>

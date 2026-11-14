@@ -21,6 +21,12 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     public IWebLingoExecutionClock? Clock { get; init; }
 
     /// <summary>
+    /// Where the execution's text goes, which a native module's functions reach through the heap
+    /// (<see cref="WebLingoHeap.Output"/>), as <c>std:system</c>'s <c>write</c> does (section 3.9); none by default.
+    /// </summary>
+    public IWebLingoTextOutput? Output { get; init; }
+
+    /// <summary>
     /// The values its host gives the program's parameters (<c>param name;</c>, section 3.9), each a string, as
     /// <c>weblingo run script.wl name=value</c> gives them; none by default.
     /// </summary>
