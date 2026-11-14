@@ -418,6 +418,8 @@ public static class WebLingoMembers
     /// </summary>
     private static WebLingoValue ExtendedClassOf(WebLingoValue target, WebLingoHeap heap)
     {
+        // A class a metaclass made has its metaclass's methods (section 3.7).
+        if (target.Kind == WebLingoValueKind.Class && heap.ClassOfValue(target) is { Kind: WebLingoValueKind.Class } metaclass) return metaclass;
         if (!heap.Extended || target.Kind == WebLingoValueKind.Null) return WebLingoValue.Null;
         var index = ValueClassOf(target.Kind);
         return index >= 0 && heap.ValueClasses is { } classes && classes[index].Kind == WebLingoValueKind.Class

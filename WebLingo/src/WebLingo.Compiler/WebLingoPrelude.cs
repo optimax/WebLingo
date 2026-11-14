@@ -55,6 +55,8 @@ internal static class WebLingoPrelude
         "Number" => "class Number { constructor(value = 0.0) { hold(this, value); } }",
         "String" => "class String { constructor(value = \"\") { hold(this, value); } }",
         "Function" => "class Function { constructor(f = function () {}) { hold(this, f); } }",
+        // A metaclass's super(name, base) names and bases the class it makes (section 3.7).
+        "Class" => "class Class { constructor(name = null, base = null) { hold(this, [name, base]); } }",
         _ => $"class {name} {{}}"
     };
 }

@@ -438,6 +438,11 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class K { static const max = 10; static make() { return 1; } } var before = [K.max, K.make()]; K.make = function () { return 2; }; extend K { static const min = 1; } writeLn([before, K.make(), K.min, new K().max]);", "[[10, 1], 2, 1, 10]")]
     [InlineData("class A { property v { get { return 1; } } } class B extends A {} A.setProperty(\"v\", function (this) { return 2; }, null); writeLn([new A().v, new B().v]);", "[2, 2]")]
     [InlineData("extend Integer {} Integer.setProperty(\"doubled\", function (this) { return this * 2; }, null); writeLn(4.doubled);", "8")]
+    [InlineData("class Entity extends Class { constructor(name) { super(name); this.setMethod(\"save\", function (this) { return \"saved \" + this.toString(); }); } describe() { return \"entity \" + this.__className; } } var User = new Entity(\"User\"); var u = new User(); writeLn([User.describe(), User is Entity, User is Class, User.__instanceOf == Entity, User, u.save(), u is User]);", "[\"entity User\", true, true, true, class User, \"saved User {}\", true]")]
+    [InlineData("class Meta extends Class { hello() { return \"hi \" + this.__className; } } class Meta2 extends Meta {} var A = new Meta(\"A\"); var M = new Meta2(\"M\"); writeLn([A.hello(), new A(), A.__parent, M.hello(), M is Meta]);", "[\"hi A\", A {}, class Object, \"hi M\", true]")]
+    [InlineData("class Meta extends Class {} class Shape { area() { return 0; } } var Sq = new Meta(\"Sq\", Shape); writeLn([new Sq().area(), new Sq() is Shape, Sq.__parent]);", "[0, true, class Shape]")]
+    [InlineData("class Meta extends Class { hello() { return \"metaclass\"; } } var A = new Meta(\"A\"); A.hello = function () { return \"static\"; }; var P = new Class(\"P\"); writeLn([A.hello(), P.__instanceOf, P is Class, P is Meta]);", "[\"static\", class Class, true, false]")]
+    [InlineData("class Meta extends Class {} var C = new Meta(); writeLn([C, new C()]);", "[class, class {}]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -526,7 +531,6 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("try { var a = []; a[1]; } catch (e) { throw; }", "WL3005")]
     [InlineData("class Bad { toString() { return 5; } } writeLn(new Bad());", "WL3001")]
     [InlineData("class Bad { toString(x) { return \"\"; } } writeLn([new Bad()]);", "WL2006")]
-    [InlineData("class X extends Class {}", "WL3001")]
     [InlineData("class Bad { equal(o) { return 1; } } var B = new Bad(); try { throw 1; } catch (B e) {}", "WL3001")]
     [InlineData("try { throw 1; } catch (String e) {}", "WL3008")]
     [InlineData("var f = function (a, b = 1) {}; f();", "WL2006")]
@@ -617,6 +621,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var C = new Class(\"C\"); C.setConstant(\"a b\", 1);", "WL3001")]
     [InlineData("var C = new Class(\"C\"); C.setProperty(\"p\", function (this) { return 1; }, null); new C().p = 1;", "WL3001")]
     [InlineData("var C = new Class(\"C\"); C.setStaticProperty(\"p\", null, function (v) {}); writeLn(C.p);", "WL3006")]
+    [InlineData("class Meta extends Class {} new Meta(5);", "WL3001")]
+    [InlineData("class Meta extends Class {} new Meta(\"A\", 5);", "WL3001")]
+    [InlineData("class Bad extends Class { constructor() { super(\"B\", this); } } new Bad();", "WL3001")]
+    [InlineData("class Meta extends Class {} new Meta(\"A\", Task);", "WL3001")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

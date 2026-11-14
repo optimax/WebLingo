@@ -20,11 +20,13 @@
 
 2026-11-14: designed (specification, section 3.7, "Classes of values"); split into the parts the specification defines in section 9 (part 5 of "Extending the classes of values"), each a task below. Waits for them.
 
-## [IDLE] Extending the Classes of Values: `Class`, Metaclasses
+## [WORKING] Extending the Classes of Values: `Class`, Metaclasses
 
 `class Entity extends Class { … }`, whose instances are classes (specification, section 3.7, and part 5.4 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
 
 2026-11-14: waits for "Extending the Classes of Values: `Class`, Names", whose `className` a metaclass's methods read.
+
+Done (Claude, 2026-11-14): on both VMs, with conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Classes made while the program runs", and the rows that called `Class` sealed): `Class` is written in WebLingo, its constructor naming and basing the class a metaclass makes by the built-in classes' `hold`, so that the bytecode is unchanged; a class a metaclass made has its metaclass's methods after its own static members, and before the built-in `setMethod` and the like, which a metaclass may therefore replace. A conformance test that took `extends Class` for WL3001 is gone. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
 
 ## Task Combinators
 
@@ -258,6 +260,19 @@ A5: Yes. In fact, standard modules should follow the same model: they are pre-in
 **Q6, C libraries, as Python's `ctypes` reaches them: (a) not directly: a native module reaches them, through P/Invoke, adapter-only (section 7.14); (b) a foreign-function interface for scripts too, later.**
 
 A6: (b), API TBD.
+
+## Constants Inside Classes
+
+This should be allowed:
+
+```
+class MathStuff {
+    const PI = 3.14;
+}
+
+var m = new MathStuff();
+var v = m.PI;
+```
 
 ## Arrow Notation
 

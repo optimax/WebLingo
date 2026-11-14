@@ -214,6 +214,7 @@ public sealed class WebLingoHeap
     public bool TrySetHeld(WebLingoValue instance, WebLingoValue value, out WebLingoRuntimeError? error)
     {
         error = null;
+        if (instance.Kind == WebLingoValueKind.Class && value.Kind == WebLingoValueKind.Array) return TryShapeClass(instance, value, out error);
         if (!IsHolding(instance))
         {
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
@@ -352,6 +353,8 @@ public sealed class WebLingoHeap
     public WebLingoValue ClassOfValue(WebLingoValue value) => value.Kind switch
     {
         WebLingoValueKind.Instance => Get<InstanceObject>(value, WebLingoValueKind.Instance).Class,
+        // A class a metaclass made is its instance; any other class is Class's, which the caller finds (section 3.7).
+        WebLingoValueKind.Class => Get<ClassObject>(value, WebLingoValueKind.Class).Metaclass,
         WebLingoValueKind.Array when value.HasClass => Get<ArrayObject>(value, WebLingoValueKind.Array).Instance?.Class ?? WebLingoValue.Null,
         WebLingoValueKind.Map or WebLingoValueKind.Set when value.HasClass =>
             Get<MapObject>(value, value.Kind).Instance?.Class ?? WebLingoValue.Null,
@@ -676,9 +679,64 @@ public sealed class WebLingoHeap
     public void MarkClassClass(WebLingoValue classValue)
     {
         var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
-        target.Sealed = true;
         target.IsValueClass = true;
         target.MakesClasses = true;
+        target.Makes = WebLingoValueKind.Class; // A class extending it, a metaclass, makes classes (section 3.7).
+    }
+
+    /// <summary>
+    /// A new instance of a metaclass, a class extending <c>Class</c>: a class, unnamed and extending <c>Object</c> until
+    /// its constructor's <c>super(name, base)</c> runs (<see cref="TryShapeClass"/>), whose class is the metaclass
+    /// (section 3.7).
+    /// </summary>
+    private bool TryAllocateMetaclassInstance(WebLingoValue metaclass, out WebLingoValue made, out WebLingoRuntimeError? error)
+    {
+        if (!TryAllocateClass("", WebLingoValue.Null, new Dictionary<string, WebLingoValue>(StringComparer.Ordinal), ObjectClass, out made,
+                out error, defaultConstructor: true))
+        {
+            return false;
+        }
+        Get<ClassObject>(made, WebLingoValueKind.Class).Metaclass = metaclass;
+        return true;
+    }
+
+    /// <summary>
+    /// <c>Class</c>'s constructor's <c>hold(this, [name, base])</c>: the class a metaclass made named, a string, or
+    /// unnamed for <c>null</c>, and extending the base given, a class, or <c>Object</c> for <c>null</c> (WL3001 otherwise,
+    /// and for a base that is the class itself, or extends it).
+    /// </summary>
+    private bool TryShapeClass(WebLingoValue classValue, WebLingoValue shape, out WebLingoRuntimeError? error)
+    {
+        var parts = GetArray(shape);
+        var (name, baseClass) = (parts[0], parts[1]);
+        error = null;
+        if (name.Kind is not (WebLingoValueKind.Null or WebLingoValueKind.String))
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"A class's name is a string, not {WebLingoValueFormatter.Describe(name, this)}.");
+            return false;
+        }
+        if (baseClass.Kind == WebLingoValueKind.Null) baseClass = ObjectClass;
+        if (baseClass.Kind != WebLingoValueKind.Class || Get<ClassObject>(baseClass, WebLingoValueKind.Class).Sealed)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"{Capitalized(WebLingoValueFormatter.Describe(baseClass, this))} cannot be extended.");
+            return false;
+        }
+        for (var current = baseClass; current.Kind == WebLingoValueKind.Class; current = Get<ClassObject>(current, WebLingoValueKind.Class).Base)
+        {
+            if (current != classValue) continue;
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "A class cannot extend itself.");
+            return false;
+        }
+        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        var baseObject = Get<ClassObject>(baseClass, WebLingoValueKind.Class);
+        target.Name = name.Kind == WebLingoValueKind.String ? GetString(name) : "";
+        target.Base = baseClass;
+        target.Makes = baseObject.Makes;
+        target.Holds = baseObject.Holds;
+        _classVersion++;
+        return true;
     }
 
     /// <summary>
@@ -762,6 +820,7 @@ public sealed class WebLingoHeap
                 TryAllocate(new ArrayObject([]) { Instance = own }, WebLingoValueKind.Array, 0, out instance, out error, own is not null),
             WebLingoValueKind.Map or WebLingoValueKind.Set =>
                 TryAllocate(new MapObject { Instance = own }, classObject.Makes, 0, out instance, out error, own is not null),
+            WebLingoValueKind.Class => TryAllocateMetaclassInstance(classValue, out instance, out error),
             _ => TryAllocate(new InstanceObject(classValue) { Holds = classObject.Holds != WebLingoValueKind.Null },
                 WebLingoValueKind.Instance, 0, out instance, out error)
         };
@@ -975,6 +1034,7 @@ public sealed class WebLingoHeap
                     break;
                 case ClassObject classObject:
                     Mark(classObject.Base, marked, pending);
+                    Mark(classObject.Metaclass, marked, pending);
                     Mark(classObject.Constructor, marked, pending);
                     foreach (var method in classObject.Methods.Values) Mark(method, marked, pending);
                     foreach (var method in classObject.OwnMethods.Values) Mark(method, marked, pending);
@@ -1137,7 +1197,7 @@ public sealed class WebLingoHeap
         public WebLingoValue Constructor { get; set; } = Constructor;
         /// <summary>Its name, empty for an unnamed class, which <c>__className</c> may change while the program runs.</summary>
         public string Name { get; set; } = Name;
-        public WebLingoValue Base { get; init; }
+        public WebLingoValue Base { get; set; }
         public Dictionary<string, WebLingoValue> OwnMethods { get; init; } = new(StringComparer.Ordinal);
         public int Version { get; set; }
         public WebLingoValue[] DisposeChain { get; set; } = [];
@@ -1159,6 +1219,8 @@ public sealed class WebLingoHeap
         public bool MakesClasses { get; set; }
         /// <summary>Its static fields that are constants, which cannot be assigned; null for none (section 3.7).</summary>
         public HashSet<string>? Constants { get; set; }
+        /// <summary>For a class a metaclass made, that metaclass, its class; null for any other (section 3.7).</summary>
+        public WebLingoValue Metaclass { get; set; }
         /// <summary>Its properties' getters and setters, its own and its bases', by the property's name; null for none (section 3.7).</summary>
         public Dictionary<string, WebLingoValue>? Getters { get; set; }
         public Dictionary<string, WebLingoValue>? Setters { get; set; }
