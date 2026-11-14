@@ -2,16 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [DONE] M0.10 Syntax: Disposal That Throws
-
-Asked again: A5 of "M0.10 Syntax: `toString()` and Disposal That Throws" was left as "(". Until it is answered, the disposal goes on, (a), as M0.10.6 implemented it (`WsExceptions.DisposalGoesOn`). Added by Claude, 2026-11-13.
-
-Q1, disposal that throws: when B's `dispose()` throws while an instance of B is disposed, (a) A's `dispose()` still runs, as section 3.4 proposes, and an exception it throws replaces B's, as A13 has it for `using`; (b) A's does not run, and B's exception goes on.
-
-A1: (a).
-
-Done (Claude, 2026-11-13): recorded as approved in the specification, section 3.7 ("Disposal that throws"), its decision register and section 10's open question 4; the code already does this (`WsExceptions.DisposalGoesOn`), whose comment now says so.
-
 ## [QUESTION] Typed Catches Syntax: Classes of Values
 
 Follow-ups to "Typed Catches": A4 asks whether every value can be an instance of a class, such as `Integer`. It can: each kind of value gets a built-in class, which `is` and a typed catch test by the value's kind, with nothing stored in the value and nothing slower. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
