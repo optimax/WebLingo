@@ -172,6 +172,11 @@ public enum WsOpCode : byte
     /// members, their closures made as their captures say, an extension's (section 3.7).
     /// </summary>
     Extend,
+    /// <summary>
+    /// A = destination, given null, B = an instance of a class that holds a value, C = the value, which it holds, of its
+    /// class's kind (WS3001 otherwise): the built-in classes' constructors' (section 3.7).
+    /// </summary>
+    Hold,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
@@ -240,6 +245,12 @@ public sealed record WsClassInfo(string Name, int Constructor, IReadOnlyList<WsC
 
     /// <summary>The names of its static fields, which exist, as <c>null</c>, from when it is made.</summary>
     public IReadOnlyList<string> StaticFields { get; init; } = [];
+
+    /// <summary>
+    /// Whether its constructor is the one a class that declares none gets, which only runs its base's, and which a
+    /// class holding a value passes over, its arguments going on to its base's (section 3.7).
+    /// </summary>
+    public bool DefaultConstructor { get; init; }
 }
 
 /// <summary>A class of a module's that a runtime error of a code becomes, when a handler catches it (section 3.7).</summary>

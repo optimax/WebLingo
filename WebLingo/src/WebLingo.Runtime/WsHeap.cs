@@ -160,6 +160,138 @@ public sealed class WsHeap
         return target;
     }
 
+    /// <summary>
+    /// Marks a class as a kind of value's, <c>Boolean</c>'s, <c>Integer</c>'s, <c>Number</c>'s or <c>String</c>'s
+    /// (section 3.7): <c>new</c> on it makes a plain value, and a class that extends it makes instances that hold one.
+    /// </summary>
+    public void MarkValueClass(WsValue classValue, WsValueKind kind)
+    {
+        var target = Get<ClassObject>(classValue, WsValueKind.Class);
+        target.Holds = kind;
+        target.IsValueClass = true;
+    }
+
+    /// <summary>Whether a class is a kind of value's itself, <c>Integer</c> for example, whose <c>new</c> makes a plain value.</summary>
+    public bool IsValueClass(WsValue classValue) => Get<ClassObject>(classValue, WsValueKind.Class).IsValueClass;
+
+    /// <summary>Whether a value is an instance of a class extending a kind of value, which holds one (section 3.7).</summary>
+    public bool IsHolding(WsValue value) => value.Kind == WsValueKind.Instance && Get<InstanceObject>(value, WsValueKind.Instance).Holds;
+
+    /// <summary>The value an instance of a class extending a kind of value holds; any other value itself.</summary>
+    public WsValue Held(WsValue value) =>
+        value.Kind == WsValueKind.Instance && Get<InstanceObject>(value, WsValueKind.Instance) is { Holds: true } holding
+            ? holding.Value
+            : value;
+
+    /// <summary>
+    /// <c>hold(this, value)</c>, the built-in classes' constructors': the instance holds the value, which must be of its
+    /// class's kind, a number given to a class extending <c>Number</c> as a binary64 (WS3001 otherwise).
+    /// </summary>
+    public bool TrySetHeld(WsValue instance, WsValue value, out WsRuntimeError? error)
+    {
+        error = null;
+        if (!IsHolding(instance))
+        {
+            error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                $"{Capitalized(WsValueFormatter.Describe(instance, this))} cannot hold a value.");
+            return false;
+        }
+        var target = Get<InstanceObject>(instance, WsValueKind.Instance);
+        var classObject = Get<ClassObject>(target.Class, WsValueKind.Class);
+        if (!TryOfKind(classObject.Holds, classObject.Name, Held(value), out var held, out error)) return false;
+        target.Value = held;
+        return true;
+    }
+
+    /// <summary>
+    /// <c>new Integer(42)</c>, <c>new Integer()</c> and the like: a plain value, the one given, or its kind's first (0,
+    /// 0.0, <c>""</c>, <c>false</c>), not an instance (section 3.7).
+    /// </summary>
+    public bool TryMakeValue(WsValue classValue, WsValue[] values, int first, int count, out WsValue result,
+        out WsRuntimeError? error)
+    {
+        // The result may go where the argument is, so the argument is read before the result is written.
+        var classObject = Get<ClassObject>(classValue, WsValueKind.Class);
+        if (count == 1) return TryOfKind(classObject.Holds, classObject.Name, Held(values[first]), out result, out error);
+        result = WsValue.Null;
+        if (count > 1)
+        {
+            error = new WsRuntimeError(WsDiagnosticCodes.WrongArgumentCount,
+                $"'{classObject.Name}' takes 0 to 1 arguments, not {count}.");
+            return false;
+        }
+        error = null;
+        switch (classObject.Holds)
+        {
+            case WsValueKind.Boolean:
+                result = WsValue.FromBoolean(false);
+                return true;
+            case WsValueKind.Int64:
+                result = WsValue.FromInt64(0);
+                return true;
+            case WsValueKind.Binary64:
+                result = WsValue.FromBinary64(0.0);
+                return true;
+            default:
+                return TryAllocateString("", out result, out error);
+        }
+    }
+
+    /// <summary>A value as a class holding the kind given holds it: of that kind, an int64 a binary64 for <c>Number</c>.</summary>
+    private bool TryOfKind(WsValueKind kind, string className, WsValue value, out WsValue result, out WsRuntimeError? error)
+    {
+        error = null;
+        result = kind == WsValueKind.Binary64 && value.Kind == WsValueKind.Int64 ? WsValue.FromBinary64(value.AsInt64) : value;
+        if (result.Kind == kind) return true;
+        error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+            $"The class {className} holds {KindName(kind)}, not {WsValueFormatter.Describe(value, this)}.");
+        result = WsValue.Null;
+        return false;
+    }
+
+    private static string KindName(WsValueKind kind) => kind switch
+    {
+        WsValueKind.Boolean => "a Boolean",
+        WsValueKind.Int64 => "an integer",
+        WsValueKind.Binary64 => "a number",
+        _ => "a string"
+    };
+
+    /// <summary>
+    /// Arithmetic's result on an instance holding a value (section 3.7): a new instance of its class, holding the
+    /// result, its constructor not run, with its fields, copied.
+    /// </summary>
+    public bool TryHoldAnew(WsValue source, WsValue value, out WsValue result, out WsRuntimeError? error)
+    {
+        var from = Get<InstanceObject>(source, WsValueKind.Instance);
+        var made = new InstanceObject(from.Class) { Holds = true, Value = value };
+        for (var i = 0; i < from.Count; i++)
+        {
+            var (name, field) = from.At(i);
+            made.Set(name, field);
+        }
+        return TryAllocate(made, WsValueKind.Instance, made.Count, out result, out error);
+    }
+
+    /// <summary>The kind of value a class extending a kind of value holds, or null's for any other class.</summary>
+    public WsValueKind HeldKind(WsValue instance) =>
+        Get<ClassObject>(Get<InstanceObject>(instance, WsValueKind.Instance).Class, WsValueKind.Class).Holds;
+
+    /// <summary>
+    /// The constructor <c>new</c> runs: the class's own; but a class holding a value whose constructor is the one a class
+    /// declaring none gets passes its arguments on to its base's, as such a class does (section 3.7).
+    /// </summary>
+    public WsValue ConstructorFor(WsValue classValue)
+    {
+        var target = Get<ClassObject>(classValue, WsValueKind.Class);
+        if (target.Holds == WsValueKind.Null) return target.Constructor;
+        while (target.DefaultConstructor && target.Base.Kind == WsValueKind.Class)
+        {
+            target = Get<ClassObject>(target.Base, WsValueKind.Class);
+        }
+        return target.Constructor;
+    }
+
     public void MarkCollectionClass(WsValue classValue, WsValueKind kind)
     {
         var target = Get<ClassObject>(classValue, WsValueKind.Class);
@@ -305,10 +437,11 @@ public sealed class WsHeap
     /// </summary>
     public bool TryAllocateClass(string name, WsValue constructor, Dictionary<string, WsValue> methods, WsValue baseClass,
         out WsValue value, out WsRuntimeError? error, Dictionary<string, WsValue>? staticMethods = null,
-        IReadOnlyList<string>? staticFields = null)
+        IReadOnlyList<string>? staticFields = null, bool defaultConstructor = false)
     {
         value = WsValue.Null;
         var makes = WsValueKind.Instance;
+        var holds = WsValueKind.Null;
         if (baseClass.Kind != WsValueKind.Null)
         {
             if (baseClass.Kind != WsValueKind.Class)
@@ -324,6 +457,7 @@ public sealed class WsHeap
                 return false;
             }
             makes = baseObject.Makes;
+            holds = baseObject.Holds;
         }
         var fields = new Dictionary<string, WsValue>(StringComparer.Ordinal);
         if (staticFields is not null)
@@ -335,6 +469,8 @@ public sealed class WsHeap
             Base = baseClass,
             OwnMethods = new Dictionary<string, WsValue>(methods, StringComparer.Ordinal),
             Makes = makes,
+            Holds = holds,
+            DefaultConstructor = defaultConstructor,
             StaticMethods = staticMethods ?? new Dictionary<string, WsValue>(StringComparer.Ordinal),
             StaticFields = fields
         };
@@ -425,7 +561,8 @@ public sealed class WsHeap
                 TryAllocate(new ArrayObject([]) { Instance = own }, WsValueKind.Array, 0, out instance, out error, own is not null),
             WsValueKind.Map or WsValueKind.Set =>
                 TryAllocate(new MapObject { Instance = own }, classObject.Makes, 0, out instance, out error, own is not null),
-            _ => TryAllocate(new InstanceObject(classValue), WsValueKind.Instance, 0, out instance, out error)
+            _ => TryAllocate(new InstanceObject(classValue) { Holds = classObject.Holds != WsValueKind.Null },
+                WsValueKind.Instance, 0, out instance, out error)
         };
     }
 
@@ -646,6 +783,7 @@ public sealed class WsHeap
                     break;
                 case InstanceObject instance:
                     Mark(instance.Class, marked, pending);
+                    Mark(instance.Value, marked, pending);
                     for (var i = 0; i < instance.Count; i++) Mark(instance.At(i).Value, marked, pending);
                     break;
                 case WsTask task:
@@ -799,6 +937,12 @@ public sealed class WsHeap
         public WsValueKind Makes { get; set; } = WsValueKind.Instance;
         /// <summary>Whether it is Array, Map or Set itself, whose <c>new</c> makes a plain collection.</summary>
         public bool IsCollectionClass { get; set; }
+        /// <summary>The kind of value its instances hold, a class extending Boolean, Integer, Number or String, or null's.</summary>
+        public WsValueKind Holds { get; set; } = WsValueKind.Null;
+        /// <summary>Whether it is Boolean, Integer, Number or String itself, whose <c>new</c> makes a plain value.</summary>
+        public bool IsValueClass { get; set; }
+        /// <summary>Whether its constructor is the one a class declaring none gets, which only runs its base's.</summary>
+        public bool DefaultConstructor { get; init; }
         public Dictionary<string, WsValue> StaticMethods { get; init; } = new(StringComparer.Ordinal);
         public Dictionary<string, WsValue> StaticFields { get; init; } = new(StringComparer.Ordinal);
     }
@@ -817,6 +961,9 @@ public sealed class WsHeap
 
         public WsValue Class { get; } = classValue;
         public int Count => _fields.Count;
+        /// <summary>Whether it holds a value, as an instance of a class extending a kind of value does, and which (section 3.7).</summary>
+        public bool Holds { get; init; }
+        public WsValue Value { get; set; }
         /// <summary>Whether its disposal has begun, which runs at most once (section 3.7).</summary>
         public bool Disposed { get; set; }
 

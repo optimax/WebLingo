@@ -20,6 +20,7 @@ public static class WsValueFormatter
         return value.Kind switch
         {
             WsValueKind.String => heap.GetString(value),
+            WsValueKind.Instance when heap.IsHolding(value) => Held(value, heap),
             WsValueKind.Array or WsValueKind.Map or WsValueKind.Set or WsValueKind.Instance => FormatCollection(value, heap),
             WsValueKind.Class => "class " + heap.ClassName(value),
             _ => Format(value)
@@ -150,7 +151,7 @@ public static class WsValueFormatter
             {
                 item = collection.Kind == WsValueKind.Set ? heap.SetValueAt(collection, next) : heap.GetArray(collection)[next];
             }
-            if (item.Kind is WsValueKind.Array or WsValueKind.Map or WsValueKind.Set or WsValueKind.Instance)
+            if (item.Kind is WsValueKind.Array or WsValueKind.Map or WsValueKind.Set or WsValueKind.Instance && !heap.IsHolding(item))
             {
                 if (open.Contains(item.Handle))
                 {
@@ -196,8 +197,15 @@ public static class WsValueFormatter
             : "";
 
     /// <summary>A value in a collection that is not a collection itself: a string quoted, anything else as written.</summary>
-    private static string Scalar(WsValue value, WsHeap heap) =>
+    internal static string Scalar(WsValue value, WsHeap heap) =>
         value.Kind == WsValueKind.String ? Quote(heap.GetString(value)) : Format(value, heap);
+
+    /// <summary>
+    /// An instance of a class extending a kind of value: its class's name, a colon, and the value it held, as a
+    /// collection writes it, <c>Celsius:21.5</c>, <c>Name:"Ann"</c> (section 3.7).
+    /// </summary>
+    internal static string Held(WsValue value, WsHeap heap) =>
+        heap.ClassName(heap.ClassOf(value)) + ":" + Scalar(heap.Held(value), heap);
 
     private static string FormatBinary64(double value)
     {

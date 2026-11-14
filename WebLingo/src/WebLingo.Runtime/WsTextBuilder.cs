@@ -58,6 +58,11 @@ public sealed class WsTextBuilder
                         instance = _value;
                         return false;
                     }
+                    if (_heap.IsHolding(_value))
+                    {
+                        _text.Append(WsValueFormatter.Held(_value, _heap));
+                        return true;
+                    }
                     Open(_value);
                     break;
                 default:
@@ -121,6 +126,11 @@ public sealed class WsTextBuilder
             {
                 instance = item;
                 return false;
+            }
+            if (_heap.IsHolding(item))
+            {
+                _text.Append(WsValueFormatter.Held(item, _heap));
+                continue;
             }
             Open(item);
         }

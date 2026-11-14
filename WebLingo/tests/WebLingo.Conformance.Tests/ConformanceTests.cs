@@ -359,6 +359,14 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("{ var k = 10; extend Integer { plusK() { return this + k; } } writeLn(1.plusK()); }", "11")]
     [InlineData("extend Integer { isPositive() { return this > 0; } static zero() { return 0; } } writeLn([4.isPositive(), (0 - 3).isPositive(), Integer.zero()]); var f = 4.isPositive; writeLn(f());", "[true, false, 0]\ntrue")]
     [InlineData("class P {} extend P { equal(o) { return true; } } writeLn(new P().equal(1)); try { throw 5; } catch (P e) { writeLn(\"not caught here\"); } catch (e) { writeLn(e); }", "true\n5")]
+    [InlineData("class Celsius extends Number { warm() { return this > 20; } } var c = new Celsius(21.5); writeLn([c, c + 1, 1 + c, -c, c * 2]); writeLn([c is Number, c is Celsius, 21.5 is Celsius, c.warm(), c == 21.5, c < 22]);", "[Celsius:21.5, Celsius:22.5, Celsius:22.5, Celsius:-21.5, Celsius:43.0]\n[true, true, false, true, true, true]")]
+    [InlineData("writeLn([new Number(5), new Integer(), new Integer(42), new Boolean(), new Boolean(true)]); writeLn(new String() == \"\"); writeLn(new Integer(42) is Integer);", "[5.0, 0, 42, false, true]\ntrue\ntrue")]
+    [InlineData("class Name extends String { shout() { return this + \"!\"; } } var n = new Name(\"Ann\"); writeLn(n); writeLn([n.length, n[0], n.shout()]); foreach (var ch in n) write(ch); writeLn(null);", "Name:\"Ann\"\n[3, \"A\", Name:\"Ann!\"]\nAnnnull")]
+    [InlineData("class Flag extends Boolean {} var f = new Flag(true); if (f) writeLn(\"on\"); writeLn([!f, f && true, f == true]); while (new Flag()) { writeLn(\"never\"); }", "on\n[false, true, true]")]
+    [InlineData("class Count extends Integer { constructor(n) { super(n * 2); this.label = \"x\"; } } var k = new Count(3); writeLn([k, k + 1, (k + 1).label, k / 4, k - k]);", "[Count:6, Count:7, \"x\", 1.5, Count:0]")]
+    [InlineData("class Celsius extends Number {} class Hot extends Celsius {} writeLn([new Hot(40), new Celsius(), new Hot(1) + new Celsius(2)]);", "[Hot:40.0, Celsius:0.0, Hot:3.0]")]
+    [InlineData("class C extends Number { toString() { return \"C\" + super.toString(); } } writeLn(new C(1)); writeLn(new C(2).toString());", "CC:1.0\nCC:2.0")]
+    [InlineData("class Celsius extends Number {} extend Celsius { f() { return this * 9 / 5 + 32; } } writeLn(new Celsius(100).f());", "Celsius:212.0")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -448,8 +456,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("try { var a = []; a[1]; } catch (e) { throw; }", "WS3005")]
     [InlineData("class Bad { toString() { return 5; } } writeLn(new Bad());", "WS3001")]
     [InlineData("class Bad { toString(x) { return \"\"; } } writeLn([new Bad()]);", "WS2006")]
-    [InlineData("class X extends Integer {}", "WS3001")]
-    [InlineData("var s = new String();", "WS3001")]
+    [InlineData("class X extends Function {}", "WS3001")]
     [InlineData("class Bad { equal(o) { return 1; } } var B = new Bad(); try { throw 1; } catch (B e) {}", "WS3001")]
     [InlineData("try { throw 1; } catch (String e) {}", "WS3008")]
     [InlineData("var f = function (a, b = 1) {}; f();", "WS2006")]
@@ -500,6 +507,12 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var x = 5; { extend x { m() {} } }", "WS3001")]
     [InlineData("extend Object { d() { return 1; } } null.d();", "WS3006")]
     [InlineData("extend Integer { m() { return 1; } } \"s\".m();", "WS3006")]
+    [InlineData("var s = new String(5);", "WS3001")]
+    [InlineData("new Integer(1.5);", "WS3001")]
+    [InlineData("new Integer(1, 2);", "WS2006")]
+    [InlineData("class Count extends Integer {} var k = new Count(2.5);", "WS3001")]
+    [InlineData("class Flag extends Boolean {} writeLn(new Flag(true) + 1);", "WS3001")]
+    [InlineData("class N extends Number {} var m = {}; m[new N(1)] = 1;", "WS3001")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

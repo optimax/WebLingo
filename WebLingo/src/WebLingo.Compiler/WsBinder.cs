@@ -433,7 +433,8 @@ public sealed class WsBinder
         var members = new List<WsMethodSyntax>();
         var staticSyntax = new List<WsMethodSyntax>();
         foreach (var member in declaration.Methods) (member.IsStatic ? staticSyntax : members).Add(member);
-        if (!members.Exists(member => member.Name == "constructor"))
+        var defaultConstructor = !members.Exists(member => member.Name == "constructor");
+        if (defaultConstructor)
         {
             var span = new WsSourceSpan(declaration.Span.Start, 0);
             members.Insert(0, new WsMethodSyntax("constructor", span, [], new WsBlockSyntax([], span), span));
@@ -501,7 +502,8 @@ public sealed class WsBinder
         {
             Base = baseClass,
             StaticMethods = staticMethods,
-            StaticFields = fields
+            StaticFields = fields,
+            DefaultConstructor = defaultConstructor
         };
     }
 
@@ -831,6 +833,10 @@ public sealed class WsBinder
         {
             return new WsBoundToText(arguments[0], call.Span);
         }
+        if (_inPrelude && calleeSyntax is WsNameSyntax { Name: "hold" } && arguments.Count == 2)
+        {
+            return new WsBoundHold(arguments[0], arguments[1], call.Span);
+        }
         if (calleeSyntax is WsSuperSyntax)
         {
             if (_class is { InConstructor: false, InExtension: false })
@@ -927,7 +933,7 @@ public sealed class WsBinder
         {
             if (builtin == name) return declaration.Local; // UseError() makes every runtime error's class.
         }
-        return BindBuiltinClass(name, WsPrelude.Source(name), baseLocal);
+        return BindBuiltinClass(name, WsPrelude.Source(name), baseLocal, inPrelude: true);
     }
 
     /// <summary>Binds a built-in class from its source, extending <paramref name="baseLocal"/>, or nothing if null.</summary>

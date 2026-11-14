@@ -241,6 +241,7 @@ public sealed class WsStackBytecodeVerifier
             case WsStackOpCode.ToText:
             case WsStackOpCode.IsInstance:
             case WsStackOpCode.Await:
+            case WsStackOpCode.Hold:
                 return Unused(a, b);
             case WsStackOpCode.GetIndex:
                 return (a is 0 or 1 ? null : $"its A is {a}, not 0 or 1.") ?? Unused(b);
@@ -413,6 +414,7 @@ public sealed class WsStackBytecodeVerifier
         WsStackOpCode.GetSuper => (2, 1),
         WsStackOpCode.Dispose => (1, 0),
         WsStackOpCode.Extend => (1, 0),
+        WsStackOpCode.Hold => (2, 1),
         WsStackOpCode.Throw => (1, 0),
         WsStackOpCode.Rethrow => (2, 0),
         WsStackOpCode.ToText => (1, 1),

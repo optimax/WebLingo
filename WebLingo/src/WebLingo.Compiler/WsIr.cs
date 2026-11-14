@@ -38,6 +38,9 @@ public sealed record WsIrClass(string Name, int Constructor, IReadOnlyList<(stri
 
     /// <summary>The names of its static fields, which exist, as <c>null</c>, from when it is made.</summary>
     public IReadOnlyList<string> StaticFields { get; init; } = [];
+
+    /// <summary>Whether its constructor is the one a class that declares none gets, which only runs its base's.</summary>
+    public bool DefaultConstructor { get; init; }
 }
 
 /// <summary>Where a closure's capture comes from: a local of the function making it, or one of that one's captures.</summary>
@@ -180,6 +183,9 @@ public sealed record WsIrIs(WsIrExpression Value, WsIrExpression Class, WsSource
 
 /// <summary>The text of a value, an instance as its fields, as <c>Object</c>'s <c>toString()</c> gives it (section 3.7).</summary>
 public sealed record WsIrToText(WsIrExpression Value, WsSourceSpan Span) : WsIrExpression(Span);
+
+/// <summary>An instance holding a value, of its class's kind; gives null (section 3.7).</summary>
+public sealed record WsIrHold(WsIrExpression Instance, WsIrExpression Value, WsSourceSpan Span) : WsIrExpression(Span);
 
 public sealed record WsIrBinary(WsBinaryOperator Operator, WsIrExpression Left, WsIrExpression Right, WsSourceSpan Span)
     : WsIrExpression(Span);

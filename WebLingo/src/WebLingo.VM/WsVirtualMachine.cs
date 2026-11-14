@@ -243,14 +243,14 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             continue;
                         case WsOpCode.Negate:
                         {
-                            if (!WsOperators.TryNegate(registers[ins.B], out var negated, out error)) break;
+                            if (!WsOperators.TryNegate(registers[ins.B], heap, out var negated, out error)) break;
                             registers[ins.A] = negated;
                             pc++;
                             continue;
                         }
                         case WsOpCode.Plus:
                         {
-                            if (!WsOperators.TryPlus(registers[ins.B], out var same, out error)) break;
+                            if (!WsOperators.TryPlus(registers[ins.B], heap, out var same, out error)) break;
                             registers[ins.A] = same;
                             pc++;
                             continue;
@@ -305,7 +305,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             continue;
                         case WsOpCode.Not:
                         {
-                            if (!WsOperators.TryNot(registers[ins.B], out var not, out error)) break;
+                            if (!WsOperators.TryNot(heap.Held(registers[ins.B]), out var not, out error)) break;
                             registers[ins.A] = not;
                             pc++;
                             continue;
@@ -315,8 +315,13 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             var condition = registers[ins.A];
                             if (condition.Kind != WsValueKind.Boolean)
                             {
-                                error = WsOperators.CheckBoolean(condition, "A condition");
-                                break;
+                                // A Boolean an instance holds is its condition (section 3.7).
+                                condition = heap.Held(condition);
+                                if (condition.Kind != WsValueKind.Boolean)
+                                {
+                                    error = WsOperators.CheckBoolean(condition, "A condition");
+                                    break;
+                                }
                             }
                             pc = condition.AsBoolean ? pc + 1 : ins.B;
                             continue;
@@ -334,16 +339,20 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             var condition = registers[ins.A];
                             if (condition.Kind != WsValueKind.Boolean)
                             {
-                                error = WsOperators.CheckBoolean(condition, "A condition");
-                                break;
+                                condition = heap.Held(condition);
+                                if (condition.Kind != WsValueKind.Boolean)
+                                {
+                                    error = WsOperators.CheckBoolean(condition, "A condition");
+                                    break;
+                                }
                             }
                             pc = condition.AsBoolean ? ins.B : pc + 1;
                             continue;
                         }
                         case WsOpCode.CheckBoolean:
-                            if (registers[ins.A].Kind != WsValueKind.Boolean)
+                            if (registers[ins.A].Kind != WsValueKind.Boolean && heap.Held(registers[ins.A]).Kind != WsValueKind.Boolean)
                             {
-                                error = WsOperators.CheckBoolean(registers[ins.A], "'&&' and '||' need Booleans:");
+                                error = WsOperators.CheckBoolean(heap.Held(registers[ins.A]), "'&&' and '||' need Booleans:");
                                 break;
                             }
                             pc++;
@@ -509,6 +518,12 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             pc++;
                             continue;
                         }
+                        case WsOpCode.Hold:
+                            // hold(this, value): the built-in classes' constructors' (section 3.7).
+                            if (!heap.TrySetHeld(registers[ins.B], registers[ins.C], out error)) break;
+                            registers[ins.A] = WsValue.Null;
+                            pc++;
+                            continue;
                         case WsOpCode.Extend:
                             // extend: the class given its extension's methods and static members (section 3.7).
                             if (!TryExtendClass(module.Classes[ins.B], registers[ins.A], registers, cells, out error)) break;
@@ -536,8 +551,15 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                                     $"{Capitalized(WsValueFormatter.Describe(classValue, heap))} is not a class, and cannot be made with 'new'.");
                                 break;
                             }
+                            if (heap.IsValueClass(classValue))
+                            {
+                                // new Integer(42) is 42, and new Integer() 0 (section 3.7).
+                                if (!heap.TryMakeValue(classValue, registers, ins.C, ins.D, out registers[ins.A], out error)) break;
+                                pc++;
+                                continue;
+                            }
                             if (!heap.TryAllocateInstance(classValue, out var instance, out error)) break;
-                            callee = heap.ClassConstructor(classValue);
+                            callee = heap.ConstructorFor(classValue);
                             if (callee.Kind == WsValueKind.Null)
                             {
                                 if (ins.D != 0)
@@ -1536,10 +1558,15 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             {
                 if (module.ValueClasses[i] != index) continue;
                 _valueClasses[i] = made;
-                // Array, Map and Set make collections, and classes extend them; the others, for now, neither (section 3.7).
+                // Array, Map and Set make collections, and classes extend them; Boolean, Integer, Number and String make
+                // plain values, and classes extending them hold one; the others, for now, neither (section 3.7).
                 if (i == (int)WsValueClass.Array) heap.MarkCollectionClass(made, WsValueKind.Array);
                 else if (i == (int)WsValueClass.Map) heap.MarkCollectionClass(made, WsValueKind.Map);
                 else if (i == (int)WsValueClass.Set) heap.MarkCollectionClass(made, WsValueKind.Set);
+                else if (i == (int)WsValueClass.Boolean) heap.MarkValueClass(made, WsValueKind.Boolean);
+                else if (i == (int)WsValueClass.Integer) heap.MarkValueClass(made, WsValueKind.Int64);
+                else if (i == (int)WsValueClass.Number) heap.MarkValueClass(made, WsValueKind.Binary64);
+                else if (i == (int)WsValueClass.String) heap.MarkValueClass(made, WsValueKind.String);
                 else heap.SealClass(made);
             }
             for (var i = 0; i < module.ErrorClasses.Count; i++)
@@ -1711,7 +1738,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                     statics.Add(info.StaticMethods[i].Name, closures[slot]);
                 }
                 return heap.TryAllocateClass(info.Name, closures[0], methods, baseClass, out made, out error, statics,
-                    info.StaticFields);
+                    info.StaticFields, info.DefaultConstructor);
             }
             finally
             {

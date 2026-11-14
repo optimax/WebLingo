@@ -400,6 +400,16 @@ public sealed class WsCodeGenerator
                 Emit(new WsInstruction(WsOpCode.ToText, destination, operand), text.Span);
                 return destination;
             }
+            case WsIrHold hold:
+            {
+                var mark = _nextRegister;
+                var instance = EmitExpression(hold.Instance, null);
+                var value = EmitExpression(hold.Value, null);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WsInstruction(WsOpCode.Hold, destination, instance, value), hold.Span);
+                return destination;
+            }
             case WsIrUnary unary:
             {
                 var mark = _nextRegister;
@@ -596,6 +606,7 @@ public sealed class WsCodeGenerator
         WsIrStoreLocal store => store.Local == local || Assigns(store.Value, local),
         WsIrUnary unary => Assigns(unary.Operand, local),
         WsIrToText text => Assigns(text.Value, local),
+        WsIrHold hold => Assigns(hold.Instance, local) || Assigns(hold.Value, local),
         WsIrAwait awaited => Assigns(awaited.Value, local),
         WsIrIs test => Assigns(test.Value, local) || Assigns(test.Class, local),
         WsIrBinary binary => Assigns(binary.Left, local) || Assigns(binary.Right, local),

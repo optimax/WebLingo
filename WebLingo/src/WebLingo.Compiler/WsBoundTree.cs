@@ -66,6 +66,9 @@ public sealed record WsBoundClass(
     /// <summary>The class it extends, evaluated when it is made, or null.</summary>
     public WsBoundExpression? Base { get; init; }
 
+    /// <summary>Whether its constructor is the one a class that declares none gets, which only runs its base's.</summary>
+    public bool DefaultConstructor { get; init; }
+
     /// <summary>Its static methods, functions without <c>this</c> (section 3.7).</summary>
     public IReadOnlyList<(string Name, WsBoundFunction Function)> StaticMethods { get; init; } = [];
 
@@ -165,6 +168,9 @@ public sealed record WsBoundAwait(WsBoundExpression Value, WsSourceSpan Span) : 
 public sealed record WsBoundIs(WsBoundExpression Value, WsBoundExpression Class, WsSourceSpan Span) : WsBoundExpression(Span);
 
 public sealed record WsBoundToText(WsBoundExpression Value, WsSourceSpan Span) : WsBoundExpression(Span);
+
+/// <summary>The built-in classes' <c>hold(this, value)</c>: the instance holds the value, of its class's kind (section 3.7).</summary>
+public sealed record WsBoundHold(WsBoundExpression Instance, WsBoundExpression Value, WsSourceSpan Span) : WsBoundExpression(Span);
 
 public sealed record WsBoundUnary(WsUnaryOperator Operator, WsBoundExpression Operand, WsSourceSpan Span)
     : WsBoundExpression(Span);

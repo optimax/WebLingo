@@ -189,6 +189,9 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             case WsOpCode.IsInstance:
                 return Register(function, a, "destination") ?? Register(function, b, "value") ?? Register(function, c, "class")
                     ?? Unused(d);
+            case WsOpCode.Hold:
+                return Register(function, a, "destination") ?? Register(function, b, "instance") ?? Register(function, c, "value")
+                    ?? Unused(d);
             case WsOpCode.StoreCell:
                 return Register(function, a, "cell") ?? Register(function, b, "source") ?? Unused(c, d);
             case WsOpCode.LoadCapture:
@@ -526,6 +529,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return exception >= 0 ? exception : Unwritten(instruction.B, state, locals);
             }
             case WsOpCode.IsInstance:
+            case WsOpCode.Hold:
             {
                 var value = Unwritten(instruction.B, state, locals);
                 return value >= 0 ? value : Unwritten(instruction.C, state, locals);
@@ -648,7 +652,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
 
     private static int? Writes(WsInstruction instruction) => instruction.OpCode switch
     {
-        WsOpCode.LoadConstant or WsOpCode.Move or WsOpCode.Negate or WsOpCode.Plus or WsOpCode.ToText or WsOpCode.IsInstance or WsOpCode.Await or WsOpCode.Add or WsOpCode.Subtract
+        WsOpCode.LoadConstant or WsOpCode.Move or WsOpCode.Negate or WsOpCode.Plus or WsOpCode.ToText or WsOpCode.IsInstance or WsOpCode.Hold or WsOpCode.Await or WsOpCode.Add or WsOpCode.Subtract
             or WsOpCode.Multiply or WsOpCode.Divide or WsOpCode.CallBuiltin or WsOpCode.LoadNull or WsOpCode.LoadBoolean
             or WsOpCode.Not or WsOpCode.Equal or WsOpCode.NotEqual or WsOpCode.Less or WsOpCode.LessOrEqual
             or WsOpCode.Greater or WsOpCode.GreaterOrEqual or WsOpCode.NewCell or WsOpCode.BoxRegister or WsOpCode.CopyCell

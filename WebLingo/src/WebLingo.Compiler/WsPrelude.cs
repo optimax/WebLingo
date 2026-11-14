@@ -42,8 +42,17 @@ internal static class WsPrelude
         return false;
     }
 
-    /// <summary>A built-in class's source: a kind of value's, empty; a kind of runtime error's, taking a message.</summary>
-    public static string Source(string name) => IsErrorClass(name)
-        ? $"class {name} extends Error {{ constructor(message) {{ super(message); }} }}"
-        : $"class {name} {{}}";
+    /// <summary>
+    /// A built-in class's source: a kind of runtime error's, taking a message; a kind of value that a class may extend,
+    /// holding a value of its kind, which its constructor gives (<c>hold</c>, section 3.7); any other, empty.
+    /// </summary>
+    public static string Source(string name) => name switch
+    {
+        _ when IsErrorClass(name) => $"class {name} extends Error {{ constructor(message) {{ super(message); }} }}",
+        "Boolean" => "class Boolean { constructor(value = false) { hold(this, value); } }",
+        "Integer" => "class Integer { constructor(value = 0) { hold(this, value); } }",
+        "Number" => "class Number { constructor(value = 0.0) { hold(this, value); } }",
+        "String" => "class String { constructor(value = \"\") { hold(this, value); } }",
+        _ => $"class {name} {{}}"
+    };
 }

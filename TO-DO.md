@@ -12,11 +12,11 @@
 
 2026-11-13: split into the parts the specification defines in section 9 ("Extending the classes of values"), each a task below. Waits for them.
 
-## [IDLE] Extending the Classes of Values: `Boolean`, `Integer`, `Number` and `String`
+## [WORKING] Extending the Classes of Values: `Boolean`, `Integer`, `Number` and `String`
 
 Classes extending them, whose instances hold a value, given by `super(value)`, which arithmetic, comparisons and `==` use, written `Celsius(21.5)`; and `new` on those classes (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
 
-2026-11-13: answered; after "Extending the Classes of Values: Classed Values' Text".
+Done (Claude, 2026-11-13): on both VMs, with their conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Classes holding a value"), two of them asked in "Classes of Values, Constructors". Checks: the Release build, without warnings, the 1,476 tests, and the CLI on the samples, on Windows only; Linux not tried.
 
 ## [IDLE] Extending the Classes of Values: `Function`
 
@@ -34,7 +34,19 @@ Classes extending them, whose instances hold a value, given by `super(value)`, w
 
 `static operator +(a, b) { … }`, and `-`, `*`, `/` and the comparisons, which a class may declare (A3 of "Classes of Values, Extensions, Continued"; specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
 
-2026-11-13: after "Extending the Classes of Values: `Boolean`, `Integer`, `Number` and `String`".
+2026-11-13: next.
+
+## [QUESTION] Classes of Values, Constructors
+
+What "Extending the Classes of Values: `Boolean`, `Integer`, `Number` and `String`" chose where the answers so far leave it open (specification, section 15.2, "Classes holding a value"). One decision each, answerable with a letter. Added by Claude, 2026-11-13.
+
+**Q1, A7's "a class without a constructor passes its arguments on": (a) for every class, so that `class B extends A {}` makes `new B(1)` run `A`'s constructor with `1` (it is WS2006 now, a class without a constructor taking none); (b) only for a class holding a value, as built.**
+
+A1:
+
+**Q2, an arithmetic result not of its class's kind, `count / 2` where `Count` extends `Integer`, a binary64: (a) a plain value, `1.5`, as built; (b) WS3001.**
+
+A2:
 
 ## [QUESTION] Building Classes at Run Time
 
@@ -84,19 +96,19 @@ A3: (a)
 
 **Q4, `export` marks a `function`, `class`, `var` or `const` declaration at a module's top level, and an importer reads an exported `var` as it is when read (`db.count`); assigning it: (a) WS3001, an export being the module's to change; (b) allowed, as a member is assigned.**
 
-A4:
+A4: (a)
 
 **Q5, importing names: (a) only the instance, `import util from "lib/util.ws";`, then `util.f()`; (b) names too, `import { f, g } from "lib/util.ws";`, as JavaScript does.**
 
-A5:
+A5: (b), both forms allowed, really
 
 **Q6, a quoted parameter (A8): a shell removes the quotes of `value="10"`, so `weblingo` gets `value=10`, an integer: (a) quotes that reach it make a string, `value='"10"'` in a shell; (b) `weblingo run script.ws --string value=10` makes a string, whatever the value looks like.**
 
-A6:
+A6: "a shell removes the quotes " Does it? Have you checked?
 
 **Q7, the standard modules' names: (a) `system` and `std/fs`, as A10 and Q10 name them; (b) every one under `std/`, `std/system` among them.**
 
-A7:
+A7: 
 
 ## [IDLE] Modules
 
@@ -226,5 +238,9 @@ What `write` writes is for people to read, and does not reliably rebuild a value
 If text that rebuilds a value (round-trip text) is wanted, it is a serialization feature: a way to write a value, and to read it back into an equal one, that does not depend on its class's constructor (a rebuilt instance gets its fields set directly, as a runtime error's `Error` already does, specification, section 15.2, "Exceptions"). It deserves a design of its own, rather than borrowing call syntax for `write`'s text. Such a design would decide, among other things: its format (JSON, a WebLingo literal form, or both); how a class is named in it, and found again when it is read (a class in another module, or one renamed since); whether a class may shape its own serialized form, as `toString()` shapes its text; what cannot be serialized (functions, closures, tasks, native resources) and what reading one then does; cycles and shared references; and the security of reading text from outside (no code runs, and no class is made, that the reader did not allow).
 
 It is deferred: nothing needs it yet, and it can be added later, if it proves necessary, without changing `write`'s text or any program.
+
+## Properties
+
+With getters and setters.
 
 # END-OF-TO-DO

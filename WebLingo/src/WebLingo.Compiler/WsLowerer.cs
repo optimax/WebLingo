@@ -156,7 +156,12 @@ public sealed class WsLowerer
         foreach (var (name, function) in declaration.StaticMethods) staticMethods.Add((name, LowerFunction(function)));
         var staticFields = new List<string>();
         foreach (var (name, _, _) in declaration.StaticFields) staticFields.Add(name);
-        _classes.Add(new WsIrClass(declaration.Name, constructor, methods) { StaticMethods = staticMethods, StaticFields = staticFields });
+        _classes.Add(new WsIrClass(declaration.Name, constructor, methods)
+        {
+            StaticMethods = staticMethods,
+            StaticFields = staticFields,
+            DefaultConstructor = declaration.DefaultConstructor
+        });
         return _classes.Count - 1;
     }
 
@@ -320,6 +325,8 @@ public sealed class WsLowerer
                 return new WsIrIs(LowerExpression(test.Value), LowerExpression(test.Class), test.Span);
             case WsBoundToText text:
                 return new WsIrToText(LowerExpression(text.Value), text.Span);
+            case WsBoundHold hold:
+                return new WsIrHold(LowerExpression(hold.Instance), LowerExpression(hold.Value), hold.Span);
             case WsBoundBinary binary:
                 var left = LowerExpression(binary.Left);
                 var right = LowerExpression(binary.Right);

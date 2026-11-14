@@ -160,6 +160,8 @@ public enum WsStackOpCode : byte
     /// register bytecode's <c>Extend</c>.
     /// </summary>
     Extend,
+    /// <summary>Pops a value, then an instance, which holds it, as the register bytecode's <c>Hold</c>, and pushes null.</summary>
+    Hold,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);

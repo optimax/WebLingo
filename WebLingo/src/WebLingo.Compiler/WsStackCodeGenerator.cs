@@ -314,6 +314,11 @@ public sealed class WsStackCodeGenerator
                 EmitValue(awaited.Value);
                 Emit(WsStackOpCode.Await, awaited.Span);
                 return;
+            case WsIrHold hold:
+                EmitValue(hold.Instance);
+                EmitValue(hold.Value);
+                Emit(WsStackOpCode.Hold, hold.Span);
+                return;
             case WsIrIs test:
                 EmitValue(test.Value);
                 EmitValue(test.Class);
@@ -663,6 +668,7 @@ public sealed class WsStackCodeGenerator
             WsStackOpCode.GetSuper => (2, 1),
             WsStackOpCode.Dispose => (1, 0),
             WsStackOpCode.Extend => (1, 0),
+            WsStackOpCode.Hold => (2, 1),
             WsStackOpCode.Throw => (1, 0),
             WsStackOpCode.ToText => (1, 1),
             WsStackOpCode.IsInstance => (2, 1),

@@ -29,6 +29,11 @@ public static class WsOperators
         {
             return heap.TryAllocateString(heap.GetString(left) + heap.GetString(right), out result, out error);
         }
+        if ((left.Kind == WsValueKind.Instance || right.Kind == WsValueKind.Instance) && heap is not null
+            && (heap.IsHolding(left) || heap.IsHolding(right)))
+        {
+            return TryHeld(op, left, right, heap, out result, out error);
+        }
         if (op == WsArithmeticOperator.Add && (left.Kind == WsValueKind.String || right.Kind == WsValueKind.String))
         {
             error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
@@ -76,6 +81,12 @@ public static class WsOperators
     public static bool TryCompare(WsComparisonOperator op, WsValue left, WsValue right, WsHeap? heap, out WsValue result,
         out WsRuntimeError? error)
     {
+        if ((left.Kind == WsValueKind.Instance || right.Kind == WsValueKind.Instance) && heap is not null)
+        {
+            // An instance holding a value is compared as the value it holds (section 3.7).
+            left = heap.Held(left);
+            right = heap.Held(right);
+        }
         error = null;
         if (op is WsComparisonOperator.Equal or WsComparisonOperator.NotEqual)
         {
@@ -100,6 +111,52 @@ public static class WsOperators
             _ => o >= 0
         });
         return true;
+    }
+
+    /// <summary>
+    /// Arithmetic on an instance holding a value (section 3.7): on the values held, its result an instance of its left
+    /// operand's class, if that holds one, else of its right's, with that operand's fields; or a plain value, when it is
+    /// not of the kind that class holds (an integer's class divided, giving a binary64).
+    /// </summary>
+    private static bool TryHeld(WsArithmeticOperator op, WsValue left, WsValue right, WsHeap heap, out WsValue result,
+        out WsRuntimeError? error)
+    {
+        var source = heap.IsHolding(left) ? left : right;
+        if (!TryBinary(op, heap.Held(left), heap.Held(right), heap, out var value, out error))
+        {
+            result = WsValue.Null;
+            return false;
+        }
+        if (value.Kind != heap.HeldKind(source))
+        {
+            result = value;
+            return true;
+        }
+        return heap.TryHoldAnew(source, value, out result, out error);
+    }
+
+    /// <summary>Unary <c>-</c> on any value, an instance holding a number giving one of its class (section 3.7).</summary>
+    public static bool TryNegate(WsValue operand, WsHeap heap, out WsValue result, out WsRuntimeError? error)
+    {
+        if (!heap.IsHolding(operand)) return TryNegate(operand, out result, out error);
+        if (!TryNegate(heap.Held(operand), out var value, out error))
+        {
+            result = WsValue.Null;
+            return false;
+        }
+        return heap.TryHoldAnew(operand, value, out result, out error);
+    }
+
+    /// <summary>Unary <c>+</c> on any value, an instance holding a number giving one of its class (section 3.7).</summary>
+    public static bool TryPlus(WsValue operand, WsHeap heap, out WsValue result, out WsRuntimeError? error)
+    {
+        if (!heap.IsHolding(operand)) return TryPlus(operand, out result, out error);
+        if (!TryPlus(heap.Held(operand), out var value, out error))
+        {
+            result = WsValue.Null;
+            return false;
+        }
+        return heap.TryHoldAnew(operand, value, out result, out error);
     }
 
     /// <summary><c>!</c>: the opposite of a Boolean; anything else is an error.</summary>

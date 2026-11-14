@@ -16,7 +16,8 @@ internal static class WsClassTable
             classes.Add(new WsClassInfo(declared.Name, declared.Constructor, methods)
             {
                 StaticMethods = statics,
-                StaticFields = declared.StaticFields
+                StaticFields = declared.StaticFields,
+                DefaultConstructor = declared.DefaultConstructor
             });
         }
         return classes;

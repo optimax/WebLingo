@@ -67,6 +67,8 @@ public static class WsMembers
             {
                 return heap.TryAllocateBoundMethod(target, method, out result, out error, member == WsMember.Dispose);
             }
+            // An instance holding a value has that value's members too, its string's length (section 3.7).
+            if (heap.IsHolding(target)) return TryGet(heap.Held(target), member, name, heap, optional, out result, out error);
             if (optional) return true;
             error = NoSuchMember(target, name, heap);
             return false;
@@ -179,7 +181,7 @@ public static class WsMembers
         WsValue closure;
         if (name == "constructor")
         {
-            closure = heap.ClassConstructor(baseClass);
+            closure = heap.ConstructorFor(baseClass);
             if (closure.Kind == WsValueKind.Null) throw new InvalidOperationException("The base class has no constructor.");
         }
         else if (!heap.TryGetMethod(baseClass, name, out closure))
@@ -409,6 +411,7 @@ public static class WsMembers
     {
         result = WsValue.Null;
         error = null;
+        target = heap.Held(target); // An instance holding a string is indexed as its string (section 3.7).
         if (optional && target.Kind == WsValueKind.Null) return true;
         if (target.Kind == WsValueKind.Array)
         {
@@ -447,6 +450,7 @@ public static class WsMembers
     /// <summary><c>target[index] = value</c>.</summary>
     public static bool TrySetIndex(WsValue target, WsValue index, WsValue value, WsHeap heap, out WsRuntimeError? error)
     {
+        target = heap.Held(target);
         if (target.Kind == WsValueKind.Array)
         {
             var elements = heap.GetArray(target);
@@ -473,6 +477,7 @@ public static class WsMembers
     {
         next = position;
         done = false;
+        collection = heap.Held(collection); // An instance holding a string is visited as its string (section 3.7).
         error = null;
         if (position.Kind != WsValueKind.Int64) throw new InvalidOperationException("A loop's position is not an integer.");
         var at = position.AsInt64;
