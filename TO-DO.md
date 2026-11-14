@@ -88,14 +88,6 @@ A16: (a).
 
 2026-11-14: those are done, and the module system it needs too; split into the parts the specification defines in section 9 ("M0.12 parts"), each a task below. Waits for them.
 
-## [IDLE] M0.12.4: Layouts
-
-`<% layout "/layouts/main.wlp", { title: "Products" }; %>`, `renderBody()`, a layout's own layout, and a cycle of them (specification, section 13, "Contracts", and section 9, M0.12.4), on both VMs. Added by Claude, 2026-11-14.
-
-2026-11-14: waits for "M0.12.2: Includes", whose paths it shares.
-
-Done (Claude, 2026-11-14): `<% layout "/layouts/main.wlp", { title: "Products" }; %>` runs the layout, given the values as its parameters, and the rest of the page, its body, where the layout calls `renderBody()`, streaming, on both VMs; a layout may have a layout of its own, a cycle of them being WL5003 at compile time. The page imports its layout as a module of its program, its scope its own, the body an `async` function the layout awaits; the template compiler reads a layout as one (a parse hook in the compiler's options, which reads the files a program imports). `samples/SimpleWebsite` now has a layout, an include and a component, and runs through `welp`. Guessed, and recorded as Proposed in the specification, section 15.2 ("Layouts"): `layout` is not a keyword; the statement stands after a page's parameters and imports, before anything else, at most once, never in an included template (WL5007 otherwise); its values are a map literal; a layout's parameters given wrong are WL5006 at compile time; `renderBody()` may be called any number of times; the page's body runs in a function of the page's scope, so `export` there is WL1001. Checks: the Release build, without warnings, the full test suite, and both command lines on the samples, on Windows only; Linux not tried.
-
 ## [IDLE] M0.12.5: Template Output's Workload
 
 A benchmark workload of template output (specification, sections 5.6 and 9, M0.12.5), the third of those "Both VMs, for now" waits for. Added by Claude, 2026-11-14.
