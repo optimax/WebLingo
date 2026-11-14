@@ -39,66 +39,6 @@ A7:
 A1 of "Typed Catches Syntax: Classes of Values": classes may extend `Array`, `Map` and `Set` (specification, section 3.7, "Classes of values"), on both VMs. Added by Claude, 2026-11-13.
 
 2026-11-13: waits for the answers to "Classes of Values, Continued".
-## [DONE] Asynchrony: `async` and `await`
-
-A15 of "M0.11: Templates": asynchrony is designed first, before templates. WebLingo's own operation model (WS-P007), worker-affine executions (WS-H012) and worker-local heaps (WS-P013) are approved; how a program writes asynchrony is not. One decision each, answerable with "yes" or a letter. Once they are answered, its implementation becomes tasks of its own, before M0.11. Added by Claude, 2026-11-13.
-
-NOTE: C# is annoying requiring that Task be explicitly returned from async methods. WebLingo should allow returning normal values from an async methods which are then magically wrapped in a task by the runtime and delivered to await. OK?
-
-Q1, syntax: `async function f() { … }`, `async` methods and `async function (…) { … }`, whose call gives a task at once; `await t` waits for task `t`, giving its result, or throwing its exception. Agreed?
-
-A1: Yes.
-
-Q2, where `await` may stand: (a) in an `async` function, and at the top level of a script or a template; (b) only in an `async` function.
-
-A2: (a). The top level of a script/module is its executable block. A script/module becomes an instance of `Module`, which has an `exec()` function. Would that work? 
-
-Q3, when an `async` function starts: (a) at once, when it is called, running until its first `await`, as in C# and JavaScript; (b) only when something awaits its task.
-
-A3: (a)
-
-Q4, concurrency: an execution's tasks run on its one worker, one at a time, switching only at `await`, so that no two run at once and nothing needs a lock (WS-H012, WS-P013). Agreed?
-
-A4: How about a real thread pool?
-
-Q5, what `await` takes: (a) only a task, anything else being WS3001; (b) any value, a value that is not a task giving itself.
-
-A5: (b) and awaiting a plain value still yields.
-
-Q6, a task is a value of its own kind, of the built-in class `Task` (section 3.2), with nothing but `await` for now; `Task.all`, `Task.any` and timeouts come when they are needed. Agreed?
-
-A6: OK. Add a TO-DO.
-
-Q7, a task's exception that nothing awaits: (a) it is lost; (b) when the execution ends, the first such exception stops it, as an uncaught one does, so that none goes unnoticed.
-
-A7: (b) with a way to opt out for fire-and-forget.
-
-Q8, where tasks come from, besides `async` functions: the host's operations (files, network, database: WS-P004, WS-P009, WS-P011) give tasks, and the standard library has `delay(milliseconds)`, for tests. Agreed?
-
-A8: Yes.
-
-Q9, the end of an execution: (a) it waits for every task still running; (b) it ends when the top level does, the tasks still running being cancelled.
-
-A9: (b).
-
-Q10, how the VMs do it: a waiting `async` function's frames are kept on the heap, held by its task, and resumed by the worker's scheduler when what it waits for completes; no thread blocks (WS-P007, WS-P008). Agreed?
-
-A10: OK.
-
-Q11, cancellation: an execution's cancellation (WS3004) ends its waiting tasks too, uncatchable, as now. Agreed?
-
-A11: Yes.
-
-Q12, `using` and asynchrony: (a) `dispose()` stays synchronous for now, as section 3.4 begins; (b) a `dispose()` may be `async`, and `using` awaits it.
-
-A12: (b)
-
-Q13, templates: a template's body may `await` anywhere, as an `async` function's may, and `renderComponent(…)` gives a task, which the page awaits, as section 13's example writes. Agreed?
-
-A13: Yes.
-
-Done (Claude, 2026-11-13): recorded as approved in the specification, a new section 3.8 ("Asynchrony"), its decision register, and section 13. What the answers leave open (A2's `Module`, A4's thread pool, A7's opting out, A12 in a function that is not `async`) is asked in "Asynchrony, Continued"; A6's `Task.all`, `Task.any` and timeouts are the task "Task Combinators"; the implementation is the task "Asynchrony".
-
 ## [QUESTION] Asynchrony, Continued
 
 Follow-ups to "Asynchrony: `async` and `await`". One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
