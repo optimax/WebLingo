@@ -399,7 +399,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class V { constructor(x) { this.x = x; } static operator +(a, b) { return new V(a.x + b.x); } static operator <(a, b) { return a.x < b.x; } } writeLn([1, 2, (new V(1) + new V(2)).x, [3, [4, (new V(5) + new V(6)).x]]]);", "[1, 2, 3, [3, [4, 11]]]")]
     [InlineData("class S { static operator >=(a, b) { return true; } static operator <=(a, b) { return false; } } writeLn([new S() >= 1, new S() <= 1, new S() == new S()]);", "[true, false, false]")]
     [InlineData("class A { static var n = 1; static make(x) { return x * 2; } } var a = new A(); writeLn([a.n, a.make(4), A.n]);", "[1, 8, 1]")]
-    [InlineData("class A { static var n = 1; static m() { return \"static\"; } m() { return \"method\"; } } var a = new A(); a.n = 5; writeLn([a.n, A.n, a.m()]);", "[5, 1, \"method\"]")]
+    [InlineData("class A { static var n = 1; static m() { return \"static\"; } m() { return \"method\"; } } var a = new A(); a.n = 5; writeLn([a.n, A.n, a.m()]);", "[5, 5, \"method\"]")]
     [InlineData("class A { static var n = 1; static f() { return 1; } } class B extends A {} var b = new B(); A.n = 2; writeLn([b.n, b?.n, b?.missing]); var g = b.f; writeLn(g == A.f);", "[2, 2, null]\ntrue")]
     [InlineData("class A { static var k = \"s\"; } var a = new A(); a.k = function () { return \"field\"; }; writeLn(a.k()); class S extends Array { static var size = 3; } writeLn(new S().size);", "field\n3")]
     [InlineData("class A { constructor(x, y = 2) { this.x = x; this.y = y; } } class B extends A {} class C extends B { m() { return 1; } } writeLn([new B(5).x, new C(1, 3).y, new C(1).y]);", "[5, 3, 2]")]
@@ -451,6 +451,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("async function after(ms, v) { await delay(ms); return v; } async function fails(ms, m) { await delay(ms); throw m; } writeLn(await Task.all([Task.any([after(2, \"x\")]), Task.timeout(after(1, \"y\"), 50)]));", "[\"x\", \"y\"]")]
     [InlineData("writeLn([Integer.parse(\"10\"), Integer.parse(\"-7\"), Integer.parse(\"+007\"), Number.parse(\"1.5\"), Number.parse(\"10\"), Number.parse(\"-1e3\"), Number.parse(\"Infinity\"), Boolean.parse(\"true\"), Integer.parse(\"-9223372036854775808\")]);", "[10, -7, 7, 1.5, 10.0, -1000.0, Infinity, true, -9223372036854775808]")]
     [InlineData("class Celsius extends Number {} writeLn([new Integer(\"10\"), new Number(\"2.5\"), new Boolean(\"false\"), new Celsius(\"21.5\")]);", "[10, 2.5, false, Celsius:21.5]")]
+    [InlineData("class C { static var count = 0; } class D extends C {} var p = new C(); var q = new D(); p.count = 5; q.count = q.count + 1; p.other = 1; writeLn([C.count, p.count, q.count, p, C?.other]);", "[6, 6, 6, C {other: 1}, null]")]
+    [InlineData("class Stack extends Array { static var made = 0; } var s = new Stack(); s.made = 3; writeLn([Stack.made, s]);", "[3, Stack:[]]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -652,6 +654,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("Integer.parse();", "WL2006")]
     [InlineData("new Integer(\"x\");", "WL3001")]
     [InlineData("String.parse(\"x\");", "WL3006")]
+    [InlineData("class K { static const max = 1; } new K().max = 2;", "WL3001")]
+    [InlineData("class C {} var p = new C(); p.count = 1; writeLn(C.count);", "WL3006")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

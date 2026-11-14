@@ -835,8 +835,13 @@ public sealed class WebLingoHeap
 
     public bool TryGetField(WebLingoValue instance, string name, out WebLingoValue value) => Fields(instance).TryGet(name, out value);
 
-    /// <summary>Assigns a field, which exists from then on: a new one is one more unit, within the budget (WL3003).</summary>
-    public bool TrySetField(WebLingoValue instance, string name, WebLingoValue value, out WebLingoRuntimeError? error)
+    /// <summary>
+    /// Assigns a field, which exists from then on: a new one is one more unit, within the budget (WL3003). Given its
+    /// class, <c>p.count = 5</c> assigns a static field of the class, its own or a base's, when the instance has no field
+    /// of that name (section 3.7); a static constant is WL3001.
+    /// </summary>
+    public bool TrySetField(WebLingoValue instance, string name, WebLingoValue value, out WebLingoRuntimeError? error,
+        WebLingoValue classValue = default)
     {
         var fields = Fields(instance);
         error = null;
@@ -844,6 +849,29 @@ public sealed class WebLingoHeap
         {
             fields.Set(name, value);
             return true;
+        }
+        return TryAddField(fields, name, value, classValue, out error);
+    }
+
+    /// <summary>A field the instance does not have: its class's static field of that name assigned, or a new field made.</summary>
+    private bool TryAddField(InstanceObject fields, string name, WebLingoValue value, WebLingoValue classValue, out WebLingoRuntimeError? error)
+    {
+        error = null;
+        for (var current = classValue; current.Kind == WebLingoValueKind.Class;)
+        {
+            var target = Get<ClassObject>(current, WebLingoValueKind.Class);
+            if (target.StaticFields.Count > 0 && target.StaticFields.ContainsKey(name))
+            {
+                if (target.Constants?.Contains(name) == true)
+                {
+                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                        $"'{name}' is a constant of the class {target.Name}, and cannot be assigned.");
+                    return false;
+                }
+                target.StaticFields[name] = value;
+                return true;
+            }
+            current = target.Base;
         }
         if (!TryReserve(1, out error)) return false;
         fields.Set(name, value);

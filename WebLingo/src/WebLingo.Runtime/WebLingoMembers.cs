@@ -260,7 +260,7 @@ public static class WebLingoMembers
         if (IsClassedCollection(target, heap, out var collectionClass))
         {
             var collectionAssignee = heap.FindAssignee(collectionClass, name, out setter);
-            if (collectionAssignee == WebLingoHeap.Assignee.Field) return heap.TrySetField(target, name, value, out error);
+            if (collectionAssignee == WebLingoHeap.Assignee.Field) return heap.TrySetField(target, name, value, out error, collectionClass);
             error = NotAField(collectionAssignee, target, name, heap);
             return false;
         }
@@ -278,8 +278,9 @@ public static class WebLingoMembers
                 $"Only an instance's fields can be assigned, not a member of {WebLingoValueFormatter.Describe(target, heap)}.");
             return false;
         }
-        var assignee = heap.FindAssignee(heap.ClassOf(target), name, out setter);
-        if (assignee == WebLingoHeap.Assignee.Field) return heap.TrySetField(target, name, value, out error);
+        var classValue = heap.ClassOf(target);
+        var assignee = heap.FindAssignee(classValue, name, out setter);
+        if (assignee == WebLingoHeap.Assignee.Field) return heap.TrySetField(target, name, value, out error, classValue);
         error = NotAField(assignee, target, name, heap);
         return false;
     }
