@@ -462,7 +462,7 @@ The initial IIS adapter is an implementation choice, not a permanent dependency 
                     |
           WebLingo Runtime
                     |
-    WSHI: host-neutral request/response/lifecycle API
+    WLHI: host-neutral request/response/lifecycle API
                     |
       +-------------+--------------+
       |             |              |
@@ -471,6 +471,8 @@ The initial IIS adapter is an implementation choice, not a permanent dependency 
 ```
 
 Hosting adapters must not directly manipulate VM registers, GC internals or compiler structures.
+
+**WLHI, the WebLingo Host Interface**, is what a host and the WebLingo runtime know of each other, and all they know: the contracts through which a host, IIS's adapter, FastCGI's, or a standalone HTTP server, starts and stops the runtime, and has it run requests. It is made of the runtime's lifecycle (§6.4); the lifecycle of a request, from the application generation it is bound to through its execution context to its release (§6.6); the HTTP request and response a script sees, with their headers and streamed bodies (§6.7); and, for a host that is not .NET, the C-compatible native ABI that carries these across a process's boundary (§6.8). A host adapts to WLHI, never the reverse (§11). It was WSHI, the WebScript Host Interface, until the names were renamed (§1; the owner's decision, 14 November 2026).
 
 ### 6.3 Runtime hierarchy
 
@@ -557,7 +559,7 @@ public interface IWebLingoHttpResponse
 
 Response states: **Uncommitted → Committed → Completed**. Headers cannot be mutated after commitment; body output must support streaming and backpressure. Request bodies must be streamable without mandatory full buffering.
 
-### 6.8 WSHI native ABI — proposed
+### 6.8 WLHI native ABI — proposed
 
 A future C-compatible ABI will use opaque runtime, application and request handles, with create/load/begin/cancel/release operations. Final signatures must define ABI versioning, struct sizes, calling conventions, ownership, callback lifetime, threading and error reporting. No managed .NET object crosses the ABI.
 
@@ -574,7 +576,7 @@ MySite/
   weblingo.json
 ```
 
-The desired deployment model is automatic source detection, compilation and caching, with no build tooling required on the server. IIS uses the ASP.NET Core adapter first. FastCGI and standalone hosts translate protocol details into WSHI.
+The desired deployment model is automatic source detection, compilation and caching, with no build tooling required on the server. IIS uses the ASP.NET Core adapter first. FastCGI and standalone hosts translate protocol details into WLHI.
 
 ### 6.10 Scheduling — approved affinity, proposed fairness
 
@@ -1041,7 +1043,7 @@ These items should be explicitly tracked rather than silently treated as approve
 3. **Portable source and bytecode.** WBC must be validated before execution and must not expose host memory structures.
 4. **Clear ownership boundaries.** Worker-affine mutable heaps, explicit cross-worker transfer, deterministic resource disposal.
 5. **Separation of disposal and GC.** `dispose()` is deterministic resource release; tracing GC reclaims script-object memory.
-6. **Stable host-neutral interfaces.** IIS, FastCGI and standalone hosts adapt to WSHI, not the reverse.
+6. **Stable host-neutral interfaces.** IIS, FastCGI and standalone hosts adapt to WLHI (§6.2), not the reverse.
 7. **Safe publication.** Hot reload swaps whole initialized application generations atomically.
 8. **Secure by default.** Escaped template output, capability-aware services and bounded resource use.
 9. **First-class template composition.** Includes, layouts, and parameterized components must all ship with the first `.wlp` template-capable release; no phased deferral.
@@ -1074,7 +1076,7 @@ Tradeoff: MIT does not require third parties to contribute improvements back. If
 1. **Ownership and provenance:** Track copyright holders, contributors, third-party code, assets, and generated content; verify that the project has the rights necessary to publish each component.
 2. **Dependency review:** Maintain a software bill of materials or equivalent dependency inventory; verify redistribution compatibility, required notices, and transitive dependencies. Avoid introducing restrictive dependencies into the portable core.
 3. **Reproducible releases:** Provide versioned source tags, documented builds, release artifacts, checksums, and automated Windows/Linux conformance tests.
-4. **Specification and compatibility:** Publish versioned language, WBC, PAL/WSHI and extension contracts; state compatibility and deprecation policies.
+4. **Specification and compatibility:** Publish versioned language, WBC, PAL/WLHI and extension contracts; state compatibility and deprecation policies.
 5. **Community governance:** Establish contribution rules, code review and maintainer authority, a security disclosure process, and a code of conduct before accepting substantial public contributions.
 6. **Trademark and naming:** Conduct a fresh name/trademark and ecosystem-confusion check for **WebLingo** before public launch; the MIT software license does not establish availability of the name or rights to a logo.
 7. **Security:** Document the limitations of capability-based logical isolation and the need for OS-level process isolation in hostile multi-tenant deployments.
