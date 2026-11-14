@@ -1075,6 +1075,23 @@ public sealed class WsStackVirtualMachine
                     continue;
 
                 failed:
+                    if (_operator.Kind == WsValueKind.Function)
+                    {
+                        // A class's operator, which the operation found: called with its two operands, the slot below them
+                        // made the callee's, as a call's is, its frame given one more slot if it has none (section 3.7).
+                        callee = _operator;
+                        _operator = WsValue.Null;
+                        if (sp == slots.Length) slots = Grown(frame, slots);
+                        slots[sp] = slots[sp - 1];
+                        slots[sp - 1] = slots[sp - 2];
+                        slots[sp - 2] = callee;
+                        sp++;
+                        self = WsValue.Null;
+                        firstArgument = sp - 2;
+                        argumentCount = 2;
+                        constructed = WsValue.Null;
+                        goto call;
+                    }
                     // A call that failed before its frame was pushed leaves nothing in that frame: no disposal, no text.
                     if (depth + 1 < frames.Length && frames[depth + 1] is { } unpushed)
                     {
@@ -1202,6 +1219,11 @@ public sealed class WsStackVirtualMachine
                     _ => x / y
                 }), slots, sp);
             }
+            if ((left.Kind == WsValueKind.Instance || right.Kind == WsValueKind.Instance || left.HasClass || right.HasClass)
+                && TryOperator(opCode, left, right))
+            {
+                return false;
+            }
             if (!WsOperators.TryBinary(ArithmeticOf(opCode), left, right, heap, out var value, out error)) return false;
             return Done(value, slots, sp);
         }
@@ -1241,6 +1263,11 @@ public sealed class WsStackVirtualMachine
                     WsStackOpCode.Greater => x > y,
                     _ => x >= y
                 }), slots, sp);
+            }
+            if ((left.Kind == WsValueKind.Instance || right.Kind == WsValueKind.Instance || left.HasClass || right.HasClass)
+                && TryOperator(opCode, left, right))
+            {
+                return false;
             }
             if (!WsOperators.TryCompare(ComparisonOf(opCode), left, right, heap, out var value, out error)) return false;
             return Done(value, slots, sp);
@@ -1373,6 +1400,50 @@ public sealed class WsStackVirtualMachine
         /// <summary>The execution's tasks (section 3.8), made when it starts; the program's own task, if its top level awaits, a root.</summary>
         private WsScheduler _scheduler = null!;
         private readonly WsValue[] _main = new WsValue[1];
+
+        /// <summary>
+        /// A class's operator that an arithmetic or a comparison found (section 3.7), with its operands: called as a
+        /// function, from where the operation's failure leads.
+        /// </summary>
+        private WsValue _operator;
+        private readonly WsValue[] _operands = new WsValue[2];
+
+        /// <summary>The name of the operator a class may declare for an operation, or null for one it may not.</summary>
+        private static string? OperatorName(WsStackOpCode opCode) => opCode switch
+        {
+            WsStackOpCode.Add => "operator+",
+            WsStackOpCode.Subtract => "operator-",
+            WsStackOpCode.Multiply => "operator*",
+            WsStackOpCode.Divide => "operator/",
+            WsStackOpCode.Less => "operator<",
+            WsStackOpCode.LessOrEqual => "operator<=",
+            WsStackOpCode.Greater => "operator>",
+            WsStackOpCode.GreaterOrEqual => "operator>=",
+            _ => null
+        };
+
+        /// <summary>Whether an operation on two values calls a class's operator (section 3.7), which it then keeps.</summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool TryOperator(WsStackOpCode opCode, WsValue left, WsValue right)
+        {
+            if (OperatorName(opCode) is not { } name || !WsMembers.TryFindOperator(name, left, right, heap, out _operator)) return false;
+            _operands[0] = left;
+            _operands[1] = right;
+            return true;
+        }
+
+        /// <summary>The running frame's slots, one more, its roots registered anew, for an operator's call.</summary>
+        private WsValue[] Grown(Frame frame, WsValue[] slots)
+        {
+            heap.RemoveLastRoots(frame.Closure);
+            heap.RemoveLastRoots(slots);
+            var grown = new WsValue[slots.Length + 1];
+            Array.Copy(slots, grown, slots.Length);
+            frame.Slots = grown;
+            heap.AddRoots(grown);
+            heap.AddRoots(frame.Closure);
+            return grown;
+        }
 
         /// <summary>What an <c>await</c> waits for, on its way to the code that suspends the frame.</summary>
         private WsValue _awaited;

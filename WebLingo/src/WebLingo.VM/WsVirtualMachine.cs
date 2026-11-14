@@ -1029,6 +1029,19 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                     continue;
 
                 failed:
+                    if (_operator.Kind == WsValueKind.Function)
+                    {
+                        // A class's operator, which the operation found: called with its two operands (section 3.7).
+                        callee = _operator;
+                        _operator = WsValue.Null;
+                        self = WsValue.Null;
+                        arguments = _operands;
+                        firstArgument = 0;
+                        argumentCount = 2;
+                        resultRegister = _operatorResult;
+                        constructed = WsValue.Null;
+                        goto call;
+                    }
                     // A call that failed before its frame was pushed leaves nothing in that frame: no disposal, no text.
                     if (depth + 1 < frames.Length && frames[depth + 1] is { } unpushed)
                     {
@@ -1154,6 +1167,12 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                     _ => x / y
                 }), registers, ins);
             }
+            if ((left.Kind == WsValueKind.Instance || right.Kind == WsValueKind.Instance || left.HasClass || right.HasClass)
+                && TryOperator(opCode, left, right))
+            {
+                _operatorResult = ins.A;
+                return false;
+            }
             if (!WsOperators.TryBinary(ArithmeticOf(opCode), left, right, heap, out var value, out error)) return false;
             registers[ins.A] = value;
             return true;
@@ -1193,6 +1212,12 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                     WsOpCode.Greater => x > y,
                     _ => x >= y
                 }), registers, ins);
+            }
+            if ((left.Kind == WsValueKind.Instance || right.Kind == WsValueKind.Instance || left.HasClass || right.HasClass)
+                && TryOperator(opCode, left, right))
+            {
+                _operatorResult = ins.A;
+                return false;
             }
             if (!WsOperators.TryCompare(ComparisonOf(opCode), left, right, heap, out var value, out error)) return false;
             registers[ins.A] = value;
@@ -1326,6 +1351,38 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         /// <summary>The execution's tasks (section 3.8), made when it starts; the program's own task, if its top level awaits, a root.</summary>
         private WsScheduler _scheduler = null!;
         private readonly WsValue[] _main = new WsValue[1];
+
+        /// <summary>
+        /// A class's operator that an arithmetic or a comparison found (section 3.7), with its operands, and, on the
+        /// register VM, where its result goes: called as a function, from where the operation's failure leads.
+        /// </summary>
+        private WsValue _operator;
+        private readonly WsValue[] _operands = new WsValue[2];
+        private int _operatorResult;
+
+        /// <summary>The name of the operator a class may declare for an operation, or null for one it may not.</summary>
+        private static string? OperatorName(WsOpCode opCode) => opCode switch
+        {
+            WsOpCode.Add => "operator+",
+            WsOpCode.Subtract => "operator-",
+            WsOpCode.Multiply => "operator*",
+            WsOpCode.Divide => "operator/",
+            WsOpCode.Less => "operator<",
+            WsOpCode.LessOrEqual => "operator<=",
+            WsOpCode.Greater => "operator>",
+            WsOpCode.GreaterOrEqual => "operator>=",
+            _ => null
+        };
+
+        /// <summary>Whether an operation on two values calls a class's operator (section 3.7), which it then keeps.</summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool TryOperator(WsOpCode opCode, WsValue left, WsValue right)
+        {
+            if (OperatorName(opCode) is not { } name || !WsMembers.TryFindOperator(name, left, right, heap, out _operator)) return false;
+            _operands[0] = left;
+            _operands[1] = right;
+            return true;
+        }
 
         /// <summary>What an <c>await</c> waits for, on its way to the code that suspends the frame.</summary>
         private WsValue _awaited;

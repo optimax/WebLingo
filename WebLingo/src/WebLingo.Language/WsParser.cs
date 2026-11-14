@@ -273,6 +273,30 @@ public sealed class WsParser : IWsParser
                     continue;
                 }
             }
+            if (isStatic && Current is { Kind: WsTokenKind.Identifier, Text: "operator" } && IsOperator(Peek(1).Kind))
+            {
+                // static operator +(a, b) { … }: what an operator does with the class's values (section 3.7).
+                Advance();
+                var symbol = Advance();
+                if (!EnterRecursion()) return Made();
+                try
+                {
+                    var (operands, operatorBody) = ParseFunctionRest();
+                    if (operands.Count != 2 && !_statementHasError)
+                    {
+                        Report(WsDiagnosticCodes.UnexpectedToken, "An operator takes two parameters, its operands.", symbol.Span);
+                    }
+                    methods.Add(new WsMethodSyntax("operator" + symbol.Text, symbol.Span, operands, operatorBody, SpanFrom(memberStart))
+                    {
+                        IsStatic = true
+                    });
+                }
+                finally
+                {
+                    _recursionDepth--;
+                }
+                continue;
+            }
             var isAsync = Current.Kind == WsTokenKind.Async && Peek(1).Kind is WsTokenKind.Identifier or WsTokenKind.Function;
             if (isAsync) Advance();
             if (Current.Kind == WsTokenKind.Function) Advance();
@@ -315,6 +339,10 @@ public sealed class WsParser : IWsParser
         Expect(WsTokenKind.CloseBrace, "'}'");
         return Made();
     }
+
+    /// <summary>The operators a class may declare: arithmetic's and the orderings, not <c>==</c> (section 3.7).</summary>
+    private static bool IsOperator(WsTokenKind kind) => kind is WsTokenKind.Plus or WsTokenKind.Minus or WsTokenKind.Star
+        or WsTokenKind.Slash or WsTokenKind.Less or WsTokenKind.LessEqual or WsTokenKind.Greater or WsTokenKind.GreaterEqual;
 
     /// <summary>
     /// <c>static var name = value;</c>, after its <c>static</c>: a field of a class itself (section 3.7). <c>const</c> or

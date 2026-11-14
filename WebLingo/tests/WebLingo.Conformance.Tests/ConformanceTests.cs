@@ -116,6 +116,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var extend = 1;", "WS1001", 1, 5)]
     [InlineData("extend Q { }", "WS2001", 1, 8)]
     [InlineData("var x = 5; extend x { }", "WS2001", 1, 19)]
+    [InlineData("class E { static operator ==(a, b) { return true; } }", "WS1001", 1, 27)]
+    [InlineData("class W { static operator +(a) { return 1; } }", "WS1001", 1, 27)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -371,6 +373,16 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class Handler extends Function { constructor(f) { super(f); this.calls = 0; } describe() { return \"handler\"; } } var h = new Handler(function (x) { return x * 2; }); writeLn(h(21)); writeLn(h.describe()); writeLn([h is Function, h is Handler]); writeLn(h); h.calls = h.calls + 1; writeLn(h.calls);", "42\nhandler\n[true, true]\nHandler:function\n1")]
     [InlineData("class Say extends Function {} var say = new Say(writeLn); say(\"via a built-in\"); class P { m() { return \"m\"; } } writeLn(new Say(new P().m)()); writeLn(new Say()());", "via a built-in\nm\nnull")]
     [InlineData("class H extends Function {} var h = new H(async function () { return 5; }); writeLn(await h()); var calls = [new H(function () { return 1; }), function () { return 2; }]; foreach (var c in calls) write(c()); writeLn(null);", "5\n12null")]
+    [InlineData("class V { constructor(x) { this.x = x; } static operator +(a, b) { return new V(a.x + b.x); } static operator <(a, b) { return a.x < b.x; } } var v = new V(1) + new V(2); writeLn(v.x); writeLn([new V(1) < new V(2), new V(3) < new V(2)]);", "3\n[true, false]")]
+    [InlineData("class M { static operator *(a, b) { return \"M*\"; } } writeLn(2 * new M()); writeLn(new M() * 2);", "M*\nM*")]
+    [InlineData("class A { static operator +(a, b) { return \"A\"; } } class B { static operator +(a, b) { return \"B\"; } } writeLn(new A() + new B()); writeLn(new B() + new A());", "A\nB")]
+    [InlineData("class A { static operator -(a, b) { return \"A-\"; } } class B extends A {} writeLn(new B() - 1);", "A-")]
+    [InlineData("class Money extends Number { static operator +(a, b) { return \"money\"; } } writeLn(new Money(1) + 2); class C extends Number {} writeLn(new C(1) + 2);", "money\nC:3.0")]
+    [InlineData("class Vec extends Array { static operator +(a, b) { var r = new Vec(); r.push(a[0] + b[0]); return r; } } var p = new Vec(); p.push(1); var q = new Vec(); q.push(2); writeLn(p + q);", "Vec:[3]")]
+    [InlineData("class P { constructor(x) { this.x = x; } } extend P { static operator /(a, b) { return a.x / b.x; } } writeLn(new P(3) / new P(2));", "1.5")]
+    [InlineData("class T { static operator +(a, b) { throw \"no\"; } } try { new T() + 1; } catch (e) { writeLn(e); }", "no")]
+    [InlineData("class V { constructor(x) { this.x = x; } static operator +(a, b) { return new V(a.x + b.x); } static operator <(a, b) { return a.x < b.x; } } writeLn([1, 2, (new V(1) + new V(2)).x, [3, [4, (new V(5) + new V(6)).x]]]);", "[1, 2, 3, [3, [4, 11]]]")]
+    [InlineData("class S { static operator >=(a, b) { return true; } static operator <=(a, b) { return false; } } writeLn([new S() >= 1, new S() <= 1, new S() == new S()]);", "[true, false, false]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -521,6 +533,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class H extends Function {} new H(1);", "WS3001")]
     [InlineData("class H extends Function {} var h = new H(function (x) { return x; }); h(1, 2);", "WS2006")]
     [InlineData("class C extends Number {} var c = new C(1); c();", "WS2005")]
+    [InlineData("class N { static operator +(a, b) { return 1; } } writeLn(new N() > 1);", "WS3001")]
+    [InlineData("class N { static operator +(a, b) { return 1; } } writeLn(-new N());", "WS3001")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

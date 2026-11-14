@@ -274,6 +274,22 @@ public static class WsMembers
     }
 
     /// <summary>
+    /// The operator a class declares (<c>static operator +(a, b)</c>, a static method named <c>operator+</c>), that an
+    /// operation on two values calls: its left operand's class's, its own or a base's, else its right's; false when
+    /// neither is an instance, or a collection, of a class that declares it (section 3.7).
+    /// </summary>
+    public static bool TryFindOperator(string name, WsValue left, WsValue right, WsHeap heap, out WsValue method) =>
+        TryFindOperator(name, left, heap, out method) || TryFindOperator(name, right, heap, out method);
+
+    private static bool TryFindOperator(string name, WsValue operand, WsHeap heap, out WsValue method)
+    {
+        method = WsValue.Null;
+        var classValue = heap.ClassOfValue(operand);
+        return classValue.Kind == WsValueKind.Class && heap.TryGetStatic(classValue, name, out method)
+            && method.Kind == WsValueKind.Function;
+    }
+
+    /// <summary>
     /// <c>Object</c>'s <c>toString()</c> or <c>equal()</c>, which every value has (section 3.7); false for another
     /// member, or before the program has made <c>Object</c>.
     /// </summary>

@@ -18,11 +18,11 @@
 
 2026-11-13: waits for the design of "Building Classes at Run Time".
 
-## [IDLE] Extending the Classes of Values: Operators
+## [WORKING] Extending the Classes of Values: Operators
 
 `static operator +(a, b) { … }`, and `-`, `*`, `/` and the comparisons, which a class may declare (A3 of "Classes of Values, Extensions, Continued"; specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
 
-2026-11-13: next.
+Done (Claude, 2026-11-13): on both VMs, with their conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Operators"), among them that `==` and `!=`, and unary operators, are not declared. Checks: the Release build, without warnings, the 1,520 tests, and the CLI on the samples, on Windows only; Linux not tried.
 
 ## [QUESTION] Classes of Values, Constructors
 
@@ -94,9 +94,9 @@ A5: (b), both forms allowed, really
 
 A6: "a shell removes the quotes " Does it? Have you checked?
 
-**Q7, the standard modules' names: (a) `system` and `std/fs`, as A10 and Q10 name them; (b) every one under `std/`, `std/system` among them.**
+**Q7, the standard modules' names: (a) `system` and `std/fs`, as A10 and Q10 name them; (b) every one under `std/`, `std/system` among them; (c): standard (built-in) modules named by a scheme, std:fs and std:system, resolved by the compiler and runtime, never as paths.**
 
-A7: 
+A7: (c)
 
 ## [IDLE] Modules
 
