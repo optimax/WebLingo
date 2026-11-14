@@ -301,9 +301,8 @@ The module system, `import`, `export` and `param`, approved by the owner on 13 N
 - **Paths.** A path is from the importing file's folder, `./` being that folder and `/` the drive's root, as for the language proper in §13 ("Includes"); `.wl` may be left out.
 - **Cycles.** A module may import itself, directly or through others: the second import gets the instance as it is so far, as JavaScript does.
 - **Parameters.** `param name;` and `param size = 10;` declare a module's parameters, at its top level, before its other statements, each a `const` of it: `param` is a keyword of the language. An importer gives them, `import db from "lib/db.wl" { size: 10 };`, and a template's caller gives a component's or a layout's (§13). A parameter without a default that is not given is an error, where the module is imported, of a code of its own.
-- **A script's parameters.** `weblingo run script.wl size=10 name=Ann` gives a script its parameters, each value read as a WebLingo literal if it is one (`10`, `true`), as a string otherwise; a quoted value is a string, so `value="10"` gives `"10"`.
+- **A script's parameters.** `weblingo run script.wl size=10 name=Ann` gives a script its parameters, each value a string, `"10"` and `"Ann"`, which the script converts itself where it needs another kind, since a shell removes the quotes that would tell a string from another literal (approved 14 November 2026, in place of reading a value as a WebLingo literal when it is one).
 - **The standard library.** Its parts are modules named by a scheme, `std:fs` and `std:system`, which the compiler and the runtime resolve, never as paths (`import fs from "std:fs";`). The built-ins belong to modules too: `write` and `writeLn` are `std:system`'s, which every module imports implicitly.
-- **Still open:** how a parameter is given as a string when it looks like another literal, a shell removing the quotes of `value="10"` (the follow-ups of 14 November 2026 approved the rest of this section).
 
 ---
 
