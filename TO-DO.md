@@ -30,12 +30,6 @@ Classes extending them, whose instances hold a value, given by `super(value)`, w
 
 2026-11-13: waits for the design of "Building Classes at Run Time".
 
-## [WORKING] Extending the Classes of Values: Classed Values' Text
-
-A classed value written as its class's name, a colon and its value, `Stack:[1, 2]`, in place of `Stack([1, 2])` (A4 of "Classes of Values, Extensions, Continued"; specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
-
-Done (Claude, 2026-11-13): for collections, on both VMs, with their conformance tests; part 3 writes the other classed values so. Checks: the Release build, without warnings, the 1,450 tests, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## [IDLE] Extending the Classes of Values: Operators
 
 `static operator +(a, b) { … }`, and `-`, `*`, `/` and the comparisons, which a class may declare (A3 of "Classes of Values, Extensions, Continued"; specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
@@ -86,7 +80,7 @@ A2: (a)
 
 **Q3, a module's lifetime under a host: A2 runs a module once per execution, and section 2.3 once per application generation: (a) once per execution, a request's, its instance the request's own; (b) once per application generation, its instance shared by the requests, which then cannot change it, since a heap is one worker's (WS-P013).**
 
-A3:
+A3: (a)
 
 **Q4, `export` marks a `function`, `class`, `var` or `const` declaration at a module's top level, and an importer reads an exported `var` as it is when read (`db.count`); assigning it: (a) WS3001, an export being the module's to change; (b) allowed, as a member is assigned.**
 

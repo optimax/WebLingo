@@ -1321,3 +1321,9 @@ Q5, `new Class()` (A9) needs what "Adding Methods at Run Time" describes, a func
 A5: (a)
 
 Done (Claude, 2026-11-13, `e871811`): recorded as approved in the specification, section 3.7 ("Classes of values"), with parts 6 and 7 in section 9 ("Extending the classes of values") for A4's text and A3's operators, each a task below; A5's design is the task "Building Classes at Run Time".
+
+## [DONE] Extending the Classes of Values: Classed Values' Text
+
+A classed value written as its class's name, a colon and its value, `Stack:[1, 2]`, in place of `Stack([1, 2])` (A4 of "Classes of Values, Extensions, Continued"; specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
+
+Done (Claude, 2026-11-13, `81b722b`): for collections, on both VMs, with their conformance tests; part 3 writes the other classed values so. Checks: the Release build, without warnings, the 1,450 tests, and the CLI on the samples, on Windows only; Linux not tried.
