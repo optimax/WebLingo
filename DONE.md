@@ -1816,3 +1816,35 @@ A2: (a)
 A3: (b)
 
 Done (Claude, 2026-11-14, `13a0a52`): A1 and A2 were built with "Extending the Classes of Values: `Class`, Making Classes" (`d009021`), `addMethod` since named `setMethod`; A3, `Point.removeMethod(name)`, on both VMs, with conformance tests, recorded as approved in the specification, section 3.7, its choices in section 15.2 ("Classes made while the program runs"): it gives whether the class had the method, and removes a declared method as one given while the program runs, both being a class's own methods alike. That declared classes and classes made while the program runs share one implementation is "Internals on Par with Script", below. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Native Code Extensions
+
+Make it possible to install and bind native (C# on CLR, later Native C#) code as (external) modules extending the library available to scripts (like Python does for C).
+
+The design needs the owner's decisions first, and the module system ("Modules"; specification, section 3.9), which such modules extend. One decision each, answerable with "yes" or a letter. Questions added by Claude, 2026-11-14.
+
+**Q1, what a native module is, on .NET: (a) an assembly (a DLL) with a class implementing an interface of WebLingo's (`IWebLingoNativeModule`), whose functions and classes become the module's exports; (b) C# source, which the host compiles when it installs it.**
+
+A1: (a) but let's discuss this in detail.
+
+**Q2, importing one: (a) a scheme of its own, `import db from "native:sqlite";`, as `std:` names the standard modules; (b) the standard modules' scheme, `std:sqlite`, so that a standard module and an installed one look alike; (c) a path to the assembly.**
+
+A2: (c), and (a) when the compiler is configured to understand the scheme as pointing to a particular folder, so `native:sqlite` resolves to `sqlite` module in the folder user-configured as `native`. Otherwise, explicit path to the asembly (relative or absolute) should work.
+
+**Q3, where they are found: (a) installed into a folder the host is configured with (`weblingo.json`, or the CLI's own), and loaded when first imported; (b) beside the script that imports them.**
+
+A3: As in A2, multiple folders can be configured, each as a separate scheme. Native  executable modules and scripts (text) should not in general be mixed.
+
+**Q4, trust: native code runs with the host's own rights, past WebLingo's capabilities (section 7.13): (a) only a module an application's capability policy names may be loaded, never one a script asks for alone; (b) any installed module, by any script.**
+
+A4: (b). Installed modules are like built-ins and trusted. What should be prevented, is script downloading a native module which is then executed.
+
+**Q5, its contract: a native function takes and gives WebLingo's values (`WebLingoValue`) through the runtime's API, may make classes and instances, and may give a task for asynchronous work, on WebLingo's operation model (WS-P007), never on .NET's `Task` in the core; and under Native C#, the same module's source is compiled by that toolchain, the contract unchanged (WL-017). Agreed?**
+
+A5: Yes. In fact, standard modules should follow the same model: they are pre-installed external native extensions that can - for example - be swapped by an alternative implementation. Everything should follow the same packaging model, without priviledged code. Runtime treats every native library/moodule the same.
+
+**Q6, C libraries, as Python's `ctypes` reaches them: (a) not directly: a native module reaches them, through P/Invoke, adapter-only (section 7.14); (b) a foreign-function interface for scripts too, later.**
+
+A6: (b), API TBD.
+
+Done (Claude, 2026-11-14, `97ebbdd`): recorded as approved in the specification, section 3.9 ("Native modules"), A1's details and A2's paths against A4's concern being asked in "Native Code Extensions, Continued", as A1 asks to discuss them. Checks: the Release build, without warnings, and the full test suite, on Windows only; Linux not tried.
