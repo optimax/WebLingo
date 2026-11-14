@@ -955,7 +955,7 @@ Proposed central props:
 | M0.9 | Collections: arrays, maps and sets (§3.2), with indexing, `length` and member access (§3.3), and `foreach` (§3.5) | Implemented (13 November 2026), in parts M0.9.1 to M0.9.6 (below), on both VMs, on Windows |
 | M0.10 | Classes, `dispose()` and `using` (§3.2, §3.4, WL-L011) | Implemented (13 November 2026), in parts M0.10.1 to M0.10.7 (below), on both VMs, on Windows; typed catches, `is` and the classes of values implemented too (13 November 2026), but for extending `Array`, `Map` and `Set` |
 | M0.11 | Asynchrony: `async`, `await` and tasks (§3.8) | Implemented (13 November 2026), in parts M0.11.1 and M0.11.2 (below), on both VMs, on Windows |
-| M0.12 | `.wlp` templates: includes, layouts and parameterized components, together (§13, WL-T001 to WL-T008) | Its contracts decided in part (§13, "Contracts", 13 November 2026); after M0.11, and the module system it needs (`import` and `param`) |
+| M0.12 | `.wlp` templates: includes, layouts and parameterized components, together (§13, WL-T001 to WL-T008) | Its contracts decided in part (§13, "Contracts", 13 November 2026); after M0.11, and the module system it needs (`import` and `param`), both done; in parts M0.12.1 to M0.12.5 (below, 14 November 2026) |
 | M0.13 | WBC, the bytecode's binary format (§5.1, §5.3) | After M0.12 |
 
 **M0.7 parts** (12 November 2026), each landing on its own with its conformance tests, which `WebLingo.Conformance.Tests` runs beside §8.6's:
@@ -989,6 +989,14 @@ Proposed central props:
 3. **Dynamic imports:** `await Module.import(path)`, a module compiled when it runs. Implemented (14 November 2026), on both VMs.
 4. **Standard modules:** the scheme `std:`, and `std:system`, which every module imports, with `write` and `writeLn`. Implemented (14 November 2026), on both VMs.
 5. **A script's parameters:** `weblingo run script.wl name=value`. Implemented (14 November 2026), on both VMs.
+
+**M0.12 parts** (14 November 2026), each landing on its own with its tests, on both VMs, the first `.wlp`-capable release having all of them together (WL-T001, WL-T008):
+
+1. **M0.12.1, pages:** `WebLingo.Templates`, a `.wlp`'s text, `<% … %>`, `<%= … %>`, `<%- … %>` and `<%# … %>`, statements across blocks, escaping, `null`, and line breaks (§13, "Contracts"), compiled through the WebLingo compiler into a program that writes the page; `welp run page.wlp`, in `WebLingo.Pages.Cli`, writing it to standard output; and `WebLingo.Templates.Tests`.
+2. **M0.12.2, includes:** `<% include "/includes/header.wlp"; %>`, textual, resolved and compiled with the page, and a cycle of them an error of the templates' range (WL5001 on).
+3. **M0.12.3, components:** `param` in a component, `renderComponent(path, values)`, a task, the component found and compiled when it runs, as `Module.import(…)` finds and compiles a module (§3.9), and a missing one's error.
+4. **M0.12.4, layouts:** `<% layout "/layouts/main.wlp", { title: … }; %>`, `renderBody()`, a layout's own layout, and a cycle of them.
+5. **M0.12.5, template output's benchmark workload** (§5.6), the third of the workloads "Both VMs, for now" waits for.
 
 **Extending the classes of values** (§3.7, 13 November 2026), in parts, each landing on its own with its conformance tests, on both VMs:
 
