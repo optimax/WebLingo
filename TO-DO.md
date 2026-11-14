@@ -102,11 +102,21 @@ The module system: `import`, static and dynamic, `export`, `param`, a script's p
 
 2026-11-14: split into the parts the specification defines in section 9 ("Modules"), each a task below. Waits for them.
 
-## [IDLE] Modules: Parameters
+## [QUESTION] Modules: Parameters
 
 `param`, the values an importer gives, and a missing one's error (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
 
 2026-11-14: waits for "Modules: Static Imports and Exports".
+
+2026-11-14: that landed; what a module with parameters does when imported twice needs the owner's decision first, as does how an import's values are checked. One decision each, answerable with a letter.
+
+**Q1, a module imported again with other values, `import a from "box" { size: 1 };` here and `{ size: 2 }` there: (a) it runs once, with the values of the import that ran it first, a later import's values unused, as "once per execution" has it; (b) it runs once for each set of values, each import with other values getting an instance of its own, as a template's component is rendered once per call; (c) an error, a module with parameters being imported once.**
+
+A1:
+
+**Q2, an import's values: (a) a map literal only, `{ size: 10 }`, whose names the compiler checks against the module's parameters, a missing or an extra one an error at compile time (a new code, WL2016); (b) any expression giving a map, checked when the import runs.**
+
+A2:
 
 ## [IDLE] Modules: Dynamic Imports
 
