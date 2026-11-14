@@ -2,32 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [IDLE] Extending the Classes of Values
-
-`extend` blocks, and classes extending `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class`, with `new` on those classes ("Classes of Values, Further"; specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
-
-2026-11-13: waits for the answers to "Classes of Values, Extensions".
-
-2026-11-13: answered; `extend`, classes extending `Boolean`, `Integer`, `Number`, `String` and `Function`, and their text (`Celsius(21.5)`, `Stack([1, 2])`) can be built; the class of an arithmetic result, and `Class`, wait for "Classes of Values, Extensions, Continued".
-
-2026-11-13: split into the parts the specification defines in section 9 ("Extending the classes of values"), each a task below. Waits for them.
-
-## [IDLE] Extending the Classes of Values: `Class`
-
-`new Class()` and `extends Class` (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
-
-2026-11-13: waits for the design of "Building Classes at Run Time".
-
-2026-11-14: designed (specification, section 3.7, "Classes of values"); split into the parts the specification defines in section 9 (part 5 of "Extending the classes of values"), each a task below. Waits for them.
-
-## [WORKING] Extending the Classes of Values: `Class`, Metaclasses
-
-`class Entity extends Class { … }`, whose instances are classes (specification, section 3.7, and part 5.4 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
-
-2026-11-14: waits for "Extending the Classes of Values: `Class`, Names", whose `className` a metaclass's methods read.
-
-Done (Claude, 2026-11-14): on both VMs, with conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Classes made while the program runs", and the rows that called `Class` sealed): `Class` is written in WebLingo, its constructor naming and basing the class a metaclass makes by the built-in classes' `hold`, so that the bytecode is unchanged; a class a metaclass made has its metaclass's methods after its own static members, and before the built-in `setMethod` and the like, which a metaclass may therefore replace. A conformance test that took `extends Class` for WL3001 is gone. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## Task Combinators
 
 `Task.all`, `Task.any` and timeouts (A6 of "Asynchrony: `async` and `await`"; specification, section 3.8). Added by Claude, 2026-11-13.

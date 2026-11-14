@@ -1637,3 +1637,33 @@ ASIDE1: `Point.__instanceOf` == `Class`, right? What about `Class.__instanceOf`?
 ASIDE2: `var f = function () {};`. Then, `f.__instanceOf` is?
 
 Done (Claude, 2026-11-14, `f081a02`): `addMethod` renamed `setMethod` in the runtime, the tests, the specification (section 3.7, recorded as approved, and section 15.2) and the README, with nothing kept for the old name; `DONE.md` keeps the name its tasks used. The asides, as built: `Point.__instanceOf` is `Class`, and so is `Class.__instanceOf`, a class being a value of the class `Class`, `Class` included (as Python's `type(type)` is `type`); `f.__instanceOf` is `Function`; and once metaclasses land, a class that `new Entity("User")` made gives `Entity`. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Extending the Classes of Values: `Class`, Metaclasses
+
+`class Entity extends Class { … }`, whose instances are classes (specification, section 3.7, and part 5.4 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for "Extending the Classes of Values: `Class`, Names", whose `className` a metaclass's methods read.
+
+Done (Claude, 2026-11-14, `123f46f`): on both VMs, with conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Classes made while the program runs", and the rows that called `Class` sealed): `Class` is written in WebLingo, its constructor naming and basing the class a metaclass makes by the built-in classes' `hold`, so that the bytecode is unchanged; a class a metaclass made has its metaclass's methods after its own static members, and before the built-in `setMethod` and the like, which a metaclass may therefore replace. A conformance test that took `extends Class` for WL3001 is gone. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Extending the Classes of Values: `Class`
+
+`new Class()` and `extends Class` (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for the design of "Building Classes at Run Time".
+
+2026-11-14: designed (specification, section 3.7, "Classes of values"); split into the parts the specification defines in section 9 (part 5 of "Extending the classes of values"), each a task below. Waits for them.
+
+Done (Claude, 2026-11-14): its four parts have landed, on both VMs: making classes (`d009021`), names (`8651b8e`), properties and constants (`c6ba136`), and metaclasses (`123f46f`); `addMethod` became `setMethod` (`f081a02`). Checks: those of each part, on Windows only; Linux not tried.
+
+## [DONE] Extending the Classes of Values
+
+`extend` blocks, and classes extending `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class`, with `new` on those classes ("Classes of Values, Further"; specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for the answers to "Classes of Values, Extensions".
+
+2026-11-13: answered; `extend`, classes extending `Boolean`, `Integer`, `Number`, `String` and `Function`, and their text (`Celsius(21.5)`, `Stack([1, 2])`) can be built; the class of an arithmetic result, and `Class`, wait for "Classes of Values, Extensions, Continued".
+
+2026-11-13: split into the parts the specification defines in section 9 ("Extending the classes of values"), each a task below. Waits for them.
+
+Done (Claude, 2026-11-14): every part section 9 defines has landed, on both VMs, the last of them `Class` (part 5, in four parts of its own, the last `123f46f`). Checks: those of each part, on Windows only; Linux not tried.
