@@ -9,6 +9,7 @@ namespace WebLingo.Runtime;
 public enum WebLingoMember : byte
 {
     Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, SetMethod, SetProperty, SetStaticProperty, SetConstant,
+    All, Any, Timeout,
     /// <summary>The names every value, or every class, has (section 3.7), last, so that one comparison finds them.</summary>
     ClassName, InstanceOf, Parent
 }
@@ -40,6 +41,9 @@ public static class WebLingoMembers
         "setProperty" => WebLingoMember.SetProperty,
         "setStaticProperty" => WebLingoMember.SetStaticProperty,
         "setConstant" or "static:const" => WebLingoMember.SetConstant,
+        "all" => WebLingoMember.All,
+        "any" => WebLingoMember.Any,
+        "timeout" => WebLingoMember.Timeout,
         "__className" => WebLingoMember.ClassName,
         "__instanceOf" => WebLingoMember.InstanceOf,
         "__parent" => WebLingoMember.Parent,
@@ -148,7 +152,7 @@ public static class WebLingoMembers
             {
                 return heap.TryAllocateBoundMethod(target, objectToString, out result, out error);
             }
-            if (IsClassMethod(target, member))
+            if (IsClassMethod(target, member, heap))
             {
                 error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
                     $"'{name}' is a method of {WebLingoValueFormatter.Describe(target, heap)}, and can only be called.");
@@ -614,6 +618,28 @@ public static class WebLingoMembers
             : heap.TrySetProperty(target, memberName, values[first + 1], values[first + 2], member == WebLingoMember.SetStaticProperty, out error);
     }
 
+    /// <summary>
+    /// <c>Task.all(values)</c>, <c>Task.any(values)</c>, each given an array (WL3001 otherwise), and
+    /// <c>Task.timeout(task, milliseconds)</c>: a task, which the execution's scheduler completes (section 3.8).
+    /// </summary>
+    private static bool TryCombine(WebLingoMember member, string name, WebLingoValue[] values, int first, int count, WebLingoHeap heap,
+        out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        var arity = member == WebLingoMember.Timeout ? 2 : 1;
+        if (count != arity) return WrongArgumentCount(name, arity, count, out error);
+        var scheduler = heap.Scheduler ?? throw new InvalidOperationException("The execution has no scheduler.");
+        if (member == WebLingoMember.Timeout) return scheduler.TryTimeout(values[first], values[first + 1], out result, out error);
+        if (values[first].Kind != WebLingoValueKind.Array)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"'{name}' takes an array of values, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+            return false;
+        }
+        var given = new List<WebLingoValue>(heap.GetArray(values[first]));
+        return member == WebLingoMember.All ? scheduler.TryAll(given, out result, out error) : scheduler.TryAny(given, out result, out error);
+    }
+
     /// <summary>Whether a string is a name, as a program writes one: ASCII letters, digits and <c>_</c>, not first a digit.</summary>
     private static bool IsName(string text)
     {
@@ -629,17 +655,19 @@ public static class WebLingoMembers
         (target.Kind == WebLingoValueKind.Array && member is WebLingoMember.Push or WebLingoMember.Pop)
         || (target.Kind == WebLingoValueKind.Map && member is WebLingoMember.Has or WebLingoMember.Remove)
         || (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
-        || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
-        || IsClassMethod(target, member);
+        || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget);
 
     /// <summary>
     /// Whether <c>x.name(…)</c> calls a class's built-in method, <c>setMethod</c>, <c>setProperty</c>,
     /// <c>setStaticProperty</c> or <c>setConstant</c>, which a class has when it has no static member of that name; a
     /// <c>static const</c> calls <c>setConstant</c> by a name no program can declare (section 3.7).
     /// </summary>
-    public static bool IsClassMethod(WebLingoValue target, WebLingoMember member) =>
-        target.Kind == WebLingoValueKind.Class && member is WebLingoMember.SetMethod or WebLingoMember.SetProperty
-            or WebLingoMember.SetStaticProperty or WebLingoMember.SetConstant;
+    /// <remarks><c>Task</c> has <c>all</c>, <c>any</c> and <c>timeout</c> besides (section 3.8).</remarks>
+    public static bool IsClassMethod(WebLingoValue target, WebLingoMember member, WebLingoHeap heap) =>
+        target.Kind == WebLingoValueKind.Class
+        && (member is WebLingoMember.SetMethod or WebLingoMember.SetProperty or WebLingoMember.SetStaticProperty or WebLingoMember.SetConstant
+            || (member is WebLingoMember.All or WebLingoMember.Any or WebLingoMember.Timeout && heap.ValueClasses is { } classes
+                && classes[(int)WebLingoValueClass.Task] == target));
 
     /// <summary>
     /// Calls a method, <c>x.name(…)</c>, with the <paramref name="count"/> arguments from
@@ -681,7 +709,14 @@ public static class WebLingoMembers
             result = WebLingoValue.FromBoolean(removed);
             return true;
         }
-        if (IsClassMethod(target, member)) return TryCallClassMethod(target, member, name, values, first, count, heap, out error);
+        if (IsClassMethod(target, member, heap))
+        {
+            if (member is WebLingoMember.All or WebLingoMember.Any or WebLingoMember.Timeout)
+            {
+                return TryCombine(member, name, values, first, count, heap, out result, out error);
+            }
+            return TryCallClassMethod(target, member, name, values, first, count, heap, out error);
+        }
         if (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
         {
             // t.forget(): nothing reports its exception, if it faults (section 3.8).

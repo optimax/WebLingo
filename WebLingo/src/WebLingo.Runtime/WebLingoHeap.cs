@@ -1053,6 +1053,11 @@ public sealed class WebLingoHeap
                 case WebLingoTask task:
                     Mark(task.Result, marked, pending);
                     Mark(task.Exception, marked, pending);
+                    Mark(task.Results, marked, pending);
+                    if (task.Joins is not null)
+                    {
+                        foreach (var (combinator, _) in task.Joins) Mark(combinator, marked, pending);
+                    }
                     foreach (var waiter in task.Waiters) Mark(waiter, marked, pending);
                     if (task.FrameRoots is not null)
                     {

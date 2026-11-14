@@ -1,7 +1,11 @@
+using WebLingo.Core;
 namespace WebLingo.Runtime;
 
 /// <summary>Where a task stands (specification, section 3.8).</summary>
 public enum WebLingoTaskState : byte { Pending, Done, Faulted }
+
+/// <summary>What a task without a function of its own waits for (section 3.8): none, all its values, any of them, or a timeout.</summary>
+public enum WebLingoCombinator : byte { None, All, Any, Timeout }
 
 /// <summary>
 /// A task (specification, section 3.8): what an <c>async</c> function's call gives, or <c>delay</c>'s, an object of
@@ -28,6 +32,21 @@ public sealed class WebLingoTask
     /// <summary>Whether something awaited it, or forgot it (<c>t.forget()</c>): a fault neither saw stops the execution at its end.</summary>
     public bool Observed { get; set; }
     public bool Forgotten { get; set; }
+
+    /// <summary>
+    /// The combinators that wait for it (<c>Task.all</c>, <c>Task.any</c>, <c>Task.timeout</c>), each with the place it
+    /// has among their values, told when it completes; null for none.
+    /// </summary>
+    public List<(WebLingoValue Combinator, int Index)>? Joins { get; set; }
+
+    /// <summary>
+    /// For a combinator: which, the array of results <c>Task.all</c> fills, the values it still waits for, and a timeout's
+    /// time, in milliseconds.
+    /// </summary>
+    public WebLingoCombinator Combinator { get; set; }
+    public WebLingoValue Results { get; set; }
+    public int Remaining { get; set; }
+    public long Milliseconds { get; set; }
 }
 
 /// <summary>What resumes a waiting task's <c>async</c> function: what its <c>await</c> gives, or the exception it throws there.</summary>
@@ -70,7 +89,7 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         return true;
     }
 
-    /// <summary>A task done, with its result: the tasks waiting for it become ready.</summary>
+    /// <summary>A task done, with its result: the tasks waiting for it become ready, and the combinators told.</summary>
     public void Complete(WebLingoValue task, WebLingoValue result)
     {
         var state = heap.GetTask(task);
@@ -78,6 +97,150 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         state.Result = result;
         foreach (var waiter in state.Waiters) _ready.Enqueue(new WebLingoResumption(waiter, result, false, null, 0));
         state.Waiters.Clear();
+        Joined(state, false, result, null, 0);
+    }
+
+    /// <summary>
+    /// <c>Task.all(values)</c>: a task that completes with an array of the values' results, in their order, once all
+    /// have, a value that is not a task its own result; or faults, at once, with the first exception one of them throws,
+    /// the others going on (section 3.8). Every task it is given is observed.
+    /// </summary>
+    public bool TryAll(List<WebLingoValue> values, out WebLingoValue combined, out WebLingoRuntimeError? error)
+    {
+        var initial = new WebLingoValue[values.Count];
+        if (!heap.TryAllocateTask(out combined, out error) || !heap.TryAllocateArray(initial, 0, initial.Length, out var results, out error))
+        {
+            return false;
+        }
+        var state = heap.GetTask(combined);
+        (state.Combinator, state.Results) = (WebLingoCombinator.All, results);
+        var elements = heap.GetArray(results);
+        for (var i = 0; i < values.Count && state.State == WebLingoTaskState.Pending; i++)
+        {
+            if (values[i].Kind != WebLingoValueKind.Task)
+            {
+                elements[i] = values[i];
+                continue;
+            }
+            var given = heap.GetTask(values[i]);
+            given.Observed = true;
+            if (given.State == WebLingoTaskState.Done) elements[i] = given.Result;
+            else if (given.State == WebLingoTaskState.Faulted) Fault(combined, given.Exception, given.Error, given.Origin);
+            else
+            {
+                Join(given, combined, i);
+                state.Remaining++;
+            }
+        }
+        // The tasks after a fault are observed too, which it no longer waits for.
+        foreach (var value in values)
+        {
+            if (value.Kind == WebLingoValueKind.Task) heap.GetTask(value).Observed = true;
+        }
+        if (state.State == WebLingoTaskState.Pending && state.Remaining == 0) Complete(combined, results);
+        return true;
+    }
+
+    /// <summary>
+    /// <c>Task.any(values)</c>: a task that completes, or faults, as the first of the values to complete does, a value that
+    /// is not a task, or a task already complete, at once, the first such in their order; the others go on, observed
+    /// (section 3.8). At least one value is needed (WL3001).
+    /// </summary>
+    public bool TryAny(List<WebLingoValue> values, out WebLingoValue combined, out WebLingoRuntimeError? error)
+    {
+        combined = WebLingoValue.Null;
+        if (values.Count == 0)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "'any' needs at least one value, the first of which to complete it gives.");
+            return false;
+        }
+        if (!heap.TryAllocateTask(out combined, out error)) return false;
+        var state = heap.GetTask(combined);
+        state.Combinator = WebLingoCombinator.Any;
+        foreach (var value in values)
+        {
+            if (value.Kind == WebLingoValueKind.Task) heap.GetTask(value).Observed = true;
+        }
+        for (var i = 0; i < values.Count && state.State == WebLingoTaskState.Pending; i++)
+        {
+            if (values[i].Kind != WebLingoValueKind.Task)
+            {
+                Complete(combined, values[i]);
+                break;
+            }
+            var given = heap.GetTask(values[i]);
+            if (given.State == WebLingoTaskState.Done) Complete(combined, given.Result);
+            else if (given.State == WebLingoTaskState.Faulted) Fault(combined, given.Exception, given.Error, given.Origin);
+        }
+        for (var i = 0; i < values.Count && state.State == WebLingoTaskState.Pending; i++)
+        {
+            if (values[i].Kind == WebLingoValueKind.Task) Join(heap.GetTask(values[i]), combined, i);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// <c>Task.timeout(task, milliseconds)</c>: a task that completes, or faults, as the task does, or faults with a
+    /// timeout (WL3010, a <c>TimeoutError</c> when caught) once that time has passed first, the task going on, observed; a
+    /// value that is not a task completes it at once (section 3.8). The time is an integer of 0 or more (WL3001).
+    /// </summary>
+    public bool TryTimeout(WebLingoValue value, WebLingoValue milliseconds, out WebLingoValue combined, out WebLingoRuntimeError? error)
+    {
+        combined = WebLingoValue.Null;
+        if (milliseconds.Kind != WebLingoValueKind.Int64 || milliseconds.AsInt64 < 0)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"'timeout' takes a time in milliseconds, an integer of 0 or more, not {WebLingoValueFormatter.Describe(milliseconds, heap)}.");
+            return false;
+        }
+        if (!heap.TryAllocateTask(out combined, out error)) return false;
+        var state = heap.GetTask(combined);
+        (state.Combinator, state.Milliseconds) = (WebLingoCombinator.Timeout, milliseconds.AsInt64);
+        if (value.Kind != WebLingoValueKind.Task)
+        {
+            Complete(combined, value);
+            return true;
+        }
+        var given = heap.GetTask(value);
+        given.Observed = true;
+        if (given.State == WebLingoTaskState.Done) Complete(combined, given.Result);
+        else if (given.State == WebLingoTaskState.Faulted) Fault(combined, given.Exception, given.Error, given.Origin);
+        else
+        {
+            Join(given, combined, 0);
+            _timers.Add((Now + milliseconds.AsInt64, _order++, combined));
+        }
+        return true;
+    }
+
+    private static void Join(WebLingoTask given, WebLingoValue combinator, int index)
+    {
+        (given.Joins ??= []).Add((combinator, index));
+    }
+
+    /// <summary>A task has completed, or faulted: each combinator still waiting for it learns how (section 3.8).</summary>
+    private void Joined(WebLingoTask state, bool faulted, WebLingoValue value, WebLingoRuntimeError? error, long origin)
+    {
+        if (state.Joins is not { } joins) return;
+        state.Joins = null;
+        foreach (var (combinator, index) in joins)
+        {
+            var waiting = heap.GetTask(combinator);
+            if (waiting.State != WebLingoTaskState.Pending) continue;
+            if (faulted)
+            {
+                Fault(combinator, value, error, origin);
+            }
+            else if (waiting.Combinator != WebLingoCombinator.All)
+            {
+                Complete(combinator, value);
+            }
+            else
+            {
+                heap.GetArray(waiting.Results)[index] = value;
+                if (--waiting.Remaining == 0) Complete(combinator, waiting.Results);
+            }
+        }
     }
 
     /// <summary>
@@ -95,6 +258,7 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         foreach (var waiter in state.Waiters) _ready.Enqueue(new WebLingoResumption(waiter, exception, true, error, origin));
         state.Waiters.Clear();
         if (!state.Observed) _faulted.Add(task);
+        Joined(state, true, exception, error, origin);
     }
 
     /// <summary>
@@ -152,7 +316,14 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         {
             _virtualNow = due;
         }
-        Complete(task, WebLingoValue.Null);
+        var timed = heap.GetTask(task);
+        if (timed.Combinator != WebLingoCombinator.Timeout) Complete(task, WebLingoValue.Null);
+        else if (timed.State == WebLingoTaskState.Pending)
+        {
+            // A timeout whose task has not completed in its time (section 3.8).
+            Fault(task, WebLingoValue.Null, new WebLingoRuntimeError(WebLingoDiagnosticCodes.Timeout,
+                $"The task did not complete within {timed.Milliseconds} milliseconds."), WebLingoExceptions.Nowhere);
+        }
         return true;
     }
 

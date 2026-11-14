@@ -443,6 +443,12 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class Meta extends Class {} class Shape { area() { return 0; } } var Sq = new Meta(\"Sq\", Shape); writeLn([new Sq().area(), new Sq() is Shape, Sq.__parent]);", "[0, true, class Shape]")]
     [InlineData("class Meta extends Class { hello() { return \"metaclass\"; } } var A = new Meta(\"A\"); A.hello = function () { return \"static\"; }; var P = new Class(\"P\"); writeLn([A.hello(), P.__instanceOf, P is Class, P is Meta]);", "[\"static\", class Class, true, false]")]
     [InlineData("class Meta extends Class {} var C = new Meta(); writeLn([C, new C()]);", "[class, class {}]")]
+    [InlineData("async function after(ms, v) { await delay(ms); return v; } async function fails(ms, m) { await delay(ms); throw m; } writeLn([await Task.all([after(3, \"a\"), 2, after(1, \"c\")]), await Task.all([])]);", "[[\"a\", 2, \"c\"], []]")]
+    [InlineData("async function after(ms, v) { await delay(ms); return v; } async function fails(ms, m) { await delay(ms); throw m; } try { await Task.all([after(3, 1), fails(1, \"bad\"), fails(2, \"worse\")]); } catch (e) { writeLn(e); }", "bad")]
+    [InlineData("async function after(ms, v) { await delay(ms); return v; } async function fails(ms, m) { await delay(ms); throw m; } writeLn([await Task.any([after(3, \"slow\"), after(1, \"fast\")]), await Task.any([after(3, \"slow\"), 5])]);", "[\"fast\", 5]")]
+    [InlineData("async function after(ms, v) { await delay(ms); return v; } async function fails(ms, m) { await delay(ms); throw m; } try { await Task.any([after(3, 1), fails(1, \"first\")]); } catch (e) { writeLn(e); }", "first")]
+    [InlineData("async function after(ms, v) { await delay(ms); return v; } async function fails(ms, m) { await delay(ms); throw m; } writeLn([await Task.timeout(after(1, \"in time\"), 50), await Task.timeout(7, 0)]); try { await Task.timeout(after(50, \"late\"), 2); } catch (TimeoutError e) { writeLn([e.code, e is Error]); }", "[\"in time\", 7]\n[\"WL3010\", true]")]
+    [InlineData("async function after(ms, v) { await delay(ms); return v; } async function fails(ms, m) { await delay(ms); throw m; } writeLn(await Task.all([Task.any([after(2, \"x\")]), Task.timeout(after(1, \"y\"), 50)]));", "[\"x\", \"y\"]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -625,6 +631,14 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class Meta extends Class {} new Meta(\"A\", 5);", "WL3001")]
     [InlineData("class Bad extends Class { constructor() { super(\"B\", this); } } new Bad();", "WL3001")]
     [InlineData("class Meta extends Class {} new Meta(\"A\", Task);", "WL3001")]
+    [InlineData("Task.all(5);", "WL3001")]
+    [InlineData("Task.any([]);", "WL3001")]
+    [InlineData("Task.timeout(1, -1);", "WL3001")]
+    [InlineData("Task.all();", "WL2006")]
+    [InlineData("var f = Task.all;", "WL3001")]
+    [InlineData("class P {} P.all([]);", "WL3006")]
+    [InlineData("async function late() { await delay(50); return 1; } var t = Task.timeout(late(), 2); await delay(60);", "WL3010")]
+    [InlineData("async function late() { await delay(50); return 1; } await Task.timeout(late(), 2);", "WL3010")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

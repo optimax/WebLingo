@@ -81,5 +81,11 @@ public static class WebLingoExceptions
     /// </summary>
     public static long Origin(int function, int instruction) => ((long)function << 32) | (uint)instruction;
 
+    /// <summary>
+    /// The origin of a runtime error that no instruction raised, a timeout's (section 3.8): it is thrown from the
+    /// <c>await</c> it reaches, and reported nowhere in the source if nothing awaits it.
+    /// </summary>
+    public const long Nowhere = -1;
+
     public static (int Function, int Instruction) FromOrigin(long origin) => ((int)(origin >> 32), (int)(origin & 0xFFFFFFFF));
 }

@@ -511,7 +511,7 @@ public sealed class WebLingoStackVirtualMachine
                                     goto call;
                                 }
                                 // Else the class's built-in setMethod, below, which a static member of its name hides.
-                                if (!WebLingoMembers.IsClassMethod(target, name.Member)) break;
+                                if (!WebLingoMembers.IsClassMethod(target, name.Member, heap)) break;
                             }
                             if (target.Kind == WebLingoValueKind.Instance)
                             {
@@ -1704,6 +1704,8 @@ public sealed class WebLingoStackVirtualMachine
                     var discards = frame.AwaitDiscards;
                     frame.AwaitDiscards = false;
                     if (resumption.Throws) (_thrown, _thrownError, _origin) = (resumption.Value, resumption.Error, resumption.Origin);
+                    // A timeout's error, which no instruction raised, is thrown from the await it reaches (section 3.8).
+                    if (resumption.Throws && _origin == WebLingoExceptions.Nowhere) _origin = OriginOf(frame.Function, frame.Pc - 1);
                     else if (!discards) frame.Slots[frame.Sp++] = resumption.Value;
                     return true;
                 }

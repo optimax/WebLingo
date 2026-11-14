@@ -76,6 +76,8 @@ public static class WebLingoDiagnosticCodes
     public const string UncaughtException = "WL3008";
     /// <summary>A program waiting for a task that nothing will complete, such as two that await each other (proposed, section 3.8).</summary>
     public const string Deadlock = "WL3009";
+    /// <summary>A task that did not complete in the time <c>Task.timeout</c> gave it (proposed, section 3.8).</summary>
+    public const string Timeout = "WL3010";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";
