@@ -82,6 +82,84 @@ public sealed class WsHeap
     /// Marks a class as a kind of collection's, <c>Array</c>'s, <c>Map</c>'s or <c>Set</c>'s (section 3.7): <c>new</c>
     /// makes an empty one, and a class that extends it makes collections of that kind, of its own class, with fields.
     /// </summary>
+    /// <summary>Whether an <c>extend</c> has run, so that a kind of value's class may have methods of its own (section 3.7).</summary>
+    public bool Extended { get; private set; }
+
+    /// <summary>
+    /// The classes of the kinds of values the program has made, by <c>WsValueClass</c>, which its VM keeps as roots; a
+    /// value's methods are its kind's class's, once an <c>extend</c> has run (section 3.7).
+    /// </summary>
+    public WsValue[]? ValueClasses { get; set; }
+
+    /// <summary>
+    /// How many extensions have run: a class whose methods were gathered from its bases before the last gathers them
+    /// again when they are next looked up (section 3.7).
+    /// </summary>
+    private int _classVersion;
+
+    /// <summary>
+    /// <c>extend</c> (section 3.7): a class given methods and static members, each replacing one of its own of that name;
+    /// its instances and subclasses, made before or after, have the methods. Anything but a class is WS3001.
+    /// </summary>
+    public bool TryExtendClass(WsValue classValue, Dictionary<string, WsValue> methods, Dictionary<string, WsValue> staticMethods,
+        IReadOnlyList<string> staticFields, out WsRuntimeError? error)
+    {
+        if (classValue.Kind != WsValueKind.Class)
+        {
+            error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                $"{Capitalized(WsValueFormatter.Describe(classValue, this))} cannot be extended: only a class can.");
+            return false;
+        }
+        var target = Get<ClassObject>(classValue, WsValueKind.Class);
+        var before = Size(target);
+        foreach (var (name, closure) in methods) target.OwnMethods[name] = closure;
+        foreach (var (name, closure) in staticMethods)
+        {
+            target.StaticFields.Remove(name);
+            target.StaticMethods[name] = closure;
+        }
+        foreach (var name in staticFields)
+        {
+            target.StaticMethods.Remove(name);
+            target.StaticFields.TryAdd(name, WsValue.Null);
+        }
+        _classVersion++;
+        Extended = true;
+        var grown = Size(target) - before;
+        if (!TryReserve(grown, out error)) return false;
+        Units += grown;
+        return true;
+    }
+
+    /// <summary>A class, its methods gathered anew from its bases if an extension has run since they last were.</summary>
+    private ClassObject Current(ClassObject target) => target.Version == _classVersion ? target : Gather(target);
+
+    /// <summary>A class's methods, its base's with its own in their place, and its disposal (section 3.7).</summary>
+    private ClassObject Gather(ClassObject target)
+    {
+        var methods = target.Methods;
+        methods.Clear();
+        WsValue[] inherited = [];
+        if (target.Base.Kind == WsValueKind.Class)
+        {
+            var baseObject = Current(Get<ClassObject>(target.Base, WsValueKind.Class));
+            foreach (var (name, closure) in baseObject.Methods) methods[name] = closure;
+            inherited = baseObject.DisposeChain;
+        }
+        foreach (var (name, closure) in target.OwnMethods) methods[name] = closure;
+        // Its disposal: its own dispose method, if it has one, then its base's disposal (section 3.7).
+        var disposeChain = inherited;
+        if (target.OwnMethods.TryGetValue("dispose", out var own))
+        {
+            disposeChain = new WsValue[inherited.Length + 1];
+            disposeChain[0] = own;
+            for (var i = 0; i < inherited.Length; i++) disposeChain[i + 1] = inherited[i];
+        }
+        target.DisposeChain = disposeChain;
+        target.Version = _classVersion;
+        return target;
+    }
+
     public void MarkCollectionClass(WsValue classValue, WsValueKind kind)
     {
         var target = Get<ClassObject>(classValue, WsValueKind.Class);
@@ -230,7 +308,6 @@ public sealed class WsHeap
         IReadOnlyList<string>? staticFields = null)
     {
         value = WsValue.Null;
-        var all = methods;
         var makes = WsValueKind.Instance;
         if (baseClass.Kind != WsValueKind.Null)
         {
@@ -246,32 +323,22 @@ public sealed class WsHeap
                 error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation, $"The class {baseObject.Name} cannot be extended.");
                 return false;
             }
-            all = new Dictionary<string, WsValue>(baseObject.Methods, StringComparer.Ordinal);
             makes = baseObject.Makes;
-            foreach (var (methodName, closure) in methods) all[methodName] = closure;
-        }
-        // Its disposal: its own dispose method, if it declares one, then its base's disposal (section 3.7).
-        var inherited = baseClass.Kind == WsValueKind.Class ? Get<ClassObject>(baseClass, WsValueKind.Class).DisposeChain : [];
-        var disposeChain = inherited;
-        if (methods.TryGetValue("dispose", out var own))
-        {
-            disposeChain = new WsValue[inherited.Length + 1];
-            disposeChain[0] = own;
-            for (var i = 0; i < inherited.Length; i++) disposeChain[i + 1] = inherited[i];
         }
         var fields = new Dictionary<string, WsValue>(StringComparer.Ordinal);
         if (staticFields is not null)
         {
             foreach (var field in staticFields) fields[field] = WsValue.Null;
         }
-        var made = new ClassObject(name, constructor, all)
+        var made = new ClassObject(name, constructor, new Dictionary<string, WsValue>(StringComparer.Ordinal))
         {
             Base = baseClass,
-            DisposeChain = disposeChain,
+            OwnMethods = new Dictionary<string, WsValue>(methods, StringComparer.Ordinal),
             Makes = makes,
             StaticMethods = staticMethods ?? new Dictionary<string, WsValue>(StringComparer.Ordinal),
             StaticFields = fields
         };
+        Gather(made);
         return TryAllocate(made, WsValueKind.Class, Size(made), out value, out error);
     }
 
@@ -317,7 +384,7 @@ public sealed class WsHeap
     /// A class's disposal: the dispose methods that disposing an instance runs on it, in order, its own first, then its
     /// bases', each once (section 3.7); none if neither it nor a base declares one.
     /// </summary>
-    public WsValue[] DisposeChain(WsValue classValue) => Get<ClassObject>(classValue, WsValueKind.Class).DisposeChain;
+    public WsValue[] DisposeChain(WsValue classValue) => Current(Get<ClassObject>(classValue, WsValueKind.Class)).DisposeChain;
 
     /// <summary>Marks an instance disposed, giving whether it was not already (section 3.7).</summary>
     public bool TryMarkDisposed(WsValue instance)
@@ -338,7 +405,7 @@ public sealed class WsHeap
 
     /// <summary>A method's closure, by its name, from a class.</summary>
     public bool TryGetMethod(WsValue value, string name, out WsValue closure) =>
-        Get<ClassObject>(value, WsValueKind.Class).Methods.TryGetValue(name, out closure);
+        Current(Get<ClassObject>(value, WsValueKind.Class)).Methods.TryGetValue(name, out closure);
 
     /// <summary>A new instance of a class, without fields yet.</summary>
     public bool TryAllocateInstance(WsValue classValue, out WsValue instance, out WsRuntimeError? error)
@@ -572,6 +639,7 @@ public sealed class WsHeap
                     Mark(classObject.Base, marked, pending);
                     Mark(classObject.Constructor, marked, pending);
                     foreach (var method in classObject.Methods.Values) Mark(method, marked, pending);
+                    foreach (var method in classObject.OwnMethods.Values) Mark(method, marked, pending);
                     foreach (var method in classObject.DisposeChain) Mark(method, marked, pending);
                     foreach (var method in classObject.StaticMethods.Values) Mark(method, marked, pending);
                     foreach (var field in classObject.StaticFields.Values) Mark(field, marked, pending);
@@ -716,10 +784,16 @@ public sealed class WsHeap
         public InstanceObject? Instance { get; init; }
     }
 
+    /// <summary>
+    /// A class: <see cref="Methods"/> are those its instances have, its base's with its own in their place, gathered
+    /// from <see cref="OwnMethods"/>, those it declares and those extensions gave it, as of <see cref="Version"/>.
+    /// </summary>
     private sealed record ClassObject(string Name, WsValue Constructor, Dictionary<string, WsValue> Methods)
     {
         public WsValue Base { get; init; }
-        public WsValue[] DisposeChain { get; init; } = [];
+        public Dictionary<string, WsValue> OwnMethods { get; init; } = new(StringComparer.Ordinal);
+        public int Version { get; set; }
+        public WsValue[] DisposeChain { get; set; } = [];
         public bool Sealed { get; set; }
         /// <summary>What <c>new</c> makes: an instance, or a collection, for Array, Map, Set and the classes extending them.</summary>
         public WsValueKind Makes { get; set; } = WsValueKind.Instance;
@@ -729,9 +803,9 @@ public sealed class WsHeap
         public Dictionary<string, WsValue> StaticFields { get; init; } = new(StringComparer.Ordinal);
     }
 
-    /// <summary>A class's units: one, and one for each method and static member.</summary>
+    /// <summary>A class's units: one, and one for each method of its own and static member.</summary>
     private static int Size(ClassObject classObject) =>
-        classObject.Methods.Count + classObject.StaticMethods.Count + classObject.StaticFields.Count + 1;
+        classObject.OwnMethods.Count + classObject.StaticMethods.Count + classObject.StaticFields.Count + 1;
 
     private sealed record BoundMethodObject(WsValue Instance, WsValue Closure, bool Disposes);
 

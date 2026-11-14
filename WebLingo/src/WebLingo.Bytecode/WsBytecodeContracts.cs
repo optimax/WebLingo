@@ -167,6 +167,11 @@ public enum WsOpCode : byte
     /// task's result once it completes, goes to A, or the task's exception is thrown here (section 3.8).
     /// </summary>
     Await,
+    /// <summary>
+    /// A = register holding a class (WS3001 otherwise), B = class index: the class given that class's methods and static
+    /// members, their closures made as their captures say, an extension's (section 3.7).
+    /// </summary>
+    Extend,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);

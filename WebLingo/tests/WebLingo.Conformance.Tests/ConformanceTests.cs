@@ -109,6 +109,13 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("async function f() { var g = function () { await 1; }; }", "WS2014", 1, 44)]
     [InlineData("class A { async constructor() {} }", "WS1001", 1, 17)]
     [InlineData("var async = 1;", "WS1001", 1, 5)]
+    [InlineData("class P { m() { return 1; } } extend P { m() { return super.m(); } }", "WS2009", 1, 55)]
+    [InlineData("class P {} extend P { constructor() {} }", "WS1001", 1, 23)]
+    [InlineData("class P {} extend P { dispose() {} destructor() {} }", "WS2011", 1, 36)]
+    [InlineData("class P {} extend P { m() {} m() {} }", "WS2002", 1, 30)]
+    [InlineData("var extend = 1;", "WS1001", 1, 5)]
+    [InlineData("extend Q { }", "WS2001", 1, 8)]
+    [InlineData("var x = 5; extend x { }", "WS2001", 1, 19)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -337,6 +344,21 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class R { dispose() { writeLn(\"d\"); } } async function f() { using (var r = new R()) {} writeLn(\"f\"); } var t = f(); writeLn(\"main\"); await t;", "d\nf\nmain")]
     [InlineData("class R { async dispose() { await null; writeLn(\"d\"); } } async function f() { using (var r = new R()) { return 1; } } var t = f(); writeLn(\"main\"); writeLn(await t);", "main\nd\n1")]
     [InlineData("class S extends Array {} var s = new S(); s.push(1); s.push(s); writeLn(s); writeLn([s]); class M extends Map {} var m = new M(); m[\"k\"] = s; writeLn(m);", "S([1, S([…])])\n[S([1, S([…])])]\nM({\"k\": S([1, S([…])])})")]
+    [InlineData("class A { static var x = 1; } class B extends A {} extend B { static var x = 2; } writeLn(A.x); writeLn(B.x);", "1\n2")]
+    [InlineData("class A { m() { return \"A\"; } } class B extends A { m() { return \"B\"; } } extend A { m() { return \"A2\"; } } writeLn(new B().m()); writeLn(new A().m());", "B\nA2")]
+    [InlineData("writeLn(new P().hi()); class P {} extend P { hi() { return \"hi\"; } }", "hi")]
+    [InlineData("class P {} var p = new P(); { extend P { hi() { return \"hi\"; } } writeLn(p.hi()); } writeLn(p.hi());", "hi\nhi")]
+    [InlineData("extend Integer { async later() { await null; return this + 1; } } writeLn(await 1.later());", "2")]
+    [InlineData("extend String { toString() { return \"S\"; } } writeLn(\"a\".toString()); writeLn(\"a\");", "S\na")]
+    [InlineData("extend Class { describe() { return \"class \" + this.toString(); } } class P {} writeLn(P.describe());", "class class P")]
+    [InlineData("class Stack extends Array {} extend Array { top() { return this[this.length - 1]; } } var s = new Stack(); s.push(1); s.push(2); writeLn(s.top()); writeLn([3].top());", "2\n3")]
+    [InlineData("extend Array { push(v) { writeLn(\"pushing\"); } } var a = []; a.push(1); writeLn(a.length);", "pushing\n0")]
+    [InlineData("extend Object { d() { return \"d\"; } } writeLn(null.toString()); writeLn(true.d()); writeLn(1.5.d());", "null\nd\nd")]
+    [InlineData("class R { dispose() { writeLn(\"old\"); } } extend R { dispose() { writeLn(\"new\"); } } using (var r = new R()) {}", "new")]
+    [InlineData("class A { dispose() { writeLn(\"A\"); } } class B extends A {} extend B { destructor() { writeLn(\"B\"); } } new B().dispose();", "B\nA")]
+    [InlineData("{ var k = 10; extend Integer { plusK() { return this + k; } } writeLn(1.plusK()); }", "11")]
+    [InlineData("extend Integer { isPositive() { return this > 0; } static zero() { return 0; } } writeLn([4.isPositive(), (0 - 3).isPositive(), Integer.zero()]); var f = 4.isPositive; writeLn(f());", "[true, false, 0]\ntrue")]
+    [InlineData("class P {} extend P { equal(o) { return true; } } writeLn(new P().equal(1)); try { throw 5; } catch (P e) { writeLn(\"not caught here\"); } catch (e) { writeLn(e); }", "true\n5")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -475,6 +497,9 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var s = #{1}; writeLn(s.add);", "WS3001")]
     [InlineData("var s = #{1}; s.push(1);", "WS3006")]
     [InlineData("writeLn(#{1}.length());", "WS2005")]
+    [InlineData("var x = 5; { extend x { m() {} } }", "WS3001")]
+    [InlineData("extend Object { d() { return 1; } } null.d();", "WS3006")]
+    [InlineData("extend Integer { m() { return 1; } } \"s\".m();", "WS3006")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

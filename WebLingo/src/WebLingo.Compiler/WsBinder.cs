@@ -113,18 +113,31 @@ public sealed class WsBinder
             if (statement is not WsClassDeclarationSyntax derived) continue;
             bases.Add(derived, derived.Base is { } baseSyntax ? BindExpression(baseSyntax) : Reference(UseObject(), derived.NameSpan));
         }
-        // A class's static fields are set when it is made, so their values are bound where the block begins too, where
-        // 'this' is not the class's (WS2009).
-        var statics = new Dictionary<WsClassDeclarationSyntax, List<(string, WsBoundExpression, WsSourceSpan)>>();
+        // An extension runs where its block begins too, after its classes are made (section 3.7), so its class is bound
+        // there, as a base is.
+        var targets = new Dictionary<WsExtendSyntax, WsBoundExpression>();
         foreach (var statement in syntax)
         {
-            if (statement is not WsClassDeclarationSyntax { StaticFields.Count: > 0 } withStatics) continue;
+            if (statement is WsExtendSyntax extension) targets.Add(extension, BindExpression(extension.Target));
+        }
+        // A class's static fields are set when it is made, so their values are bound where the block begins too, where
+        // 'this' is not the class's (WS2009).
+        var statics = new Dictionary<WsStatementSyntax, List<(string, WsBoundExpression, WsSourceSpan)>>();
+        foreach (var statement in syntax)
+        {
+            var fields = statement switch
+            {
+                WsClassDeclarationSyntax withStatics => withStatics.StaticFields,
+                WsExtendSyntax extension => extension.StaticFields,
+                _ => []
+            };
+            if (fields.Count == 0) continue;
             _scope = new Scope(_scope, _function);
             _scope.Locals.Add("this", _noThis);
             var values = new List<(string, WsBoundExpression, WsSourceSpan)>();
-            foreach (var field in withStatics.StaticFields) values.Add((field.Name, BindExpression(field.Value), field.NameSpan));
+            foreach (var field in fields) values.Add((field.Name, BindExpression(field.Value), field.NameSpan));
             _scope = _scope.Parent!;
-            statics.Add(withStatics, values);
+            statics.Add(statement, values);
         }
         var statements = new List<WsBoundStatement>();
         foreach (var statement in syntax)
@@ -144,6 +157,12 @@ public sealed class WsBinder
                 var bound = BindClass(declaration, local, bases.GetValueOrDefault(declaration),
                     statics.GetValueOrDefault(declaration) ?? []);
                 if (local is not null) statements.Add(new WsBoundClassDeclaration(local, bound, declaration.Span));
+                continue;
+            }
+            if (statement is WsExtendSyntax extended)
+            {
+                var bound = BindExtension(extended, statics.GetValueOrDefault(extended) ?? []);
+                statements.Add(new WsBoundExtension(targets[extended], bound, extended.Span));
                 continue;
             }
             statements.Add(BindStatement(statement));
@@ -373,6 +392,8 @@ public sealed class WsBinder
                 return new WsBoundBlock(BindStatements([function]), function.Span);
             case WsClassDeclarationSyntax declaration:
                 return new WsBoundBlock(BindStatements([declaration]), declaration.Span);
+            case WsExtendSyntax extension:
+                return new WsBoundBlock(BindStatements([extension]), extension.Span);
             default:
                 throw new InvalidOperationException($"Unknown statement {statement.GetType().Name}.");
         }
@@ -485,6 +506,66 @@ public sealed class WsBinder
     }
 
     /// <summary>
+    /// An extension's members (section 3.7): methods, <c>destructor()</c> being <c>dispose()</c> as in a class, and
+    /// static members, which have names of their own; a constructor, which the parser reported, is left out. Its
+    /// methods have <c>this</c>, but no <c>super</c> (WS2009).
+    /// </summary>
+    private WsBoundClass BindExtension(WsExtendSyntax extension,
+        List<(string Name, WsBoundExpression Value, WsSourceSpan Span)> staticFields)
+    {
+        var name = extension.Target switch
+        {
+            WsNameSyntax target => target.Name,
+            WsMemberAccessSyntax target => target.Name,
+            _ => "extension"
+        };
+        var methods = new List<(string, WsBoundFunction)>();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        var staticMethods = new List<(string, WsBoundFunction)>();
+        var staticNames = new HashSet<string>(StringComparer.Ordinal);
+        var outerClass = _class;
+        WsMethodSyntax? disposer = null;
+        foreach (var member in extension.Methods)
+        {
+            if (!member.IsStatic && member.Name is "dispose" or "destructor") disposer ??= member;
+        }
+        foreach (var method in extension.Methods)
+        {
+            if (method.Name == "constructor" && !method.IsStatic) continue;
+            var methodName = method.Name;
+            if (!method.IsStatic && method.Name is "dispose" or "destructor")
+            {
+                if (disposer != method)
+                {
+                    Report(WsDiagnosticCodes.DisposeAndDestructor,
+                        "An extension gives 'dispose()' or 'destructor()', which are the same method, not both.", method.NameSpan);
+                    continue;
+                }
+                methodName = "dispose";
+            }
+            _class = method.IsStatic ? null : new ClassContext(null, false, false) { InExtension = true };
+            var function = method.IsStatic
+                ? BindFunction(methodName, method.Parameters, method.Body, method.Span, isStatic: true, isAsync: method.IsAsync)
+                : BindFunction(methodName, method.Parameters, method.Body, method.Span, isMethod: true, isAsync: method.IsAsync);
+            _class = outerClass;
+            if (!(method.IsStatic ? staticNames : names).Add(methodName))
+            {
+                Report(WsDiagnosticCodes.DuplicateDeclaration, $"'{methodName}' is already declared in this extension.",
+                    method.NameSpan);
+                continue;
+            }
+            (method.IsStatic ? staticMethods : methods).Add((methodName, function));
+        }
+        var fields = new List<(string, WsBoundExpression, WsSourceSpan)>();
+        foreach (var field in staticFields)
+        {
+            if (staticNames.Add(field.Name)) fields.Add(field);
+            else Report(WsDiagnosticCodes.DuplicateDeclaration, $"'{field.Name}' is already declared in this extension.", field.Span);
+        }
+        return new WsBoundClass(name, null, methods, extension.Span) { StaticMethods = staticMethods, StaticFields = fields };
+    }
+
+    /// <summary>
     /// A function's body, in a function context of its own, its parameters its first locals; a method's first is
     /// <c>this</c>, which only a method declares (section 3.7).
     /// </summary>
@@ -551,6 +632,11 @@ public sealed class WsBinder
     /// </summary>
     private WsBoundExpression BindSuper(string name, WsSourceSpan span)
     {
+        if (_class is { InExtension: true })
+        {
+            Report(WsDiagnosticCodes.ThisOutsideMethod, "'super' is not allowed in an extension's methods.", span);
+            return new WsBoundError(span);
+        }
         if (_class is not { HasBase: true, Local: { } classLocal } || LookupLocal("this") is not { } self
             || ReferenceEquals(self, _noThis))
         {
@@ -747,7 +833,7 @@ public sealed class WsBinder
         }
         if (calleeSyntax is WsSuperSyntax)
         {
-            if (_class is { InConstructor: false })
+            if (_class is { InConstructor: false, InExtension: false })
             {
                 Report(WsDiagnosticCodes.ThisOutsideMethod, "'super(…)' is only allowed in a constructor.", calleeSyntax.Span);
                 return new WsBoundError(call.Span);
@@ -900,7 +986,11 @@ public sealed class WsBinder
 
     /// <summary>A function being bound: the program, or one nested in it.</summary>
     /// <summary>A class whose methods are being bound: its local, whether it extends another, and whether in its constructor.</summary>
-    private sealed record ClassContext(WsLocalSymbol? Local, bool HasBase, bool InConstructor);
+    private sealed record ClassContext(WsLocalSymbol? Local, bool HasBase, bool InConstructor)
+    {
+        /// <summary>Whether it is an extension's, whose methods have no <c>super</c> (section 3.7).</summary>
+        public bool InExtension { get; init; }
+    }
 
     private sealed class FunctionContext(FunctionContext? parent, string name)
     {

@@ -2,7 +2,7 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [QUESTION] Classes of Values, Extensions, Continued
+## Classes of Values, Extensions, Continued
 
 Follow-ups to "Classes of Values, Extensions". One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
 
@@ -20,11 +20,11 @@ A3: (a)
 
 **Q4, reading A1's text back: `Celsius(21.5)` and `Stack([1, 2])` agree with a literal representation only if calling a class makes an instance: (a) calling a class makes one, as `new` does, so that `Celsius(21.5)` in a program is `new Celsius(21.5)` (it is WS2005 now); (b) they stay a text only, and calling a class stays WS2005.**
 
-A4: 
+A4: (b) and we use the display reprsenetation `Class:Value(s)`
 
 **Q5, `new Class()` (A9) needs what "Adding Methods at Run Time" describes, a function with a receiver and a way to attach it to a class, and that task is deferred: (a) design them now, with `new Class()` and `extends Class`, as a task of their own after "Extending the Classes of Values"; (b) they wait with that task, and `new Class()` and `extends Class` stay WS3001 until then.**
 
-A5:
+A5: (a)
 
 ## [IDLE] Extending the Classes of Values
 
@@ -36,11 +36,11 @@ A5:
 
 2026-11-13: split into the parts the specification defines in section 9 ("Extending the classes of values"), each a task below. Waits for them.
 
-## [IDLE] Extending the Classes of Values: `extend`
+## [WORKING] Extending the Classes of Values: `extend`
 
 `extend` blocks: methods and static members given to a class, a program's or a kind of value's, hoisted with its block's classes, reaching every instance and subclass (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
 
-2026-11-13: next, after "Extending the Classes of Values: Classed Collections' Text".
+Done (Claude, 2026-11-13): on both VMs, with its conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Extensions"). Checks: the Release build, without warnings, the 1,450 tests, and the CLI on the samples, on Windows only; Linux not tried.
 
 ## [IDLE] Extending the Classes of Values: `Boolean`, `Integer`, `Number` and `String`
 
@@ -52,7 +52,7 @@ Classes extending them, whose instances hold a value, given by `super(value)`, w
 
 `new Function(f)`, `new Function()`, and classes extending `Function`, whose instances are functions with methods of their own (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
 
-2026-11-13: waits for "Extending the Classes of Values: `extend`".
+2026-11-13: next, after "Extending the Classes of Values: `extend`".
 
 ## [IDLE] Extending the Classes of Values: `Class`
 
@@ -218,5 +218,13 @@ A2:
 **Q3: may a method attached at run time be removed again (`Point.removeMethod("describe")`)? (a) no; (b) yes.**
 
 A3: 
+
+## [DEFER] Serialization: Text That Rebuilds a Value
+
+What `write` writes is for people to read, and does not reliably rebuild a value. Writing a classed value as if it were a call (`Celsius(21.5)`, `Stack([1, 2])`, "Classes of Values, Extensions") reads back as the same value only when the class's constructor takes the held value as it is; a class with a constructor of its own (`constructor(fahrenheit) { super((fahrenheit - 32) * 5 / 9); }`) would make something else from it. Discussed with the owner, 2026-11-13; added by Claude the same day.
+
+If text that rebuilds a value (round-trip text) is wanted, it is a serialization feature: a way to write a value, and to read it back into an equal one, that does not depend on its class's constructor (a rebuilt instance gets its fields set directly, as a runtime error's `Error` already does, specification, section 15.2, "Exceptions"). It deserves a design of its own, rather than borrowing call syntax for `write`'s text. Such a design would decide, among other things: its format (JSON, a WebLingo literal form, or both); how a class is named in it, and found again when it is read (a class in another module, or one renamed since); whether a class may shape its own serialized form, as `toString()` shapes its text; what cannot be serialized (functions, closures, tasks, native resources) and what reading one then does; cycles and shared references; and the security of reading text from outside (no code runs, and no class is made, that the reader did not allow).
+
+It is deferred: nothing needs it yet, and it can be added later, if it proves necessary, without changing `write`'s text or any program.
 
 # END-OF-TO-DO

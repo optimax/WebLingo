@@ -155,6 +155,11 @@ public enum WsStackOpCode : byte
     JumpIfGiven,
     /// <summary>Pops a value and suspends the <c>async</c> function, then pushes what <c>await</c> gives, as the register bytecode's <c>Await</c>.</summary>
     Await,
+    /// <summary>
+    /// A = class index: pops a class (WS3001 otherwise), and gives it that class's methods and static members, as the
+    /// register bytecode's <c>Extend</c>.
+    /// </summary>
+    Extend,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);

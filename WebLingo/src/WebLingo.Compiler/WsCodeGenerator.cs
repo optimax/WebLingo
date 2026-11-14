@@ -160,6 +160,9 @@ public sealed class WsCodeGenerator
             case WsIrThrow throwStatement:
                 Emit(new WsInstruction(WsOpCode.Throw, EmitExpression(throwStatement.Value, null)), throwStatement.Span);
                 break;
+            case WsIrExtend extension:
+                Emit(new WsInstruction(WsOpCode.Extend, EmitExpression(extension.Target, null), extension.Class), extension.Span);
+                break;
             case WsIrRethrow rethrow:
                 EmitRethrow(rethrow.Value, rethrow.Origin, rethrow.Span);
                 break;

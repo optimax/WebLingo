@@ -76,7 +76,7 @@ public static class WsMembers
             // A static member, the class's own or its base's (section 3.7).
             error = null;
             if (heap.TryGetStatic(target, name, out result)) return true;
-            if (TryGetObjectMethod(member, name, heap, out var objectToString))
+            if (TryGetValueMethod(target, member, name, heap, out var objectToString))
             {
                 return heap.TryAllocateBoundMethod(target, objectToString, out result, out error);
             }
@@ -84,9 +84,9 @@ public static class WsMembers
             error = NoSuchMember(target, name, heap);
             return false;
         }
-        if (TryGetObjectMethod(member, name, heap, out var objectMethod))
+        if (TryGetValueMethod(target, member, name, heap, out var objectMethod))
         {
-            // Every value has Object's toString() and equal() (section 3.7).
+            // Every value has Object's toString() and equal(), and its kind's class's extensions (section 3.7).
             return heap.TryAllocateBoundMethod(target, objectMethod, out result, out error);
         }
         if (target.Kind == WsValueKind.String && member == WsMember.Length)
@@ -251,6 +251,24 @@ public static class WsMembers
         error = new WsRuntimeError(WsDiagnosticCodes.NoSuchMember,
             $"{Capitalized(WsValueFormatter.Describe(target, heap))} has no method 'dispose', and cannot be disposed.");
         return false;
+    }
+
+    /// <summary>
+    /// A method of a value that is not an instance: its kind's class's, an extension's, once an <c>extend</c> has run, or
+    /// <c>Object</c>'s if the program has not made that class; or <c>Object</c>'s <c>toString()</c> or <c>equal()</c>,
+    /// which every value has, <c>null</c> included, which has no class (section 3.7).
+    /// </summary>
+    public static bool TryGetValueMethod(WsValue target, WsMember member, string name, WsHeap heap, out WsValue method)
+    {
+        if (heap.Extended && target.Kind != WsValueKind.Null)
+        {
+            var index = ValueClassOf(target.Kind);
+            var classValue = index >= 0 && heap.ValueClasses is { } classes && classes[index].Kind == WsValueKind.Class
+                ? classes[index]
+                : heap.ObjectClass;
+            if (classValue.Kind == WsValueKind.Class && heap.TryGetMethod(classValue, name, out method)) return true;
+        }
+        return TryGetObjectMethod(member, name, heap, out method);
     }
 
     /// <summary>

@@ -152,6 +152,10 @@ public sealed class WsStackCodeGenerator
                 EmitValue(throwStatement.Value);
                 Emit(WsStackOpCode.Throw, throwStatement.Span);
                 break;
+            case WsIrExtend extension:
+                EmitValue(extension.Target);
+                Emit(WsStackOpCode.Extend, extension.Span, extension.Class);
+                break;
             case WsIrRethrow rethrow:
                 EmitRethrow(rethrow.Value, rethrow.Origin, rethrow.Span);
                 break;
@@ -658,6 +662,7 @@ public sealed class WsStackCodeGenerator
             WsStackOpCode.MakeClass => (b, 1),
             WsStackOpCode.GetSuper => (2, 1),
             WsStackOpCode.Dispose => (1, 0),
+            WsStackOpCode.Extend => (1, 0),
             WsStackOpCode.Throw => (1, 0),
             WsStackOpCode.ToText => (1, 1),
             WsStackOpCode.IsInstance => (2, 1),

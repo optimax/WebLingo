@@ -183,6 +183,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             heap.AddRoots(frame.Closure);
             _scheduler = new WsScheduler(heap, context.Clock);
             heap.Scheduler = _scheduler;
+            heap.ValueClasses = _valueClasses;
             if (module.EntryPoint.IsAsync && !TryStartMain(frame)) return _ended!;
 
             var code = frame.Code;
@@ -478,7 +479,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                                 if (isMethod && name.Member == WsMember.Dispose) goto dispose;
                                 goto call;
                             }
-                            if (WsMembers.TryGetObjectMethod(name.Member, name.Text, heap, out var objectMethod))
+                            if (WsMembers.TryGetValueMethod(target, name.Member, name.Text, heap, out var objectMethod))
                             {
                                 // Every value has Object's toString() and equal() (section 3.7).
                                 callee = objectMethod;
@@ -508,6 +509,11 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             pc++;
                             continue;
                         }
+                        case WsOpCode.Extend:
+                            // extend: the class given its extension's methods and static members (section 3.7).
+                            if (!TryExtendClass(module.Classes[ins.B], registers[ins.A], registers, cells, out error)) break;
+                            pc++;
+                            continue;
                         case WsOpCode.GetSuper:
                         {
                             if (!WsMembers.TryGetSuper(registers[ins.B], registers[ins.C], names[ins.D].Text, heap, out var bound,
@@ -1554,7 +1560,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             {
                 return true;
             }
-            return WsMembers.TryGetObjectMethod(WsMember.Equal, "equal", heap, out method);
+            return WsMembers.TryGetValueMethod(type, WsMember.Equal, "equal", heap, out method);
         }
 
         /// <summary>The class a runtime error of this code becomes: its kind's, or Error.</summary>
@@ -1706,6 +1712,37 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                 }
                 return heap.TryAllocateClass(info.Name, closures[0], methods, baseClass, out made, out error, statics,
                     info.StaticFields);
+            }
+            finally
+            {
+                heap.RemoveLastRoots(closures);
+            }
+        }
+
+        /// <summary>
+        /// <c>extend</c> (section 3.7): an extension's methods' and static methods' closures, made as their captures say,
+        /// given to the class <paramref name="target"/>, with its static fields' names.
+        /// </summary>
+        private bool TryExtendClass(WsClassInfo info, WsValue target, WsValue[] registers, WsValue[] cells, out WsRuntimeError? error)
+        {
+            var closures = new WsValue[info.Methods.Count + info.StaticMethods.Count];
+            heap.AddRoots(closures);
+            try
+            {
+                var methods = new Dictionary<string, WsValue>(StringComparer.Ordinal);
+                for (var i = 0; i < info.Methods.Count; i++)
+                {
+                    if (!TryMakeClosure(info.Methods[i].Function, registers, cells, out closures[i], out error)) return false;
+                    methods[info.Methods[i].Name] = closures[i];
+                }
+                var statics = new Dictionary<string, WsValue>(StringComparer.Ordinal);
+                for (var i = 0; i < info.StaticMethods.Count; i++)
+                {
+                    var slot = info.Methods.Count + i;
+                    if (!TryMakeClosure(info.StaticMethods[i].Function, registers, cells, out closures[slot], out error)) return false;
+                    statics[info.StaticMethods[i].Name] = closures[slot];
+                }
+                return heap.TryExtendClass(target, methods, statics, info.StaticFields, out error);
             }
             finally
             {

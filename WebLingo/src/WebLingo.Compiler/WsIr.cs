@@ -132,6 +132,10 @@ public sealed record WsIrFinally(int Value, int Origin, WsIrStatement Body);
 /// <summary><c>throw value;</c> (section 3.7).</summary>
 public sealed record WsIrThrow(WsIrExpression Value, WsSourceSpan Span) : WsIrStatement(Span);
 
+/// <summary>The class <paramref name="Target"/> gives, given the methods and static members of the program's class
+/// <paramref name="Class"/>, an extension's (section 3.7).</summary>
+public sealed record WsIrExtend(WsIrExpression Target, int Class, WsSourceSpan Span) : WsIrStatement(Span);
+
 /// <summary>Throws the exception in local <paramref name="Value"/> again, from where local <paramref name="Origin"/> says.</summary>
 public sealed record WsIrRethrow(int Value, int Origin, WsSourceSpan Span) : WsIrStatement(Span);
 

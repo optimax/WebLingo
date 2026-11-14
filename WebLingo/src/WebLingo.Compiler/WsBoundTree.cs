@@ -76,6 +76,12 @@ public sealed record WsBoundClass(
 /// <summary>A class declaration; the class is made when its block begins, since it is in scope throughout.</summary>
 public sealed record WsBoundClassDeclaration(WsLocalSymbol Local, WsBoundClass Class, WsSourceSpan Span) : WsBoundStatement(Span);
 
+/// <summary>
+/// <c>extend Target { … }</c>: the class <paramref name="Target"/> gives, evaluated where its block begins, given
+/// <paramref name="Class"/>'s methods and static members, which has no constructor (section 3.7).
+/// </summary>
+public sealed record WsBoundExtension(WsBoundExpression Target, WsBoundClass Class, WsSourceSpan Span) : WsBoundStatement(Span);
+
 public sealed record WsBoundIf(WsBoundExpression Condition, WsBoundStatement Then, WsBoundStatement? Else, WsSourceSpan Span)
     : WsBoundStatement(Span);
 

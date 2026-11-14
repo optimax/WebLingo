@@ -198,13 +198,13 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
             case WsOpCode.LoadBuiltin:
                 return Register(function, a, "destination") ?? Index(b, module.Imports.Count, "import") ?? Unused(c, d);
             case WsOpCode.MakeClass:
+            case WsOpCode.Extend:
             {
-                if ((Register(function, a, "destination") ?? Index(b, module.Classes.Count, "class")
-                     ?? (d is 0 or 1 ? null : $"its D is {d}, not 0 or 1.") ?? (d == 1 ? Register(function, c, "base") : Unused(c)))
-                    is { } classError)
-                {
-                    return classError;
-                }
+                var operandError = instruction.OpCode == WsOpCode.Extend
+                    ? Register(function, a, "class") ?? Index(b, module.Classes.Count, "class") ?? Unused(c, d)
+                    : Register(function, a, "destination") ?? Index(b, module.Classes.Count, "class")
+                      ?? (d is 0 or 1 ? null : $"its D is {d}, not 0 or 1.") ?? (d == 1 ? Register(function, c, "base") : Unused(c));
+                if (operandError is not null) return operandError;
                 foreach (var member in WsClassTables.Functions(module.Classes[b]))
                 {
                     foreach (var capture in module.Functions[member].Captures)
@@ -573,7 +573,16 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return classValue >= 0 ? classValue : Unwritten(instruction.C, state, locals);
             }
             case WsOpCode.MakeClass:
-                if (instruction.D == 1 && Unwritten(instruction.C, state, locals) is var baseValue and >= 0) return baseValue;
+            case WsOpCode.Extend:
+                if (instruction.OpCode == WsOpCode.MakeClass && instruction.D == 1
+                    && Unwritten(instruction.C, state, locals) is var baseValue and >= 0)
+                {
+                    return baseValue;
+                }
+                if (instruction.OpCode == WsOpCode.Extend && Unwritten(instruction.A, state, locals) is var extended and >= 0)
+                {
+                    return extended;
+                }
                 foreach (var member in WsClassTables.Functions(module.Classes[instruction.B]))
                 {
                     foreach (var capture in module.Functions[member].Captures)

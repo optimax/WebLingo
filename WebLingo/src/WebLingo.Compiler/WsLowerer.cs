@@ -103,7 +103,22 @@ public sealed class WsLowerer
         }
         foreach (var statement in block)
         {
-            if (statement is not (WsBoundFunctionDeclaration or WsBoundClassDeclaration)) lowered.Add(LowerStatement(statement));
+            // An extension, in its order once the block's classes are made and their static fields set, then its own
+            // static fields, set in their order (section 3.7).
+            if (statement is not WsBoundExtension extension) continue;
+            lowered.Add(new WsIrExtend(LowerExpression(extension.Target), LowerClass(extension.Class), extension.Span));
+            foreach (var (name, value, span) in extension.Class.StaticFields)
+            {
+                lowered.Add(new WsIrEvaluate(new WsIrStoreMember(LowerExpression(extension.Target), name, LowerExpression(value), span),
+                    span));
+            }
+        }
+        foreach (var statement in block)
+        {
+            if (statement is not (WsBoundFunctionDeclaration or WsBoundClassDeclaration or WsBoundExtension))
+            {
+                lowered.Add(LowerStatement(statement));
+            }
         }
         return lowered;
     }

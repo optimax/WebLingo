@@ -182,6 +182,7 @@ public sealed class WsStackVirtualMachine
             heap.AddRoots(frame.Closure);
             _scheduler = new WsScheduler(heap, context.Clock);
             heap.Scheduler = _scheduler;
+            heap.ValueClasses = _valueClasses;
             if (module.EntryPoint.IsAsync && !TryStartMain(frame)) return _ended!;
 
             var code = frame.Code;
@@ -502,7 +503,7 @@ public sealed class WsStackVirtualMachine
                                 if (isMethod && name.Member == WsMember.Dispose) goto dispose;
                                 goto call;
                             }
-                            if (WsMembers.TryGetObjectMethod(name.Member, name.Text, heap, out var objectMethod))
+                            if (WsMembers.TryGetValueMethod(target, name.Member, name.Text, heap, out var objectMethod))
                             {
                                 // Every value has Object's toString() and equal() (section 3.7).
                                 callee = objectMethod;
@@ -531,6 +532,12 @@ public sealed class WsStackVirtualMachine
                             pc++;
                             continue;
                         }
+                        case WsStackOpCode.Extend:
+                            // extend: the class given its extension's methods and static members, then popped (section 3.7).
+                            if (!TryExtendClass(module.Classes[ins.A], slots[sp - 1], slots, cells, out error)) break;
+                            sp--;
+                            pc++;
+                            continue;
                         case WsStackOpCode.GetSuper:
                         {
                             if (!WsMembers.TryGetSuper(slots[sp - 2], slots[sp - 1], names[ins.A].Text, heap, out var bound, out error))
@@ -1601,7 +1608,7 @@ public sealed class WsStackVirtualMachine
             {
                 return true;
             }
-            return WsMembers.TryGetObjectMethod(WsMember.Equal, "equal", heap, out method);
+            return WsMembers.TryGetValueMethod(type, WsMember.Equal, "equal", heap, out method);
         }
 
         /// <summary>The class a runtime error of this code becomes: its kind's, or Error.</summary>
@@ -1734,6 +1741,37 @@ public sealed class WsStackVirtualMachine
         /// A class value: its constructor's and its methods' closures made now, kept as roots until the class holds
         /// them, since making each may collect (section 3.7).
         /// </summary>
+        /// <summary>
+        /// <c>extend</c> (section 3.7): an extension's methods' and static methods' closures, made as their captures say,
+        /// given to the class <paramref name="target"/>, with its static fields' names.
+        /// </summary>
+        private bool TryExtendClass(WsClassInfo info, WsValue target, WsValue[] slots, WsValue[] cells, out WsRuntimeError? error)
+        {
+            var closures = new WsValue[info.Methods.Count + info.StaticMethods.Count];
+            heap.AddRoots(closures);
+            try
+            {
+                var methods = new Dictionary<string, WsValue>(StringComparer.Ordinal);
+                for (var i = 0; i < info.Methods.Count; i++)
+                {
+                    if (!TryMakeClosure(info.Methods[i].Function, slots, cells, out closures[i], out error)) return false;
+                    methods[info.Methods[i].Name] = closures[i];
+                }
+                var statics = new Dictionary<string, WsValue>(StringComparer.Ordinal);
+                for (var i = 0; i < info.StaticMethods.Count; i++)
+                {
+                    var slot = info.Methods.Count + i;
+                    if (!TryMakeClosure(info.StaticMethods[i].Function, slots, cells, out closures[slot], out error)) return false;
+                    statics[info.StaticMethods[i].Name] = closures[slot];
+                }
+                return heap.TryExtendClass(target, methods, statics, info.StaticFields, out error);
+            }
+            finally
+            {
+                heap.RemoveLastRoots(closures);
+            }
+        }
+
         private bool TryMakeClass(WsClassInfo info, WsValue baseClass, WsValue[] slots, WsValue[] cells, out WsValue made,
             out WsRuntimeError? error)
         {

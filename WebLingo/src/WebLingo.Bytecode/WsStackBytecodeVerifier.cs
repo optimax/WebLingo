@@ -161,11 +161,11 @@ public sealed class WsStackBytecodeVerifier
             case WsStackOpCode.LoadBuiltin:
                 return Index(a, module.Imports.Count, "import") ?? Unused(b);
             case WsStackOpCode.MakeClass:
+            case WsStackOpCode.Extend:
             {
-                if ((Index(a, module.Classes.Count, "class") ?? (b is 0 or 1 ? null : $"its B is {b}, not 0 or 1.")) is { } classError)
-                {
-                    return classError;
-                }
+                var operandError = Index(a, module.Classes.Count, "class")
+                    ?? (instruction.OpCode == WsStackOpCode.Extend ? Unused(b) : b is 0 or 1 ? null : $"its B is {b}, not 0 or 1.");
+                if (operandError is not null) return operandError;
                 foreach (var member in WsClassTables.Functions(module.Classes[a]))
                 {
                     foreach (var capture in module.Functions[member].Captures)
@@ -412,6 +412,7 @@ public sealed class WsStackBytecodeVerifier
         WsStackOpCode.MakeClass => (instruction.B, 1),
         WsStackOpCode.GetSuper => (2, 1),
         WsStackOpCode.Dispose => (1, 0),
+        WsStackOpCode.Extend => (1, 0),
         WsStackOpCode.Throw => (1, 0),
         WsStackOpCode.Rethrow => (2, 0),
         WsStackOpCode.ToText => (1, 1),
@@ -473,6 +474,7 @@ public sealed class WsStackBytecodeVerifier
             case WsStackOpCode.JumpIfGiven:
                 return IsSet(written, instruction.B) ? -1 : instruction.B;
             case WsStackOpCode.MakeClass:
+            case WsStackOpCode.Extend:
                 foreach (var member in WsClassTables.Functions(module.Classes[instruction.A]))
                 {
                     foreach (var capture in module.Functions[member].Captures)

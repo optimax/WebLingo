@@ -134,6 +134,17 @@ public sealed record WsClassDeclarationSyntax(
     public IReadOnlyList<WsStaticFieldSyntax> StaticFields { get; init; } = [];
 }
 
+/// <summary>
+/// <c>extend Name { members }</c>: methods and static members given to a class that exists, a program's or a kind of
+/// value's, hoisted with its block's classes (section 3.7).
+/// </summary>
+public sealed record WsExtendSyntax(WsExpressionSyntax Target, IReadOnlyList<WsMethodSyntax> Methods, WsSourceSpan Span)
+    : WsStatementSyntax(Span)
+{
+    /// <summary>Its static fields, in their order; its static methods are among <see cref="Methods"/>.</summary>
+    public IReadOnlyList<WsStaticFieldSyntax> StaticFields { get; init; } = [];
+}
+
 /// <summary><c>return value;</c>, or <c>return;</c>, which gives <c>null</c>.</summary>
 public sealed record WsReturnSyntax(WsExpressionSyntax? Value, WsSourceSpan Span) : WsStatementSyntax(Span);
 

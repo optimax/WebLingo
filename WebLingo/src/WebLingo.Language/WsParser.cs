@@ -78,7 +78,7 @@ public sealed class WsParser : IWsParser
         if (Current.Kind == WsTokenKind.Do) return ParseDoWhile(start);
         if (Current.Kind == WsTokenKind.For) return ParseFor(start);
         if (Current.Kind == WsTokenKind.Foreach) return ParseForEach(start);
-        if (Current.Kind == WsTokenKind.Class) return ParseClass(start);
+        if (Current.Kind is WsTokenKind.Class or WsTokenKind.Extend) return ParseClass(start);
         if (Current.Kind == WsTokenKind.Using) return ParseUsing(start);
         if (Current.Kind == WsTokenKind.Try) return ParseTry(start);
         if (Current.Kind == WsTokenKind.Throw)
@@ -238,13 +238,14 @@ public sealed class WsParser : IWsParser
     /// </summary>
     private WsStatementSyntax ParseClass(int start)
     {
-        Advance();
-        var (name, nameSpan) = ExpectName();
+        // class Name { … }, or extend Name { … }, whose members are a class's but for a constructor (section 3.7).
+        var isExtension = Advance().Kind == WsTokenKind.Extend;
+        var (name, nameSpan) = isExtension ? ("", default) : ExpectName();
         WsExpressionSyntax? baseClass = null;
-        if (Current.Kind == WsTokenKind.Extends)
+        if (isExtension || Current.Kind == WsTokenKind.Extends)
         {
-            // extends Name, or a member of one (section 3.7).
-            Advance();
+            // extends Name, or extend Name, or a member of one (section 3.7).
+            if (!isExtension) Advance();
             baseClass = ParsePrimary();
             while (Current.Kind == WsTokenKind.Dot && Peek(1).Kind == WsTokenKind.Identifier)
             {
@@ -256,8 +257,9 @@ public sealed class WsParser : IWsParser
         Expect(WsTokenKind.OpenBrace, "'{'");
         var methods = new List<WsMethodSyntax>();
         var staticFields = new List<WsStaticFieldSyntax>();
-        WsClassDeclarationSyntax Made() =>
-            new(name, nameSpan, methods, SpanFrom(start)) { Base = baseClass, StaticFields = staticFields };
+        WsStatementSyntax Made() => isExtension
+            ? new WsExtendSyntax(baseClass!, methods, SpanFrom(start)) { StaticFields = staticFields }
+            : new WsClassDeclarationSyntax(name, nameSpan, methods, SpanFrom(start)) { Base = baseClass, StaticFields = staticFields };
         while (Current.Kind is not (WsTokenKind.CloseBrace or WsTokenKind.EndOfFile))
         {
             var memberStart = Current.Span.Start;
@@ -288,6 +290,10 @@ public sealed class WsParser : IWsParser
             if (isAsync && methodName.Text == "constructor" && !_statementHasError)
             {
                 Report(WsDiagnosticCodes.UnexpectedToken, "A constructor cannot be async.", methodName.Span);
+            }
+            if (isExtension && methodName.Text == "constructor" && !_statementHasError)
+            {
+                Report(WsDiagnosticCodes.UnexpectedToken, "An extension cannot have a constructor.", methodName.Span);
             }
             if (!EnterRecursion()) return Made();
             try
@@ -1087,14 +1093,20 @@ public sealed class WsParser : IWsParser
                 foreach (var catchClause in tryStatement.Catches) statements.Push(catchClause.Body);
                 if (tryStatement.Finally is { } finallyBlock) statements.Push(finallyBlock);
             }
-            if (statement is WsClassDeclarationSyntax classDeclaration)
+            var (classMethods, classFields) = statement switch
             {
-                foreach (var method in classDeclaration.Methods)
+                WsClassDeclarationSyntax declared => (declared.Methods, declared.StaticFields),
+                WsExtendSyntax extension => (extension.Methods, extension.StaticFields),
+                _ => (null, null)
+            };
+            if (classMethods is not null)
+            {
+                foreach (var method in classMethods)
                 {
                     statements.Push(method.Body);
                     PushDefaults(method.Parameters, statements);
                 }
-                foreach (var field in classDeclaration.StaticFields)
+                foreach (var field in classFields!)
                 {
                     statements.Push(new WsExpressionStatementSyntax(field.Value, field.Value.Span));
                 }
