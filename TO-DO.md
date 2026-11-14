@@ -2,32 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [DONE] Classes of Values, Extensions, Continued
-
-Follow-ups to "Classes of Values, Extensions". One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
-
-Q1, the class of an arithmetic result (A6): (a) its left operand's class, if it has one, else its right's: `new Celsius(21.5) + 1` and `1 + new Celsius(21.5)` are both a `Celsius`, and `celsius + fahrenheit` a `Celsius`; (b) a class only when its classed operands all have the same one, a plain value otherwise.
-
-A1: (a)
-
-Q2, how arithmetic makes that result: (a) a new instance of the class, holding the result, its constructor not run, with no fields; (b) the same, with the fields of the operand whose class it is, copied.
-
-A2: (b)
-
-Q3, operators (A6's remark: defining `+` is what gives a class full control of it): (a) a class may declare what an operator does with its values, as C# does, by a static method, `static operator +(a, b) { … }`, which `+` calls when either operand's class declares it, the left's first, and likewise for `-`, `*`, `/` and the comparisons, Q1's default applying where none does; (b) later, as a design of its own, Q1's default holding until then.
-
-A3: (a)
-
-Q4, reading A1's text back: `Celsius(21.5)` and `Stack([1, 2])` agree with a literal representation only if calling a class makes an instance: (a) calling a class makes one, as `new` does, so that `Celsius(21.5)` in a program is `new Celsius(21.5)` (it is WS2005 now); (b) they stay a text only, and calling a class stays WS2005.
-
-A4: (b) and we use the display reprsenetation `Class:Value(s)`
-
-Q5, `new Class()` (A9) needs what "Adding Methods at Run Time" describes, a function with a receiver and a way to attach it to a class, and that task is deferred: (a) design them now, with `new Class()` and `extends Class`, as a task of their own after "Extending the Classes of Values"; (b) they wait with that task, and `new Class()` and `extends Class` stay WS3001 until then.
-
-A5: (a)
-
-Done (Claude, 2026-11-13): recorded as approved in the specification, section 3.7 ("Classes of values"), with parts 6 and 7 in section 9 ("Extending the classes of values") for A4's text and A3's operators, each a task below; A5's design is the task "Building Classes at Run Time".
-
 ## [IDLE] Extending the Classes of Values
 
 `extend` blocks, and classes extending `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class`, with `new` on those classes ("Classes of Values, Further"; specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
