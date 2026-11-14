@@ -98,12 +98,6 @@ A3: (a) but - like (c) says - measure the impact on performance.
 
 2026-11-14 (Claude): the answers recorded as approved in the specification, section 3.9 ("Native modules"), and its decision register; split into the parts section 9 defines ("Native modules"), each a task below. Waits for them.
 
-## [WORKING] Native Modules, Part 1: Native Functions
-
-`IWebLingoNativeModule` and `IWebLingoNativeRegistry`, a module's functions; a host's schemes, from `weblingo.json` and `--scheme`; an assembly loaded from a scheme's folder only, into the host's context; a native module imported by its scheme, or by a path within a scheme's folder, statically and while the program runs (specification, sections 3.9 and 9, "Native modules", part 1), on both VMs. Added by Claude, 2026-11-14.
-
-Done (Claude, 2026-11-14): a native module's assembly, in a configured scheme's folder, registers its functions with `IWebLingoNativeRegistry`, each then one of the host's built-ins; a script imports the module by its scheme, `import t from "native:test";`, or by the assembly's path within a scheme's folder, statically or with `Module.import`, on both VMs; `weblingo` and `welp` take their schemes from `weblingo.json`, in the program's folder, and `--scheme name=folder`, which comes before the file's. Tested with a native module of the tests' own (`tests/WebLingo.Native.TestModule`), on both VMs and through `weblingo`. Guessed, and recorded as Proposed in the specification, section 15.2 ("Native modules"): a scheme's name is two or more letters and digits, so that a drive letter is never one; an import path ending in `.dll` names an assembly; an unconfigured scheme's path is a file's; a module that cannot be found, loaded or registered is WL2015; `weblingo.json` holds only `"schemes"`, anything else stopping the command (exit 4); a malformed `--scheme` is a usage error (exit 2). `std:` stays the compiler's own until part 3. Checks: the Release build, without warnings, the full test suite, and both command lines on the samples, on Windows only; Linux not tried.
-
 ## [IDLE] Native Modules, Part 2: Native Classes
 
 A native module's classes, `registry.Class(…)`, their constructors, methods and static members native functions, made by the heap's own methods (specification, sections 3.7, 3.9 and 9, "Native modules", part 2), on both VMs. Added by Claude, 2026-11-14.
