@@ -40,20 +40,6 @@ Classes, with single inheritance and no exposed prototype chain (specification, 
 
 
 
-## [WORKING] M0.10.6: Exceptions
-
-`throw`, `try`, `catch` and `finally`, runtime errors as exceptions, and `using` when an exception leaves it (specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
-
-2026-11-13: waits for the answers to "M0.10 Syntax: Static Members, `Object` and Exceptions".
-
-2026-11-13: answered; waits for M0.10.5, whose `Object` `Error` extends.
-
-2026-11-13: paused at the user's request. Work in progress is committed on the branch `claude/m0.10.6-exceptions`, not merged, and not built as a whole. Done there: the bytecode (handler tables, `Throw`, `Rethrow`, the module's `Error` class) and both verifiers; the front end and the binder (`try`, `catch`, `finally`, `throw`, `throw;`, `Error`, WS2010, WS2012); the IR, the lowerer and both code generators; and `WsExceptions` in the runtime. Left: the unwinding in both VMs, the tests, and the documents. Q5 of "M0.10 Syntax: `toString()` and Disposal That Throws" is `WsExceptions.DisposalGoesOn`, set to (a) until it is answered.
-
-2026-11-13: resumed, and finished.
-
-Done (Claude, 2026-11-13): `throw value;`, `throw;`, `try` with `catch`, `finally`, or both, and `Error`, with the runtime errors a handler catches becoming `Error`s with their code, but the execution's limits and a cancellation; `finally` and `using` run on every way out, an exception's included, and an exception from `dispose()` replaces the one on its way out (A13); WS2010 and WS2012. Both VMs search table-driven handler regions (A14) only when an exception is thrown, so nothing runs on the way into a `try`, and the benchmark's times did not change beyond the noise of a busy machine. Choices of mine, in section 15.2 as proposed (row "Exceptions"): `throw;` outside a `catch` is a new code, WS2010; `Error` is written in WebLingo and added to a program that names it or has a `try` or a `using`; an uncaught `Error` with a code is reported as that code, so a runtime error caught and rethrown is reported as before; a disposal goes on after one of its methods throws, as I recommended for Q5 of "M0.10 Syntax: `toString()` and Disposal That Throws", which is still open (`WsExceptions.DisposalGoesOn` changes it). Every new conformance case gives the same result on both VMs. Build and 1,187 tests pass on Windows; Linux not tried.
-
 ## [IDLE] M0.10.7: `toString()`
 
 `Object`'s `toString()` (A3 of "M0.10 Syntax: Static Members, `Object` and Exceptions"; specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
