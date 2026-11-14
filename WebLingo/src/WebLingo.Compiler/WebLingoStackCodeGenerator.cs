@@ -332,9 +332,9 @@ public sealed class WebLingoStackCodeGenerator
                 Emit(WebLingoStackOpCode.Import, import.Span, import.Unit);
                 return;
             case WebLingoIrMakeModule made:
-                // Its exports' cells, as they are.
-                foreach (var local in made.Locals) Emit(WebLingoStackOpCode.LoadLocal, made.Span, local);
-                Emit(WebLingoStackOpCode.MakeModule, made.Span, made.Unit, made.Locals.Count);
+                // Its exports.
+                foreach (var value in made.Values) EmitValue(value);
+                Emit(WebLingoStackOpCode.MakeModule, made.Span, made.Unit, made.Values.Count);
                 return;
             case WebLingoIrHold hold:
                 EmitValue(hold.Instance);

@@ -468,14 +468,15 @@ public sealed class WebLingoCodeGenerator
             }
             case WebLingoIrMakeModule made:
             {
-                // Its exports' cells, as they are, in consecutive registers.
+                // Its exports, in consecutive registers.
                 var mark = _nextRegister;
                 var first = _nextRegister;
-                foreach (var local in made.Locals) Emit(new WebLingoInstruction(WebLingoOpCode.Move, Allocate(), local), made.Span);
+                for (var i = 0; i < made.Values.Count; i++) Allocate();
+                for (var i = 0; i < made.Values.Count; i++) EmitExpression(made.Values[i], first + i);
                 _nextRegister = mark;
                 var destination = target ?? Allocate();
-                Emit(new WebLingoInstruction(WebLingoOpCode.MakeModule, destination, made.Unit, made.Locals.Count == 0 ? 0 : first,
-                    made.Locals.Count), made.Span);
+                Emit(new WebLingoInstruction(WebLingoOpCode.MakeModule, destination, made.Unit, made.Values.Count == 0 ? 0 : first,
+                    made.Values.Count), made.Span);
                 return destination;
             }
             case WebLingoIrNewArray array:

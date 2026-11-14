@@ -78,7 +78,14 @@ public static class WebLingoMembers
         }
         if (target.Kind == WebLingoValueKind.Module && heap.TryGetExport(target, name, out var cell))
         {
-            // An export, as it is when read; one its module has not set yet is read before its initialization (section 3.9).
+            // An export, as it is when read; one its module has not set yet is read before its initialization; a standard
+            // module's, its value (section 3.9).
+            if (cell.Kind != WebLingoValueKind.Cell)
+            {
+                result = cell;
+                error = null;
+                return true;
+            }
             if (heap.TryReadCell(cell, out result))
             {
                 error = null;

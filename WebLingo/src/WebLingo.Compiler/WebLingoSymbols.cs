@@ -16,7 +16,11 @@ public interface IWebLingoSourceResolver
 }
 
 /// <summary>A file of a program, parsed, and the module each of its imports names, by its index among the program's.</summary>
-public sealed record WebLingoModuleSource(string Name, WebLingoCompilationUnitSyntax Root, IReadOnlyDictionary<WebLingoImportSyntax, int> Imports);
+public sealed record WebLingoModuleSource(string Name, WebLingoCompilationUnitSyntax Root, IReadOnlyDictionary<WebLingoImportSyntax, int> Imports)
+{
+    /// <summary>Whether it is a standard module, which the compiler makes itself, without a file (section 3.9).</summary>
+    public bool IsStandard { get; init; }
+}
 
 public sealed record WebLingoCompilerOptions(IReadOnlyList<WebLingoBuiltinDeclaration> Builtins)
 {

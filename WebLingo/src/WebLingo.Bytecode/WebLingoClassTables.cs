@@ -70,7 +70,8 @@ internal static class WebLingoClassTables
         {
             var unit = units[i];
             if (unit is null || string.IsNullOrEmpty(unit.Name) || unit.Exports is null) return $"File {i} is missing or has no name.";
-            if (i == 0 ? unit.Function != -1 : !isUnitFunction(unit.Function))
+            var standard = unit.Name.StartsWith("std:", StringComparison.Ordinal);
+            if (i == 0 || standard ? unit.Function != -1 : !isUnitFunction(unit.Function))
             {
                 return $"File {i} ('{unit.Name}'): its function, {unit.Function}, is not one that runs a file.";
             }

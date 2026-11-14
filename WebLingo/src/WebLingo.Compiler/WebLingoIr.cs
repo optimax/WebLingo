@@ -211,8 +211,12 @@ public sealed record WebLingoIrMakeClosure(int Function, WebLingoSourceSpan Span
 /// <summary>The program's file <paramref name="Unit"/>'s instance, or the task of running it (section 3.9).</summary>
 public sealed record WebLingoIrImport(int Unit, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
 
-/// <summary>The program's file <paramref name="Unit"/>'s instance, its exports the cells of those locals (section 3.9).</summary>
-public sealed record WebLingoIrMakeModule(int Unit, IReadOnlyList<int> Locals, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
+/// <summary>
+/// The program's file <paramref name="Unit"/>'s instance, its exports those values: a file's, the cells of its locals,
+/// as they are; a standard module's, its built-ins (section 3.9).
+/// </summary>
+public sealed record WebLingoIrMakeModule(int Unit, IReadOnlyList<WebLingoIrExpression> Values, WebLingoSourceSpan Span)
+    : WebLingoIrExpression(Span);
 
 /// <summary>A file the program imports given the closure of its function, which runs it (section 3.9).</summary>
 public sealed record WebLingoIrRegisterUnit(int Unit, WebLingoIrExpression Closure, WebLingoSourceSpan Span) : WebLingoIrStatement(Span);

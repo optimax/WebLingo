@@ -26,7 +26,11 @@ public sealed record WebLingoBoundProgram(
 /// exports, by name, and the local holding its instance.
 /// </summary>
 public sealed record WebLingoBoundUnit(string Name, WebLingoBoundFunction? Function,
-    IReadOnlyList<(string Name, WebLingoLocalSymbol Local)> Exports, WebLingoLocalSymbol Instance);
+    IReadOnlyList<(string Name, WebLingoLocalSymbol Local)> Exports, WebLingoLocalSymbol Instance)
+{
+    /// <summary>For a standard module, <c>std:system</c>: the built-ins it exports, and no function (section 3.9).</summary>
+    public IReadOnlyList<WebLingoBuiltinSymbol>? Builtins { get; init; }
+}
 
 /// <summary>An import: the program's file <paramref name="Unit"/>'s instance, run if it has not been, into a local (section 3.9).</summary>
 public sealed record WebLingoBoundImport(int Unit, WebLingoLocalSymbol Local, WebLingoSourceSpan Span) : WebLingoBoundStatement(Span);

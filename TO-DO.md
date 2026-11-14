@@ -112,11 +112,11 @@ A2:
 
 A1:
 
-## [IDLE] Modules: Standard Modules
+## [WORKING] Modules: Standard Modules
 
 The scheme `std:`, and `std:system`, which every module imports, with `write` and `writeLn` (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
 
-2026-11-14: waits for "Modules: Dynamic Imports".
+Done (Claude, 2026-11-14): `std:system`, the host's built-ins, on both VMs, with its tests in `ModuleTests`; its choices are recorded as Proposed in the specification, section 15.2 ("Modules"). It needed no dynamic imports. Other standard modules (`std:fs`) come with the services they give. Checks: the Release build, without warnings, the 1,549 tests, and the CLI on the samples, on Windows only; Linux not tried.
 
 ## [IDLE] Modules: A Script's Parameters
 

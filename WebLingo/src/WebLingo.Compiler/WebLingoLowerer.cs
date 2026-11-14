@@ -42,10 +42,16 @@ public sealed class WebLingoLowerer
             var function = unit.Function is null ? -1 : lowerer.LowerUnit(unit, i);
             var exports = new List<string>();
             foreach (var (name, _) in unit.Exports) exports.Add(name);
+            foreach (var builtin in unit.Builtins ?? []) exports.Add(builtin.Name);
             units.Add(new WebLingoIrUnit(unit.Name, function, exports));
             if (function >= 0) prologue.Add(new WebLingoIrRegisterUnit(i, new WebLingoIrMakeClosure(function, default), default));
         }
         if (program.Units.Count > 0) prologue.Add(MakeModule(program.Units[0], 0));
+        for (var i = 1; i < program.Units.Count; i++)
+        {
+            // A standard module, made with the program's own instance, before any import (section 3.9).
+            if (program.Units[i].Builtins is { } builtins) prologue.Add(MakeModule(program.Units[i], i));
+        }
         var statements = lowerer.LowerBlock(program.Statements, prologue);
         return new WebLingoIrProgram(statements, Names(program.Locals), program.Builtins)
         {
@@ -63,9 +69,10 @@ public sealed class WebLingoLowerer
     /// <summary>A file's instance, made where its function begins, its exports its cells (section 3.9).</summary>
     private static WebLingoIrStatement MakeModule(WebLingoBoundUnit unit, int index)
     {
-        var cells = new List<int>();
-        foreach (var (_, local) in unit.Exports) cells.Add(local.Index);
-        return Initialize(unit.Instance, new WebLingoIrMakeModule(index, cells, default), default);
+        var values = new List<WebLingoIrExpression>();
+        foreach (var (_, local) in unit.Exports) values.Add(new WebLingoIrLoadLocal(local.Index, default)); // Its cell, as it is.
+        foreach (var builtin in unit.Builtins ?? []) values.Add(new WebLingoIrLoadBuiltin(builtin.Index, default));
+        return Initialize(unit.Instance, new WebLingoIrMakeModule(index, values, default), default);
     }
 
     /// <summary>

@@ -64,7 +64,23 @@ public sealed class WebLingoCompilation
             {
                 if (statement is not WebLingoImportSyntax import || import.Path.Length == 0) continue;
                 string? error;
-                if (options.Resolver is not { } resolver)
+                if (import.Path.StartsWith("std:", StringComparison.Ordinal))
+                {
+                    // A standard module, named by the scheme std:, never a path (section 3.9).
+                    if (StandardModules.Contains(import.Path))
+                    {
+                        if (!indexes.TryGetValue(import.Path, out var standard))
+                        {
+                            standard = roots.Count;
+                            indexes.Add(import.Path, standard);
+                            roots.Add((import.Path, new WebLingoCompilationUnitSyntax([], default), new Dictionary<WebLingoImportSyntax, int>()));
+                        }
+                        imports[import] = standard;
+                        continue;
+                    }
+                    error = "there is no such standard module";
+                }
+                else if (options.Resolver is not { } resolver)
                 {
                     error = "this host finds no modules";
                 }
@@ -85,6 +101,12 @@ public sealed class WebLingoCompilation
                     $"The module '{import.Path}' cannot be imported: {error}.", import.PathSpan) { Source = source });
             }
         }
-        foreach (var (name, root, imports) in roots) modules.Add(new WebLingoModuleSource(name, root, imports));
+        foreach (var (name, root, imports) in roots)
+        {
+            modules.Add(new WebLingoModuleSource(name, root, imports) { IsStandard = StandardModules.Contains(name) });
+        }
     }
+
+    /// <summary>The standard modules there are (section 3.9): <c>std:system</c>, the host's built-ins.</summary>
+    private static readonly HashSet<string> StandardModules = new(StringComparer.Ordinal) { "std:system" };
 }

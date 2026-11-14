@@ -78,6 +78,23 @@ public sealed class ModuleTests
         }
     }
 
+    [Fact]
+    public void TheStandardModuleSystemHoldsTheBuiltIns()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["main.wl"] = "import sys from \"std:system\"; import { writeLn } from \"std:system\"; import m from \"m\"; " +
+                          "sys.writeLn(1); writeLn([sys, sys.write == write, m.f()]); try { sys.writeLn = 1; } catch (e) { writeLn(e.code); }",
+            ["m.wl"] = "import { write } from \"std:system\"; export function f() { write(\"m: \"); return 2; }",
+            ["nope.wl"] = "import x from \"std:nope\";",
+        };
+        AssertBoth(files, "1\nm: [module std:system, true, 2]\nWL3001\n");
+        foreach (var run in BothVms)
+        {
+            Assert.Equal(WebLingoDiagnosticCodes.ModuleNotFound, run(files, "nope.wl").Diagnostics[0].Code);
+        }
+    }
+
     [Theory]
     [InlineData("{ import m from \"m\"; }", WebLingoDiagnosticCodes.UnexpectedToken)]
     [InlineData("function f() { export var x = 1; }", WebLingoDiagnosticCodes.UnexpectedToken)]

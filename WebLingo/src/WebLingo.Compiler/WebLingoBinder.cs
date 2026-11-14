@@ -51,8 +51,12 @@ public sealed class WebLingoBinder
     /// </summary>
     private const string ErrorSource = "class Error { constructor(message) { this.message = message; this.code = null; } }";
 
+    /// <summary>The host's built-ins, in the order it gives them, which <c>std:system</c> exports (section 3.9).</summary>
+    private readonly IReadOnlyList<WebLingoBuiltinDeclaration> _builtinDeclarations;
+
     public WebLingoBinder(WebLingoCompilerOptions options)
     {
+        _builtinDeclarations = options.Builtins;
         foreach (var builtin in options.Builtins) _hostBuiltins[builtin.Name] = builtin;
         _function = _main = new FunctionContext(null, "main");
         _prelude = new Scope(null, _function);
@@ -96,6 +100,14 @@ public sealed class WebLingoBinder
         for (var i = 1; i < modules.Count; i++)
         {
             var module = modules[i];
+            if (module.IsStandard)
+            {
+                // std:system: the host's built-ins, its exports, made where the program begins (section 3.9).
+                var exported = new List<WebLingoBuiltinSymbol>();
+                foreach (var declaration in _builtinDeclarations) exported.Add(UseBuiltin(declaration));
+                units.Add(new WebLingoBoundUnit(module.Name, null, [], DeclareHidden(module.Name, default)) { Builtins = exported });
+                continue;
+            }
             var (outerFunction, outerScope) = (_function, _scope);
             _source = module.Name;
             _importTargets = module.Imports;
