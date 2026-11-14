@@ -10,30 +10,6 @@ Asked again: A5 of "M0.10 Syntax: `toString()` and Disposal That Throws" was lef
 
 A1:
 
-## [IDLE] M0.10: Classes, `dispose()` and `using`
-
-Classes, with single inheritance and no exposed prototype chain (specification, section 3.2), the disposal protocol, `dispose()` and its `destructor()` sugar, and `using` blocks (section 3.4, WS-L011), on both VMs. Their syntax and part of their meaning are not in the specification yet, and will be proposed as questions. Added by Claude, 2026-11-13.
-
-2026-11-13: waits for M0.9.
-
-2026-11-13: M0.9 is done; now waits for the answers to "M0.10 Syntax: Classes, `dispose()` and `using`".
-
-2026-11-13: the syntax is approved, but for static members, `Object` and exceptions (specification, section 3.7). M0.10 is split into the parts the specification defines in section 9 ("M0.10 parts"), each a task below, M0.10.1 to M0.10.6. Waits for them.
-
-2026-11-13: static members, `Object` and exceptions approved; `toString()` (A3) is a seventh part, M0.10.7, a task below. Waits for its parts.
-
-
-
-## [WORKING] M0.10.7: `toString()`
-
-`Object`'s `toString()` (A3 of "M0.10 Syntax: Static Members, `Object` and Exceptions"; specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
-
-2026-11-13: waits for the answers to "M0.10 Syntax: `toString()` and Disposal That Throws".
-
-2026-11-13: answered; next.
-
-Done (Claude, 2026-11-13): every value's `toString()`, `Object`'s giving the text `write` writes, which a class may override; `write`, `writeLn` and a `toString()` of `Object`'s then write what the override gives, wherever the instance is, and anything but a string is WS3001 (A1 to A4). The VMs run an override as a call on their own stacks, the text being built with a stack of its own that waits for it (`WsTextBuilder`); one new operation, `ToText`, which only `Object` uses. A program that overrides no `toString()` writes as before, and the benchmark's times did not change beyond the noise. Choices of mine, in section 15.2 as proposed (row "`toString()`"): `null.toString()` is `"null"` and `Point.toString()` `"class Point"`; a `toString()` with parameters is WS2006 where the text is written; `Object`'s `toString()` writes an instance that holds itself as `Name {…}`. Every new conformance case gives the same result on both VMs. Build and 1,206 tests pass on Windows; Linux not tried.
-
 ## [IDLE] Typed Catches
 
 A `catch` that catches only some exceptions (A7 of "M0.10 Syntax: Static Members, `Object` and Exceptions"; specification, section 3.7), on both VMs. Its syntax, and how a `catch` names what it catches, will be proposed as questions once exceptions are implemented. Added by Claude, 2026-11-13.

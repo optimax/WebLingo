@@ -849,3 +849,27 @@ Q5, disposal that throws: when B's `dispose()` throws while an instance of B is 
 A5: (
 
 Done (Claude, 2026-11-13, `73d16fa`): A1 to A4 recorded as approved in the specification, section 3.7 (a point of its own, `toString()`), its decision register, and section 9's M0.10.7. A5 was left unfinished, "(", so Q5 is asked again in "M0.10 Syntax: Disposal That Throws"; until it is answered, a disposal goes on after one of its methods throws, (a), as M0.10.6 made it, one constant to change.
+
+## [DONE] M0.10.7: `toString()`
+
+`Object`'s `toString()` (A3 of "M0.10 Syntax: Static Members, `Object` and Exceptions"; specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for the answers to "M0.10 Syntax: `toString()` and Disposal That Throws".
+
+2026-11-13: answered; next.
+
+Done (Claude, 2026-11-13, `036125b`): every value's `toString()`, `Object`'s giving the text `write` writes, which a class may override; `write`, `writeLn` and a `toString()` of `Object`'s then write what the override gives, wherever the instance is, and anything but a string is WS3001 (A1 to A4). The VMs run an override as a call on their own stacks, the text being built with a stack of its own that waits for it (`WsTextBuilder`); one new operation, `ToText`, which only `Object` uses. A program that overrides no `toString()` writes as before, and the benchmark's times did not change beyond the noise. Choices of mine, in section 15.2 as proposed (row "`toString()`"): `null.toString()` is `"null"` and `Point.toString()` `"class Point"`; a `toString()` with parameters is WS2006 where the text is written; `Object`'s `toString()` writes an instance that holds itself as `Name {…}`. Every new conformance case gives the same result on both VMs. Build and 1,206 tests pass on Windows; Linux not tried.
+
+## [DONE] M0.10: Classes, `dispose()` and `using`
+
+Classes, with single inheritance and no exposed prototype chain (specification, section 3.2), the disposal protocol, `dispose()` and its `destructor()` sugar, and `using` blocks (section 3.4, WS-L011), on both VMs. Their syntax and part of their meaning are not in the specification yet, and will be proposed as questions. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for M0.9.
+
+2026-11-13: M0.9 is done; now waits for the answers to "M0.10 Syntax: Classes, `dispose()` and `using`".
+
+2026-11-13: the syntax is approved, but for static members, `Object` and exceptions (specification, section 3.7). M0.10 is split into the parts the specification defines in section 9 ("M0.10 parts"), each a task below, M0.10.1 to M0.10.6. Waits for them.
+
+2026-11-13: static members, `Object` and exceptions approved; `toString()` (A3) is a seventh part, M0.10.7, a task below. Waits for its parts.
+
+Done (Claude, 2026-11-13): its seven parts landed, each with its own task in DONE.md: classes (`54cc651`), inheritance (`5c89f1d`), disposal (`f6c014a`), static members (`622798b`), `Object` and `equal()` (`3024a26`), exceptions (`760ad15`), and `toString()` (`036125b`), on both VMs. What a disposal does when one of its methods throws is asked again in "M0.10 Syntax: Disposal That Throws"; typed catches are "Typed Catches".
