@@ -171,8 +171,18 @@ public sealed class WsHeap
         target.IsValueClass = true;
     }
 
-    /// <summary>Whether a class is a kind of value's itself, <c>Integer</c> for example, whose <c>new</c> makes a plain value.</summary>
-    public bool IsValueClass(WsValue classValue) => Get<ClassObject>(classValue, WsValueKind.Class).IsValueClass;
+    /// <summary>
+    /// Whether <c>new</c> on a class with so many arguments makes a plain value: on a kind of value's class itself,
+    /// <c>new Integer(42)</c>, but for <c>new Function()</c>, an instance of <c>Function</c> holding a function that does
+    /// nothing (section 3.7).
+    /// </summary>
+    public bool MakesPlainValue(WsValue classValue, int count) =>
+        Get<ClassObject>(classValue, WsValueKind.Class) is { IsValueClass: true } target
+        && !(target.Holds == WsValueKind.Function && count == 0);
+
+    /// <summary>Whether a value can be called: a function, a built-in, a bound method, or an instance holding one.</summary>
+    public bool IsCallable(WsValue value) =>
+        Held(value).Kind is WsValueKind.Function or WsValueKind.Builtin or WsValueKind.BoundMethod;
 
     /// <summary>Whether a value is an instance of a class extending a kind of value, which holds one (section 3.7).</summary>
     public bool IsHolding(WsValue value) => value.Kind == WsValueKind.Instance && Get<InstanceObject>(value, WsValueKind.Instance).Holds;
@@ -243,6 +253,7 @@ public sealed class WsHeap
         error = null;
         result = kind == WsValueKind.Binary64 && value.Kind == WsValueKind.Int64 ? WsValue.FromBinary64(value.AsInt64) : value;
         if (result.Kind == kind) return true;
+        if (kind == WsValueKind.Function && result.Kind is WsValueKind.Builtin or WsValueKind.BoundMethod) return true;
         error = new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
             $"The class {className} holds {KindName(kind)}, not {WsValueFormatter.Describe(value, this)}.");
         result = WsValue.Null;
@@ -254,6 +265,7 @@ public sealed class WsHeap
         WsValueKind.Boolean => "a Boolean",
         WsValueKind.Int64 => "an integer",
         WsValueKind.Binary64 => "a number",
+        WsValueKind.Function => "a function",
         _ => "a string"
     };
 

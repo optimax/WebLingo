@@ -367,6 +367,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class Celsius extends Number {} class Hot extends Celsius {} writeLn([new Hot(40), new Celsius(), new Hot(1) + new Celsius(2)]);", "[Hot:40.0, Celsius:0.0, Hot:3.0]")]
     [InlineData("class C extends Number { toString() { return \"C\" + super.toString(); } } writeLn(new C(1)); writeLn(new C(2).toString());", "CC:1.0\nCC:2.0")]
     [InlineData("class Celsius extends Number {} extend Celsius { f() { return this * 9 / 5 + 32; } } writeLn(new Celsius(100).f());", "Celsius:212.0")]
+    [InlineData("var f = function (x) { return x + 1; }; writeLn(new Function(f) == f); writeLn(new Function(f)(2)); var g = new Function(); writeLn([g(), g is Function]); writeLn(g);", "true\n3\n[null, true]\nFunction:function")]
+    [InlineData("class Handler extends Function { constructor(f) { super(f); this.calls = 0; } describe() { return \"handler\"; } } var h = new Handler(function (x) { return x * 2; }); writeLn(h(21)); writeLn(h.describe()); writeLn([h is Function, h is Handler]); writeLn(h); h.calls = h.calls + 1; writeLn(h.calls);", "42\nhandler\n[true, true]\nHandler:function\n1")]
+    [InlineData("class Say extends Function {} var say = new Say(writeLn); say(\"via a built-in\"); class P { m() { return \"m\"; } } writeLn(new Say(new P().m)()); writeLn(new Say()());", "via a built-in\nm\nnull")]
+    [InlineData("class H extends Function {} var h = new H(async function () { return 5; }); writeLn(await h()); var calls = [new H(function () { return 1; }), function () { return 2; }]; foreach (var c in calls) write(c()); writeLn(null);", "5\n12null")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -456,7 +460,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("try { var a = []; a[1]; } catch (e) { throw; }", "WS3005")]
     [InlineData("class Bad { toString() { return 5; } } writeLn(new Bad());", "WS3001")]
     [InlineData("class Bad { toString(x) { return \"\"; } } writeLn([new Bad()]);", "WS2006")]
-    [InlineData("class X extends Function {}", "WS3001")]
+    [InlineData("class X extends Class {}", "WS3001")]
     [InlineData("class Bad { equal(o) { return 1; } } var B = new Bad(); try { throw 1; } catch (B e) {}", "WS3001")]
     [InlineData("try { throw 1; } catch (String e) {}", "WS3008")]
     [InlineData("var f = function (a, b = 1) {}; f();", "WS2006")]
@@ -513,6 +517,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class Count extends Integer {} var k = new Count(2.5);", "WS3001")]
     [InlineData("class Flag extends Boolean {} writeLn(new Flag(true) + 1);", "WS3001")]
     [InlineData("class N extends Number {} var m = {}; m[new N(1)] = 1;", "WS3001")]
+    [InlineData("new Function(5);", "WS3001")]
+    [InlineData("class H extends Function {} new H(1);", "WS3001")]
+    [InlineData("class H extends Function {} var h = new H(function (x) { return x; }); h(1, 2);", "WS2006")]
+    [InlineData("class C extends Number {} var c = new C(1); c();", "WS2005")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

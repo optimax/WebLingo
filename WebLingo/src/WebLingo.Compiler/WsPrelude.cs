@@ -53,6 +53,7 @@ internal static class WsPrelude
         "Integer" => "class Integer { constructor(value = 0) { hold(this, value); } }",
         "Number" => "class Number { constructor(value = 0.0) { hold(this, value); } }",
         "String" => "class String { constructor(value = \"\") { hold(this, value); } }",
+        "Function" => "class Function { constructor(f = function () {}) { hold(this, f); } }",
         _ => $"class {name} {{}}"
     };
 }

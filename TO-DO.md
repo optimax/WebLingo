@@ -12,11 +12,11 @@
 
 2026-11-13: split into the parts the specification defines in section 9 ("Extending the classes of values"), each a task below. Waits for them.
 
-## [IDLE] Extending the Classes of Values: `Function`
+## [WORKING] Extending the Classes of Values: `Function`
 
 `new Function(f)`, `new Function()`, and classes extending `Function`, whose instances are functions with methods of their own (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
 
-2026-11-13: next, after "Extending the Classes of Values: `extend`".
+Done (Claude, 2026-11-13): on both VMs, with their conformance tests; its choices are recorded as Proposed in the specification, section 15.2 ("Classes holding a value"): `new Function()` is an instance of `Function` holding a function that does nothing, written `Function:function`. Checks: the Release build, without warnings, the 1,492 tests, and the CLI on the samples, on Windows only; Linux not tried.
 
 ## [IDLE] Extending the Classes of Values: `Class`
 

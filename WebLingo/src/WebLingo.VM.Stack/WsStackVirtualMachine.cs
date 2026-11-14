@@ -577,7 +577,7 @@ public sealed class WsStackVirtualMachine
                                     $"{Capitalized(WsValueFormatter.Describe(classValue, heap))} is not a class, and cannot be made with 'new'.");
                                 break;
                             }
-                            if (heap.IsValueClass(classValue))
+                            if (heap.MakesPlainValue(classValue, ins.A))
                             {
                                 // new Integer(42) is 42, and new Integer() 0 (section 3.7).
                                 if (!heap.TryMakeValue(classValue, slots, first, ins.A, out slots[first - 1], out error)) break;
@@ -811,6 +811,12 @@ public sealed class WsStackVirtualMachine
                     }
                     if (callee.Kind != WsValueKind.Function)
                     {
+                        if (callee.Kind == WsValueKind.Instance && heap.IsCallable(callee))
+                        {
+                            // An instance of a class extending Function is called as the function it holds (section 3.7).
+                            callee = heap.Held(callee);
+                            goto call;
+                        }
                         var what = Capitalized(WsValueFormatter.Describe(callee, heap));
                         error = new WsRuntimeError(WsDiagnosticCodes.NotAFunction, callee.Kind == WsValueKind.Class
                             ? $"{what} is not a function: make an instance with 'new'."
@@ -1617,6 +1623,7 @@ public sealed class WsStackVirtualMachine
                 else if (i == (int)WsValueClass.Integer) heap.MarkValueClass(made, WsValueKind.Int64);
                 else if (i == (int)WsValueClass.Number) heap.MarkValueClass(made, WsValueKind.Binary64);
                 else if (i == (int)WsValueClass.String) heap.MarkValueClass(made, WsValueKind.String);
+                else if (i == (int)WsValueClass.Function) heap.MarkValueClass(made, WsValueKind.Function);
                 else heap.SealClass(made);
             }
             for (var i = 0; i < module.ErrorClasses.Count; i++)
