@@ -20,24 +20,6 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 
 2026-11-14: M0.12 is done; still waits for the choice between the VMs (WL-BC002), which waits for an I/O-bound workload, the last of those "Both VMs, for now" waits for, which needs the platform layer.
 
-## [WORKING] Arrow Notation, Continued
-
-What JavaScript's arrow functions have beyond "Arrow Notation", which made `(a, b) => { … }` the same as `function (a, b) { … }` (specification, section 3.5). One decision each, answerable with a letter. Added by Claude, 2026-11-14.
-
-Q1, an expression for a body, `(a, b) => a + b`, giving its value, as `(a, b) => { return a + b; }` does: (a) yes; (b) no, a block always.
-
-A1: (a)
-
-Q2, one parameter without parentheses, `x => { … }` (and `x => x * 2`, with Q1's (a)): (a) yes; (b) no, parentheses always.
-
-A2: (a)
-
-Q3, `async (x) => { … }`, the same as `async function (x) { … }`: (a) yes; (b) no.
-
-A3: (a)
-
-Done (Claude, 2026-11-14): `(a, b) => a + b` gives its expression's value, `x => x * 2` takes one parameter without parentheses, and `async (x) => { … }` and `async x => …` are `async` functions, on both VMs, each parsed into the syntax `function` expressions are. Recorded as approved in the specification, section 3.5 ("Functions"), its details as Proposed in section 15.2 ("Functions and calls"): a `{` after `=>` always begins a block, so a map is given in parentheses, `() => ({a: 1})`; `this => …` is not a receiver. A conformance case that expected `(a) => a + 1` to be an error now expects an error only where the expression is missing. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## [DEFER] Serialization: Text That Rebuilds a Value
 
 What `write` writes is for people to read, and does not reliably rebuild a value. Writing a classed value as if it were a call (`Celsius(21.5)`, `Stack([1, 2])`, "Classes of Values, Extensions") reads back as the same value only when the class's constructor takes the held value as it is; a class with a constructor of its own (`constructor(fahrenheit) { super((fahrenheit - 32) * 5 / 9); }`) would make something else from it. Discussed with the owner, 2026-11-13; added by Claude the same day.
