@@ -2,28 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [DONE] Classes of Values, Further
-
-A2 of "Classes of Values, Continued": `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class` are to be like any other class, and extendable, with new methods for example. What that means needs deciding. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
-
-Q1, new methods for a kind's values: (a) a block that adds methods to an existing class, `extend Integer { isEven() { return this % 2 == 0; } }`, after which `4.isEven()`, as C#'s extension methods and Swift's extensions do; (b) only subclasses, `class Even extends Integer { … }`; (c) both.
-
-A1: (c).
-
-Q2, a subclass of `Integer`, `Number`, `String` or `Boolean`, if there are any: `new Celsius(21.5)` holds a number, which arithmetic, comparisons and `==` use, `is Number` and `is Celsius`, with its own methods and fields, written `Celsius 21.5`. Agreed?
-
-A2:  Yes. Maybe write those [class-name]:[value(s)], i.e. `Celsius:21.5`, or `Celsius(21.5)` i.e. the same way as constructing it, except without the `new`.
-
-Q3, `new` on those classes: (a) `new Integer()` is `0`, `new String()` `""`, `new Boolean()` `false`, and `new Integer(5)` `5`; (b) WS3001, their values being made by literals.
-
-A3: (a). So `var x = new Integer(42);` is the same as `var x = 42`.
-
-Q4, `Function` and `Class`: (a) as (1) to (3) say for the others, a subclass of `Function` being a function with methods of its own; (b) new methods only, as (1) (a), with no subclasses.
-
-A4: (a).
-
-Done (Claude, 2026-11-13): recorded as approved in the specification, section 3.7 ("Classes of values"). A2's way of writing such an instance, and what `extend`, `new Function(…)` and `new Class(…)` need besides, are asked in "Classes of Values, Extensions"; the implementation is the task "Extending the Classes of Values".
-
 ## [QUESTION] Classes of Values, Extensions
 
 Follow-ups to "Classes of Values, Further". One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
