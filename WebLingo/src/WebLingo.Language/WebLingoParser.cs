@@ -743,15 +743,62 @@ public sealed class WebLingoParser : IWebLingoParser
         }
         if (arrowClose >= 0 && _index < arrowClose && _statementHasError) _index = arrowClose;
         Expect(WebLingoTokenKind.CloseParen, "')'");
-        if (arrowClose >= 0) Expect(WebLingoTokenKind.Arrow, "'=>'");
+        if (arrowClose < 0) return (parameters, ParseFunctionBody());
+        Expect(WebLingoTokenKind.Arrow, "'=>'");
+        return (parameters, ParseArrowBody());
+    }
+
+    /// <summary>A function's body, a block.</summary>
+    private WebLingoBlockSyntax ParseFunctionBody()
+    {
         var bodyStart = Current.Span.Start;
         if (Current.Kind != WebLingoTokenKind.OpenBrace)
         {
             if (!_statementHasError) ReportUnexpected("'{', which begins the function's body");
-            return (parameters, new WebLingoBlockSyntax([], new WebLingoSourceSpan(bodyStart, 0)));
+            return new WebLingoBlockSyntax([], new WebLingoSourceSpan(bodyStart, 0));
         }
         var body = ParseBlock(bodyStart);
-        return (parameters, body as WebLingoBlockSyntax ?? new WebLingoBlockSyntax([], body.Span));
+        return body as WebLingoBlockSyntax ?? new WebLingoBlockSyntax([], body.Span);
+    }
+
+    /// <summary>
+    /// An arrow function's body, after its <c>=&gt;</c> (section 3.5): a block, or an expression, which the function gives,
+    /// as <c>{ return expression; }</c> does; a <c>{</c> always begins a block.
+    /// </summary>
+    private WebLingoBlockSyntax ParseArrowBody()
+    {
+        if (Current.Kind == WebLingoTokenKind.OpenBrace) return ParseFunctionBody();
+        var start = Current.Span.Start;
+        var value = ParseExpression();
+        var span = SpanFrom(start);
+        return new WebLingoBlockSyntax([new WebLingoReturnSyntax(value, span)], span);
+    }
+
+    /// <summary>
+    /// An arrow function, at its parameters, after <c>async</c> if it is one (section 3.5): <c>(a, b) =&gt; …</c>, a
+    /// receiver included, as <c>function (a, b) { … }</c> is, or one parameter without parentheses, <c>x =&gt; …</c>.
+    /// </summary>
+    private WebLingoExpressionSyntax ParseArrowFunction(int start, bool isAsync)
+    {
+        if (!EnterRecursion()) return new WebLingoErrorExpressionSyntax(Current.Span);
+        try
+        {
+            if (Current.Kind == WebLingoTokenKind.Identifier)
+            {
+                _statementHasError = false;
+                var parameter = Advance();
+                Advance(); // =>
+                var body = ParseArrowBody();
+                return new WebLingoFunctionExpressionSyntax([new WebLingoParameterSyntax(parameter.Text, parameter.Span)], body,
+                    SpanFrom(start)) { IsAsync = isAsync };
+            }
+            var (parameters, arrowBody) = ParseFunctionRest(receiver: true, arrowClose: ArrowClose());
+            return new WebLingoFunctionExpressionSyntax(parameters, arrowBody, SpanFrom(start)) { IsAsync = isAsync };
+        }
+        finally
+        {
+            _recursionDepth--;
+        }
     }
 
     /// <summary>A statement nested in another, within the parser's recursion limit; null beyond it.</summary>
@@ -1068,6 +1115,14 @@ public sealed class WebLingoParser : IWebLingoParser
             case WebLingoTokenKind.StringLiteral:
                 Advance();
                 return new WebLingoStringLiteralSyntax(token.StringValue!, token.Span);
+            case WebLingoTokenKind.Async when Peek(1).Kind == WebLingoTokenKind.Identifier && Peek(2).Kind == WebLingoTokenKind.Arrow:
+            case WebLingoTokenKind.Async when Peek(1).Kind == WebLingoTokenKind.OpenParen && ArrowClose(_index + 1) >= 0:
+                // async x => …, async (a, b) => …: an async arrow function, as async function (a, b) { … } is (section 3.5).
+                Advance();
+                return ParseArrowFunction(token.Span.Start, isAsync: true);
+            case WebLingoTokenKind.Identifier when Peek(1).Kind == WebLingoTokenKind.Arrow:
+                // x => …: an arrow function of one parameter, without parentheses (section 3.5).
+                return ParseArrowFunction(token.Span.Start, isAsync: false);
             case WebLingoTokenKind.Function:
             case WebLingoTokenKind.Async when Peek(1).Kind == WebLingoTokenKind.Function:
             {
@@ -1162,20 +1217,9 @@ public sealed class WebLingoParser : IWebLingoParser
                 var arguments = ParseElements(WebLingoTokenKind.CloseParen, "')'");
                 return new WebLingoNewExpressionSyntax(target, arguments, SpanFrom(token.Span.Start));
             }
-            case WebLingoTokenKind.OpenParen when ArrowClose() is var close and >= 0:
-            {
-                // (a, b) => { … }: a function expression, as function (a, b) { … } is, a receiver included (section 3.5).
-                if (!EnterRecursion()) return new WebLingoErrorExpressionSyntax(token.Span);
-                try
-                {
-                    var (parameters, body) = ParseFunctionRest(receiver: true, arrowClose: close);
-                    return new WebLingoFunctionExpressionSyntax(parameters, body, SpanFrom(token.Span.Start));
-                }
-                finally
-                {
-                    _recursionDepth--;
-                }
-            }
+            case WebLingoTokenKind.OpenParen when ArrowClose() >= 0:
+                // (a, b) => …: a function expression, as function (a, b) { … } is, a receiver included (section 3.5).
+                return ParseArrowFunction(token.Span.Start, isAsync: false);
             case WebLingoTokenKind.OpenParen:
                 Advance();
                 var inner = ParseExpression();
@@ -1423,13 +1467,13 @@ public sealed class WebLingoParser : IWebLingoParser
     private WebLingoToken Peek(int ahead) => _tokens[Math.Min(_index + ahead, _tokens.Count - 1)];
 
     /// <summary>
-    /// The index of the <c>)</c> that matches the <c>(</c> here, if <c>=&gt;</c> follows it, so that the parentheses hold
-    /// an arrow function's parameters (section 3.5); -1 otherwise, for a parenthesized expression.
+    /// The index of the <c>)</c> that matches the <c>(</c> here, or at <paramref name="from"/>, if <c>=&gt;</c> follows it,
+    /// so that the parentheses hold an arrow function's parameters (section 3.5); -1 otherwise, for a parenthesized expression.
     /// </summary>
-    private int ArrowClose()
+    private int ArrowClose(int from = -1)
     {
         var depth = 0;
-        for (var i = _index; i < _tokens.Count; i++)
+        for (var i = from >= 0 ? from : _index; i < _tokens.Count; i++)
         {
             var kind = _tokens[i].Kind;
             if (kind == WebLingoTokenKind.OpenParen) depth++;

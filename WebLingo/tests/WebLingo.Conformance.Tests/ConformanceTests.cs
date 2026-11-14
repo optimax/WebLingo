@@ -136,7 +136,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A { const X; }", "WL1006", 1, 17)]
     [InlineData("class A { const X = 1; const X = 2; }", "WL2002", 1, 30)]
     [InlineData("var f = (1) => { return 2; };", "WL1001", 1, 10)]
-    [InlineData("var f = (a) => a + 1;", "WL1001", 1, 16)]
+    [InlineData("var f = x => ;", "WL1001", 1, 14)]
+    [InlineData("var f = async (a) => ;", "WL1001", 1, 22)]
     [InlineData("var f = (this = 1) => { };", "WL1001", 1, 15)]
     [InlineData("var f = (a, a) => { return a; };", "WL2002", 1, 13)]
     [InlineData("var f = (a = 1, b) => { };", "WL1001", 1, 17)]
@@ -473,6 +474,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var P = new Class(\"P\"); P.setMethod(\"sum\", (this) => { return this.x + this.y; }); var p = new P(); p.x = 1; p.y = 2; var describe = (this, prefix) => { return prefix + this.x.toString(); }; writeLn([p.sum(), describe(p, \"x = \")]);", "[3, \"x = 1\"]")]
     [InlineData("class A { constructor() { this.v = 7; } get() { var f = () => { return this.v; }; return f(); } } writeLn(new A().get());", "7")]
     [InlineData("writeLn([((x) => { return x * 2; })(21), (1 + 2) * 3, ((4))]);", "[42, 9, 4]")]
+    [InlineData("var add = (a, b) => a + b; var twice = x => x * 2; var none = () => null; writeLn([add(2, 3), twice(21), none()]);", "[5, 42, null]")]
+    [InlineData("var k = 1; var f = x => x + k; k = 2; var add = a => b => a + b; function apply(g, v) { return g(v); } writeLn([f(1), add(2)(3), apply(x => x + 1, 41)]);", "[3, 5, 42]")]
+    [InlineData("var m = () => ({a: 1}); var b = x => { }; writeLn([m(), b(1)]);", "[{\"a\": 1}, null]")]
+    [InlineData("var f = async x => { await delay(1); return x * 2; }; var g = async (a, b) => a + b; var h = async x => await f(x) + 1; writeLn([await f(21), await g(1, 2), await h(1)]);", "[42, 3, 3]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
