@@ -99,7 +99,7 @@ Template composition includes **mandatory first-release includes, layouts, and p
 - Module graph and route table are associated with an application generation.
 - Source compilation and bytecode caching are runtime services.
 - `.wlp` pages and `.wl` route handlers are equally supported.
-- Module initialization occurs once per application generation; failures prevent the generation from becoming active.
+- A generation compiles its modules once; a module runs once per execution, a request's, its instance the request's own (§3.9, the owner's decision of 14 November 2026, in place of running once per generation); a module that fails to compile prevents the generation from becoming active.
 - Standard library and database access use provider interfaces.
 
 ---
@@ -294,15 +294,15 @@ How a program writes asynchrony, on WebLingo's own operation model (WL-P007), ap
 The module system, `import`, `export` and `param`, approved by the owner on 13 November 2026, but for the points that say they are still open. Templates build on it (§13, "Contracts").
 
 - **Modules.** A script, or a module, is a `.wl` file, and an instance of the built-in class `Module`, whose top level is the body of its `async` method `exec()` (§3.8).
-- **Importing.** `import db from "lib/db.wl";` imports a module statically, at a module's top level: it is resolved, and compiled, with the importing program. `Module.import("lib/db.wl")` imports one dynamically, anywhere, its path known only when it runs: the module is compiled then. Either gives the module's instance.
-- **Running once.** A module runs once per execution, the first time it is imported; every later import gets the same instance, already run.
-- **Exports.** Only the declarations a module marks `export` (`export function f() { … }`) are members of its instance.
+- **Importing.** `import db from "lib/db.wl";` imports a module statically, at a module's top level: it is resolved, and compiled, with the importing program. `Module.import("lib/db.wl")` imports one dynamically, anywhere, its path known only when it runs: the module is compiled then. Either gives the module's instance; `Module.import(…)` gives it as a task, which completes once the module has run, `var db = await Module.import("lib/db.wl");`, a module's top level being `async`. A module also imports names, `import { f, g } from "lib/util.wl";`, as JavaScript does, beside its instance.
+- **Running once.** A module runs once per execution, the first time it is imported; every later import gets the same instance, already run. Under a host, an execution is a request's, and the instance the request's own. A module's static imports run before its top level, in their order, each awaited, so that it begins with them run, as JavaScript's do.
+- **Exports.** Only the declarations a module marks `export` (`export function f() { … }`) are members of its instance: a `function`, `class`, `var` or `const` declaration at its top level. An importer reads an exported `var` as it is when read (`db.count`), and cannot assign it (WS3001): an export is its module's to change.
 - **Paths.** A path is from the importing file's folder, `./` being that folder and `/` the drive's root, as for the language proper in §13 ("Includes"); `.wl` may be left out.
 - **Cycles.** A module may import itself, directly or through others: the second import gets the instance as it is so far, as JavaScript does.
 - **Parameters.** `param name;` and `param size = 10;` declare a module's parameters, at its top level, before its other statements, each a `const` of it: `param` is a keyword of the language. An importer gives them, `import db from "lib/db.wl" { size: 10 };`, and a template's caller gives a component's or a layout's (§13). A parameter without a default that is not given is an error, where the module is imported, of a code of its own.
 - **A script's parameters.** `weblingo run script.wl size=10 name=Ann` gives a script its parameters, each value read as a WebLingo literal if it is one (`10`, `true`), as a string otherwise; a quoted value is a string, so `value="10"` gives `"10"`.
-- **The standard library.** Its parts are modules imported by name (`import fs from "std/fs";`). The built-ins belong to modules too: `write` and `writeLn` are `system`'s, which every module imports implicitly.
-- **Still open:** what `Module.import(…)` gives while the module runs, when a static import's module runs, a module's lifetime under a host (§2.3), assigning an export, importing names, a quoted parameter in a shell, and the standard modules' names.
+- **The standard library.** Its parts are modules named by a scheme, `std:fs` and `std:system`, which the compiler and the runtime resolve, never as paths (`import fs from "std:fs";`). The built-ins belong to modules too: `write` and `writeLn` are `std:system`'s, which every module imports implicitly.
+- **Still open:** how a parameter is given as a string when it looks like another literal, a shell removing the quotes of `value="10"` (the follow-ups of 14 November 2026 approved the rest of this section).
 
 ---
 
