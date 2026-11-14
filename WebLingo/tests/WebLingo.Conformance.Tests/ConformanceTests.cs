@@ -271,8 +271,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(\"a\".equal(\"a\")); writeLn(5.equal(6)); var z = null; writeLn(z.equal(null));", "true\nfalse\ntrue")]
     [InlineData("try { 1 + \"a\"; } catch (TypeError e) { writeLn(e is TypeError); writeLn(e.code); } try { throw new KeyError(\"mine\"); } catch (KeyError e) { writeLn(e); }", "true\nWS3001\nKeyError {message: \"mine\", code: null}")]
     [InlineData("try { throw null; } catch (Object e) { writeLn(\"object\"); } catch (e) { writeLn(\"any \" + e.toString()); }", "any null")]
-    [InlineData("class Stack extends Array { top() { return this[this.length - 1]; } } var s = new Stack(); s.push(1); s.push(2); writeLn(s.top()); writeLn(s.length); writeLn(s); writeLn([s is Array, s is Stack, [] is Stack]); s.name = \"st\"; writeLn(s.name); foreach (var x in s) write(x); writeLn(\"\");", "2\n2\nStack [1, 2]\n[true, true, false]\nst\n12")]
-    [InlineData("class Bag extends Set {} var b = new Bag(); b.add(1); b.add(1); writeLn(b); class Dict extends Map { get(k) { return this?[k]; } } var d = new Dict(); d[\"a\"] = 1; writeLn(d.get(\"a\")); writeLn(d.get(\"b\")); writeLn([d]);", "Bag #{1}\n1\nnull\n[Dict {\"a\": 1}]")]
+    [InlineData("class Stack extends Array { top() { return this[this.length - 1]; } } var s = new Stack(); s.push(1); s.push(2); writeLn(s.top()); writeLn(s.length); writeLn(s); writeLn([s is Array, s is Stack, [] is Stack]); s.name = \"st\"; writeLn(s.name); foreach (var x in s) write(x); writeLn(\"\");", "2\n2\nStack([1, 2])\n[true, true, false]\nst\n12")]
+    [InlineData("class Bag extends Set {} var b = new Bag(); b.add(1); b.add(1); writeLn(b); class Dict extends Map { get(k) { return this?[k]; } } var d = new Dict(); d[\"a\"] = 1; writeLn(d.get(\"a\")); writeLn(d.get(\"b\")); writeLn([d]);", "Bag(#{1})\n1\nnull\n[Dict({\"a\": 1})]")]
     [InlineData("writeLn(new Array()); writeLn(new Map()); writeLn(new Set()); writeLn([new Array() is Array, new Map() is Map]);", "[]\n{}\n#{}\n[true, true]")]
     [InlineData("class Stack extends Array { constructor(x) { super(); this.push(x); } push(v) { write(\"push \"); writeLn(v); } } var s = new Stack(5); writeLn(s.length);", "push 5\n0")]
     [InlineData("class Stack extends Array { toString() { return \"stack of \" + this.length.toString(); } } var s = new Stack(); s.push(1); writeLn(s); writeLn([s]);", "stack of 1\n[stack of 1]")]
@@ -336,6 +336,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class R { constructor(n) { this.n = n; } async dispose() { await delay(this.n); writeLn(this.n); } } async function use(n) { using (var r = new R(n)) {} } var a = use(20); var b = use(10); await a; await b;", "10\n20")]
     [InlineData("class R { dispose() { writeLn(\"d\"); } } async function f() { using (var r = new R()) {} writeLn(\"f\"); } var t = f(); writeLn(\"main\"); await t;", "d\nf\nmain")]
     [InlineData("class R { async dispose() { await null; writeLn(\"d\"); } } async function f() { using (var r = new R()) { return 1; } } var t = f(); writeLn(\"main\"); writeLn(await t);", "main\nd\n1")]
+    [InlineData("class S extends Array {} var s = new S(); s.push(1); s.push(s); writeLn(s); writeLn([s]); class M extends Map {} var m = new M(); m[\"k\"] = s; writeLn(m);", "S([1, S([…])])\n[S([1, S([…])])]\nM({\"k\": S([1, S([…])])})")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
