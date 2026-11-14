@@ -183,16 +183,63 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
             if (!builtins.TryGetBuiltin(function.Name, out _)) builtins.Register(function);
             exports.Add(new WebLingoNativeExport(function.Export, function.Name, function.Arity));
         }
-        module = new WebLingoNativeModuleInfo(name, exports);
+        var classes = new List<WebLingoNativeClassInfo>();
+        foreach (var nativeClass in registry.Classes)
+        {
+            // Its members, each one of the host's built-ins: its constructor first, then its methods, then its static ones.
+            var members = nativeClass.Builtins(name + "." + nativeClass.Name);
+            foreach (var member in members)
+            {
+                if (!builtins.TryGetBuiltin(member.Name, out _)) builtins.Register(member);
+            }
+            var methods = new List<WebLingoNativeExport>();
+            var statics = new List<WebLingoNativeExport>();
+            for (var i = 0; i < nativeClass.Methods.Count; i++) methods.Add(Export(nativeClass.Methods[i].Name, members[1 + i]));
+            for (var i = 0; i < nativeClass.StaticMethods.Count; i++)
+            {
+                statics.Add(Export(nativeClass.StaticMethods[i].Name, members[1 + nativeClass.Methods.Count + i]));
+            }
+            classes.Add(new WebLingoNativeClassInfo(nativeClass.Name, Export("constructor", members[0]), methods, statics));
+        }
+        module = new WebLingoNativeModuleInfo(name, exports) { Classes = classes };
         error = null;
         return true;
     }
+
+    private static WebLingoNativeExport Export(string name, IWebLingoBuiltinFunction builtin) => new(name, builtin.Name, builtin.Arity);
 
     /// <summary>What a native module registers its exports with: each function checked, the first error kept.</summary>
     private sealed class Registry(string module) : IWebLingoNativeRegistry
     {
         public List<NativeFunction> Functions { get; } = [];
-        public string? Error { get; private set; }
+        public List<WebLingoNativeClass> Classes { get; } = [];
+        private string? _error;
+
+        /// <summary>The first fault in what the module registered, its classes' included.</summary>
+        public string? Error
+        {
+            get
+            {
+                if (_error is not null) return _error;
+                foreach (var registered in Classes)
+                {
+                    if (registered.Error is { } wrong) return $"it registers {wrong}";
+                }
+                return null;
+            }
+        }
+
+        public WebLingoNativeClass Class(string name)
+        {
+            var made = new WebLingoNativeClass(name);
+            if (_error is not null) return made;
+            if (!IsName(name)) _error = $"it registers a class named '{name}', which is not a name";
+            else if (Taken(name)) _error = $"it registers '{name}' twice";
+            else Classes.Add(made);
+            return made;
+        }
+
+        private bool Taken(string name) => Functions.Exists(f => f.Export == name) || Classes.Exists(c => c.Name == name);
 
         public void Function(string name, int arity, WebLingoNativeFunction function) => Add(name, arity, function, false);
 
@@ -200,10 +247,10 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
 
         private void Add(string name, int arity, WebLingoNativeFunction function, bool writesText)
         {
-            if (Error is not null) return;
-            if (!IsName(name)) Error = $"it registers a function named '{name}', which is not a name";
-            else if (arity < 0) Error = $"it registers '{name}' with an arity of {arity}";
-            else if (Functions.Exists(f => f.Export == name)) Error = $"it registers '{name}' twice";
+            if (_error is not null) return;
+            if (!IsName(name)) _error = $"it registers a function named '{name}', which is not a name";
+            else if (arity < 0) _error = $"it registers '{name}' with an arity of {arity}";
+            else if (Taken(name)) _error = $"it registers '{name}' twice";
             else if (writesText) Functions.Add(new NativeTextFunction(module + "." + name, name, arity, function));
             else Functions.Add(new NativeFunction(module + "." + name, name, arity, function));
         }

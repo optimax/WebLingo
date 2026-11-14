@@ -78,6 +78,8 @@ public sealed record WebLingoBoundFunction(
     public bool IsAsync { get; init; }
     /// <summary>The file it is in, when it is not the program's own (section 3.9).</summary>
     public string? Source { get; init; }
+    /// <summary>Whether it is a native class's member, which only calls its built-in, an error in it reported where it was called (section 3.9).</summary>
+    public bool IsNative { get; init; }
 }
 
 public abstract record WebLingoBoundStatement(WebLingoSourceSpan Span);

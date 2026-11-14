@@ -890,6 +890,91 @@ public sealed class WebLingoHeap
 
     public WebLingoValue ClassOf(WebLingoValue instance) => Get<InstanceObject>(instance, WebLingoValueKind.Instance).Class;
 
+    /// <summary>
+    /// The instances native classes' constructors have marked as their own, by handle (section 3.9): each its class, and its
+    /// host object, if any, kept apart from the instance, so that no other instance is any larger. The collector removes an
+    /// instance it frees, so that its handle, used again, is not taken for it.
+    /// </summary>
+    private Dictionary<int, NativeState>? _natives;
+
+    private sealed class NativeState(object nativeClass)
+    {
+        public object Class { get; } = nativeClass;
+        public object? HostObject { get; set; }
+        /// <summary>Whether its host object was released, the instance then disposed for its native class's methods.</summary>
+        public bool Released { get; set; }
+    }
+
+    /// <summary>The native class that marked an instance as its own, or null, for an instance it did not or any other value (section 3.9).</summary>
+    internal object? NativeClassOf(WebLingoValue value) =>
+        value.Kind == WebLingoValueKind.Instance && _natives is not null && _natives.TryGetValue(value.Handle, out var native) ? native.Class : null;
+
+    /// <summary>Marks an instance as a native class's own: false for any other value, or one another native class marked.</summary>
+    internal bool TryMarkNative(WebLingoValue value, object nativeClass)
+    {
+        if (value.Kind != WebLingoValueKind.Instance || _objects[value.Handle] is not InstanceObject) return false;
+        _natives ??= [];
+        if (_natives.TryGetValue(value.Handle, out var native)) return ReferenceEquals(native.Class, nativeClass);
+        _natives.Add(value.Handle, new NativeState(nativeClass));
+        return true;
+    }
+
+    /// <summary>A marked instance's state; its native class has checked that it is one.</summary>
+    private NativeState Native(WebLingoValue value) => _natives![value.Handle];
+
+    internal void SetHostObject(WebLingoValue value, object hostObject)
+    {
+        var native = Native(value);
+        native.HostObject = hostObject;
+        native.Released = false;
+    }
+
+    internal object? HostObjectOf(WebLingoValue value, out bool released)
+    {
+        var native = Native(value);
+        released = native.Released;
+        return native.HostObject;
+    }
+
+    /// <summary>An instance's host object, taken out of it, the instance then released; null when it held none.</summary>
+    internal object? ReleaseHostObject(WebLingoValue value)
+    {
+        var native = Native(value);
+        var hostObject = native.HostObject;
+        native.HostObject = null;
+        native.Released = true;
+        return hostObject;
+    }
+
+    /// <summary>
+    /// Disposes the host objects that instances still hold, as the collector disposes those of the instances it frees,
+    /// when the execution ends (section 3.9).
+    /// </summary>
+    public void ReleaseHostObjects()
+    {
+        if (_natives is null) return;
+        foreach (var native in _natives.Values) DisposeHostObject(native);
+    }
+
+    /// <summary>
+    /// A host object no longer reachable, disposed if it is <see cref="IDisposable"/>: a fallback, not a timely release
+    /// (section 3.4), whose failure the program does not see.
+    /// </summary>
+    private static void DisposeHostObject(NativeState native)
+    {
+        if (native.HostObject is not { } hostObject) return;
+        native.HostObject = null;
+        native.Released = true;
+        try
+        {
+            (hostObject as IDisposable)?.Dispose();
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            // Nothing awaits it, and the program has let it go.
+        }
+    }
+
     public bool TryGetField(WebLingoValue instance, string name, out WebLingoValue value) => Fields(instance).TryGet(name, out value);
 
     /// <summary>
@@ -1175,6 +1260,7 @@ public sealed class WebLingoHeap
         for (var handle = 0; handle < _objects.Count; handle++)
         {
             if (marked[handle] || _objects[handle] is not { } item) continue;
+            if (_natives is { Count: > 0 } && _natives.Remove(handle, out var native)) DisposeHostObject(native);
             Units -= SizeOf(item);
             _objects[handle] = null;
             _free.Push(handle);

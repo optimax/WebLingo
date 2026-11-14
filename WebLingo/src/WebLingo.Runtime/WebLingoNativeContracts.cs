@@ -23,6 +23,12 @@ public interface IWebLingoNativeRegistry
     /// (<see cref="IWebLingoTextBuiltin"/>, section 3.7).
     /// </summary>
     void TextFunction(string name, int arity, WebLingoNativeFunction function);
+
+    /// <summary>
+    /// An exported class, by a name a script can write, given once, and not a function's too: its members are declared on
+    /// what this gives (<see cref="WebLingoNativeClass"/>), whose host objects its functions reach through it.
+    /// </summary>
+    WebLingoNativeClass Class(string name);
 }
 
 /// <summary>

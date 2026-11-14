@@ -104,7 +104,14 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             Loader = Loader,
             Components = Components
         };
-        return execution.Run();
+        try
+        {
+            return execution.Run();
+        }
+        finally
+        {
+            heap.ReleaseHostObjects(); // What native classes' instances still hold (section 3.9).
+        }
     }
 
     /// <summary>A copy of the code, without LINQ, which the portable core does not use.</summary>
@@ -1120,7 +1127,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     }
                     _thrown = WebLingoValue.Null;
                     _thrownError = error;
-                    _origin = OriginOf(frame.Function, pc);
+                    _origin = RaisedAt(frames, depth, pc);
 
                 throwing:
                     // An exception, raised at pc: the first handler around it in this frame catches it; a disposal it
@@ -2154,6 +2161,18 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             _thrown = exception;
             _thrownError = null;
             return true;
+        }
+
+        /// <summary>
+        /// Where a runtime error raised at <paramref name="pc"/> in the frame at <paramref name="depth"/> is reported: there,
+        /// or, in a native class's member, which only calls its built-in, at that member's call (section 3.9). One that
+        /// cannot be caught is reported where it was raised, so that this failure path stays as it was: a change to it
+        /// slowed the stack VM's calls (Documents/implementation.md, "A VM's Dispatch Method Is Sensitive to Its Locals").
+        /// </summary>
+        private long RaisedAt(Frame[] frames, int depth, int pc)
+        {
+            while (depth > 0 && frames[depth].Function.IsNative) pc = frames[--depth].Pc - 1;
+            return OriginOf(frames[depth].Function, pc);
         }
 
         /// <summary>An exception that nothing caught: the program stops, reporting it where it was first thrown.</summary>

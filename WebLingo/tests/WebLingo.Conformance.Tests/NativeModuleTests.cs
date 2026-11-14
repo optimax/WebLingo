@@ -9,7 +9,8 @@ using Xunit;
 namespace WebLingo.Conformance.Tests;
 
 /// <summary>
-/// Native modules' functions (specification, section 3.9, "Native modules"; section 9, "Native modules", part 1): a test
+/// Native modules' functions and classes (specification, section 3.9, "Native modules"; section 9, "Native modules", parts 1
+/// and 2): a test
 /// module, <c>WebLingo.Native.TestModule</c>, installed as <c>test.dll</c> in a scheme's folder, <c>native/</c>, imported by
 /// programs run on both VMs, which must give the same; and through <c>weblingo</c>, its schemes given by
 /// <c>weblingo.json</c> and <c>--scheme</c>.
@@ -68,6 +69,52 @@ public sealed class NativeModuleTests : IDisposable
     public void ANativeFunctionsFailureIsARuntimeError(string source, string error)
     {
         Assert.StartsWith(error, Run(source).Error);
+    }
+
+    [Theory]
+    [InlineData("import { Counter } from \"native:test\"; var c = new Counter(5); writeLn([c.add(2), c.add(3), Counter.describe(), c, c.__instanceOf]);", "[7, 10, \"a counter\", Counter(10), class Counter]")]
+    [InlineData("import { Counter } from \"native:test\"; class Twice extends Counter { add(n) { return super.add(n * 2); } } var t = new Twice(1); writeLn([t.add(2), t is Counter, t is Twice, t]);", "[5, true, true, Counter(5)]")]
+    [InlineData("import t from \"native:test\"; writeLn([t, t.Counter, new t.Counter(3)]);", "[module native:test, class Counter, Counter(3)]")]
+    [InlineData("import t from \"native:test\"; var u = await Module.import(\"native:test\"); writeLn([t.Counter == u.Counter, new u.Counter(2) is t.Counter]);", "[true, true]")]
+    [InlineData("import { Counter } from \"native:test\"; var C = new Class(\"C\", Counter); var c = new C(4); writeLn([c.add(1), c is Counter]);", "[5, true]")]
+    [InlineData("import { Counter } from \"native:test\"; extend Counter { twice() { return this.add(this.add(0)); } } writeLn(new Counter(3).twice());", "6")]
+    [InlineData("import { Counter } from \"native:test\"; var c = new Counter(1); using (var d = c) { d.add(1); } try { c.add(1); } catch (e) { writeLn([e.code, e.message, c]); }", "[\"WL3001\", \"This Counter has been disposed.\", Counter(disposed)]")]
+    [InlineData("import { Counter } from \"native:test\"; var c = new Counter(1); c.close(); c.close(); c.dispose(); writeLn(c);", "Counter(disposed)")]
+    [InlineData("import { Other } from \"native:test\"; try { new Other().peek(); } catch (e) { writeLn(e.message); }", "An instance of Other is not an instance that the native class Counter's constructor made.")]
+    [InlineData("import { Counter } from \"native:test\"; Counter.setMethod(\"constructor\", function (this, n) {}); var c = new Counter(1); try { c.add(1); } catch (e) { writeLn(e.message); }", "'add' of the native class Counter runs only on an instance that its constructor made, not on an instance of Counter.")]
+    [InlineData("import { Counter } from \"native:test\"; try { new Counter(\"x\"); } catch (e) { writeLn(e.message); } try { new Counter(); } catch (e) { writeLn(e.code); }", "A Counter starts from an integer.\nWL2006")]
+    [InlineData("import { Counter, released } from \"native:test\"; var before = released(); for (var i = 0; i < 100; i = i + 1) { new Counter(i); } var big = \"0123456789\"; for (var i = 0; i < 17; i = i + 1) { big = big + big; } writeLn(released() - before >= 99);", "true")]
+    public void ANativeModulesClassesAreItsExports(string source, string printed)
+    {
+        // Classes as any others, extended, made and disposed alike, their instances' host objects only theirs (part 2).
+        Assert.Equal(("", printed + "\n", ""), Run(source));
+    }
+
+    [Fact]
+    public void ANativeClassesHostObjectsAreReleasedWhenTheExecutionEnds()
+    {
+        const string released = "import t from \"native:test\"; writeLn(t.released());";
+        var before = long.Parse(Run(released).Output, System.Globalization.CultureInfo.InvariantCulture);
+        Run("import { Counter } from \"native:test\"; var kept = new Counter(1);"); // On both VMs: two tallies.
+        Assert.Equal((before + 2).ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n", Run(released).Output);
+    }
+
+    [Fact]
+    public void ANativeMethodsErrorIsReportedWhereItWasCalled()
+    {
+        // Not in the class's members, which the compiler wrote, but at the call, in the file that made it (section 3.9).
+        File.WriteAllText(Path.Combine(_folder, "lib.wl"), "export function use(c) {\n  return c.add(1);\n}");
+        var script = Path.Combine(_folder, "script.wl");
+        File.WriteAllText(script,
+            "import { Counter } from \"lib:test\";\nimport { use } from \"./lib.wl\";\nvar c = new Counter(1);\nc.close();\n  c.add(1);");
+        var (exit, _, error) = Weblingo(["run", "--scheme", "lib=" + _native, script]);
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
+        Assert.Contains("script.wl(5,3): error WL3001: This Counter has been disposed.", error);
+        File.WriteAllText(script,
+            "import { Counter } from \"lib:test\";\nimport { use } from \"./lib.wl\";\nvar c = new Counter(1);\nc.dispose();\nuse(c);");
+        (exit, _, error) = Weblingo(["run", "--scheme", "lib=" + _native, script]);
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
+        Assert.Contains("lib.wl(2,10): error WL3001: This Counter has been disposed.", error);
     }
 
     [Fact]

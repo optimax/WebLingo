@@ -1,0 +1,207 @@
+using System.Diagnostics.CodeAnalysis;
+using WebLingo.Core;
+namespace WebLingo.Runtime;
+
+/// <summary>A native class's constructor, method or static method: its name, its arity, without the instance, and its function.</summary>
+public sealed record WebLingoNativeMember(string Name, int Arity, WebLingoNativeFunction Function);
+
+/// <summary>
+/// A native module's class (specification, sections 3.7 and 3.9), which <see cref="IWebLingoNativeRegistry.Class"/> gives:
+/// its constructor, its methods and its static methods, each a native function, a constructor's and a method's first
+/// argument the instance it runs on. The compiler makes it a class as any other is, extending <c>Object</c>, whose members
+/// call those functions, so that a program may extend it, and its instances are disposed, written and compared as any
+/// other's. Its constructor marks an instance as its own; a method given an instance that is not one of its class's, or
+/// of a class extending it, is WL3001, without running. An instance may hold one host object, a .NET object no script
+/// sees, which only the class's own functions reach, through <see cref="TrySetHostObject"/>,
+/// <see cref="TryGetHostObject{T}"/> and <see cref="TryReleaseHostObject"/>; one never released is disposed, if it is
+/// <see cref="IDisposable"/>, when the collector frees its instance, or when the execution ends.
+/// </summary>
+public sealed class WebLingoNativeClass(string name)
+{
+    private readonly List<WebLingoNativeMember> _methods = [];
+    private readonly List<WebLingoNativeMember> _staticMethods = [];
+
+    public string Name { get; } = name;
+    public WebLingoNativeMember? Constructor { get; private set; }
+    public IReadOnlyList<WebLingoNativeMember> Methods => _methods;
+    public IReadOnlyList<WebLingoNativeMember> StaticMethods => _staticMethods;
+
+    /// <summary>The first fault in what the module declared, or null: a name that is not one, an arity below 0, or a name twice.</summary>
+    public string? Error { get; private set; }
+
+    /// <summary>
+    /// Its constructor, which <c>new</c> runs with the instance first, then the arguments; a class without one takes none,
+    /// its instances marked as its own all the same. A constructor is declared once.
+    /// </summary>
+    public WebLingoNativeClass DeclareConstructor(int arity, WebLingoNativeFunction constructor)
+    {
+        if (Check("constructor", arity, Constructor is not null ? "constructor" : null)) Constructor = new("constructor", arity, constructor);
+        return this;
+    }
+
+    /// <summary>A method, called on an instance, which its function is given first; <c>dispose</c> is the class's disposal.</summary>
+    public WebLingoNativeClass DeclareMethod(string name, int arity, WebLingoNativeFunction method)
+    {
+        if (CheckMember(name, arity, _methods)) _methods.Add(new(name, arity, method));
+        return this;
+    }
+
+    /// <summary>A static method, called on the class, without an instance.</summary>
+    public WebLingoNativeClass DeclareStaticMethod(string name, int arity, WebLingoNativeFunction method)
+    {
+        if (CheckMember(name, arity, _staticMethods)) _staticMethods.Add(new(name, arity, method));
+        return this;
+    }
+
+    private bool CheckMember(string name, int arity, List<WebLingoNativeMember> members)
+    {
+        string? twice = null;
+        foreach (var member in members)
+        {
+            if (member.Name == name) twice = name;
+        }
+        if (Error is null && name is "constructor" or "destructor")
+        {
+            Error = name == "constructor"
+                ? $"class '{Name}' declares a member named 'constructor': declare its constructor as one"
+                : $"class '{Name}' declares a member named 'destructor': declare its disposal as 'dispose'";
+        }
+        return Check(name, arity, twice);
+    }
+
+    private bool Check(string name, int arity, string? twice)
+    {
+        if (Error is not null) return false;
+        if (!IsName(name)) Error = $"class '{Name}' declares a member named '{name}', which is not a name";
+        else if (arity < 0) Error = $"class '{Name}' declares '{name}' with an arity of {arity}";
+        else if (twice is not null) Error = $"class '{Name}' declares '{twice}' twice";
+        return Error is null;
+    }
+
+    /// <summary>
+    /// The built-ins that run its members, each named <paramref name="prefix"/> and the member's name: its constructor's
+    /// <c>.constructor</c>, a method's <c>.name</c>, a static method's <c>.static.name</c>, names no program can write; a
+    /// constructor's and a method's arity one more than the member's, for the instance it is given first. A class without a
+    /// constructor gets one that only marks its instances.
+    /// </summary>
+    public IReadOnlyList<IWebLingoBuiltinFunction> Builtins(string prefix)
+    {
+        var builtins = new List<IWebLingoBuiltinFunction>
+        {
+            new MemberBuiltin(prefix + ".constructor", this, Constructor ?? new("constructor", 0, MarksOnly), MemberKind.Constructor)
+        };
+        foreach (var method in _methods) builtins.Add(new MemberBuiltin(prefix + "." + method.Name, this, method, MemberKind.Method));
+        foreach (var method in _staticMethods) builtins.Add(new MemberBuiltin(prefix + ".static." + method.Name, this, method, MemberKind.Static));
+        return builtins;
+    }
+
+    private static bool MarksOnly(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        error = null;
+        return true;
+    }
+
+    /// <summary>Whether <paramref name="instance"/> is one of this class's, its constructor having marked it.</summary>
+    public bool IsInstance(WebLingoValue instance, WebLingoHeap heap) => ReferenceEquals(heap.NativeClassOf(instance), this);
+
+    /// <summary>
+    /// Gives an instance of this class its host object, in place of one it held, which is not released (the module
+    /// releases it first if it must), and no longer disposed: WL3001 for any other value.
+    /// </summary>
+    public bool TrySetHostObject(WebLingoValue instance, object hostObject, WebLingoHeap heap, out WebLingoRuntimeError? error)
+    {
+        ArgumentNullException.ThrowIfNull(hostObject);
+        if (!CheckInstance(instance, heap, out error)) return false;
+        heap.SetHostObject(instance, hostObject);
+        return true;
+    }
+
+    /// <summary>
+    /// An instance's host object, of the type <typeparamref name="T"/>: WL3001 for a value that is not one of this class's
+    /// instances, for one whose host object was released, which is disposed, and for one without such an object.
+    /// </summary>
+    public bool TryGetHostObject<T>(WebLingoValue instance, WebLingoHeap heap, [NotNullWhen(true)] out T? hostObject,
+        out WebLingoRuntimeError? error) where T : class
+    {
+        hostObject = null;
+        if (!CheckInstance(instance, heap, out error)) return false;
+        var held = heap.HostObjectOf(instance, out var released);
+        if (held is T found)
+        {
+            hostObject = found;
+            return true;
+        }
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, released
+            ? $"This {Name} has been disposed."
+            : $"This {Name} has nothing of its own to use: its constructor did not give it.");
+        return false;
+    }
+
+    /// <summary>
+    /// Takes an instance's host object out of it, for the module to close or dispose, the instance then disposed, so that
+    /// <see cref="TryGetHostObject{T}"/> reports it as such: null when it held none, or was released already, so that
+    /// releasing twice does nothing. WL3001 for a value that is not one of this class's instances.
+    /// </summary>
+    public bool TryReleaseHostObject(WebLingoValue instance, WebLingoHeap heap, out object? hostObject, out WebLingoRuntimeError? error)
+    {
+        hostObject = null;
+        if (!CheckInstance(instance, heap, out error)) return false;
+        hostObject = heap.ReleaseHostObject(instance);
+        return true;
+    }
+
+    private bool CheckInstance(WebLingoValue instance, WebLingoHeap heap, out WebLingoRuntimeError? error)
+    {
+        error = null;
+        if (IsInstance(instance, heap)) return true;
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+            $"{Capitalized(WebLingoValueFormatter.Describe(instance, heap))} is not an instance that the native class {Name}'s constructor made.");
+        return false;
+    }
+
+    /// <summary>A name as a program writes one: ASCII letters, digits and <c>_</c>, not first a digit.</summary>
+    private static bool IsName(string name)
+    {
+        if (string.IsNullOrEmpty(name) || char.IsAsciiDigit(name[0])) return false;
+        foreach (var c in name)
+        {
+            if (!char.IsAsciiLetterOrDigit(c) && c != '_') return false;
+        }
+        return true;
+    }
+
+    private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
+
+    private enum MemberKind { Constructor, Method, Static }
+
+    /// <summary>
+    /// A member as a built-in: a constructor marks its instance, then runs; a method runs only on an instance of its class;
+    /// a static method as it is called.
+    /// </summary>
+    private sealed class MemberBuiltin(string name, WebLingoNativeClass owner, WebLingoNativeMember member, MemberKind kind)
+        : IWebLingoBuiltinFunction
+    {
+        public string Name => name;
+        public int Arity => member.Arity + (kind == MemberKind.Static ? 0 : 1);
+
+        public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+        {
+            result = WebLingoValue.Null;
+            if (kind == MemberKind.Constructor && !heap.TryMarkNative(arguments[0], owner))
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"The native class {owner.Name} cannot make {WebLingoValueFormatter.Describe(arguments[0], heap)} one of its instances.");
+                return false;
+            }
+            if (kind == MemberKind.Method && !owner.IsInstance(arguments[0], heap))
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"'{member.Name}' of the native class {owner.Name} runs only on an instance that its constructor made, "
+                    + $"not on {WebLingoValueFormatter.Describe(arguments[0], heap)}.");
+                return false;
+            }
+            return member.Function(arguments, heap, out result, out error);
+        }
+    }
+}

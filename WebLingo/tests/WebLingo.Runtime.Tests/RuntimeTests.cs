@@ -363,6 +363,51 @@ public sealed class InterpolationFormatTests
     }
 }
 
+public sealed class NativeClassTests
+{
+    private static bool Nothing(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        error = null;
+        return true;
+    }
+
+    [Theory]
+    [InlineData("constructor", "class 'C' declares a member named 'constructor': declare its constructor as one")]
+    [InlineData("destructor", "class 'C' declares a member named 'destructor': declare its disposal as 'dispose'")]
+    [InlineData("1st", "class 'C' declares a member named '1st', which is not a name")]
+    [InlineData("a.b", "class 'C' declares a member named 'a.b', which is not a name")]
+    public void AMemberMustBeNamedAsAProgramNamesIt(string name, string error)
+    {
+        Assert.Equal(error, new WebLingoNativeClass("C").DeclareMethod(name, 0, Nothing).Error);
+    }
+
+    [Fact]
+    public void AMembersNameAndArityAreChecked()
+    {
+        Assert.Equal("class 'C' declares 'm' twice", new WebLingoNativeClass("C").DeclareMethod("m", 0, Nothing).DeclareMethod("m", 1, Nothing).Error);
+        Assert.Equal("class 'C' declares 'constructor' twice", new WebLingoNativeClass("C").DeclareConstructor(0, Nothing).DeclareConstructor(0, Nothing).Error);
+        Assert.Equal("class 'C' declares 'm' with an arity of -1", new WebLingoNativeClass("C").DeclareStaticMethod("m", -1, Nothing).Error);
+        // A static method and a method may share a name, as a class's may (section 3.7).
+        var shared = new WebLingoNativeClass("C").DeclareMethod("m", 0, Nothing).DeclareStaticMethod("m", 0, Nothing);
+        Assert.Null(shared.Error);
+        Assert.Equal(["n:t.C.constructor", "n:t.C.m", "n:t.C.static.m"], shared.Builtins("n:t.C").Select(b => b.Name));
+        Assert.Equal([1, 1, 0], shared.Builtins("n:t.C").Select(b => b.Arity));
+    }
+
+    [Fact]
+    public void AValueThatIsNotItsInstanceHasNoHostObject()
+    {
+        var heap = new WebLingoHeap();
+        Assert.True(heap.TryAllocateString("x", out var text, out _));
+        var nativeClass = new WebLingoNativeClass("C");
+        Assert.False(nativeClass.TryGetHostObject<object>(text, heap, out _, out var error));
+        Assert.Equal("A string is not an instance that the native class C's constructor made.", error!.Message);
+        Assert.False(nativeClass.TrySetHostObject(WebLingoValue.FromInt64(1), new object(), heap, out error));
+        Assert.Equal(WebLingoDiagnosticCodes.InvalidOperation, error!.Code);
+    }
+}
+
 public sealed class QuoteTests
 {
     [Theory]

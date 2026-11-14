@@ -5,7 +5,19 @@ namespace WebLingo.Compiler;
 /// A native module as the compiler sees it (specification, section 3.9): its name, <c>scheme:module</c>, which identifies
 /// it, and its exports, each a function's name, the built-in the host registers it as, and its arity.
 /// </summary>
-public sealed record WebLingoNativeModuleInfo(string Name, IReadOnlyList<WebLingoNativeExport> Exports);
+public sealed record WebLingoNativeModuleInfo(string Name, IReadOnlyList<WebLingoNativeExport> Exports)
+{
+    /// <summary>Its exported classes (section 3.9).</summary>
+    public IReadOnlyList<WebLingoNativeClassInfo> Classes { get; init; } = [];
+}
+
+/// <summary>
+/// A native module's class as the compiler sees it: its name, and the built-ins that are its constructor, its methods and
+/// its static methods, each export's arity its built-in's, which is one more than the member's for a constructor and a
+/// method, whose built-in is given the instance first.
+/// </summary>
+public sealed record WebLingoNativeClassInfo(string Name, WebLingoNativeExport Constructor, IReadOnlyList<WebLingoNativeExport> Methods,
+    IReadOnlyList<WebLingoNativeExport> StaticMethods);
 
 /// <summary>A native module's exported function: the name it exports it by, the built-in that is it, and its arity.</summary>
 public sealed record WebLingoNativeExport(string Name, string Builtin, int Arity);

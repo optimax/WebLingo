@@ -59,6 +59,8 @@ public sealed record WebLingoIrFunction(
 {
     /// <summary>The file it is in, when it is not the program's own (section 3.9).</summary>
     public string? Source { get; init; }
+    /// <summary>Whether it is a native class's member, which only calls its built-in, an error in it reported where it was called (section 3.9).</summary>
+    public bool IsNative { get; init; }
     /// <summary>A method's or a constructor's, whose first parameter is <c>this</c>.</summary>
     public bool HasThis { get; init; }
     /// <summary>How many of its last parameters have default values, and so may be left out (section 3.5).</summary>

@@ -227,6 +227,8 @@ public sealed record WebLingoFunction(
     public int ParameterCount { get; init; }
     /// <summary>The file its spans are in, when it is not the program's own: a module it imports (section 3.9).</summary>
     public string? Source { get; init; }
+    /// <summary>Whether it is a native class's member, which only calls its built-in, an error in it reported where it was called (section 3.9).</summary>
+    public bool IsNative { get; init; }
     /// <summary>The cells a closure of it captures, from the function that makes the closure.</summary>
     public IReadOnlyList<WebLingoCapture> Captures { get; init; } = [];
     /// <summary>A method's or a constructor's: its first parameter is <c>this</c>, which its caller gives (section 3.7).</summary>

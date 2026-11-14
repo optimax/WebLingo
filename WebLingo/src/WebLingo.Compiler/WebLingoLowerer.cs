@@ -94,7 +94,8 @@ public sealed class WebLingoLowerer
             function.Span)
         {
             IsAsync = true,
-            Source = function.Source
+            Source = function.Source,
+            IsNative = function.IsNative
         };
         return functionIndex;
     }
@@ -315,7 +316,8 @@ public sealed class WebLingoLowerer
             HasThis = function.HasThis,
             OptionalCount = optional,
             IsAsync = function.IsAsync,
-            Source = function.Source
+            Source = function.Source,
+            IsNative = function.IsNative
         };
         return index;
     }
