@@ -2,16 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [WORKING] WSHI
-
-A follow-up to "Rename WebScript's Leftovers to WebLingo". Added by Claude, 2026-11-14.
-
-Q1, WSHI, the host-neutral interface's name (specification, sections 6.2, 6.6 and 6.8), WebScript's: (a) WLHI; (b) WSHI, as it is.
-
-A1: (a) WLHI, but you need to define it first (fully spelled out) in the spec, and describe what it is: : the full name in words, and a short paragraph in §6.2 saying which contracts make up the host interface, with references to §6.4, §6.6, §6.7 and §6.8.
-
-Done (Claude, 2026-11-14): WLHI, the WebLingo Host Interface, defined in the specification, section 6.2: what it is, and the contracts it is made of, the runtime's lifecycle (§6.4), a request's (§6.6), the HTTP request and response (§6.7), and the native ABI (§6.8); WSHI renamed WLHI everywhere but `DONE.md`.
-
 ## [IDLE] Extending the Classes of Values
 
 `extend` blocks, and classes extending `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class`, with `new` on those classes ("Classes of Values, Further"; specification, section 3.7), on both VMs. Added by Claude, 2026-11-13.
