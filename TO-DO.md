@@ -104,11 +104,13 @@ A native module's classes, `registry.Class(…)`, their constructors, methods an
 
 2026-11-14: waits for "Native Modules, Part 1: Native Functions".
 
-## [IDLE] Native Modules, Part 3: Standard Modules as Native Modules
+## Native Modules, Part 3: Standard Modules as Native Modules
 
 `std:system`'s built-ins in a native module installed with the runtime, in `std/` beside its program, the `std` scheme configurable as any other (specification, sections 3.9 and 9, "Native modules", part 3), on both VMs. Added by Claude, 2026-11-14.
 
 2026-11-14: waits for "Native Modules, Part 1: Native Functions".
+
+2026-11-14: part 1 is done; this can begin.
 
 ## [IDLE] Native Modules, Part 4: The Built-in Classes as Native Classes
 
