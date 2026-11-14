@@ -321,6 +321,21 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("async function f() { var m = {a: [1, 2]}; foreach (var (k, v) in m) { foreach (var x in v) { await null; write(k + x.toString()); } } } await f(); writeLn(null);", "a1a2null")]
     [InlineData("var order = []; async function t(n, d) { await delay(d); order.push(n); } var all = [t(1, 30), t(2, 10), t(3, 20), t(4, 10)]; foreach (var x in all) await x; writeLn(order);", "[2, 4, 3, 1]")]
     [InlineData("async function f() { await null; return \"late\"; } var t = f(); writeLn(\"early\"); writeLn(await t);", "early\nlate")]
+    [InlineData("class R { async dispose() { await delay(5); writeLn(\"disposed\"); } } async function f() { using (var r = new R()) { writeLn(\"in\"); } writeLn(\"after\"); } await f();", "in\ndisposed\nafter")]
+    [InlineData("class R { async dispose() { await null; writeLn(\"disposed\"); } } using (var r = new R()) { writeLn(\"in\"); } writeLn(\"after\");", "in\ndisposed\nafter")]
+    [InlineData("class A { dispose() { writeLn(\"A\"); } } class B extends A { async dispose() { await delay(1); writeLn(\"B\"); } } using (var b = new B()) {} writeLn(\"end\");", "B\nA\nend")]
+    [InlineData("class A { async dispose() { await null; writeLn(\"A\"); } } class B extends A { dispose() { writeLn(\"B\"); } } var b = new B(); var t = b.dispose(); writeLn(t is Task); await t; writeLn(\"end\");", "B\ntrue\nA\nend")]
+    [InlineData("class R { async dispose() { await null; } } var r = new R(); var t = r.dispose(); writeLn(r.dispose()); await t; writeLn(\"ok\");", "null\nok")]
+    [InlineData("class R { async dispose() { await null; throw \"bad\"; } } try { using (var r = new R()) {} } catch (e) { writeLn(\"caught \" + e); }", "caught bad")]
+    [InlineData("class R { async dispose() { await null; writeLn(\"disposed\"); } } try { using (var r = new R()) { throw \"body\"; } } catch (e) { writeLn(e); }", "disposed\nbody")]
+    [InlineData("class A { dispose() { writeLn(\"A\"); } } class B extends A { async dispose() { await null; throw \"B\"; } } try { using (var b = new B()) {} } catch (e) { writeLn(\"caught \" + e); }", "A\ncaught B")]
+    [InlineData("class A { async dispose() { throw \"A\"; } } class B extends A { async dispose() { await null; throw \"B\"; } } try { await new B().dispose(); } catch (e) { writeLn(\"caught \" + e); }", "caught A")]
+    [InlineData("class R { async dispose() { writeLn(\"d\"); } } var r = new R(); function f() { using (var x = r) {} } try { f(); } catch (e) { writeLn(e.code); } await r.dispose();", "WS3001\nd")]
+    [InlineData("class R { async dispose() { writeLn(\"d\"); } } function f(r) { return r.dispose(); } var t = f(new R()); writeLn(t is Task); await t;", "d\ntrue")]
+    [InlineData("class R { constructor(n) { this.n = n; } async dispose() { await null; writeLn(\"d\" + this.n.toString()); } } async function f() { foreach (var i in [1, 2]) { using (var r = new R(i)) { if (i == 1) continue; return i; } } } writeLn(await f());", "d1\nd2\n2")]
+    [InlineData("class R { constructor(n) { this.n = n; } async dispose() { await delay(this.n); writeLn(this.n); } } async function use(n) { using (var r = new R(n)) {} } var a = use(20); var b = use(10); await a; await b;", "10\n20")]
+    [InlineData("class R { dispose() { writeLn(\"d\"); } } async function f() { using (var r = new R()) {} writeLn(\"f\"); } var t = f(); writeLn(\"main\"); await t;", "d\nf\nmain")]
+    [InlineData("class R { async dispose() { await null; writeLn(\"d\"); } } async function f() { using (var r = new R()) { return 1; } } var t = f(); writeLn(\"main\"); writeLn(await t);", "main\nd\n1")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WsCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -480,7 +495,9 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class T extends Task {}", "WS3001")]
     [InlineData("var t = new Task();", "WS3001")]
     [InlineData("var m = {}; m[delay(0)] = 1;", "WS3001")]
-    [InlineData("class R { async dispose() {} } using (var r = new R()) {}", "WS3001")]
+    [InlineData("class R { async dispose() {} } function f() { using (var r = new R()) {} } f();", "WS3001")]
+    [InlineData("class R { async dispose() {} } var f = function () { using (var r = new R()) {} }; f();", "WS3001")]
+    [InlineData("class R { async dispose() { throw \"x\"; } } new R().dispose();", "WS3008")]
     [InlineData("class P { async toString() { return \"p\"; } } writeLn(new P());", "WS3001")]
     [InlineData("class P { async toString() { await null; return \"p\"; } } writeLn([new P()]);", "WS3001")]
     public void AsynchronyErrorsAreReported(string source, string code)

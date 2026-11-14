@@ -213,6 +213,25 @@ public sealed class StackVirtualMachineTests
     }
 
     [Fact]
+    public void AWaitingDisposalKeepsItsInstanceThroughCollections()
+    {
+        const string source =
+            "class R { constructor(tag) { this.tag = tag + \"!\"; } async dispose() { await delay(10); writeLn(this.tag); } } " +
+            "async function churn() { var s = \"\"; for (var i = 0; i < 40; i = i + 1) { " +
+            "for (var j = 0; j < 500; j = j + 1) s = \"abcdefghij\" + \"klmnopqrst\"; await null; } return s.length; } " +
+            "async function use() { using (var r = new R(\"a\")) {} } " +
+            "var u = use(); var c = churn(); writeLn(await c); await u;";
+        foreach (var vm in BothVms)
+        {
+            var output = new WsCollectedOutput();
+            var context = Context(output) with { Resources = new WsResourceBudget(65535, MaxHeapUnits: 20_000) };
+            var result = vm(source, context);
+            Assert.True(result.Succeeded, result.Error?.Message);
+            Assert.Equal(new[] { "20", "a!" }, output.Lines);
+        }
+    }
+
+    [Fact]
     public void ManyTasksWaitAtOnce()
     {
         const string source =

@@ -144,7 +144,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         public bool FirstRun;
         /// <summary>The roots a waiting frame's task holds: its registers and its closure, made once (section 3.8).</summary>
         public WsValue[][]? WaitingRoots;
-        public int AwaitDestination;
+        public int AwaitDestination; // -1 drops what it gives, as a using's await of its disposal does.
     }
 
     /// <summary>
@@ -608,13 +608,14 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                                 pc++;
                                 continue;
                             }
-                            error = BeginDisposal(resource, 0, out var chain);
+                            error = BeginDisposal(resource, 0, frame.Function, out var chain);
                             if (error is not null) break;
                             if (chain is null)
                             {
                                 pc++;
                                 continue;
                             }
+                            if (_asyncDisposal && !heap.TryAllocateTask(out _newTask, out error)) break;
                             if (depth + 1 == frames.Length) Array.Resize(ref frames, frames.Length * 2);
                             Disposing(frames, depth + 1, chain, resource);
                             callee = chain[0];
@@ -672,12 +673,12 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             heap.RemoveLastRoots(frame.Closure);
                             heap.RemoveLastRoots(registers);
                             Array.Clear(registers, 0, frame.Function.RegisterCount); // So that nothing stays reachable.
+                            if (frame.DisposeChain is not null) goto disposed;
                             if (frame.Task.Kind == WsValueKind.Task)
                             {
                                 _returned = result;
                                 goto asyncReturned;
                             }
-                            if (frame.DisposeChain is not null) goto disposed;
                             if (frame.Text is not null)
                             {
                                 _returned = result;
@@ -762,7 +763,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             goto failed;
                         }
 
-                        if (function.IsAsync && !heap.TryAllocateTask(out _newTask, out error)) goto failed;
+                        if (function.IsAsync && !TryMakeTask(frames, depth, out error)) goto failed;
                         frame.Pc = pc + 1;
                         if (++depth == frames.Length) Array.Resize(ref frames, frames.Length * 2);
                         var called = frames[depth] ??= new Frame();
@@ -797,8 +798,9 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                     // x.dispose(): the instance's dispose methods run on it in turn, once, in the frame of one call, which
                     // gives null (section 3.7).
                     {
-                        error = BeginDisposal(self, argumentCount, out var chain);
+                        error = BeginDisposal(self, argumentCount, null, out var chain);
                         if (error is not null) goto failed;
+                        if (_asyncDisposal && !heap.TryAllocateTask(out _newTask, out error)) goto failed;
                         if (chain is null)
                         {
                             registers[resultRegister] = WsValue.Null;
@@ -820,6 +822,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         frame.DisposeChain = null;
                         frame.Closure[0] = WsValue.Null;
                         frame.Closure[1] = WsValue.Null;
+                        if (frame.Task.Kind == WsValueKind.Task) goto asyncDisposed;
                         var disposedTo = frame.ResultRegister;
                         var held = frame.Holds;
                         if (held) TakeHeld(frame);
@@ -928,6 +931,13 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         goto text;
                     }
 
+                asyncDisposed:
+                    // An async disposal's last method has returned: its task completes, or faults with what one of its
+                    // methods threw. Still on its caller's stack, the disposal gives the task, which a using awaits.
+                    DisposalEnded(frame);
+                    if (!frame.FirstRun) goto schedule;
+                    goto asyncGave;
+
                 asyncReturned:
                     // An async function has returned: its task is done, with its result. Still on its caller's stack, its call
                     // gives the task; resumed by the scheduler, nothing runs below it (section 3.8).
@@ -958,6 +968,13 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                     registers = frame.Registers;
                     cells = frame.Cells;
                     if (_text is not null) goto textGiven;
+                    if (_usingAwaits)
+                    {
+                        // A using awaits its async disposal, as await would, whatever it gives dropped (section 3.8).
+                        _usingAwaits = false;
+                        frame.AwaitDestination = -1;
+                        goto awaiting;
+                    }
                     pc = frame.Pc;
                     continue;
 
@@ -982,6 +999,9 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                     if (depth + 1 < frames.Length && frames[depth + 1] is { } unpushed)
                     {
                         unpushed.DisposeChain = null;
+                        unpushed.Task = WsValue.Null;
+                        unpushed.Closure[3] = WsValue.Null;
+                        unpushed.FirstRun = false;
                         if (unpushed.Text is { Rooted: true } stale) heap.RemoveLastRoots(stale.Builder.Roots);
                         unpushed.Text = null;
                     }
@@ -1157,25 +1177,41 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         /// on it in turn, or <c>null</c> if its disposal has begun already. Disposal gives them no arguments, so a call
         /// with some, or a dispose method that takes some, is WS2006.
         /// </summary>
-        private WsRuntimeError? BeginDisposal(WsValue instance, int argumentCount, out WsValue[]? chain)
+        private WsRuntimeError? BeginDisposal(WsValue instance, int argumentCount, WsFunction? usingIn, out WsValue[]? chain)
         {
             chain = null;
+            _asyncDisposal = false;
             if (argumentCount != 0)
             {
                 return new WsRuntimeError(WsDiagnosticCodes.WrongArgumentCount, $"'dispose' takes no arguments, not {argumentCount}.");
             }
+            if (instance.Kind == WsValueKind.Instance)
+            {
+                // An async dispose method makes the disposal async, which a using awaits; one in a function that is not
+                // async cannot, and is WS3001 before the disposal begins (section 3.8).
+                foreach (var method in heap.DisposeChain(heap.ClassOf(instance)))
+                {
+                    var function = module.Functions[heap.GetClosure(method).Function];
+                    if (!function.IsAsync) continue;
+                    _asyncDisposal = true;
+                    if (usingIn is { IsAsync: false })
+                    {
+                        return new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
+                            $"'{function.Name}' is async, and a function that is not async cannot await it at the end of its using.");
+                    }
+                }
+            }
             if (!WsMembers.TryBeginDisposal(instance, heap, out chain, out var error)) return error;
-            if (chain is null) return null;
+            if (chain is null)
+            {
+                _asyncDisposal = false;
+                return null;
+            }
             foreach (var method in chain)
             {
                 var (index, _) = heap.GetClosure(method);
                 var function = module.Functions[index];
                 if (function.ParameterCount != 1) return WrongArgumentCount(function.Name, function.ParameterCount - 1, 0);
-                if (function.IsAsync)
-                {
-                    return new WsRuntimeError(WsDiagnosticCodes.InvalidOperation,
-                        $"'{function.Name}' is async, and a disposal does not await it yet.");
-                }
             }
             return null;
         }
@@ -1184,13 +1220,54 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         /// Makes the frame at <paramref name="depth"/> ready to run an instance's dispose methods in turn, the first by the
         /// call about to be made, the rest as each returns (section 3.7).
         /// </summary>
-        private static Frame Disposing(Frame[] frames, int depth, WsValue[] chain, WsValue instance)
+        private Frame Disposing(Frame[] frames, int depth, WsValue[] chain, WsValue instance)
         {
             var frame = frames[depth] ??= new Frame();
             frame.DisposeChain = chain;
             frame.DisposeNext = 1;
             frame.Closure[1] = instance;
+            if (_asyncDisposal)
+            {
+                // An async disposal is an async function's frame, whose task is the disposal's (section 3.8).
+                frame.Task = frame.Closure[3] = _newTask;
+                frame.FirstRun = true;
+                _newTask = WsValue.Null;
+            }
             return frame;
+        }
+
+        /// <summary>
+        /// An async function's call makes its task (section 3.8), but for a disposal's frame, which has the disposal's,
+        /// if it is async.
+        /// </summary>
+        private bool TryMakeTask(Frame[] frames, int depth, out WsRuntimeError? error)
+        {
+            error = null;
+            if (depth + 1 < frames.Length && frames[depth + 1] is { DisposeChain: not null }) return true;
+            return heap.TryAllocateTask(out _newTask, out error);
+        }
+
+        /// <summary>
+        /// An async disposal's last method has returned: its task completes, with <c>null</c>, or faults with the
+        /// exception one of its methods threw, and is what the disposal gives (section 3.8).
+        /// </summary>
+        private void DisposalEnded(Frame frame)
+        {
+            var task = frame.Task;
+            frame.Task = WsValue.Null;
+            frame.Closure[3] = WsValue.Null;
+            if (frame.Holds)
+            {
+                TakeHeld(frame);
+                _scheduler.Fault(task, _thrown, _thrownError, _origin);
+                _thrown = WsValue.Null;
+                _thrownError = null;
+            }
+            else
+            {
+                _scheduler.Complete(task, WsValue.Null);
+            }
+            _returned = task;
         }
 
         // The exception being thrown, while the frames are searched for its handler: a value, or a runtime error not
@@ -1228,6 +1305,12 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         /// <summary>Whether the frame the scheduler resumed throws, at its await, rather than being given a value.</summary>
         private bool _resumedThrowing;
 
+        /// <summary>Whether the disposal begun last has an async method (section 3.8).</summary>
+        private bool _asyncDisposal;
+
+        /// <summary>Whether a using's caller is to await its async disposal's task (<see cref="_awaited"/>).</summary>
+        private bool _usingAwaits;
+
         /// <summary>A top level that awaits: an async function itself, whose task is the program's (section 3.8).</summary>
         private bool TryStartMain(Frame frame)
         {
@@ -1243,6 +1326,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
         /// <summary>An async function's frame, about to run: its task, made for its call, which the call gives (section 3.8).</summary>
         private void Started(Frame called)
         {
+            if (called.DisposeChain is not null) return;
             called.Task = called.Closure[3] = _newTask;
             called.FirstRun = true;
             _newTask = WsValue.Null;
@@ -1268,7 +1352,12 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             var task = frame.Task;
             frame.Task = WsValue.Null;
             frame.Closure[0] = WsValue.Null;
+            frame.Closure[1] = WsValue.Null;
+            frame.Closure[2] = WsValue.Null;
             frame.Closure[3] = WsValue.Null;
+            frame.DisposeChain = null;
+            frame.Holds = false;
+            frame.HeldError = null;
             _scheduler.Fault(task, _thrown, _thrownError, _origin);
             _thrown = WsValue.Null;
             _thrownError = null;
@@ -1304,7 +1393,16 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             frame.Text = null;
             if (text is null)
             {
-                caller.Registers[frame.ResultRegister] = _returned;
+                if (frame.ResultRegister >= 0)
+                {
+                    caller.Registers[frame.ResultRegister] = _returned;
+                }
+                else
+                {
+                    // A using's disposal: the using awaits it.
+                    _awaited = _returned;
+                    _usingAwaits = true;
+                }
                 _returned = WsValue.Null;
             }
             return text;
@@ -1342,7 +1440,7 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                     heap.AddRoots(frame.Closure);
                     _resumedThrowing = resumption.Throws;
                     if (resumption.Throws) (_thrown, _thrownError, _origin) = (resumption.Value, resumption.Error, resumption.Origin);
-                    else frame.Registers[frame.AwaitDestination] = resumption.Value;
+                    else if (frame.AwaitDestination >= 0) frame.Registers[frame.AwaitDestination] = resumption.Value;
                     return true;
                 }
                 if (!_scheduler.TryAdvanceTime())

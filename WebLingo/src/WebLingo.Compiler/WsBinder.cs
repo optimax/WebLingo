@@ -264,7 +264,9 @@ public sealed class WsBinder
             }
             case WsUsingSyntax usingStatement:
             {
-                // The value is bound first: the name it declares does not exist in it yet.
+                // The value is bound first: the name it declares does not exist in it yet. A using may await its
+                // resource's async disposal: at the program's top level, which then becomes async (section 3.8).
+                if (_function == _main) _main.Awaits = true;
                 var value = BindExpression(usingStatement.Value);
                 _scope = new Scope(_scope, _function);
                 var local = Declare(usingStatement.Name, WsDeclarationKind.Var, usingStatement.NameSpan, null)
