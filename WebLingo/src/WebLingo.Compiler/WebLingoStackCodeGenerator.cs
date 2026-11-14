@@ -333,7 +333,9 @@ public sealed class WebLingoStackCodeGenerator
             case WebLingoIrImportDynamic dynamic:
                 EmitValue(dynamic.Path);
                 if (dynamic.Values is { } given) EmitValue(given);
-                Emit(WebLingoStackOpCode.ImportDynamic, dynamic.Span, dynamic.Values is null ? 0 : 1);
+                // A: 1 for values, plus 2 for a component's render (section 13).
+                var flags = (dynamic.Values is null ? 0 : 1) + (dynamic.Anew ? 2 : 0);
+                Emit(WebLingoStackOpCode.ImportDynamic, dynamic.Span, flags);
                 return;
             case WebLingoIrImport import:
                 if (import.Values is { } values) EmitValue(values);
@@ -700,7 +702,7 @@ public sealed class WebLingoStackCodeGenerator
             WebLingoStackOpCode.Extend => (1, 0),
             WebLingoStackOpCode.Hold => (2, 1),
             WebLingoStackOpCode.Import => (b, 1),
-            WebLingoStackOpCode.ImportDynamic => (a + 1, 1),
+            WebLingoStackOpCode.ImportDynamic => ((a & 1) + 1, 1),
             WebLingoStackOpCode.RegisterUnit => (1, 0),
             WebLingoStackOpCode.MakeModule => (b, 1),
             WebLingoStackOpCode.Throw => (1, 0),

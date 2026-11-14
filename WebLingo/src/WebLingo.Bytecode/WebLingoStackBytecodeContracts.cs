@@ -168,7 +168,7 @@ public enum WebLingoStackOpCode : byte
     MakeModule,
     /// <summary>A = a module the program imports: pops the closure of its function, which runs it.</summary>
     RegisterUnit,
-    /// <summary>A = 1 if there are values: pops them, then a module's path, and pushes a task, which completes with the module's instance once it has run, as <c>ImportDynamic</c> does (section 3.9).</summary>
+    /// <summary>A = 1 if there are values, plus 2 for a component's render, which runs the file anew (section 13): pops them, then a module's path, and pushes a task, which completes with the module's instance once it has run, as <c>ImportDynamic</c> does (section 3.9).</summary>
     ImportDynamic
 }
 

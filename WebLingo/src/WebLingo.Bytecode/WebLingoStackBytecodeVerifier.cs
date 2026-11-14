@@ -168,7 +168,8 @@ public sealed class WebLingoStackBytecodeVerifier
             case WebLingoStackOpCode.LoadBuiltin:
                 return Index(a, module.Imports.Count, "import") ?? Unused(b);
             case WebLingoStackOpCode.ImportDynamic:
-                return (a is 0 or 1 ? null : $"its values' flag, {a}, is not 0 or 1.") ?? Unused(b);
+                // A: 1 for values, plus 2 for a component's render (section 13).
+                return (a is >= 0 and <= 3 ? null : $"its flags, {a}, are not 0 to 3.") ?? Unused(b);
             case WebLingoStackOpCode.Import:
                 // B is 1 when the values it gives the file's parameters are on the stack, which a file that has some is always given.
                 return Index(a, module.Units.Count, "file")
@@ -434,7 +435,7 @@ public sealed class WebLingoStackBytecodeVerifier
         WebLingoStackOpCode.Extend => (1, 0),
         WebLingoStackOpCode.Hold => (2, 1),
         WebLingoStackOpCode.Import => (instruction.B, 1),
-        WebLingoStackOpCode.ImportDynamic => (instruction.A + 1, 1),
+        WebLingoStackOpCode.ImportDynamic => ((instruction.A & 1) + 1, 1),
         WebLingoStackOpCode.RegisterUnit => (1, 0),
         WebLingoStackOpCode.MakeModule => (instruction.B, 1),
         WebLingoStackOpCode.Throw => (1, 0),

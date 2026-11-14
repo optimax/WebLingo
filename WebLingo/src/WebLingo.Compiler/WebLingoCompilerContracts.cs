@@ -24,6 +24,10 @@ public sealed class WebLingoCompiler(WebLingoCompilerOptions options) : IWebLing
     public WebLingoCompilationResult CompileImport(string name, string source) =>
         Generate(WebLingoCompilation.CreateImport(name, source, options), "import " + name);
 
+    /// <summary>A file another reader parsed, such as a template compiler's component (section 13), compiled as an import.</summary>
+    public WebLingoCompilationResult CompileImport(WebLingoSyntaxTree file) =>
+        Generate(WebLingoCompilation.CreateImport(file, options), "import " + file.Source.Name);
+
     private WebLingoCompilationResult Generate(WebLingoCompilation compilation, string sourceName)
     {
         if (compilation.HasErrors) return new WebLingoCompilationResult(null, compilation.Diagnostics);

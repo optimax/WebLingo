@@ -147,7 +147,11 @@ public sealed class WebLingoBinder
             {
                 // std:system: the host's built-ins, its exports, made where the program begins (section 3.9).
                 var exported = new List<WebLingoBuiltinSymbol>();
-                foreach (var declaration in _builtinDeclarations) exported.Add(UseBuiltin(declaration));
+                foreach (var declaration in _builtinDeclarations)
+                {
+                    // A component's render is no function, and so no export (section 13).
+                    if (!declaration.RendersComponent) exported.Add(UseBuiltin(declaration));
+                }
                 units.Add(new WebLingoBoundUnit(module.Name, null, [], DeclareHidden(module.Name, default)) { Builtins = exported });
                 continue;
             }
@@ -1118,7 +1122,13 @@ public sealed class WebLingoBinder
                 ? new WebLingoBoundMember(Reference(module, name.Span), local.ImportName!, name.Span)
                 : Reference(local, name.Span);
         }
-        if (_hostBuiltins.TryGetValue(name.Name, out var builtin)) return new WebLingoBoundBuiltinReference(UseBuiltin(builtin), name.Span);
+        if (_hostBuiltins.TryGetValue(name.Name, out var builtin))
+        {
+            if (!builtin.RendersComponent) return new WebLingoBoundBuiltinReference(UseBuiltin(builtin), name.Span);
+            Report(WebLingoDiagnosticCodes.InvalidOperation, $"'{name.Name}' renders a component, and can only be called.",
+                name.Span);
+            return new WebLingoBoundError(name.Span);
+        }
         Report(WebLingoDiagnosticCodes.UndefinedIdentifier, $"'{name.Name}' is not defined.", name.Span);
         return new WebLingoBoundError(name.Span);
     }
@@ -1257,6 +1267,13 @@ public sealed class WebLingoBinder
         if (calleeSyntax is WebLingoNameSyntax name && LookupLocal(name.Name) is null
             && _hostBuiltins.TryGetValue(name.Name, out var declaration))
         {
+            if (declaration.RendersComponent)
+            {
+                // name(path, values): a component's render (section 13), a dynamic import that runs its file anew.
+                if (!CheckArity(name.Name, 2, arguments.Count, call.Span, 1)) return new WebLingoBoundError(call.Span);
+                var values = arguments.Count == 2 ? arguments[1] : null;
+                return new WebLingoBoundImportDynamic(arguments[0], values, call.Span) { Anew = true };
+            }
             // A built-in called by its name: checked now, and called directly.
             if (!CheckArity(name.Name, declaration.Arity, arguments.Count, call.Span)) return new WebLingoBoundError(call.Span);
             return new WebLingoBoundBuiltinCall(UseBuiltin(declaration), arguments, call.Span);

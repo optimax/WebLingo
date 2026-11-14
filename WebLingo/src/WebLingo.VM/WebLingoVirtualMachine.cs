@@ -30,6 +30,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
     /// <summary>What finds and compiles a module a program imports while it runs (section 3.9); none, and it can import none.</summary>
     public IWebLingoModuleLoader? Loader { get; init; }
 
+    /// <summary>
+    /// What finds and compiles a component a program renders (section 13), which runs anew each time; none, and it can
+    /// render none.
+    /// </summary>
+    public IWebLingoModuleLoader? Components { get; init; }
+
     public WebLingoVirtualMachine() : this(new WebLingoBytecodeVerifier()) { }
 
     public WebLingoVirtualMachine(IWebLingoBytecodeVerifier verifier) => _verifier = verifier;
@@ -93,7 +99,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         var codes = new WebLingoInstruction[module.Functions.Count][];
         for (var i = 0; i < codes.Length; i++) codes[i] = ToArray(module.Functions[i].Code);
 
-        return new Execution(module, ToArray(module.EntryPoint.Code), codes, constants, names, builtins, context, heap) { Loader = Loader }.Run();
+        var execution = new Execution(module, ToArray(module.EntryPoint.Code), codes, constants, names, builtins, context, heap)
+        {
+            Loader = Loader,
+            Components = Components
+        };
+        return execution.Run();
     }
 
     /// <summary>A copy of the code, without LINQ, which the portable core does not use.</summary>
@@ -544,9 +555,10 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             pc++;
                             continue;
                         case WebLingoOpCode.ImportDynamic:
-                            // Module.import(path, values): a task, at once, or the call that gives one (section 3.9).
-                            registers[ins.A] = ImportedWhileRunning(registers[ins.B], ins.D == 1 ? registers[ins.C] : WebLingoValue.Null, ins.A,
-                                frame.Function, out error);
+                            // Module.import(path, values), or a component's render: a task, at once, or the call that gives one
+                            // (sections 3.9 and 13).
+                            registers[ins.A] = ImportedWhileRunning(registers[ins.B],
+                                (ins.D & 1) == 1 ? registers[ins.C] : WebLingoValue.Null, ins.D >= 2, ins.A, frame.Function, out error);
                             if (registers[ins.A].Kind == WebLingoValueKind.Task)
                             {
                                 pc++;
@@ -1468,6 +1480,9 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// <summary>What finds and compiles a module the program imports while it runs (section 3.9).</summary>
         public IWebLingoModuleLoader? Loader { get; init; }
 
+        /// <summary>What finds and compiles a component the program renders (section 13).</summary>
+        public IWebLingoModuleLoader? Components { get; init; }
+
         /// <summary>The values that modules imported while the program runs bring, their constants; a root.</summary>
         private readonly List<WebLingoValue> _linked = [];
 
@@ -1479,8 +1494,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// run; null when a call is pending that gives one: the module's function, if the program has its file, or its
         /// compiled import's entry, joined to the program, if not. Its path is found from the importing file's folder.
         /// </summary>
-        private WebLingoValue ImportedWhileRunning(WebLingoValue path, WebLingoValue values, int result, WebLingoFunction function,
-            out WebLingoRuntimeError? error)
+        private WebLingoValue ImportedWhileRunning(WebLingoValue path, WebLingoValue values, bool anew, int result,
+            WebLingoFunction function, out WebLingoRuntimeError? error)
         {
             error = null;
             if (path.Kind != WebLingoValueKind.String)
@@ -1491,31 +1506,52 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             }
             var text = heap.GetString(path);
             var importer = function.Source ?? (module.Units.Count > 0 ? module.Units[0].Name : module.Name);
-            string? why = "this host imports no modules while a program runs";
-            if (Loader is null || !Loader.TryResolve(importer, text, out var name, out why))
+            var loader = anew ? Components : Loader;
+            string? why = anew ? "this host renders no components" : "this host imports no modules while a program runs";
+            if (loader is null || !loader.TryResolve(importer, text, out var name, out why))
             {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.ModuleNotFound, $"The module '{text}' cannot be imported: {why}.");
+                error = anew
+                    ? new WebLingoRuntimeError(WebLingoDiagnosticCodes.ComponentNotFound,
+                        $"The component '{text}' cannot be rendered: {why}.")
+                    : new WebLingoRuntimeError(WebLingoDiagnosticCodes.ModuleNotFound, $"The module '{text}' cannot be imported: {why}.");
                 return WebLingoValue.Null;
             }
             var unit = UnitNamed(name);
             if (unit < 0)
             {
                 // A file the program has not: compiled, with the files it imports, and joined to the program, whose entry
-                // imports it with the values given.
-                if (Loader.Compile(name, out var failure) is not { } compiled)
+                // imports it with the values given; a component's checked first, as a render's are (section 13).
+                if (loader.Compile(name, out var failure) is not { } compiled)
                 {
-                    error = new WebLingoRuntimeError(failure?.Code ?? WebLingoDiagnosticCodes.ModuleNotFound,
-                        $"The module '{text}' does not compile: {failure?.Message ?? "it cannot be read"}");
+                    var notFound = anew ? WebLingoDiagnosticCodes.ComponentNotFound : WebLingoDiagnosticCodes.ModuleNotFound;
+                    var what = anew ? "component" : "module";
+                    error = new WebLingoRuntimeError(failure?.Code ?? notFound,
+                        $"The {what} '{text}' does not compile: {failure?.Message ?? "it cannot be read"}");
                     return WebLingoValue.Null;
                 }
                 if (!TryLink(compiled, out var entry, out error)) return WebLingoValue.Null;
+                if (anew && UnitNamed(name) is var joined and >= 0
+                    && !_modules.TryFind(joined, name, module.Units[joined].Parameters, values, out _, out error, anew: true))
+                {
+                    return WebLingoValue.Null;
+                }
                 _operands[0] = values;
                 Pend(entry, 1, result);
                 return WebLingoValue.Null;
             }
             var info = module.Units[unit];
-            if (!_modules.TryFind(unit, info.Name, info.Parameters, values, out var instance, out error)) return WebLingoValue.Null;
-            if (instance.Kind == WebLingoValueKind.Module || _unitClosures[unit].Kind != WebLingoValueKind.Function)
+            if (!_modules.TryFind(unit, info.Name, info.Parameters, values, out var instance, out error, anew))
+            {
+                return WebLingoValue.Null;
+            }
+            if (anew && _unitClosures[unit].Kind != WebLingoValueKind.Function)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.ComponentNotFound,
+                    $"The component '{text}' cannot be rendered: it is the program's own file.");
+                return WebLingoValue.Null;
+            }
+            var ran = instance.Kind == WebLingoValueKind.Module || _unitClosures[unit].Kind != WebLingoValueKind.Function;
+            if (!anew && ran)
             {
                 // A file that has run, or is running, for these values: a task already complete with its instance.
                 if (!heap.TryAllocateTask(out var task, out error)) return WebLingoValue.Null;
@@ -1526,6 +1562,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             {
                 return WebLingoValue.Null;
             }
+            if (anew) _modules.RunAnew();
             _operands[0] = values;
             Pend(_unitClosures[unit], info.Parameters.Count > 0 ? 1 : 0, result);
             return WebLingoValue.Null;

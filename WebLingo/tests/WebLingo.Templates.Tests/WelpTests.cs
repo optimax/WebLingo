@@ -127,6 +127,27 @@ public sealed class WelpTests : IDisposable
         Assert.Contains("error WL3005", error);
     }
 
+    [Fact]
+    public void AComponentIsFoundAndCompiledWhenItIsRendered()
+    {
+        Write("site/components/card.wlp", "<% param product; param size = \"small\"; %>\n<article class=\"<%= size %>\"><%= product %></article>\n");
+        var page = Write("site/index.wlp",
+            "<% foreach (var p in [\"Tea\", \"<Cake>\"]) { %>\n<% await renderComponent(\"/components/card.wlp\", { product: p }); %>\n<% } %>\n");
+        Assert.Equal((WebLingoCommandLine.Success, "<article class=\"small\">Tea</article>\n<article class=\"small\">&lt;Cake&gt;</article>\n", ""),
+            Run(["run", page]));
+
+        // A component's runtime error names it, and a missing one is reported where it is rendered.
+        Write("site/components/bad.wlp", "<p>\n<%= [1][5] %>");
+        page = Write("site/index.wlp", "<% await renderComponent(\"components/bad\"); %>");
+        var (exit, output, error) = Run(["run", page]);
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "<p>\n"), (exit, output));
+        Assert.Contains("components/bad.wlp(2,", error);
+        page = Write("site/index.wlp", "<% await renderComponent(\"/components/none.wlp\"); %>");
+        (exit, _, error) = Run(["run", page]);
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
+        Assert.Contains("index.wlp(1,10): error WL5005: The component '/components/none.wlp' cannot be rendered: there is no such file.", error);
+    }
+
     private string Write(string relative, string text)
     {
         var path = Path.Combine(_folder, relative);

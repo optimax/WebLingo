@@ -181,9 +181,15 @@ public sealed record WebLingoBoundContinue(WebLingoSourceSpan Span) : WebLingoBo
 
 public abstract record WebLingoBoundExpression(WebLingoSourceSpan Span);
 
-/// <summary><c>Module.import(path, values)</c>: a task, which completes with the module's instance once it has run (section 3.9).</summary>
+/// <summary>
+/// <c>Module.import(path, values)</c>: a task, which completes with the module's instance once it has run (section 3.9); or,
+/// <see cref="Anew"/>, a component's render (section 13), which runs the file anew each time.
+/// </summary>
 public sealed record WebLingoBoundImportDynamic(WebLingoBoundExpression Path, WebLingoBoundExpression? Values, WebLingoSourceSpan Span)
-    : WebLingoBoundExpression(Span);
+    : WebLingoBoundExpression(Span)
+{
+    public bool Anew { get; init; }
+}
 
 /// <summary>
 /// A static constant's value (<c>static const name = value;</c>, section 3.7), which only a class's or an extension's

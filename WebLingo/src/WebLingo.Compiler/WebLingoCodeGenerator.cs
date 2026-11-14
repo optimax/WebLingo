@@ -470,7 +470,9 @@ public sealed class WebLingoCodeGenerator
                 var values = dynamic.Values is { } given ? EmitExpression(given, null) : 0;
                 _nextRegister = Math.Max(_nextRegister, mark);
                 var destination = target ?? Allocate();
-                Emit(new WebLingoInstruction(WebLingoOpCode.ImportDynamic, destination, path, values, dynamic.Values is null ? 0 : 1), dynamic.Span);
+                // D: 1 for values, plus 2 for a component's render (section 13).
+                var flags = (dynamic.Values is null ? 0 : 1) + (dynamic.Anew ? 2 : 0);
+                Emit(new WebLingoInstruction(WebLingoOpCode.ImportDynamic, destination, path, values, flags), dynamic.Span);
                 return destination;
             }
             case WebLingoIrImport import:

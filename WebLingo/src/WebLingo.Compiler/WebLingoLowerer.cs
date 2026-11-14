@@ -485,7 +485,7 @@ public sealed class WebLingoLowerer
                     LowerExpression(element.Value), element.Span);
             case WebLingoBoundImportDynamic imported:
                 return new WebLingoIrImportDynamic(LowerExpression(imported.Path), imported.Values is { } values ? LowerExpression(values) : null,
-                    imported.Span);
+                    imported.Span) { Anew = imported.Anew };
             case WebLingoBoundMember member:
                 return new WebLingoIrMember(LowerExpression(member.Target), member.Name, member.Span) { IsOptional = member.IsOptional };
             case WebLingoBoundMemberAssignment field:

@@ -76,6 +76,24 @@ public sealed class VerifierTests
     }
 
     [Fact]
+    public void ADynamicImportsFlagsAreItsValuesAndAComponentsRender()
+    {
+        // D: 1 for values in C, plus 2 for a component's render (section 13).
+        for (var d = 0; d <= 3; d++)
+        {
+            var c = (d & 1) == 1 ? 1 : 0;
+            Assert.Equal(WebLingoVerificationResult.Valid, Verify(Module(registers: 3, locals: 2,
+                I(WebLingoOpCode.LoadNull, 0), I(WebLingoOpCode.LoadNull, 1), I(WebLingoOpCode.ImportDynamic, 2, 0, c, d), I(WebLingoOpCode.Return))));
+        }
+        AssertRejected(Module(registers: 3, locals: 2, I(WebLingoOpCode.LoadNull, 0), I(WebLingoOpCode.ImportDynamic, 2, 0, 0, 4),
+            I(WebLingoOpCode.Return)), 1, "its flags, 4, are not 0 to 3");
+        AssertRejected(Module(registers: 3, locals: 2, I(WebLingoOpCode.LoadNull, 0), I(WebLingoOpCode.ImportDynamic, 2, 0, 1, 2),
+            I(WebLingoOpCode.Return)), 1, "C, 1, is not 0 without values");
+        AssertRejected(Module(registers: 3, locals: 2, I(WebLingoOpCode.LoadNull, 0), I(WebLingoOpCode.ImportDynamic, 2, 0, 1, 3),
+            I(WebLingoOpCode.Return)), 1, "register 1");
+    }
+
+    [Fact]
     public void ADisposedRegisterMustHaveBeenWritten()
     {
         Assert.Equal(WebLingoVerificationResult.Valid,

@@ -88,11 +88,13 @@ A16: (a).
 
 2026-11-14: those are done, and the module system it needs too; split into the parts the specification defines in section 9 ("M0.12 parts"), each a task below. Waits for them.
 
-## [IDLE] M0.12.3: Components
+## [WORKING] M0.12.3: Components
 
 `<% param product; %>` in a component, `renderComponent(path, values)`, a task, the component found and compiled when it runs, as `Module.import(…)` is, and a missing one's error (specification, section 13, "Contracts", and section 9, M0.12.3), on both VMs. Added by Claude, 2026-11-14.
 
 2026-11-14: waits for "M0.12.1: Pages".
+
+Done (Claude, 2026-11-14): `renderComponent(path, values)` renders a component, on both VMs: found by the templates' resolver when it is first rendered, compiled as an import by the template compiler, kept, and run anew at each render, the task of running it its call's result; its `param` statements are its parameters, which each render gives. Guessed, and recorded as Proposed in the specification, section 15.2 ("Components"): a component's path is found as an include's is (`/` from the root, any other from the rendering file's folder, `.wlp` added); the task completes with the component's instance; a component that cannot be found or read is WL5005, and its parameters wrong WL5006, runtime errors a catch may catch, while one that does not compile is its first diagnostic's code and message, as a dynamic import's is. The compiler knows `renderComponent` as a built-in the template compiler declares so (`RendersComponent`), a dynamic import that runs its file anew (`ImportDynamic`'s flag 2), so that the language itself knows nothing of templates; a VM finds components with a loader of its own. The register VM's `Run` changed by an operand's reading only: timed against `main`'s, alternately, twice, with no difference beyond the noise. Checks: the Release build, without warnings, the full test suite, and both command lines, on Windows only; Linux not tried.
 
 ## [IDLE] M0.12.4: Layouts
 

@@ -189,7 +189,7 @@ public enum WebLingoOpCode : byte
     MakeModule,
     /// <summary>A = a module the program imports, B = register holding the closure of its function, which runs it.</summary>
     RegisterUnit,
-    /// <summary>A = destination register, B = register of a module's path, C = register of the values its parameters are given, D = 1 if there are values; a task, which completes with the module's instance once it has run (section 3.9).</summary>
+    /// <summary>A = destination register, B = register of a module's path, C = register of the values its parameters are given, D = 1 if there are values, plus 2 for a component's render, which runs the file anew (section 13); a task, which completes with the module's instance once it has run (section 3.9).</summary>
     ImportDynamic
 }
 

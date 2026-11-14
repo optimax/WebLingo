@@ -94,4 +94,8 @@ public static class WebLingoDiagnosticCodes
     public const string TemplateCycle = "WL5003";
     /// <summary>Includes beyond their limits: nested too deeply, or too much text in all (proposed, section 13).</summary>
     public const string TemplateTooLarge = "WL5004";
+    /// <summary>A component that cannot be found, read or compiled when it is rendered, a runtime error (proposed, section 13).</summary>
+    public const string ComponentNotFound = "WL5005";
+    /// <summary>A component rendered with a value for a parameter it does not declare, or without one it needs (proposed, section 13).</summary>
+    public const string ComponentParameter = "WL5006";
 }

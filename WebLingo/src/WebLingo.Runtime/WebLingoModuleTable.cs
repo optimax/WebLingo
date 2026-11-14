@@ -16,6 +16,10 @@ public sealed class WebLingoModuleTable
     /// <summary>The values of the import about to run its file, whose instance <see cref="Made"/> is told of next.</summary>
     private WebLingoValue[]? _making;
 
+    /// <summary>Whether the file about to run is a component rendered anew, whose instance no import gets (section 13).
+    /// </summary>
+    private bool _anew;
+
     public WebLingoModuleTable(int units, WebLingoHeap heap)
     {
         _heap = heap;
@@ -33,14 +37,18 @@ public sealed class WebLingoModuleTable
     /// <summary>
     /// What an import of file <paramref name="unit"/> gets, given <paramref name="values"/>, a map, or <c>null</c> for
     /// none: the file's instance for those values, if one has begun; else <c>null</c>, for its function to run. Its
-    /// values are each a parameter's, and give each one without a default (WL2016 otherwise).
+    /// values are each a parameter's, and give each one without a default (WL2016 otherwise). A component rendered
+    /// (<paramref name="anew"/>, section 13) always gets <c>null</c>, its function to run anew, the VM saying so first
+    /// (<see cref="RunAnew"/>), and its values wrong are WL5006.
     /// </summary>
     public bool TryFind(int unit, string name, IReadOnlyList<WebLingoModuleParameter> parameters, WebLingoValue values,
-        out WebLingoValue instance, out WebLingoRuntimeError? error)
+        out WebLingoValue instance, out WebLingoRuntimeError? error, bool anew = false)
     {
         instance = WebLingoValue.Null;
         error = null;
         _making = null;
+        _anew = false;
+        var code = anew ? WebLingoDiagnosticCodes.ComponentParameter : WebLingoDiagnosticCodes.ModuleParameter;
         if (values.Kind is not (WebLingoValueKind.Null or WebLingoValueKind.Map))
         {
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
@@ -60,8 +68,11 @@ public sealed class WebLingoModuleTable
             }
             if (index < 0)
             {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.ModuleParameter,
-                    $"{WebLingoValueFormatter.Describe(key, _heap)} is not a parameter of '{name}'.");
+                // A component's error names the key, if it is a string (section 13); a module's, as it was, its kind.
+                var what = anew && key.Kind == WebLingoValueKind.String
+                    ? $"'{_heap.GetString(key)}'"
+                    : WebLingoValueFormatter.Describe(key, _heap);
+                error = new WebLingoRuntimeError(code, $"{what} is not a parameter of '{name}'.");
                 return false;
             }
             given[index] = value;
@@ -69,9 +80,10 @@ public sealed class WebLingoModuleTable
         for (var i = 0; i < parameters.Count; i++)
         {
             if (given[i].Kind != WebLingoValueKind.Missing || parameters[i].HasDefault) continue;
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.ModuleParameter, $"'{name}''s parameter '{parameters[i].Name}' is not given.");
+            error = new WebLingoRuntimeError(code, $"'{name}''s parameter '{parameters[i].Name}' is not given.");
             return false;
         }
+        if (anew) return true;
         if (parameters.Count == 0)
         {
             instance = _instances[unit];
@@ -89,9 +101,21 @@ public sealed class WebLingoModuleTable
         return true;
     }
 
+    /// <summary>
+    /// The file about to run is a component rendered anew (section 13): its instance is its call's own, which no import
+    /// gets.
+    /// </summary>
+    public void RunAnew() => _anew = true;
+
     /// <summary>A file's instance, made where its function begins: the one its imports get, with the values it was run for.</summary>
     public void Made(int unit, WebLingoValue instance)
     {
+        if (_anew)
+        {
+            // A component's render: its instance is its call's own.
+            _anew = false;
+            return;
+        }
         if (_making is not { } values)
         {
             _instances[unit] = instance;

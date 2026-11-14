@@ -213,9 +213,15 @@ public sealed record WebLingoIrStoreCapture(int Capture, WebLingoIrExpression Va
 public sealed record WebLingoIrMakeClosure(int Function, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
 
 /// <summary>The program's file <paramref name="Unit"/>'s instance, or the task of running it (section 3.9).</summary>
-/// <summary><c>Module.import(path, values)</c>: a task, which completes with the module's instance (section 3.9).</summary>
+/// <summary>
+/// <c>Module.import(path, values)</c>: a task, which completes with the module's instance (section 3.9); or, <see cref="Anew"/>,
+/// a component's render (section 13), which runs the file anew each time.
+/// </summary>
 public sealed record WebLingoIrImportDynamic(WebLingoIrExpression Path, WebLingoIrExpression? Values, WebLingoSourceSpan Span)
-    : WebLingoIrExpression(Span);
+    : WebLingoIrExpression(Span)
+{
+    public bool Anew { get; init; }
+}
 
 public sealed record WebLingoIrImport(int Unit, WebLingoSourceSpan Span) : WebLingoIrExpression(Span)
 {

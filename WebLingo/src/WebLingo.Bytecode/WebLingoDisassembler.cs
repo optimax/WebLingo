@@ -78,9 +78,9 @@ public static class WebLingoDisassembler
             WebLingoOpCode.Await => $"Await {Register(function, a)}, {Register(function, b)}",
             WebLingoOpCode.Extend => $"Extend {Register(function, a)}, class{b}",
             WebLingoOpCode.Hold => $"Hold {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
-            WebLingoOpCode.ImportDynamic => d == 1
+            WebLingoOpCode.ImportDynamic => ((d & 1) == 1
                 ? $"ImportDynamic {Register(function, a)}, {Register(function, b)}, {Register(function, c)}"
-                : $"ImportDynamic {Register(function, a)}, {Register(function, b)}",
+                : $"ImportDynamic {Register(function, a)}, {Register(function, b)}") + (d >= 2 ? ", anew" : ""),
             WebLingoOpCode.Import => d == 1 ? $"Import {Register(function, a)}, file{b}, {Register(function, c)}" : $"Import {Register(function, a)}, file{b}",
             WebLingoOpCode.MakeModule => $"MakeModule {Register(function, a)}, file{b}, {Register(function, c)}+{d}",
             WebLingoOpCode.RegisterUnit => $"RegisterUnit file{a}, {Register(function, b)}",

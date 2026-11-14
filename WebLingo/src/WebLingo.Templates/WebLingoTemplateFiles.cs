@@ -34,12 +34,12 @@ public sealed class WebLingoTemplateFiles
 
     /// <summary>
     /// A diagnostic of the page's program where it is: its span in the template it is in, which it then names
-    /// (<see cref="WebLingoDiagnostic.Source"/>). One in the page, or in a module the page imports, which names it already,
-    /// is as it was.
+    /// (<see cref="WebLingoDiagnostic.Source"/>). One in the page itself, whether it names the page (a component's runtime
+    /// error does) or nothing, or in another file, which it names already, is as it was.
     /// </summary>
     public WebLingoDiagnostic Locate(WebLingoDiagnostic diagnostic)
     {
-        if (diagnostic.Source is not null) return diagnostic;
+        if (diagnostic.Source is not null && diagnostic.Source != Page.Name) return diagnostic;
         var index = 0;
         for (var i = 1; i < _files.Count && _files[i].Start <= diagnostic.Span.Start; i++) index = i;
         if (index == 0) return diagnostic;

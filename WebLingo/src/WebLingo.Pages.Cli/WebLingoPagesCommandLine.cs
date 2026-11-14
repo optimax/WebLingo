@@ -40,8 +40,11 @@ public static class WebLingoPagesCommandLine
 
     private static WebLingoCommandLineCompilation Compile(WebLingoSourceText page, WebLingoCompilerOptions options, string? root)
     {
-        var templates = new WebLingoTemplateFileResolver(page.Name, root);
-        var result = new WebLingoTemplateCompiler(options, templates).Compile(page, out var files);
-        return new WebLingoCommandLineCompilation(result) { Locate = files.Locate, TextOf = files.TextOf };
+        var compiler = new WebLingoTemplateCompiler(options, new WebLingoTemplateFileResolver(page.Name, root));
+        var result = compiler.Compile(page);
+        return new WebLingoCommandLineCompilation(result)
+        {
+            Locate = compiler.Sources.Locate, TextOf = compiler.Sources.TextOf, Components = compiler.Components
+        };
     }
 }

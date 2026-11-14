@@ -292,9 +292,11 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                 }
                 return Unused(d);
             case WebLingoOpCode.ImportDynamic:
+                // D: 1 for values, plus 2 for a component's render (section 13).
                 return Register(function, a, "destination") ?? Register(function, b, "path")
-                    ?? (d == 1 ? Register(function, c, "values")
-                        : d == 0 && c == 0 ? null : $"its values' flag, {d}, is not 0 or 1, or C, {c}, is not 0 without them.");
+                    ?? (d is 1 or 3 ? Register(function, c, "values")
+                        : d is 0 or 2 && c == 0 ? null
+                        : $"its flags, {d}, are not 0 to 3, or C, {c}, is not 0 without values.");
             case WebLingoOpCode.Import:
                 // D is 1 when C holds the values it gives the file's parameters, which a file that has some is always given.
                 return Register(function, a, "destination") ?? Index(b, module.Units.Count, "file")
@@ -554,7 +556,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             case WebLingoOpCode.ImportDynamic:
             {
                 var path = Unwritten(instruction.B, state, locals);
-                return path >= 0 || instruction.D != 1 ? path : Unwritten(instruction.C, state, locals);
+                return path >= 0 || (instruction.D & 1) == 0 ? path : Unwritten(instruction.C, state, locals);
             }
             case WebLingoOpCode.Rethrow:
             {

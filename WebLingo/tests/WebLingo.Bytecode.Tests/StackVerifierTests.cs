@@ -102,6 +102,7 @@ public sealed class StackVerifierTests
     [InlineData(WebLingoStackOpCode.Call, -1, 0, "its argument count, -1")]
     [InlineData(WebLingoStackOpCode.MakeClosure, 0, 0, "function 0 does not exist")]
     [InlineData((WebLingoStackOpCode)200, 0, 0, "the operation 200 is unknown")]
+    [InlineData(WebLingoStackOpCode.ImportDynamic, 4, 0, "its flags, 4, are not 0 to 3")]
     public void AnInvalidOperandIsRejected(WebLingoStackOpCode opCode, int a, int b, string error)
     {
         AssertRejected(Module(locals: 1, maxStack: 4, I(opCode, a, b), I(WebLingoStackOpCode.Return)), 0, error);

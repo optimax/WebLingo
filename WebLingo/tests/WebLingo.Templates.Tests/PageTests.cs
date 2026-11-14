@@ -154,6 +154,55 @@ public sealed class PageTests
         Assert.Equal("WL5004 at t62.wlp 1,12: Includes nest too deeply here: at most 64.", diagnostics);
     }
 
+    [Theory]
+    // A component renders where it is called, anew each time, given its parameters' values; its scope is its own.
+    [InlineData("<% await renderComponent(\"/card.wlp\", { name: \"Ann\" }); %>", "card.wlp=<% param name; %>\n<b><%= name %></b>", "<b>Ann</b>")]
+    [InlineData("<% await renderComponent(\"/c.wlp\"); await renderComponent(\"/c\"); %>", "c.wlp=x", "xx")]
+    [InlineData("<% foreach (var n in [\"a\", \"b\"]) { await renderComponent(\"/item.wlp\", { n: n }); } %>",
+        "item.wlp=<% param n; %><li><%= n %></li>", "<li>a</li><li>b</li>")]
+    [InlineData("<% await renderComponent(\"/s.wlp\", {}); await renderComponent(\"/s.wlp\", { size: 2 }); %>",
+        "s.wlp=<% param size = 10; %><%= size %>,", "10,2,")]
+    [InlineData("<% renderComponent(\"/c.wlp\"); %>after", "c.wlp=x", "xafter")]
+    [InlineData("<% var x = 1; await renderComponent(\"/c.wlp\", { x: 2 }); %><%= x %>", "c.wlp=<% param x; %><%= x %>", "21")]
+    // A path starting with / is from the root, any other from the rendering file's folder; a component may include.
+    [InlineData("<% await renderComponent(\"parts/a.wlp\"); %>", "parts/a.wlp=a<% await renderComponent(\"b.wlp\"); %>|parts/b.wlp=b", "ab")]
+    [InlineData("<% await renderComponent(\"/c.wlp\"); %>", "c.wlp=[<% include \"/h.wlp\"; %>]|h.wlp=h", "[h]")]
+    // A component may render itself.
+    [InlineData("<% await renderComponent(\"/tree.wlp\", { n: 3 }); %>",
+        "tree.wlp=<% param n; %><%= n %><% if (n > 0) { await renderComponent(\"tree.wlp\", { n: n - 1 }); } %>", "3210")]
+    // A missing one is a runtime error, which a catch may catch.
+    [InlineData("<% try { await renderComponent(\"/nope.wlp\"); } catch (e) { write(e.code); } %>", "", "WL5005")]
+    public void AComponentRendersWhereItIsCalled(string page, string templates, string written)
+    {
+        Assert.Equal(("", written, ""), Render(page, Templates(templates)));
+    }
+
+    [Theory]
+    [InlineData("<% await renderComponent(\"/nope.wlp\"); %>", "",
+        "WL5005 at page.wlp 1,10: The component '/nope.wlp' cannot be rendered: there is no such file.")]
+    [InlineData("<% await renderComponent(\"/card.wlp\"); %>", "card.wlp=<% param name; %><%= name %>",
+        "WL5006 at page.wlp 1,10: 'card.wlp''s parameter 'name' is not given.")]
+    [InlineData("<% await renderComponent(\"/card.wlp\", { name: 1 }); await renderComponent(\"/card.wlp\", { name: 2, size: 3 }); %>",
+        "card.wlp=<% param name; %><%= name %>", "WL5006 at page.wlp 1,59: 'size' is not a parameter of 'card.wlp'.")]
+    // A component does not see the variables where it is rendered.
+    [InlineData("<% var secret = 1; await renderComponent(\"/c.wlp\"); %>", "c.wlp=<%= secret %>",
+        "WL2001 at page.wlp 1,26: The component '/c.wlp' does not compile: 'secret' is not defined.")]
+    // An error in a component, or in a template it includes, is reported where it is.
+    [InlineData("<% await renderComponent(\"/c.wlp\"); %>", "c.wlp=x\n<%= [1][5] %>", "WL3005 at c.wlp 2,")]
+    [InlineData("<% await renderComponent(\"/c.wlp\"); %>", "c.wlp=<% include \"/h.wlp\"; %>|h.wlp=\n<%= [1][5] %>", "WL3005 at h.wlp 2,")]
+    public void AComponentThatFailsIsAnErrorWhereItIsRendered(string page, string templates, string error)
+    {
+        Assert.StartsWith(error, Render(page, Templates(templates)).Error);
+    }
+
+    [Fact]
+    public void RenderComponentIsOnlyCalled()
+    {
+        Assert.Equal("WL3001 at page.wlp 1,12: 'renderComponent' renders a component, and can only be called.",
+            Render("<% var r = renderComponent; %>").Diagnostics);
+        Assert.StartsWith("WL2006 at page.wlp 1,4: 'renderComponent' takes 1 to 2 arguments, not 0.", Render("<% renderComponent(); %>").Diagnostics);
+    }
+
     [Fact]
     public void APageParsedWithoutAResolverIncludesNothing()
     {
@@ -195,21 +244,25 @@ public sealed class PageTests
     private static (string Diagnostics, string Written, string Error) Render(string page, IWebLingoSourceResolver? templates = null)
     {
         var text = new WebLingoSourceText(page, "page.wlp");
-        var compiler = new WebLingoTemplateCompiler(Options, templates);
 
-        var registerCompiled = compiler.Compile(text, out var files);
+        // Each VM with a compiler of its own, whose sources hold the page's files and those of the components it renders.
+        var compiler = new WebLingoTemplateCompiler(Options, templates);
+        var registerCompiled = compiler.Compile(text);
         var registerOutput = new WebLingoCollectedOutput();
         var registerResult = registerCompiled.Module is { } module
-            ? new WebLingoVirtualMachine().Execute(module, Context(registerOutput))
+            ? new WebLingoVirtualMachine { Components = compiler.Components }.Execute(module, Context(registerOutput))
             : null;
-        var register = (Describe(files, registerCompiled.Diagnostics), registerOutput.Text, Describe(files, registerResult?.Error));
+        var register = (Describe(compiler.Sources, text, registerCompiled.Diagnostics), registerOutput.Text,
+            Describe(compiler.Sources, text, registerResult?.Error));
 
-        var stackCompiled = compiler.CompileForStack(text, out files);
+        compiler = new WebLingoTemplateCompiler(Options, templates);
+        var stackCompiled = compiler.CompileForStack(text);
         var stackOutput = new WebLingoCollectedOutput();
         var stackResult = stackCompiled.Module is { } stackModule
-            ? new WebLingoStackVirtualMachine().Execute(stackModule, Context(stackOutput))
+            ? new WebLingoStackVirtualMachine { Components = compiler.Components }.Execute(stackModule, Context(stackOutput))
             : null;
-        var stack = (Describe(files, stackCompiled.Diagnostics), stackOutput.Text, Describe(files, stackResult?.Error));
+        var stack = (Describe(compiler.Sources, text, stackCompiled.Diagnostics), stackOutput.Text,
+            Describe(compiler.Sources, text, stackResult?.Error));
 
         Assert.Equal(register, stack);
         return register;
@@ -225,19 +278,19 @@ public sealed class PageTests
         return new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services, InstructionBudget = 1_000_000 };
     }
 
-    private static string Describe(WebLingoTemplateFiles files, IReadOnlyList<WebLingoDiagnostic> diagnostics)
+    private static string Describe(WebLingoTemplateSources sources, WebLingoSourceText page, IReadOnlyList<WebLingoDiagnostic> diagnostics)
     {
         var lines = new List<string>();
-        foreach (var diagnostic in diagnostics) lines.Add(Describe(files, diagnostic));
+        foreach (var diagnostic in diagnostics) lines.Add(Describe(sources, page, diagnostic));
         return string.Join(" | ", lines);
     }
 
     /// <summary>A diagnostic, a runtime error's located first, in the file it is in.</summary>
-    private static string Describe(WebLingoTemplateFiles files, WebLingoDiagnostic? diagnostic)
+    private static string Describe(WebLingoTemplateSources sources, WebLingoSourceText page, WebLingoDiagnostic? diagnostic)
     {
         if (diagnostic is null) return "";
-        diagnostic = files.Locate(diagnostic);
-        var text = diagnostic.Source is { } name ? files.TextOf(name)! : files.Page;
+        diagnostic = sources.Locate(diagnostic);
+        var text = diagnostic.Source is { } name ? sources.TextOf(name)! : page;
         var location = text.GetLocation(diagnostic.Span.Start);
         return $"{diagnostic.Code} at {text.Name} {location.Line},{location.Column}: {diagnostic.Message}";
     }

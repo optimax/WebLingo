@@ -41,10 +41,18 @@ public sealed class WebLingoCompilation
     /// its own, whose top level imports it, with the values it is given, and whose second file it is.
     /// </summary>
     public static WebLingoCompilation CreateImport(string name, string source, WebLingoCompilerOptions options) =>
-        Create(new WebLingoParser("", "import " + name).ParseCompilationUnit(), "import " + name, options, (name, source));
+        Create(new WebLingoParser("", "import " + name).ParseCompilationUnit(), "import " + name, options,
+            (name, new WebLingoParser(source, name).ParseCompilationUnit()));
+
+    /// <summary>A file another reader parsed, named as its source text is, compiled as an import.</summary>
+    public static WebLingoCompilation CreateImport(WebLingoSyntaxTree file, WebLingoCompilerOptions options)
+    {
+        var name = "import " + file.Source.Name;
+        return Create(new WebLingoParser("", name).ParseCompilationUnit(), name, options, (file.Source.Name, file));
+    }
 
     private static WebLingoCompilation Create(WebLingoSyntaxTree syntaxTree, string sourceName, WebLingoCompilerOptions options,
-        (string Name, string Source)? imported)
+        (string Name, WebLingoSyntaxTree Tree)? imported)
     {
         var modules = new List<WebLingoModuleSource>();
         var found = new List<WebLingoDiagnostic>(syntaxTree.Diagnostics);
@@ -66,7 +74,8 @@ public sealed class WebLingoCompilation
     /// found is WL2015, and a file's syntax errors are reported, each naming its file.
     /// </summary>
     private static void Gather(WebLingoSyntaxTree main, string mainName, WebLingoCompilerOptions options,
-        List<WebLingoModuleSource> modules, List<WebLingoDiagnostic> diagnostics, (string Name, string Source)? imported)
+        List<WebLingoModuleSource> modules, List<WebLingoDiagnostic> diagnostics,
+        (string Name, WebLingoSyntaxTree Tree)? imported)
     {
         var indexes = new Dictionary<string, int>(StringComparer.Ordinal) { [mainName] = 0 };
         var roots = new List<(string Name, WebLingoCompilationUnitSyntax Root, Dictionary<WebLingoImportSyntax, int> Imports)>
@@ -77,9 +86,8 @@ public sealed class WebLingoCompilation
         {
             // An import's file, the program's second (section 3.9).
             indexes.Add(file.Name, 1);
-            var tree = new WebLingoParser(file.Source, file.Name).ParseCompilationUnit();
-            foreach (var diagnostic in tree.Diagnostics) diagnostics.Add(diagnostic with { Source = file.Name });
-            roots.Add((file.Name, tree.Root, new Dictionary<WebLingoImportSyntax, int>()));
+            foreach (var diagnostic in file.Tree.Diagnostics) diagnostics.Add(diagnostic with { Source = file.Name });
+            roots.Add((file.Name, file.Tree.Root, new Dictionary<WebLingoImportSyntax, int>()));
         }
         for (var i = 0; i < roots.Count; i++)
         {

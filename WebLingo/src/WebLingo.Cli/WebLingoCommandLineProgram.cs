@@ -1,3 +1,4 @@
+using WebLingo.Bytecode;
 using WebLingo.Compiler;
 using WebLingo.Core;
 using WebLingo.Runtime;
@@ -32,4 +33,7 @@ public sealed record WebLingoCommandLineCompilation(WebLingoCompilationResult Re
 {
     public Func<WebLingoDiagnostic, WebLingoDiagnostic> Locate { get; init; } = diagnostic => diagnostic;
     public Func<string, WebLingoSourceText?> TextOf { get; init; } = _ => null;
+
+    /// <summary>What finds and compiles the components the program renders while it runs, if it renders any (section 13).</summary>
+    public IWebLingoModuleLoader? Components { get; init; }
 }

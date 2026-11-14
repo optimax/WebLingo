@@ -120,7 +120,8 @@ public static class WebLingoCommandLine
             Parameters = parameters
         };
         // The VM imports modules while the program runs as the compiler imports them, with the same resolver (section 3.9).
-        var result = new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(options) }.Execute(compiled.Module, context);
+        var vm = new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(options), Components = compilation.Components };
+        var result = vm.Execute(compiled.Module, context);
         output.Flush();
         if (result.Succeeded) return Success;
         var located = compilation.Locate(result.Error!);

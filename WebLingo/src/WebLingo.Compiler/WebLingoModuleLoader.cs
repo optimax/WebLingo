@@ -1,5 +1,6 @@
 using WebLingo.Bytecode;
 using WebLingo.Core;
+using WebLingo.Language;
 namespace WebLingo.Compiler;
 
 /// <summary>
@@ -9,6 +10,12 @@ namespace WebLingo.Compiler;
 public sealed class WebLingoModuleLoader(WebLingoCompilerOptions options) : IWebLingoModuleLoader, IWebLingoStackModuleLoader
 {
     private readonly Dictionary<string, string> _sources = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// How a file is read, from its name and its text, when not by the WebLingo parser: a template compiler's components'
+    /// (section 13), which are pages.
+    /// </summary>
+    public Func<string, string, WebLingoSyntaxTree>? Parse { get; init; }
 
     public bool TryResolve(string importer, string path, out string name, out string? error)
     {
@@ -31,14 +38,20 @@ public sealed class WebLingoModuleLoader(WebLingoCompilerOptions options) : IWeb
 
     WebLingoCompiledModule? IWebLingoModuleLoader.Compile(string name, out WebLingoDiagnostic? error)
     {
-        var result = new WebLingoCompiler(options).CompileImport(name, _sources.GetValueOrDefault(name, ""));
+        var compiler = new WebLingoCompiler(options);
+        var result = Parse is { } parse
+            ? compiler.CompileImport(parse(name, _sources.GetValueOrDefault(name, "")))
+            : compiler.CompileImport(name, _sources.GetValueOrDefault(name, ""));
         error = FirstError(result.Diagnostics);
         return result.Module;
     }
 
     WebLingoStackModule? IWebLingoStackModuleLoader.Compile(string name, out WebLingoDiagnostic? error)
     {
-        var result = new WebLingoStackCompiler(options).CompileImport(name, _sources.GetValueOrDefault(name, ""));
+        var compiler = new WebLingoStackCompiler(options);
+        var result = Parse is { } parse
+            ? compiler.CompileImport(parse(name, _sources.GetValueOrDefault(name, "")))
+            : compiler.CompileImport(name, _sources.GetValueOrDefault(name, ""));
         error = FirstError(result.Diagnostics);
         return result.Module;
     }

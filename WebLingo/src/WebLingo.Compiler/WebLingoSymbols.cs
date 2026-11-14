@@ -3,7 +3,16 @@ using WebLingo.Language;
 namespace WebLingo.Compiler;
 
 /// <summary>A built-in function the host offers to scripts (<c>write</c>, registered by the CLI), by name and arity.</summary>
-public sealed record WebLingoBuiltinDeclaration(string Name, int Arity);
+public sealed record WebLingoBuiltinDeclaration(string Name, int Arity)
+{
+    /// <summary>
+    /// Whether a call of it renders a component (specification, section 13): <c>name(path, values)</c> runs the file the path
+    /// names anew, with the values given its parameters, found and compiled while the program runs, as <c>Module.import</c>
+    /// finds one (section 3.9), its call giving the task of running it; it has no function the host gives, and is only
+    /// called. A template compiler declares <c>renderComponent</c> so.
+    /// </summary>
+    public bool RendersComponent { get; init; }
+}
 
 /// <summary>What the compiler needs from its host: the built-in functions scripts may call.</summary>
 /// <summary>

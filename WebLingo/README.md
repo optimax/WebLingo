@@ -30,7 +30,7 @@ WebLingo Pages are `.wlp` templates, compiled by the template compiler (`WebLing
 </ul>
 ```
 
-writes `<ul>`, then `<li>Item 1 for you &amp; me</li>` and the same for 2, each on a line of its own, then `</ul>`. `<% include "/includes/header.wlp"; %>` reads a template in its place, as if its text stood there: a path starting with `/` is from the application's root, which `welp run --root site page.wlp` gives (the page's folder when it is left out), any other from the including file's folder. Layouts and components come next, so `samples/SimpleWebsite` does not run yet.
+writes `<ul>`, then `<li>Item 1 for you &amp; me</li>` and the same for 2, each on a line of its own, then `</ul>`. `<% include "/includes/header.wlp"; %>` reads a template in its place, as if its text stood there: a path starting with `/` is from the application's root, which `welp run --root site page.wlp` gives (the page's folder when it is left out), any other from the including file's folder. `await renderComponent("/components/card.wlp", { product: p });` renders a component, a page with a scope of its own, found and compiled when it is first rendered, which declares the values it takes as parameters, `<% param product; param size = "small"; %>`. Layouts come next, so `samples/SimpleWebsite` does not run yet.
 
 ## Prerequisites
 
@@ -56,7 +56,7 @@ The last command times the VM on the benchmark's workloads (`benchmarks/WebLingo
 
 ## Architecture
 
-See [`Documents/weblingo-architecture.md`](../Documents/weblingo-architecture.md) at the repository root; section 15 has M0.6's status, and the choices made where the specification is silent, all still proposed. The VM instruction architecture remains provisional (WL-BC002): there are a register VM, which `weblingo` runs, and a stack VM, both from the same lowered IR, which the benchmark (`benchmarks/WebLingo.Benchmarks`) compares. Includes, layouts, and parameterized components are **all mandatory** for the first template-capable release; pages and their includes are implemented, and layouts and components are not yet.
+See [`Documents/weblingo-architecture.md`](../Documents/weblingo-architecture.md) at the repository root; section 15 has M0.6's status, and the choices made where the specification is silent, all still proposed. The VM instruction architecture remains provisional (WL-BC002): there are a register VM, which `weblingo` runs, and a stack VM, both from the same lowered IR, which the benchmark (`benchmarks/WebLingo.Benchmarks`) compares. Includes, layouts, and parameterized components are **all mandatory** for the first template-capable release; pages, their includes and components are implemented, and layouts are not yet.
 
 ## Verification status
 
