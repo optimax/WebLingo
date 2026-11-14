@@ -8,11 +8,11 @@ Follow-ups to "Typed Catches Syntax: Classes of Values". One decision each, answ
 
 **Q1, a catch whose name is not a class (A5, "Is there a problem with that?"): no problem, but for one point: `A.equal(e)` runs the program's own `equal` when `A` is an instance whose class overrides it, while the VM is searching for a handler, so that a catch could fail or have side effects, which A3 wanted to avoid. (a) `==`, which runs no code, and differs only for such instances; (b) `A.equal(e)`, as you write, an exception it throws replacing the one being caught.**
 
-A1:
+A1: (b)
 
 **Q2, `Function` and `Class`: (a) like `Boolean`, `Integer`, `Number` and `String`: no class extends them, and `new` makes none; (b) classes may extend them.**
 
-A2:
+A2: 
 
 **Q3, extending `Array`, `Map` and `Set`: `class Stack extends Array { top() { return this[this.length - 1]; } }`; `new Stack()` is an empty array of class `Stack`: indexed, with `length`, `push` and `pop`, visited by `foreach`, `is Array` and `is Stack`, with its own methods. Agreed?**
 
@@ -39,61 +39,101 @@ A7:
 A1 of "Typed Catches Syntax: Classes of Values": classes may extend `Array`, `Map` and `Set` (specification, section 3.7, "Classes of values"), on both VMs. Added by Claude, 2026-11-13.
 
 2026-11-13: waits for the answers to "Classes of Values, Continued".
-## [QUESTION] Asynchrony: `async` and `await`
+## [DONE] Asynchrony: `async` and `await`
 
 A15 of "M0.11: Templates": asynchrony is designed first, before templates. WebLingo's own operation model (WS-P007), worker-affine executions (WS-H012) and worker-local heaps (WS-P013) are approved; how a program writes asynchrony is not. One decision each, answerable with "yes" or a letter. Once they are answered, its implementation becomes tasks of its own, before M0.11. Added by Claude, 2026-11-13.
 
-**Q1, syntax: `async function f() { … }`, `async` methods and `async function (…) { … }`, whose call gives a task at once; `await t` waits for task `t`, giving its result, or throwing its exception. Agreed?**
+NOTE: C# is annoying requiring that Task be explicitly returned from async methods. WebLingo should allow returning normal values from an async methods which are then magically wrapped in a task by the runtime and delivered to await. OK?
+
+Q1, syntax: `async function f() { … }`, `async` methods and `async function (…) { … }`, whose call gives a task at once; `await t` waits for task `t`, giving its result, or throwing its exception. Agreed?
 
 A1: Yes.
 
-**Q2, where `await` may stand: (a) in an `async` function, and at the top level of a script or a template; (b) only in an `async` function.**
+Q2, where `await` may stand: (a) in an `async` function, and at the top level of a script or a template; (b) only in an `async` function.
 
 A2: (a). The top level of a script/module is its executable block. A script/module becomes an instance of `Module`, which has an `exec()` function. Would that work? 
 
-**Q3, when an `async` function starts: (a) at once, when it is called, running until its first `await`, as in C# and JavaScript; (b) only when something awaits its task.**
+Q3, when an `async` function starts: (a) at once, when it is called, running until its first `await`, as in C# and JavaScript; (b) only when something awaits its task.
 
 A3: (a)
 
-**Q4, concurrency: an execution's tasks run on its one worker, one at a time, switching only at `await`, so that no two run at once and nothing needs a lock (WS-H012, WS-P013). Agreed?**
+Q4, concurrency: an execution's tasks run on its one worker, one at a time, switching only at `await`, so that no two run at once and nothing needs a lock (WS-H012, WS-P013). Agreed?
 
 A4: How about a real thread pool?
 
-**Q5, what `await` takes: (a) only a task, anything else being WS3001; (b) any value, a value that is not a task giving itself.**
+Q5, what `await` takes: (a) only a task, anything else being WS3001; (b) any value, a value that is not a task giving itself.
 
 A5: (b) and awaiting a plain value still yields.
 
-**Q6, a task is a value of its own kind, of the built-in class `Task` (section 3.2), with nothing but `await` for now; `Task.all`, `Task.any` and timeouts come when they are needed. Agreed?**
+Q6, a task is a value of its own kind, of the built-in class `Task` (section 3.2), with nothing but `await` for now; `Task.all`, `Task.any` and timeouts come when they are needed. Agreed?
 
 A6: OK. Add a TO-DO.
 
-**Q7, a task's exception that nothing awaits: (a) it is lost; (b) when the execution ends, the first such exception stops it, as an uncaught one does, so that none goes unnoticed.**
+Q7, a task's exception that nothing awaits: (a) it is lost; (b) when the execution ends, the first such exception stops it, as an uncaught one does, so that none goes unnoticed.
 
-A7: 
+A7: (b) with a way to opt out for fire-and-forget.
 
-**Q8, where tasks come from, besides `async` functions: the host's operations (files, network, database: WS-P004, WS-P009, WS-P011) give tasks, and the standard library has `delay(milliseconds)`, for tests. Agreed?**
+Q8, where tasks come from, besides `async` functions: the host's operations (files, network, database: WS-P004, WS-P009, WS-P011) give tasks, and the standard library has `delay(milliseconds)`, for tests. Agreed?
 
-A8:
+A8: Yes.
 
-**Q9, the end of an execution: (a) it waits for every task still running; (b) it ends when the top level does, the tasks still running being cancelled.**
+Q9, the end of an execution: (a) it waits for every task still running; (b) it ends when the top level does, the tasks still running being cancelled.
 
-A9:
+A9: (b).
 
-**Q10, how the VMs do it: a waiting `async` function's frames are kept on the heap, held by its task, and resumed by the worker's scheduler when what it waits for completes; no thread blocks (WS-P007, WS-P008). Agreed?**
+Q10, how the VMs do it: a waiting `async` function's frames are kept on the heap, held by its task, and resumed by the worker's scheduler when what it waits for completes; no thread blocks (WS-P007, WS-P008). Agreed?
 
-A10:
+A10: OK.
 
-**Q11, cancellation: an execution's cancellation (WS3004) ends its waiting tasks too, uncatchable, as now. Agreed?**
+Q11, cancellation: an execution's cancellation (WS3004) ends its waiting tasks too, uncatchable, as now. Agreed?
 
-A11:
+A11: Yes.
 
-**Q12, `using` and asynchrony: (a) `dispose()` stays synchronous for now, as section 3.4 begins; (b) a `dispose()` may be `async`, and `using` awaits it.**
+Q12, `using` and asynchrony: (a) `dispose()` stays synchronous for now, as section 3.4 begins; (b) a `dispose()` may be `async`, and `using` awaits it.
 
-A12:
+A12: (b)
 
-**Q13, templates: a template's body may `await` anywhere, as an `async` function's may, and `renderComponent(…)` gives a task, which the page awaits, as section 13's example writes. Agreed?**
+Q13, templates: a template's body may `await` anywhere, as an `async` function's may, and `renderComponent(…)` gives a task, which the page awaits, as section 13's example writes. Agreed?
 
-A13:
+A13: Yes.
+
+Done (Claude, 2026-11-13): recorded as approved in the specification, a new section 3.8 ("Asynchrony"), its decision register, and section 13. What the answers leave open (A2's `Module`, A4's thread pool, A7's opting out, A12 in a function that is not `async`) is asked in "Asynchrony, Continued"; A6's `Task.all`, `Task.any` and timeouts are the task "Task Combinators"; the implementation is the task "Asynchrony".
+
+## [QUESTION] Asynchrony, Continued
+
+Follow-ups to "Asynchrony: `async` and `await`". One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
+
+**Q1, concurrency (A4, "How about a real thread pool?"): the approved hosting design runs each execution on one worker (WS-H012), with a heap of its own that no other thread touches (WS-P013), while many executions, a server's requests, run at once on a pool of workers, and blocking I/O runs on a bounded pool of its own (section 6.10), so a server already uses its cores. Tasks of one execution running on several threads at once would share its heap, which needs locks around every object, or a collector that runs beside the program, and makes every program open to data races. (a) Keep one worker per execution, its tasks taking turns at `await`, and add parallel work later as workers with heaps of their own that exchange copied messages (WS-P013's explicit transfer), as JavaScript's workers do; (b) a thread pool for one execution's tasks, their heap shared under locks, changing WS-H012 and WS-P013.**
+
+A1:
+
+**Q2, scripts as modules (A2, "Would that work?"): it would. A script's or a module's top level becomes the body of an `async` method, `exec()`, of an instance of a built-in class `Module`, which the host calls and awaits; the module's exports would be its instance's members. It belongs with `import` ("M0.11 Syntax: Templates, Continued", Q3). (a) Adopt it now, as what a script is; (b) decide it with `import`, when the module system is designed.**
+
+A2:
+
+**Q3, forgetting a task (A7's opting out): (a) `t.forget()`, a method of the task, after which nothing reports its exception; (b) a statement, `forget t;`; (c) a function, `Task.forget(t)`.**
+
+A3:
+
+**Q4, an `async` `dispose()` in a function that is not `async` (A12), where `using` cannot wait for it: (a) WS3001, at the end of the `using`; (b) the disposal starts, and is not waited for, as if forgotten.**
+
+A4:
+
+**Q5, its milestone: asynchrony comes before templates, so (a) it is M0.11, templates becoming M0.12 and WBC M0.13; (b) it is a part of M0.10, M0.10.8; (c) another, which you give.**
+
+A5:
+
+## [IDLE] Asynchrony
+
+`async` functions and methods, `await`, tasks, and asynchronous disposal (specification, section 3.8), on both VMs, before M0.11's templates, which use them. Added by Claude, 2026-11-13.
+
+2026-11-13: waits for the answers to "Asynchrony, Continued", whose first question, concurrency, shapes it.
+
+## [IDLE] Task Combinators
+
+`Task.all`, `Task.any` and timeouts (A6 of "Asynchrony: `async` and `await`"; specification, section 3.8). Added by Claude, 2026-11-13.
+
+2026-11-13: waits for "Asynchrony".
 
 ## [QUESTION] M0.11 Syntax: Templates, Continued
 

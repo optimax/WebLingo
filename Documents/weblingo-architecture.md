@@ -32,6 +32,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | Statements, operators and literals | The syntax M0.7 implements (§3.5): blocks, `true`, `false` and `null`, comparisons and logic, `if`, loops, `foreach`, strings, and functions, hoisted in their block; a hoisted function reading a variable before its declaration has run is a runtime error (WS2004) | Approved (12 November 2026; the hoisted function's read, 13 November 2026) |
 | Collections | Arrays, maps and sets, with indexing, members, `length`, `foreach`, identity, text, set literals and optional access (§3.6) | Approved (13 November 2026) |
 | Classes and disposal | Classes, instances, fields, `this`, methods, inheritance, `x?.name`, text, `dispose()` and `destructor()`, disposal once and chained, `using`, static members, `Object` and `equal()`, exceptions, `toString()`, a disposal that throws, typed catches, and the classes of values (§3.7) | Approved (13 November 2026) |
+| Asynchrony | `async` functions, `await` of any value, tasks of the class `Task`, exceptions nothing awaits, the end of an execution, frames kept on the heap, cancellation, `async` disposal, and templates' `await` (§3.8); the concurrency of an execution's tasks, scripts as `Module`s, and forgetting a task, still open | Approved (13 November 2026) |
 | Templates (M0.11) | The language is independent of templates; a template compiler extends the language's, with a program of its own; text, statements across blocks, escaping, `null`, line breaks, `include`, layouts and their parameters, components found at run time and their declared parameters, and codes WS5001 on (§13, "Contracts"); the technology's name, `import`, default values, and asynchrony, which comes first, still open | Approved (13 November 2026) |
 | M0.1 | Mandatory semicolons; no automatic semicolon insertion | Approved |
 | M0.1 | Numeric categories int64, IEEE binary64, decimal128 | Approved |
@@ -268,6 +269,24 @@ The syntax and meaning of classes, the disposal protocol and `using` (§3.2, §3
 - **`using` and exceptions.** `using` disposes on every way out, an exception's included, as a `finally` would. An exception from `dispose()` while another is on its way out replaces it, as in C#.
 - **How the VMs do it.** Table-driven protected regions (§5.4): each function lists its `try` ranges and their handlers, and nothing runs on the way into a `try`.
 - **Use after disposal.** For a class written in WebLingo, nothing is checked: the class checks its own state if it needs to.
+
+### 3.8 Asynchrony — approved 13 November 2026
+
+How a program writes asynchrony, on WebLingo's own operation model (WS-P007), approved by the owner on 13 November 2026, before templates, which use it (§13), but for the points that say they are still open.
+
+- **`async` and `await`.** `async function f() { … }`, `async` methods and `async function (…) { … }`: a call of one gives a task at once. `await t` waits for the task `t`, giving its result, or throwing its exception.
+- **Where `await` stands.** In an `async` function, and at the top level of a script or a template, which is its executable block. Whether a script, or a module, is an instance of a built-in class `Module`, whose `exec()` runs that block, is still open.
+- **Starting.** An `async` function starts at once, when it is called, and runs until its first `await`, as in C# and JavaScript.
+- **What `await` takes.** Any value: a task gives its result once it completes, any other value itself; `await` always lets other tasks run first, even on a value that is not a task.
+- **Tasks.** A task is a value of the built-in class `Task`, with nothing but `await` for now; `Task.all`, `Task.any` and timeouts come when they are needed.
+- **Exceptions nothing awaits.** When an execution ends, the first exception of a task that nothing awaited stops it, as an uncaught one does, so that none goes unnoticed; a way to opt out of this, for a task started and forgotten, is still open.
+- **Where tasks come from.** Besides `async` functions, the host's operations give tasks (files, network, database: WS-P004, WS-P009, WS-P011), and the standard library has `delay(milliseconds)`, for tests.
+- **The end of an execution.** It ends when its top level does; its tasks still running are cancelled.
+- **How the VMs do it.** A waiting `async` function's frames are kept on the heap, held by its task, and resumed by the worker's scheduler when what it waits for completes; no thread blocks (WS-P007, WS-P008).
+- **Cancellation.** An execution's cancellation (WS3004) ends its waiting tasks too, uncatchable, as now.
+- **`using`.** A `dispose()` may be `async`, and `using` awaits it.
+- **Templates.** A template's body may `await` anywhere, as an `async` function's may, and `renderComponent(…)` gives a task, which the page awaits (§13).
+- **Concurrency.** Whether an execution's tasks run on its one worker, one at a time, switching only at `await` (WS-H012, WS-P013), or on a pool of threads at once, is still open.
 
 ---
 
@@ -943,7 +962,7 @@ Proposed central props:
 
 **After M0.8** (order approved by the owner, 13 November 2026): M0.9, then M0.10, M0.11 and M0.12, as the table gives them. Each needs syntax, or a format, that this specification does not give yet, which is decided feature by feature before it is built; and each is built on both VMs (§5.6, "Both VMs, for now").
 
-**Immediate next activity:** the rest of the classes of values (extending `Array`, `Map` and `Set`), asynchrony (`async` and `await`), and the rest of M0.11's contracts, for the owner's decision; then those, asynchrony before M0.11. The compiler and both VMs cover M0.6's subset and the language of §3.5, §3.6 and §3.7.
+**Immediate next activity:** the rest of the classes of values (extending `Array`, `Map` and `Set`), the rest of asynchrony (§3.8), and the rest of M0.11's contracts, for the owner's decision; then those, asynchrony before M0.11. The compiler and both VMs cover M0.6's subset and the language of §3.5, §3.6 and §3.7.
 
 ---
 
@@ -1161,7 +1180,7 @@ The owner's answers to what sections 2.2 and 13 left open, approved on 13 Novemb
 - **Includes.** `<% include "/includes/header.wsp"; %>` is a statement whose path is a string literal, resolved and compiled with the page. It is textual: the included template sees the variables where it is included, as if its text stood there. A path starting with `/` is from the application's root, any other from the including file's folder. In the language proper, `/` is the drive's root, `./` the current folder, and `xyz/abc` the current folder's `xyz` subfolder, and so on. `import`, for what has a scope of its own, is still to be designed.
 - **Layouts.** `<% layout "/layouts/main.wsp", { title: "Products" }; %>`: at most one for a page, given the values the layout reads as its parameters, so that the page's body runs, and streams, where the layout calls `renderBody()` (WS-T003). A layout may itself have a layout, and so on; a cycle of them is a compile-time error.
 - **Components.** `renderComponent(path, { product: p })` is a built-in: its path is any string, and the component is found and compiled when it runs. A component declares its parameters at its top, `<%@ params product, size %>`, each then a variable of it, a missing one an error, an extra one an error; a parameter may have a default value, which makes it optional, its syntax still open.
-- **Asynchrony.** `async` and `await` are designed first, before templates (section 13's examples use `await`).
+- **Asynchrony.** `async` and `await` are designed first, before templates (section 13's examples use `await`): §3.8.
 - **Errors.** Template errors (a cycle of includes or layouts, a missing file, a path outside the application, a component's parameters) have a range of codes of their own, WS5001 on.
 
 ---
