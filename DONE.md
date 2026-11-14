@@ -1283,3 +1283,9 @@ Q10, the standard library: it becomes modules imported by name (`import fs from 
 A10: Well, even built-ins should be treated like they belong to modules, so maybe `write` and `writeLn` are in `system`, but `system` is always implicitly imported by all modules.
 
 Done (Claude, 2026-11-13, `fb78f7f`): recorded as approved in the specification, section 3.9, a new section. What the answers leave open is asked in "Modules, Continued"; the implementation is the task "Modules".
+
+## [DONE] Extending the Classes of Values: Classed Collections' Text
+
+A collection of a class extending `Array`, `Map` or `Set` written `Stack([1, 2])`, in place of `Stack [1, 2]` (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
+
+Done (Claude, 2026-11-13, `2af1f42`): on both VMs, with its conformance tests. Checks: the Release build, without warnings, the 1,400 tests, and the CLI on the samples, on Windows only; Linux not tried.

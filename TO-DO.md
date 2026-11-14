@@ -42,12 +42,6 @@ A5:
 
 2026-11-13: next, after "Extending the Classes of Values: Classed Collections' Text".
 
-## [WORKING] Extending the Classes of Values: Classed Collections' Text
-
-A collection of a class extending `Array`, `Map` or `Set` written `Stack([1, 2])`, in place of `Stack [1, 2]` (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
-
-Done (Claude, 2026-11-13): on both VMs, with its conformance tests. Checks: the Release build, without warnings, the 1,400 tests, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## [IDLE] Extending the Classes of Values: `Boolean`, `Integer`, `Number` and `String`
 
 Classes extending them, whose instances hold a value, given by `super(value)`, which arithmetic, comparisons and `==` use, written `Celsius(21.5)`; and `new` on those classes (specification, sections 3.7 and 9), on both VMs. Added by Claude, 2026-11-13.
