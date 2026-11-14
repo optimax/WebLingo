@@ -1351,3 +1351,18 @@ Done (Claude, 2026-11-13, `185690f`): on both VMs, with their conformance tests;
 Let's make sure that class static members are accessible through instance references (unless shadowed by the instance member) as well as class references. 
 
 Done (Claude, 2026-11-14, `9b9bf93`): on both VMs, with their conformance tests; recorded in the specification, section 3.7 ("Static members"), and section 15.2 ("Static members"). What assigning one through an instance does is asked in "Static Members Through Instances, Continued". Checks: the Release build, without warnings, the 1,528 tests, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Rename WebScript's Leftovers to WebLingo
+
+The project was renamed from WebScript to WebLingo (specification, section 1), but kept WebScript's `ws` in its file extensions, its diagnostic codes, its specification IDs and its type names. The owner decided, 2026-11-13, in a chat with Claude, to rename them all now, while nothing is released: "Better now than later." Added by Claude, 2026-11-14.
+
+- **Scripts:** `.ws` becomes `.wl`.
+- **Templates:** `.wsp` becomes `.wlp` (the owner's answer: yes).
+- **Diagnostic codes:** `WS1001` becomes `WL1001`, and so on: the numbers and their meanings stay, the prefix changes.
+- **Specification IDs:** `WS-BC002` becomes `WL-BC002`, `WS-T001` `WL-T001`, and so on.
+- **Type names in source:** the `Ws` prefix becomes `WebLingo` (`WsLexer` becomes `WebLingoLexer`, `WsValue` `WebLingoValue`, and so on; the owner's choice, 2026-11-14, over `Wl`), with the files named after them.
+- **No backward compatibility:** the old extension is not accepted, and the old codes and names are not kept as aliases (the owner: "Don't worry about backwards compatibility. We are building and designing the system as we speak.").
+
+Where it reaches: the CLI and anything else that looks at an extension; the samples, and the benchmark's workloads (`Workloads/*.ws`); every test that writes a source file or checks a code (`program.ws`, `"WS2001"`); `WsDiagnosticCodes` and every `Ws` type, in every project; the specification (sections 1, 1.1, 2.2, 6.9, 8.4, 13, 15.2, and every `WS-` ID and `WS` code), `Documents/implementation.md` (sections 1, 7, 12, and its paths), `Documents/NativeCompatibility.md`, `WebLingo/README.md`, `TO-DO.md` and `DONE.md`'s open text, and the GitHub workflow if it names any. `Documents/implementation.md`, section 12, lists the extensions and the `WS` prefixes among the names not to change without asking: this task is the owner's asking, and the section is updated to the new names. The rename is mechanical, so it lands as one change, checked by the Release build, the full test suite, and the CLI run on the renamed samples, on both VMs.
+
+Done (Claude, 2026-11-14, `68f65d5`): as listed, on both VMs: 60 files renamed (the `Ws` types' and the samples' and workloads'), and every `WS` code and ID, `Ws` type name and `.ws` or `.wsp` in the solution, the documents and `TO-DO.md` (but this task's own text); recorded in the specification, sections 1 and 1.1, and `Documents/implementation.md`, sections 1, 5 and 12. `DONE.md` is left as written, a record of what was done under the old names. WSHI, the host interface's name (specification, section 6), is not in the list, and is asked in "WSHI". Checks: the Release build, without warnings, the 1,528 tests, and the CLI on the renamed samples, on Windows only; Linux not tried.
