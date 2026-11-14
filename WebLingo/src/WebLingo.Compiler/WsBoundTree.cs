@@ -33,6 +33,8 @@ public sealed record WsBoundFunction(
 {
     /// <summary>A method's or a constructor's: its first parameter is <c>this</c>, which its caller gives (section 3.7).</summary>
     public bool HasThis { get; init; }
+    /// <summary>Its parameters' default values, but <c>this</c>'s, null for one that has none (section 3.5).</summary>
+    public IReadOnlyList<WsBoundExpression?> Defaults { get; init; } = [];
 }
 
 public abstract record WsBoundStatement(WsSourceSpan Span);

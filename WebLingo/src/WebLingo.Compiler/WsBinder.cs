@@ -97,8 +97,7 @@ public sealed class WsBinder
         {
             var local = statement switch
             {
-                WsFunctionDeclarationSyntax function =>
-                    Declare(function.Name, WsDeclarationKind.Function, function.NameSpan, function.Parameters.Count),
+                WsFunctionDeclarationSyntax function => DeclareFunction(function),
                 WsClassDeclarationSyntax declaration => Declare(declaration.Name, WsDeclarationKind.Class, declaration.NameSpan, null),
                 _ => null
             };
@@ -494,17 +493,38 @@ public sealed class WsBinder
         _scope = new Scope(outerScope, _function);
         if (isMethod) Declare("this", WsDeclarationKind.Parameter, span, null);
         if (isStatic) _scope.Locals.Add("this", _noThis); // An outer method's 'this' is not a static method's (WS2009).
-        foreach (var parameter in parameters) Declare(parameter.Name, WsDeclarationKind.Parameter, parameter.Span, null);
+        var defaults = new List<WsBoundExpression?>();
+        foreach (var parameter in parameters)
+        {
+            // A default is bound before its parameter is declared, as a variable's initializer is (section 3.1).
+            defaults.Add(parameter.Default is { } value ? BindExpression(value) : null);
+            Declare(parameter.Name, WsDeclarationKind.Parameter, parameter.Span, null);
+        }
         _scope = new Scope(_scope, _function); // The body may declare a name its parameters have, shadowing it.
         var statements = BindStatements(body.Statements);
         var bound = new WsBoundFunction(name, parameters.Count + (isMethod ? 1 : 0), _function.Locals, _function.Captures,
             statements, span)
         {
-            HasThis = isMethod
+            HasThis = isMethod,
+            Defaults = defaults
         };
         _function = outerFunction;
         _scope = outerScope;
         return bound;
+    }
+
+    /// <summary>A function declared by name, with how many arguments a call of it may give (section 3.5).</summary>
+    private WsLocalSymbol? DeclareFunction(WsFunctionDeclarationSyntax function)
+    {
+        var local = Declare(function.Name, WsDeclarationKind.Function, function.NameSpan, function.Parameters.Count);
+        if (local is null) return null;
+        var required = 0;
+        foreach (var parameter in function.Parameters)
+        {
+            if (parameter.Default is null) required++;
+        }
+        local.FunctionMinArity = required;
+        return local;
     }
 
     private WsLocalSymbol? Declare(string name, WsDeclarationKind kind, WsSourceSpan span, int? arity)
@@ -747,19 +767,21 @@ public sealed class WsBinder
             if (!CheckArity(name.Name, declaration.Arity, arguments.Count, call.Span)) return new WsBoundError(call.Span);
             return new WsBoundBuiltinCall(UseBuiltin(declaration), arguments, call.Span);
         }
-        if (calleeSyntax is WsNameSyntax functionName && LookupLocal(functionName.Name) is { FunctionArity: { } arity }
-            && !CheckArity(functionName.Name, arity, arguments.Count, call.Span))
+        if (calleeSyntax is WsNameSyntax functionName && LookupLocal(functionName.Name) is { FunctionArity: { } arity } function
+            && !CheckArity(functionName.Name, arity, arguments.Count, call.Span, function.FunctionMinArity ?? arity))
         {
             return new WsBoundError(call.Span);
         }
         return new WsBoundCall(BindExpression(calleeSyntax), arguments, call.Span);
     }
 
-    private bool CheckArity(string name, int arity, int count, WsSourceSpan span)
+    private bool CheckArity(string name, int arity, int count, WsSourceSpan span, int? minimum = null)
     {
-        if (count == arity) return true;
+        var least = minimum ?? arity;
+        if (count >= least && count <= arity) return true;
         var noun = arity == 1 ? "argument" : "arguments";
-        Report(WsDiagnosticCodes.WrongArgumentCount, $"'{name}' takes {arity} {noun}, not {count}.", span);
+        var takes = least == arity ? $"{arity} {noun}" : $"{least} to {arity} arguments";
+        Report(WsDiagnosticCodes.WrongArgumentCount, $"'{name}' takes {takes}, not {count}.", span);
         return false;
     }
 

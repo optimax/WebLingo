@@ -38,7 +38,7 @@ public sealed class WsStackCodeGenerator
             var name = function.Name.Length == 0 ? "function" : function.Name;
             var generated = GenerateFunction(module, name, function.ParameterCount, function.LocalNames, captures, function.Body,
                 diagnostics);
-            if (generated is not null) functions.Add(generated with { HasThis = function.HasThis });
+            if (generated is not null) functions.Add(generated with { HasThis = function.HasThis, OptionalCount = function.OptionalCount });
         }
         if (main is null || functions.Count != program.Functions.Count) return null;
 
@@ -153,6 +153,16 @@ public sealed class WsStackCodeGenerator
             case WsIrNewCell cell:
                 Emit(WsStackOpCode.NewCell, cell.Span, cell.Local);
                 break;
+            case WsIrDefaultParameter parameter:
+            {
+                // Skipped when the caller gave the parameter; otherwise its default, into its local or its cell.
+                var skip = _code.Count;
+                Emit(WsStackOpCode.JumpIfGiven, parameter.Span, 0, parameter.Local);
+                EmitValue(parameter.Value);
+                Emit(parameter.Captured ? WsStackOpCode.StoreCell : WsStackOpCode.StoreLocal, parameter.Span, parameter.Local);
+                PatchJump(skip);
+                break;
+            }
             case WsIrBoxLocal box:
                 Emit(WsStackOpCode.BoxLocal, box.Span, box.Local);
                 break;
@@ -642,6 +652,7 @@ public sealed class WsStackCodeGenerator
             WsStackOpCode.Throw => (1, 0),
             WsStackOpCode.ToText => (1, 1),
             WsStackOpCode.IsInstance => (2, 1),
+            WsStackOpCode.JumpIfGiven => (0, 0),
             WsStackOpCode.Rethrow => (2, 0),
             WsStackOpCode.New => (a + 1, 1),
             WsStackOpCode.SetMember => (2, b),

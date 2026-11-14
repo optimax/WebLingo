@@ -2,7 +2,7 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [QUESTION] Classes of Values, Further
+## Classes of Values, Further
 
 A2 of "Classes of Values, Continued": `Boolean`, `Integer`, `Number`, `String`, `Function` and `Class` are to be like any other class, and extendable, with new methods for example. What that means needs deciding. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
 
@@ -16,15 +16,17 @@ A2:  Yes. Maybe write those [class-name]:[value(s)], i.e. `Celsius:21.5`, or `Ce
 
 **Q3, `new` on those classes: (a) `new Integer()` is `0`, `new String()` `""`, `new Boolean()` `false`, and `new Integer(5)` `5`; (b) WS3001, their values being made by literals.**
 
-A3:
+A3: (a). So `var x = new Integer(42);` is the same as `var x = 42`.
 
 **Q4, `Function` and `Class`: (a) as (1) to (3) say for the others, a subclass of `Function` being a function with methods of its own; (b) new methods only, as (1) (a), with no subclasses.**
 
-A4:
+A4: (a).
 
-## [IDLE] Default Parameter Values
+## [WORKING] Default Parameter Values
 
 `function f(a, b = 1) { … }`, for functions, methods and constructors (A5 of "M0.11 Syntax: Templates, Continued"; specification, section 3.5), on both VMs. Added by Claude, 2026-11-13.
+
+Done (Claude, 2026-11-13): default values for the parameters of functions, function expressions, methods and constructors, on both VMs: evaluated when the parameter is left out, a `null` given being a value; a call checked against the range of arguments it may give. One new operation, `JumpIfGiven`, and a function's `OptionalCount`; the call path gained no work for a call that gives every argument, and `calls` takes the same time. Choices of mine, in section 15.2 as proposed (row "Default values"): a default is evaluated before its own parameter is declared, so it may use the ones before it, and `b = b` names an outer `b`; a parameter without a default after one with one is WS1001. Every new conformance case gives the same result on both VMs. Build and 1,275 tests pass on Windows; Linux not tried.
 
 ## [IDLE] M0.11: Asynchrony
 
@@ -44,29 +46,29 @@ A4:
 
 The language's module system, which A3 of "M0.11 Syntax: Templates, Continued" makes `import`, and A4's `param` as a keyword of the language, a module's parameter; A2 of "Asynchrony, Continued" makes a script, or a module, an instance of `Module`. Templates (M0.12) need both. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
 
-**Q1, importing: (a) `import db from "lib/db.ws";`, a statement at a module's top level, naming the module's instance; (b) `var db = import("lib/db.ws");`, an expression, anywhere.**
+**Q1, importing: (a) `import db from "lib/db.ws";`, a statement at a module's top level, naming the module's instance; (b) `var db = Module.import("lib/db.ws");`, an expression, anywhere.**
 
-A1:
+A1: (c) both. (a) is static, known at compile time, (b) is dynamic, only at runtime.
 
 **Q2, when a module runs: once per execution, the first time it is imported; every later import gets the same instance, already run. Agreed?**
 
-A2:
+A2: Yes.
 
 **Q3, exports: (a) every top-level declaration of a module is a member of its instance; (b) only those marked `export` (`export function f() { … }`).**
 
-A3:
+A3: (b).
 
 **Q4, paths: as A9 of "M0.11: Templates" has it for the language: from the importing file's folder, `./` that folder, `/` the drive's root; and `.ws` may be left out. Agreed?**
 
-A4:
+A4: Yes.
 
 **Q5, cycles: a module that imports itself, directly or through others: (a) a compile-time error; (b) allowed, the second import getting the instance as it is so far, as JavaScript does.**
 
-A5:
+A5: (b).
 
 **Q6, `param` in the language: `param name;` and `param size = 10;` declare a module's parameters, at its top level, before its other statements, each a `const` of it; an importer gives them, `import db from "lib/db.ws" { size: 10 };`, and a template's caller gives a component's or a layout's. Agreed?**
 
-A6:
+A6: Yes.
 
 **Q7, a parameter without a default that is not given: (a) an error, where the module is imported, of a new code; (b) `null`.**
 
@@ -167,6 +169,8 @@ A16: (a).
 WBC, the bytecode's binary format, its writing and its reading, with verification (specification, sections 5.1, 5.3 and 5.5). Its encoding choices are proposed in the specification and not yet approved, and the format is the chosen VM's, so this waits for the choice between the VMs (WS-BC002) as well. Added by Claude, 2026-11-13.
 
 2026-11-13: waits for M0.11.
+
+2026-11-13: M0.13 now, after M0.12, templates (specification, section 9); waits for M0.12.
 
 ## Static Members Callable on Instances
 

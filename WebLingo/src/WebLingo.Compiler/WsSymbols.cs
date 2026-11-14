@@ -34,6 +34,8 @@ public sealed class WsLocalSymbol(string name, WsDeclarationKind kind, int index
     public bool IsCaptured { get; internal set; }
     /// <summary>A declared function's parameter count, which a direct call is checked against.</summary>
     public int? FunctionArity { get; init; }
+    /// <summary>For a function declared by name: how many of its parameters a call must give, the others having defaults.</summary>
+    public int? FunctionMinArity { get; set; }
     public bool IsConstant => Kind is WsDeclarationKind.Const or WsDeclarationKind.Function or WsDeclarationKind.Class;
 }
 

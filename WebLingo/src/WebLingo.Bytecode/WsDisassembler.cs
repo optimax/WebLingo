@@ -55,7 +55,7 @@ public static class WsDisassembler
             WsOpCode.Equal or WsOpCode.NotEqual or WsOpCode.Less or WsOpCode.LessOrEqual or WsOpCode.Greater
                 or WsOpCode.GreaterOrEqual =>
                 $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
-            WsOpCode.JumpIfFalse or WsOpCode.JumpIfTrue => $"{instruction.OpCode} {Register(function, a)}, {b:D2}",
+            WsOpCode.JumpIfFalse or WsOpCode.JumpIfTrue or WsOpCode.JumpIfGiven => $"{instruction.OpCode} {Register(function, a)}, {b:D2}",
             WsOpCode.CheckBoolean => $"CheckBoolean {Register(function, a)}",
             WsOpCode.NewCell or WsOpCode.BoxRegister or WsOpCode.CopyCell or WsOpCode.ReturnValue =>
                 $"{instruction.OpCode} {Register(function, a)}",

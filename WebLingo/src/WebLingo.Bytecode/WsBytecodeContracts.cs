@@ -157,6 +157,11 @@ public enum WsOpCode : byte
     /// it (<c>is</c>, and typed catches; section 3.7).
     /// </summary>
     IsInstance,
+    /// <summary>
+    /// A = a parameter's register, B = target instruction: jumps there if the caller gave the parameter, which, then, is
+    /// not the missing value the VM put in its place, nor a cell holding it (default values; section 3.5).
+    /// </summary>
+    JumpIfGiven,
 }
 
 public readonly record struct WsInstruction(WsOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
@@ -195,6 +200,11 @@ public sealed record WsFunction(
     public IReadOnlyList<WsCapture> Captures { get; init; } = [];
     /// <summary>A method's or a constructor's: its first parameter is <c>this</c>, which its caller gives (section 3.7).</summary>
     public bool HasThis { get; init; }
+    /// <summary>
+    /// How many of its last parameters may be left out, having default values, which its code gives them (section 3.5);
+    /// the VM puts a missing value in their place, which <see cref="WsOpCode.JumpIfGiven"/> tells.
+    /// </summary>
+    public int OptionalCount { get; init; }
     /// <summary>
     /// Its protected regions, innermost first, which an exception raised in it, or in a call it makes, looks through for
     /// the first that holds the instruction it was raised at (section 3.7; section 5.4's table-driven regions).

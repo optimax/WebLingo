@@ -329,6 +329,14 @@ public sealed class WsStackVirtualMachine
                             pc = condition.AsBoolean ? pc + 1 : ins.A;
                             continue;
                         }
+                        case WsStackOpCode.JumpIfGiven:
+                        {
+                            // Whether the caller gave a parameter, which, captured, is in a cell (section 3.5).
+                            var parameter = slots[ins.B];
+                            if (parameter.Kind == WsValueKind.Cell) heap.TryReadCell(parameter, out parameter);
+                            pc = parameter.Kind == WsValueKind.Missing ? pc + 1 : ins.A;
+                            continue;
+                        }
                         case WsStackOpCode.JumpIfTrue:
                         {
                             var condition = slots[--sp];
@@ -756,9 +764,12 @@ public sealed class WsStackVirtualMachine
                         var (index, closureCells) = heap.GetClosure(callee);
                         var function = module.Functions[index];
                         var withThis = function.HasThis ? 1 : 0;
-                        if (function.ParameterCount != argumentCount + withThis)
+                        if (function.ParameterCount != argumentCount + withThis
+                            && (argumentCount + withThis > function.ParameterCount
+                                || argumentCount + withThis < function.ParameterCount - function.OptionalCount))
                         {
-                            error = WrongArgumentCount(function.Name, function.ParameterCount - withThis, argumentCount);
+                            error = WrongArgumentCount(function.Name, function.ParameterCount - withThis, argumentCount,
+                                function.OptionalCount);
                             goto failed;
                         }
                         if (depth + 1 >= maxCallDepth)
@@ -776,6 +787,8 @@ public sealed class WsStackVirtualMachine
                         var calledSlots = called.Slots;
                         if (withThis == 1) calledSlots[0] = self;
                         for (var i = 0; i < argumentCount; i++) calledSlots[withThis + i] = slots[firstArgument + i];
+                        // The parameters left out are missing, until the function's code gives them their defaults.
+                        for (var i = withThis + argumentCount; i < function.ParameterCount; i++) calledSlots[i] = WsValue.Missing;
                         called.Function = function;
                         called.Code = codes[index];
                         called.Cells = closureCells;
@@ -1334,9 +1347,10 @@ public sealed class WsStackVirtualMachine
             frame.DiscardResult = false;
         }
 
-        private static WsRuntimeError WrongArgumentCount(string name, int arity, int count) =>
-            new(WsDiagnosticCodes.WrongArgumentCount,
-                $"'{name}' takes {arity} {(arity == 1 ? "argument" : "arguments")}, not {count}.");
+        private static WsRuntimeError WrongArgumentCount(string name, int arity, int count, int optional = 0) =>
+            new(WsDiagnosticCodes.WrongArgumentCount, optional == 0
+                ? $"'{name}' takes {arity} {(arity == 1 ? "argument" : "arguments")}, not {count}."
+                : $"'{name}' takes {arity - optional} to {arity} arguments, not {count}.");
 
         private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 

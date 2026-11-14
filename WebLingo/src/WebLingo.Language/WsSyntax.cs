@@ -88,7 +88,11 @@ public sealed record WsBreakSyntax(WsSourceSpan Span) : WsStatementSyntax(Span);
 public sealed record WsContinueSyntax(WsSourceSpan Span) : WsStatementSyntax(Span);
 
 /// <summary>A function's parameter, by name.</summary>
-public sealed record WsParameterSyntax(string Name, WsSourceSpan Span) : WsSyntaxNode(Span);
+public sealed record WsParameterSyntax(string Name, WsSourceSpan Span) : WsSyntaxNode(Span)
+{
+    /// <summary>Its default value, <c>b = 1</c>, which makes it optional, or null (section 3.5).</summary>
+    public WsExpressionSyntax? Default { get; init; }
+}
 
 /// <summary><c>function name(parameters) { body }</c>, in scope throughout its block (specification, section 3.5).</summary>
 public sealed record WsFunctionDeclarationSyntax(

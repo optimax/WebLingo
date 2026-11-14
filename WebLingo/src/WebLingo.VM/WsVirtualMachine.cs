@@ -306,6 +306,14 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                             pc = condition.AsBoolean ? pc + 1 : ins.B;
                             continue;
                         }
+                        case WsOpCode.JumpIfGiven:
+                        {
+                            // Whether the caller gave a parameter, which, captured, is in a cell (section 3.5).
+                            var parameter = registers[ins.A];
+                            if (parameter.Kind == WsValueKind.Cell) heap.TryReadCell(parameter, out parameter);
+                            pc = parameter.Kind == WsValueKind.Missing ? pc + 1 : ins.B;
+                            continue;
+                        }
                         case WsOpCode.JumpIfTrue:
                         {
                             var condition = registers[ins.A];
@@ -715,9 +723,12 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         var (index, closureCells) = heap.GetClosure(callee);
                         var function = module.Functions[index];
                         var withThis = function.HasThis ? 1 : 0;
-                        if (function.ParameterCount != argumentCount + withThis)
+                        if (function.ParameterCount != argumentCount + withThis
+                            && (argumentCount + withThis > function.ParameterCount
+                                || argumentCount + withThis < function.ParameterCount - function.OptionalCount))
                         {
-                            error = WrongArgumentCount(function.Name, function.ParameterCount - withThis, argumentCount);
+                            error = WrongArgumentCount(function.Name, function.ParameterCount - withThis, argumentCount,
+                                function.OptionalCount);
                             goto failed;
                         }
                         if (depth + 1 >= maxCallDepth)
@@ -737,6 +748,8 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
                         var calledRegisters = called.Registers;
                         if (withThis == 1) calledRegisters[0] = self;
                         for (var i = 0; i < argumentCount; i++) calledRegisters[withThis + i] = arguments[firstArgument + i];
+                        // The parameters left out are missing, until the function's code gives them their defaults.
+                        for (var i = withThis + argumentCount; i < function.ParameterCount; i++) calledRegisters[i] = WsValue.Missing;
                         called.Function = function;
                         called.Code = codes[index];
                         called.Cells = closureCells;
@@ -1292,9 +1305,10 @@ public sealed class WsVirtualMachine : IWsVirtualMachine
             frame.Text = null;
         }
 
-        private static WsRuntimeError WrongArgumentCount(string name, int arity, int count) =>
-            new(WsDiagnosticCodes.WrongArgumentCount,
-                $"'{name}' takes {arity} {(arity == 1 ? "argument" : "arguments")}, not {count}.");
+        private static WsRuntimeError WrongArgumentCount(string name, int arity, int count, int optional = 0) =>
+            new(WsDiagnosticCodes.WrongArgumentCount, optional == 0
+                ? $"'{name}' takes {arity} {(arity == 1 ? "argument" : "arguments")}, not {count}."
+                : $"'{name}' takes {arity - optional} to {arity} arguments, not {count}.");
 
         private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 

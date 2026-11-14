@@ -49,7 +49,7 @@ public sealed class WsCodeGenerator
             var name = function.Name.Length == 0 ? "function" : function.Name;
             var generated = GenerateFunction(module, name, function.ParameterCount, function.LocalNames, captures, function.Body,
                 diagnostics);
-            if (generated is not null) functions.Add(generated with { HasThis = function.HasThis });
+            if (generated is not null) functions.Add(generated with { HasThis = function.HasThis, OptionalCount = function.OptionalCount });
         }
         if (main is null || functions.Count != program.Functions.Count) return null;
 
@@ -161,6 +161,25 @@ public sealed class WsCodeGenerator
             case WsIrNewCell cell:
                 Emit(new WsInstruction(WsOpCode.NewCell, cell.Local), cell.Span);
                 break;
+            case WsIrDefaultParameter parameter:
+            {
+                // Skipped when the caller gave the parameter; otherwise its default, into its register or its cell.
+                var skip = _code.Count;
+                Emit(new WsInstruction(WsOpCode.JumpIfGiven, parameter.Local), parameter.Span);
+                if (parameter.Captured)
+                {
+                    var mark = _nextRegister;
+                    var value = EmitExpression(parameter.Value, null);
+                    Emit(new WsInstruction(WsOpCode.StoreCell, parameter.Local, value), parameter.Span);
+                    _nextRegister = mark;
+                }
+                else
+                {
+                    EmitExpression(parameter.Value, parameter.Local);
+                }
+                _code[skip] = _code[skip] with { B = _code.Count };
+                break;
+            }
             case WsIrBoxLocal box:
                 Emit(new WsInstruction(WsOpCode.BoxRegister, box.Local), box.Span);
                 break;

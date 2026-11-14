@@ -422,6 +422,15 @@ public sealed class WsParser : IWsParser
             : new WsUsingSyntax(name, nameSpan, value, body, SpanFrom(start));
     }
 
+    /// <summary>Parameters' default values, as statements of their own, so that each expression's depth is checked.</summary>
+    private static void PushDefaults(IReadOnlyList<WsParameterSyntax> parameters, Stack<WsStatementSyntax> statements)
+    {
+        foreach (var parameter in parameters)
+        {
+            if (parameter.Default is { } value) statements.Push(new WsExpressionStatementSyntax(value, value.Span));
+        }
+    }
+
     /// <summary>A name being declared; an empty one, reported, if there is none.</summary>
     private (string Name, WsSourceSpan Span) ExpectName()
     {
@@ -481,6 +490,7 @@ public sealed class WsParser : IWsParser
         Expect(WsTokenKind.OpenParen, "'('");
         if (Current.Kind != WsTokenKind.CloseParen)
         {
+            var optional = false;
             while (true)
             {
                 if (Current.Kind != WsTokenKind.Identifier)
@@ -489,7 +499,20 @@ public sealed class WsParser : IWsParser
                     break;
                 }
                 var parameter = Advance();
-                parameters.Add(new WsParameterSyntax(parameter.Text, parameter.Span));
+                WsExpressionSyntax? defaultValue = null;
+                if (Current.Kind == WsTokenKind.Equals)
+                {
+                    // A default value, which makes the parameter optional (section 3.5).
+                    Advance();
+                    defaultValue = ParseExpression();
+                    optional = true;
+                }
+                else if (optional && !_statementHasError)
+                {
+                    Report(WsDiagnosticCodes.UnexpectedToken,
+                        "A parameter without a default value cannot follow one with a default value.", parameter.Span);
+                }
+                parameters.Add(new WsParameterSyntax(parameter.Text, parameter.Span) { Default = defaultValue });
                 if (Current.Kind != WsTokenKind.Comma) break;
                 Advance();
             }
@@ -1020,7 +1043,11 @@ public sealed class WsParser : IWsParser
                 statements.Push(conditional.Then);
             }
             if (statement is WsWhileSyntax whileLoop) statements.Push(whileLoop.Body);
-            if (statement is WsFunctionDeclarationSyntax function) statements.Push(function.Body);
+            if (statement is WsFunctionDeclarationSyntax function)
+            {
+                statements.Push(function.Body);
+                PushDefaults(function.Parameters, statements);
+            }
             if (statement is WsDoWhileSyntax doLoop) statements.Push(doLoop.Body);
             if (statement is WsForEachSyntax forEachLoop) statements.Push(forEachLoop.Body);
             if (statement is WsUsingSyntax usingStatement) statements.Push(usingStatement.Body);
@@ -1032,7 +1059,11 @@ public sealed class WsParser : IWsParser
             }
             if (statement is WsClassDeclarationSyntax classDeclaration)
             {
-                foreach (var method in classDeclaration.Methods) statements.Push(method.Body);
+                foreach (var method in classDeclaration.Methods)
+                {
+                    statements.Push(method.Body);
+                    PushDefaults(method.Parameters, statements);
+                }
                 foreach (var field in classDeclaration.StaticFields)
                 {
                     statements.Push(new WsExpressionStatementSyntax(field.Value, field.Value.Span));
@@ -1086,6 +1117,7 @@ public sealed class WsParser : IWsParser
                     case WsAssignmentExpressionSyntax assignment: pending.Push((assignment.Value, depth + 1)); break;
                     case WsFunctionExpressionSyntax functionExpression:
                         statements.Push(functionExpression.Body);
+                        PushDefaults(functionExpression.Parameters, statements);
                         break;
                     case WsCallExpressionSyntax call:
                         pending.Push((call.Callee, depth + 1));

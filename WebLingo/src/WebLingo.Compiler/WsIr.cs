@@ -48,7 +48,15 @@ public sealed record WsIrFunction(
 {
     /// <summary>A method's or a constructor's, whose first parameter is <c>this</c>.</summary>
     public bool HasThis { get; init; }
+    /// <summary>How many of its last parameters have default values, and so may be left out (section 3.5).</summary>
+    public int OptionalCount { get; init; }
 }
+
+/// <summary>
+/// A parameter's default value, given it at the function's start when its caller left it out; in its cell if it is
+/// captured (section 3.5).
+/// </summary>
+public sealed record WsIrDefaultParameter(int Local, bool Captured, WsIrExpression Value, WsSourceSpan Span) : WsIrStatement(Span);
 
 /// <summary>Gives the local a new cell, without a value until it is initialized.</summary>
 public sealed record WsIrNewCell(int Local, WsSourceSpan Span) : WsIrStatement(Span);

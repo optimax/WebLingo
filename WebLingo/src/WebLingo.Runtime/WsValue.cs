@@ -5,7 +5,7 @@ namespace WebLingo.Runtime;
 /// a BoundMethod (a method and the instance it runs on) refer to an object of a heap by
 /// handle; a Builtin is a host built-in, by its import index; a Cell is never a script's value, only a frame's.
 /// </summary>
-public enum WsValueKind : byte { Null, Boolean, Int64, Binary64, String, Function, Builtin, Cell, Array, Map, Set, Class, Instance, BoundMethod }
+public enum WsValueKind : byte { Null, Boolean, Int64, Binary64, String, Function, Builtin, Cell, Array, Map, Set, Class, Instance, BoundMethod, Missing }
 
 /// <summary>
 /// A runtime value (specification, section 4.1): a kind and a 64-bit payload, 16 bytes in all. M0.6 has null,
@@ -24,6 +24,12 @@ public readonly struct WsValue : IEquatable<WsValue>
     public WsValueKind Kind { get; }
 
     public static WsValue Null => default;
+
+    /// <summary>
+    /// What a VM puts in the place of a parameter its caller left out, which the function's code replaces with its
+    /// default value before anything else reads it (section 3.5); never a program's value.
+    /// </summary>
+    public static WsValue Missing => new(WsValueKind.Missing, 0);
     public static WsValue True => new(WsValueKind.Boolean, 1);
     public static WsValue False => new(WsValueKind.Boolean, 0);
 

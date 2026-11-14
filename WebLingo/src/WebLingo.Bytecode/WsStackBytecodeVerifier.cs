@@ -98,6 +98,10 @@ public sealed class WsStackBytecodeVerifier
         }
         if (function.Captures is null) return Fail("The function has no capture table.");
         if (function.Handlers is null) return Fail("The function has no handler table.");
+        if (function.OptionalCount < 0 || function.OptionalCount > function.ParameterCount - (function.HasThis ? 1 : 0))
+        {
+            return Fail($"The function has {function.OptionalCount} optional parameters of {function.ParameterCount}.");
+        }
         for (var i = 0; i < function.Handlers.Count; i++)
         {
             var handler = function.Handlers[i];
@@ -151,6 +155,8 @@ public sealed class WsStackBytecodeVerifier
             case WsStackOpCode.JumpIfFalse:
             case WsStackOpCode.JumpIfTrue:
                 return Index(a, function.Code.Count, "target instruction") ?? Unused(b);
+            case WsStackOpCode.JumpIfGiven:
+                return Index(a, function.Code.Count, "target instruction") ?? Index(b, function.LocalCount, "local");
             case WsStackOpCode.LoadBuiltin:
                 return Index(a, module.Imports.Count, "import") ?? Unused(b);
             case WsStackOpCode.MakeClass:
@@ -408,6 +414,7 @@ public sealed class WsStackBytecodeVerifier
         WsStackOpCode.Rethrow => (2, 0),
         WsStackOpCode.ToText => (1, 1),
         WsStackOpCode.IsInstance => (2, 1),
+        WsStackOpCode.JumpIfGiven => (0, 0),
         WsStackOpCode.New => (instruction.A + 1, 1),
         WsStackOpCode.SetMember => (2, instruction.B),
         WsStackOpCode.NewArray or WsStackOpCode.NewSet => (instruction.A, 1),
@@ -460,6 +467,8 @@ public sealed class WsStackBytecodeVerifier
             case WsStackOpCode.LoadCell:
             case WsStackOpCode.StoreCell:
                 return IsSet(written, instruction.A) ? -1 : instruction.A;
+            case WsStackOpCode.JumpIfGiven:
+                return IsSet(written, instruction.B) ? -1 : instruction.B;
             case WsStackOpCode.MakeClass:
                 foreach (var member in WsClassTables.Functions(module.Classes[instruction.A]))
                 {
@@ -490,7 +499,7 @@ public sealed class WsStackBytecodeVerifier
 
     private static bool IsJump(WsStackOpCode opCode) =>
         opCode is WsStackOpCode.Jump or WsStackOpCode.JumpIfFalse or WsStackOpCode.JumpIfTrue or WsStackOpCode.ForEachNext
-            or WsStackOpCode.ForEachNextEntry;
+            or WsStackOpCode.ForEachNextEntry or WsStackOpCode.JumpIfGiven;
 
     private static int ItemCount(WsStackOpCode opCode) => opCode == WsStackOpCode.ForEachNextEntry ? 2 : 1;
 

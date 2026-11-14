@@ -38,6 +38,7 @@ public static class WsValueFormatter
         WsValueKind.Class => $"class#{value.Handle}",
         WsValueKind.Instance => $"instance#{value.Handle}",
         WsValueKind.BoundMethod => "function",
+        WsValueKind.Missing => "missing",
         WsValueKind.Boolean => value.AsBoolean ? "true" : "false",
         WsValueKind.Int64 => value.AsInt64.ToString(CultureInfo.InvariantCulture),
         _ => FormatBinary64(value.AsBinary64)

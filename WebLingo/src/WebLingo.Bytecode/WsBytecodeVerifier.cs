@@ -93,6 +93,10 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
         }
         if (function.Captures is null) return Fail("The function has no capture table.");
         if (function.Handlers is null) return Fail("The function has no handler table.");
+        if (function.OptionalCount < 0 || function.OptionalCount > function.ParameterCount - (function.HasThis ? 1 : 0))
+        {
+            return Fail($"The function has {function.OptionalCount} optional parameters of {function.ParameterCount}.");
+        }
         for (var i = 0; i < function.Handlers.Count; i++)
         {
             var handler = function.Handlers[i];
@@ -165,6 +169,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                     ?? Register(function, c, "right") ?? Unused(d);
             case WsOpCode.JumpIfFalse:
             case WsOpCode.JumpIfTrue:
+            case WsOpCode.JumpIfGiven:
                 return Register(function, a, "condition") ?? Index(b, function.Code.Count, "target instruction")
                     ?? Unused(c, d);
             case WsOpCode.CheckBoolean:
@@ -395,7 +400,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                     Flow(instruction.A, state, atBlockStart, pending);
                     break;
                 }
-                if (instruction.OpCode is WsOpCode.JumpIfFalse or WsOpCode.JumpIfTrue)
+                if (instruction.OpCode is WsOpCode.JumpIfFalse or WsOpCode.JumpIfTrue or WsOpCode.JumpIfGiven)
                 {
                     Flow(instruction.B, state, atBlockStart, pending); // And on to the next instruction.
                 }
@@ -438,7 +443,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
     private static int? JumpTarget(WsInstruction instruction) => instruction.OpCode switch
     {
         WsOpCode.Jump or WsOpCode.ForEachNext => instruction.A,
-        WsOpCode.JumpIfFalse or WsOpCode.JumpIfTrue => instruction.B,
+        WsOpCode.JumpIfFalse or WsOpCode.JumpIfTrue or WsOpCode.JumpIfGiven => instruction.B,
         _ => null
     };
 
@@ -507,6 +512,7 @@ public sealed class WsBytecodeVerifier : IWsBytecodeVerifier
                 return Unwritten(instruction.B, state, locals);
             case WsOpCode.JumpIfFalse:
             case WsOpCode.JumpIfTrue:
+            case WsOpCode.JumpIfGiven:
             case WsOpCode.CheckBoolean:
             case WsOpCode.Dispose:
             case WsOpCode.Throw:

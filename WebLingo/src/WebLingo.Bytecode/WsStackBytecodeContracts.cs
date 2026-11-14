@@ -151,6 +151,8 @@ public enum WsStackOpCode : byte
     ToText,
     /// <summary>Pops a class, then a value, and pushes whether the value is an instance of it, as <c>IsInstance</c> does.</summary>
     IsInstance,
+    /// <summary>A = target instruction, B = a parameter's local: jumps there if the caller gave the parameter.</summary>
+    JumpIfGiven,
 }
 
 public readonly record struct WsStackInstruction(WsStackOpCode OpCode, int A = 0, int B = 0);
@@ -173,6 +175,8 @@ public sealed record WsStackFunction(
     public int SlotCount => LocalCount + MaxStack;
     /// <summary>A method's or a constructor's: its first parameter is <c>this</c>, which its caller gives (section 3.7).</summary>
     public bool HasThis { get; init; }
+    /// <summary>How many of its last parameters may be left out, as the register bytecode's.</summary>
+    public int OptionalCount { get; init; }
     /// <summary>Its protected regions, innermost first, as the register bytecode's (section 3.7).</summary>
     public IReadOnlyList<WsStackHandler> Handlers { get; init; } = [];
 }

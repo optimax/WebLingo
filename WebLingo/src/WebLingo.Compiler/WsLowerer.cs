@@ -156,13 +156,24 @@ public sealed class WsLowerer
             if (!parameter.IsCaptured) continue;
             body.Add(new WsIrBoxLocal(parameter.Index, parameter.DeclarationSpan));
         }
+        // A parameter its caller left out gets its default value, after a captured one has moved into its cell.
+        var offset = function.HasThis ? 1 : 0;
+        var optional = 0;
+        for (var i = 0; i < function.Defaults.Count; i++)
+        {
+            if (function.Defaults[i] is not { } value) continue;
+            optional++;
+            var parameter = function.Locals[offset + i];
+            body.Add(new WsIrDefaultParameter(parameter.Index, parameter.IsCaptured, LowerExpression(value), value.Span));
+        }
         body.AddRange(LowerBlock(function.Body));
         var captures = new List<WsIrCapture>();
         foreach (var capture in function.Captures) captures.Add(new WsIrCapture(capture.FromLocal, capture.Index));
         _functions[index] = new WsIrFunction(function.Name, function.ParameterCount, Names(function.Locals), captures, body,
             function.Span)
         {
-            HasThis = function.HasThis
+            HasThis = function.HasThis,
+            OptionalCount = optional
         };
         return index;
     }
