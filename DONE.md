@@ -1714,7 +1714,7 @@ Done (Claude, 2026-11-14, `b260d5f`): recorded as approved in the specification,
 
 **Q1, a module imported again with other values, `import a from "box" { size: 1 };` here and `{ size: 2 }` there: (a) it runs once, with the values of the import that ran it first, a later import's values unused, as "once per execution" has it; (b) it runs once for each set of values, each import with other values getting an instance of its own, as a template's component is rendered once per call; (c) an error, a module with parameters being imported once.**
 
-A1: (b). It looks to me like a sneaky way of introducing generics (the same module instantiated iwth different parameters).
+A1: (b). It looks to me like a sneaky way of introducing generics (the same module instantiated with different parameters).
 
 **Q2, an import's values: (a) a map literal only, `{ size: 10 }`, whose names the compiler checks against the module's parameters, a missing or an extra one an error at compile time (a new code, WL2016); (b) any expression giving a map, checked when the import runs.**
 
@@ -1741,3 +1741,17 @@ class Integer {
 ```
 
 Done (Claude, 2026-11-14, `dee6093`): both, recorded as approved in the specification, section 3.7 ("Classes of values"): `Integer.parse("10")`, `Number.parse("1.5")` and `Boolean.parse("true")`, and `new Integer("10")` and the like reading a string the same way, as A1's constructor does, on both VMs, with conformance tests; their choices recorded as Proposed in section 15.2 ("Classes holding a value"), among them that a number may have a sign, and nothing around it, not even a space. A1 writes `Integer("10")`, which is read as `new Integer("10")`: a class called without `new` stays WL2005 (section 3.7, "Instances"). A1's code block had taken the place of the line "## [IDLE] Modules", the heading of the task after it, which is restored. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Modules: Dynamic Imports
+
+`await Module.import(path)`, a module compiled when it runs (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for "Modules: Parameters".
+
+2026-11-14: a module compiled while the program runs must join the running program: its functions, constants and classes added to the program's, its built-in classes the program's own (so that `x is Object` holds across them), and a file it imports that has run already not run again. That is a large change to both VMs and to the bytecode, which templates' `renderComponent(…)` needs too (section 13: a component is found and compiled when it runs). A decision of sequence, answerable with a letter:
+
+**Q1, when to build the VMs' linking of a module compiled while the program runs: (a) now, as this part, before the standard modules and properties; (b) with M0.12's components, which need it too, dynamic imports landing with them.**
+
+A1: (a)
+
+Done (Claude, 2026-11-14, `e27005d`): on both VMs, with tests in `ModuleTests` (`WebLingo.VM.Tests`) and through the CLI; its choices recorded as Proposed in the specification, section 15.2 ("Modules"), among them that a module that does not compile is a runtime error of its first diagnostic's code, and that a member's name after a point may be a keyword, which `Module.import` needs (a parser test that took `a.if;` for malformed takes `a.5;` now). The compiler compiles the file as an import, a program of its own, and each VM joins it to the running program by appending its tables and moving its instructions' indices; M0.12's components can join the same way. Checks: the Release build, without warnings, the full test suite, the benchmark against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.

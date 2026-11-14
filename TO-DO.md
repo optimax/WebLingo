@@ -18,20 +18,6 @@ The module system: `import`, static and dynamic, `export`, `param`, a script's p
 
 2026-11-14: split into the parts the specification defines in section 9 ("Modules"), each a task below. Waits for them.
 
-## [WORKING] Modules: Dynamic Imports
-
-`await Module.import(path)`, a module compiled when it runs (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
-
-2026-11-14: waits for "Modules: Parameters".
-
-2026-11-14: a module compiled while the program runs must join the running program: its functions, constants and classes added to the program's, its built-in classes the program's own (so that `x is Object` holds across them), and a file it imports that has run already not run again. That is a large change to both VMs and to the bytecode, which templates' `renderComponent(…)` needs too (section 13: a component is found and compiled when it runs). A decision of sequence, answerable with a letter:
-
-**Q1, when to build the VMs' linking of a module compiled while the program runs: (a) now, as this part, before the standard modules and properties; (b) with M0.12's components, which need it too, dynamic imports landing with them.**
-
-A1: (a)
-
-Done (Claude, 2026-11-14): on both VMs, with tests in `ModuleTests` (`WebLingo.VM.Tests`) and through the CLI; its choices recorded as Proposed in the specification, section 15.2 ("Modules"), among them that a module that does not compile is a runtime error of its first diagnostic's code, and that a member's name after a point may be a keyword, which `Module.import` needs (a parser test that took `a.if;` for malformed takes `a.5;` now). The compiler compiles the file as an import, a program of its own, and each VM joins it to the running program by appending its tables and moving its instructions' indices; M0.12's components can join the same way. Checks: the Release build, without warnings, the full test suite, the benchmark against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## [IDLE] Modules: A Script's Parameters
 
 `weblingo run script.wl name=value` (specification, sections 3.9 and 9). Added by Claude, 2026-11-14.
