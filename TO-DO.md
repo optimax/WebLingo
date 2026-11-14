@@ -118,11 +118,17 @@ A1:
 
 A2:
 
-## [IDLE] Modules: Dynamic Imports
+## [QUESTION] Modules: Dynamic Imports
 
 `await Module.import(path)`, a module compiled when it runs (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
 
 2026-11-14: waits for "Modules: Parameters".
+
+2026-11-14: a module compiled while the program runs must join the running program: its functions, constants and classes added to the program's, its built-in classes the program's own (so that `x is Object` holds across them), and a file it imports that has run already not run again. That is a large change to both VMs and to the bytecode, which templates' `renderComponent(…)` needs too (section 13: a component is found and compiled when it runs). A decision of sequence, answerable with a letter:
+
+**Q1, when to build the VMs' linking of a module compiled while the program runs: (a) now, as this part, before the standard modules and properties; (b) with M0.12's components, which need it too, dynamic imports landing with them.**
+
+A1:
 
 ## [IDLE] Modules: Standard Modules
 
