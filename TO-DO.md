@@ -164,6 +164,36 @@ A5: Yes. In fact, standard modules should follow the same model: they are pre-in
 
 A6: (b), API TBD.
 
+Done (Claude, 2026-11-14): recorded as approved in the specification, section 3.9 ("Native modules"), A1's details and A2's paths against A4's concern being asked in "Native Code Extensions, Continued", as A1 asks to discuss them. Checks: the Release build, without warnings, and the full test suite, on Windows only; Linux not tried.
+
+## [QUESTION] Native Code Extensions, Continued
+
+The details A1 of "Native Code Extensions" asks to discuss, and one point between A2 and A4 (specification, section 3.9, "Native modules"). One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-14.
+
+**Q1, what a native module gives: an assembly with one public class implementing `IWebLingoNativeModule`, whose `Register(IWebLingoNativeRegistry registry)` gives its exports, each a function with a name, an arity, and a delegate that takes the call's arguments, as `WebLingoValue`s, with the execution's heap, and gives a value, or a task for asynchronous work, as the host's built-ins (`IWebLingoBuiltinFunction`) do now. Agreed?**
+
+A1:
+
+**Q2, a native module's classes: (a) none at first, functions only, classes coming later; (b) classes from the start, each declared by the module with its methods as native functions (`registry.Class("Connection", …)`).**
+
+A2:
+
+**Q3, loading one on .NET (adapter-only, section 7.14): (a) each in an `AssemblyLoadContext` of its own, so that two modules may depend on different versions of one library, and a reload can unload it with its application's generation (WL-H004); (b) into the host's own context, simpler, and never unloaded.**
+
+A3:
+
+**Q4, a scheme's folder (A2, A3): (a) the module's assembly in it, `native/sqlite.dll`, its dependencies beside it; (b) a folder of its own for each module, `native/sqlite/sqlite.dll`, its dependencies inside it.**
+
+A4:
+
+**Q5, A2's explicit paths and A4's concern, a script that writes an assembly and imports it: (a) a native module loads only from a configured scheme's folder, an explicit path too, which scripts cannot write to (section 7.13's capabilities); (b) explicit paths anywhere, the host's filesystem capability alone keeping scripts from writing assemblies where they can be loaded from.**
+
+A5:
+
+**Q6, the standard modules as native ones (A5): (a) now: `std:system`'s built-ins moved into a native module installed with the runtime, in the `std` scheme's folder; (b) with the first standard module that is not the host's built-ins (`std:fs`, `std:tasks`).**
+
+A6:
+
 ## Constants Inside Classes
 
 This should be allowed:
