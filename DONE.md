@@ -823,3 +823,29 @@ Done (Claude, 2026-11-13, `3024a26`): `Object`, with `equal(other)` giving `this
 2026-11-13: resumed, and finished.
 
 Done (Claude, 2026-11-13, `760ad15`): `throw value;`, `throw;`, `try` with `catch`, `finally`, or both, and `Error`, with the runtime errors a handler catches becoming `Error`s with their code, but the execution's limits and a cancellation; `finally` and `using` run on every way out, an exception's included, and an exception from `dispose()` replaces the one on its way out (A13); WS2010 and WS2012. Both VMs search table-driven handler regions (A14) only when an exception is thrown, so nothing runs on the way into a `try`, and the benchmark's times did not change beyond the noise of a busy machine. Choices of mine, in section 15.2 as proposed (row "Exceptions"): `throw;` outside a `catch` is a new code, WS2010; `Error` is written in WebLingo and added to a program that names it or has a `try` or a `using`; an uncaught `Error` with a code is reported as that code, so a runtime error caught and rethrown is reported as before; a disposal goes on after one of its methods throws, as I recommended for Q5 of "M0.10 Syntax: `toString()` and Disposal That Throws", which is still open (`WsExceptions.DisposalGoesOn` changes it). Every new conformance case gives the same result on both VMs. Build and 1,187 tests pass on Windows; Linux not tried.
+
+## [DONE] M0.10 Syntax: `toString()` and Disposal That Throws
+
+Follow-ups to "M0.10 Syntax: Static Members, `Object` and Exceptions": A3 adds `toString()` to `Object`, and exceptions raise what a disposal does when one of its methods throws. One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
+
+Q1, `toString()` when a class does not override it gives (a) the text `write` writes, `Point {x: 1, y: 2}`; (b) the class's name, `Point`, as C#'s `ToString()` does.
+
+A1: (a).
+
+Q2, `write`, `writeLn` and a template's `<%= %>` given an instance whose class overrides `toString()`: (a) write what it returns, wherever the instance is, inside an array or a map too, as C#'s `Console.Write` does; (b) write its class and fields as now, `toString()` running only where a program calls it.
+
+A2: (a).
+
+Q3, if Q2 is (a): a `toString()` that returns anything but a string is (a) WS3001 where it is written; (b) written as the value it returns.
+
+A3: (a).
+
+Q4, `toString()` on other values: (a) only instances have it; (b) every value has it, giving the text `write` writes (`n.toString()` is `"5"` when `n` is 5), so that `"n = " + n.toString()` joins a number to a string, which `+` alone does not (section 3.5).
+
+A4: (b).
+
+Q5, disposal that throws: when B's `dispose()` throws while an instance of B is disposed, (a) A's `dispose()` still runs, as section 3.4 proposes, and an exception it throws replaces B's, as A13 has it for `using`; (b) A's does not run, and B's exception goes on.
+
+A5: (
+
+Done (Claude, 2026-11-13, `73d16fa`): A1 to A4 recorded as approved in the specification, section 3.7 (a point of its own, `toString()`), its decision register, and section 9's M0.10.7. A5 was left unfinished, "(", so Q5 is asked again in "M0.10 Syntax: Disposal That Throws"; until it is answered, a disposal goes on after one of its methods throws, (a), as M0.10.6 made it, one constant to change.
