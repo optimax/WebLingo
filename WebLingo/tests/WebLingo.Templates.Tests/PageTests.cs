@@ -77,6 +77,23 @@ public sealed class PageTests
     }
 
     [Fact]
+    public void AnUnclosedMultiLineStringNamesItsBlock()
+    {
+        // It runs on over the page's text after its block, so its diagnostic names the block's <% too (section 3.5).
+        var (diagnostics, _, _) = Render("<p>\n  <% var s = \"\"\"\n  a %>\n<p>");
+        Assert.Contains("WL1011 at page.wlp 2,14: This multi-line string has no closing \"\"\". It began in the block at line 2, "
+            + "column 3.", diagnostics);
+    }
+
+    [Theory]
+    [InlineData("<% var who = \"Ann\"; %><%= $\"<b>{who}</b>\" %>", "&lt;b&gt;Ann&lt;/b&gt;")]
+    [InlineData("<%- \"\"\"\n  <ul>\n    <li>%></li>\n  </ul>\n  \"\"\" %>", "<ul>\n  <li>%></li>\n</ul>")]
+    public void APagesBlocksTakeMultiLineAndInterpolatedStrings(string page, string written)
+    {
+        Assert.Equal(("", written, ""), Render(page));
+    }
+
+    [Fact]
     public void ARuntimeErrorIsReportedAtItsPlaceInThePage()
     {
         var (_, written, error) = Render("<p>\n<%= [1][5] %>\n</p>");

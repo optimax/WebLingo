@@ -1329,6 +1329,7 @@ public sealed class WebLingoBinder
         {
             "Object" => UseObject(),
             "Error" => UseError(),
+            WebLingoParser.InterpolationText => UseInterpolationText(),
             _ when WebLingoPrelude.IsValueClass(name) || WebLingoPrelude.IsErrorClass(name) => UseBuiltinClass(name),
             _ => null
         };
@@ -1338,6 +1339,21 @@ public sealed class WebLingoBinder
     /// A built-in class besides <c>Object</c> and <c>Error</c>, a kind of value's or of runtime error's (section 3.7):
     /// bound, in the scope around the program's, and made where the program begins, once something uses it.
     /// </summary>
+    /// <summary>
+    /// The class an interpolated string's values are written by (section 3.5): <c>of(value)</c> gives the text
+    /// <c>write</c> writes, an instance's <c>toString()</c> included, and <c>""</c> for <c>null</c>; written in
+    /// WebLingo, and made where the program begins, as the built-in classes are, under a name no program can write.
+    /// </summary>
+    private WebLingoLocalSymbol UseInterpolationText()
+    {
+        foreach (var (builtin, declaration) in _builtinClasses)
+        {
+            if (builtin == WebLingoParser.InterpolationText) return declaration.Local;
+        }
+        return BindBuiltinClass(WebLingoParser.InterpolationText,
+            "class Text { static of(value) { if (value == null) { return \"\"; } return value.toString(); } }", UseObject(), inPrelude: true);
+    }
+
     private WebLingoLocalSymbol UseBuiltinClass(string name)
     {
         foreach (var (builtin, declaration) in _builtinClasses)

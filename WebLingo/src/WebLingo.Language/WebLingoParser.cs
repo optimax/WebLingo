@@ -15,6 +15,12 @@ public sealed class WebLingoParser : IWebLingoParser
     /// <summary>How deep a parsed expression may be, so that every later stage can walk it recursively.</summary>
     public const int MaxExpressionDepth = 1000;
 
+    /// <summary>
+    /// The class an interpolated string's values are written by, <c>&lt;text&gt;.of(value)</c>, which the binder makes,
+    /// named so that no program can name it (section 3.5).
+    /// </summary>
+    public const string InterpolationText = "<text>";
+
     private readonly WebLingoSourceText _source;
     private readonly IReadOnlyList<WebLingoToken> _tokens;
     private readonly List<WebLingoDiagnostic> _diagnostics = [];
@@ -1115,6 +1121,9 @@ public sealed class WebLingoParser : IWebLingoParser
             case WebLingoTokenKind.StringLiteral:
                 Advance();
                 return new WebLingoStringLiteralSyntax(token.StringValue!, token.Span);
+            case WebLingoTokenKind.InterpolatedString:
+                Advance();
+                return ParseInterpolated(token);
             case WebLingoTokenKind.Async when Peek(1).Kind == WebLingoTokenKind.Identifier && Peek(2).Kind == WebLingoTokenKind.Arrow:
             case WebLingoTokenKind.Async when Peek(1).Kind == WebLingoTokenKind.OpenParen && ArrowClose(_index + 1) >= 0:
                 // async x => …, async (a, b) => …: an async arrow function, as async function (a, b) { … } is (section 3.5).
@@ -1465,6 +1474,58 @@ public sealed class WebLingoParser : IWebLingoParser
     }
 
     private WebLingoToken Peek(int ahead) => _tokens[Math.Min(_index + ahead, _tokens.Count - 1)];
+
+    /// <summary>
+    /// An interpolated string (section 3.5), parsed into the syntax a program could write but for the class's name: its
+    /// text and its values joined by <c>+</c>, each value written by <c>&lt;text&gt;.of(value)</c>, a string for any value,
+    /// so that nothing after the parser tells it apart. An interpolation's code is parsed as an expression of its own.
+    /// </summary>
+    private WebLingoExpressionSyntax ParseInterpolated(WebLingoToken token)
+    {
+        WebLingoExpressionSyntax? result = null;
+        foreach (var part in token.Parts!)
+        {
+            WebLingoExpressionSyntax piece;
+            if (part.Code is null)
+            {
+                piece = new WebLingoStringLiteralSyntax(part.Text!, part.Span);
+            }
+            else
+            {
+                if (part.Format is { } format)
+                {
+                    Report(WebLingoDiagnosticCodes.UnexpectedToken, "A format after ':' in an interpolation is not yet available.", format);
+                }
+                var value = ParseInterpolation(part);
+                var text = new WebLingoNameSyntax(InterpolationText, part.Span);
+                piece = new WebLingoCallExpressionSyntax(new WebLingoMemberAccessSyntax(text, "of", part.Span, part.Span), [value], part.Span);
+            }
+            result = result is null
+                ? piece
+                : new WebLingoBinaryExpressionSyntax(WebLingoBinaryOperator.Add, result, piece, part.Span, token.Span);
+        }
+        // Only text, or nothing: a string as it is; an interpolation first: its value's text is a string already.
+        return result ?? new WebLingoStringLiteralSyntax("", token.Span);
+    }
+
+    /// <summary>An interpolation's code, parsed by a parser of its own, as one expression and nothing after it.</summary>
+    private WebLingoExpressionSyntax ParseInterpolation(WebLingoInterpolationPart part)
+    {
+        if (part.Code!.Count == 0)
+        {
+            Report(WebLingoDiagnosticCodes.UnexpectedToken, "An interpolation needs an expression.", part.Span);
+            return new WebLingoErrorExpressionSyntax(part.Span);
+        }
+        var tokens = new List<WebLingoToken>(part.Code)
+        {
+            new(WebLingoTokenKind.EndOfFile, "}", new WebLingoSourceSpan(part.Span.Start + part.Span.Length, 0))
+        };
+        var parser = new WebLingoParser(_source, tokens, []);
+        var value = parser.ParseExpression();
+        if (parser.Current.Kind != WebLingoTokenKind.EndOfFile) parser.ReportUnexpected("'}', which ends the interpolation");
+        _diagnostics.AddRange(parser._diagnostics);
+        return value;
+    }
 
     /// <summary>
     /// The index of the <c>)</c> that matches the <c>(</c> here, or at <paramref name="from"/>, if <c>=&gt;</c> follows it,

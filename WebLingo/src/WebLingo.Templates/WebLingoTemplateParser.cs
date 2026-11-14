@@ -156,7 +156,20 @@ public sealed class WebLingoTemplateParser
                 var code = new List<WebLingoToken>();
                 WebLingoToken token;
                 while ((token = lexer.NextToken()).Kind != WebLingoTokenKind.EndOfFile) code.Add(token);
-                foreach (var diagnostic in lexer.Diagnostics) diagnostics.Add(diagnostic with { Span = Shift(diagnostic.Span, shift) });
+                foreach (var diagnostic in lexer.Diagnostics)
+                {
+                    var located = diagnostic with { Span = Shift(diagnostic.Span, shift) };
+                    if (diagnostic.Code == WebLingoDiagnosticCodes.UnterminatedMultiLineString)
+                    {
+                        // It runs on over the page's text after its block: the block it began in is named too (section 3.5).
+                        var opened = new WebLingoSourceText(text, "").GetLocation(open);
+                        located = located with
+                        {
+                            Message = $"{diagnostic.Message} It began in the block at line {opened.Line}, column {opened.Column}."
+                        };
+                    }
+                    diagnostics.Add(located);
+                }
                 end = token.Span.Start + token.Span.Length;
                 block = new Piece(open, end) { Block = kind, Opening = opening, Closing = token.Span };
                 block.Tokens.AddRange(code);

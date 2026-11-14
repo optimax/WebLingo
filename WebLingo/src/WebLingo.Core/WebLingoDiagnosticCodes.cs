@@ -26,6 +26,11 @@ public static class WebLingoDiagnosticCodes
     public const string InvalidEscape = "WL1009";
     /// <summary>A string literal not closed on its line.</summary>
     public const string UnterminatedString = "WL1010";
+    /// <summary>A multi-line string with no closing delimiter (proposed, section 3.5).</summary>
+    public const string UnterminatedMultiLineString = "WL1011";
+    /// <summary>A multi-line or interpolated string written wrongly: a line not indented as its closing delimiter, a brace
+    /// where none may stand, or more quotes or dollars than it takes (proposed, section 3.5).</summary>
+    public const string MalformedString = "WL1012";
 
     /// <summary>Undefined identifier.</summary>
     public const string UndefinedIdentifier = "WL2001";

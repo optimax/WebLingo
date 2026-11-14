@@ -253,6 +253,72 @@ public sealed class LexerTests
     }
 
     [Theory]
+    // Raw strings (section 3.5): no escapes; on one line, or over several, without the closing delimiter's indentation,
+    // their breaks LF, and neither the break after the opening nor the one before the closing their own.
+    [InlineData("\"\"\"a \"b\" \\n c\"\"\"", "a \"b\" \\n c")]
+    [InlineData("'''it's \"x\"'''", "it's \"x\"")]
+    [InlineData("\"\"\"\"a \"\"\" b\"\"\"\"", "a \"\"\" b")]
+    [InlineData("\"\"\"\n    one\n      two\n    \"\"\"", "one\n  two")]
+    [InlineData("\"\"\"\r\n  one\r\n\r\n  two\r\n  \"\"\"", "one\n\ntwo")]
+    [InlineData("\"\"\"\r  one\r  two\r  \"\"\"", "one\ntwo")]
+    [InlineData("\"\"\"  \n\\d+\\.\\d+\n\"\"\"", "\\d+\\.\\d+")]
+    [InlineData("\"\"\"\n\"\"\"", "")]
+    public void RawStringsAreAsTheyStand(string text, string value)
+    {
+        var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);
+        Assert.Empty(diagnostics);
+        Assert.Equal((WebLingoTokenKind.StringLiteral, value), (tokens[0].Kind, tokens[0].StringValue));
+        Assert.Equal(WebLingoTokenKind.EndOfFile, tokens[1].Kind);
+    }
+
+    [Theory]
+    [InlineData("\"\"\"\n  a\n  \"\"", "WL1011", 0, 3)]
+    [InlineData("x = \"\"\"a\nb\"\"\";", "WL1010", 4, 4)]
+    [InlineData("\"\"\"\n  a\n b\n  \"\"\"", "WL1012", 8, 0)]
+    [InlineData("\"\"\"a\"\"\"\"", "WL1012", 4, 4)]
+    [InlineData("$\"a}b\"", "WL1012", 3, 1)]
+    [InlineData("$$\"a\"", "WL1012", 0, 2)]
+    [InlineData("$\"a{b\"", "WL1010", 3, 1)]
+    [InlineData("$\"\\q\"", "WL1009", 2, 2)]
+    [InlineData("$$\"\"\"{{{{{a}}}}}\"\"\"", "WL1012", 5, 5)]
+    public void AMalformedStringIsReportedWhereItIs(string text, string code, int start, int length)
+    {
+        WebLingoLexer.Tokenize(text, out var diagnostics);
+        Assert.Contains((code, new WebLingoSourceSpan(start, length)), diagnostics.Select(d => (d.Code, d.Span)));
+    }
+
+    [Fact]
+    public void AnInterpolatedStringHoldsItsTextAndItsCode()
+    {
+        var tokens = WebLingoLexer.Tokenize("$\"a{x + 1}b{{c}}\\{d\\}{y:0.0}\"", out var diagnostics);
+        Assert.Empty(diagnostics);
+        var parts = tokens[0].Parts!;
+        Assert.Equal(WebLingoTokenKind.InterpolatedString, tokens[0].Kind);
+        Assert.Equal(["a", null, "b{c}{d}", null], parts.Select(p => p.Text));
+        Assert.Equal(["x", "+", "1"], parts[1].Code!.Select(t => t.Text));
+        Assert.Equal(new WebLingoSourceSpan(23, 4), parts[3].Format);
+    }
+
+    [Fact]
+    public async Task RandomStringsAlwaysEnd()
+    {
+        // Every text of these characters lexes, and ends, whatever it holds (fixed seed, so it is the same each time).
+        var random = new Random(1234);
+        const string alphabet = "$\"'{}:\\\n\r a1+";
+        var lexing = Task.Run(() =>
+        {
+            for (var i = 0; i < 20000; i++)
+            {
+                var text = new char[random.Next(1, 24)];
+                for (var j = 0; j < text.Length; j++) text[j] = alphabet[random.Next(alphabet.Length)];
+                WebLingoLexer.Tokenize(new string(text), out _);
+            }
+        });
+        Assert.Same(lexing, await Task.WhenAny(lexing, Task.Delay(TimeSpan.FromSeconds(30))));
+        await lexing;
+    }
+
+    [Theory]
     [InlineData("\"a\\qb\"", 2, 2)]
     [InlineData("\"\\u{D800}\"", 1, 2)]
     [InlineData("\"\\u{110000}\"", 1, 2)]

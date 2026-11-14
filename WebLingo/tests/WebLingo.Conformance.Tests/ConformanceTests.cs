@@ -137,6 +137,11 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A { const X = 1; const X = 2; }", "WL2002", 1, 30)]
     [InlineData("var f = (1) => { return 2; };", "WL1001", 1, 10)]
     [InlineData("var f = x => ;", "WL1001", 1, 14)]
+    [InlineData("var s = \"\"\"\n  a\n\";", "WL1011", 1, 9)]
+    [InlineData("var s = $\"{}\";", "WL1001", 1, 12)]
+    [InlineData("var s = $\"{1:0.0}\";", "WL1001", 1, 13)]
+    [InlineData("var s = $\"{1 2}\";", "WL1001", 1, 14)]
+    [InlineData("var s = \"\"\"\n  a\n b\n  \"\"\";", "WL1012", 3, 1)]
     [InlineData("var f = async (a) => ;", "WL1001", 1, 22)]
     [InlineData("var f = (this = 1) => { };", "WL1001", 1, 15)]
     [InlineData("var f = (a, a) => { return a; };", "WL2002", 1, 13)]
@@ -478,6 +483,13 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var k = 1; var f = x => x + k; k = 2; var add = a => b => a + b; function apply(g, v) { return g(v); } writeLn([f(1), add(2)(3), apply(x => x + 1, 41)]);", "[3, 5, 42]")]
     [InlineData("var m = () => ({a: 1}); var b = x => { }; writeLn([m(), b(1)]);", "[{\"a\": 1}, null]")]
     [InlineData("var f = async x => { await delay(1); return x * 2; }; var g = async (a, b) => a + b; var h = async x => await f(x) + 1; writeLn([await f(21), await g(1, 2), await h(1)]);", "[42, 3, 3]")]
+    [InlineData("var s = \"\"\"\n    a\n      b\n    \"\"\"; writeLn(s);", "a\n  b")]
+    [InlineData("writeLn('''x \"y\" 'z' \\n''');", "x \"y\" 'z' \\n")]
+    [InlineData("var name = \"Ann\"; writeLn($\"Hi, {name}! {1 + 2}{{}} \\{x\\} [{null}]\");", "Hi, Ann! 3{} {x} []")]
+    [InlineData("class P { toString() { return \"a P\"; } } writeLn($\"{new P()}|{[1, \"a\"]}|{true}|{1.5}\");", "a P|[1, \"a\"]|true|1.5")]
+    [InlineData("var n = 2; writeLn($$\"\"\"\n  { \"n\": {{n}}, \"s\": \"{{\"x\" + n.toString()}}\" }\n  \"\"\");", "{ \"n\": 2, \"s\": \"x2\" }")]
+    [InlineData("writeLn([$\"{$\"[{1}]\"}\", $\"\", $\"a\", $\"{\"b\"}\"]);", "[\"[1]\", \"\", \"a\", \"b\"]")]
+    [InlineData("var Text = 5; writeLn($\"{Text}\");", "5")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));

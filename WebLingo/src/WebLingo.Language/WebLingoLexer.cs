@@ -12,8 +12,14 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
 {
     private const string LargestInteger = "9223372036854775807";
 
+    /// <summary>How deep interpolations may nest, an interpolation's code holding an interpolated string (WL1008).</summary>
+    public const int MaxInterpolationDepth = 32;
+
     private readonly List<WebLingoDiagnostic> _diagnostics = [];
     private readonly string? _end;
+    private readonly bool _interpolation;
+    private readonly int _nesting;
+    private int _depth;
     private int _position;
 
     /// <summary>
@@ -26,6 +32,17 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
     {
         _position = start;
         _end = end;
+    }
+
+    /// <summary>
+    /// A lexer of an interpolation's code, from <paramref name="start"/>, which ends at a <c>}</c>, or a <c>:</c>, outside
+    /// its own brackets, giving its <see cref="WebLingoTokenKind.EndOfFile"/> there, empty.
+    /// </summary>
+    private WebLingoLexer(string source, int start, int nesting) : this(source)
+    {
+        _position = start;
+        _nesting = nesting;
+        _interpolation = true;
     }
 
     public IReadOnlyList<WebLingoDiagnostic> Diagnostics => _diagnostics;
@@ -48,6 +65,22 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
 
     public WebLingoToken NextToken()
     {
+        var token = Next();
+        if (_interpolation)
+        {
+            _depth += token.Kind switch
+            {
+                WebLingoTokenKind.OpenParen or WebLingoTokenKind.OpenBrace or WebLingoTokenKind.OpenBracket
+                    or WebLingoTokenKind.HashBrace or WebLingoTokenKind.QuestionBracket => 1,
+                WebLingoTokenKind.CloseParen or WebLingoTokenKind.CloseBrace or WebLingoTokenKind.CloseBracket => -1,
+                _ => 0
+            };
+        }
+        return token;
+    }
+
+    private WebLingoToken Next()
+    {
         SkipWhitespaceAndComments();
         var start = _position;
         if (start >= source.Length) return new WebLingoToken(WebLingoTokenKind.EndOfFile, "", new WebLingoSourceSpan(source.Length, 0));
@@ -56,9 +89,15 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
             return new WebLingoToken(WebLingoTokenKind.EndOfFile, _end, new WebLingoSourceSpan(start, _end.Length));
         }
         var c = source[start];
+        if (_interpolation && _depth == 0 && c is '}' or ':')
+        {
+            // An interpolation's code ends at its }, or at the : that begins its format.
+            return new WebLingoToken(WebLingoTokenKind.EndOfFile, "", new WebLingoSourceSpan(start, 0));
+        }
         if (IsIdentifierStart(c)) return ReadIdentifierOrKeyword(start);
         if (IsDigit(c)) return ReadNumericLiteral(start);
-        if (c is '"' or '\'') return ReadStringLiteral(start);
+        if (c is '"' or '\'') return Run(start, c) >= 3 ? ReadRawString(start, 0) : ReadStringLiteral(start);
+        if (c == '$' && Run(start, '$') is var dollars && CharAt(start + dollars) is '"' or '\'') return ReadInterpolated(start, dollars);
         var pair = (c, start + 1 < source.Length ? source[start + 1] : '\0') switch
         {
             ('=', '=') => WebLingoTokenKind.EqualEqual, ('!', '=') => WebLingoTokenKind.BangEqual,
@@ -265,30 +304,341 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
                 _position++;
                 continue;
             }
-            var escapeStart = _position;
-            _position++;
-            var next = _position < source.Length ? source[_position] : '\0';
-            var simple = next switch
-            {
-                'n' => "\n", 'r' => "\r", 't' => "\t", '0' => "\0", '\\' => "\\", '\'' => "'", '"' => "\"",
-                _ => null
-            };
-            if (simple is not null)
-            {
-                text.Append(simple);
-                _position++;
-                continue;
-            }
-            if (next == 'u' && ReadUnicodeEscape(text)) continue;
-            if (next is not ('\r' or '\n') && _position < source.Length) _position++;
-            Report(WebLingoDiagnosticCodes.InvalidEscape,
-                "This escape is not valid: use \\n, \\r, \\t, \\0, \\\\, \\', \\\" or \\u{…} with a Unicode scalar value.",
-                new WebLingoSourceSpan(escapeStart, _position - escapeStart));
-            valid = false;
+            valid &= ReadEscape(text, braces: false);
         }
         if (!valid) return Token(WebLingoTokenKind.Bad, start);
         return new WebLingoToken(WebLingoTokenKind.StringLiteral, source[start.._position], new WebLingoSourceSpan(start, _position - start),
             StringValue: text.ToString());
+    }
+
+    /// <summary>
+    /// An escape in a string, at its <c>\</c>: appended, and true; or reported (WL1009), and false. In an interpolated
+    /// string (<paramref name="braces"/>), <c>\{</c> and <c>\}</c> are braces.
+    /// </summary>
+    private bool ReadEscape(System.Text.StringBuilder text, bool braces)
+    {
+        var escapeStart = _position;
+        _position++;
+        var next = _position < source.Length ? source[_position] : '\0';
+        var simple = next switch
+        {
+            'n' => "\n", 'r' => "\r", 't' => "\t", '0' => "\0", '\\' => "\\", '\'' => "'", '"' => "\"",
+            '{' when braces => "{", '}' when braces => "}",
+            _ => null
+        };
+        if (simple is not null)
+        {
+            text.Append(simple);
+            _position++;
+            return true;
+        }
+        if (next == 'u' && ReadUnicodeEscape(text)) return true;
+        if (next is not ('\r' or '\n') && _position < source.Length) _position++;
+        Report(WebLingoDiagnosticCodes.InvalidEscape,
+            braces
+                ? "This escape is not valid: use \\n, \\r, \\t, \\0, \\\\, \\', \\\", \\{, \\} or \\u{…} with a Unicode scalar value."
+                : "This escape is not valid: use \\n, \\r, \\t, \\0, \\\\, \\', \\\" or \\u{…} with a Unicode scalar value.",
+            new WebLingoSourceSpan(escapeStart, _position - escapeStart));
+        return false;
+    }
+
+    /// <summary>
+    /// An interpolated string (section 3.5), at its <paramref name="dollars"/> <c>$</c>: <c>$"…{x}…"</c>, on one line, with an
+    /// ordinary string's escapes, a brace written <c>{{</c> or <c>\{</c>; or a multi-line one, <c>$"""…{x}…"""</c>, raw,
+    /// as many <c>$</c> as the braces that open an interpolation.
+    /// </summary>
+    private WebLingoToken ReadInterpolated(int start, int dollars)
+    {
+        var open = start + dollars;
+        var quote = source[open];
+        if (Run(open, quote) >= 3) return ReadRawString(start, dollars);
+        _position = open + 1;
+        if (dollars > 1)
+        {
+            Report(WebLingoDiagnosticCodes.MalformedString, "A single-line interpolated string takes one '$'.",
+                new WebLingoSourceSpan(start, dollars));
+        }
+        var parts = new List<WebLingoInterpolationPart>();
+        var text = new System.Text.StringBuilder();
+        var textStart = _position;
+        var lineEnd = LineEnd(_position);
+        var valid = dollars == 1;
+        while (true)
+        {
+            if (_position >= lineEnd)
+            {
+                Report(WebLingoDiagnosticCodes.UnterminatedString, $"This string has no closing {quote} on its line.",
+                    new WebLingoSourceSpan(start, _position - start));
+                return Token(WebLingoTokenKind.Bad, start);
+            }
+            var c = source[_position];
+            if (c == quote)
+            {
+                _position++;
+                break;
+            }
+            if (c is '{' or '}' && CharAt(_position + 1) == c)
+            {
+                text.Append(c);
+                _position += 2;
+            }
+            else if (c == '}')
+            {
+                Report(WebLingoDiagnosticCodes.MalformedString, "A '}' in an interpolated string is written '}}' or '\\}'.",
+                    new WebLingoSourceSpan(_position, 1));
+                _position++;
+                valid = false;
+            }
+            else if (c == '{')
+            {
+                AddText(parts, text, textStart);
+                _position++;
+                valid &= ReadInterpolation(parts, 1, lineEnd);
+                textStart = _position;
+            }
+            else if (c == '\\')
+            {
+                valid &= ReadEscape(text, braces: true);
+            }
+            else
+            {
+                text.Append(c);
+                _position++;
+            }
+        }
+        AddText(parts, text, textStart);
+        if (!valid) return Token(WebLingoTokenKind.Bad, start);
+        return new WebLingoToken(WebLingoTokenKind.InterpolatedString, source[start.._position], new WebLingoSourceSpan(start, _position - start),
+            Parts: parts);
+    }
+
+    /// <summary>
+    /// An interpolation, after its opening braces: its code, read by a lexer of its own up to its <c>}</c>, its format after
+    /// a <c>:</c>, if it has one, then its <paramref name="braces"/> closing braces, all before <paramref name="limit"/>.
+    /// </summary>
+    private bool ReadInterpolation(List<WebLingoInterpolationPart> parts, int braces, int limit)
+    {
+        var start = _position;
+        if (_nesting >= MaxInterpolationDepth)
+        {
+            Report(WebLingoDiagnosticCodes.NestingTooDeep, $"Interpolations nest too deeply here: at most {MaxInterpolationDepth}.",
+                new WebLingoSourceSpan(start, 0));
+            _position = limit;
+            return false;
+        }
+        var lexer = new WebLingoLexer(source, start, _nesting + 1);
+        var code = new List<WebLingoToken>();
+        WebLingoToken token;
+        while ((token = lexer.NextToken()).Kind != WebLingoTokenKind.EndOfFile) code.Add(token);
+        _diagnostics.AddRange(lexer.Diagnostics);
+        _position = token.Span.Start;
+        WebLingoSourceSpan? format = null;
+        if (_position < limit && source[_position] == ':')
+        {
+            var formatStart = _position;
+            while (_position < limit && source[_position] != '}') _position++;
+            format = new WebLingoSourceSpan(formatStart, _position - formatStart);
+        }
+        if (_position >= limit || Run(_position, '}') < braces)
+        {
+            Report(WebLingoDiagnosticCodes.UnterminatedString,
+                $"This interpolation has no closing '{new string('}', braces)}' on its line.", new WebLingoSourceSpan(start - braces, braces));
+            _position = Math.Min(Math.Max(_position, start), limit);
+            return false;
+        }
+        parts.Add(new WebLingoInterpolationPart(null, code, new WebLingoSourceSpan(start, _position - start)) { Format = format });
+        _position += braces;
+        return true;
+    }
+
+    /// <summary>
+    /// A raw string (section 3.5), at its <paramref name="dollars"/> <c>$</c>, or its quotes when it has none: three or more
+    /// double or single quotes, and the same again to close it, with no escapes. On one line, <c>"""a "b" c"""</c>; or over
+    /// several, its opening alone at the end of its line and its closing first on its own, each line then without the
+    /// closing delimiter's indentation, its lines' breaks LF, and neither the break after its opening nor the one before
+    /// its closing its own.
+    /// </summary>
+    private WebLingoToken ReadRawString(int start, int dollars)
+    {
+        var open = start + dollars;
+        var quote = source[open];
+        var count = Run(open, quote);
+        var delimiter = new string(quote, count);
+        var contentStart = open + count;
+        var lineEnd = LineEnd(contentStart);
+        var segments = new List<(int Start, int End)>();
+        var valid = true;
+        if (!IsBlank(contentStart, lineEnd))
+        {
+            var close = contentStart;
+            while (close < lineEnd && !(source[close] == quote && Run(close, quote) >= count)) close++;
+            if (close >= lineEnd)
+            {
+                Report(WebLingoDiagnosticCodes.UnterminatedString, $"This string has no closing {delimiter} on its line.",
+                    new WebLingoSourceSpan(start, lineEnd - start));
+                _position = lineEnd;
+                return Token(WebLingoTokenKind.Bad, start);
+            }
+            valid &= CheckClose(close, quote, count);
+            segments.Add((contentStart, close));
+            _position = close + Run(close, quote);
+            return Finish(start, dollars, segments, valid);
+        }
+        var lines = new List<(int Start, int End)>();
+        var closeAt = -1;
+        var lineStart = NextLine(lineEnd);
+        while (lineStart >= 0)
+        {
+            var end = LineEnd(lineStart);
+            var first = lineStart;
+            while (first < end && source[first] is ' ' or '\t') first++;
+            if (first < end && source[first] == quote && Run(first, quote) >= count)
+            {
+                closeAt = first;
+                break;
+            }
+            lines.Add((lineStart, end));
+            lineStart = NextLine(end);
+        }
+        if (closeAt < 0)
+        {
+            Report(WebLingoDiagnosticCodes.UnterminatedMultiLineString, $"This multi-line string has no closing {delimiter}.",
+                new WebLingoSourceSpan(start, contentStart - start));
+            _position = source.Length;
+            return Token(WebLingoTokenKind.Bad, start);
+        }
+        valid &= CheckClose(closeAt, quote, count);
+        var indentStart = LineStart(closeAt);
+        var indent = source.AsSpan(indentStart, closeAt - indentStart);
+        foreach (var (lineFrom, lineTo) in lines)
+        {
+            if (IsBlank(lineFrom, lineTo))
+            {
+                segments.Add((lineTo, lineTo));
+            }
+            else if (lineTo - lineFrom >= indent.Length && source.AsSpan(lineFrom, indent.Length).SequenceEqual(indent))
+            {
+                segments.Add((lineFrom + indent.Length, lineTo));
+            }
+            else
+            {
+                Report(WebLingoDiagnosticCodes.MalformedString,
+                    "This line of a multi-line string does not begin with its closing delimiter's indentation.",
+                    new WebLingoSourceSpan(lineFrom, 0));
+                segments.Add((lineFrom, lineTo));
+                valid = false;
+            }
+        }
+        _position = closeAt + Run(closeAt, quote);
+        return Finish(start, dollars, segments, valid);
+    }
+
+    /// <summary>A raw string's closing quotes, as many as its opening's, not more (WL1012).</summary>
+    private bool CheckClose(int close, char quote, int count)
+    {
+        if (Run(close, quote) == count) return true;
+        Report(WebLingoDiagnosticCodes.MalformedString, $"This string closes with more quotes than its {count} open it.",
+            new WebLingoSourceSpan(close, Run(close, quote)));
+        return false;
+    }
+
+    /// <summary>
+    /// A raw string's token, from its lines' text, joined by LF: a string literal; or, with <paramref name="dollars"/>, an
+    /// interpolated string, a run of that many <c>{</c> opening an interpolation, which as many <c>}</c> close, and a
+    /// shorter run of either brace being text.
+    /// </summary>
+    private WebLingoToken Finish(int start, int dollars, List<(int Start, int End)> segments, bool valid)
+    {
+        var end = _position;
+        var text = new System.Text.StringBuilder();
+        var parts = new List<WebLingoInterpolationPart>();
+        for (var s = 0; s < segments.Count; s++)
+        {
+            if (s > 0) text.Append('\n');
+            var (from, to) = segments[s];
+            var textStart = from;
+            for (_position = from; _position < to;)
+            {
+                var c = source[_position];
+                var run = c is '{' or '}' && dollars > 0 ? Math.Min(Run(_position, c), to - _position) : 0;
+                if (dollars == 0 || run < dollars)
+                {
+                    text.Append(c);
+                    _position++;
+                }
+                else if (c == '}' || run >= 2 * dollars)
+                {
+                    Report(WebLingoDiagnosticCodes.MalformedString,
+                        c == '}'
+                            ? $"A run of {run} '}}' stands outside an interpolation, which {dollars} '$' close with {dollars}."
+                            : $"A run of {run} '{{' is more than {2 * dollars - 1}, which {dollars} '$' allow.",
+                        new WebLingoSourceSpan(_position, run));
+                    _position += run;
+                    valid = false;
+                }
+                else
+                {
+                    text.Append(c, run - dollars);
+                    AddText(parts, text, textStart);
+                    _position += run;
+                    valid &= ReadInterpolation(parts, dollars, to);
+                    textStart = _position;
+                }
+            }
+        }
+        _position = end;
+        if (!valid) return Token(WebLingoTokenKind.Bad, start);
+        var span = new WebLingoSourceSpan(start, end - start);
+        if (dollars == 0) return new WebLingoToken(WebLingoTokenKind.StringLiteral, source[start..end], span, StringValue: text.ToString());
+        AddText(parts, text, end);
+        return new WebLingoToken(WebLingoTokenKind.InterpolatedString, source[start..end], span, Parts: parts);
+    }
+
+    /// <summary>The text gathered so far, as a part, if there is any.</summary>
+    private static void AddText(List<WebLingoInterpolationPart> parts, System.Text.StringBuilder text, int start)
+    {
+        if (text.Length == 0) return;
+        parts.Add(new WebLingoInterpolationPart(text.ToString(), null, new WebLingoSourceSpan(start, 0)));
+        text.Clear();
+    }
+
+    /// <summary>How many of <paramref name="c"/> stand in a row from <paramref name="at"/>.</summary>
+    private int Run(int at, char c)
+    {
+        var end = at;
+        while (end < source.Length && source[end] == c) end++;
+        return end - at;
+    }
+
+    private char CharAt(int at) => at < source.Length ? source[at] : '\0';
+
+    /// <summary>Where the line holding <paramref name="at"/> ends, at its break or at the end of the text.</summary>
+    private int LineEnd(int at)
+    {
+        while (at < source.Length && source[at] is not ('\r' or '\n')) at++;
+        return at;
+    }
+
+    private int LineStart(int at)
+    {
+        while (at > 0 && source[at - 1] is not ('\r' or '\n')) at--;
+        return at;
+    }
+
+    /// <summary>Where the line after the break at <paramref name="lineEnd"/> begins (CR LF, LF or CR), or -1 at the end.</summary>
+    private int NextLine(int lineEnd)
+    {
+        if (lineEnd >= source.Length) return -1;
+        return source[lineEnd] == '\r' && CharAt(lineEnd + 1) == '\n' ? lineEnd + 2 : lineEnd + 1;
+    }
+
+    private bool IsBlank(int from, int to)
+    {
+        for (var i = from; i < to; i++)
+        {
+            if (source[i] is not (' ' or '\t')) return false;
+        }
+        return true;
     }
 
     /// <summary>
