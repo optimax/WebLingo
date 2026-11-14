@@ -20,9 +20,11 @@
 
 2026-11-14: designed (specification, section 3.7, "Classes of values"); split into the parts the specification defines in section 9 (part 5 of "Extending the classes of values"), each a task below. Waits for them.
 
-## Extending the Classes of Values: `Class`, Making Classes
+## [WORKING] Extending the Classes of Values: `Class`, Making Classes
 
 `new Class("Point")`, `new Class("Point", Shape)` and `new Class()`; functions with a receiver, `function (this, a) { … }`; and `Point.addMethod(name, f)`, a constructor included (specification, section 3.7, and part 5.1 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
+
+Done (Claude, 2026-11-14): on both VMs, with conformance tests; the choices the design leaves open are recorded as Proposed in the specification, section 15.2 ("Classes made while the program runs"), among them that a field holding a function with a receiver runs it on its first argument, not on the field's instance, as a field's function is called as any function is, and that `addMethod` takes a name only, so that no program names a property's accessor or an operator with it. Checks: the Release build, without warnings, the 1,653 tests, the benchmark against `main`'s, and the CLI on the samples, on Windows only; Linux not tried.
 
 ## [IDLE] Extending the Classes of Values: `Class`, Names
 
@@ -42,21 +44,23 @@
 
 2026-11-14: waits for "Extending the Classes of Values: `Class`, Names", whose `className` a metaclass's methods read.
 
-## [QUESTION] Building Classes at Run Time, Continued
+## Building Classes at Run Time, Continued
 
 The follow-ups of "Building Classes at Run Time" (specification, section 3.7, "Classes of values"). One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-14.
 
 **Q1, replacing a declared class's static method (A6): (a) by assignment, `Point.origin = f;`, which then replaces a static method as it declares a new static member, assigning one being WL3001 no longer; (b) by a method of every class, `Point.setStaticMethod("origin", f)`, assignment staying WL3001.**
 
-A1:
+A1: (a)
 
 **Q2, replacing a property or a constant (A7, A8: "a setter"): (a) its `add…` method again, `addProperty`, `addStaticProperty` or `addConstant` given a name the class has replacing that member, as `addMethod` replaces a method (A3); (b) `set…` methods of their own, `setProperty`, `setStaticProperty` and `setConstant`, an `add…` given a name the class has being WL3001.**
 
-A2:
+A2: So, instead of add____ and set____, have just set____ with the semantics that it adds the first time, and replaces subsequently.
 
 **Q3, a program's own members named `className`, `instanceOf` or `parent` (a tree's `this.parent = node;` is common): (a) the program's own come first, a static member `className` or `parent` of a class, or a field or method `instanceOf` of an instance, hiding the built-in one there; (b) the built-in ones are reserved: declaring a static member `className` or `parent` is WL2002, and assigning a field `instanceOf` WL3001.**
 
-A3:
+A3: Ugly, but effective: use `__className`, `__instanceOf`, and `__parent`.
+
+ASIDE: 
 
 ## Task Combinators
 
@@ -261,7 +265,7 @@ If text that rebuilds a value (round-trip text) is wanted, it is a serialization
 
 It is deferred: nothing needs it yet, and it can be added later, if it proves necessary, without changing `write`'s text or any program.
 
-## [QUESTION] Native Code Extensions
+## Native Code Extensions
 
 Make it possible to install and bind native (C# on CLR, later Native C#) code as (external) modules extending the library available to scripts (like Python does for C).
 
@@ -269,27 +273,27 @@ The design needs the owner's decisions first, and the module system ("Modules"; 
 
 **Q1, what a native module is, on .NET: (a) an assembly (a DLL) with a class implementing an interface of WebLingo's (`IWebLingoNativeModule`), whose functions and classes become the module's exports; (b) C# source, which the host compiles when it installs it.**
 
-A1:
+A1: (a) but let's discuss this in detail.
 
 **Q2, importing one: (a) a scheme of its own, `import db from "native:sqlite";`, as `std:` names the standard modules; (b) the standard modules' scheme, `std:sqlite`, so that a standard module and an installed one look alike; (c) a path to the assembly.**
 
-A2:
+A2: (c), and (a) when the compiler is configured to understand the scheme as pointing to a particular folder, so `native:sqlite` resolves to `sqlite` module in the folder user-configured as `native`. Otherwise, explicit path to the asembly (relative or absolute) should work.
 
 **Q3, where they are found: (a) installed into a folder the host is configured with (`weblingo.json`, or the CLI's own), and loaded when first imported; (b) beside the script that imports them.**
 
-A3:
+A3: As in A2, multiple folders can be configured, each as a separate scheme. Native  executable modules and scripts (text) should not in general be mixed.
 
 **Q4, trust: native code runs with the host's own rights, past WebLingo's capabilities (section 7.13): (a) only a module an application's capability policy names may be loaded, never one a script asks for alone; (b) any installed module, by any script.**
 
-A4:
+A4: (b). Installed modules are like built-ins and trusted. What should be prevented, is script downloading a native module which is then executed.
 
 **Q5, its contract: a native function takes and gives WebLingo's values (`WebLingoValue`) through the runtime's API, may make classes and instances, and may give a task for asynchronous work, on WebLingo's operation model (WS-P007), never on .NET's `Task` in the core; and under Native C#, the same module's source is compiled by that toolchain, the contract unchanged (WL-017). Agreed?**
 
-A5:
+A5: Yes. In fact, standard modules should follow the same model: they are pre-installed external native extensions that can - for example - be swapped by an alternative implementation. Everything should follow the same packaging model, without priviledged code. Runtime treats every native library/moodule the same.
 
 **Q6, C libraries, as Python's `ctypes` reaches them: (a) not directly: a native module reaches them, through P/Invoke, adapter-only (section 7.14); (b) a foreign-function interface for scripts too, later.**
 
-A6:
+A6: (b), API TBD.
 
 ## Arrow Notation
 

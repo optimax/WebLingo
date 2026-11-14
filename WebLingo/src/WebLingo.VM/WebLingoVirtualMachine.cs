@@ -425,7 +425,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             // Register B must hold a function taking D arguments; the compiler checks what it can, and
                             // the call, after this switch, the rest (WL2005, WL2006).
                             callee = registers[ins.B];
-                            self = WebLingoValue.Null;
+                            self = WebLingoValue.Missing; // No receiver: a function with one takes it as its first argument.
                             arguments = registers;
                             firstArgument = ins.C;
                             argumentCount = ins.D;
@@ -463,7 +463,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             {
                                 // A collection of a class extending Array, Map or Set: its field's function, or its class's
                                 // method, before its own members (section 3.7).
-                                self = collectionMethod ? target : WebLingoValue.Null;
+                                self = collectionMethod ? target : WebLingoValue.Missing;
                                 arguments = registers;
                                 firstArgument = ins.C + 1;
                                 argumentCount = ins.D;
@@ -474,20 +474,24 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             if (target.Kind is WebLingoValueKind.Class or WebLingoValueKind.Module)
                             {
                                 // A static member, called as any function is (section 3.7).
-                                if (!WebLingoMembers.TryGetStaticCallee(target, name.Member, name.Text, heap, out callee, out error)) break;
-                                self = WebLingoValue.Null;
-                                arguments = registers;
-                                firstArgument = ins.C + 1;
-                                argumentCount = ins.D;
-                                resultRegister = ins.A;
-                                constructed = WebLingoValue.Null;
-                                goto call;
+                                if (WebLingoMembers.TryGetStaticCallee(target, name.Member, name.Text, heap, out callee, out error))
+                                {
+                                    self = WebLingoValue.Missing;
+                                    arguments = registers;
+                                    firstArgument = ins.C + 1;
+                                    argumentCount = ins.D;
+                                    resultRegister = ins.A;
+                                    constructed = WebLingoValue.Null;
+                                    goto call;
+                                }
+                                // Else the class's built-in addMethod, below, which a static member of its name hides.
+                                if (!WebLingoMembers.IsClassMethod(target, name.Member)) break;
                             }
                             if (target.Kind == WebLingoValueKind.Instance)
                             {
                                 // A field's function is called as any function is; a method runs on the instance.
                                 if (!WebLingoMembers.TryFindCallee(target, name.Text, heap, out callee, out var isMethod, out error)) break;
-                                self = isMethod ? target : WebLingoValue.Null;
+                                self = isMethod ? target : WebLingoValue.Missing;
                                 arguments = registers;
                                 firstArgument = ins.C + 1;
                                 argumentCount = ins.D;
@@ -808,7 +812,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     {
                         var (index, closureCells) = heap.GetClosure(callee);
                         var function = module.Functions[index];
-                        var withThis = function.HasThis ? 1 : 0;
+                        var withThis = function.HasThis && self.Kind != WebLingoValueKind.Missing ? 1 : 0; // A receiver, if the call has one.
                         if (function.ParameterCount != argumentCount + withThis
                             && (argumentCount + withThis > function.ParameterCount
                                 || argumentCount + withThis < function.ParameterCount - function.OptionalCount))
@@ -1707,6 +1711,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 else if (i == (int)WebLingoValueClass.Number) heap.MarkValueClass(made, WebLingoValueKind.Binary64);
                 else if (i == (int)WebLingoValueClass.String) heap.MarkValueClass(made, WebLingoValueKind.String);
                 else if (i == (int)WebLingoValueClass.Function) heap.MarkValueClass(made, WebLingoValueKind.Function);
+                else if (i == (int)WebLingoValueClass.Class) heap.MarkClassClass(made);
                 else heap.SealClass(made);
             }
             for (var i = 0; i < module.ErrorClasses.Count; i++)

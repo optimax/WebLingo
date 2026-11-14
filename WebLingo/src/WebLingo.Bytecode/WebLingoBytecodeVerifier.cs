@@ -248,7 +248,6 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                     return closureError;
                 }
                 if (module.Functions[b] is not { Captures: { } captures }) return $"function {b} is missing.";
-                if (module.Functions[b].HasThis) return $"function {b} is a method, which only its class makes.";
                 foreach (var capture in captures)
                 {
                     var error = capture.FromLocal

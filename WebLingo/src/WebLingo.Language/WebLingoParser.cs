@@ -624,17 +624,27 @@ public sealed class WebLingoParser : IWebLingoParser
     {
         Advance();
         var name = Advance();
-        var (parameters, body) = ParseFunctionRest();
+        var (parameters, body) = ParseFunctionRest(receiver: true);
         return new WebLingoFunctionDeclarationSyntax(name.Text, name.Span, parameters, body, SpanFrom(start)) { IsAsync = isAsync };
     }
 
     /// <summary>A function's parameters and body, after <c>function</c> and its name, if it has one.</summary>
-    private (IReadOnlyList<WebLingoParameterSyntax> Parameters, WebLingoBlockSyntax Body) ParseFunctionRest()
+    /// <remarks>
+    /// A function that is not a method may take a receiver, <c>this</c> as its first parameter, without a default
+    /// (<paramref name="receiver"/>; section 3.7).
+    /// </remarks>
+    private (IReadOnlyList<WebLingoParameterSyntax> Parameters, WebLingoBlockSyntax Body) ParseFunctionRest(bool receiver = false)
     {
         _statementHasError = false;
         var parameters = new List<WebLingoParameterSyntax>();
         Expect(WebLingoTokenKind.OpenParen, "'('");
-        if (Current.Kind != WebLingoTokenKind.CloseParen)
+        if (receiver && Current.Kind == WebLingoTokenKind.This)
+        {
+            parameters.Add(new WebLingoParameterSyntax("this", Advance().Span));
+            if (Current.Kind == WebLingoTokenKind.Equals) ReportUnexpected("',' or ')': a receiver has no default value");
+            else if (Current.Kind == WebLingoTokenKind.Comma) Advance();
+        }
+        if (Current.Kind != WebLingoTokenKind.CloseParen && !_statementHasError)
         {
             var optional = false;
             while (true)
@@ -997,7 +1007,7 @@ public sealed class WebLingoParser : IWebLingoParser
                 if (!EnterRecursion()) return new WebLingoErrorExpressionSyntax(token.Span);
                 try
                 {
-                    var (parameters, body) = ParseFunctionRest();
+                    var (parameters, body) = ParseFunctionRest(receiver: true);
                     return new WebLingoFunctionExpressionSyntax(parameters, body, SpanFrom(token.Span.Start)) { IsAsync = isAsync };
                 }
                 finally

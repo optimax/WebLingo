@@ -236,6 +236,7 @@ public sealed class WebLingoHeap
     {
         // The result may go where the argument is, so the argument is read before the result is written.
         var classObject = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        if (classObject.MakesClasses) return TryNewClass(values, first, count, out result, out error);
         if (count == 1) return TryOfKind(classObject.Holds, classObject.Name, Held(values[first]), out result, out error);
         result = WebLingoValue.Null;
         if (count > 1)
@@ -579,7 +580,7 @@ public sealed class WebLingoHeap
     /// <summary>The class a class extends, or <c>null</c>.</summary>
     public WebLingoValue ClassBase(WebLingoValue value) => Get<ClassObject>(value, WebLingoValueKind.Class).Base;
 
-    public string ClassName(WebLingoValue value) => Get<ClassObject>(value, WebLingoValueKind.Class).Name;
+    public string ClassName(WebLingoValue value) => Get<ClassObject>(value, WebLingoValueKind.Class).Name is { Length: > 0 } name ? name : "class";
 
     /// <summary>A class's constructor's closure, or <c>null</c> if it has none.</summary>
     public WebLingoValue ClassConstructor(WebLingoValue value) => Get<ClassObject>(value, WebLingoValueKind.Class).Constructor;
@@ -620,6 +621,74 @@ public sealed class WebLingoHeap
         if (target.Setters is { } setters && setters.TryGetValue(name, out setter)) return Assignee.Setter;
         return target.Getters is { } getters && getters.ContainsKey(name) ? Assignee.ReadOnly : Assignee.Field;
     }
+
+    /// <summary>
+    /// Marks the built-in class <c>Class</c>, whose <c>new</c> makes a class (<see cref="TryNewClass"/>), not an
+    /// instance; no class may extend it yet (section 3.7).
+    /// </summary>
+    public void MarkClassClass(WebLingoValue classValue)
+    {
+        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        target.Sealed = true;
+        target.IsValueClass = true;
+        target.MakesClasses = true;
+    }
+
+    /// <summary>
+    /// <c>new Class(name, base)</c>: a class made while the program runs, named by a string, or unnamed for none, and
+    /// extending <c>Object</c>, or the class given (section 3.7). It has no methods, nor a constructor of its own, until
+    /// <see cref="TryAddMethod"/> gives it some.
+    /// </summary>
+    private bool TryNewClass(WebLingoValue[] values, int first, int count, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        // Its arguments are read before its result is written, which may go where they are.
+        var name = count > 0 ? values[first] : WebLingoValue.Null;
+        var baseClass = count > 1 ? values[first + 1] : WebLingoValue.Null;
+        result = WebLingoValue.Null;
+        if (count > 2)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.WrongArgumentCount, $"'Class' takes 0 to 2 arguments, not {count}.");
+            return false;
+        }
+        if (name.Kind is not (WebLingoValueKind.Null or WebLingoValueKind.String))
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"A class's name is a string, not {WebLingoValueFormatter.Describe(name, this)}.");
+            return false;
+        }
+        var text = name.Kind == WebLingoValueKind.String ? GetString(name) : "";
+        if (baseClass.Kind == WebLingoValueKind.Null) baseClass = ObjectClass;
+        return TryAllocateClass(text, WebLingoValue.Null, new Dictionary<string, WebLingoValue>(StringComparer.Ordinal), baseClass, out result,
+            out error, defaultConstructor: true);
+    }
+
+    /// <summary>
+    /// <c>Point.addMethod(name, f)</c>: a class's method, which its instances, and its subclasses', made before or after,
+    /// then have, replacing one of that name as an extension's does; <c>constructor</c> its constructor, and
+    /// <c>destructor</c> its <c>dispose</c> (section 3.7).
+    /// </summary>
+    public bool TryAddMethod(WebLingoValue classValue, string name, WebLingoValue method, out WebLingoRuntimeError? error)
+    {
+        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        error = null;
+        if (name == "constructor")
+        {
+            target.Constructor = method;
+            target.DefaultConstructor = false;
+            return true;
+        }
+        var before = Size(target);
+        target.OwnMethods[name == "destructor" ? "dispose" : name] = method;
+        _classVersion++;
+        Extended = true;
+        var grown = Size(target) - before;
+        if (!TryReserve(grown, out error)) return false;
+        Units += grown;
+        return true;
+    }
+
+    /// <summary>Whether a class has a name; one <c>new Class()</c> made has none (section 3.7).</summary>
+    public bool IsNamed(WebLingoValue classValue) => Get<ClassObject>(classValue, WebLingoValueKind.Class).Name.Length > 0;
 
     /// <summary>A method's closure, by its name, from a class.</summary>
     public bool TryGetMethod(WebLingoValue value, string name, out WebLingoValue closure) =>
@@ -1014,6 +1083,8 @@ public sealed class WebLingoHeap
     /// </summary>
     private sealed record ClassObject(string Name, WebLingoValue Constructor, Dictionary<string, WebLingoValue> Methods)
     {
+        /// <summary>Its constructor's closure, which <c>addMethod("constructor", f)</c> may give it while the program runs.</summary>
+        public WebLingoValue Constructor { get; set; } = Constructor;
         public WebLingoValue Base { get; init; }
         public Dictionary<string, WebLingoValue> OwnMethods { get; init; } = new(StringComparer.Ordinal);
         public int Version { get; set; }
@@ -1027,8 +1098,13 @@ public sealed class WebLingoHeap
         public WebLingoValueKind Holds { get; set; } = WebLingoValueKind.Null;
         /// <summary>Whether it is Boolean, Integer, Number or String itself, whose <c>new</c> makes a plain value.</summary>
         public bool IsValueClass { get; set; }
-        /// <summary>Whether its constructor is the one a class declaring none gets, which only runs its base's.</summary>
-        public bool DefaultConstructor { get; init; }
+        /// <summary>
+        /// Whether its constructor is the one a class declaring none gets, which only runs its base's, or, for a class made
+        /// while the program runs, none yet.
+        /// </summary>
+        public bool DefaultConstructor { get; set; }
+        /// <summary>Whether it is <c>Class</c>, whose <c>new</c> makes a class (section 3.7).</summary>
+        public bool MakesClasses { get; set; }
         /// <summary>Its properties' getters and setters, its own and its bases', by the property's name; null for none (section 3.7).</summary>
         public Dictionary<string, WebLingoValue>? Getters { get; set; }
         public Dictionary<string, WebLingoValue>? Setters { get; set; }

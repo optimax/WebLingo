@@ -203,7 +203,6 @@ public sealed class WebLingoStackBytecodeVerifier
             {
                 if ((Index(a, module.Functions.Count, "function") ?? Unused(b)) is { } closureError) return closureError;
                 if (module.Functions[a] is not { Captures: { } captures }) return $"function {a} is missing.";
-                if (module.Functions[a].HasThis) return $"function {a} is a method, which only its class makes.";
                 foreach (var capture in captures)
                 {
                     var error = capture.FromLocal

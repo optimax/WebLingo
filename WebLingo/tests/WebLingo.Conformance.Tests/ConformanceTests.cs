@@ -126,6 +126,11 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class A { a() { return 1; } property a { get { return 1; } } }", "WL2002", 1, 38)]
     [InlineData("class A { static var a = 1; static property a { get { return 1; } } }", "WL2002", 1, 45)]
     [InlineData("extend Integer { static property a { get { return field; } } }", "WL2001", 1, 51)]
+    [InlineData("function f(a, this) { }", "WL1001", 1, 15)]
+    [InlineData("class A { m(this) { } }", "WL1001", 1, 13)]
+    [InlineData("function f(this = 1) { }", "WL1001", 1, 17)]
+    [InlineData("class B { m() { return 1; } } class A extends B { m() { var f = function (this) { return super.m(); }; return f(this); } }", "WL2009", 1, 90)]
+    [InlineData("function f(this, a) { return a; } f(1);", "WL2006", 1, 35)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -411,6 +416,16 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class Celsius extends Number { property kelvin { get { return this + 273.0; } } } writeLn(new Celsius(1.5).kelvin);", "Celsius:274.5")]
     [InlineData("var field = 9; class F { property a { get { return field; } set(value) { var field = value; } } } var f = new F(); f.a = 1; writeLn([f.a, field]);", "[null, 9]")]
     [InlineData("class A { property() { return 1; } } var property = 2; writeLn([new A().property(), property]);", "[1, 2]")]
+    [InlineData("function describe(this, prefix) { return prefix + this.x.toString(); } class P { constructor() { this.x = 3; } } var f = function (this, n) { return this.x + n; }; var p = new P(); writeLn([describe(p, \"x = \"), f(p, 1)]);", "[\"x = 3\", 4]")]
+    [InlineData("var Point = new Class(\"Point\"); Point.addMethod(\"constructor\", function (this, x, y) { this.x = x; this.y = y; }); Point.addMethod(\"describe\", function (this, prefix) { return prefix + this.x.toString() + \", \" + this.y.toString(); }); var p = new Point(3, 4); var d = p.describe; writeLn([p.describe(\"p = \"), d(\"d = \"), p, Point, p is Point, p is Object]);", "[\"p = 3, 4\", \"d = 3, 4\", Point {x: 3, y: 4}, class Point, true, true]")]
+    [InlineData("var Point = new Class(\"Point\"); Point.addMethod(\"constructor\", function (this, x, y) { this.x = x; this.y = y; }); Point.addMethod(\"describe\", function (this, prefix) { return prefix + this.x.toString() + \", \" + this.y.toString(); }); var p = new Point(3, 4); var Line = new Class(\"Line\", Point); var l = new Line(1, 2); Point.addMethod(\"describe\", function (this, prefix) { return prefix + \"replaced\"; }); writeLn([p.describe(\"p: \"), l.describe(\"l: \"), l is Point, l]);", "[\"p: replaced\", \"l: replaced\", true, Line {x: 1, y: 2}]")]
+    [InlineData("var C = new Class(); var c = new C(); c.x = 1; var N = new Class(null, C); writeLn([C, c, new N() is C]);", "[class, class {x: 1}, true]")]
+    [InlineData("var Point = new Class(\"Point\"); Point.addMethod(\"constructor\", function (this, x, y) { this.x = x; this.y = y; }); Point.addMethod(\"describe\", function (this, prefix) { return prefix + this.x.toString() + \", \" + this.y.toString(); }); Point.origin = function () { return new Point(0, 0); }; Point.count = 0; Point.count = Point.count + 1; writeLn([Point.origin(), Point.count]);", "[Point {x: 0, y: 0}, 1]")]
+    [InlineData("var Base = new Class(\"Base\"); Base.addMethod(\"hi\", function (this) { return \"hi \" + this.toString(); }); function make() { class D extends Base { constructor() { this.n = 1; } } return new D(); } writeLn(make().hi());", "hi D {n: 1}")]
+    [InlineData("var Base = new Class(\"Base\"); function make() { class D extends Base {} return new D(); } writeLn(make());", "D {}")]
+    [InlineData("class P { constructor() { this.x = 2; } } var f = function (this, n) { return this.x * n; }; var p = new P(); var q = new P(); q.x = 5; p.g = f; writeLn(p.g(q, 3));", "15")]
+    [InlineData("var R = new Class(\"R\"); var log = []; R.addMethod(\"destructor\", function (this) { log.push(\"disposed\"); }); using (var r = new R()) { log.push(\"used\"); } writeLn(log);", "[\"used\", \"disposed\"]")]
+    [InlineData("extend Integer { describe(prefix) { return prefix + this.toString(); } } Integer.addMethod(\"twice\", function (this) { return this * 2; }); writeLn([4.twice(), 4.describe(\"n = \")]);", "[8, \"n = 4\"]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -571,6 +586,15 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class S { static property a { get { return 1; } } } S.a = 2;", "WL3001")]
     [InlineData("class S { static property a { get { return 1; } } } S.a();", "WL3001")]
     [InlineData("class S { static property a { set(v) { } } } writeLn(S.a);", "WL3006")]
+    [InlineData("new Class(5);", "WL3001")]
+    [InlineData("new Class(\"A\", 5);", "WL3001")]
+    [InlineData("new Class(\"A\", Object, 1);", "WL2006")]
+    [InlineData("var C = new Class(\"C\"); C.addMethod(\"x y\", function (this) {});", "WL3001")]
+    [InlineData("var C = new Class(\"C\"); C.addMethod(\"m\", 5);", "WL3001")]
+    [InlineData("var C = new Class(\"C\"); C.addMethod(\"m\");", "WL2006")]
+    [InlineData("var C = new Class(\"C\"); var m = C.addMethod;", "WL3001")]
+    [InlineData("var C = new Class(\"C\"); new C(1);", "WL2006")]
+    [InlineData("var f = function (this, a) { return a; }; f(1, 2, 3);", "WL2006")]
     public void MembersAndIndexesAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

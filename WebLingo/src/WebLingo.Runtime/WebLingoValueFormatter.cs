@@ -22,7 +22,7 @@ public static class WebLingoValueFormatter
             WebLingoValueKind.String => heap.GetString(value),
             WebLingoValueKind.Instance when heap.IsHolding(value) => Held(value, heap),
             WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Instance => FormatCollection(value, heap),
-            WebLingoValueKind.Class => "class " + heap.ClassName(value),
+            WebLingoValueKind.Class => heap.IsNamed(value) ? "class " + heap.ClassName(value) : "class",
             WebLingoValueKind.Module => "module " + heap.ModuleName(value),
             _ => Format(value)
         };
@@ -70,7 +70,7 @@ public static class WebLingoValueFormatter
     public static string Describe(WebLingoValue value, WebLingoHeap heap) => value.Kind switch
     {
         WebLingoValueKind.Instance => $"an instance of {heap.ClassName(heap.ClassOf(value))}",
-        WebLingoValueKind.Class => $"the class {heap.ClassName(value)}",
+        WebLingoValueKind.Class => heap.IsNamed(value) ? $"the class {heap.ClassName(value)}" : "an unnamed class",
         WebLingoValueKind.Module => $"the module {heap.ModuleName(value)}",
         _ => Describe(value)
     };

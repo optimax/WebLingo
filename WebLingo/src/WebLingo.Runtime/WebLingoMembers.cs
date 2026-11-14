@@ -6,7 +6,7 @@ namespace WebLingo.Runtime;
 /// once, when it loads a module, so that it does not compare names as it runs; a name that is no member of any value
 /// is <see cref="Unknown"/>, and is kept for the message of its error.
 /// </summary>
-public enum WebLingoMember : byte { Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget }
+public enum WebLingoMember : byte { Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, AddMethod }
 
 /// <summary>A member's name as a module's constant gives it, and the member it names.</summary>
 public readonly record struct WebLingoMemberName(WebLingoMember Member, string Text);
@@ -31,6 +31,7 @@ public static class WebLingoMembers
         "toString" => WebLingoMember.ToString,
         "equal" => WebLingoMember.Equal,
         "forget" => WebLingoMember.Forget,
+        "addMethod" => WebLingoMember.AddMethod,
         _ => WebLingoMember.Unknown
     };
 
@@ -134,6 +135,12 @@ public static class WebLingoMembers
             if (TryGetValueMethod(target, member, name, heap, out var objectToString))
             {
                 return heap.TryAllocateBoundMethod(target, objectToString, out result, out error);
+            }
+            if (IsClassMethod(target, member))
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"'{name}' is a method of {WebLingoValueFormatter.Describe(target, heap)}, and can only be called.");
+                return false;
             }
             if (optional) return true;
             error = NoSuchMember(target, name, heap);
@@ -290,6 +297,8 @@ public static class WebLingoMembers
         if (name == "constructor")
         {
             closure = heap.ConstructorFor(baseClass);
+            // A base made while the program runs, and given no constructor, nor its bases, takes none, as Object's does.
+            if (closure.Kind == WebLingoValueKind.Null) closure = heap.ConstructorFor(heap.ObjectClass);
             if (closure.Kind == WebLingoValueKind.Null) throw new InvalidOperationException("The base class has no constructor.");
         }
         else if (!heap.TryGetMethod(baseClass, name, out closure))
@@ -488,11 +497,30 @@ public static class WebLingoMembers
     };
 
     /// <summary>Whether the member is a method of the value: an array's <c>push</c> and <c>pop</c>, a map's <c>has</c> and <c>remove</c>.</summary>
+    /// <summary>Whether a string is a name, as a program writes one: ASCII letters, digits and <c>_</c>, not first a digit.</summary>
+    private static bool IsName(string text)
+    {
+        if (text.Length == 0 || char.IsAsciiDigit(text[0])) return false;
+        foreach (var c in text)
+        {
+            if (!char.IsAsciiLetterOrDigit(c) && c != '_') return false;
+        }
+        return true;
+    }
+
     private static bool IsMethod(WebLingoValue target, WebLingoMember member) =>
         (target.Kind == WebLingoValueKind.Array && member is WebLingoMember.Push or WebLingoMember.Pop)
         || (target.Kind == WebLingoValueKind.Map && member is WebLingoMember.Has or WebLingoMember.Remove)
         || (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
-        || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget);
+        || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
+        || IsClassMethod(target, member);
+
+    /// <summary>
+    /// Whether <c>x.name(…)</c> calls a class's built-in method, <c>addMethod</c>, which a class has when it has no
+    /// static member of that name (section 3.7).
+    /// </summary>
+    public static bool IsClassMethod(WebLingoValue target, WebLingoMember member) =>
+        target.Kind == WebLingoValueKind.Class && member == WebLingoMember.AddMethod;
 
     /// <summary>
     /// Calls a method, <c>x.name(…)</c>, with the <paramref name="count"/> arguments from
@@ -533,6 +561,25 @@ public static class WebLingoMembers
             if (!heap.TryRemoveFromMap(target, values[first], out var removed, out error)) return false;
             result = WebLingoValue.FromBoolean(removed);
             return true;
+        }
+        if (IsClassMethod(target, member))
+        {
+            // Point.addMethod(name, f): a method given while the program runs (section 3.7).
+            if (count != 2) return WrongArgumentCount(name, 2, count, out error);
+            var method = values[first + 1];
+            if (values[first].Kind != WebLingoValueKind.String || !IsName(heap.GetString(values[first])))
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"A method's name is a name, letters, digits and '_', not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                return false;
+            }
+            if (method.Kind != WebLingoValueKind.Function)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"A method is a function, not {WebLingoValueFormatter.Describe(method, heap)}.");
+                return false;
+            }
+            return heap.TryAddMethod(target, heap.GetString(values[first]), method, out error);
         }
         if (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
         {

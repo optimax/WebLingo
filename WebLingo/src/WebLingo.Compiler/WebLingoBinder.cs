@@ -756,6 +756,19 @@ public sealed class WebLingoBinder
     {
         var outerFunction = _function;
         var outerScope = _scope;
+        var (outerClass, outerAccessor) = (_class, _accessor);
+        // A function with a receiver, its first parameter `this`, is bound as a method is, but of no class: it has no
+        // `super`, and no property's `field` (section 3.7).
+        var receiver = parameters.Count > 0 && parameters[0].Name == "this";
+        if (receiver)
+        {
+            var rest = new List<WebLingoParameterSyntax>();
+            for (var i = 1; i < parameters.Count; i++) rest.Add(parameters[i]);
+            span = parameters[0].Span;
+            parameters = rest;
+            isMethod = true;
+            (_class, _accessor) = (null, null);
+        }
         _function = new FunctionContext(outerFunction, name) { IsAsync = isAsync };
         _scope = new Scope(outerScope, _function);
         if (isMethod) Declare("this", WebLingoDeclarationKind.Parameter, span, null);
@@ -789,6 +802,7 @@ public sealed class WebLingoBinder
         };
         _function = outerFunction;
         _scope = outerScope;
+        (_class, _accessor) = (outerClass, outerAccessor);
         return bound;
     }
 
