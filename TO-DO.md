@@ -18,7 +18,31 @@
 
 2026-11-13: waits for the design of "Building Classes at Run Time".
 
-## [QUESTION] Building Classes at Run Time
+2026-11-14: designed (specification, section 3.7, "Classes of values"); split into the parts the specification defines in section 9 (part 5 of "Extending the classes of values"), each a task below. Waits for them.
+
+## Extending the Classes of Values: `Class`, Making Classes
+
+`new Class("Point")`, `new Class("Point", Shape)` and `new Class()`; functions with a receiver, `function (this, a) { … }`; and `Point.addMethod(name, f)`, a constructor included (specification, section 3.7, and part 5.1 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
+
+## [IDLE] Extending the Classes of Values: `Class`, Names
+
+`Point.className`, `p.instanceOf` and `Point.parent` (specification, section 3.7, and part 5.2 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for Q3 of "Building Classes at Run Time, Continued", and for "Extending the Classes of Values: `Class`, Making Classes".
+
+## [IDLE] Extending the Classes of Values: `Class`, Properties and Constants
+
+`addProperty`, `addStaticProperty`, `addConstant` and `static const`, and replacing a class's static methods, properties and constants while the program runs (specification, section 3.7, and part 5.3 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for Q1 and Q2 of "Building Classes at Run Time, Continued", and for "Extending the Classes of Values: `Class`, Making Classes".
+
+## [IDLE] Extending the Classes of Values: `Class`, Metaclasses
+
+`class Entity extends Class { … }`, whose instances are classes (specification, section 3.7, and part 5.4 of "Extending the classes of values", section 9), on both VMs. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for "Extending the Classes of Values: `Class`, Names", whose `className` a metaclass's methods read.
+
+## Building Classes at Run Time
 
 `new Class()`, which a program names and gives methods while it runs, after which it acts as a declared class does (A9 of "Classes of Values, Extensions", and A5 of "Classes of Values, Extensions, Continued": design it now, with what "Adding Methods at Run Time" describes, and `extends Class`). One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-13.
 
@@ -95,19 +119,19 @@ From then on `Point` acts as a declared class does: `class Line extends Point { 
 
 **Q6, a static method: (a) `Point.addStaticMethod("origin", f)`, a static method, which cannot be assigned (WL3001), as a declared class's cannot; (b) none: `Point.origin = f;` declares a static field holding `f`, which `Point.origin()` calls, as it does now.**
 
-A6:
+A6: (b). Clarification: a declared class's static method should be replaceable, too, so somehow it needs to be assignable. `Point.setStaticMethod("origin",f)` maybe?
 
 **Q7, properties: `Point.addProperty("sum", getter, setter)`, each a function with a receiver, or `null` for none, and `Point.addStaticProperty("unit", getter, setter)`, each without one, acting as a declared class's properties do (section 3.7, "Properties"). A run-time property has no `field` of its own, `field` being a word of the `property` syntax only: it keeps its value in a field it names (`Point.unitValue` above). Agreed?**
 
-A7:
+A7: Yes, but like in A6, a setter for property is needed, too.
 
 **Q8, constants: (a) `Point.addConstant("dimensions", 2)`, a static member that cannot be assigned (WL3001), and `static const dimensions = 2;` in a declared class, which is WL1001 now; (b) none: a static property with only a getter serves.**
 
-A8:
+A8: (a), with A6 - a setter.
 
 **Q9, a class's name: `Point.name` gives a class's name, a string, or `null` for an unnamed one; assigning it names an unnamed class, once, and is WL3001 for a named one, so that a class may no longer declare a static member called `name` (WL2002). An unnamed class is written `class`, and its instances `class {x: 1}`. Agreed?**
 
-A9:
+A9: Should be perhaps `className`. It makes possible things like `Integer.className = "Double"`, but that's OK, I guess. With power comes responsibility.
 
 **Q5 again, `extends Class`, laid out: (b) would let a class make classes and give them members of their own, as a metaclass does:**
 
@@ -127,9 +151,27 @@ writeLn([u.save(), u is User]);                                    // ["saved Us
 
 **(a) WL3001 still, `new Class(…)` and the `add…` methods being how a program makes a class; (b) as above: an instance of a class extending `Class` is a class, its constructor's `super(name)` making it, and its class's methods are its own members, as its static members are, after them.**
 
-A5 (again):
+A5 (again): (b). Then, an object instance must be able to point to its class: `p.instanceOf`, and class instance to its parent `Point.parent`  (->  `Object`).
 
-## [QUESTION] Task Combinators
+Done (Claude, 2026-11-14): the design recorded as approved in the specification, section 3.7 ("Classes of values"), A9's `className` renaming any class, as A9 allows; the parts of its implementation defined in section 9 (part 5 of "Extending the classes of values"), each a task below "Extending the Classes of Values: `Class`". What A6 to A9 and A5 leave open is asked in "Building Classes at Run Time, Continued". Checks: the Release build, without warnings, and the full test suite, on Windows only; Linux not tried.
+
+## [QUESTION] Building Classes at Run Time, Continued
+
+The follow-ups of "Building Classes at Run Time" (specification, section 3.7, "Classes of values"). One decision each, answerable with "yes" or a letter. Added by Claude, 2026-11-14.
+
+**Q1, replacing a declared class's static method (A6): (a) by assignment, `Point.origin = f;`, which then replaces a static method as it declares a new static member, assigning one being WL3001 no longer; (b) by a method of every class, `Point.setStaticMethod("origin", f)`, assignment staying WL3001.**
+
+A1:
+
+**Q2, replacing a property or a constant (A7, A8: "a setter"): (a) its `add…` method again, `addProperty`, `addStaticProperty` or `addConstant` given a name the class has replacing that member, as `addMethod` replaces a method (A3); (b) `set…` methods of their own, `setProperty`, `setStaticProperty` and `setConstant`, an `add…` given a name the class has being WL3001.**
+
+A2:
+
+**Q3, a program's own members named `className`, `instanceOf` or `parent` (a tree's `this.parent = node;` is common): (a) the program's own come first, a static member `className` or `parent` of a class, or a field or method `instanceOf` of an instance, hiding the built-in one there; (b) the built-in ones are reserved: declaring a static member `className` or `parent` is WL2002, and assigning a field `instanceOf` WL3001.**
+
+A3:
+
+## Task Combinators
 
 `Task.all`, `Task.any` and timeouts (A6 of "Asynchrony: `async` and `await`"; specification, section 3.8). Added by Claude, 2026-11-13.
 
@@ -153,7 +195,7 @@ A3: (a)
 
 A4: (a) in module `std:tasks`, once it exists, so both (a) and (b) I guess.
 
-## [QUESTION] Modules, Quoted Parameters
+## Modules, Quoted Parameters
 
 A6 of "Modules, Continued" asked whether a shell removes the quotes of `value="10"`. Checked on 2026-11-14, with a program printing the arguments it gets: bash gives it `value=10`, and only `'value="10"'` keeps the quotes; Windows PowerShell 5.1 gives `value=10` for both `value="10"` and `'value="10"'`; and cmd.exe gives `value=10`. So A8's quotes rarely reach `weblingo`, and never from Windows PowerShell 5.1. Added by Claude, 2026-11-14.
 
@@ -171,7 +213,7 @@ The module system: `import`, static and dynamic, `export`, `param`, a script's p
 
 2026-11-14: split into the parts the specification defines in section 9 ("Modules"), each a task below. Waits for them.
 
-## [QUESTION] Modules: Parameters
+## Modules: Parameters
 
 `param`, the values an importer gives, and a missing one's error (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
 
@@ -187,7 +229,7 @@ A1: (b). It looks to me like a sneaky way of introducing generics (the same modu
 
 A2: (a) for static imports, (b) for dynamic.
 
-## [QUESTION] Modules: Dynamic Imports
+## Modules: Dynamic Imports
 
 `await Module.import(path)`, a module compiled when it runs (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
 
@@ -291,7 +333,7 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 
 2026-11-13: M0.13 now, after M0.12, templates (specification, section 9); waits for M0.12.
 
-## [QUESTION] Static Members Through Instances, Continued
+## Static Members Through Instances, Continued
 
 A follow-up to "Static Members Callable on Instances". Added by Claude, 2026-11-14.
 
@@ -314,15 +356,15 @@ It is deferred: it can be added later, if it proves necessary, since `extend` al
 
 **Q1: a function with a receiver, `function (this, a) { … }`, its first parameter named `this`, bound by a call's target, or given as the first argument of a direct call. Agreed?**
 
-A1: 
+A1:  Yes.
 
 **Q2: attaching it: (a) a built-in method of every class, `Point.addMethod("describe", f)`; (b) a statement, `extend Point with describe = f;`.**
 
-A2: 
+A2: (a)
 
 **Q3: may a method attached at run time be removed again (`Point.removeMethod("describe")`)? (a) no; (b) yes.**
 
-A3: 
+A3: (b)
 
 ## [DEFER] Serialization: Text That Rebuilds a Value
 
@@ -361,5 +403,17 @@ A5:
 **Q6, C libraries, as Python's `ctypes` reaches them: (a) not directly: a native module reaches them, through P/Invoke, adapter-only (section 7.14); (b) a foreign-function interface for scripts too, later.**
 
 A6:
+
+## Arrow Notation
+
+```
+function (this) { return this.x + this.y; }
+```
+
+should be equivalent to
+
+```
+(this) => { return this.x + this.y; }
+```
 
 # END-OF-TO-DO
