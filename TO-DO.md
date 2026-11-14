@@ -162,21 +162,6 @@ A5:
 
 A6:
 
-## [WORKING] Constants Inside Classes
-
-This should be allowed:
-
-```
-class MathStuff {
-    const PI = 3.14;
-}
-
-var m = new MathStuff();
-var v = m.PI;
-```
-
-Done (Claude, 2026-11-14): `const PI = 3.14;` in a class, or an `extend` block, declares a constant of the class itself, as C#'s `const` does and as `static const` does, so that `m.PI` reads it through the instance, as any static member is read, and `MathStuff.PI` through the class; recorded in the specification, section 3.7, as the owner's request, its being static recorded as Proposed in section 15.2 ("Classes made while the program runs"). On both VMs, with conformance tests. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
-
 ## Internals on Par with Script
 
 Make sure that there is only one implementation of - for example - how to make a class, so the way to make a class at run time via code (`var Point = new Class("Point");` ) and the way the runtime makes classes from 
