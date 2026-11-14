@@ -510,7 +510,7 @@ public sealed class WebLingoStackVirtualMachine
                                     constructed = WebLingoValue.Null;
                                     goto call;
                                 }
-                                // Else the class's built-in addMethod, below, which a static member of its name hides.
+                                // Else the class's built-in setMethod, below, which a static member of its name hides.
                                 if (!WebLingoMembers.IsClassMethod(target, name.Member)) break;
                             }
                             if (target.Kind == WebLingoValueKind.Instance)

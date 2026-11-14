@@ -8,7 +8,7 @@ namespace WebLingo.Runtime;
 /// </summary>
 public enum WebLingoMember : byte
 {
-    Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, AddMethod, SetProperty, SetStaticProperty, SetConstant,
+    Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, SetMethod, SetProperty, SetStaticProperty, SetConstant,
     /// <summary>The names every value, or every class, has (section 3.7), last, so that one comparison finds them.</summary>
     ClassName, InstanceOf, Parent
 }
@@ -36,7 +36,7 @@ public static class WebLingoMembers
         "toString" => WebLingoMember.ToString,
         "equal" => WebLingoMember.Equal,
         "forget" => WebLingoMember.Forget,
-        "addMethod" => WebLingoMember.AddMethod,
+        "setMethod" => WebLingoMember.SetMethod,
         "setProperty" => WebLingoMember.SetProperty,
         "setStaticProperty" => WebLingoMember.SetStaticProperty,
         "setConstant" or "static:const" => WebLingoMember.SetConstant,
@@ -573,7 +573,7 @@ public static class WebLingoMembers
     }
 
     /// <summary>
-    /// A class's built-in method (section 3.7): <c>addMethod(name, f)</c>, <c>setProperty(name, getter, setter)</c>,
+    /// A class's built-in method (section 3.7): <c>setMethod(name, f)</c>, <c>setProperty(name, getter, setter)</c>,
     /// <c>setStaticProperty(name, getter, setter)</c> and <c>setConstant(name, value)</c>, each giving <c>null</c>. A name
     /// is a string that is a name; a method a function, and a getter or a setter a function or <c>null</c> (WL3001
     /// otherwise).
@@ -598,17 +598,17 @@ public static class WebLingoMembers
         for (var i = 1; i < arity; i++)
         {
             var function = values[first + i];
-            if (function.Kind == WebLingoValueKind.Function || (function.Kind == WebLingoValueKind.Null && member != WebLingoMember.AddMethod))
+            if (function.Kind == WebLingoValueKind.Function || (function.Kind == WebLingoValueKind.Null && member != WebLingoMember.SetMethod))
             {
                 continue;
             }
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, member == WebLingoMember.AddMethod
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, member == WebLingoMember.SetMethod
                 ? $"A method is a function, not {WebLingoValueFormatter.Describe(function, heap)}."
                 : $"A property's getter or setter is a function, or null, not {WebLingoValueFormatter.Describe(function, heap)}.");
             return false;
         }
-        return member == WebLingoMember.AddMethod
-            ? heap.TryAddMethod(target, memberName, values[first + 1], out error)
+        return member == WebLingoMember.SetMethod
+            ? heap.TrySetMethod(target, memberName, values[first + 1], out error)
             : heap.TrySetProperty(target, memberName, values[first + 1], values[first + 2], member == WebLingoMember.SetStaticProperty, out error);
     }
 
@@ -631,12 +631,12 @@ public static class WebLingoMembers
         || IsClassMethod(target, member);
 
     /// <summary>
-    /// Whether <c>x.name(…)</c> calls a class's built-in method, <c>addMethod</c>, <c>setProperty</c>,
+    /// Whether <c>x.name(…)</c> calls a class's built-in method, <c>setMethod</c>, <c>setProperty</c>,
     /// <c>setStaticProperty</c> or <c>setConstant</c>, which a class has when it has no static member of that name; a
     /// <c>static const</c> calls <c>setConstant</c> by a name no program can declare (section 3.7).
     /// </summary>
     public static bool IsClassMethod(WebLingoValue target, WebLingoMember member) =>
-        target.Kind == WebLingoValueKind.Class && member is WebLingoMember.AddMethod or WebLingoMember.SetProperty
+        target.Kind == WebLingoValueKind.Class && member is WebLingoMember.SetMethod or WebLingoMember.SetProperty
             or WebLingoMember.SetStaticProperty or WebLingoMember.SetConstant;
 
     /// <summary>

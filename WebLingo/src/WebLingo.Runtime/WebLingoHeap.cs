@@ -684,7 +684,7 @@ public sealed class WebLingoHeap
     /// <summary>
     /// <c>new Class(name, base)</c>: a class made while the program runs, named by a string, or unnamed for none, and
     /// extending <c>Object</c>, or the class given (section 3.7). It has no methods, nor a constructor of its own, until
-    /// <see cref="TryAddMethod"/> gives it some.
+    /// <see cref="TrySetMethod"/> gives it some.
     /// </summary>
     private bool TryNewClass(WebLingoValue[] values, int first, int count, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
@@ -710,11 +710,11 @@ public sealed class WebLingoHeap
     }
 
     /// <summary>
-    /// <c>Point.addMethod(name, f)</c>: a class's method, which its instances, and its subclasses', made before or after,
+    /// <c>Point.setMethod(name, f)</c>: a class's method, which its instances, and its subclasses', made before or after,
     /// then have, replacing one of that name as an extension's does; <c>constructor</c> its constructor, and
     /// <c>destructor</c> its <c>dispose</c> (section 3.7).
     /// </summary>
-    public bool TryAddMethod(WebLingoValue classValue, string name, WebLingoValue method, out WebLingoRuntimeError? error)
+    public bool TrySetMethod(WebLingoValue classValue, string name, WebLingoValue method, out WebLingoRuntimeError? error)
     {
         var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
         error = null;
@@ -1133,7 +1133,7 @@ public sealed class WebLingoHeap
     /// </summary>
     private sealed record ClassObject(string Name, WebLingoValue Constructor, Dictionary<string, WebLingoValue> Methods)
     {
-        /// <summary>Its constructor's closure, which <c>addMethod("constructor", f)</c> may give it while the program runs.</summary>
+        /// <summary>Its constructor's closure, which <c>setMethod("constructor", f)</c> may give it while the program runs.</summary>
         public WebLingoValue Constructor { get; set; } = Constructor;
         /// <summary>Its name, empty for an unnamed class, which <c>__className</c> may change while the program runs.</summary>
         public string Name { get; set; } = Name;
