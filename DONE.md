@@ -1430,3 +1430,9 @@ Q2, an arithmetic result not of its class's kind, `count / 2` where `Count` exte
 A2: (a)
 
 Done (Claude, 2026-11-14, `e992b43`): recorded as approved in the specification, section 3.7 ("Instances" and "Classes of values"): every class without a constructor passes its arguments on to the nearest base that declares one, and with none takes none; on both VMs, with their conformance tests. This task's heading was lost from `TO-DO.md` in the commit `68f65d5`, and is restored. Checks: the Release build, without warnings, the full test suite, and the CLI on the samples, on Windows only; Linux not tried.
+
+## [DONE] Modules: Standard Modules
+
+The scheme `std:`, and `std:system`, which every module imports, with `write` and `writeLn` (specification, sections 3.9 and 9), on both VMs. Added by Claude, 2026-11-14.
+
+Done (Claude, 2026-11-14, `318f33a`): `std:system`, the host's built-ins, on both VMs, with its tests in `ModuleTests`; its choices are recorded as Proposed in the specification, section 15.2 ("Modules"). It needed no dynamic imports. Other standard modules (`std:fs`) come with the services they give. Checks: the Release build, without warnings, the 1,549 tests, and the CLI on the samples, on Windows only; Linux not tried.
