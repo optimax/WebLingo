@@ -34,7 +34,7 @@ A3: (a) but - like (c) says - measure the impact on performance.
 
 2026-11-14 (Claude): the answers recorded as approved in the specification, section 3.9 ("Native modules"), and its decision register; split into the parts section 9 defines ("Native modules"), each a task below. Waits for them.
 
-## [WORKING] Native Modules, Part 4: The Built-in Classes as Native Classes
+## [QUESTION] Native Modules, Part 4: The Built-in Classes as Native Classes
 
 `Array`, `Map`, `Set`, `Task`, `Module`, `Class` and `Function` as a standard module's native classes, their methods native functions, measured against the VMs' own on the benchmark, as A3 of "Native Modules" asks (specification, sections 3.9 and 9, "Native modules", part 4), on both VMs. Added by Claude, 2026-11-14.
 
@@ -81,6 +81,28 @@ Q2, how a class is visited by `foreach`, which part 4's native classes and COM's
 A2: (b)
 
 2026-11-15 (Claude): A1 (b) and A2 (b). The plan: the two branches' work moved onto today's `main` (`std:fs` landed since), on a branch of its own, then its costs cut: a native call's arguments read where they are, not copied into a new array (the native functions' contract taking a read-only view of them), a class's members that the runtime names by number (`push`, `length`, an indexer) found by that number, std:core's functions reaching the heap directly, and the stack VM calling directly too when the result is dropped; then measured against `main` and against the uncut build, alternately, and the numbers explained in plain language. Nothing lands before the owner has seen them. A2's protocol is a task of its own ("The `foreach` Protocol", below), whose details need answers first.
+
+2026-11-15 (Claude): done as A1 asks, and measured again; nothing landed. All of part 4's work is now on one branch, `claude/native-builtins`, moved onto today's `main` (`std:fs` included), its costs cut: a built-in's arguments read where they are, never copied (the built-ins' contract takes a read-only view of them, `ReadOnlySpan`); a member the runtime names by number (`push`, `length`, an indexer) found by that number; `std:core`'s members reaching the heap directly; and the stack VM calling directly when a result is dropped too. All 2,790 tests pass, on Windows. `main`, the branch before the cuts and after them, run alternately, three rounds of all nine workloads on both VMs:
+
+| Workload | VM | `main` | Before the cuts | After the cuts |
+|---|---|---:|---:|---:|
+| collections | register | 4.4 ms | 9.3 ms (2.11 times) | 9.0 ms (2.05 times) |
+| collections | stack | 5.0 ms | 11.2 ms (2.24 times) | 10.2 ms (2.04 times) |
+| templates | register | 5.9 ms | 5.6 ms | 4.6 ms (0.78 times) |
+| templates | stack | 5.8 ms | 5.6 ms | 5.2 ms (0.90 times) |
+| the seven others | both | | as `main`, within the noise | as `main`, within the noise |
+
+In plain language:
+
+- Programs that hardly use the built-in classes' members run as fast as on `main`, before the cuts and after: loops, calls, closures, strings, objects, async, and io.
+- `collections` uses them about 120,000 times a run (`push`, `length`, `a[i]`, `m[k]`), and takes about twice as long as on `main`, after the cuts as before them.
+- The cuts did what they were for: `collections` allocates 1.10 MB again, as on `main` (8.1 MB before), and the stack VM runs `main`'s count of instructions again. But the time hardly moved: the copying and the lookups by name were not where it went.
+- Where it goes: on `main`, `a.push(x)` is one check inside the VM ("an array, and `push`? then add the value"), a few billionths of a second. As a native member it is a call: the VM finds `Array`'s `push`, sees that it is native, finds its function, hands it the arguments through the module's interface, which checks that the value is an array, and then adds it. Each step is small; together they cost about 38 billionths of a second a use on the register VM, and 43 on the stack VM, which over 120,000 uses is `collections`' extra 4.6 to 5.2 ms. Making that much cheaper would mean making a call as cheap as the check the VMs do now, which is what their own members already are.
+- A gain either way: with arguments no longer copied, every built-in's call is cheaper, `write` and a page's text among them, so `templates` is 22 percent faster on the register VM and 10 percent on the stack VM, and allocates 12.0 MB, not 14.8.
+
+**Q3, what lands: (a) the built-in classes as `std:core`'s native classes, as the branch has them, about twice as slow where a program uses their members most, as fast elsewhere; (b) the VMs keep their own members for the built-in classes, `std:core` dropped, and what lands is what helps every native module and built-in: arguments read where they are, native classes' properties, indexers and direct calls, members found by number; (c) `std:core` lands as what defines the built-in classes, but the VMs keep their own fast way for its members until a program replaces one (`extend`, `setMethod`), each member then written twice, which the tests keep alike; (d) nothing.**
+
+A3:
 
 
 ## [QUESTION] The `foreach` Protocol
