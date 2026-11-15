@@ -32,7 +32,7 @@ A3: (a) but - like (c) says - measure the impact on performance.
 
 2026-11-14 (Claude): the answers recorded as approved in the specification, section 3.9 ("Native modules"), and its decision register; split into the parts section 9 defines ("Native modules"), each a task below. Waits for them.
 
-## [IDLE] Native Modules, Part 4: The Built-in Classes as Native Classes
+## [QUESTION] Native Modules, Part 4: The Built-in Classes as Native Classes
 
 `Array`, `Map`, `Set`, `Task`, `Module`, `Class` and `Function` as a standard module's native classes, their methods native functions, measured against the VMs' own on the benchmark, as A3 of "Native Modules" asks (specification, sections 3.9 and 9, "Native modules", part 4), on both VMs. Added by Claude, 2026-11-14.
 
@@ -59,6 +59,25 @@ Q4, the members that are not methods, `length`, indexing (`a[i]`) and `foreach`:
 A4: (b), `length` should look like a property to the scripts. 
 
 2026-11-15 (Claude): the plan. `std:core`, a native module installed as `std/core.dll`, as `std:tasks` is, which the compiler loads for every program, as it loads `std:system`; its classes are the classes of values (`WebLingoNativeClass.OfValues(kind)`), their methods run on values of their kind, not on instances a constructor marked. Native classes get properties (`DeclareProperty`) and an indexer (`DeclareIndexer`), each getter and setter a native function, `length` a property. Built on two branches, neither landing until the owner has seen the numbers (A3): `claude/native-builtin-classes`, the members called through methods written in WebLingo, as part 2's are (A2's (b)); and `claude/native-builtin-direct`, on it, the VMs calling a native member's built-in directly, given the instance first, without the method's frame (A2's (a)). Measured on the benchmark, every workload on both VMs, against `main`, the three run alternately. Guessed: the measurement covers `Array`, `Map`, `Set` and `Task`, whose members the benchmark's workloads use; `Module`, `Class` and `Function` follow the mode chosen, their members (`Module.import`, `setMethod`) rare enough that no workload would show them; and `foreach` stays the VMs' own for now, the language having no way yet for a class to be visited by it, which a question will ask.
+
+2026-11-15 (Claude): built on two branches, neither landed, as A3 asks: `claude/native-builtin-classes`, A2's (b), `std:core`'s members called through methods written in WebLingo; and `claude/native-builtin-direct`, on it, A2's (a), the VMs calling a native member's built-in directly, given the instance first, without the method's frame. `std:core` (`std/core.dll`) has `Array`, `Map`, `Set` and `Task`, their methods, `length` (a property) and their indexers native functions; native classes got properties and an indexer. Measured against `main`, the three run alternately, three rounds of every workload on both VMs, each the middle of its three medians (recorded in the specification, section 5.6, "The built-in classes as native classes"):
+
+| Workload | VM | `main` | (b) through methods | (a) direct |
+|---|---|---:|---:|---:|
+| collections | register | 4.5 ms | 12.6 ms (2.80 times) | 10.2 ms (2.27 times) |
+| collections | stack | 5.1 ms | 13.7 ms (2.69 times) | 11.7 ms (2.29 times) |
+| the seven others | both | | within the machine's noise | within the machine's noise |
+
+Where the time goes, both ways: each call of a native member copies its arguments into an array of its own, as every built-in's call does (7 of the 8.1 MB `collections` allocates, against `main`'s 1.06 MB); finds the member by its name in its class, where the VMs' own find it by a number; and passes through two delegates to the runtime's own member. (b) runs the method's frame besides: 1.1 million instructions for `main`'s 605,000. Found on the way, and fixed on both branches: three changes that made the stack VM's `loops` workload, which calls no built-in member, 7 to 19 percent slower, .NET inlining the index wrappers into its dispatch method, the indexer's pending call written in it, and the direct call written in its call path; each moved out of it, `loops` is as fast as on `main` (the lesson is in `Documents/implementation.md`, section 11). What a script would see either way: a built-in method read without a call (`[1].push`) is a function bound to its value, as any class's method is, where it was WL3001; and `a.length = 2` says that the property has no setter. All 660 conformance programs give the same diagnostics, output and errors on both VMs with `std:core` as with the VMs' own members, but for that message. All 2,763 tests pass on both branches, on Windows only. Guessed: `Module`, `Class` and `Function` follow the choice, unbuilt; `foreach` stays the VMs' own (Q2).
+
+**Q1, what lands: (a) the direct calls, (a), as they are, the built-in classes' members about 2.3 times slower where a program uses them most; (b) the direct calls, after their costs are cut (arguments passed without a copy, a member found by its number, not its name), measured again before anything lands; (c) the VMs keep their own members, `std:core` dropped, and what lands is what native modules gain, their classes' properties, indexers and direct calls; (d) nothing.**
+
+A1:
+
+**Q2, how a class is visited by `foreach`, which part 4's native classes and COM's collections both need: (a) a native class declares an iterator, a native function given the instance and a position, giving the next item, or entry, and the next position, as the VMs visit collections now; (b) the language gets a protocol of its own, a class's `iterate()` giving an iterator whose `next()` gives each item, which classes written in WebLingo implement too.**
+
+A2:
+
 
 ## [QUESTION] COM Module
 

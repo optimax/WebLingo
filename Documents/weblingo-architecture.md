@@ -458,6 +458,16 @@ Implementation complexity, in lines of source, the stack VM's against the regist
 
 **Template output** (M0.12.5, 14 November 2026), the third of them, measured as part 4 was: `templates`, a page (`templates.wasp`, compiled by the template compiler), writes a table of 10,000 rows, each its text, an integer and a string written escaped, and an integer written as it stands. The register VM took 6.1 to 6.7 ms over two runs, the stack VM 6.4 to 6.5 ms, running 280,010 and 400,015 instructions, from 40 instructions of code (135 bytes) and 58 (104 bytes); both allocated 14.8 MB of .NET's heap, the page's text and the strings the writes make. Writing and escaping text, the same for both, takes most of the time, so the two VMs are close here, the register VM's fewer instructions counting for less. I/O-bound work is still to come, with the platform layer.
 
+
+**The built-in classes as native classes** (§9, "Native modules", part 4; §3.9, 15 November 2026), measured as part 4 was, three rounds of 11 timed runs, `main` and two builds that did not land run alternately, each the middle of its three medians: `std:core`'s `Array`, `Map`, `Set` and `Task`, their methods, `length` and indexers native functions, called through methods written in WebLingo (two calls for one), or directly by the VMs, given the instance first, without the method's frame. Only `collections`, which calls built-in members 140,000 times, changed beyond the machine's noise:
+
+| Workload | VM | VMs' own | Through methods | Direct |
+|---|---|---:|---:|---:|
+| collections | register | 4.5 ms | 12.6 ms (2.80×) | 10.2 ms (2.27×) |
+| collections | stack | 5.1 ms | 13.7 ms (2.69×) | 11.7 ms (2.29×) |
+
+Both ways, each call copies its arguments into an array of its own (8.1 MB allocated, against 1.06 MB), finds its member by its name in its class, and passes through two delegates to the runtime's own member; through methods, it runs a frame besides (1,105,096 instructions run on the register VM, against 605,064 either other way). The choice is the owner's.
+
 ---
 
 ## 6. Hosting architecture (WL-H001–WL-H014)
