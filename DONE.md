@@ -2199,3 +2199,33 @@ Q1, the word for WASP's A, "Web _ Server Pages": (a) Application, Web Applicatio
 A1: Web Application Server Pages
 
 Done (Claude, 2026-11-15, `54753f4`): WebLingo Pages renamed WASP, Web Application Server Pages: pages are `.wasp` files, their command line `wasp`, built by `WebLingo.Wasp.Cli` (was `WebLingo.Pages.Cli`, `welp`), `wasp --version` printing `WASP M0.12 (pre-alpha)`; the samples' pages, the benchmark's page, the tests, the README and both documents follow, nothing kept for the old names. Recorded as approved in the specification, section 1, its decision register ("Project naming") and section 13. Guessed: the command line's name, `wasp`, and its project's, `WebLingo.Wasp.Cli`, following the technology's, and `WebLingo.Templates` keeping its name, the template compiler's library that section 13 approved. Worth weighing before a public launch (section 12.3, item 6): the Wasp web framework's command line is `wasp` too, so a machine with both would have two commands of that name. Checks: the Release build, without warnings, the full test suite (2,104 tests; six expected columns moved by one, `.wasp` being a character longer than `.wlp`), `wasp` on `samples/SimpleWebsite`, and the benchmark's page, on Windows only; Linux not tried.
+
+## [DONE] I/O-Bound Workload
+
+A benchmark workload of I/O-bound work (specification, section 5.6), the last of those "Both VMs, for now" waits for, after which the owner chooses between the VMs (WL-BC002), and M0.13 can begin. Scripts reach I/O through the platform layer (section 7: WL-P004's filesystem, synchronous and asynchronous, on WebLingo's own operation model, WL-P007) and a standard module, such as `std:fs` (section 3.9), a native module installed with the runtime. Added by Claude, 2026-11-14.
+
+2026-11-14: waits for "Native Modules", which standard modules are; its own contracts (the standard module's functions, and the capabilities, section 7.13, a host gives a script) will be asked then.
+
+2026-11-14 (Claude): native modules' functions and classes, which `std:fs` needs, are done; the platform layer has only a clock so far (`WebLingo.Platform.Abstractions`), its asynchronous operations being WebLingo's own (WL-P007, approved). `std:fs`'s contracts need five decisions, each answerable with a letter. The workload itself I would guess: a program that writes 1,000 small files and reads them back, one at a time, awaiting each, then all at once, with `Task.all`.
+
+Q1, `std:fs`'s first functions: (a) whole files as text: `readText(path)`, `writeText(path, text)`, `appendText(path, text)`, `exists(path)` and `remove(path)`, none for folders yet; (b) (a), and folders: `list(path)`, `makeFolder(path)` and `removeFolder(path)`; (c) (b), and files opened as handles, a native class `File` (`File.open(path, mode)`, `read`, `write` and `dispose()`), as section 3.4's example has one.
+
+A1: (c)
+
+Q2, synchronous and asynchronous, which WL-P004 asks for both: (a) each function in both forms, `readText(path)` and `readTextAsync(path)`, a task, as .NET names them; (b) asynchronous by default, `await fs.readText(path)`, a synchronous one named `readTextSync(path)`, as Node.js names them; (c) asynchronous only, for now.
+
+A2: (b)
+
+Q3, text's encoding: (a) UTF-8 always, a byte order mark skipped when read and none written, malformed bytes an error; (b) UTF-8 by default, another encoding named by an optional argument.
+
+A3: (b)
+
+Q4, the files a script may reach under `weblingo` (capabilities, section 7.13): (a) any the process may, capabilities coming with hosting; (b) those below the script's folder, unless the command line grants more (`--allow-fs folder`); (c) none, unless the command line grants them, `--allow-read folder` and `--allow-write folder`, as Deno does.
+
+A4: (a)
+
+Q5, an I/O failure (a missing file, a path not granted): (a) a runtime error of a code of its own, WL3011, of a class `IOError` extending `Error`, which a catch may catch, its message naming the path as the script gave it, never the host's own paths; (b) WL3001, as another invalid operation is.
+
+A5: (a)
+
+Done (Claude, 2026-11-15, `ddf8cdf`): `std:fs`, a native module installed as `std/fs.dll` (`WebLingo.StdLib.Fs`), as A1 to A5 have it: `readText`, `writeText`, `appendText`, `exists`, `remove`, `list`, `makeFolder` and `removeFolder`, and the native class `File`, `File.open(path, mode)`, `read`, `write` and `dispose()`; each asynchronous by default, its `Sync` form beside it; UTF-8 unless an optional argument names an encoding; any file the process may; and every failure an `IOError` (WL3011) naming the path as the script gave it. Recorded as approved in the specification, section 3.9 ("Files: `std:fs`"), its register, and its codes (WL3011); the details are Proposed in section 15.2 ("Files (`std:fs`)", and "Native modules' optional parameters and factories"). Built for it: the platform's file system, `IWebLingoFileSystem` (`DotNetFileSystem` on .NET), and the host's side of the scheduler, `IWebLingoSchedulerHost` (`DotNetSchedulerHost`), on whose threads an asynchronous function's work runs, its outcome posted back to the worker, which waits for it when nothing else can run, both VMs unchanged but for handing the heap the host's file system and scheduler; a native function's optional parameters, through a function written in WebLingo with those defaults; and native classes' factories, static methods given their class, `File.open` one. The benchmark's `io` workload writes 1,000 small files and reads them back, one at a time, then all at once with `Task.all`: 1,100.5 ms on the register VM, 1,136.0 ms on the stack VM, nearly all of it the file system's (the specification, section 5.6, "I/O-bound work", with every workload's numbers, for the choice between the VMs, a task below). Guessed: `File`'s `read()` gives its next line, `null` at its end; modes `"r"`, `"w"` and `"a"`; `list` gives names, in ordinal order; `makeFolder` makes the folders above it too; paths from the process's current folder; UTF-8 written without a byte order mark and read skipping one; text not valid in its encoding an `IOError`; an unknown encoding WL3001. Checks: the Release build, without warnings, the full test suite (2,131 tests), the CLI on the samples, and the benchmark, on Windows only; Linux not tried.
