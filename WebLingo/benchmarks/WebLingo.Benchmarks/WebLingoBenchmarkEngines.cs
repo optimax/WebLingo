@@ -40,7 +40,7 @@ public sealed class WebLingoRegisterEngine : IWebLingoBenchmarkEngine
     public IWebLingoBenchmarkProgram Compile(string source, string name, WebLingoCompilerOptions options)
     {
         // A page (section 13) through the template compiler; a script through the WebLingo compiler.
-        var compiled = name.EndsWith(".wlp", StringComparison.Ordinal)
+        var compiled = name.EndsWith(".wasp", StringComparison.Ordinal)
             ? new WebLingoTemplateCompiler(options).Compile(new WebLingoSourceText(source, name))
             : new WebLingoCompiler(options).Compile(source, name);
         if (compiled.Module is not { } module)
@@ -99,7 +99,7 @@ public sealed class WebLingoStackEngine : IWebLingoBenchmarkEngine
 
     public IWebLingoBenchmarkProgram Compile(string source, string name, WebLingoCompilerOptions options)
     {
-        var compiled = name.EndsWith(".wlp", StringComparison.Ordinal)
+        var compiled = name.EndsWith(".wasp", StringComparison.Ordinal)
             ? new WebLingoTemplateCompiler(options).CompileForStack(new WebLingoSourceText(source, name))
             : new WebLingoStackCompiler(options).Compile(source, name);
         if (compiled.Module is not { } module)

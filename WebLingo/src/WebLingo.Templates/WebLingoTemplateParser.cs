@@ -5,7 +5,7 @@ using WebLingo.Language;
 namespace WebLingo.Templates;
 
 /// <summary>
-/// A page (a <c>.wlp</c>, specification, section 13, "Contracts") read as the WebLingo parser's tokens, and parsed into a
+/// A page (a <c>.wasp</c>, specification, section 13, "Contracts") read as the WebLingo parser's tokens, and parsed into a
 /// program that writes it: its text, each piece between blocks, as a call of <see cref="WebLingoTemplateWriters.Raw"/>
 /// with the text as it stands; <c>&lt;% … %&gt;</c> as its statements, a statement spanning several blocks with the text
 /// between them in its body; <c>&lt;%= … %&gt;</c> and <c>&lt;%- … %&gt;</c> as a call of

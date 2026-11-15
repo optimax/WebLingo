@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <AssemblyName>welp</AssemblyName>
+    <AssemblyName>wasp</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../WebLingo.Cli/WebLingo.Cli.csproj" />

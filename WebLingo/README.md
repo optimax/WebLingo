@@ -19,7 +19,7 @@ Every variable is initialized where it is declared, and a name means nothing bef
 
 ## Pages
 
-WebLingo Pages are `.wlp` templates, compiled by the template compiler (`WebLingo.Templates`) into WebLingo, and run by `welp`, their command line (`src/WebLingo.Pages.Cli`). A page's text is written as it stands; `<% … %>` holds statements, which may span several blocks, the text between them in their body; `<%= x %>` writes `x`'s text escaped for HTML, `<%- x %>` as it stands, and either nothing for `null`; and `<%# … %>` is a comment. A line holding only `<% … %>` blocks and spaces writes nothing, not even its line break:
+WASP pages, Web Application Server Pages, are `.wasp` templates, compiled by the template compiler (`WebLingo.Templates`) into WebLingo, and run by `wasp`, their command line (`src/WebLingo.Wasp.Cli`). A page's text is written as it stands; `<% … %>` holds statements, which may span several blocks, the text between them in their body; `<%= x %>` writes `x`'s text escaped for HTML, `<%- x %>` as it stands, and either nothing for `null`; and `<%# … %>` is a comment. A line holding only `<% … %>` blocks and spaces writes nothing, not even its line break:
 
 ```html
 <% param who = "you & me"; %>
@@ -30,7 +30,7 @@ WebLingo Pages are `.wlp` templates, compiled by the template compiler (`WebLing
 </ul>
 ```
 
-writes `<ul>`, then `<li>Item 1 for you &amp; me</li>` and the same for 2, each on a line of its own, then `</ul>`. `<% include "/includes/header.wlp"; %>` reads a template in its place, as if its text stood there: a path starting with `/` is from the application's root, which `welp run --root site page.wlp` gives (the page's folder when it is left out), any other from the including file's folder. `await renderComponent("/components/card.wlp", { product: p });` renders a component, a page with a scope of its own, found and compiled when it is first rendered, which declares the values it takes as parameters, `<% param product; param size = "small"; %>`. `<% layout "/layouts/main.wlp", { title: "Products" }; %>`, after a page's parameters and imports and before anything else, runs the layout, a template with parameters of its own, which writes the rest of the page where it calls `renderBody()`. `samples/SimpleWebsite` has a layout, an include and a component: `dotnet run --project src/WebLingo.Pages.Cli -- run samples/SimpleWebsite/index.wlp`.
+writes `<ul>`, then `<li>Item 1 for you &amp; me</li>` and the same for 2, each on a line of its own, then `</ul>`. `<% include "/includes/header.wasp"; %>` reads a template in its place, as if its text stood there: a path starting with `/` is from the application's root, which `wasp run --root site page.wasp` gives (the page's folder when it is left out), any other from the including file's folder. `await renderComponent("/components/card.wasp", { product: p });` renders a component, a page with a scope of its own, found and compiled when it is first rendered, which declares the values it takes as parameters, `<% param product; param size = "small"; %>`. `<% layout "/layouts/main.wasp", { title: "Products" }; %>`, after a page's parameters and imports and before anything else, runs the layout, a template with parameters of its own, which writes the rest of the page where it calls `renderBody()`. `samples/SimpleWebsite` has a layout, an include and a component: `dotnet run --project src/WebLingo.Wasp.Cli -- run samples/SimpleWebsite/index.wasp`.
 
 ## Prerequisites
 
@@ -46,13 +46,13 @@ dotnet test WebLingo.slnx -c Release
 dotnet run --project src/WebLingo.Cli -- run samples/Arithmetic/arithmetic.wl
 dotnet run --project src/WebLingo.Cli -- check samples/Arithmetic/arithmetic.wl
 dotnet run --project src/WebLingo.Cli -- --version
-dotnet run --project src/WebLingo.Pages.Cli -- run page.wlp
+dotnet run --project src/WebLingo.Wasp.Cli -- run page.wasp
 dotnet run --project benchmarks/WebLingo.Benchmarks -c Release
 ```
 
 The last command times the VM on the benchmark's workloads (`benchmarks/WebLingo.Benchmarks/Workloads`), and writes the results as a table.
 
-`weblingo run <file>` compiles a script and runs it; `weblingo check <file>` compiles it and reports its errors without running it. A script imports a native module, an assembly in a folder its host is configured with, by a scheme, `import db from "native:sqlite";`, or by the assembly's path within such a folder: `weblingo run --scheme native=C:/WebLingo/native script.wl`, or a `weblingo.json` in the script's folder, `{ "schemes": { "native": "C:/WebLingo/native" } }`, names the folders. A native module's exports are functions and classes, whose instances may hold .NET objects of their own. Errors go to standard error as `file(line,column): error CODE: message`. The exit code is 0 on success, 1 for compilation errors, 2 for a usage error, 3 for a runtime error, and 4 for a file that cannot be read. `welp run [--root <folder>] <page.wlp>` and `welp check [--root <folder>] <page.wlp>` do the same for a page, the page being written to standard output.
+`weblingo run <file>` compiles a script and runs it; `weblingo check <file>` compiles it and reports its errors without running it. A script imports a native module, an assembly in a folder its host is configured with, by a scheme, `import db from "native:sqlite";`, or by the assembly's path within such a folder: `weblingo run --scheme native=C:/WebLingo/native script.wl`, or a `weblingo.json` in the script's folder, `{ "schemes": { "native": "C:/WebLingo/native" } }`, names the folders. A native module's exports are functions and classes, whose instances may hold .NET objects of their own. Errors go to standard error as `file(line,column): error CODE: message`. The exit code is 0 on success, 1 for compilation errors, 2 for a usage error, 3 for a runtime error, and 4 for a file that cannot be read. `wasp run [--root <folder>] <page.wasp>` and `wasp check [--root <folder>] <page.wasp>` do the same for a page, the page being written to standard output.
 
 ## Architecture
 

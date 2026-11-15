@@ -3,23 +3,23 @@ using WebLingo.Compiler;
 using WebLingo.Core;
 using WebLingo.StdLib;
 using WebLingo.Templates;
-namespace WebLingo.Pages.Cli;
+namespace WebLingo.Wasp.Cli;
 
 /// <summary>
-/// <c>welp</c>, WebLingo Pages' command line (specification, section 13, "Contracts"): <c>run</c>, which compiles a page
-/// (a <c>.wlp</c>) with the template compiler and writes it to standard output, <c>check</c>, and <c>--version</c>, with
+/// <c>wasp</c>, WASP's command line (specification, section 13, "Contracts"): <c>run</c>, which compiles a page
+/// (a <c>.wasp</c>) with the template compiler and writes it to standard output, <c>check</c>, and <c>--version</c>, with
 /// <c>weblingo</c>'s diagnostics, errors and exit codes (<see cref="WebLingoCommandLine"/>); <c>--root &lt;folder&gt;</c>,
 /// before the page, names the application's root, which an include's path starting with <c>/</c> is from, the page's
 /// folder when it is left out. It is the host: it registers the standard library's built-ins and the ones a page calls
 /// (<see cref="WebLingoTemplateBuiltins"/>), and finds the templates a page includes (<see cref="WebLingoTemplateFileResolver"/>).
 /// </summary>
-public static class WebLingoPagesCommandLine
+public static class WebLingoWaspCommandLine
 {
-    public const string Version = "WebLingo Pages M0.12 (pre-alpha)";
+    public const string Version = "WASP M0.12 (pre-alpha)";
 
-    /// <summary><c>welp</c>: pages, <c>.wlp</c> files, compiled by the template compiler, with the application's root given, or not.</summary>
+    /// <summary><c>wasp</c>: pages, <c>.wasp</c> files, compiled by the template compiler, with the application's root given, or not.</summary>
     public static WebLingoCommandLineProgram Pages(string? root) =>
-        new("welp", Version, ".wlp", WebLingoTemplateBuiltins.Create, (page, options) => Compile(page, options, root))
+        new("wasp", Version, ".wasp", WebLingoTemplateBuiltins.Create, (page, options) => Compile(page, options, root))
         {
             Options = "[--root <folder>] ",
             OptionsHelp = ["  --root the application's root, which an include's path starting with / is from; the page's folder when left out"]
@@ -27,7 +27,7 @@ public static class WebLingoPagesCommandLine
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
-        // welp run|check [--root <folder>] [--scheme name=folder]… <page.wlp> …: --root taken out, among the options before
+        // wasp run|check [--root <folder>] [--scheme name=folder]… <page.wasp> …: --root taken out, among the options before
         // the page, the rest what weblingo's command line takes.
         string? root = null;
         var rest = new List<string>(args);

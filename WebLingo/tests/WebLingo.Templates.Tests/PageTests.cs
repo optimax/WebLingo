@@ -73,7 +73,7 @@ public sealed class PageTests
     public void APageThatDoesNotCompileIsReportedWhereItIsWrong(string page, string code, int line, int column)
     {
         var (diagnostics, _, _) = Render(page);
-        Assert.Contains($"{code} at page.wlp {line},{column}:", diagnostics);
+        Assert.Contains($"{code} at page.wasp {line},{column}:", diagnostics);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class PageTests
     {
         // It runs on over the page's text after its block, so its diagnostic names the block's <% too (section 3.5).
         var (diagnostics, _, _) = Render("<p>\n  <% var s = \"\"\"\n  a %>\n<p>");
-        Assert.Contains("WL1011 at page.wlp 2,14: This multi-line string has no closing \"\"\". It began in the block at line 2, "
+        Assert.Contains("WL1011 at page.wasp 2,14: This multi-line string has no closing \"\"\". It began in the block at line 2, "
             + "column 3.", diagnostics);
     }
 
@@ -99,16 +99,16 @@ public sealed class PageTests
     {
         var (_, written, error) = Render("<p>\n<%= [1][5] %>\n</p>");
         Assert.Equal("<p>\n", written);
-        Assert.StartsWith("WL3005 at page.wlp 2,", error);
+        Assert.StartsWith("WL3005 at page.wasp 2,", error);
     }
 
     [Fact]
     public void TheParsedPageIsAProgramThatWritesIt()
     {
-        var tree = WebLingoTemplateParser.Parse(new WebLingoSourceText("a<%= b %>c", "page.wlp"));
+        var tree = WebLingoTemplateParser.Parse(new WebLingoSourceText("a<%= b %>c", "page.wasp"));
         Assert.False(tree.HasErrors);
         Assert.Equal(3, tree.Root.Statements.Count);
-        Assert.Equal("page.wlp", tree.Source.Name);
+        Assert.Equal("page.wasp", tree.Source.Name);
     }
 
     [Theory]
@@ -123,16 +123,16 @@ public sealed class PageTests
 
     [Theory]
     // An include is textual: the template is read in its place, and sees the variables there, as its text would.
-    [InlineData("a<% include \"/h.wlp\"; %>c", "h.wlp=b", "abc")]
-    [InlineData("<% var name = \"Ann\"; %><% include \"/greet.wlp\"; %>", "greet.wlp=Hello, <%= name %>!", "Hello, Ann!")]
-    [InlineData("<% include \"/h.wlp\"; %><%= x * 3 %>", "h.wlp=<% var x = 2; %>", "6")]
-    [InlineData("<% foreach (var i in [1, 2]) { include \"/item.wlp\"; } %>", "item.wlp=<li><%= i %></li>", "<li>1</li><li>2</li>")]
-    [InlineData("<% include \"/h.wlp\"; include \"h\"; %>", "h.wlp=x", "xx")]
+    [InlineData("a<% include \"/h.wasp\"; %>c", "h.wasp=b", "abc")]
+    [InlineData("<% var name = \"Ann\"; %><% include \"/greet.wasp\"; %>", "greet.wasp=Hello, <%= name %>!", "Hello, Ann!")]
+    [InlineData("<% include \"/h.wasp\"; %><%= x * 3 %>", "h.wasp=<% var x = 2; %>", "6")]
+    [InlineData("<% foreach (var i in [1, 2]) { include \"/item.wasp\"; } %>", "item.wasp=<li><%= i %></li>", "<li>1</li><li>2</li>")]
+    [InlineData("<% include \"/h.wasp\"; include \"h\"; %>", "h.wasp=x", "xx")]
     // A path starting with / is from the application's root, any other from the including file's folder.
-    [InlineData("<% include \"/inc/a.wlp\"; %>", "inc/a.wlp=a<% include \"b.wlp\"; %>|inc/b.wlp=b", "ab")]
-    [InlineData("<% include \"inc/a\"; %>", "inc/a.wlp=a<% include \"/b.wlp\"; %>|b.wlp=root b", "aroot b")]
+    [InlineData("<% include \"/inc/a.wasp\"; %>", "inc/a.wasp=a<% include \"b.wasp\"; %>|inc/b.wasp=b", "ab")]
+    [InlineData("<% include \"inc/a\"; %>", "inc/a.wasp=a<% include \"/b.wasp\"; %>|b.wasp=root b", "aroot b")]
     // Each file's lines are its own: a line holding only an include writes nothing, the template its own lines.
-    [InlineData("<html>\n<% include \"/head.wlp\"; %>\n</html>", "head.wlp=<% var t = 1; %>\n<head><%= t %></head>\n", "<html>\n<head>1</head>\n</html>")]
+    [InlineData("<html>\n<% include \"/head.wasp\"; %>\n</html>", "head.wasp=<% var t = 1; %>\n<head><%= t %></head>\n", "<html>\n<head>1</head>\n</html>")]
     // include is a name like any other where no string follows it.
     [InlineData("<% var include = 2; %><%= include %>", "", "2")]
     public void AnIncludeReadsTheTemplateInItsPlace(string page, string templates, string written)
@@ -141,14 +141,14 @@ public sealed class PageTests
     }
 
     [Theory]
-    [InlineData("<% include \"/nope.wlp\"; %>", "", "WL5002 at page.wlp 1,12: The template '/nope.wlp' cannot be included: there is no such file.")]
-    [InlineData("<% include \"/h.wlp\" %>", "h.wlp=x", "WL1002 at page.wlp 1,20: A ';' is missing here.")]
-    [InlineData("<% include \"/a.wlp\"; %>", "a.wlp=<% include \"b.wlp\"; %>|b.wlp=<% include \"a.wlp\"; %>",
-        "WL5003 at b.wlp 1,12: Including 'a.wlp' makes a cycle: a.wlp includes b.wlp includes a.wlp.")]
-    [InlineData("<% include \"/page.wlp\"; %>", "", "WL5003 at page.wlp 1,12: Including '/page.wlp' makes a cycle: page.wlp includes page.wlp.")]
+    [InlineData("<% include \"/nope.wasp\"; %>", "", "WL5002 at page.wasp 1,12: The template '/nope.wasp' cannot be included: there is no such file.")]
+    [InlineData("<% include \"/h.wasp\" %>", "h.wasp=x", "WL1002 at page.wasp 1,21: A ';' is missing here.")]
+    [InlineData("<% include \"/a.wasp\"; %>", "a.wasp=<% include \"b.wasp\"; %>|b.wasp=<% include \"a.wasp\"; %>",
+        "WL5003 at b.wasp 1,12: Including 'a.wasp' makes a cycle: a.wasp includes b.wasp includes a.wasp.")]
+    [InlineData("<% include \"/page.wasp\"; %>", "", "WL5003 at page.wasp 1,12: Including '/page.wasp' makes a cycle: page.wasp includes page.wasp.")]
     // An error in a template is reported in it, at its own line and column.
-    [InlineData("<p>\n<% include \"/h.wlp\"; %>", "h.wlp=line\n<%= y %>", "WL2001 at h.wlp 2,5: 'y' is not defined.")]
-    [InlineData("<% include \"/h.wlp\"; %>", "h.wlp=\n<% var x = 1;", "WL5001 at h.wlp 2,1: This block has no closing '%>'.")]
+    [InlineData("<p>\n<% include \"/h.wasp\"; %>", "h.wasp=line\n<%= y %>", "WL2001 at h.wasp 2,5: 'y' is not defined.")]
+    [InlineData("<% include \"/h.wasp\"; %>", "h.wasp=\n<% var x = 1;", "WL5001 at h.wasp 2,1: This block has no closing '%>'.")]
     public void AnIncludeThatFailsIsReportedWhereItIs(string page, string templates, string diagnostic)
     {
         Assert.Equal(diagnostic, Render(page, Templates(templates)).Diagnostics);
@@ -157,57 +157,57 @@ public sealed class PageTests
     [Fact]
     public void ARuntimeErrorInATemplateIsReportedInIt()
     {
-        var (_, written, error) = Render("<p>\n<% include \"/h.wlp\"; %>", Templates("h.wlp=before\n<%= [1][5] %>"));
+        var (_, written, error) = Render("<p>\n<% include \"/h.wasp\"; %>", Templates("h.wasp=before\n<%= [1][5] %>"));
         Assert.Equal("<p>\nbefore\n", written);
-        Assert.StartsWith("WL3005 at h.wlp 2,", error);
+        Assert.StartsWith("WL3005 at h.wasp 2,", error);
     }
 
     [Fact]
     public void IncludesNestAtMost64Deep()
     {
         var chain = new List<string>();
-        for (var i = 0; i < 70; i++) chain.Add($"t{i}.wlp=<% include \"t{i + 1}.wlp\"; %>");
-        chain.Add("t70.wlp=end");
-        var (diagnostics, _, _) = Render("<% include \"/t0.wlp\"; %>", Templates(string.Join("|", chain)));
-        Assert.Equal("WL5004 at t62.wlp 1,12: Includes nest too deeply here: at most 64.", diagnostics);
+        for (var i = 0; i < 70; i++) chain.Add($"t{i}.wasp=<% include \"t{i + 1}.wasp\"; %>");
+        chain.Add("t70.wasp=end");
+        var (diagnostics, _, _) = Render("<% include \"/t0.wasp\"; %>", Templates(string.Join("|", chain)));
+        Assert.Equal("WL5004 at t62.wasp 1,12: Includes nest too deeply here: at most 64.", diagnostics);
     }
 
     [Theory]
     // A component renders where it is called, anew each time, given its parameters' values; its scope is its own.
-    [InlineData("<% await renderComponent(\"/card.wlp\", { name: \"Ann\" }); %>", "card.wlp=<% param name; %>\n<b><%= name %></b>", "<b>Ann</b>")]
-    [InlineData("<% await renderComponent(\"/c.wlp\"); await renderComponent(\"/c\"); %>", "c.wlp=x", "xx")]
-    [InlineData("<% foreach (var n in [\"a\", \"b\"]) { await renderComponent(\"/item.wlp\", { n: n }); } %>",
-        "item.wlp=<% param n; %><li><%= n %></li>", "<li>a</li><li>b</li>")]
-    [InlineData("<% await renderComponent(\"/s.wlp\", {}); await renderComponent(\"/s.wlp\", { size: 2 }); %>",
-        "s.wlp=<% param size = 10; %><%= size %>,", "10,2,")]
-    [InlineData("<% renderComponent(\"/c.wlp\"); %>after", "c.wlp=x", "xafter")]
-    [InlineData("<% var x = 1; await renderComponent(\"/c.wlp\", { x: 2 }); %><%= x %>", "c.wlp=<% param x; %><%= x %>", "21")]
+    [InlineData("<% await renderComponent(\"/card.wasp\", { name: \"Ann\" }); %>", "card.wasp=<% param name; %>\n<b><%= name %></b>", "<b>Ann</b>")]
+    [InlineData("<% await renderComponent(\"/c.wasp\"); await renderComponent(\"/c\"); %>", "c.wasp=x", "xx")]
+    [InlineData("<% foreach (var n in [\"a\", \"b\"]) { await renderComponent(\"/item.wasp\", { n: n }); } %>",
+        "item.wasp=<% param n; %><li><%= n %></li>", "<li>a</li><li>b</li>")]
+    [InlineData("<% await renderComponent(\"/s.wasp\", {}); await renderComponent(\"/s.wasp\", { size: 2 }); %>",
+        "s.wasp=<% param size = 10; %><%= size %>,", "10,2,")]
+    [InlineData("<% renderComponent(\"/c.wasp\"); %>after", "c.wasp=x", "xafter")]
+    [InlineData("<% var x = 1; await renderComponent(\"/c.wasp\", { x: 2 }); %><%= x %>", "c.wasp=<% param x; %><%= x %>", "21")]
     // A path starting with / is from the root, any other from the rendering file's folder; a component may include.
-    [InlineData("<% await renderComponent(\"parts/a.wlp\"); %>", "parts/a.wlp=a<% await renderComponent(\"b.wlp\"); %>|parts/b.wlp=b", "ab")]
-    [InlineData("<% await renderComponent(\"/c.wlp\"); %>", "c.wlp=[<% include \"/h.wlp\"; %>]|h.wlp=h", "[h]")]
+    [InlineData("<% await renderComponent(\"parts/a.wasp\"); %>", "parts/a.wasp=a<% await renderComponent(\"b.wasp\"); %>|parts/b.wasp=b", "ab")]
+    [InlineData("<% await renderComponent(\"/c.wasp\"); %>", "c.wasp=[<% include \"/h.wasp\"; %>]|h.wasp=h", "[h]")]
     // A component may render itself.
-    [InlineData("<% await renderComponent(\"/tree.wlp\", { n: 3 }); %>",
-        "tree.wlp=<% param n; %><%= n %><% if (n > 0) { await renderComponent(\"tree.wlp\", { n: n - 1 }); } %>", "3210")]
+    [InlineData("<% await renderComponent(\"/tree.wasp\", { n: 3 }); %>",
+        "tree.wasp=<% param n; %><%= n %><% if (n > 0) { await renderComponent(\"tree.wasp\", { n: n - 1 }); } %>", "3210")]
     // A missing one is a runtime error, which a catch may catch.
-    [InlineData("<% try { await renderComponent(\"/nope.wlp\"); } catch (e) { write(e.code); } %>", "", "WL5005")]
+    [InlineData("<% try { await renderComponent(\"/nope.wasp\"); } catch (e) { write(e.code); } %>", "", "WL5005")]
     public void AComponentRendersWhereItIsCalled(string page, string templates, string written)
     {
         Assert.Equal(("", written, ""), Render(page, Templates(templates)));
     }
 
     [Theory]
-    [InlineData("<% await renderComponent(\"/nope.wlp\"); %>", "",
-        "WL5005 at page.wlp 1,10: The component '/nope.wlp' cannot be rendered: there is no such file.")]
-    [InlineData("<% await renderComponent(\"/card.wlp\"); %>", "card.wlp=<% param name; %><%= name %>",
-        "WL5006 at page.wlp 1,10: 'card.wlp''s parameter 'name' is not given.")]
-    [InlineData("<% await renderComponent(\"/card.wlp\", { name: 1 }); await renderComponent(\"/card.wlp\", { name: 2, size: 3 }); %>",
-        "card.wlp=<% param name; %><%= name %>", "WL5006 at page.wlp 1,59: 'size' is not a parameter of 'card.wlp'.")]
+    [InlineData("<% await renderComponent(\"/nope.wasp\"); %>", "",
+        "WL5005 at page.wasp 1,10: The component '/nope.wasp' cannot be rendered: there is no such file.")]
+    [InlineData("<% await renderComponent(\"/card.wasp\"); %>", "card.wasp=<% param name; %><%= name %>",
+        "WL5006 at page.wasp 1,10: 'card.wasp''s parameter 'name' is not given.")]
+    [InlineData("<% await renderComponent(\"/card.wasp\", { name: 1 }); await renderComponent(\"/card.wasp\", { name: 2, size: 3 }); %>",
+        "card.wasp=<% param name; %><%= name %>", "WL5006 at page.wasp 1,60: 'size' is not a parameter of 'card.wasp'.")]
     // A component does not see the variables where it is rendered.
-    [InlineData("<% var secret = 1; await renderComponent(\"/c.wlp\"); %>", "c.wlp=<%= secret %>",
-        "WL2001 at page.wlp 1,26: The component '/c.wlp' does not compile: 'secret' is not defined.")]
+    [InlineData("<% var secret = 1; await renderComponent(\"/c.wasp\"); %>", "c.wasp=<%= secret %>",
+        "WL2001 at page.wasp 1,26: The component '/c.wasp' does not compile: 'secret' is not defined.")]
     // An error in a component, or in a template it includes, is reported where it is.
-    [InlineData("<% await renderComponent(\"/c.wlp\"); %>", "c.wlp=x\n<%= [1][5] %>", "WL3005 at c.wlp 2,")]
-    [InlineData("<% await renderComponent(\"/c.wlp\"); %>", "c.wlp=<% include \"/h.wlp\"; %>|h.wlp=\n<%= [1][5] %>", "WL3005 at h.wlp 2,")]
+    [InlineData("<% await renderComponent(\"/c.wasp\"); %>", "c.wasp=x\n<%= [1][5] %>", "WL3005 at c.wasp 2,")]
+    [InlineData("<% await renderComponent(\"/c.wasp\"); %>", "c.wasp=<% include \"/h.wasp\"; %>|h.wasp=\n<%= [1][5] %>", "WL3005 at h.wasp 2,")]
     public void AComponentThatFailsIsAnErrorWhereItIsRendered(string page, string templates, string error)
     {
         Assert.StartsWith(error, Render(page, Templates(templates)).Error);
@@ -215,20 +215,20 @@ public sealed class PageTests
 
     [Theory]
     // A page's layout runs first, given the page's values, and the page's body runs where the layout calls renderBody().
-    [InlineData("<% layout \"/main.wlp\", { title: \"Products\" }; %>\n<h1>Products</h1>\n",
-        "main.wlp=<% param title; %>\n<html><title><%= title %></title>\n<% renderBody(); %>\n</html>\n",
+    [InlineData("<% layout \"/main.wasp\", { title: \"Products\" }; %>\n<h1>Products</h1>\n",
+        "main.wasp=<% param title; %>\n<html><title><%= title %></title>\n<% renderBody(); %>\n</html>\n",
         "<html><title>Products</title>\n<h1>Products</h1>\n</html>\n")]
-    [InlineData("<% layout \"/l.wlp\"; %>body", "l.wlp=[<% renderBody(); %>]", "[body]")]
-    [InlineData("<% layout \"l\"; %><% var n = 2; %><%= n * 2 %>", "l.wlp=[<% renderBody(); %>]", "[4]")]
-    [InlineData("<% param who = \"x\"; %>\n<% layout \"/l.wlp\", { who: who, }; %>\nhi", "l.wlp=<% param who; %><%= who %>:<% renderBody(); %>", "x:hi")]
-    [InlineData("<% layout \"/l.wlp\"; %>x", "l.wlp=<% param title = \"Home\"; %><%= title %>:<% renderBody(); %>", "Home:x")]
-    [InlineData("<% layout \"/l.wlp\"; %>x", "l.wlp=<% renderBody(); renderBody(); %>", "xx")]
+    [InlineData("<% layout \"/l.wasp\"; %>body", "l.wasp=[<% renderBody(); %>]", "[body]")]
+    [InlineData("<% layout \"l\"; %><% var n = 2; %><%= n * 2 %>", "l.wasp=[<% renderBody(); %>]", "[4]")]
+    [InlineData("<% param who = \"x\"; %>\n<% layout \"/l.wasp\", { who: who, }; %>\nhi", "l.wasp=<% param who; %><%= who %>:<% renderBody(); %>", "x:hi")]
+    [InlineData("<% layout \"/l.wasp\"; %>x", "l.wasp=<% param title = \"Home\"; %><%= title %>:<% renderBody(); %>", "Home:x")]
+    [InlineData("<% layout \"/l.wasp\"; %>x", "l.wasp=<% renderBody(); renderBody(); %>", "xx")]
     // A layout may have a layout of its own.
-    [InlineData("<% layout \"/l1.wlp\", { title: \"T\" }; %>body",
-        "l1.wlp=<% param title; %><% layout \"l2.wlp\", { t: title }; %><main><% renderBody(); %></main>|l2.wlp=<% param t; %><html><%= t %><% renderBody(); %></html>",
+    [InlineData("<% layout \"/l1.wasp\", { title: \"T\" }; %>body",
+        "l1.wasp=<% param title; %><% layout \"l2.wasp\", { t: title }; %><main><% renderBody(); %></main>|l2.wasp=<% param t; %><html><%= t %><% renderBody(); %></html>",
         "<html>T<main>body</main></html>")]
     // The body streams where the layout has it, waiting included.
-    [InlineData("<% layout \"/l.wlp\"; %>a<% await renderComponent(\"/c.wlp\"); %>b<% await delay(1); %>c", "l.wlp=[<% renderBody(); %>]|c.wlp=C",
+    [InlineData("<% layout \"/l.wasp\"; %>a<% await renderComponent(\"/c.wasp\"); %>b<% await delay(1); %>c", "l.wasp=[<% renderBody(); %>]|c.wasp=C",
         "[aCbc]")]
     public void ALayoutWrapsItsPage(string page, string templates, string written)
     {
@@ -236,20 +236,20 @@ public sealed class PageTests
     }
 
     [Theory]
-    [InlineData("<% layout \"/nope.wlp\"; %>", "", "WL5002 at page.wlp 1,11: The layout '/nope.wlp' cannot be used: there is no such file.")]
-    [InlineData("<% layout \"/a.wlp\"; %>", "a.wlp=<% layout \"b.wlp\"; %>A<% renderBody(); %>|b.wlp=<% layout \"a.wlp\"; %>B<% renderBody(); %>",
-        "WL5003 at page.wlp 1,11: Using the layout '/a.wlp' makes a cycle: page.wlp uses a.wlp uses b.wlp uses a.wlp.")]
-    [InlineData("<% layout \"/page.wlp\"; %>", "", "WL5003 at page.wlp 1,11: Using the layout '/page.wlp' makes a cycle: page.wlp uses page.wlp.")]
-    [InlineData("<% layout \"/l.wlp\", { title: 1, x: 2 }; %>", "l.wlp=<% param title; %>", "WL5006 at page.wlp 1,33: 'x' is not a parameter of 'l.wlp'.")]
-    [InlineData("<% layout \"/l.wlp\"; %>", "l.wlp=<% param title; %>", "WL5006 at page.wlp 1,11: 'l.wlp''s parameter 'title' is not given.")]
-    [InlineData("<p>\n<% layout \"/l.wlp\"; %>", "l.wlp=", "WL5007 at page.wlp 2,4: A page's layout comes before anything else the page does or writes, after its parameters and imports.")]
-    [InlineData("<% layout \"/l.wlp\"; layout \"/l.wlp\"; %>", "l.wlp=", "WL5007 at page.wlp 1,21: A page has at most one layout.")]
-    [InlineData("<% include \"/h.wlp\"; %>", "h.wlp=<% layout \"/l.wlp\"; %>|l.wlp=", "WL5007 at h.wlp 1,4: A layout is a page's own: a template it includes cannot have one.")]
-    [InlineData("<% layout \"/l.wlp\", x; %>", "l.wlp=", "WL1001 at page.wlp 1,21: Expected a layout's values, a map literal, found 'x'.")]
-    [InlineData("<% layout \"/l.wlp\" %>", "l.wlp=", "WL1002 at page.wlp 1,19: A ';' is missing here.")]
+    [InlineData("<% layout \"/nope.wasp\"; %>", "", "WL5002 at page.wasp 1,11: The layout '/nope.wasp' cannot be used: there is no such file.")]
+    [InlineData("<% layout \"/a.wasp\"; %>", "a.wasp=<% layout \"b.wasp\"; %>A<% renderBody(); %>|b.wasp=<% layout \"a.wasp\"; %>B<% renderBody(); %>",
+        "WL5003 at page.wasp 1,11: Using the layout '/a.wasp' makes a cycle: page.wasp uses a.wasp uses b.wasp uses a.wasp.")]
+    [InlineData("<% layout \"/page.wasp\"; %>", "", "WL5003 at page.wasp 1,11: Using the layout '/page.wasp' makes a cycle: page.wasp uses page.wasp.")]
+    [InlineData("<% layout \"/l.wasp\", { title: 1, x: 2 }; %>", "l.wasp=<% param title; %>", "WL5006 at page.wasp 1,34: 'x' is not a parameter of 'l.wasp'.")]
+    [InlineData("<% layout \"/l.wasp\"; %>", "l.wasp=<% param title; %>", "WL5006 at page.wasp 1,11: 'l.wasp''s parameter 'title' is not given.")]
+    [InlineData("<p>\n<% layout \"/l.wasp\"; %>", "l.wasp=", "WL5007 at page.wasp 2,4: A page's layout comes before anything else the page does or writes, after its parameters and imports.")]
+    [InlineData("<% layout \"/l.wasp\"; layout \"/l.wasp\"; %>", "l.wasp=", "WL5007 at page.wasp 1,22: A page has at most one layout.")]
+    [InlineData("<% include \"/h.wasp\"; %>", "h.wasp=<% layout \"/l.wasp\"; %>|l.wasp=", "WL5007 at h.wasp 1,4: A layout is a page's own: a template it includes cannot have one.")]
+    [InlineData("<% layout \"/l.wasp\", x; %>", "l.wasp=", "WL1001 at page.wasp 1,22: Expected a layout's values, a map literal, found 'x'.")]
+    [InlineData("<% layout \"/l.wasp\" %>", "l.wasp=", "WL1002 at page.wasp 1,20: A ';' is missing here.")]
     // renderBody() is a layout's; a layout does not see the page's variables.
-    [InlineData("<% renderBody(); %>", "", "WL2001 at page.wlp 1,4: 'renderBody' is not defined.")]
-    [InlineData("<% param secret = 1; %><% layout \"/l.wlp\"; %>", "l.wlp=<%= secret %>", "WL2001 at l.wlp 1,5: 'secret' is not defined.")]
+    [InlineData("<% renderBody(); %>", "", "WL2001 at page.wasp 1,4: 'renderBody' is not defined.")]
+    [InlineData("<% param secret = 1; %><% layout \"/l.wasp\"; %>", "l.wasp=<%= secret %>", "WL2001 at l.wasp 1,5: 'secret' is not defined.")]
     public void ALayoutThatFailsIsReportedWhereItIs(string page, string templates, string diagnostic)
     {
         Assert.StartsWith(diagnostic, Render(page, Templates(templates)).Diagnostics);
@@ -258,30 +258,30 @@ public sealed class PageTests
     [Fact]
     public void ARuntimeErrorInALayoutIsReportedInIt()
     {
-        var (_, written, error) = Render("<% layout \"/l.wlp\"; %>body", Templates("l.wlp=<% renderBody(); %>\n<%= [1][5] %>"));
+        var (_, written, error) = Render("<% layout \"/l.wasp\"; %>body", Templates("l.wasp=<% renderBody(); %>\n<%= [1][5] %>"));
         // The layout's first line holds only a statement block, and so writes no line break.
         Assert.Equal("body", written);
-        Assert.StartsWith("WL3005 at l.wlp 2,", error);
+        Assert.StartsWith("WL3005 at l.wasp 2,", error);
     }
 
     [Fact]
     public void RenderComponentIsOnlyCalled()
     {
-        Assert.Equal("WL3001 at page.wlp 1,12: 'renderComponent' renders a component, and can only be called.",
+        Assert.Equal("WL3001 at page.wasp 1,12: 'renderComponent' renders a component, and can only be called.",
             Render("<% var r = renderComponent; %>").Diagnostics);
-        Assert.StartsWith("WL2006 at page.wlp 1,4: 'renderComponent' takes 1 to 2 arguments, not 0.", Render("<% renderComponent(); %>").Diagnostics);
+        Assert.StartsWith("WL2006 at page.wasp 1,4: 'renderComponent' takes 1 to 2 arguments, not 0.", Render("<% renderComponent(); %>").Diagnostics);
     }
 
     [Fact]
     public void APageParsedWithoutAResolverIncludesNothing()
     {
-        var tree = WebLingoTemplateParser.Parse(new WebLingoSourceText("<% include \"/h.wlp\"; %>", "page.wlp"));
-        Assert.Equal("The template '/h.wlp' cannot be included: this host finds no templates.", Assert.Single(tree.Diagnostics).Message);
+        var tree = WebLingoTemplateParser.Parse(new WebLingoSourceText("<% include \"/h.wasp\"; %>", "page.wasp"));
+        Assert.Equal("The template '/h.wasp' cannot be included: this host finds no templates.", Assert.Single(tree.Diagnostics).Message);
     }
 
     /// <summary>
     /// Templates in memory, each <c>name=text</c>, separated by <c>|</c>: a path starting with <c>/</c> names one from the
-    /// root, any other from the including file's folder, <c>.wlp</c> added to one without an extension.
+    /// root, any other from the including file's folder, <c>.wasp</c> added to one without an extension.
     /// </summary>
     private sealed class MemoryTemplates(Dictionary<string, string> texts) : IWebLingoSourceResolver
     {
@@ -289,7 +289,7 @@ public sealed class PageTests
         {
             var folder = importer.LastIndexOf('/') is var slash and >= 0 ? importer[..(slash + 1)] : "";
             name = path.StartsWith('/') ? path[1..] : folder + path;
-            if (!name.EndsWith(".wlp", StringComparison.Ordinal)) name += ".wlp";
+            if (!name.EndsWith(".wasp", StringComparison.Ordinal)) name += ".wasp";
             error = texts.TryGetValue(name, out source!) ? null : "there is no such file";
             return error is null;
         }
@@ -297,7 +297,7 @@ public sealed class PageTests
 
     private static MemoryTemplates Templates(string templates)
     {
-        var texts = new Dictionary<string, string>(StringComparer.Ordinal) { ["page.wlp"] = "" };
+        var texts = new Dictionary<string, string>(StringComparer.Ordinal) { ["page.wasp"] = "" };
         foreach (var entry in templates.Split('|', StringSplitOptions.RemoveEmptyEntries))
         {
             var equals = entry.IndexOf('=');
@@ -312,7 +312,7 @@ public sealed class PageTests
     /// </summary>
     private static (string Diagnostics, string Written, string Error) Render(string page, IWebLingoSourceResolver? templates = null)
     {
-        var text = new WebLingoSourceText(page, "page.wlp");
+        var text = new WebLingoSourceText(page, "page.wasp");
 
         // Each VM with a compiler of its own, whose sources hold the page's files and those of the components it renders.
         var compiler = new WebLingoTemplateCompiler(Options, templates);

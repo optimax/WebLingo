@@ -1,10 +1,10 @@
 using WebLingo.Compiler;
-namespace WebLingo.Pages.Cli;
+namespace WebLingo.Wasp.Cli;
 
 /// <summary>
-/// The templates a page includes, as <c>welp</c> finds them (specification, section 13, "Contracts"): a path starting with
+/// The templates a page includes, as <c>wasp</c> finds them (specification, section 13, "Contracts"): a path starting with
 /// <c>/</c> from the application's root, <paramref name="root"/>, or the page's folder when that is null, any other from
-/// the including file's folder, <c>.wlp</c> added to one without an extension. A template outside the root cannot be
+/// the including file's folder, <c>.wasp</c> added to one without an extension. A template outside the root cannot be
 /// included. A template is named by its path from the current folder, with <c>/</c> between its folders, and the page by
 /// the path it was given, so that each is one template however many include it.
 /// </summary>
@@ -25,7 +25,7 @@ public sealed class WebLingoTemplateFileResolver(string pagePath, string? root) 
             var full = Path.GetFullPath(path.StartsWith('/')
                 ? Path.Combine(_rootFull, path.TrimStart('/'))
                 : Path.Combine(Path.GetDirectoryName(includerFull) ?? "", path));
-            if (Path.GetExtension(full).Length == 0) full += ".wlp";
+            if (Path.GetExtension(full).Length == 0) full += ".wasp";
             var relative = Path.GetRelativePath(_rootFull, full);
             if (Path.IsPathRooted(relative) || (relative.StartsWith("..", StringComparison.Ordinal) && (relative.Length == 2 || relative[2] is '/' or '\\')))
             {

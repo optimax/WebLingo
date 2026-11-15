@@ -1,17 +1,17 @@
 using WebLingo.Cli;
-using WebLingo.Pages.Cli;
+using WebLingo.Wasp.Cli;
 using Xunit;
 namespace WebLingo.Templates.Tests;
 
 /// <summary>
-/// <c>welp</c>, WebLingo Pages' command line (specification, section 13, "Contracts"), end to end: each page is written to
+/// <c>wasp</c>, WASP's command line (specification, section 13, "Contracts"), end to end: each page is written to
 /// a file and run through it, as a user would, with its output, its diagnostics and its exit code checked.
 /// </summary>
-public sealed class WelpTests : IDisposable
+public sealed class WaspTests : IDisposable
 {
-    private readonly string _folder = Path.Combine(Path.GetTempPath(), "welp-tests-" + Guid.NewGuid().ToString("N"));
+    private readonly string _folder = Path.Combine(Path.GetTempPath(), "wasp-tests-" + Guid.NewGuid().ToString("N"));
 
-    public WelpTests() => Directory.CreateDirectory(_folder);
+    public WaspTests() => Directory.CreateDirectory(_folder);
 
     public void Dispose() => Directory.Delete(_folder, recursive: true);
 
@@ -20,73 +20,73 @@ public sealed class WelpTests : IDisposable
     {
         var page = "<html>\n<% foreach (var n in [1, 2]) { %>\n<p><%= n %> &lt; <%= \"3 & 4\" %></p>\n<% } %>\n</html>\n";
         Assert.Equal((WebLingoCommandLine.Success, "<html>\n<p>1 &lt; 3 &amp; 4</p>\n<p>2 &lt; 3 &amp; 4</p>\n</html>\n", ""),
-            Welp("run", page));
+            Wasp("run", page));
     }
 
     [Fact]
     public void CheckCompilesThePageWithoutWritingIt()
     {
-        Assert.Equal((WebLingoCommandLine.Success, "", ""), Welp("check", "<p><%= 1 %></p>"));
+        Assert.Equal((WebLingoCommandLine.Success, "", ""), Wasp("check", "<p><%= 1 %></p>"));
     }
 
     [Fact]
     public void APageTakesItsParametersAsAScriptDoes()
     {
         var page = "<% param name; %>\nHello, <%= name %>!";
-        Assert.Equal((WebLingoCommandLine.Success, "Hello, &lt;World&gt;!", ""), Welp("run", page, "name=<World>"));
+        Assert.Equal((WebLingoCommandLine.Success, "Hello, &lt;World&gt;!", ""), Wasp("run", page, "name=<World>"));
     }
 
     [Fact]
     public void APageImportsModulesFromItsFolder()
     {
         File.WriteAllText(Path.Combine(_folder, "lib.wl"), "export function twice(x) { return x * 2; }");
-        Assert.Equal((WebLingoCommandLine.Success, "<b>42</b>", ""), Welp("run", "<% import { twice } from \"lib.wl\"; %><b><%= twice(21) %></b>"));
+        Assert.Equal((WebLingoCommandLine.Success, "<b>42</b>", ""), Wasp("run", "<% import { twice } from \"lib.wl\"; %><b><%= twice(21) %></b>"));
     }
 
     [Fact]
     public void ErrorsNameThePageWithTheirLineAndColumn()
     {
-        var (exit, output, error) = Welp("check", "<p>\n  <% var x = 1;\n");
+        var (exit, output, error) = Wasp("check", "<p>\n  <% var x = 1;\n");
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
         Assert.Equal("", output);
-        Assert.Equal("page.wlp(2,3): error WL5001: This block has no closing '%>'.", error.TrimEnd());
+        Assert.Equal("page.wasp(2,3): error WL5001: This block has no closing '%>'.", error.TrimEnd());
     }
 
     [Fact]
     public void ARuntimeErrorStopsThePageWhereItIs()
     {
-        var (exit, output, error) = Welp("run", "<p>before</p>\n<%= [1][5] %>\n<p>after</p>");
+        var (exit, output, error) = Wasp("run", "<p>before</p>\n<%= [1][5] %>\n<p>after</p>");
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Equal("<p>before</p>\n", output);
-        Assert.StartsWith("page.wlp(2,", error);
+        Assert.StartsWith("page.wasp(2,", error);
         Assert.Contains("error WL3005", error);
     }
 
     [Fact]
-    public void VersionAndUsageNameWelp()
+    public void VersionAndUsageNameWasp()
     {
         var output = new StringWriter();
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoPagesCommandLine.Run(["--version"], output, new StringWriter()));
-        Assert.Equal(WebLingoPagesCommandLine.Version, output.ToString().TrimEnd());
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoWaspCommandLine.Run(["--version"], output, new StringWriter()));
+        Assert.Equal(WebLingoWaspCommandLine.Version, output.ToString().TrimEnd());
 
         output = new StringWriter();
-        Assert.Equal(WebLingoCommandLine.UsageError, WebLingoPagesCommandLine.Run(["page.wlp"], output, new StringWriter()));
-        Assert.StartsWith("Usage: welp --version | run [--root <folder>] [--scheme <name>=<folder> …] <file.wlp> [name=value …] | "
-            + "check [--root <folder>] [--scheme <name>=<folder> …] <file.wlp>", output.ToString());
+        Assert.Equal(WebLingoCommandLine.UsageError, WebLingoWaspCommandLine.Run(["page.wasp"], output, new StringWriter()));
+        Assert.StartsWith("Usage: wasp --version | run [--root <folder>] [--scheme <name>=<folder> …] <file.wasp> [name=value …] | "
+            + "check [--root <folder>] [--scheme <name>=<folder> …] <file.wasp>", output.ToString());
         Assert.Contains("  --root the application's root", output.ToString());
 
         output = new StringWriter();
-        Assert.Equal(WebLingoCommandLine.UsageError, WebLingoPagesCommandLine.Run(["run", "--root", "site"], output, new StringWriter()));
-        Assert.StartsWith("Usage: welp", output.ToString());
+        Assert.Equal(WebLingoCommandLine.UsageError, WebLingoWaspCommandLine.Run(["run", "--root", "site"], output, new StringWriter()));
+        Assert.StartsWith("Usage: wasp", output.ToString());
     }
 
     [Fact]
     public void AnIncludeIsFoundFromTheRootOrFromItsFolder()
     {
-        // site/pages/index.wlp includes /includes/header.wlp, from the root, which includes nav.wlp, from its own folder.
-        Write("site/includes/header.wlp", "<header><% include \"nav.wlp\"; %></header>\n");
-        Write("site/includes/nav.wlp", "<nav><%= title %></nav>");
-        var page = Write("site/pages/index.wlp", "<% var title = \"Home\"; %>\n<% include \"/includes/header.wlp\"; %>\n<main></main>\n");
+        // site/pages/index.wasp includes /includes/header.wasp, from the root, which includes nav.wasp, from its own folder.
+        Write("site/includes/header.wasp", "<header><% include \"nav.wasp\"; %></header>\n");
+        Write("site/includes/nav.wasp", "<nav><%= title %></nav>");
+        var page = Write("site/pages/index.wasp", "<% var title = \"Home\"; %>\n<% include \"/includes/header.wasp\"; %>\n<main></main>\n");
         var root = Path.Combine(_folder, "site");
 
         var (exit, output, error) = Run(["run", "--root", root, page]);
@@ -96,63 +96,63 @@ public sealed class WelpTests : IDisposable
         // Without --root, the root is the page's folder, where there is no includes folder.
         (exit, _, error) = Run(["run", page]);
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
-        Assert.Contains("(2,12): error WL5002: The template '/includes/header.wlp' cannot be included: there is no such file.", error);
+        Assert.Contains("(2,12): error WL5002: The template '/includes/header.wasp' cannot be included: there is no such file.", error);
     }
 
     [Fact]
     public void AnIncludeOutsideTheRootIsRefused()
     {
-        Write("secret.wlp", "secret");
-        var page = Write("site/index.wlp", "<% include \"../secret.wlp\"; %>");
+        Write("secret.wasp", "secret");
+        var page = Write("site/index.wasp", "<% include \"../secret.wasp\"; %>");
         var (exit, _, error) = Run(["run", page]);
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
-        Assert.Contains("(1,12): error WL5002: The template '../secret.wlp' cannot be included: it is outside the application's root.", error);
+        Assert.Contains("(1,12): error WL5002: The template '../secret.wasp' cannot be included: it is outside the application's root.", error);
     }
 
     [Fact]
     public void AnErrorInAnIncludeNamesTheTemplate()
     {
-        Write("parts/bad.wlp", "<p>\n<%= y %>");
-        var page = Write("index.wlp", "<% include \"parts/bad.wlp\"; %>");
+        Write("parts/bad.wasp", "<p>\n<%= y %>");
+        var page = Write("index.wasp", "<% include \"parts/bad.wasp\"; %>");
         var (exit, _, error) = Run(["check", page]);
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
-        Assert.EndsWith("parts/bad.wlp(2,5): error WL2001: 'y' is not defined.", error.TrimEnd());
+        Assert.EndsWith("parts/bad.wasp(2,5): error WL2001: 'y' is not defined.", error.TrimEnd());
 
-        Write("parts/fails.wlp", "<p>before</p>\n<%= [1][5] %>");
-        page = Write("index.wlp", "<% include \"parts/fails.wlp\"; %>");
+        Write("parts/fails.wasp", "<p>before</p>\n<%= [1][5] %>");
+        page = Write("index.wasp", "<% include \"parts/fails.wasp\"; %>");
         (exit, var output, error) = Run(["run", page]);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Equal("<p>before</p>\n", output);
-        Assert.Contains("parts/fails.wlp(2,", error);
+        Assert.Contains("parts/fails.wasp(2,", error);
         Assert.Contains("error WL3005", error);
     }
 
     [Fact]
     public void AComponentIsFoundAndCompiledWhenItIsRendered()
     {
-        Write("site/components/card.wlp", "<% param product; param size = \"small\"; %>\n<article class=\"<%= size %>\"><%= product %></article>\n");
-        var page = Write("site/index.wlp",
-            "<% foreach (var p in [\"Tea\", \"<Cake>\"]) { %>\n<% await renderComponent(\"/components/card.wlp\", { product: p }); %>\n<% } %>\n");
+        Write("site/components/card.wasp", "<% param product; param size = \"small\"; %>\n<article class=\"<%= size %>\"><%= product %></article>\n");
+        var page = Write("site/index.wasp",
+            "<% foreach (var p in [\"Tea\", \"<Cake>\"]) { %>\n<% await renderComponent(\"/components/card.wasp\", { product: p }); %>\n<% } %>\n");
         Assert.Equal((WebLingoCommandLine.Success, "<article class=\"small\">Tea</article>\n<article class=\"small\">&lt;Cake&gt;</article>\n", ""),
             Run(["run", page]));
 
         // A component's runtime error names it, and a missing one is reported where it is rendered.
-        Write("site/components/bad.wlp", "<p>\n<%= [1][5] %>");
-        page = Write("site/index.wlp", "<% await renderComponent(\"components/bad\"); %>");
+        Write("site/components/bad.wasp", "<p>\n<%= [1][5] %>");
+        page = Write("site/index.wasp", "<% await renderComponent(\"components/bad\"); %>");
         var (exit, output, error) = Run(["run", page]);
         Assert.Equal((WebLingoCommandLine.RuntimeFailed, "<p>\n"), (exit, output));
-        Assert.Contains("components/bad.wlp(2,", error);
-        page = Write("site/index.wlp", "<% await renderComponent(\"/components/none.wlp\"); %>");
+        Assert.Contains("components/bad.wasp(2,", error);
+        page = Write("site/index.wasp", "<% await renderComponent(\"/components/none.wasp\"); %>");
         (exit, _, error) = Run(["run", page]);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
-        Assert.Contains("index.wlp(1,10): error WL5005: The component '/components/none.wlp' cannot be rendered: there is no such file.", error);
+        Assert.Contains("index.wasp(1,10): error WL5005: The component '/components/none.wasp' cannot be rendered: there is no such file.", error);
     }
 
     [Fact]
     public void TheSimpleWebsiteSampleRuns()
     {
         // A layout, an include and a component together; the sample's line breaks are as the checkout gives them.
-        var sample = Path.Combine(SolutionFolder(), "samples", "SimpleWebsite", "index.wlp");
+        var sample = Path.Combine(SolutionFolder(), "samples", "SimpleWebsite", "index.wasp");
         var (exit, output, error) = Run(["run", sample]);
         Assert.Equal((WebLingoCommandLine.Success, ""), (exit, error));
         Assert.Equal("<!doctype html>\n<html><body><h1>Hello from WebLingo</h1>\n<article class=\"card\">Includes</article>\n"
@@ -161,18 +161,18 @@ public sealed class WelpTests : IDisposable
     }
 
     [Fact]
-    public void APageWithALayoutRunsThroughWelp()
+    public void APageWithALayoutRunsThroughWasp()
     {
-        Write("site/layouts/main.wlp", "<% param title; %>\n<html><title><%= title %></title>\n<% renderBody(); %>\n</html>\n");
-        var page = Write("site/pages/index.wlp", "<% layout \"/layouts/main.wlp\", { title: \"A & B\" }; %>\n<h1>Body</h1>\n");
+        Write("site/layouts/main.wasp", "<% param title; %>\n<html><title><%= title %></title>\n<% renderBody(); %>\n</html>\n");
+        var page = Write("site/pages/index.wasp", "<% layout \"/layouts/main.wasp\", { title: \"A & B\" }; %>\n<h1>Body</h1>\n");
         Assert.Equal((WebLingoCommandLine.Success, "<html><title>A &amp; B</title>\n<h1>Body</h1>\n</html>\n", ""),
             Run(["run", "--root", Path.Combine(_folder, "site"), page]));
 
         // An error in the layout names it.
-        Write("site/layouts/main.wlp", "<% param title; %>\n<%= nope %>");
+        Write("site/layouts/main.wasp", "<% param title; %>\n<%= nope %>");
         var (exit, _, error) = Run(["check", "--root", Path.Combine(_folder, "site"), page]);
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
-        Assert.EndsWith("layouts/main.wlp(2,5): error WL2001: 'nope' is not defined.", error.TrimEnd());
+        Assert.EndsWith("layouts/main.wasp(2,5): error WL2001: 'nope' is not defined.", error.TrimEnd());
     }
 
     private static string SolutionFolder()
@@ -196,16 +196,16 @@ public sealed class WelpTests : IDisposable
     {
         var output = new StringWriter();
         var error = new StringWriter();
-        var exit = WebLingoPagesCommandLine.Run(args, output, error);
+        var exit = WebLingoWaspCommandLine.Run(args, output, error);
         return (exit, output.ToString(), error.ToString());
     }
 
     [Fact]
     public void APageThatCannotBeReadIsReported()
     {
-        var path = Path.Combine(_folder, "missing.wlp");
+        var path = Path.Combine(_folder, "missing.wasp");
         var error = new StringWriter();
-        Assert.Equal(WebLingoCommandLine.FileUnreadable, WebLingoPagesCommandLine.Run(["run", path], new StringWriter(), error));
+        Assert.Equal(WebLingoCommandLine.FileUnreadable, WebLingoWaspCommandLine.Run(["run", path], new StringWriter(), error));
         Assert.StartsWith(path + ": cannot read the file:", error.ToString());
     }
 
@@ -218,14 +218,14 @@ public sealed class WelpTests : IDisposable
         Assert.Equal(WebLingoCommandLine.CompilationFailed, WebLingoCommandLine.Run(["check", path], new StringWriter(), new StringWriter()));
     }
 
-    private (int Exit, string Output, string Error) Welp(string command, string page, params string[] parameters)
+    private (int Exit, string Output, string Error) Wasp(string command, string page, params string[] parameters)
     {
-        var path = Path.Combine(_folder, "page.wlp");
+        var path = Path.Combine(_folder, "page.wasp");
         File.WriteAllText(path, page);
         var output = new StringWriter();
         var error = new StringWriter();
-        var exit = WebLingoPagesCommandLine.Run([command, path, .. parameters], output, error);
+        var exit = WebLingoWaspCommandLine.Run([command, path, .. parameters], output, error);
         // Diagnostics name the file as it was given; show only its name, so the expectations hold on every machine.
-        return (exit, output.ToString(), error.ToString().Replace(path, "page.wlp", StringComparison.Ordinal));
+        return (exit, output.ToString(), error.ToString().Replace(path, "page.wasp", StringComparison.Ordinal));
     }
 }

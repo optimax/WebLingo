@@ -5,7 +5,7 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <ProjectReference Include="../../src/WebLingo.Templates/WebLingo.Templates.csproj" />
-    <ProjectReference Include="../../src/WebLingo.Pages.Cli/WebLingo.Pages.Cli.csproj" />
+    <ProjectReference Include="../../src/WebLingo.Wasp.Cli/WebLingo.Wasp.Cli.csproj" />
     <ProjectReference Include="../../src/WebLingo.Compiler/WebLingo.Compiler.csproj" />
     <ProjectReference Include="../../src/WebLingo.VM/WebLingo.VM.csproj" />
     <ProjectReference Include="../../src/WebLingo.VM.Stack/WebLingo.VM.Stack.csproj" />
