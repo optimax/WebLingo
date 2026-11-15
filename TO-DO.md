@@ -34,7 +34,7 @@ A3: (a) but - like (c) says - measure the impact on performance.
 
 2026-11-14 (Claude): the answers recorded as approved in the specification, section 3.9 ("Native modules"), and its decision register; split into the parts section 9 defines ("Native modules"), each a task below. Waits for them.
 
-## [QUESTION] Native Modules, Part 4: The Built-in Classes as Native Classes
+## [WORKING] Native Modules, Part 4: The Built-in Classes as Native Classes
 
 `Array`, `Map`, `Set`, `Task`, `Module`, `Class` and `Function` as a standard module's native classes, their methods native functions, measured against the VMs' own on the benchmark, as A3 of "Native Modules" asks (specification, sections 3.9 and 9, "Native modules", part 4), on both VMs. Added by Claude, 2026-11-14.
 
@@ -72,14 +72,32 @@ A4: (b), `length` should look like a property to the scripts.
 
 Where the time goes, both ways: each call of a native member copies its arguments into an array of its own, as every built-in's call does (7 of the 8.1 MB `collections` allocates, against `main`'s 1.06 MB); finds the member by its name in its class, where the VMs' own find it by a number; and passes through two delegates to the runtime's own member. (b) runs the method's frame besides: 1.1 million instructions for `main`'s 605,000. Found on the way, and fixed on both branches: three changes that made the stack VM's `loops` workload, which calls no built-in member, 7 to 19 percent slower, .NET inlining the index wrappers into its dispatch method, the indexer's pending call written in it, and the direct call written in its call path; each moved out of it, `loops` is as fast as on `main` (the lesson is in `Documents/implementation.md`, section 11). What a script would see either way: a built-in method read without a call (`[1].push`) is a function bound to its value, as any class's method is, where it was WL3001; and `a.length = 2` says that the property has no setter. All 660 conformance programs give the same diagnostics, output and errors on both VMs with `std:core` as with the VMs' own members, but for that message. All 2,763 tests pass on both branches, on Windows only. Guessed: `Module`, `Class` and `Function` follow the choice, unbuilt; `foreach` stays the VMs' own (Q2).
 
-**Q1, what lands: (a) the direct calls, (a), as they are, the built-in classes' members about 2.3 times slower where a program uses them most; (b) the direct calls, after their costs are cut (arguments passed without a copy, a member found by its number, not its name), measured again before anything lands; (c) the VMs keep their own members, `std:core` dropped, and what lands is what native modules gain, their classes' properties, indexers and direct calls; (d) nothing.**
+Q1, what lands: (a) the direct calls, (a), as they are, the built-in classes' members about 2.3 times slower where a program uses them most; (b) the direct calls, after their costs are cut (arguments passed without a copy, a member found by its number, not its name), measured again before anything lands; (c) the VMs keep their own members, `std:core` dropped, and what lands is what native modules gain, their classes' properties, indexers and direct calls; (d) nothing.
+
+A1: (b) and let's look at the numbers again. Explain them in plain language though.
+
+Q2, how a class is visited by `foreach`, which part 4's native classes and COM's collections both need: (a) a native class declares an iterator, a native function given the instance and a position, giving the next item, or entry, and the next position, as the VMs visit collections now; (b) the language gets a protocol of its own, a class's `iterate()` giving an iterator whose `next()` gives each item, which classes written in WebLingo implement too.
+
+A2: (b)
+
+2026-11-15 (Claude): A1 (b) and A2 (b). The plan: the two branches' work moved onto today's `main` (`std:fs` landed since), on a branch of its own, then its costs cut: a native call's arguments read where they are, not copied into a new array (the native functions' contract taking a read-only view of them), a class's members that the runtime names by number (`push`, `length`, an indexer) found by that number, std:core's functions reaching the heap directly, and the stack VM calling directly too when the result is dropped; then measured against `main` and against the uncut build, alternately, and the numbers explained in plain language. Nothing lands before the owner has seen them. A2's protocol is a task of its own ("The `foreach` Protocol", below), whose details need answers first.
+
+
+## [QUESTION] The `foreach` Protocol
+
+How `foreach` visits a class's instances, as A2 of "Native Modules, Part 4" has it: the class's `iterate()` gives an iterator, whose `next()` gives each item, which classes written in WebLingo, native classes and COM's collections all implement (specification, section 3.6, approved 15 November 2026). Added by Claude, 2026-11-15. Three decisions it needs, each answerable with a letter.
+
+**Q1, how an iterator says it has no more items: (a) `next()` gives `null` at the end, so that `null` cannot be an item; (b) the iterator also has `hasNext()`, asked before each `next()`, as Java's has; (c) `next()` gives a map, `{ value: v, done: false }`, and `{ done: true }` at the end, as JavaScript's iterators do, a map made for each item.**
 
 A1:
 
-**Q2, how a class is visited by `foreach`, which part 4's native classes and COM's collections both need: (a) a native class declares an iterator, a native function given the instance and a position, giving the next item, or entry, and the next position, as the VMs visit collections now; (b) the language gets a protocol of its own, a class's `iterate()` giving an iterator whose `next()` gives each item, which classes written in WebLingo implement too.**
+**Q2, a key and a value, `foreach (var (key, value) in x)`, for a class's instances: (a) `next()` gives each entry as an array of two, `[key, value]`, which the loop takes apart; (b) not yet: only `foreach (var item in x)` visits a class's instances.**
 
 A2:
 
+**Q3, arrays, maps, sets and strings: (a) `foreach` visits them as now, the VMs' own way, the protocol for every other class; (b) as now, but each also has `iterate()`, which a script may call itself; (c) through the protocol too, as any class, measured against the VMs' own way first.**
+
+A3:
 
 ## [QUESTION] COM Module
 
