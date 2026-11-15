@@ -32,7 +32,7 @@ A3: (a) but - like (c) says - measure the impact on performance.
 
 2026-11-14 (Claude): the answers recorded as approved in the specification, section 3.9 ("Native modules"), and its decision register; split into the parts section 9 defines ("Native modules"), each a task below. Waits for them.
 
-## [WORKING] Native Modules, Part 4: The Built-in Classes as Native Classes
+## [IDLE] Native Modules, Part 4: The Built-in Classes as Native Classes
 
 `Array`, `Map`, `Set`, `Task`, `Module`, `Class` and `Function` as a standard module's native classes, their methods native functions, measured against the VMs' own on the benchmark, as A3 of "Native Modules" asks (specification, sections 3.9 and 9, "Native modules", part 4), on both VMs. Added by Claude, 2026-11-14.
 
@@ -60,9 +60,31 @@ A4: (b), `length` should look like a property to the scripts.
 
 2026-11-15 (Claude): the plan. `std:core`, a native module installed as `std/core.dll`, as `std:tasks` is, which the compiler loads for every program, as it loads `std:system`; its classes are the classes of values (`WebLingoNativeClass.OfValues(kind)`), their methods run on values of their kind, not on instances a constructor marked. Native classes get properties (`DeclareProperty`) and an indexer (`DeclareIndexer`), each getter and setter a native function, `length` a property. Built on two branches, neither landing until the owner has seen the numbers (A3): `claude/native-builtin-classes`, the members called through methods written in WebLingo, as part 2's are (A2's (b)); and `claude/native-builtin-direct`, on it, the VMs calling a native member's built-in directly, given the instance first, without the method's frame (A2's (a)). Measured on the benchmark, every workload on both VMs, against `main`, the three run alternately. Guessed: the measurement covers `Array`, `Map`, `Set` and `Task`, whose members the benchmark's workloads use; `Module`, `Class` and `Function` follow the mode chosen, their members (`Module.import`, `setMethod`) rare enough that no workload would show them; and `foreach` stays the VMs' own for now, the language having no way yet for a class to be visited by it, which a question will ask.
 
-## COM Module
+## [QUESTION] COM Module
 
 Design and propose a native extension for Windows that would allow the scripts to use COM objects, like old ASP did. Do not code it yet.
+
+2026-11-15 (Claude): designed, not coded, in the specification, section 3.10 ("COM objects on Windows"), all of it Proposed: a native module that only Windows hosts install; `com.create("ADODB.Connection")` and `com.get(moniker)`, as `Server.CreateObject` and `GetObject`, giving a native class's instances that hold the COM objects and release them when disposed; their members through `IDispatch`, `x[k]` their default member, through the indexers part 4 gives native classes; `VARIANT`s mapped to WebLingo's values, currency and decimals as numbers and dates as ISO 8601 strings until WebLingo has those kinds; a failed call a catchable `ComError` (WL3012, with `number`, `source` and `description`, as ASP's `Err`); each COM object its worker's, as COM's apartments ask; and `foreach` over a COM collection waiting for the question part 4 asks. Five decisions, each answerable with a letter.
+
+**Q1, its name: (a) `std:com`, a standard module that only a Windows host installs; (b) a scheme of its own for Windows's native modules, `windows:com`.**
+
+A1:
+
+**Q2, its objects' members, known only while the program runs: (a) as a program writes any member, `conn.Open(text)`, `rs.EOF`, a native class getting a fallback for the members it does not declare (a getter, a setter and a call, each a native function); (b) through methods of `ComObject`'s own, `conn.call("Open", [text])`, `rs.get("EOF")`, `rs.set("Filter", text)`, native classes unchanged.**
+
+A2:
+
+**Q3, the threads COM runs on: (a) each worker that runs a script a single-threaded apartment's, with a message pump, as ASP's were, every object's calls direct; (b) workers as now, COM's objects made in an apartment of COM's own, every call to one marshalled to it, slower; (c) a thread of its own for COM in each execution, every call sent to it.**
+
+A3:
+
+**Q4, the objects a script may make: (a) any the process may; (b) only the ProgIDs and CLSIDs an application's configuration lists, `weblingo.json`'s `"com": { "allow": ["ADODB.Connection"] }`, none by default, since objects such as `WScript.Shell` reach the whole machine.**
+
+A4:
+
+**Q5, how its C# calls COM: (a) `IDispatch` through function pointers on its table of methods, by platform invoke, so that the same source compiles with Native C#; (b) .NET's own COM interop (`dynamic`, `[ComImport]`), simpler, but for .NET only.**
+
+A5:
 
 ## I/O-Bound Workload
 
