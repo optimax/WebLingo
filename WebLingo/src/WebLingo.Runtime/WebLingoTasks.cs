@@ -53,6 +53,12 @@ public sealed class WebLingoTask
 public readonly record struct WebLingoResumption(WebLingoValue Task, WebLingoValue Value, bool Throws, WebLingoRuntimeError? Error, long Origin);
 
 /// <summary>
+/// What an operation run off the worker gives its task, made on the worker from the work's result, in the execution's heap:
+/// its value, or its error (section 3.8, WL-P007).
+/// </summary>
+public delegate bool WebLingoOffWorkerFinish<in T>(T value, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error);
+
+/// <summary>
 /// The host's clock, which an execution's timers (<c>delay</c>) wait on; a host gives one, or the execution runs in
 /// virtual time (section 3.8). The portable core reads no clock itself (WL-P006, WL-P016).
 /// </summary>
@@ -291,12 +297,94 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
 
     public bool TryTakeReady(out WebLingoResumption resumption) => _ready.TryDequeue(out resumption);
 
+    /// <summary>The tasks of operations running off the worker, which the collector keeps until they finish.</summary>
+    private readonly List<WebLingoValue> _operations = [];
+
+    /// <summary>
+    /// Runs blocking work off the worker, on the host's threads (WL-P004, WL-P008), giving at once a task that completes,
+    /// on the worker, with what <paramref name="finish"/> makes of the work's result, or faults with the error
+    /// <paramref name="failed"/> makes of its exception, when the worker next has nothing else to run (WL-P007). WL3001 for
+    /// a host without a scheduler of its own (<see cref="WebLingoHeap.SchedulerHost"/>).
+    /// </summary>
+    public bool TryRunOffWorker<T>(Func<T> work, WebLingoOffWorkerFinish<T> finish, Func<Exception, WebLingoRuntimeError?> failed,
+        out WebLingoValue task, out WebLingoRuntimeError? error)
+    {
+        task = WebLingoValue.Null;
+        if (heap.SchedulerHost is not { } host)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "This host runs no operations off its worker.");
+            return false;
+        }
+        if (!heap.TryAllocateTask(out var made, out error)) return false;
+        task = made;
+        _operations.Add(made);
+        host.RunBlocking(() =>
+        {
+            T value;
+            try
+            {
+                value = work();
+            }
+            catch (Exception exception) when (failed(exception) is { } wrong)
+            {
+                host.Post(() => Finished(made, wrong));
+                return;
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                var unexpected = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"The operation failed: {exception.Message}");
+                host.Post(() => Finished(made, unexpected));
+                return;
+            }
+            host.Post(() =>
+            {
+                if (finish(value, heap, out var result, out var finishError)) Finished(made, null, result);
+                else Finished(made, finishError);
+            });
+        });
+        return true;
+    }
+
+    /// <summary>An operation's end, on the worker: its task completed with its result, or faulted with its error.</summary>
+    private void Finished(WebLingoValue task, WebLingoRuntimeError? error, WebLingoValue result = default)
+    {
+        _operations.Remove(task);
+        if (error is null) Complete(task, result);
+        else Fault(task, WebLingoValue.Null, error, WebLingoExceptions.Nowhere);
+    }
+
+    /// <summary>
+    /// With operations running off the worker: runs those that have finished, waiting for one up to
+    /// <paramref name="milliseconds"/> (-1 without end); whether any did. False at once without any.
+    /// </summary>
+    private bool TryRunFinished(int milliseconds) =>
+        _operations.Count > 0 && heap.SchedulerHost is { } host && host.RunPosted(milliseconds);
+
     /// <summary>
     /// Completes the earliest timer, waiting for it on the host's clock, or advancing virtual time to it; false if there
     /// is none. Timers due at the same time complete in the order they were made.
     /// </summary>
+    /// <remarks>
+    /// Operations off the worker that have finished come first; with some still running, it waits for them, up to the next
+    /// timer's time on the host's clock, a short while at a time, so that its VM looks at the cancellation signal between
+    /// waits; and true then means only that it may look again (WL-P007).
+    /// </remarks>
     public bool TryAdvanceTime()
     {
+        if (TryRunFinished(0)) return true;
+        if (_operations.Count > 0)
+        {
+            if (_timers.Count == 0 || clock is not null)
+            {
+                var wait = OperationWait;
+                if (_timers.Count > 0) wait = (int)Math.Clamp(EarliestDue() - clock!.Milliseconds, 0, OperationWait);
+                if (wait > 0 || _timers.Count == 0)
+                {
+                    TryRunFinished(wait);
+                    return true;
+                }
+            }
+        }
         if (_timers.Count == 0) return false;
         var next = 0;
         for (var i = 1; i < _timers.Count; i++)
@@ -327,6 +415,16 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         return true;
     }
 
+    /// <summary>How long, in milliseconds, it waits for an operation at a time, between looks at the cancellation signal.</summary>
+    private const int OperationWait = 100;
+
+    private long EarliestDue()
+    {
+        var due = long.MaxValue;
+        foreach (var timer in _timers) due = Math.Min(due, timer.Due);
+        return due;
+    }
+
     /// <summary>The first fault that nothing awaited, nor forgot, which stops the execution at its end (section 3.8).</summary>
     public bool TryFindUnobserved(out WebLingoTask faulted)
     {
@@ -351,5 +449,6 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         }
         foreach (var (_, _, task) in _timers) roots.Add(task);
         roots.AddRange(_faulted);
+        roots.AddRange(_operations);
     }
 }

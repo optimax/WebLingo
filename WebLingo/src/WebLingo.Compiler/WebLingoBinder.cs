@@ -164,12 +164,18 @@ public sealed class WebLingoBinder
                 // exports, made where the program begins (section 3.9).
                 var functions = new List<WebLingoBuiltinSymbol>();
                 var names = new List<string>();
+                var classes = new List<(string, WebLingoLocalSymbol)>();
                 foreach (var export in native.Exports)
                 {
+                    if (export.Optional > 0)
+                    {
+                        // One whose last parameters a call may leave out: a function written in WebLingo, which calls it.
+                        classes.Add((export.Name, BindNativeFunction(module.Name, export)));
+                        continue;
+                    }
                     functions.Add(UseBuiltin(new WebLingoBuiltinDeclaration(export.Builtin, export.Arity)));
                     names.Add(export.Name);
                 }
-                var classes = new List<(string, WebLingoLocalSymbol)>();
                 foreach (var nativeClass in native.Classes) classes.Add((nativeClass.Name, BindNativeClass(module.Name, nativeClass)));
                 var nativeInstance = DeclareHidden(module.Name, default);
                 units.Add(new WebLingoBoundUnit(module.Name, null, classes, nativeInstance) { Builtins = functions, BuiltinNames = names });
@@ -215,6 +221,7 @@ public sealed class WebLingoBinder
             builtins.Add(declaration);
             builtinClasses.Add((name, declaration.Class));
         }
+        builtins.AddRange(_nativeFunctions);
         statements.InsertRange(0, builtins);
         return new WebLingoBoundProgram(statements, _function.Locals, _builtinsInOrder)
         {
@@ -1395,28 +1402,62 @@ public sealed class WebLingoBinder
     private WebLingoLocalSymbol BindNativeClass(string module, WebLingoNativeClassInfo info)
     {
         var callees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
+        var name = module + "." + info.Name;
         var methods = new List<WebLingoMethodSyntax> { NativeMember("constructor", info.Constructor, false, callees) };
         foreach (var method in info.Methods) methods.Add(NativeMember(method.Name, method, false, callees));
-        foreach (var method in info.StaticMethods) methods.Add(NativeMember(method.Name, method, true, callees));
+        foreach (var method in info.StaticMethods) methods.Add(NativeMember(method.Name, method, true, callees, method.Factory ? name : null));
         var syntax = new WebLingoClassDeclarationSyntax(info.Name, default, methods, default);
         var outer = _nativeCallees;
         _nativeCallees = callees;
-        var local = BindBuiltinClass(module + "." + info.Name, syntax, UseObject());
+        var local = BindBuiltinClass(name, syntax, UseObject());
         _nativeCallees = outer;
         return local;
     }
 
+    /// <summary>
+    /// A native module's function with optional parameters (section 3.9): a function written in WebLingo, made where the
+    /// program begins, after the built-in classes, its last parameters <c>null</c> by default, which calls the function's
+    /// built-in with all of them; its local, which the module's instance exports.
+    /// </summary>
+    private WebLingoLocalSymbol BindNativeFunction(string module, WebLingoNativeExport export)
+    {
+        var callees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
+        var syntax = NativeMember(export.Name, export, true, callees);
+        // A cell, as an export's is, which the module's instance, made before the program's statements, holds (section 3.9).
+        var local = new WebLingoLocalSymbol(module + "." + export.Name, WebLingoDeclarationKind.Const, _main.Locals.Count, default, _main)
+        {
+            IsCaptured = true
+        };
+        _main.Locals.Add(local);
+        var (outerScope, outerFunction, outerClass, outerCallees) = (_scope, _function, _class, _nativeCallees);
+        (_scope, _function, _class, _nativeCallees) = (_prelude, _main, null, callees);
+        var function = BindFunction(export.Name, syntax.Parameters, syntax.Body, default);
+        (_scope, _function, _class, _nativeCallees) = (outerScope, outerFunction, outerClass, outerCallees);
+        _nativeFunctions.Add(new WebLingoBoundVariableDeclaration(local, new WebLingoBoundFunctionExpression(function, default), default));
+        return local;
+    }
+
+    /// <summary>The native modules' functions with optional parameters, made after the built-in classes (section 3.9).</summary>
+    private readonly List<WebLingoBoundStatement> _nativeFunctions = [];
+
     /// <summary>A native class's member: a method whose body calls its built-in, giving what it gives, but for a constructor.</summary>
+    /// <remarks>A factory's built-in is given its class first, by the local <paramref name="factoryOf"/> names (section 3.9).</remarks>
     private static WebLingoMethodSyntax NativeMember(string name, WebLingoNativeExport export, bool isStatic,
-        Dictionary<string, WebLingoBuiltinDeclaration> callees)
+        Dictionary<string, WebLingoBuiltinDeclaration> callees, string? factoryOf = null)
     {
         callees[export.Builtin] = new WebLingoBuiltinDeclaration(export.Builtin, export.Arity);
         var parameters = new List<WebLingoParameterSyntax>();
         var arguments = new List<WebLingoExpressionSyntax>();
         if (!isStatic) arguments.Add(new WebLingoThisSyntax(default));
-        for (var i = 0; i < export.Arity - (isStatic ? 0 : 1); i++)
+        if (factoryOf is not null) arguments.Add(new WebLingoNameSyntax(factoryOf, default));
+        var count = export.Arity - (isStatic && factoryOf is null ? 0 : 1);
+        for (var i = 0; i < count; i++)
         {
-            parameters.Add(new WebLingoParameterSyntax("a" + i.ToString(System.Globalization.CultureInfo.InvariantCulture), default));
+            // Its last parameters optional, each null when a call leaves it out (section 3.9).
+            parameters.Add(new WebLingoParameterSyntax("a" + i.ToString(System.Globalization.CultureInfo.InvariantCulture), default)
+            {
+                Default = i >= count - export.Optional ? new WebLingoNullLiteralSyntax(default) : null
+            });
             arguments.Add(new WebLingoNameSyntax(parameters[^1].Name, default));
         }
         var call = new WebLingoCallExpressionSyntax(new WebLingoNameSyntax(export.Builtin, default), arguments, default);

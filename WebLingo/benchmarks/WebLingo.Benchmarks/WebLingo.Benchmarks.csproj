@@ -15,5 +15,7 @@
     <ProjectReference Include="../../src/WebLingo.VM.Stack/WebLingo.VM.Stack.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib/WebLingo.StdLib.csproj" />
     <ProjectReference Include="../../src/WebLingo.Templates/WebLingo.Templates.csproj" />
+    <!-- Its native modules' loader, the .NET platform, and std/ beside it, std:fs among them (section 3.9). -->
+    <ProjectReference Include="../../src/WebLingo.Cli/WebLingo.Cli.csproj" />
   </ItemGroup>
 </Project>

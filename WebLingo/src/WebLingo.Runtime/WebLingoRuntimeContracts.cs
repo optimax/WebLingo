@@ -31,6 +31,18 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     /// <c>weblingo run script.wl name=value</c> gives them; none by default.
     /// </summary>
     public IReadOnlyDictionary<string, string> Parameters { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>
+    /// The platform's files, which <c>std:fs</c> reaches through the heap (<see cref="WebLingoHeap.FileSystem"/>, section
+    /// 7.4); none by default, its functions then WL3001.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoFileSystem? FileSystem { get; init; }
+
+    /// <summary>
+    /// The host's side of the execution's scheduler, on which work runs off the worker, its outcome posted back to it
+    /// (section 7.8, WL-P007); without one, nothing asynchronous but the execution's own tasks and timers runs.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoSchedulerHost? SchedulerHost { get; init; }
 }
 
 /// <summary>

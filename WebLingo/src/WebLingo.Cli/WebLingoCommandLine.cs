@@ -164,7 +164,9 @@ public static class WebLingoCommandLine
             Services = services,
             Clock = new SystemClock(new DotNetClock()),
             Output = textOutput,
-            Parameters = parameters
+            Parameters = parameters,
+            FileSystem = new DotNetFileSystem(),
+            SchedulerHost = new DotNetSchedulerHost()
         };
         // The VM imports modules while the program runs as the compiler imports them, with the same resolver (section 3.9).
         var vm = new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(options), Components = compilation.Components };

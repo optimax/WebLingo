@@ -85,6 +85,8 @@ public static class WebLingoDiagnosticCodes
     public const string Deadlock = "WL3009";
     /// <summary>A task that did not complete in the time <c>Task.timeout</c> gave it (proposed, section 3.8).</summary>
     public const string Timeout = "WL3010";
+    /// <summary>An I/O failure: a file that is not there, or cannot be read or written (section 3.9, <c>std:fs</c>).</summary>
+    public const string IOFailure = "WL3011";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";

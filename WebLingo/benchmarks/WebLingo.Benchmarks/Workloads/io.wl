@@ -1,0 +1,14 @@
+// I/O-bound work: 1,000 small files written and read back through std:fs, one at a time, each awaited, then all at once.
+param folder;
+import fs from "std:fs";
+var count = 1000;
+var total = 0;
+for (var i = 0; i < count; i = i + 1) await fs.writeText(folder + "/a" + i.toString() + ".txt", "file " + i.toString());
+for (var i = 0; i < count; i = i + 1) total = total + (await fs.readText(folder + "/a" + i.toString() + ".txt")).length;
+var writes = [];
+for (var i = 0; i < count; i = i + 1) writes.push(fs.writeText(folder + "/b" + i.toString() + ".txt", "file " + i.toString()));
+await Task.all(writes);
+var reads = [];
+for (var i = 0; i < count; i = i + 1) reads.push(fs.readText(folder + "/b" + i.toString() + ".txt"));
+foreach (var text in await Task.all(reads)) total = total + text.length;
+writeLn(total);

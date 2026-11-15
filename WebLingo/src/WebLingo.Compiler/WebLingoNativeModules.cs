@@ -20,7 +20,17 @@ public sealed record WebLingoNativeClassInfo(string Name, WebLingoNativeExport C
     IReadOnlyList<WebLingoNativeExport> StaticMethods);
 
 /// <summary>A native module's exported function: the name it exports it by, the built-in that is it, and its arity.</summary>
-public sealed record WebLingoNativeExport(string Name, string Builtin, int Arity);
+public sealed record WebLingoNativeExport(string Name, string Builtin, int Arity)
+{
+    /// <summary>
+    /// How many of its last parameters a call may leave out, each then <c>null</c> to its built-in, which a function written
+    /// in WebLingo, with those defaults, calls in its place (section 3.9).
+    /// </summary>
+    public int Optional { get; init; }
+
+    /// <summary>For a native class's static method, whether it is a factory, its built-in given the class first (section 3.9).</summary>
+    public bool Factory { get; init; }
+}
 
 /// <summary>
 /// The host's way to find native modules (section 3.9): which import paths name one, a scheme's (<c>native:sqlite</c>) or

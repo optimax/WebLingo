@@ -181,7 +181,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         foreach (var function in registry.Functions)
         {
             if (!builtins.TryGetBuiltin(function.Name, out _)) builtins.Register(function);
-            exports.Add(new WebLingoNativeExport(function.Export, function.Name, function.Arity));
+            exports.Add(new WebLingoNativeExport(function.Export, function.Name, function.Arity) { Optional = function.Optional });
         }
         var classes = new List<WebLingoNativeClassInfo>();
         foreach (var nativeClass in registry.Classes)
@@ -194,10 +194,14 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
             }
             var methods = new List<WebLingoNativeExport>();
             var statics = new List<WebLingoNativeExport>();
-            for (var i = 0; i < nativeClass.Methods.Count; i++) methods.Add(Export(nativeClass.Methods[i].Name, members[1 + i]));
+            for (var i = 0; i < nativeClass.Methods.Count; i++)
+            {
+                methods.Add(Export(nativeClass.Methods[i].Name, members[1 + i]) with { Optional = nativeClass.Methods[i].Optional });
+            }
             for (var i = 0; i < nativeClass.StaticMethods.Count; i++)
             {
-                statics.Add(Export(nativeClass.StaticMethods[i].Name, members[1 + nativeClass.Methods.Count + i]));
+                statics.Add(Export(nativeClass.StaticMethods[i].Name, members[1 + nativeClass.Methods.Count + i])
+                    with { Optional = nativeClass.StaticMethods[i].Optional, Factory = nativeClass.StaticMethods[i].Factory });
             }
             classes.Add(new WebLingoNativeClassInfo(nativeClass.Name, Export("constructor", members[0]), methods, statics));
         }
@@ -241,18 +245,21 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
 
         private bool Taken(string name) => Functions.Exists(f => f.Export == name) || Classes.Exists(c => c.Name == name);
 
-        public void Function(string name, int arity, WebLingoNativeFunction function) => Add(name, arity, function, false);
+        public void Function(string name, int arity, WebLingoNativeFunction function) => Add(name, arity, 0, function, false);
 
-        public void TextFunction(string name, int arity, WebLingoNativeFunction function) => Add(name, arity, function, true);
+        public void Function(string name, int arity, int optional, WebLingoNativeFunction function) => Add(name, arity, optional, function, false);
 
-        private void Add(string name, int arity, WebLingoNativeFunction function, bool writesText)
+        public void TextFunction(string name, int arity, WebLingoNativeFunction function) => Add(name, arity, 0, function, true);
+
+        private void Add(string name, int arity, int optional, WebLingoNativeFunction function, bool writesText)
         {
             if (_error is not null) return;
             if (!IsName(name)) _error = $"it registers a function named '{name}', which is not a name";
             else if (arity < 0) _error = $"it registers '{name}' with an arity of {arity}";
+            else if (optional < 0 || optional > arity) _error = $"it registers '{name}' with {optional} of its {arity} parameters optional";
             else if (Taken(name)) _error = $"it registers '{name}' twice";
             else if (writesText) Functions.Add(new NativeTextFunction(module + "." + name, name, arity, function));
-            else Functions.Add(new NativeFunction(module + "." + name, name, arity, function));
+            else Functions.Add(new NativeFunction(module + "." + name, name, arity, function) { Optional = optional });
         }
 
         private static bool IsName(string name)
@@ -277,6 +284,8 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         public string Name => name;
         public string Export => export;
         public int Arity => arity;
+        /// <summary>How many of its last parameters a call may leave out (section 3.9).</summary>
+        public int Optional { get; init; }
 
         public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
             function(arguments, heap, out result, out error);

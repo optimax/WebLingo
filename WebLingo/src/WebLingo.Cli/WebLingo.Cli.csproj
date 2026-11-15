@@ -11,6 +11,7 @@
     <ProjectReference Include="../WebLingo.Templates/WebLingo.Templates.csproj" />
     <!-- Built first, not referenced: a standard module the host loads as any native module is (section 3.9). -->
     <ProjectReference Include="../WebLingo.StdLib.Tasks/WebLingo.StdLib.Tasks.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../WebLingo.StdLib.Fs/WebLingo.StdLib.Fs.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <!-- std:system, a native module installed with the runtime, in std/ beside its program (section 3.9); and so beside
@@ -18,6 +19,8 @@
     <None Include="../WebLingo.StdLib/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.dll" Link="std/system.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.StdLib.Tasks/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Tasks.dll" Link="std/tasks.dll"
+          CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="../WebLingo.StdLib.Fs/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Fs.dll" Link="std/fs.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
 </Project>

@@ -71,6 +71,8 @@ public sealed class WebLingoStackVirtualMachine
 
         // The execution's own heap (worker-local, section 4.3), whose roots are the constants and the frames.
         var heap = new WebLingoHeap(context.Resources.MaxHeapUnits);
+        heap.FileSystem = context.FileSystem;
+        heap.SchedulerHost = context.SchedulerHost;
         var constants = new WebLingoValue[module.Constants.Count];
         var names = new WebLingoMemberName[module.Constants.Count]; // Each string constant as a member's name.
         heap.AddRoots(constants);

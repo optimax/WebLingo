@@ -22,11 +22,12 @@
 | .NET Task / ValueTask | Adapted only | Not permitted as WebLingo core async contract |
 | .NET `CancellationToken` | Not used | The VM's cancellation is WebLingo's own `WebLingoCancellationSignal` (WL-P007) |
 | System.Diagnostics.Stopwatch | Adapted | DotNetClock only |
-| System.IO.File, Directory, their `Info` types, FileStream | Adapted | CLI/bootstrap only; PAL required for runtime |
+| System.IO.File, Directory, their `Info` types, FileStream, StreamReader, StreamWriter | Adapted | CLI/bootstrap, and `DotNetFileSystem` (`WebLingo.Platform.DotNet`), the PAL's file system, which `std:fs` reaches (section 7.4); never the portable core |
+| System.Text.Encoding and its encodings, with exception fallbacks | Adapted | `DotNetFileSystem`'s encodings, named by scripts (`utf-8`, `utf-16`, …), invalid bytes an error |
 | System.IO.Path | Adapted | Paths and their separators are the PAL's, not the platform's |
 | System.Console | Adapted | A host's (the CLI's), never the core's |
 | System.Environment | Adapted | The core must not depend on the platform, its line ending among others |
-| OS threads (`Thread`, `ThreadPool`) | Adapted | Adapter-only (§7.14); the CLI's clock sleeps while an execution waits for a timer (`Thread.Sleep`, M0.11.1) |
+| OS threads (`Thread`, `ThreadPool`), `Monitor` | Adapted | Adapter-only (§7.14); the CLI's clock sleeps while an execution waits for a timer (`Thread.Sleep`, M0.11.1); `DotNetSchedulerHost` runs blocking work on the thread pool and holds the work posted back in a queue that `Monitor` guards (section 7.8) |
 | P/Invoke | Adapted | Adapter-only (§7.14) |
 | ASP.NET Core | Adapted | Hosting adapter only |
 | ADO.NET | Adapted | Future database adapters only |

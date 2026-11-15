@@ -18,6 +18,12 @@ public interface IWebLingoNativeRegistry
     void Function(string name, int arity, WebLingoNativeFunction function);
 
     /// <summary>
+    /// An exported function whose last <paramref name="optional"/> parameters a call may leave out, each then <c>null</c>
+    /// to the function, which is always given <paramref name="arity"/> arguments (section 3.9).
+    /// </summary>
+    void Function(string name, int arity, int optional, WebLingoNativeFunction function);
+
+    /// <summary>
     /// An exported function that writes its arguments as text, as <c>write</c> does: a VM gives it an argument's text, as a
     /// string, when the argument holds an instance whose class overrides <c>toString()</c>, having run that method
     /// (<see cref="IWebLingoTextBuiltin"/>, section 3.7).

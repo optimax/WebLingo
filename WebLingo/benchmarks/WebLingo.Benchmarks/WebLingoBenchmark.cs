@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using WebLingo.Cli;
 using WebLingo.Compiler;
+using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
 namespace WebLingo.Benchmarks;
@@ -24,43 +26,77 @@ public sealed record WebLingoMeasurement(
 /// </summary>
 public static class WebLingoBenchmark
 {
+    /// <summary>The standard modules' built-ins, which their loader registers as it loads them (section 3.9).</summary>
+    private static readonly WebLingoBuiltinRegistry NativeBuiltins = new();
+
+    /// <summary>
+    /// The workloads' built-ins, and the standard modules installed beside the benchmark in std/, as beside the command
+    /// lines, <c>std:fs</c> among them (section 3.9).
+    /// </summary>
     private static readonly WebLingoCompilerOptions Options =
-        new([new WebLingoBuiltinDeclaration("write", 1), new WebLingoBuiltinDeclaration("writeLn", 1)]);
+        new([new WebLingoBuiltinDeclaration("write", 1), new WebLingoBuiltinDeclaration("writeLn", 1)])
+        {
+            Native = new WebLingoNativeModuleLoader(new Dictionary<string, string> { ["std"] = Path.Combine(AppContext.BaseDirectory, "std") },
+                NativeBuiltins)
+        };
 
     public static WebLingoMeasurement Measure(IWebLingoBenchmarkEngine engine, WebLingoWorkload workload, int runs, int warmUps)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(runs, 1);
         ArgumentOutOfRangeException.ThrowIfNegative(warmUps);
         var program = engine.Compile(workload.Source, workload.FileName, Options);
-        for (var i = 0; i < warmUps; i++) Run(engine, workload, program);
-
-        var times = new TimeSpan[runs];
-        var instructions = 0L;
-        var allocated = 0L;
-        for (var i = 0; i < runs; i++)
+        // A workload's files, in a folder of its own, which its runs write anew, removed at the end.
+        var folder = workload.UsesFolder ? Path.Combine(Path.GetTempPath(), "weblingo-benchmark-" + Guid.NewGuid().ToString("N")) : null;
+        if (folder is not null) Directory.CreateDirectory(folder);
+        try
         {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            var before = GC.GetAllocatedBytesForCurrentThread();
-            var watch = Stopwatch.StartNew();
-            instructions = Run(engine, workload, program);
-            watch.Stop();
-            allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-            times[i] = watch.Elapsed;
+            for (var i = 0; i < warmUps; i++) Run(engine, workload, program, folder);
+
+            var times = new TimeSpan[runs];
+            var instructions = 0L;
+            var allocated = 0L;
+            for (var i = 0; i < runs; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                var before = GC.GetAllocatedBytesForCurrentThread();
+                var watch = Stopwatch.StartNew();
+                instructions = Run(engine, workload, program, folder);
+                watch.Stop();
+                allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+                times[i] = watch.Elapsed;
+            }
+            Array.Sort(times);
+            return new WebLingoMeasurement(workload.Name, engine.Name, times[runs / 2], times[0], instructions, allocated,
+                program.CodeInstructions, program.CodeBytes);
         }
-        Array.Sort(times);
-        return new WebLingoMeasurement(workload.Name, engine.Name, times[runs / 2], times[0], instructions, allocated,
-            program.CodeInstructions, program.CodeBytes);
+        finally
+        {
+            if (folder is not null) Directory.Delete(folder, recursive: true);
+        }
     }
 
-    /// <summary>Runs the program once, checks its output, and returns how many instructions it executed.</summary>
-    private static long Run(IWebLingoBenchmarkEngine engine, WebLingoWorkload workload, IWebLingoBenchmarkProgram program)
+    /// <summary>
+    /// Runs the program once, checks its output, and returns how many instructions it executed. Allocated is the worker's
+    /// own: what the host's threads allocate, an I/O workload's files read and written, is not counted.
+    /// </summary>
+    private static long Run(IWebLingoBenchmarkEngine engine, WebLingoWorkload workload, IWebLingoBenchmarkProgram program, string? folder)
     {
         var output = new WebLingoCollectedOutput();
         // The built-ins a page calls besides (section 13), which a script does not.
         var services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output));
         foreach (var builtin in WebLingoTemplateBuiltins.Create(output)) services.Register(builtin);
+        foreach (var builtin in NativeBuiltins.Builtins) services.Register(builtin);
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services };
+        if (folder is not null)
+        {
+            context = context with
+            {
+                Parameters = new Dictionary<string, string> { ["folder"] = folder.Replace('\\', '/') },
+                FileSystem = new DotNetFileSystem(),
+                SchedulerHost = new DotNetSchedulerHost()
+            };
+        }
         var result = program.Run(context);
         if (!result.Succeeded)
         {

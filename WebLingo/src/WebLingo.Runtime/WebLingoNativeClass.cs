@@ -3,7 +3,17 @@ using WebLingo.Core;
 namespace WebLingo.Runtime;
 
 /// <summary>A native class's constructor, method or static method: its name, its arity, without the instance, and its function.</summary>
-public sealed record WebLingoNativeMember(string Name, int Arity, WebLingoNativeFunction Function);
+public sealed record WebLingoNativeMember(string Name, int Arity, WebLingoNativeFunction Function)
+{
+    /// <summary>How many of its last parameters a call may leave out, each then <c>null</c> to its function (section 3.9).</summary>
+    public int Optional { get; init; }
+
+    /// <summary>
+    /// For a static method, whether it is a factory, given its class first, with which it makes the class's instances
+    /// (<see cref="WebLingoNativeClass.TryMake"/>), as <c>File.open(path, mode)</c> does.
+    /// </summary>
+    public bool Factory { get; init; }
+}
 
 /// <summary>
 /// A native module's class (specification, sections 3.7 and 3.9), which <see cref="IWebLingoNativeRegistry.Class"/> gives:
@@ -40,17 +50,65 @@ public sealed class WebLingoNativeClass(string name)
     }
 
     /// <summary>A method, called on an instance, which its function is given first; <c>dispose</c> is the class's disposal.</summary>
-    public WebLingoNativeClass DeclareMethod(string name, int arity, WebLingoNativeFunction method)
+    public WebLingoNativeClass DeclareMethod(string name, int arity, WebLingoNativeFunction method) => DeclareMethod(name, arity, 0, method);
+
+    /// <summary>A method whose last <paramref name="optional"/> parameters a call may leave out, each then <c>null</c> to its function.</summary>
+    public WebLingoNativeClass DeclareMethod(string name, int arity, int optional, WebLingoNativeFunction method)
     {
-        if (CheckMember(name, arity, _methods)) _methods.Add(new(name, arity, method));
+        if (CheckMember(name, arity, _methods) && CheckOptional(name, arity, optional)) _methods.Add(new(name, arity, method) { Optional = optional });
         return this;
     }
 
     /// <summary>A static method, called on the class, without an instance.</summary>
-    public WebLingoNativeClass DeclareStaticMethod(string name, int arity, WebLingoNativeFunction method)
+    public WebLingoNativeClass DeclareStaticMethod(string name, int arity, WebLingoNativeFunction method) => DeclareStaticMethod(name, arity, 0, method);
+
+    /// <summary>A static method whose last <paramref name="optional"/> parameters a call may leave out, each then <c>null</c>.</summary>
+    public WebLingoNativeClass DeclareStaticMethod(string name, int arity, int optional, WebLingoNativeFunction method)
     {
-        if (CheckMember(name, arity, _staticMethods)) _staticMethods.Add(new(name, arity, method));
+        if (CheckMember(name, arity, _staticMethods) && CheckOptional(name, arity, optional))
+        {
+            _staticMethods.Add(new(name, arity, method) { Optional = optional });
+        }
         return this;
+    }
+
+    /// <summary>
+    /// A factory, a static method given its class first, then its arguments, the last <paramref name="optional"/> of which
+    /// a call may leave out, which makes the class's instances with <see cref="TryMake"/>, opened, connected or read, as a
+    /// constructor cannot, being synchronous: <c>File.open(path, mode)</c>, a task giving the file.
+    /// </summary>
+    public WebLingoNativeClass DeclareFactory(string name, int arity, int optional, WebLingoNativeFunction factory)
+    {
+        if (CheckMember(name, arity, _staticMethods) && CheckOptional(name, arity, optional))
+        {
+            _staticMethods.Add(new(name, arity, factory) { Optional = optional, Factory = true });
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// A new instance of <paramref name="classValue"/>, this class or one extending it, which a factory was given, marked as
+    /// this class's own, as its constructor marks one, its constructor not run (section 3.9); WL3001 for any other value.
+    /// </summary>
+    public bool TryMake(WebLingoValue classValue, WebLingoHeap heap, out WebLingoValue instance, out WebLingoRuntimeError? error)
+    {
+        instance = WebLingoValue.Null;
+        if (classValue.Kind != WebLingoValueKind.Class)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"The native class {Name} makes its instances only of a class.");
+            return false;
+        }
+        if (!heap.TryAllocateInstance(classValue, out instance, out error)) return false;
+        if (heap.TryMarkNative(instance, this)) return true;
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+            $"The native class {Name} cannot make {WebLingoValueFormatter.Describe(instance, heap)} one of its instances.");
+        return false;
+    }
+
+    private bool CheckOptional(string name, int arity, int optional)
+    {
+        if (Error is null && (optional < 0 || optional > arity)) Error = $"class '{Name}' declares '{name}' with {optional} of its {arity} parameters optional";
+        return Error is null;
     }
 
     private bool CheckMember(string name, int arity, List<WebLingoNativeMember> members)
@@ -183,7 +241,7 @@ public sealed class WebLingoNativeClass(string name)
         : IWebLingoBuiltinFunction
     {
         public string Name => name;
-        public int Arity => member.Arity + (kind == MemberKind.Static ? 0 : 1);
+        public int Arity => member.Arity + (kind == MemberKind.Static && !member.Factory ? 0 : 1);
 
         public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
         {

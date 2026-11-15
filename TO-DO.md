@@ -12,6 +12,8 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 
 2026-11-14: M0.12 is done; still waits for the choice between the VMs (WL-BC002), which waits for an I/O-bound workload, the last of those "Both VMs, for now" waits for ("I/O-Bound Workload", below).
 
+2026-11-15: the I/O-bound workload is done; waits for the owner's choice between the VMs ("The Choice Between the VMs (WL-BC002)", below).
+
 ## [IDLE] Native Modules
 
 Native modules as the specification, section 3.9 ("Native modules"), has them, approved 14 November 2026: `IWebLingoNativeModule` and `IWebLingoNativeRegistry`, a module's functions and classes; an assembly loaded, into the host's context, from a configured scheme's folder only; a module imported by its scheme or by a path within such a folder, statically and while the program runs, its exports known to the compiler; and `std:system`'s built-ins moved into a native module in the `std` scheme's folder; on both VMs. Added by Claude, 2026-11-14.
@@ -105,7 +107,7 @@ A4:
 
 A5:
 
-## I/O-Bound Workload
+## [WORKING] I/O-Bound Workload
 
 A benchmark workload of I/O-bound work (specification, section 5.6), the last of those "Both VMs, for now" waits for, after which the owner chooses between the VMs (WL-BC002), and M0.13 can begin. Scripts reach I/O through the platform layer (section 7: WL-P004's filesystem, synchronous and asynchronous, on WebLingo's own operation model, WL-P007) and a standard module, such as `std:fs` (section 3.9), a native module installed with the runtime. Added by Claude, 2026-11-14.
 
@@ -132,6 +134,37 @@ A4: (a)
 Q5, an I/O failure (a missing file, a path not granted): (a) a runtime error of a code of its own, WL3011, of a class `IOError` extending `Error`, which a catch may catch, its message naming the path as the script gave it, never the host's own paths; (b) WL3001, as another invalid operation is.
 
 A5: (a)
+
+Done (Claude, 2026-11-15): `std:fs`, a native module installed as `std/fs.dll` (`WebLingo.StdLib.Fs`), as A1 to A5 have it: `readText`, `writeText`, `appendText`, `exists`, `remove`, `list`, `makeFolder` and `removeFolder`, and the native class `File`, `File.open(path, mode)`, `read`, `write` and `dispose()`; each asynchronous by default, its `Sync` form beside it; UTF-8 unless an optional argument names an encoding; any file the process may; and every failure an `IOError` (WL3011) naming the path as the script gave it. Recorded as approved in the specification, section 3.9 ("Files: `std:fs`"), its register, and its codes (WL3011); the details are Proposed in section 15.2 ("Files (`std:fs`)", and "Native modules' optional parameters and factories"). Built for it: the platform's file system, `IWebLingoFileSystem` (`DotNetFileSystem` on .NET), and the host's side of the scheduler, `IWebLingoSchedulerHost` (`DotNetSchedulerHost`), on whose threads an asynchronous function's work runs, its outcome posted back to the worker, which waits for it when nothing else can run, both VMs unchanged but for handing the heap the host's file system and scheduler; a native function's optional parameters, through a function written in WebLingo with those defaults; and native classes' factories, static methods given their class, `File.open` one. The benchmark's `io` workload writes 1,000 small files and reads them back, one at a time, then all at once with `Task.all`: 1,100.5 ms on the register VM, 1,136.0 ms on the stack VM, nearly all of it the file system's (the specification, section 5.6, "I/O-bound work", with every workload's numbers, for the choice between the VMs, a task below). Guessed: `File`'s `read()` gives its next line, `null` at its end; modes `"r"`, `"w"` and `"a"`; `list` gives names, in ordinal order; `makeFolder` makes the folders above it too; paths from the process's current folder; UTF-8 written without a byte order mark and read skipping one; text not valid in its encoding an `IOError`; an unknown encoding WL3001. Checks: the Release build, without warnings, the full test suite (2,131 tests), the CLI on the samples, and the benchmark, on Windows only; Linux not tried.
+
+
+## [QUESTION] The Choice Between the VMs (WL-BC002)
+
+The register VM or the stack VM (specification, sections 5.2 and 5.6; WL-BC002, Provisional), which the owner's decision of 13 November 2026 left open until property access, async suspension, template output and I/O-bound work could be measured too; all four can now, the last since `std:fs` ("I/O-Bound Workload", in `DONE.md`). M0.13, WBC, the bytecode's binary format, is the chosen VM's, and waits for it. Added by Claude, 2026-11-15.
+
+Every workload, measured together in one run, 11 timed runs after 3 warm-ups, on Windows (the specification, section 5.6, "I/O-bound work"):
+
+| Workload | Register | Stack | Stack ÷ register | Instructions run, register | Instructions run, stack | Code bytes, register | Code bytes, stack |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| loops | 26.9 ms | 33.5 ms | 1.25 | 10,010,008 | 17,514,512 | 76 | 74 |
+| calls | 10.4 ms | 11.4 ms | 1.10 | 2,063,676 | 2,670,639 | 74 | 48 |
+| closures | 13.6 ms | 15.9 ms | 1.17 | 3,120,009 | 4,660,014 | 106 | 93 |
+| strings | 10.9 ms | 12.9 ms | 1.18 | 1,920,008 | 3,100,012 | 83 | 76 |
+| collections | 4.4 ms | 4.9 ms | 1.11 | 605,064 | 1,030,106 | 223 | 218 |
+| objects | 98.5 ms | 102.4 ms | 1.04 | 3,200,026 | 5,000,042 | 187 | 156 |
+| async | 4.0 ms | 5.0 ms | 1.25 | 701,913 | 1,403,221 | 108 | 108 |
+| templates | 6.2 ms | 6.1 ms | 0.98 | 280,010 | 400,015 | 135 | 104 |
+| io | 1,100.5 ms | 1,136.0 ms | 1.03 | 114,080 | 152,109 | 758 | 560 |
+
+The register VM is faster on every workload where the VMs' own work counts, by 1.04 to 1.25 times, running 1.3 to 2.0 times fewer instructions; the stack VM's bytecode is up to 35 percent smaller, and its code generator about a fifth shorter (section 5.6, "The comparison"). Where other work dominates, writing a page's text or files, the two are as close as the machine's noise. Two decisions, each answerable with a letter.
+
+**Q1, the VM: (a) the register VM; (b) the stack VM; (c) both still, each feature built on both, until something more is measured.**
+
+A1:
+
+**Q2, if one is chosen, the other: (a) removed, with its code generator, its verifier and its tests; (b) kept as it is, built on no further, its tests kept for what it has, until it is removed.**
+
+A2:
 
 # END-OF-TO-DO
 

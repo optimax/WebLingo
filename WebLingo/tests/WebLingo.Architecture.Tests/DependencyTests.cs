@@ -24,6 +24,7 @@ public sealed class DependencyTests
         { "WebLingo.Templates", ["WebLingo.Core", "WebLingo.Language", "WebLingo.Compiler"] },
         { "WebLingo.StdLib", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.StdLib.Tasks", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
+        { "WebLingo.StdLib.Fs", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.Platform.Abstractions", ["WebLingo.Core"] },
         { "WebLingo.Hosting.Abstractions", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
     };
@@ -56,7 +57,7 @@ public sealed class DependencyTests
     [Fact]
     public void TheRulesCoverEveryPortableAssembly()
     {
-        Assert.Equal(12, PortableCore.Count); // Section 3 of Documents/implementation.md lists twelve.
+        Assert.Equal(13, PortableCore.Count); // Section 3 of Documents/implementation.md lists thirteen.
     }
 
     private static IEnumerable<string> References(string assembly) =>
