@@ -2,7 +2,7 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [IDLE] M0.13: WBC
+## [QUESTION] M0.13: WBC
 
 WBC, the bytecode's binary format, its writing and its reading, with verification (specification, sections 5.1, 5.3 and 5.5). Its encoding choices are proposed in the specification and not yet approved, and the format is the chosen VM's, so this waits for the choice between the VMs (WL-BC002) as well. Added by Claude, 2026-11-13.
 
@@ -13,6 +13,28 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 2026-11-14: M0.12 is done; still waits for the choice between the VMs (WL-BC002), which waits for an I/O-bound workload, the last of those "Both VMs, for now" waits for ("I/O-Bound Workload", below).
 
 2026-11-15: the I/O-bound workload is done; waits for the owner's choice between the VMs ("The Choice Between the VMs (WL-BC002)", below).
+
+2026-11-15 (Claude): the owner kept both VMs, and has M0.13 go ahead now, a format for each VM's bytecode in one container (A1 and A3 of "The Choice Between the VMs (WL-BC002)"). The specification proposes the container (section 5.3), none of it approved, and does not say what uses it. Guessed, for now: a `.wbc` holds a whole program as the compiler joins it, its static imports included, the native modules and dynamic imports it names found when it runs, as from source; its fixed-size fields little-endian; the files its source positions name written as the compiler was given them, relative to the program's folder, never as the host's own paths; a file of a version its reader does not know rejected, as WL4001. Five decisions, each answerable with a letter.
+
+**Q1, what uses WBC in M0.13: (a) the command line: `weblingo compile script.wl` writes `script.wbc`, `weblingo run script.wbc` runs one, and `weblingo disasm script.wbc` shows one as text, commands section 8.4 lists for later; (b) nothing but its tests yet: the format, its writer and its reader, with verification, the command line and a host's cache coming with hosting.**
+
+A1:
+
+**Q2, which VM's bytecode a `.wbc` holds: (a) one, its header saying which, the compiler writing the one it is asked for (`--vm stack`), a VM refusing the other's; (b) either or both, each in a code section of its own, each VM taking its own.**
+
+A2:
+
+**Q3, the container as section 5.3 proposes it (a 32-byte header with the magic `WBC\0`, a major and a minor version, flags, the sections' count, the directory's offset and the file's length; a directory of 32-byte entries; sections for constants, functions, code, classes and modules, exception tables, source positions and integrity; operands in LEB128, strings in UTF-8, binary64s as their 8 bytes): (a) approved, and frozen as version 1.0, every later change a new version; (b) built as proposed, but kept Proposed, free to change without a new version until the owner freezes it.**
+
+A3:
+
+**Q4, a jump's target in a file: (a) a byte offset, as section 5.3 proposes, turned into the instruction's index when read; (b) the instruction's index, as in memory, since both VMs decode a function before they run it, so that nothing is turned.**
+
+A4:
+
+**Q5, protecting a file against damage, which the verifier does not catch where it leaves the code valid (a flipped constant or string): (a) a CRC-32 of each section, in its directory entry, checked when the file is read; (b) a SHA-256 of the file, which a cache may key by too, through the platform's cryptography (section 7.10); (c) none yet.**
+
+A5:
 
 ## [IDLE] Native Modules
 
@@ -34,7 +56,7 @@ A3: (a) but - like (c) says - measure the impact on performance.
 
 2026-11-14 (Claude): the answers recorded as approved in the specification, section 3.9 ("Native modules"), and its decision register; split into the parts section 9 defines ("Native modules"), each a task below. Waits for them.
 
-## [QUESTION] Native Modules, Part 4: The Built-in Classes as Native Classes
+## Native Modules, Part 4: The Built-in Classes as Native Classes
 
 `Array`, `Map`, `Set`, `Task`, `Module`, `Class` and `Function` as a standard module's native classes, their methods native functions, measured against the VMs' own on the benchmark, as A3 of "Native Modules" asks (specification, sections 3.9 and 9, "Native modules", part 4), on both VMs. Added by Claude, 2026-11-14.
 
@@ -100,54 +122,59 @@ In plain language:
 - Where it goes: on `main`, `a.push(x)` is one check inside the VM ("an array, and `push`? then add the value"), a few billionths of a second. As a native member it is a call: the VM finds `Array`'s `push`, sees that it is native, finds its function, hands it the arguments through the module's interface, which checks that the value is an array, and then adds it. Each step is small; together they cost about 38 billionths of a second a use on the register VM, and 43 on the stack VM, which over 120,000 uses is `collections`' extra 4.6 to 5.2 ms. Making that much cheaper would mean making a call as cheap as the check the VMs do now, which is what their own members already are.
 - A gain either way: with arguments no longer copied, every built-in's call is cheaper, `write` and a page's text among them, so `templates` is 22 percent faster on the register VM and 10 percent on the stack VM, and allocates 12.0 MB, not 14.8.
 
-**Q3, what lands: (a) the built-in classes as `std:core`'s native classes, as the branch has them, about twice as slow where a program uses their members most, as fast elsewhere; (b) the VMs keep their own members for the built-in classes, `std:core` dropped, and what lands is what helps every native module and built-in: arguments read where they are, native classes' properties, indexers and direct calls, members found by number; (c) `std:core` lands as what defines the built-in classes, but the VMs keep their own fast way for its members until a program replaces one (`extend`, `setMethod`), each member then written twice, which the tests keep alike; (d) nothing.**
+Q3, what lands: (a) the built-in classes as `std:core`'s native classes, as the branch has them, about twice as slow where a program uses their members most, as fast elsewhere; (b) the VMs keep their own members for the built-in classes, `std:core` dropped, and what lands is what helps every native module and built-in: arguments read where they are, native classes' properties, indexers and direct calls, members found by number; (c) `std:core` lands as what defines the built-in classes, but the VMs keep their own fast way for its members until a program replaces one (`extend`, `setMethod`), each member then written twice, which the tests keep alike; (d) nothing.
 
-A3:
+A3: (b)
 
+2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
 
-## [QUESTION] The `foreach` Protocol
+## The `foreach` Protocol
 
 How `foreach` visits a class's instances, as A2 of "Native Modules, Part 4" has it: the class's `iterate()` gives an iterator, whose `next()` gives each item, which classes written in WebLingo, native classes and COM's collections all implement (specification, section 3.6, approved 15 November 2026). Added by Claude, 2026-11-15. Three decisions it needs, each answerable with a letter.
 
-**Q1, how an iterator says it has no more items: (a) `next()` gives `null` at the end, so that `null` cannot be an item; (b) the iterator also has `hasNext()`, asked before each `next()`, as Java's has; (c) `next()` gives a map, `{ value: v, done: false }`, and `{ done: true }` at the end, as JavaScript's iterators do, a map made for each item.**
+Q1, how an iterator says it has no more items: (a) `next()` gives `null` at the end, so that `null` cannot be an item; (b) the iterator also has `hasNext()`, asked before each `next()`, as Java's has; (c) `next()` gives a map, `{ value: v, done: false }`, and `{ done: true }` at the end, as JavaScript's iterators do, a map made for each item.
 
-A1:
+A1: (b)
 
-**Q2, a key and a value, `foreach (var (key, value) in x)`, for a class's instances: (a) `next()` gives each entry as an array of two, `[key, value]`, which the loop takes apart; (b) not yet: only `foreach (var item in x)` visits a class's instances.**
+Q2, a key and a value, `foreach (var (key, value) in x)`, for a class's instances: (a) `next()` gives each entry as an array of two, `[key, value]`, which the loop takes apart; (b) not yet: only `foreach (var item in x)` visits a class's instances.
 
-A2:
+A2: (b)
 
-**Q3, arrays, maps, sets and strings: (a) `foreach` visits them as now, the VMs' own way, the protocol for every other class; (b) as now, but each also has `iterate()`, which a script may call itself; (c) through the protocol too, as any class, measured against the VMs' own way first.**
+Q3, arrays, maps, sets and strings: (a) `foreach` visits them as now, the VMs' own way, the protocol for every other class; (b) as now, but each also has `iterate()`, which a script may call itself; (c) through the protocol too, as any class, measured against the VMs' own way first.
 
-A3:
+A3: (b)
 
-## [QUESTION] COM Module
+2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
+
+## COM Module
 
 Design and propose a native extension for Windows that would allow the scripts to use COM objects, like old ASP did. Do not code it yet.
 
 2026-11-15 (Claude): designed, not coded, in the specification, section 3.10 ("COM objects on Windows"), all of it Proposed: a native module that only Windows hosts install; `com.create("ADODB.Connection")` and `com.get(moniker)`, as `Server.CreateObject` and `GetObject`, giving a native class's instances that hold the COM objects and release them when disposed; their members through `IDispatch`, `x[k]` their default member, through the indexers part 4 gives native classes; `VARIANT`s mapped to WebLingo's values, currency and decimals as numbers and dates as ISO 8601 strings until WebLingo has those kinds; a failed call a catchable `ComError` (WL3012, with `number`, `source` and `description`, as ASP's `Err`); each COM object its worker's, as COM's apartments ask; and `foreach` over a COM collection waiting for the question part 4 asks. Five decisions, each answerable with a letter.
 
-**Q1, its name: (a) `std:com`, a standard module that only a Windows host installs; (b) a scheme of its own for Windows's native modules, `windows:com`.**
+Q1, its name: (a) `std:com`, a standard module that only a Windows host installs; (b) a scheme of its own for Windows's native modules, `windows:com`.
 
-A1:
+A1: (b)
 
-**Q2, its objects' members, known only while the program runs: (a) as a program writes any member, `conn.Open(text)`, `rs.EOF`, a native class getting a fallback for the members it does not declare (a getter, a setter and a call, each a native function); (b) through methods of `ComObject`'s own, `conn.call("Open", [text])`, `rs.get("EOF")`, `rs.set("Filter", text)`, native classes unchanged.**
+Q2, its objects' members, known only while the program runs: (a) as a program writes any member, `conn.Open(text)`, `rs.EOF`, a native class getting a fallback for the members it does not declare (a getter, a setter and a call, each a native function); (b) through methods of `ComObject`'s own, `conn.call("Open", [text])`, `rs.get("EOF")`, `rs.set("Filter", text)`, native classes unchanged.
 
-A2:
+A2: (a)
 
-**Q3, the threads COM runs on: (a) each worker that runs a script a single-threaded apartment's, with a message pump, as ASP's were, every object's calls direct; (b) workers as now, COM's objects made in an apartment of COM's own, every call to one marshalled to it, slower; (c) a thread of its own for COM in each execution, every call sent to it.**
+Q3, the threads COM runs on: (a) each worker that runs a script a single-threaded apartment's, with a message pump, as ASP's were, every object's calls direct; (b) workers as now, COM's objects made in an apartment of COM's own, every call to one marshalled to it, slower; (c) a thread of its own for COM in each execution, every call sent to it.
 
-A3:
+A3: (a)
 
-**Q4, the objects a script may make: (a) any the process may; (b) only the ProgIDs and CLSIDs an application's configuration lists, `weblingo.json`'s `"com": { "allow": ["ADODB.Connection"] }`, none by default, since objects such as `WScript.Shell` reach the whole machine.**
+Q4, the objects a script may make: (a) any the process may; (b) only the ProgIDs and CLSIDs an application's configuration lists, `weblingo.json`'s `"com": { "allow": ["ADODB.Connection"] }`, none by default, since objects such as `WScript.Shell` reach the whole machine.
 
-A4:
+A4: Don't allow com by default. It requires a config permission. (Claude's reading, which the owner did not correct: (b), the permission listing the objects allowed, `"*"` allowing any.)
 
-**Q5, how its C# calls COM: (a) `IDispatch` through function pointers on its table of methods, by platform invoke, so that the same source compiles with Native C#; (b) .NET's own COM interop (`dynamic`, `[ComImport]`), simpler, but for .NET only.**
+Q5, how its C# calls COM: (a) `IDispatch` through function pointers on its table of methods, by platform invoke, so that the same source compiles with Native C#; (b) .NET's own COM interop (`dynamic`, `[ComImport]`), simpler, but for .NET only.
 
-A5:
+A5: (a)
 
-## [QUESTION] The Choice Between the VMs (WL-BC002)
+2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
+
+## The Choice Between the VMs (WL-BC002)
 
 The register VM or the stack VM (specification, sections 5.2 and 5.6; WL-BC002, Provisional), which the owner's decision of 13 November 2026 left open until property access, async suspension, template output and I/O-bound work could be measured too; all four can now, the last since `std:fs` ("I/O-Bound Workload", in `DONE.md`). M0.13, WBC, the bytecode's binary format, is the chosen VM's, and waits for it. Added by Claude, 2026-11-15.
 
@@ -167,13 +194,19 @@ Every workload, measured together in one run, 11 timed runs after 3 warm-ups, on
 
 The register VM is faster on every workload where the VMs' own work counts, by 1.04 to 1.25 times, running 1.3 to 2.0 times fewer instructions; the stack VM's bytecode is up to 35 percent smaller, and its code generator about a fifth shorter (section 5.6, "The comparison"). Where other work dominates, writing a page's text or files, the two are as close as the machine's noise. Two decisions, each answerable with a letter.
 
-**Q1, the VM: (a) the register VM; (b) the stack VM; (c) both still, each feature built on both, until something more is measured.**
+Q1, the VM: (a) the register VM; (b) the stack VM; (c) both still, each feature built on both, until something more is measured.
 
-A1:
+A1: (c)
 
-**Q2, if one is chosen, the other: (a) removed, with its code generator, its verifier and its tests; (b) kept as it is, built on no further, its tests kept for what it has, until it is removed.**
+Q2, if one is chosen, the other: (a) removed, with its code generator, its verifier and its tests; (b) kept as it is, built on no further, its tests kept for what it has, until it is removed.
 
-A2:
+A2: does not apply while both VMs are kept (A1).
+
+Q3, asked in the chat once A1 kept both VMs, M0.13, WBC, which waited for the choice: (a) it goes ahead now, a format for each VM's bytecode, the container shared (header, section directory, constants, functions, exceptions, debug information), only the code section's encoding differing; (b) it waits until one VM is chosen, hosting first, so that startup and latency can be measured.
+
+A3: (a)
+
+2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
 
 # END-OF-TO-DO
 
