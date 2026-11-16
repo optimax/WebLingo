@@ -62,12 +62,6 @@ One decision, answerable with a letter:
 
 A1:
 
-## [WORKING] WebLingo Language Reference
-
-Write a comprehensive WebLingo Language Reference with extensive and numerous examples.
-
-2026-11-16 (Claude): written, `Documents/weblingo-language-reference.md`, listed among the project's documents (`Documents/implementation.md`, section 2) and linked from `WebLingo/README.md` and the WASP User Manual: running programs, the lexical structure, variables, values, operators, strings, statements, functions, collections, classes, exceptions, disposal, asynchrony, modules, the standard library, and the diagnostic codes, with over sixty examples, each run with `weblingo` and giving the output shown, and what the language does not have yet in its last section. Guessed: its place and its name, and that a change to the language updates it in the same change (`Documents/implementation.md`, section 2). Its examples were run on Windows only.
-
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value

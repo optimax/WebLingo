@@ -2625,3 +2625,11 @@ Write a comprehensive WASP User Manual with examples. This is not meant to be an
 2026-11-16 (Claude): written, `Documents/wasp-user-manual.md`, listed among the project's documents (`Documents/implementation.md`, section 2) and linked from both READMEs. Every example in it was run, with `wasp serve` and `wasp run`, and gives the output shown; it describes what is built, what is missing in its last section, and the language only as far as pages need it, the WebLingo Language Reference being the next task. Guessed: its place and its name, and that a change to what a site's author sees updates it in the same change (`Documents/implementation.md`, section 2). Its examples were run on Windows only.
 
 Done (Claude, 2026-11-16, `13a6d90`): `Documents/wasp-user-manual.md`, the WASP User Manual, its examples run. Main's checks: documentation only, the solution unchanged since its last checks (the Release build, without warnings, and 2,973 tests, on Windows).
+
+## [DONE] WebLingo Language Reference
+
+Write a comprehensive WebLingo Language Reference with extensive and numerous examples.
+
+2026-11-16 (Claude): written, `Documents/weblingo-language-reference.md`, listed among the project's documents (`Documents/implementation.md`, section 2) and linked from `WebLingo/README.md` and the WASP User Manual: running programs, the lexical structure, variables, values, operators, strings, statements, functions, collections, classes, exceptions, disposal, asynchrony, modules, the standard library, and the diagnostic codes, with over sixty examples, each run with `weblingo` and giving the output shown, and what the language does not have yet in its last section. Guessed: its place and its name, and that a change to the language updates it in the same change (`Documents/implementation.md`, section 2). Its examples were run on Windows only.
+
+Done (Claude, 2026-11-16, `cd23266`): `Documents/weblingo-language-reference.md`, the WebLingo Language Reference, its examples run. Main's checks: documentation only, the solution unchanged since its last checks (the Release build, without warnings, and 2,973 tests, on Windows).
