@@ -1,6 +1,7 @@
 using WebLingo.Cli;
 using WebLingo.Compiler;
 using WebLingo.Core;
+using WebLingo.Hosting;
 using WebLingo.StdLib;
 using WebLingo.Templates;
 namespace WebLingo.Wasp.Cli;
@@ -10,7 +11,8 @@ namespace WebLingo.Wasp.Cli;
 /// (a <c>.wasp</c>) with the template compiler and writes it to standard output, <c>check</c>, and <c>--version</c>, with
 /// <c>weblingo</c>'s diagnostics, errors and exit codes (<see cref="WebLingoCommandLine"/>); <c>--root &lt;folder&gt;</c>,
 /// before the page, names the application's root, which an include's path starting with <c>/</c> is from, the page's
-/// folder when it is left out. It is the host: it registers the standard library's built-ins and the ones a page calls
+/// folder when it is left out; and the page's folder's <c>WASP.config</c> gives its schemes. It is the host: it registers
+/// the standard library's built-ins and the ones a page calls
 /// (<see cref="WebLingoTemplateBuiltins"/>), and finds the templates a page includes (<see cref="WebLingoTemplateFileResolver"/>).
 /// </summary>
 public static class WebLingoWaspCommandLine
@@ -21,6 +23,7 @@ public static class WebLingoWaspCommandLine
     public static WebLingoCommandLineProgram Pages(string? root) =>
         new("wasp", Version, ".wasp", WebLingoTemplateBuiltins.Create, (page, options) => Compile(page, options, root))
         {
+            Configuration = WebLingoRouteTable.ConfigurationFile,
             Options = "[--root <folder>] ",
             OptionsHelp =
             [

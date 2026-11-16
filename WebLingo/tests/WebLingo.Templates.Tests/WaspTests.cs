@@ -239,6 +239,24 @@ public sealed class WaspTests : IDisposable
     }
 
     [Fact]
+    public void APagesFolderIsConfiguredByWaspConfig()
+    {
+        // wasp reads its page's folder's WASP.config, not weblingo.config, a script's (the owner's decision, 16 November 2026).
+        Write("weblingo.config", "{ \"schemes\": { \"l\": \"native\" } }");
+        Assert.Equal((WebLingoCommandLine.Success, "<p>2</p>", ""), Wasp("run", "<p><%= 1 + 1 %></p>"));
+
+        Write("WASP.config", "{ \"schemes\": { \"l\": \"native\" } }");
+        var (exit, _, error) = Wasp("run", "<p><%= 1 + 1 %></p>");
+        Assert.Equal(WebLingoCommandLine.FileUnreadable, exit);
+        Assert.Contains("WASP.config", error);
+        Assert.Contains("'l' is not a scheme's name, given a folder.", error);
+
+        var output = new StringWriter();
+        WebLingoWaspCommandLine.Run(["page.wasp"], output, new StringWriter());
+        Assert.Contains("  --scheme  names a folder of native modules, over WASP.config's, in the file's folder", output.ToString());
+    }
+
+    [Fact]
     public void WeblingoStillRunsScriptsOnly()
     {
         // weblingo compiles the language only: a page's block is not WebLingo.

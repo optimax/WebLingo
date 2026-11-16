@@ -28,7 +28,7 @@ lists what is missing.
 11. [Waiting: `await`](#11-waiting-await)
 12. [Errors](#12-errors)
 13. [How a page's output is sent](#13-how-a-pages-output-is-sent)
-14. [Configuration: `weblingo.config`](#14-configuration-weblingoconfig)
+14. [Configuration: `WASP.config`](#14-configuration-waspconfig)
 15. [While you work](#15-while-you-work)
 16. [The `wasp` command line](#16-the-wasp-command-line)
 17. [Deploying to IIS](#17-deploying-to-iis)
@@ -117,7 +117,7 @@ Some files are never sent, whatever their path:
 
 - a page's source, and a module's, a `.wl` that exports no handler (`/lib/catalog.wl` is a 404);
 - compiled WebLingo, `.wlbc` files;
-- the site's configuration, `weblingo.config`, and IIS's, `web.config`;
+- the site's configuration, `WASP.config`, and IIS's, `web.config`;
 - every file and folder whose name starts with `.`, such as `.git`.
 
 A typical site:
@@ -134,7 +134,7 @@ mysite/
   components/tea.wasp    a part a page renders, with values of its own
   lib/catalog.wl         a module of shared code
   css/site.css           sent as it is
-  weblingo.config        the site's configuration
+  WASP.config            the site's configuration
   web.config             IIS's, when the site runs under IIS
 ```
 
@@ -578,8 +578,8 @@ fails.wasp(3,8): error WL3005: The index 3 is outside 0 to 0.
 ```
 
 In **production**, the 500's page says only `500 Internal Server Error`, so that visitors never see the site's code.
-Locally, `wasp serve` runs in development; under IIS, in production; `weblingo.config` may name either
-([section 14](#14-configuration-weblingoconfig)).
+Locally, `wasp serve` runs in development; under IIS, in production; `WASP.config` may name either
+([section 14](#14-configuration-waspconfig)).
 
 Nothing the page wrote before the error is sent: a 500 has only its own page, and none of the headers the page set.
 That holds while the page's output is under 64 KB; after that, see [section 13](#13-how-a-pages-output-is-sent).
@@ -625,14 +625,14 @@ A page's output is kept until it reaches **64 KB**, then sent as the page writes
   and, in development, at the end of what was sent.
 - **A client that reads slowly makes the page wait** for it, as at an `await`, its server running other requests
   meanwhile, so that a slow client never fills the server's memory.
-- **A client that takes nothing for 30 seconds** has its request cancelled, its response ended. `weblingo.config`'s
+- **A client that takes nothing for 30 seconds** has its request cancelled, its response ended. `WASP.config`'s
   `"sendTimeout"` gives another time, in seconds.
 
 ---
 
-## 14. Configuration: `weblingo.config`
+## 14. Configuration: `WASP.config`
 
-A site's configuration is a JSON file, `weblingo.config`, in its root:
+A site's configuration is a JSON file, `WASP.config`, in its root:
 
 ```json
 { "environment": "development", "sendTimeout": 60 }
@@ -647,6 +647,10 @@ A site's configuration is a JSON file, `weblingo.config`, in its root:
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
 which. `wasp serve` reads the file when it starts; after changing it, start `wasp serve`, or the IIS site, again.
 
+Its name is `WASP.config`, written so: Linux tells `wasp.config` from it. A `weblingo.config` configures a folder of
+scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run` and `wasp check` read the
+`WASP.config` in the page's folder, for its `"schemes"`.
+
 ---
 
 ## 15. While you work
@@ -655,7 +659,7 @@ which. `wasp serve` reads the file when it starts; after changing it, start `was
   stopped changing for a quarter of a second, then loads the site anew; requests already running finish on the old
   version. A change that breaks the site's routes, such as a page and a route handler for one path, leaves the old
   version served, and `wasp serve` says why. A change that breaks a page makes that page a 500 until it is fixed.
-- **Development shows errors.** Run locally, the site is in development unless `weblingo.config` says otherwise
+- **Development shows errors.** Run locally, the site is in development unless `WASP.config` says otherwise
   ([section 12](#12-errors)).
 - **Pages are compiled when first asked for**, and kept in memory; WASP never writes compiled files into a site's
   folder.
@@ -750,7 +754,7 @@ the requests to it. If WebLingo is installed elsewhere, change `processPath` to 
 - **Updating WebLingo** updates every site at once. A running `wasp.exe` keeps its files in use, so stop the sites'
   application pools, or IIS (`iisreset /stop`), before copying the new version over the old, and start them again
   after.
-- **Under IIS, a site runs in production** unless its `weblingo.config` says otherwise.
+- **Under IIS, a site runs in production** unless its `WASP.config` says otherwise.
 
 The repository's `Examples/example1` is such a site, and `Examples/README.md` walks through deploying it.
 

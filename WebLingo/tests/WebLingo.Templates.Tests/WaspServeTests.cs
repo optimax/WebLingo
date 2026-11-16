@@ -99,19 +99,25 @@ public sealed class WaspServeTests : IDisposable
     [Fact]
     public void TheConfigurationNamesTheEnvironment()
     {
+        // A site's configuration is WASP.config (the owner's decision, 16 November 2026); its weblingo.config is not read.
+        Assert.Equal("WASP.config", WebLingoRouteTable.ConfigurationFile);
         Write("weblingo.config", "{ \"environment\": \"production\" }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out _, out var environment));
+        Assert.Equal(WebLingoEnvironment.Development, environment);
+
+        Write("WASP.config", "{ \"environment\": \"production\" }");
+        Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out _, out environment));
         Assert.Equal(WebLingoEnvironment.Production, environment);
 
-        Write("weblingo.config", "{ \"environment\": \"staging\" }");
+        Write("WASP.config", "{ \"environment\": \"staging\" }");
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _));
-        Assert.EndsWith("weblingo.config: \"environment\" is \"development\" or \"production\".", error);
+        Assert.EndsWith("WASP.config: \"environment\" is \"development\" or \"production\".", error);
 
-        Write("weblingo.config", "{ \"sendTimeout\": 5 }");
+        Write("WASP.config", "{ \"sendTimeout\": 5 }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
-        Write("weblingo.config", "{ \"sendTimeout\": 0 }");
+        Write("WASP.config", "{ \"sendTimeout\": 0 }");
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
-        Assert.EndsWith("weblingo.config: \"sendTimeout\" is a number of seconds, more than 0.", error);
+        Assert.EndsWith("WASP.config: \"sendTimeout\" is a number of seconds, more than 0.", error);
     }
 
     [Fact]

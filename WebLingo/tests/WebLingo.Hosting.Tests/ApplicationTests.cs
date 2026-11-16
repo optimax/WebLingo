@@ -41,7 +41,10 @@ public sealed class ApplicationTests
     [InlineData("/lib/util")]
     [InlineData("/lib/util.wl")]
     [InlineData("/app.wlbc")]
+    [InlineData("/WASP.config")]
+    [InlineData("/wasp.config")]
     [InlineData("/weblingo.config")]
+    [InlineData("/Web.config")]
     [InlineData("/web.config")]
     [InlineData("/.git/config")]
     [InlineData("/../site/index")]
@@ -164,8 +167,9 @@ public sealed class ApplicationTests
         .Add("/site/lib/util.wl", "export function twice(x) { return x * 2; }")
         .Add("/site/css/site.css", "body { }")
         .Add("/site/app.wlbc", "WLBC")
+        .Add("/site/WASP.config", "{ }")
         .Add("/site/weblingo.config", "{ }")
-        .Add("/site/web.config", "<configuration/>")
+        .Add("/site/Web.config", "<configuration/>")
         .Add("/site/.git/config", "secret");
 
     private static WebLingoApplication Load(MemoryFileSystem files, WebLingoEnvironment environment = WebLingoEnvironment.Production)

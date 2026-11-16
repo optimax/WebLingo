@@ -51,7 +51,7 @@ public static class WebLingoCommandLine
         if (args.Length >= 2 && (args[0] is "run" or "check" || (args[0] == "compile" && program.Bytecode)))
         {
             // run|check|compile [--scheme name=folder]… [for compile, --register, the default, or --stack, or their aliases
-            // --vm register and --vm stack] file [name=value …, for run]: the schemes over weblingo.config's (section 3.9).
+            // --vm register and --vm stack] file [name=value …, for run]: the schemes over the configuration's (section 3.9).
             var schemes = new Dictionary<string, string>(StringComparer.Ordinal);
             WebLingoBytecodeKind? vm = null;
             var at = 1;
@@ -126,7 +126,7 @@ public static class WebLingoCommandLine
             output.WriteLine($"  disasm    shows a {BytecodeExtension}'s bytecode as text");
             output.WriteLine($"            run and check take a {BytecodeExtension} too, which run runs on the VM it is for");
         }
-        output.WriteLine("  --scheme  names a folder of native modules, over weblingo.config's, in the file's folder");
+        output.WriteLine($"  --scheme  names a folder of native modules, over {program.Configuration}'s, in the file's folder");
         foreach (var line in program.OptionsHelp) output.WriteLine(line);
         return args.Length == 0 ? Success : UsageError;
     }
@@ -372,13 +372,13 @@ public static class WebLingoCommandLine
 
     /// <summary>
     /// The host for the file <paramref name="path"/>, whose program's own file is named <paramref name="mainName"/>: its
-    /// schemes, from <c>weblingo.config</c> in its folder and those given, <c>std:system</c> loaded, and the program's built-ins;
+    /// schemes, from its program's configuration in its folder and those given, <c>std:system</c> loaded, and the program's built-ins;
     /// null, the reason written, if they cannot be had.
     /// </summary>
     private static Host? TryHost(WebLingoCommandLineProgram program, string path, string mainName, IReadOnlyDictionary<string, string> givenSchemes,
         TextWriter output, TextWriter error)
     {
-        if (!WebLingoSchemes.TryLoad(path, givenSchemes, out var schemes, out var wrongConfiguration))
+        if (!WebLingoSchemes.TryLoad(path, program.Configuration, givenSchemes, out var schemes, out var wrongConfiguration))
         {
             error.WriteLine(wrongConfiguration);
             return null;

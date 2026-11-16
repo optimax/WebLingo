@@ -28,6 +28,12 @@ public sealed record WebLingoCommandLineProgram(
     /// <c>check</c> of a <c>.wlbc</c>, as <c>weblingo</c> has; WASP never writes one (section 5.1).
     /// </summary>
     public bool Bytecode { get; init; }
+
+    /// <summary>
+    /// The configuration's file in a file's folder (specification, sections 3.9 and 6.12): <c>weblingo.config</c>, a
+    /// script's, unless the program has another, as <c>wasp</c> has <c>WASP.config</c>, a site's.
+    /// </summary>
+    public string Configuration { get; init; } = WebLingoSchemes.ConfigurationFile;
 }
 
 /// <summary>

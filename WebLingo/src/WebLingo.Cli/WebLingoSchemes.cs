@@ -2,8 +2,9 @@ using System.Text.Json;
 namespace WebLingo.Cli;
 
 /// <summary>
-/// A command line's configuration, <c>weblingo.config</c>, JSON, in the program's folder, or in an application's root
-/// (specification, sections 3.9 and 6.12). Its schemes, each a name and the full path of a folder of native modules:
+/// A command line's configuration, JSON, in the program's folder, or in an application's root (specification, sections
+/// 3.9 and 6.12): <c>weblingo.config</c> for <c>weblingo</c>'s scripts, and <c>WASP.config</c> for <c>wasp</c>'s pages and
+/// sites, its caller naming which. Its schemes, each a name and the full path of a folder of native modules:
 /// <c>std</c>'s, <c>std/</c> beside the program, unless configured; then those of the configuration,
 /// <c>{ "schemes": { "native": "C:/WebLingo/native" } }</c>, a relative folder there being from the file's folder; then
 /// those the command line gives, <c>--scheme native=folder</c>, a relative folder from the current one, each over the
@@ -14,21 +15,24 @@ namespace WebLingo.Cli;
 /// </summary>
 public static class WebLingoSchemes
 {
-    /// <summary>The file a program's folder may hold, configuring its host.</summary>
+    /// <summary>The file a script's folder may hold, configuring <c>weblingo</c>'s host (a site's is <c>WASP.config</c>).</summary>
     public const string ConfigurationFile = "weblingo.config";
 
-    /// <summary>The schemes for the program at <paramref name="program"/>, the command line's given; false, with why, otherwise.</summary>
-    public static bool TryLoad(string program, IReadOnlyDictionary<string, string> given, out Dictionary<string, string> schemes,
-        out string? error) =>
-        TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", given, out schemes, out _, out _, out error);
+    /// <summary>
+    /// The schemes for the program at <paramref name="program"/>, from its folder's <paramref name="configuration"/>, the
+    /// command line's given over them; false, with why, otherwise.
+    /// </summary>
+    public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
+        out Dictionary<string, string> schemes, out string? error) =>
+        TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out error);
 
     /// <summary>
-    /// The configuration in <paramref name="folder"/>: its schemes, the command line's given over them, its environment,
-    /// <c>development</c>, <c>production</c>, or null if it names none, and its send timeout, in seconds, or null if it gives
-    /// none; false, with why, otherwise.
+    /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
+    /// line's given over them, its environment, <c>development</c>, <c>production</c>, or null if it names none, and its send
+    /// timeout, in seconds, or null if it gives none; false, with why, otherwise.
     /// </summary>
-    public static bool TryLoadFolder(string folder, IReadOnlyDictionary<string, string> given, out Dictionary<string, string> schemes,
-        out string? environment, out double? sendTimeout, out string? error)
+    public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
+        out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out string? error)
     {
         sendTimeout = null;
         schemes = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -37,7 +41,7 @@ public static class WebLingoSchemes
         };
         (environment, error) = (null, null);
         folder = Path.GetFullPath(folder);
-        var file = Path.Combine(folder, ConfigurationFile);
+        var file = Path.Combine(folder, configuration);
         if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, ref sendTimeout, out error)) return false;
         foreach (var (name, path) in given) schemes[name] = Path.GetFullPath(path);
         return true;
