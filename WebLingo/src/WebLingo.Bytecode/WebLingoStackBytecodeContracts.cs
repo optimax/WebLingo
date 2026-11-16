@@ -190,6 +190,12 @@ public sealed record WebLingoStackFunction(
     public string? Source { get; init; }
     /// <summary>Whether it is a native class's member, which only calls its built-in, an error in it reported where it was called (section 3.9).</summary>
     public bool IsNative { get; init; }
+    /// <summary>
+    /// For a native member that only calls one built-in with its parameters, in order: that built-in's import, which the VM
+    /// calls in its place, without its frame, and what the call gives; -1 for any other function (section 3.9).
+    /// </summary>
+    public int NativeBuiltin { get; init; } = -1;
+    public WebLingoNativeResult NativeResult { get; init; }
     /// <summary>The cells a closure of it captures, from the function that makes the closure.</summary>
     public IReadOnlyList<WebLingoCapture> Captures { get; init; } = [];
     /// <summary>The slots its frame needs: its locals and its operand stack.</summary>

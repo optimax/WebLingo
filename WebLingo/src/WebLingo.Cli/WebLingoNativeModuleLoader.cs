@@ -40,7 +40,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         public string Name => name;
         public int Arity => function.Arity;
 
-        public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
             function.TryInvoke(arguments, heap, out result, out error);
     }
 
@@ -192,18 +192,34 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
             {
                 if (!builtins.TryGetBuiltin(member.Name, out _)) builtins.Register(member);
             }
+            // In the order Builtins gives them, properties and the indexer last.
+            var next = 0;
+            var constructor = Export("constructor", members[next++]);
             var methods = new List<WebLingoNativeExport>();
             var statics = new List<WebLingoNativeExport>();
-            for (var i = 0; i < nativeClass.Methods.Count; i++)
+            var properties = new List<WebLingoNativePropertyInfo>();
+            foreach (var method in nativeClass.Methods) methods.Add(Export(method.Name, members[next++]) with { Optional = method.Optional });
+            foreach (var method in nativeClass.StaticMethods)
             {
-                methods.Add(Export(nativeClass.Methods[i].Name, members[1 + i]) with { Optional = nativeClass.Methods[i].Optional });
+                statics.Add(Export(method.Name, members[next++]) with { Optional = method.Optional, Factory = method.Factory });
             }
-            for (var i = 0; i < nativeClass.StaticMethods.Count; i++)
+            foreach (var property in nativeClass.Properties)
             {
-                statics.Add(Export(nativeClass.StaticMethods[i].Name, members[1 + nativeClass.Methods.Count + i])
-                    with { Optional = nativeClass.StaticMethods[i].Optional, Factory = nativeClass.StaticMethods[i].Factory });
+                var getter = Export(property.Name, members[next++]);
+                properties.Add(new WebLingoNativePropertyInfo(property.Name, getter, property.Setter is null ? null : Export(property.Name, members[next++])));
             }
-            classes.Add(new WebLingoNativeClassInfo(nativeClass.Name, Export("constructor", members[0]), methods, statics));
+            WebLingoNativeExport? indexGetter = null, indexSetter = null;
+            if (nativeClass.Indexer is { } indexer)
+            {
+                indexGetter = Export("[]", members[next++]);
+                if (indexer.Setter is not null) indexSetter = Export("[]=", members[next++]);
+            }
+            classes.Add(new WebLingoNativeClassInfo(nativeClass.Name, constructor, methods, statics)
+            {
+                Properties = properties,
+                IndexGetter = indexGetter,
+                IndexSetter = indexSetter
+            });
         }
         module = new WebLingoNativeModuleInfo(name, exports) { Classes = classes };
         error = null;
@@ -287,7 +303,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         /// <summary>How many of its last parameters a call may leave out (section 3.9).</summary>
         public int Optional { get; init; }
 
-        public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
             function(arguments, heap, out result, out error);
     }
 }

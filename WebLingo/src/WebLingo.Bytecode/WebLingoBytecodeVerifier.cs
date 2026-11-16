@@ -90,6 +90,12 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
         {
             return Fail($"The function has {function.Spans.Count} source spans for {function.Code.Count} instructions.");
         }
+        if (function.NativeBuiltin != -1 && (!function.IsNative || function.NativeBuiltin < 0 || function.NativeBuiltin >= module.Imports.Count
+                || module.Imports[function.NativeBuiltin].Arity != function.ParameterCount || function.IsAsync || function.OptionalCount != 0
+                || !Enum.IsDefined(function.NativeResult)))
+        {
+            return Fail($"The function's native built-in, {function.NativeBuiltin}, is not an import of a native member's arity.");
+        }
         if (function.LocalNames is not null && function.LocalNames.Count != function.LocalCount)
         {
             return Fail($"The function has {function.LocalNames.Count} local names for {function.LocalCount} locals.");

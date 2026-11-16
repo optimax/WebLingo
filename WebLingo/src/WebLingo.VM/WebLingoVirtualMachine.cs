@@ -684,6 +684,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             if (!WebLingoMembers.TryGetIndex(registers[ins.B], registers[ins.C], heap, ins.D != 0, out var element,
                                     out error))
                             {
+                                PendIndexer(error, element, registers[ins.B], registers[ins.C], default, ins.A);
                                 break;
                             }
                             registers[ins.A] = element;
@@ -691,7 +692,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             continue;
                         }
                         case WebLingoOpCode.SetIndex:
-                            if (!WebLingoMembers.TrySetIndex(registers[ins.A], registers[ins.B], registers[ins.C], heap, out error)) break;
+                            if (!WebLingoMembers.TrySetIndex(registers[ins.A], registers[ins.B], registers[ins.C], heap, out error, out callee))
+                            {
+                                // An indexer's setter gives the value assigned, which its result, written where the value is, keeps.
+                                PendIndexer(error, callee, registers[ins.A], registers[ins.B], registers[ins.C], ins.C);
+                                break;
+                            }
                             pc++;
                             continue;
                         case WebLingoOpCode.Dispose:
@@ -857,6 +863,14 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             error = WrongArgumentCount(function.Name, function.ParameterCount - withThis, argumentCount,
                                 function.OptionalCount);
                             goto failed;
+                        }
+                        if (function.NativeBuiltin >= 0 && TryCallNative(function, self, withThis, arguments, firstArgument, argumentCount,
+                                registers, resultRegister, constructed, frames, depth, out error))
+                        {
+                            // A native member that only calls its built-in: the built-in at once, without its frame (section 3.9).
+                            if (error is not null) goto failed;
+                            pc++;
+                            continue;
                         }
                         if (depth + 1 >= maxCallDepth)
                         {
@@ -1453,6 +1467,24 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             if (!setter && !ReferenceEquals(error, WebLingoMembers.Getter)) return;
             Pend(accessor, setter ? 1 : 0, result);
             _operands[0] = value;
+            _pendingSelf = self;
+        }
+
+        /// <summary>
+        /// An indexer's getter, with <paramref name="index"/>, or its setter, with the index and <paramref name="value"/>,
+        /// that an index's read or assignment failed with (<see cref="WebLingoMembers.Getter"/>,
+        /// <see cref="WebLingoMembers.Setter"/>): pending, called on the target, its result going to
+        /// <paramref name="result"/> (section 3.9); nothing for another failure.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void PendIndexer(WebLingoRuntimeError? error, WebLingoValue accessor, WebLingoValue self, WebLingoValue index,
+            WebLingoValue value, int result)
+        {
+            var setter = ReferenceEquals(error, WebLingoMembers.Setter);
+            if (!setter && !ReferenceEquals(error, WebLingoMembers.Getter)) return;
+            Pend(accessor, setter ? 2 : 1, result);
+            _operands[0] = index;
+            _operands[1] = value;
             _pendingSelf = self;
         }
 
@@ -2325,17 +2357,32 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         }
 
         /// <summary>
-        /// Calls a built-in with the <paramref name="count"/> arguments from <paramref name="first"/> on, copied out, so
-        /// that its result may overwrite them. Its failure, even an exception, is a runtime error.
+        /// A native member's arguments, read where they are (section 3.9): after the instance it runs on, when that is the
+        /// value just before them, as a method's call has it; else copied, the instance first, into the execution's own
+        /// buffer, which no other call uses meanwhile, a built-in calling nothing of the VM's.
+        /// </summary>
+        private ReadOnlySpan<WebLingoValue> NativeArguments(WebLingoValue self, int withThis, WebLingoValue[] arguments, int first, int count)
+        {
+            if (withThis == 0) return new ReadOnlySpan<WebLingoValue>(arguments, first, count);
+            if (first > 0 && arguments[first - 1] == self) return new ReadOnlySpan<WebLingoValue>(arguments, first - 1, count + 1);
+            if (_nativeArguments.Length < count + 1) _nativeArguments = new WebLingoValue[count + 1];
+            _nativeArguments[0] = self;
+            Array.Copy(arguments, first, _nativeArguments, 1, count);
+            return new ReadOnlySpan<WebLingoValue>(_nativeArguments, 0, count + 1);
+        }
+
+        private WebLingoValue[] _nativeArguments = new WebLingoValue[4];
+
+        /// <summary>
+        /// Calls a built-in with the <paramref name="count"/> arguments from <paramref name="first"/> on, read where they are,
+        /// its result written once it has returned. Its failure, even an exception, is a runtime error.
         /// </summary>
         private WebLingoRuntimeError? CallBuiltin(IWebLingoBuiltinFunction builtin, WebLingoValue[] values, int first, int count, out WebLingoValue result)
         {
             result = WebLingoValue.Null;
-            var arguments = new WebLingoValue[count];
-            for (var i = 0; i < arguments.Length; i++) arguments[i] = values[first + i];
             try
             {
-                if (!builtin.TryInvoke(arguments, heap, out result, out var error))
+                if (!builtin.TryInvoke(new ReadOnlySpan<WebLingoValue>(values, first, count), heap, out result, out var error))
                 {
                     return error ?? new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed.");
                 }
@@ -2348,16 +2395,50 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         }
 
         /// <summary>
-        /// Calls a built-in with its arguments copied out of the registers, so that its result may overwrite them.
-        /// Its failure, even an exception, is a runtime error.
+        /// A native member that only calls its built-in (section 3.9): the built-in called in its place, given the instance
+        /// first when the call has one, the member's frame never made, what the member gives going to
+        /// <paramref name="result"/>; its failure, even an exception, a runtime error where the member was called. False,
+        /// leaving the call to the member's frame, for a disposal's call or a text's, which go on when that frame returns.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool TryCallNative(WebLingoFunction function, WebLingoValue self, int withThis, WebLingoValue[] arguments, int first,
+            int count, WebLingoValue[] registers, int result, WebLingoValue constructed, Frame[] frames, int depth,
+            out WebLingoRuntimeError? error)
+        {
+            error = null;
+            if (result < 0 || (depth + 1 < frames.Length && frames[depth + 1] is { Text: not null } or { DisposeChain: not null })) return false;
+            var builtin = builtins[function.NativeBuiltin];
+            var values = NativeArguments(self, withThis, arguments, first, count);
+            try
+            {
+                if (!builtin.TryInvoke(values, heap, out var given, out error))
+                {
+                    error ??= new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed.");
+                    return true;
+                }
+                registers[result] = function.NativeResult switch
+                {
+                    WebLingoNativeResult.LastArgument => values[^1],
+                    WebLingoNativeResult.Nothing => constructed,
+                    _ => given
+                };
+            }
+            catch (Exception exception)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed: {exception.Message}");
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Calls a built-in with its arguments read where they are, in the registers, its result written once it has
+        /// returned. Its failure, even an exception, is a runtime error.
         /// </summary>
         private WebLingoRuntimeError? CallBuiltin(IWebLingoBuiltinFunction builtin, WebLingoValue[] registers, in WebLingoInstruction instruction)
         {
-            var arguments = new WebLingoValue[instruction.D];
-            for (var i = 0; i < arguments.Length; i++) arguments[i] = registers[instruction.C + i];
             try
             {
-                if (!builtin.TryInvoke(arguments, heap, out var result, out var error))
+                if (!builtin.TryInvoke(new ReadOnlySpan<WebLingoValue>(registers, instruction.C, instruction.D), heap, out var result, out var error))
                 {
                     return error ?? new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed.");
                 }

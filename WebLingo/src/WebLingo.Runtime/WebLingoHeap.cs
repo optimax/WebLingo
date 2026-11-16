@@ -195,6 +195,18 @@ public sealed class WebLingoHeap
                 (target.Setters ??= new Dictionary<string, WebLingoValue>(StringComparer.Ordinal))[name[4..]] = closure;
             }
         }
+        // The methods and getters whose names the runtime knows by number, by that number, and its indexer (section 3.9).
+        (target.KnownMethods, target.KnownGetters, target.IndexGetter, target.IndexSetter) = (null, null, WebLingoValue.Null, WebLingoValue.Null);
+        foreach (var (name, closure) in methods)
+        {
+            if (name == WebLingoIndexers.Getter) target.IndexGetter = closure;
+            else if (name == WebLingoIndexers.Setter) target.IndexSetter = closure;
+            var getter = name.StartsWith("get:", StringComparison.Ordinal);
+            var member = WebLingoMembers.Find(getter ? name[4..] : name);
+            if (member == WebLingoMember.Unknown || name.StartsWith("set:", StringComparison.Ordinal)) continue;
+            (getter ? target.KnownGetters ??= new WebLingoValue[KnownMemberCount] : target.KnownMethods ??= new WebLingoValue[KnownMemberCount])
+                [(int)member] = closure;
+        }
         // Its disposal: its own dispose method, if it has one, then its base's disposal (section 3.7).
         var disposeChain = inherited;
         if (target.OwnMethods.TryGetValue("dispose", out var own))
@@ -870,6 +882,42 @@ public sealed class WebLingoHeap
     public bool TryGetMethod(WebLingoValue value, string name, out WebLingoValue closure) =>
         Current(Get<ClassObject>(value, WebLingoValueKind.Class)).Methods.TryGetValue(name, out closure);
 
+    /// <summary>How many members the runtime knows by number (<see cref="WebLingoMember"/>).</summary>
+    private static readonly int KnownMemberCount = Enum.GetValues<WebLingoMember>().Length;
+
+    /// <summary>
+    /// A class's method, its own or a base's: one whose name the runtime knows by number found by that number, without its
+    /// name, as a kind of value's own members are; any other by its name (section 3.9).
+    /// </summary>
+    public bool TryGetMethod(WebLingoValue value, WebLingoMember member, string name, out WebLingoValue closure)
+    {
+        var target = Current(Get<ClassObject>(value, WebLingoValueKind.Class));
+        if (member == WebLingoMember.Unknown) return target.Methods.TryGetValue(name, out closure);
+        closure = target.KnownMethods is { } known ? known[(int)member] : WebLingoValue.Null;
+        return closure.Kind != WebLingoValueKind.Null;
+    }
+
+    /// <summary>A class's property's getter, one whose name the runtime knows by number found by that number (section 3.9).</summary>
+    public bool TryGetGetter(WebLingoValue value, WebLingoMember member, string name, out WebLingoValue closure)
+    {
+        var target = Current(Get<ClassObject>(value, WebLingoValueKind.Class));
+        if (member != WebLingoMember.Unknown)
+        {
+            closure = target.KnownGetters is { } known ? known[(int)member] : WebLingoValue.Null;
+            return closure.Kind != WebLingoValueKind.Null;
+        }
+        closure = WebLingoValue.Null;
+        return target.Getters is { } getters && getters.TryGetValue(name, out closure);
+    }
+
+    /// <summary>A class's indexer's getter, or its setter, a native class's (section 3.9); false for a class without one.</summary>
+    public bool TryGetIndexer(WebLingoValue value, bool setter, out WebLingoValue closure)
+    {
+        var target = Current(Get<ClassObject>(value, WebLingoValueKind.Class));
+        closure = setter ? target.IndexSetter : target.IndexGetter;
+        return closure.Kind != WebLingoValueKind.Null;
+    }
+
     /// <summary>A new instance of a class, without fields yet.</summary>
     public bool TryAllocateInstance(WebLingoValue classValue, out WebLingoValue instance, out WebLingoRuntimeError? error)
     {
@@ -1413,6 +1461,15 @@ public sealed class WebLingoHeap
         /// <summary>Its properties' getters and setters, its own and its bases', by the property's name; null for none (section 3.7).</summary>
         public Dictionary<string, WebLingoValue>? Getters { get; set; }
         public Dictionary<string, WebLingoValue>? Setters { get; set; }
+        /// <summary>
+        /// Its methods, and its properties' getters, whose names the runtime knows by number (<see cref="WebLingoMember"/>),
+        /// by that number, null for none; and its indexer's getter and setter, or null: each found without its name, as a
+        /// kind of value's own members are (section 3.9). Gathered with its methods.
+        /// </summary>
+        public WebLingoValue[]? KnownMethods { get; set; }
+        public WebLingoValue[]? KnownGetters { get; set; }
+        public WebLingoValue IndexGetter { get; set; }
+        public WebLingoValue IndexSetter { get; set; }
         public Dictionary<string, WebLingoValue> StaticMethods { get; init; } = new(StringComparer.Ordinal);
         public Dictionary<string, WebLingoValue> StaticFields { get; init; } = new(StringComparer.Ordinal);
     }

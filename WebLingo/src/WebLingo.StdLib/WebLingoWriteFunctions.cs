@@ -13,7 +13,7 @@ public sealed class WebLingoWriteFunction(IWebLingoTextOutput? output = null) : 
     public string Name => "write";
     public int Arity => 1;
 
-    public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+    public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         WebLingoStandardBuiltins.TryWrite(output, WebLingoValueFormatter.Format(arguments[0], heap), heap, out result,
             out error);
 }
@@ -24,7 +24,7 @@ public sealed class WebLingoWriteLnFunction(IWebLingoTextOutput? output = null) 
     public string Name => "writeLn";
     public int Arity => 1;
 
-    public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+    public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         WebLingoStandardBuiltins.TryWrite(output, WebLingoValueFormatter.Format(arguments[0], heap) + "\n", heap, out result,
             out error);
 }
@@ -61,7 +61,7 @@ public sealed class WebLingoDelayFunction : IWebLingoBuiltinFunction
     public string Name => "delay";
     public int Arity => 1;
 
-    public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
         if (arguments[0].Kind != WebLingoValueKind.Int64 || arguments[0].AsInt64 < 0)

@@ -76,7 +76,7 @@ public interface IWebLingoBuiltinFunction
     /// Calls the function with exactly <see cref="Arity"/> script values, whose objects are in <paramref name="heap"/>,
     /// where any it makes go too.
     /// </summary>
-    bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error);
+    bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error);
 }
 
 /// <summary>

@@ -320,7 +320,7 @@ public sealed class StackVirtualMachineTests
     {
         public string Name => "writeLn";
         public int Arity => 1;
-        public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
             throw new InvalidOperationException("broken output");
     }
 

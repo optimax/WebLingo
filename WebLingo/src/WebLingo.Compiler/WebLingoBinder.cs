@@ -1396,20 +1396,28 @@ public sealed class WebLingoBinder
     /// A native module's class (section 3.9): a class extending <c>Object</c>, bound and made as the built-in ones are, under
     /// a name no program can write, the module's and the class's, so that only the module's instance exports it. Each
     /// member calls its built-in, which <c>WebLingoNativeClass</c> runs: a constructor and a method with <c>this</c> first,
-    /// then their arguments, a static method with its arguments. Its functions are native, so that the VMs report an error
-    /// in one where it was called.
+    /// then their arguments, a static method with its arguments; its properties, a getter and a setter, as <c>get:</c> and
+    /// <c>set:</c> methods; and its indexer, as methods no program can name (<see cref="WebLingoIndexers"/>), its setter
+    /// giving the value assigned. Its functions are native, so that the VMs report an error in one where it was called.
     /// </summary>
     private WebLingoLocalSymbol BindNativeClass(string module, WebLingoNativeClassInfo info)
     {
         var callees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
         var name = module + "." + info.Name;
-        var methods = new List<WebLingoMethodSyntax> { NativeMember("constructor", info.Constructor, false, callees) };
+        var methods = new List<WebLingoMethodSyntax> { NativeMember("constructor", info.Constructor, false, callees, returns: false) };
         foreach (var method in info.Methods) methods.Add(NativeMember(method.Name, method, false, callees));
-        foreach (var method in info.StaticMethods) methods.Add(NativeMember(method.Name, method, true, callees, method.Factory ? name : null));
-        var syntax = new WebLingoClassDeclarationSyntax(info.Name, default, methods, default);
+        foreach (var method in info.StaticMethods) methods.Add(NativeMember(method.Name, method, true, callees, factoryOf: method.Factory ? name : null));
+        foreach (var property in info.Properties)
+        {
+            methods.Add(NativeMember("get:" + property.Name, property.Getter, false, callees));
+            // A setter's value is the assignment's, whatever its built-in gives.
+            if (property.Setter is { } setter) methods.Add(NativeMember("set:" + property.Name, setter, false, callees, returns: false));
+        }
+        if (info.IndexGetter is { } getter) methods.Add(NativeMember(WebLingoIndexers.Getter, getter, false, callees));
+        if (info.IndexSetter is { } indexSetter) methods.Add(NativeMember(WebLingoIndexers.Setter, indexSetter, false, callees, returnsLast: true));
         var outer = _nativeCallees;
         _nativeCallees = callees;
-        var local = BindBuiltinClass(name, syntax, UseObject());
+        var local = BindBuiltinClass(name, new WebLingoClassDeclarationSyntax(info.Name, default, methods, default), UseObject());
         _nativeCallees = outer;
         return local;
     }
@@ -1440,10 +1448,13 @@ public sealed class WebLingoBinder
     /// <summary>The native modules' functions with optional parameters, made after the built-in classes (section 3.9).</summary>
     private readonly List<WebLingoBoundStatement> _nativeFunctions = [];
 
-    /// <summary>A native class's member: a method whose body calls its built-in, giving what it gives, but for a constructor.</summary>
+    /// <summary>
+    /// A native class's member: a method whose body calls its built-in, giving what it gives, or nothing, for a constructor
+    /// and a setter, or its last argument, for an indexer's setter, the value assigned.
+    /// </summary>
     /// <remarks>A factory's built-in is given its class first, by the local <paramref name="factoryOf"/> names (section 3.9).</remarks>
     private static WebLingoMethodSyntax NativeMember(string name, WebLingoNativeExport export, bool isStatic,
-        Dictionary<string, WebLingoBuiltinDeclaration> callees, string? factoryOf = null)
+        Dictionary<string, WebLingoBuiltinDeclaration> callees, bool returns = true, bool returnsLast = false, string? factoryOf = null)
     {
         callees[export.Builtin] = new WebLingoBuiltinDeclaration(export.Builtin, export.Arity);
         var parameters = new List<WebLingoParameterSyntax>();
@@ -1461,10 +1472,11 @@ public sealed class WebLingoBinder
             arguments.Add(new WebLingoNameSyntax(parameters[^1].Name, default));
         }
         var call = new WebLingoCallExpressionSyntax(new WebLingoNameSyntax(export.Builtin, default), arguments, default);
-        WebLingoStatementSyntax body = name == "constructor" && !isStatic
-            ? new WebLingoExpressionStatementSyntax(call, default)
-            : new WebLingoReturnSyntax(call, default);
-        return new WebLingoMethodSyntax(name, default, parameters, new WebLingoBlockSyntax([body], default), default) { IsStatic = isStatic };
+        List<WebLingoStatementSyntax> body = returns && !returnsLast
+            ? [new WebLingoReturnSyntax(call, default)]
+            : [new WebLingoExpressionStatementSyntax(call, default)];
+        if (returnsLast) body.Add(new WebLingoReturnSyntax(new WebLingoNameSyntax(parameters[^1].Name, default), default));
+        return new WebLingoMethodSyntax(name, default, parameters, new WebLingoBlockSyntax(body, default), default) { IsStatic = isStatic };
     }
 
     /// <summary>Binds a built-in class from its syntax, extending <paramref name="baseLocal"/>, or nothing if null.</summary>

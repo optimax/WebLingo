@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using WebLingo.Core;
 namespace WebLingo.Runtime;
 
@@ -70,10 +71,15 @@ public static class WebLingoMembers
 
     /// <summary>A property read on a class's instance: its getter, or WL3006 for one that has only a setter (section 3.7).</summary>
     private static bool TryGetProperty(WebLingoValue target, WebLingoValue classValue, string name, WebLingoHeap heap,
+        out WebLingoValue getter, out WebLingoRuntimeError? error) =>
+        TryGetProperty(target, classValue, WebLingoMember.Unknown, name, heap, out getter, out error);
+
+    /// <summary>A property read, its getter found by number when the runtime knows its name by one, <c>length</c>'s (section 3.9).</summary>
+    private static bool TryGetProperty(WebLingoValue target, WebLingoValue classValue, WebLingoMember member, string name, WebLingoHeap heap,
         out WebLingoValue getter, out WebLingoRuntimeError? error)
     {
         error = null;
-        if (heap.TryGetAccessor(classValue, false, name, out getter))
+        if (heap.TryGetGetter(classValue, member, name, out getter))
         {
             error = Getter;
             return true;
@@ -174,7 +180,7 @@ public static class WebLingoMembers
             return heap.TryAllocateBoundMethod(target, objectMethod, out result, out error);
         }
         if (ExtendedClassOf(target, heap) is { Kind: WebLingoValueKind.Class } valueClass
-            && TryGetProperty(target, valueClass, name, heap, out result, out error))
+            && TryGetProperty(target, valueClass, member, name, heap, out result, out error))
         {
             return false; // Its kind's class's property, which an extension gave it (section 3.7).
         }
@@ -419,7 +425,7 @@ public static class WebLingoMembers
     public static bool TryGetValueMethod(WebLingoValue target, WebLingoMember member, string name, WebLingoHeap heap, out WebLingoValue method)
     {
         var classValue = ExtendedClassOf(target, heap);
-        if (classValue.Kind == WebLingoValueKind.Class && heap.TryGetMethod(classValue, name, out method)) return true;
+        if (classValue.Kind == WebLingoValueKind.Class && heap.TryGetMethod(classValue, member, name, out method)) return true;
         return TryGetObjectMethod(member, name, heap, out method);
     }
 
@@ -805,7 +811,34 @@ public static class WebLingoMembers
     /// the other would raise a missing key (WL3007) or an index out of range (WL3005), and for a <c>null</c> target, but
     /// raises every other error as the other does (section 3.6).
     /// </summary>
+    // Not inlined: a VM's dispatch method calls it, and grows slower when a small method is inlined into it
+    // (Documents/implementation.md, section 11).
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public static bool TryGetIndex(WebLingoValue target, WebLingoValue index, WebLingoHeap heap, bool optional, out WebLingoValue result,
+        out WebLingoRuntimeError? error)
+    {
+        if (TryGetIndexer(target, false, heap, out result))
+        {
+            // Its class's indexer, a native class's, whose getter the VM calls with the index (section 3.9); not yet with
+            // ?[, which would give null for the getter's missing key or index out of range.
+            if (optional)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"'?[' does not call the indexer that the class of {WebLingoValueFormatter.Describe(target, heap)} has.");
+                result = WebLingoValue.Null;
+                return false;
+            }
+            error = Getter;
+            return false;
+        }
+        return TryGetElement(target, index, heap, optional, out result, out error);
+    }
+
+    /// <summary>
+    /// <c>target[index]</c> as the runtime has it for strings, arrays and maps, without a class's indexer: what
+    /// <see cref="TryGetIndex"/> does for a value whose class has none (section 3.9).
+    /// </summary>
+    private static bool TryGetElement(WebLingoValue target, WebLingoValue index, WebLingoHeap heap, bool optional, out WebLingoValue result,
         out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
@@ -846,8 +879,56 @@ public static class WebLingoMembers
         return true;
     }
 
+    /// <summary>
+    /// The getter, or the setter, of the indexer an instance's class has, a native class's (section 3.9); false for a
+    /// class without one, and for any other value.
+    /// </summary>
+    /// <summary>
+    /// The setter of the indexer an instance's class has, which a VM finds once an assignment failed with
+    /// <see cref="Setter"/>, so that its own path stays the assignment's (section 3.9).
+    /// </summary>
+    public static bool TryGetIndexSetter(WebLingoValue target, WebLingoHeap heap, out WebLingoValue setter) =>
+        TryGetIndexer(target, true, heap, out setter);
+
+    private static bool TryGetIndexer(WebLingoValue target, bool setter, WebLingoHeap heap, out WebLingoValue accessor)
+    {
+        // Only an instance's class may have one: a native class's, or a class extending it; no program can name an
+        // indexer's methods, so no value of another kind, a collection included, reaches one.
+        accessor = WebLingoValue.Null;
+        return target.Kind == WebLingoValueKind.Instance && heap.TryGetIndexer(heap.ClassOf(target), setter, out accessor);
+    }
+
     /// <summary><c>target[index] = value</c>.</summary>
-    public static bool TrySetIndex(WebLingoValue target, WebLingoValue index, WebLingoValue value, WebLingoHeap heap, out WebLingoRuntimeError? error)
+    // Not inlined: a VM's dispatch method calls it, and grows slower when a small method is inlined into it
+    // (Documents/implementation.md, section 11).
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static bool TrySetIndex(WebLingoValue target, WebLingoValue index, WebLingoValue value, WebLingoHeap heap, out WebLingoRuntimeError? error) =>
+        TrySetIndex(target, index, value, heap, out error, out _);
+
+    /// <summary>
+    /// <c>target[index] = value</c>; or, for a value whose class has an indexer's setter, a native class's, false with
+    /// <see cref="Setter"/>, and the setter, which the VM calls with the index and the value (section 3.9).
+    /// </summary>
+    // Not inlined: a VM's dispatch method calls it, and grows slower when a small method is inlined into it
+    // (Documents/implementation.md, section 11).
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static bool TrySetIndex(WebLingoValue target, WebLingoValue index, WebLingoValue value, WebLingoHeap heap, out WebLingoRuntimeError? error,
+        out WebLingoValue setter)
+    {
+        if (TryGetIndexer(target, true, heap, out setter))
+        {
+            error = Setter;
+            return false;
+        }
+        return TrySetElement(target, index, value, heap, out error);
+    }
+
+    /// <summary>
+    /// <c>target[index] = value</c> as the runtime has it for arrays and maps, without a class's indexer: what
+    /// <see cref="TrySetIndex(WebLingoValue, WebLingoValue, WebLingoValue, WebLingoHeap, out WebLingoRuntimeError?)"/> does
+    /// for a value whose class has none (section 3.9).
+    /// </summary>
+    private static bool TrySetElement(WebLingoValue target, WebLingoValue index, WebLingoValue value, WebLingoHeap heap, out WebLingoRuntimeError? error)
     {
         target = heap.Held(target);
         if (target.Kind == WebLingoValueKind.Array)

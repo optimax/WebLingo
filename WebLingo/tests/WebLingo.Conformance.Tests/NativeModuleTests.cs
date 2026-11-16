@@ -90,6 +90,22 @@ public sealed class NativeModuleTests : IDisposable
         Assert.Equal(("", printed + "\n", ""), Run(source));
     }
 
+    [Theory]
+    [InlineData("var c = new Counter(5); c.value = 7; writeLn([c.value, c.initial, c.add(1), c.value, c?.initial]);", "[7, 5, 8, 8, 5]")]
+    [InlineData("var c = new Counter(5); try { c.initial = 1; } catch (e) { writeLn(e.code); } try { c.value = \"x\"; } catch (e) { writeLn(e.message); }", "WL3001\nA Counter's value is an integer.")]
+    [InlineData("var c = new Counter(1); c[\"a\"] = 3; c[\"b\"] = c[\"a\"] + 1; var y = (c[\"x\"] = 9); writeLn([c[\"a\"], c[\"b\"], y, c[\"x\"]]);", "[3, 4, 9, 9]")]
+    [InlineData("var c = new Counter(1); try { writeLn(c[\"z\"]); } catch (e) { writeLn([e.code, e.message]); }", "[\"WL3007\", \"This Counter has no mark 'z'.\"]")]
+    [InlineData("var c = new Counter(1); try { c[\"a\"] = \"x\"; } catch (e) { writeLn(e.message); }", "A Counter's mark is an integer.")]
+    [InlineData("var c = new Counter(1); var n = null; writeLn(n?[\"z\"]); try { c?[\"z\"]; } catch (e) { writeLn([e.code, e.message]); }", "null\n[\"WL3001\", \"'?[' does not call the indexer that the class of an instance of Counter has.\"]")]
+    [InlineData("class D extends Counter { property twice { get { return this.value * 2; } } } var d = new D(2); d[\"k\"] = 1; d.value = d.value + 1; writeLn([d[\"k\"], d.twice, d.value]);", "[1, 6, 3]")]
+    [InlineData("extend Counter { bump() { this.value = this.value + 1; return this[\"m\"] = this.value; } } var c = new Counter(4); writeLn([c.bump(), c[\"m\"]]);", "[5, 5]")]
+    [InlineData("var c = new Counter(1); c.dispose(); try { writeLn(c.value); } catch (e) { writeLn(e.message); } try { c[\"a\"] = 1; } catch (e) { writeLn(e.message); }", "This Counter has been disposed.\nThis Counter has been disposed.")]
+    public void ANativeClassesPropertiesAndIndexerAreItsInstancesMembers(string source, string printed)
+    {
+        // Native classes' properties and indexers (section 9, "Native modules", part 4), on both VMs.
+        Assert.Equal(("", printed + "\n", ""), Run("import { Counter } from \"native:test\"; " + source));
+    }
+
     [Fact]
     public void ANativeClassesHostObjectsAreReleasedWhenTheExecutionEnds()
     {

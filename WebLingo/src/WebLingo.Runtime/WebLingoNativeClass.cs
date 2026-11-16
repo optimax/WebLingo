@@ -16,6 +16,18 @@ public sealed record WebLingoNativeMember(string Name, int Arity, WebLingoNative
 }
 
 /// <summary>
+/// A native class's property (section 3.7): its getter, given the instance, and its setter, given the instance and the
+/// value assigned, or null for a property that cannot be assigned.
+/// </summary>
+public sealed record WebLingoNativeProperty(string Name, WebLingoNativeFunction Getter, WebLingoNativeFunction? Setter);
+
+/// <summary>
+/// A native class's indexer, <c>x[i]</c> and <c>x[i] = v</c>: its getter, given the instance and the index, and its
+/// setter, given the instance, the index and the value assigned, or null for one that cannot be assigned.
+/// </summary>
+public sealed record WebLingoNativeIndexer(WebLingoNativeFunction Getter, WebLingoNativeFunction? Setter);
+
+/// <summary>
 /// A native module's class (specification, sections 3.7 and 3.9), which <see cref="IWebLingoNativeRegistry.Class"/> gives:
 /// its constructor, its methods and its static methods, each a native function, a constructor's and a method's first
 /// argument the instance it runs on. The compiler makes it a class as any other is, extending <c>Object</c>, whose members
@@ -30,11 +42,36 @@ public sealed class WebLingoNativeClass(string name)
 {
     private readonly List<WebLingoNativeMember> _methods = [];
     private readonly List<WebLingoNativeMember> _staticMethods = [];
+    private readonly List<WebLingoNativeProperty> _properties = [];
 
     public string Name { get; } = name;
     public WebLingoNativeMember? Constructor { get; private set; }
     public IReadOnlyList<WebLingoNativeMember> Methods => _methods;
     public IReadOnlyList<WebLingoNativeMember> StaticMethods => _staticMethods;
+    public IReadOnlyList<WebLingoNativeProperty> Properties => _properties;
+    public WebLingoNativeIndexer? Indexer { get; private set; }
+
+    /// <summary>
+    /// A property, <c>x.name</c>, read by its getter, given the instance, and assigned by its setter, given the instance and
+    /// the value, which a property without one cannot be (section 3.7). A property's name is not a method's.
+    /// </summary>
+    public WebLingoNativeClass DeclareProperty(string name, WebLingoNativeFunction getter, WebLingoNativeFunction? setter = null)
+    {
+        string? twice = _methods.Exists(m => m.Name == name) || _properties.Exists(p => p.Name == name) ? name : null;
+        if (Check(name, 0, twice)) _properties.Add(new(name, getter, setter));
+        return this;
+    }
+
+    /// <summary>
+    /// Its indexer, <c>x[i]</c>, read by its getter, given the instance and the index, and assigned by its setter, given the
+    /// instance, the index and the value, which an indexer without one cannot be; declared once.
+    /// </summary>
+    public WebLingoNativeClass DeclareIndexer(WebLingoNativeFunction getter, WebLingoNativeFunction? setter = null)
+    {
+        if (Error is null && Indexer is not null) Error = $"class '{Name}' declares its indexer twice";
+        if (Error is null) Indexer = new(getter, setter);
+        return this;
+    }
 
     /// <summary>The first fault in what the module declared, or null: a name that is not one, an arity below 0, or a name twice.</summary>
     public string? Error { get; private set; }
@@ -118,6 +155,7 @@ public sealed class WebLingoNativeClass(string name)
         {
             if (member.Name == name) twice = name;
         }
+        if (ReferenceEquals(members, _methods) && _properties.Exists(p => p.Name == name)) twice = name;
         if (Error is null && name is "constructor" or "destructor")
         {
             Error = name == "constructor"
@@ -142,6 +180,11 @@ public sealed class WebLingoNativeClass(string name)
     /// constructor's and a method's arity one more than the member's, for the instance it is given first. A class without a
     /// constructor gets one that only marks its instances.
     /// </summary>
+    /// <remarks>
+    /// After them, each property's getter, <c>.get.name</c>, given the instance, and its setter, if it has one,
+    /// <c>.set.name</c>, given the instance and the value; then the indexer's getter, <c>.index.get</c>, given the instance
+    /// and the index, and its setter, <c>.index.set</c>, given the instance, the index and the value.
+    /// </remarks>
     public IReadOnlyList<IWebLingoBuiltinFunction> Builtins(string prefix)
     {
         var builtins = new List<IWebLingoBuiltinFunction>
@@ -150,10 +193,23 @@ public sealed class WebLingoNativeClass(string name)
         };
         foreach (var method in _methods) builtins.Add(new MemberBuiltin(prefix + "." + method.Name, this, method, MemberKind.Method));
         foreach (var method in _staticMethods) builtins.Add(new MemberBuiltin(prefix + ".static." + method.Name, this, method, MemberKind.Static));
+        foreach (var property in _properties)
+        {
+            builtins.Add(new MemberBuiltin(prefix + ".get." + property.Name, this, new(property.Name, 0, property.Getter), MemberKind.Method));
+            if (property.Setter is { } setter)
+            {
+                builtins.Add(new MemberBuiltin(prefix + ".set." + property.Name, this, new(property.Name, 1, setter), MemberKind.Method));
+            }
+        }
+        if (Indexer is { } indexer)
+        {
+            builtins.Add(new MemberBuiltin(prefix + ".index.get", this, new("[]", 1, indexer.Getter), MemberKind.Method));
+            if (indexer.Setter is { } setter) builtins.Add(new MemberBuiltin(prefix + ".index.set", this, new("[]", 2, setter), MemberKind.Method));
+        }
         return builtins;
     }
 
-    private static bool MarksOnly(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    private static bool MarksOnly(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
         error = null;
@@ -243,7 +299,7 @@ public sealed class WebLingoNativeClass(string name)
         public string Name => name;
         public int Arity => member.Arity + (kind == MemberKind.Static && !member.Factory ? 0 : 1);
 
-        public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+        public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
         {
             result = WebLingoValue.Null;
             if (kind == MemberKind.Constructor && !heap.TryMarkNative(arguments[0], owner))

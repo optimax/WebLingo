@@ -5,7 +5,7 @@ namespace WebLingo.Runtime;
 /// objects are in <paramref name="heap"/>, where any it makes go too; its result, a value or a task for asynchronous work,
 /// or its runtime error.
 /// </summary>
-public delegate bool WebLingoNativeFunction(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result,
+public delegate bool WebLingoNativeFunction(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result,
     out WebLingoRuntimeError? error);
 
 /// <summary>What a native module gives its exports to, when it is loaded (section 3.9).</summary>

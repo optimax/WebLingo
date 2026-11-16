@@ -310,6 +310,7 @@ public sealed class WebLingoLowerer
         body.AddRange(LowerBlock(function.Body));
         var captures = new List<WebLingoIrCapture>();
         foreach (var capture in function.Captures) captures.Add(new WebLingoIrCapture(capture.FromLocal, capture.Index));
+        var (nativeBuiltin, nativeResult) = function.IsNative ? NativeCallOf(body, function.ParameterCount) : (-1, default);
         _functions[index] = new WebLingoIrFunction(function.Name, function.ParameterCount, Names(function.Locals), captures, body,
             function.Span)
         {
@@ -317,9 +318,49 @@ public sealed class WebLingoLowerer
             OptionalCount = optional,
             IsAsync = function.IsAsync,
             Source = function.Source,
-            IsNative = function.IsNative
+            IsNative = function.IsNative,
+            NativeBuiltin = nativeBuiltin,
+            NativeResult = nativeResult
         };
         return index;
+    }
+
+    /// <summary>
+    /// The built-in a native member's body only calls, with its parameters in order, and what the member gives: the call's
+    /// result, a method's and a getter's; its last argument, a setter's, as an indexer's and a property's setter give it;
+    /// or nothing, a constructor's; -1 for a body that does anything else (section 3.9).
+    /// </summary>
+    private static (int Builtin, WebLingoNativeResult Result) NativeCallOf(IReadOnlyList<WebLingoIrStatement> body, int parameters)
+    {
+        int builtin;
+        switch (body)
+        {
+            case [WebLingoIrReturn { Value: { } value }] when Calls(value, out builtin):
+                return (builtin, WebLingoNativeResult.Result);
+            case [WebLingoIrEvaluate { Expression: var call }, WebLingoIrReturn { Value: WebLingoIrLoadLocal { Local: var last } }]
+                when last == parameters - 1 && Calls(call, out builtin):
+                return (builtin, WebLingoNativeResult.LastArgument);
+            case [WebLingoIrInitializeLocal { Local: var kept, Value: WebLingoIrLoadLocal { Local: var given } }, WebLingoIrEvaluate { Expression: var call },
+                    WebLingoIrReturn { Value: WebLingoIrLoadLocal { Local: var returned } }]
+                when kept == returned && given == parameters - 1 && Calls(call, out builtin):
+                return (builtin, WebLingoNativeResult.LastArgument);
+            case [WebLingoIrEvaluate { Expression: var call }] when Calls(call, out builtin):
+                return (builtin, WebLingoNativeResult.Nothing);
+            default:
+                return (-1, default);
+        }
+
+        bool Calls(WebLingoIrExpression expression, out int called)
+        {
+            called = -1;
+            if (expression is not WebLingoIrCallBuiltin call || call.Arguments.Count != parameters) return false;
+            for (var i = 0; i < parameters; i++)
+            {
+                if (call.Arguments[i] is not WebLingoIrLoadLocal { Local: var local } || local != i) return false;
+            }
+            called = call.Builtin;
+            return true;
+        }
     }
 
     private WebLingoIrStatement LowerStatement(WebLingoBoundStatement statement)

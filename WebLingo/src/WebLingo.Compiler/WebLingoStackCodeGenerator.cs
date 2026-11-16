@@ -44,7 +44,9 @@ public sealed class WebLingoStackCodeGenerator
                 OptionalCount = function.OptionalCount,
                 IsAsync = function.IsAsync,
                 Source = function.Source,
-                IsNative = function.IsNative
+                IsNative = function.IsNative,
+                NativeBuiltin = function.NativeBuiltin,
+                NativeResult = function.NativeResult
             });
         }
         if (main is null || functions.Count != program.Functions.Count) return null;

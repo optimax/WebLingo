@@ -17,7 +17,20 @@ public sealed record WebLingoNativeModuleInfo(string Name, IReadOnlyList<WebLing
 /// method, whose built-in is given the instance first.
 /// </summary>
 public sealed record WebLingoNativeClassInfo(string Name, WebLingoNativeExport Constructor, IReadOnlyList<WebLingoNativeExport> Methods,
-    IReadOnlyList<WebLingoNativeExport> StaticMethods);
+    IReadOnlyList<WebLingoNativeExport> StaticMethods)
+{
+    /// <summary>Its properties, each its getter's built-in, given the instance, and its setter's, or null (section 3.7).</summary>
+    public IReadOnlyList<WebLingoNativePropertyInfo> Properties { get; init; } = [];
+
+    /// <summary>Its indexer's getter's built-in, given the instance and the index, or null for a class without one.</summary>
+    public WebLingoNativeExport? IndexGetter { get; init; }
+
+    /// <summary>Its indexer's setter's built-in, given the instance, the index and the value, or null.</summary>
+    public WebLingoNativeExport? IndexSetter { get; init; }
+}
+
+/// <summary>A native class's property: its name, its getter's built-in, and its setter's, or null.</summary>
+public sealed record WebLingoNativePropertyInfo(string Name, WebLingoNativeExport Getter, WebLingoNativeExport? Setter);
 
 /// <summary>A native module's exported function: the name it exports it by, the built-in that is it, and its arity.</summary>
 public sealed record WebLingoNativeExport(string Name, string Builtin, int Arity)

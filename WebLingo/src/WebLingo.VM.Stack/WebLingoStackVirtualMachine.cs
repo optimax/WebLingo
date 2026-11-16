@@ -718,6 +718,8 @@ public sealed class WebLingoStackVirtualMachine
                         {
                             if (!WebLingoMembers.TryGetIndex(slots[sp - 2], slots[sp - 1], heap, ins.A != 0, out var element, out error))
                             {
+                                // An indexer's getter, pending, or another failure (section 3.9).
+                                sp = PendIndexer(error, element, slots[sp - 2], slots, sp, 2, false);
                                 break;
                             }
                             sp--;
@@ -728,7 +730,11 @@ public sealed class WebLingoStackVirtualMachine
                         case WebLingoStackOpCode.StoreIndex:
                         {
                             var value = slots[sp - 1];
-                            if (!WebLingoMembers.TrySetIndex(slots[sp - 3], slots[sp - 2], value, heap, out error)) break;
+                            if (!WebLingoMembers.TrySetIndex(slots[sp - 3], slots[sp - 2], value, heap, out error))
+                            {
+                                sp = PendIndexSetter(error, slots, sp, ins.A != 1);
+                                break;
+                            }
                             sp -= 3;
                             if (ins.A == 1) slots[sp++] = value;
                             pc++;
@@ -904,6 +910,7 @@ public sealed class WebLingoStackVirtualMachine
                                 function.OptionalCount);
                             goto failed;
                         }
+                        if (function.NativeBuiltin >= 0 && NativeApplies(frames, depth)) goto native;
                         if (depth + 1 >= maxCallDepth)
                         {
                             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.BudgetExceeded,
@@ -939,6 +946,13 @@ public sealed class WebLingoStackVirtualMachine
                         pc = 0;
                         continue;
                     }
+
+                native:
+                    // A native member that only calls its built-in: the built-in at once, without its frame (section 3.9).
+                    sp = CallNative(callee, self, slots, sp, firstArgument, argumentCount, constructed, frames, depth, out error);
+                    if (error is not null) goto failed;
+                    pc++;
+                    continue;
 
                 dispose:
                     // x.dispose(): the instance's dispose methods run on it in turn, once, in the frame of one call, which
@@ -1507,6 +1521,43 @@ public sealed class WebLingoStackVirtualMachine
             _discards = discards;
             if (setter) slots[sp - consumed] = slots[sp - 1];
             return sp - consumed + _operatorCount;
+        }
+
+        /// <summary>
+        /// <c>target[index] = value</c> that failed, the three on top of the stack: for a target whose class's indexer has a
+        /// setter, which gives the value assigned, that setter pending, the stack's new top returned; else the stack as it
+        /// was (section 3.9). Out of the dispatch method, which grows slower with the locals it would need
+        /// (Documents/implementation.md, section 11).
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private int PendIndexSetter(WebLingoRuntimeError? error, WebLingoValue[] slots, int sp, bool discards)
+        {
+            if (!ReferenceEquals(error, WebLingoMembers.Setter)
+                || !WebLingoMembers.TryGetIndexSetter(slots[sp - 3], heap, out var setter))
+            {
+                return sp;
+            }
+            return PendIndexer(error, setter, slots[sp - 3], slots, sp, 3, discards);
+        }
+
+        /// <summary>
+        /// An indexer's getter, or its setter, that an index's read or assignment failed with
+        /// (<see cref="WebLingoMembers.Getter"/>, <see cref="WebLingoMembers.Setter"/>): pending, called on
+        /// <paramref name="self"/>, the target below the operation's <paramref name="consumed"/> operands on top of the stack
+        /// giving way to the rest, the index and, for the setter, the value; the stack's new top, or its old one for another
+        /// failure (section 3.9).
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private int PendIndexer(WebLingoRuntimeError? error, WebLingoValue accessor, WebLingoValue self, WebLingoValue[] slots, int sp,
+            int consumed, bool discards)
+        {
+            var setter = ReferenceEquals(error, WebLingoMembers.Setter);
+            if (!setter && !ReferenceEquals(error, WebLingoMembers.Getter)) return sp;
+            Pend(accessor, consumed - 1);
+            _pendingSelf = self;
+            _discards = discards;
+            for (var i = sp - consumed; i < sp - 1; i++) slots[i] = slots[i + 1];
+            return sp - 1;
         }
 
         /// <summary>
@@ -2430,15 +2481,82 @@ public sealed class WebLingoStackVirtualMachine
             }
         }
 
+        /// <summary>
+        /// Whether a call of a native member that only calls its built-in may call the built-in in its place (section 3.9):
+        /// not a disposal's, a text's, or one whose result is dropped, which go on when the member's frame returns.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static bool NativeApplies(Frame[] frames, int depth) =>
+            !(depth + 1 < frames.Length && frames[depth + 1] is { Text: not null }
+                or { DisposeChain: not null, DiscardResult: false } or { DisposeChain: { Length: > 0 } });
+
+        /// <summary>
+        /// A native member's arguments, read where they are (section 3.9): after the instance it runs on, when that is the
+        /// value just before them, as a method's call has it; else copied, the instance first, into the execution's own
+        /// buffer, which no other call uses meanwhile, a built-in calling nothing of the VM's.
+        /// </summary>
+        private ReadOnlySpan<WebLingoValue> NativeArguments(WebLingoValue self, int withThis, WebLingoValue[] arguments, int first, int count)
+        {
+            if (withThis == 0) return new ReadOnlySpan<WebLingoValue>(arguments, first, count);
+            if (first > 0 && arguments[first - 1] == self) return new ReadOnlySpan<WebLingoValue>(arguments, first - 1, count + 1);
+            if (_nativeArguments.Length < count + 1) _nativeArguments = new WebLingoValue[count + 1];
+            _nativeArguments[0] = self;
+            Array.Copy(arguments, first, _nativeArguments, 1, count);
+            return new ReadOnlySpan<WebLingoValue>(_nativeArguments, 0, count + 1);
+        }
+
+        private WebLingoValue[] _nativeArguments = new WebLingoValue[4];
+
+        /// <summary>
+        /// A native member that only calls its built-in (section 3.9): the built-in called in its place, given the instance
+        /// first when the call has one, the member's frame never made, what the member gives going to the callee's slot,
+        /// below the arguments, as a call's result does, or dropped, for a call whose result is; the stack's new top, or
+        /// <paramref name="sp"/> with its failure, even an exception, a runtime error where the member was called.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private int CallNative(WebLingoValue callee, WebLingoValue self, WebLingoValue[] slots, int sp, int first, int count,
+            WebLingoValue constructed, Frame[] frames, int depth, out WebLingoRuntimeError? error)
+        {
+            var function = module.Functions[heap.GetClosure(callee).Function];
+            var withThis = function.HasThis && self.Kind != WebLingoValueKind.Missing ? 1 : 0;
+            var builtin = builtins[function.NativeBuiltin];
+            var values = NativeArguments(self, withThis, slots, first, count);
+            try
+            {
+                if (!builtin.TryInvoke(values, heap, out var given, out error))
+                {
+                    error ??= new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed.");
+                    return sp;
+                }
+                if (depth + 1 < frames.Length && frames[depth + 1] is { DiscardResult: true } dropping)
+                {
+                    // A call whose result is dropped, which its frame would have dropped when it returned.
+                    dropping.DiscardResult = false;
+                    dropping.DisposeChain = null;
+                    return first - 1;
+                }
+                slots[first - 1] = function.NativeResult switch
+                {
+                    WebLingoNativeResult.LastArgument => values[^1],
+                    WebLingoNativeResult.Nothing => constructed,
+                    _ => given
+                };
+                return first;
+            }
+            catch (Exception exception)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed: {exception.Message}");
+                return sp;
+            }
+        }
+
         private WebLingoRuntimeError? CallBuiltin(IWebLingoBuiltinFunction builtin, WebLingoValue[] slots, int first, int count,
             out WebLingoValue result)
         {
             result = WebLingoValue.Null;
-            var arguments = new WebLingoValue[count];
-            for (var i = 0; i < arguments.Length; i++) arguments[i] = slots[first + i];
             try
             {
-                if (!builtin.TryInvoke(arguments, heap, out result, out var error))
+                if (!builtin.TryInvoke(new ReadOnlySpan<WebLingoValue>(slots, first, count), heap, out result, out var error))
                 {
                     return error ?? new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed.");
                 }

@@ -56,7 +56,7 @@ A3: (a) but - like (c) says - measure the impact on performance.
 
 2026-11-14 (Claude): the answers recorded as approved in the specification, section 3.9 ("Native modules"), and its decision register; split into the parts section 9 defines ("Native modules"), each a task below. Waits for them.
 
-## Native Modules, Part 4: The Built-in Classes as Native Classes
+## [WORKING] Native Modules, Part 4: The Built-in Classes as Native Classes
 
 `Array`, `Map`, `Set`, `Task`, `Module`, `Class` and `Function` as a standard module's native classes, their methods native functions, measured against the VMs' own on the benchmark, as A3 of "Native Modules" asks (specification, sections 3.9 and 9, "Native modules", part 4), on both VMs. Added by Claude, 2026-11-14.
 
@@ -128,6 +128,8 @@ A3: (b)
 
 2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
 
+2026-11-15 (Claude): done as A3 (b) has it, on `claude/native-classes-members`, from `main`: the built-in classes keep the VMs' own members, `std:core` dropped, and what serves every native module landed from `claude/native-builtins`: native classes' properties (`DeclareProperty`) and indexer (`DeclareIndexer`), the VMs calling a native member's built-in directly, without its frame, every built-in's arguments read where they are (`ReadOnlySpan<WebLingoValue>`, added to the portability inventory), and members the runtime names by number found by it. The test module's `Counter` got two properties and an indexer, tested on both VMs. Recorded in the specification, sections 3.9 (the owner's decision, in place of making the built-in classes native), 5.6 and 9, and in `Documents/implementation.md` (the pipeline, and a lesson in section 11). Measured against `main`, alternately, three rounds of every workload but `io`: all within the machine's noise, but `templates`, 18 to 23 percent faster; two slowdowns of `collections` found and fixed on the way, the runtime looking for an indexer on every array and map, and the stack VM's indexing moved into helpers. Guessed, and Proposed: `x?[k]` does not call a native class's indexer yet, WL3001 on an instance whose class has one ("Optional Indexing Through a Native Class's Indexer", below). Checks: the Release build, without warnings, and the full test suite (2,140 tests), on Windows only; Linux not tried. `claude/native-builtins` is kept until this lands, then deleted.
+
 ## The `foreach` Protocol
 
 How `foreach` visits a class's instances, as A2 of "Native Modules, Part 4" has it: the class's `iterate()` gives an iterator, whose `next()` gives each item, which classes written in WebLingo, native classes and COM's collections all implement (specification, section 3.6, approved 15 November 2026). Added by Claude, 2026-11-15. Three decisions it needs, each answerable with a letter.
@@ -145,6 +147,10 @@ Q3, arrays, maps, sets and strings: (a) `foreach` visits them as now, the VMs' o
 A3: (b)
 
 2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
+
+## Optional Indexing Through a Native Class's Indexer
+
+`x?[k]` on an instance whose class has an indexer, a native class's (specification, section 3.9), calls the indexer's getter as `x[k]` does, and gives `null` where the getter raises a missing key (WL3007) or an index out of range (WL3005), as `?[` does for a collection (section 3.6); for now it is WL3001. It needs a pending call that turns those two errors into `null`, in both VMs' dispatch methods, so it is measured against `main`. Added by Claude, 2026-11-15, from "Native Modules, Part 4".
 
 # END-OF-TO-DO
 

@@ -17,13 +17,13 @@ public sealed class WebLingoTasksModule : IWebLingoNativeModule
         registry.Function("timeout", 2, Timeout);
     }
 
-    private static bool All(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+    private static bool All(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         TryCombine("all", arguments[0], heap, out result, out error);
 
-    private static bool Any(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+    private static bool Any(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         TryCombine("any", arguments[0], heap, out result, out error);
 
-    private static bool Timeout(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    private static bool Timeout(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
         if (!TryScheduler(heap, out var scheduler, out error)) return false;

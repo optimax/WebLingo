@@ -14,7 +14,7 @@ public sealed class WebLingoTemplateWriteFunction(bool escapes, IWebLingoTextOut
     public string Name => escapes ? WebLingoTemplateWriters.Escaped : WebLingoTemplateWriters.Raw;
     public int Arity => 1;
 
-    public bool TryInvoke(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         if (arguments[0].Kind != WebLingoValueKind.Null)
         {

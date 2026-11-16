@@ -15,6 +15,7 @@
 | `System.Text.StringBuilder` | Planned | The disassembler, the lexer's string literals, the text of an array (`WebLingoValueFormatter`), and `WebLingoCollectedOutput` (`WebLingo.StdLib`), which collects a script's output for tests and hosts |
 | `volatile` fields | Planned | `WebLingoCancellationSignal`, set by the host, read by the VM |
 | `ref readonly` locals and `in` parameters | Planned | The VMs read their instructions where they are, without copying them |
+| `ReadOnlySpan<T>` | Planned | A built-in's and a native function's arguments, a read-only view of the VM's registers or slots, never copied (`IWebLingoBuiltinFunction`, `WebLingoNativeFunction`, specification, section 3.9); Native C# needs `ref struct`s for it, or the contract becomes an array, an offset and a count |
 | `Math.BigMul(long, long, out long)` | Planned | The VMs' int64 multiplication, whose 128-bit product shows an overflow |
 | `Array.Resize`, `Array.Clear` | Planned | The VMs' stacks of frames, and the registers or slots a returning call clears |
 | `char.IsSurrogatePair`, `string.Substring` | Planned | A string's `length` and indexing count Unicode scalar values (`WebLingoMembers`), over the UTF-16 text a string is kept as |

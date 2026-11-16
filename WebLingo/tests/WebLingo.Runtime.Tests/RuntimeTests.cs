@@ -365,7 +365,7 @@ public sealed class InterpolationFormatTests
 
 public sealed class NativeClassTests
 {
-    private static bool Nothing(WebLingoValue[] arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    private static bool Nothing(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
         error = null;
