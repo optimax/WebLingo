@@ -25,6 +25,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 |---|---|---|
 | Product direction | JavaScript-inspired, non-ECMAScript-compatible, native-oriented server scripting | Approved |
 | Project naming | WebLingo, with `weblingo.dev` as the intended project domain; `.wl` and `.wasp` files, `WL` IDs and codes, and `WebLingo` type names in source, in place of WebScript's `.ws`, `.wsp`, `WS` and `Ws`; WASP, Web Application Server Pages, the templates' technology, its command line `wasp`, in place of WebLingo Pages, `.wlp` and `welp`; WLBC, WebLingo ByteCode, the bytecode's format, its files `.wlbc`, in place of WBC (§1) | Approved (the names 14 November 2026; WASP 15 November 2026; WLBC 16 November 2026) |
+| Command lines | `weblingo` is strictly the scripts' runner (`run`, `check`, `compile`, `disasm`); `wasp` is the web handler: its pages, and serving applications, locally and under IIS (§8.4, §6.9) | Approved (16 November 2026) |
 | WL-G001 | Free and open-source project direction; release timing, scope, and MIT licensing proposal | Direction confirmed; release and licensing details proposed |
 | Implementation | C#/.NET 10 initially, later Native C# compilation | Approved |
 | WL-017 | Native C# portability contract and replaceable adapters | Approved |
@@ -926,7 +927,7 @@ Codes added while implementing M0.6 (§15.2):
 
 **VM:** execute verified modules with an execution context containing owner worker, cancellation, instruction budget, resource budget and runtime services. Initial execution may be synchronous.
 
-**CLI:** executable `weblingo`; first working commands `run`, `check`, `--version`; `compile` and `disasm`, and `run` and `check` of a `.wlbc`, since M0.13.2 (§5.3, §15.2, "WLBC on the command line"); later `serve`.
+**CLI:** executable `weblingo`; first working commands `run`, `check`, `--version`; `compile` and `disasm`, and `run` and `check` of a `.wlbc`, since M0.13.2 (§5.3, §15.2, "WLBC on the command line"). `weblingo` is strictly the scripts' runner, and `wasp`, WASP's command line, the web handler, which serves applications, locally and under IIS, so that `serve` is `wasp`'s, not `weblingo`'s (the owner's decision, 16 November 2026).
 
 Example:
 
@@ -1025,7 +1026,7 @@ Proposed central props:
 | M0.11 | Asynchrony: `async`, `await` and tasks (§3.8) | Implemented (13 November 2026), in parts M0.11.1 and M0.11.2 (below), on both VMs, on Windows |
 | M0.12 | `.wasp` templates: includes, layouts and parameterized components, together (§13, WL-T001 to WL-T008) | Its contracts decided in part (§13, "Contracts", 13 November 2026); after M0.11, and the module system it needs (`import` and `param`), both done; in parts M0.12.1 to M0.12.5 (below, 14 November 2026), all implemented (14 November 2026), on both VMs, on Windows, `samples/SimpleWebsite` running through `wasp`; what WL-T007 and WL-T008 ask of a host (dependency invalidation, application generations, cancellation and streaming to a response) waits for hosting |
 | M0.13 | WLBC, the bytecode's binary format (§5.1, §5.3) | Implemented (16 November 2026), in parts (below), on both VMs: a format for each VM's bytecode, in one container, both VMs kept (15 November 2026); WASP never writing its files, and the format's questions answered (16 November 2026) |
-| M0.14 | Hosting: web applications served through the ASP.NET Core adapter, for IIS first (§6, WL-H009), their pages and `.wl` route handlers compiled and cached in memory, their generations reloaded atomically (WL-T007), and served locally from the command line (§8.4) | The owner's choice (16 November 2026); in parts (below), M0.14.1 first |
+| M0.14 | Hosting: web applications served through the ASP.NET Core adapter, for IIS first (§6, WL-H009), their pages and `.wl` route handlers compiled and cached in memory, their generations reloaded atomically (WL-T007), and served by `wasp`, locally and under IIS (§8.4) | The owner's choice (16 November 2026); in parts (below), M0.14.1 first |
 
 **M0.7 parts** (12 November 2026), each landing on its own with its conformance tests, which `WebLingo.Conformance.Tests` runs beside §8.6's:
 
@@ -1084,8 +1085,8 @@ Proposed central props:
 1. **M0.14.1, WLHI's HTTP contracts** (§6.7): a request's method, path, query, scheme, host, headers and body, and a response's status, headers and body, Uncommitted, then Committed, its status and headers fixed, then Completed; and a request and a response held in memory, for tests and for hosts that buffer.
 2. **M0.14.2, the host's core** (§6.3 to §6.6): the runtime, its applications and their generations, an application's pages and handlers compiled and cached in memory (§5.1), a request's path found among them, run on a worker, its output written to the response, and a runtime error's response.
 3. **M0.14.3, the request and the response in scripts:** what a page and a `.wl` route handler see of them, and what a handler is.
-4. **M0.14.4, the ASP.NET Core adapter** (§6.1, WL-H009): ASP.NET Core's requests translated to WLHI's, an application's other files served as they are, and IIS through the ASP.NET Core Module.
-5. **M0.14.5, serving an application locally** on Kestrel, from the command line (§8.4).
+4. **M0.14.4, the ASP.NET Core adapter** (§6.1, WL-H009): ASP.NET Core's requests translated to WLHI's, an application's other files served as they are, and IIS through the ASP.NET Core Module, which runs `wasp`.
+5. **M0.14.5, serving an application locally** on Kestrel, with `wasp serve` (§8.4; `weblingo` runs scripts only).
 6. **M0.14.6, reloading** (§6.5, WL-T007): an application's files watched, a new generation compiled when one changes, and published atomically once healthy, the old one drained.
 7. **M0.14.7, streaming** (§6.7, WL-T008): a response's body written as the page runs, with backpressure, and a request's body read as it arrives, neither buffered whole.
 

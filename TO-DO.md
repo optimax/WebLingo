@@ -20,9 +20,9 @@ A2:
 
 A3:
 
-**Q4, which command serves an application locally, and what IIS's ASP.NET Core Module runs: (a) `wasp serve [--root site] [--port 8080]`, WASP's command line, which the site's `web.config` names for IIS too; (b) `weblingo serve`, as section 8.4 lists, `web.config` naming it for IIS.**
+Q4, which command serves an application locally, and what IIS's ASP.NET Core Module runs: (a) `wasp serve [--root site] [--port 8080]`, WASP's command line, which the site's `web.config` names for IIS too; (b) `weblingo serve`, as section 8.4 lists, `web.config` naming it for IIS.
 
-A4:
+A4: (a), in the chat, 2026-11-16: "weblingo is strictly the script interpreter/runner. wasp is the web handler". Recorded in the specification, sections 1.1, 8.4 and 9.
 
 **Q5, what a runtime error in a request gives: (a) a 500, its body a page showing the error (its file, line, column, code and message) when the application runs in development, and a page without them otherwise, `weblingo.json`'s `"environment"` saying which, development for the local command and production under IIS by default; (b) always a 500 page without the error, which only the host's log has.**
 
@@ -52,13 +52,13 @@ What a page and a `.wl` route handler see of their request and response, and wha
 
 ASP.NET Core's requests translated to WLHI's, an application's other files served as they are, and IIS through the ASP.NET Core Module (specification, section 6.1, WL-H009; section 9, "M0.14 parts", part 4). Added by Claude, 2026-11-16.
 
-2026-11-16: waits for M0.14.2, and for Q4 of "M0.14: Hosting".
+2026-11-16: waits for M0.14.2.
 
 ## [IDLE] M0.14.5: Serving an Application Locally
 
 An application served on Kestrel from the command line (specification, section 8.4; section 9, "M0.14 parts", part 5). Added by Claude, 2026-11-16.
 
-2026-11-16: waits for M0.14.4, and for Q4 of "M0.14: Hosting".
+2026-11-16: waits for M0.14.4.
 
 ## [IDLE] M0.14.6: Reloading
 
