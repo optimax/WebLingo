@@ -3,7 +3,7 @@ namespace WebLingo.Bytecode;
 
 // The stack bytecode (specification, section 5.6, "The comparison's parts", part 3): the instruction model of the
 // stack VM, which is compared with the register VM before the choice between them is made (WL-BC002, provisional).
-// Like the register bytecode, it is an in-memory model, not WBC, and nothing here is a frozen format. A function's
+// Like the register bytecode, it is an in-memory model, not WLBC, and nothing here is a frozen format. A function's
 // frame holds its locals, then its operand stack; an instruction takes its operands from the top of the stack and
 // pushes its result there. Constants, imports and captures are the register bytecode's.
 

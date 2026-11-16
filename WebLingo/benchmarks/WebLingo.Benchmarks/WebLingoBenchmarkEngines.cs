@@ -24,7 +24,7 @@ public interface IWebLingoBenchmarkProgram
 
     /// <summary>
     /// How many bytes its instructions would take in a variable-length encoding: a byte for the operation, and each
-    /// operand it uses as an unsigned LEB128 number. WBC's encoding is not decided (section 5.3); this only compares
+    /// operand it uses as an unsigned LEB128 number. WLBC's encoding is not decided (section 5.3); this only compares
     /// the two instruction sets' sizes. Constants and other tables, the same for every VM, are not counted.
     /// </summary>
     long CodeBytes { get; }

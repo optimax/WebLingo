@@ -2,7 +2,7 @@ using WebLingo.Core;
 namespace WebLingo.Bytecode;
 
 // M0.6's in-memory bytecode (specification, sections 5.3 and 8.4): a register instruction model the VM executes after
-// the verifier has checked it. It is not WBC, the serialized format, whose encoding is not decided yet, and nothing
+// the verifier has checked it. It is not WLBC, the serialized format, whose encoding is not decided yet, and nothing
 // here is a frozen format.
 
 /// <summary>

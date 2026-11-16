@@ -17,14 +17,14 @@ WebLingo is a JavaScript-inspired, native-oriented, cross-platform **server-side
 - The execution engine and platform services must be independent of IIS, ASP.NET Core, FastCGI, Kestrel, Windows and Linux.
 - IIS is the priority deployment target; FastCGI and standalone HTTP hosting are architectural targets.
 
-The approved project name is **WebLingo** (formerly WebScript). The intended project domain is **`weblingo.dev`**. The solution is `WebLingo.slnx`, project and namespace roots use `WebLingo`, and the CLI executable is `weblingo`. Scripts and modules are `.wl` files, templates `.wasp` files; specification IDs and diagnostic codes have the prefix `WL` (`WL-BC002`, `WL1001`), and type names in source the prefix `WebLingo` (`WebLingoLexer`). They kept WebScript's `ws` (`.ws`, `.wsp`, `WS`, `Ws`) until the owner had them renamed, with no backward compatibility, on 14 November 2026. The technology of templates for web servers (§13) is **WASP**, Web Application Server Pages, by analogy to Active Server Pages, without "Active", which came from COM's ActiveX and Active Scripting, which WebLingo does not have: its pages are `.wasp` files, its command line `wasp`, in the project `WebLingo.Wasp.Cli` (the owner's decision, 15 November 2026, in place of WebLingo Pages, `.wlp` and `welp`, with no backward compatibility).
+The approved project name is **WebLingo** (formerly WebScript). The intended project domain is **`weblingo.dev`**. The solution is `WebLingo.slnx`, project and namespace roots use `WebLingo`, and the CLI executable is `weblingo`. Scripts and modules are `.wl` files, templates `.wasp` files; specification IDs and diagnostic codes have the prefix `WL` (`WL-BC002`, `WL1001`), and type names in source the prefix `WebLingo` (`WebLingoLexer`). They kept WebScript's `ws` (`.ws`, `.wsp`, `WS`, `Ws`) until the owner had them renamed, with no backward compatibility, on 14 November 2026. The technology of templates for web servers (§13) is **WASP**, Web Application Server Pages, by analogy to Active Server Pages, without "Active", which came from COM's ActiveX and Active Scripting, which WebLingo does not have: its pages are `.wasp` files, its command line `wasp`, in the project `WebLingo.Wasp.Cli` (the owner's decision, 15 November 2026, in place of WebLingo Pages, `.wlp` and `welp`, with no backward compatibility). Compiled bytecode is **WLBC**, WebLingo ByteCode, its files `.wlbc` files (the owner's decision, 16 November 2026, in place of WBC, before any such file was written).
 
 ### 1.1 Decision register
 
 | ID / area | Decision | Status |
 |---|---|---|
 | Product direction | JavaScript-inspired, non-ECMAScript-compatible, native-oriented server scripting | Approved |
-| Project naming | WebLingo, with `weblingo.dev` as the intended project domain; `.wl` and `.wasp` files, `WL` IDs and codes, and `WebLingo` type names in source, in place of WebScript's `.ws`, `.wsp`, `WS` and `Ws`; WASP, Web Application Server Pages, the templates' technology, its command line `wasp`, in place of WebLingo Pages, `.wlp` and `welp` (§1) | Approved (the names 14 November 2026; WASP 15 November 2026) |
+| Project naming | WebLingo, with `weblingo.dev` as the intended project domain; `.wl` and `.wasp` files, `WL` IDs and codes, and `WebLingo` type names in source, in place of WebScript's `.ws`, `.wsp`, `WS` and `Ws`; WASP, Web Application Server Pages, the templates' technology, its command line `wasp`, in place of WebLingo Pages, `.wlp` and `welp`; WLBC, WebLingo ByteCode, the bytecode's format, its files `.wlbc`, in place of WBC (§1) | Approved (the names 14 November 2026; WASP 15 November 2026; WLBC 16 November 2026) |
 | WL-G001 | Free and open-source project direction; release timing, scope, and MIT licensing proposal | Direction confirmed; release and licensing details proposed |
 | Implementation | C#/.NET 10 initially, later Native C# compilation | Approved |
 | WL-017 | Native C# portability contract and replaceable adapters | Approved |
@@ -46,9 +46,10 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WL-T001–WL-T008 | Includes, layouts, and parameterized components all required in the first template-capable release | **Approved** |
 | Template named sections | Optional page-specific layout sections | Proposed extension; not yet approved |
 | WL-BC002 | Register VM preferred, stack VM benchmark required before final decision | **Provisional** |
-| WL-BC002, until decided | Both VMs are kept, and every new feature is built on both, until property access, async suspension, template output and I/O-bound workloads can be measured too; those measured, both still, until something more is; and WBC, a format for each VM's bytecode in one container (§5.6, §9) | Approved (13 November 2026; both kept still, every workload measured, and WBC for both, 15 November 2026) |
+| WL-BC002, until decided | Both VMs are kept, and every new feature is built on both, until property access, async suspension, template output and I/O-bound workloads can be measured too; those measured, both still, until something more is; and WLBC, a format for each VM's bytecode in one container (§5.6, §9) | Approved (13 November 2026; both kept still, every workload measured, and WLBC for both, 15 November 2026) |
 | WL-BC002 comparison | The stack VM in a project of its own, `WebLingo.VM.Stack`, its code generator in `WebLingo.Compiler`; a console benchmark, `WebLingo.Benchmarks`, timing with `Stopwatch`, with no new package; the register VM's dispatch tuned for speed before the two are compared (§5.6) | Approved (13 November 2026) |
 | M0.3 encoding | Variable-length register operands; disk byte offsets / decoded instruction indices | Proposed |
+| WASP and `.wlbc` files | WASP never writes a `.wlbc` file: wherever it runs pages, in `wasp` and in the web hosts, it compiles and caches a page, and what the page includes, imports, renders or is laid out by, in memory only (§5.1, WL-T007) | Approved (16 November 2026) |
 | M0.3 numbers | IEEE 754 decimal128 BID binary representation | Proposed |
 | M0.3 exceptions | Table-driven exception and cleanup regions | Approved (13 November 2026, §3.7) |
 | M0.3 dispatch | Initial C# `switch` interpreter | Proposed |
@@ -65,7 +66,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | M0.6 testing default | xUnit on .NET 10 | Adopted M0.6 default |
 | M0.6 implementation choices | Lexical, syntax, runtime and CLI choices made where this specification is silent, while implementing M0.6.2 onward (§15.2) | Each row of §15.2 has its own status; the lexical and syntax ones, and the binding ones but "Compilation stages", the bytecode ones but "Compiler output", and the runtime and CLI ones asked about, approved 12 November 2026; the rest are Proposed |
 | Repository documents | One copy of this specification, `Documents/weblingo-architecture.md`; documents in the repository's root `Documents/` folder; a shallow folder structure, with no `docs/architecture/` folder; the whole repository may become public (§8.2) | Approved (12 November 2026) |
-| Milestones after M0.8 | M0.9 collections, M0.10 classes and disposal, M0.11 asynchrony, M0.12 `.wasp` templates, M0.13 WBC, in that order (§9) | Approved (13 November 2026; asynchrony put before templates the same day) |
+| Milestones after M0.8 | M0.9 collections, M0.10 classes and disposal, M0.11 asynchrony, M0.12 `.wasp` templates, M0.13 WLBC, in that order (§9) | Approved (13 November 2026; asynchrony put before templates the same day) |
 
 **Approval boundary:** M0.6 was approved as a specification. This does not imply the repository or implementation already exists. Detailed M0.3 encoding choices were recommended but not separately approved; the architectural decision between stack and register VMs remains open.
 
@@ -81,7 +82,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 4. Portable compiler and execution engine; host-neutral interfaces.
 5. Fast startup and request execution, bounded memory and streaming I/O.
 6. Hot reload without exposing partially initialized application state.
-7. Versioned, verified portable bytecode (WBC).
+7. Versioned, verified portable bytecode (WLBC).
 
 ### 2.2 Source types and template syntax
 
@@ -355,9 +356,11 @@ The proposed implementation uses a compact tagged `WebLingoValue` (target size *
 
 ## 5. Bytecode and VM architecture (WL-BC001–WL-BC016)
 
-### 5.1 WBC goals
+### 5.1 WLBC goals
 
-WebLingo Bytecode (WBC) is intended to be portable, versioned, verified, architecture-independent and suitable for caching. It must not embed .NET object references, machine pointers or hosting-framework types.
+WebLingo ByteCode (WLBC) is intended to be portable, versioned, verified, architecture-independent and suitable for caching. It must not embed .NET object references, machine pointers or hosting-framework types.
+
+WASP never writes a `.wlbc` file: wherever it runs pages, in `wasp` and in the web hosts, it compiles and caches a page, and what the page includes, imports, renders or is laid out by, in memory only (the owner's decision, 16 November 2026; WL-T007).
 
 ### 5.2 VM architecture — **provisional**
 
@@ -373,9 +376,9 @@ The register VM is the **preferred first implementation**, but the final registe
 
 M0.6 implementation default: implement the minimal register VM first and add a stack VM benchmark prototype later. **This does not approve WL-BC002 permanently.** The stack VM and the comparison exist since 13 November 2026 (§5.6, "The comparison"). The owner kept both VMs that day: every new feature is built on both, and the choice is made once the workloads not yet measurable can be measured. Those measured, the owner kept both still, on 15 November 2026 (§5.6, "Both VMs, for now").
 
-### 5.3 Proposed WBC binary container
+### 5.3 Proposed WLBC binary container
 
-- Header target: **32 bytes**, magic `WBC\0`, major/minor version, ABI/feature flags, section count, directory offset and total length.
+- Header target: **32 bytes**, magic `WLBC`, major/minor version, ABI/feature flags, section count, directory offset and total length.
 - Section-directory entry target: **32 bytes**.
 - Sections: constants, type/module metadata, function table, code, exception tables, debug/source mapping, integrity metadata.
 - Integer encoding: signed LEB128 where appropriate.
@@ -449,7 +452,7 @@ An initial C# `switch` dispatch loop is **proposed** for clarity and portability
 
 Implementation complexity, in lines of source, the stack VM's against the register VM's: the code generator 375 against 468 (it allocates no registers, and needs no copy of a local that a later operand assigns), the verifier 346 against 402, the VM 633 against 604, and the instruction model 121 against 148. Not measured yet, because the language does not have them: property access, async suspension, template output, and I/O-bound server workloads (this section's list); and startup and latency, which matter once there is a host. The choice between the VMs is the owner's (WL-BC002).
 
-**Both VMs, for now** (owner's decision, 13 November 2026). WL-BC002 stays provisional until property access, async suspension, template output and I/O-bound workloads can be measured too. Until then, every new feature is built on both VMs, from the same lowered IR, each with its code generator, its verifier and its VM, and gives the same results on both; and each of those workloads joins the benchmark when the language can express it, so that the choice is made on all of them. Every one of them measured (15 November 2026, "I/O-bound work"), the owner kept both VMs still, each feature built on both, until something more is measured, startup and latency, which matter once there is a host, among what is not yet; and WBC goes ahead, a format for each VM's bytecode in one container (§9, M0.13; the owner's decision, 15 November 2026).
+**Both VMs, for now** (owner's decision, 13 November 2026). WL-BC002 stays provisional until property access, async suspension, template output and I/O-bound workloads can be measured too. Until then, every new feature is built on both VMs, from the same lowered IR, each with its code generator, its verifier and its VM, and gives the same results on both; and each of those workloads joins the benchmark when the language can express it, so that the choice is made on all of them. Every one of them measured (15 November 2026, "I/O-bound work"), the owner kept both VMs still, each feature built on both, until something more is measured, startup and latency, which matter once there is a host, among what is not yet; and WLBC goes ahead, a format for each VM's bytecode in one container (§9, M0.13; the owner's decision, 15 November 2026).
 
 **Collections workload** (M0.9.4, 13 November 2026), measured as part 4 was: `collections` fills an array and a map, and reads, writes and visits them with `foreach` and indexing. The register VM took 3.7 to 4.5 ms over two runs, the stack VM 4.7 to 5.2 ms, running 605,064 and 1,030,106 instructions, from 67 instructions of code (223 bytes) and 115 (218 bytes); both allocated 1.06 MB.
 
@@ -647,7 +650,7 @@ Applications have immutable capability policies for filesystem, network, databas
 ### 7.2 PAL layers
 
 ```text
-Portable WebLingo core (lexer, compiler, WBC, VM, GC)
+Portable WebLingo core (lexer, compiler, WLBC, VM, GC)
                            |
                  PAL abstractions
                            |
@@ -774,7 +777,7 @@ A compilable, minimal **.NET 10 Visual Studio solution**, not a full language im
 
 `Source → Lexer → Parser → Binder → Lowered IR → Bytecode generator → Verifier → VM → Result`
 
-The first implementation may use an in-memory bytecode representation; WBC binary serialization comes after encoding decisions are settled.
+The first implementation may use an in-memory bytecode representation; WLBC binary serialization comes after encoding decisions are settled.
 
 ### 8.2 Proposed repository layout
 
@@ -904,7 +907,7 @@ Codes added while implementing M0.6 (§15.2):
 
 **Binder/IR:** resolve lexical symbols, each from its declaration on (§3.1); produce bound tree and lowered IR independent of register/stack VM choice.
 
-**Bytecode generator:** produce an executable in-memory module; serialization deferred until WBC encoding finalized.
+**Bytecode generator:** produce an executable in-memory module; serialization deferred until WLBC encoding finalized.
 
 **Verifier:** reject invalid opcodes, operands, branches, constants and uninitialized temporaries.
 
@@ -1000,7 +1003,7 @@ Proposed central props:
 |---|---|---|
 | M0.1 | Language grammar and semantics | Key normative choices approved; detailed semantics drafted |
 | M0.2 | Runtime value model, GC and disposal | Key choices approved; detailed physical contracts drafted |
-| M0.3 | WBC bytecode and VM architecture | Drafted; the VMs compared (13 November 2026, §5.6), the choice and several encoding choices open |
+| M0.3 | WLBC bytecode and VM architecture | Drafted; the VMs compared (13 November 2026, §5.6), the choice and several encoding choices open |
 | M0.4 | Hosting ABI and runtime lifecycle | **Four explicit architectural decisions approved** |
 | M0.5 | Platform abstraction and portability | **Four explicit architectural decisions approved** |
 | M0.6 | Solution scaffolding and implementation contracts | **Approved; M0.6.1–M0.6.7 implemented and verified on Windows and Linux (§15)** |
@@ -1010,7 +1013,7 @@ Proposed central props:
 | M0.10 | Classes, `dispose()` and `using` (§3.2, §3.4, WL-L011) | Implemented (13 November 2026), in parts M0.10.1 to M0.10.7 (below), on both VMs, on Windows; typed catches, `is` and the classes of values implemented too (13 November 2026), but for extending `Array`, `Map` and `Set` |
 | M0.11 | Asynchrony: `async`, `await` and tasks (§3.8) | Implemented (13 November 2026), in parts M0.11.1 and M0.11.2 (below), on both VMs, on Windows |
 | M0.12 | `.wasp` templates: includes, layouts and parameterized components, together (§13, WL-T001 to WL-T008) | Its contracts decided in part (§13, "Contracts", 13 November 2026); after M0.11, and the module system it needs (`import` and `param`), both done; in parts M0.12.1 to M0.12.5 (below, 14 November 2026), all implemented (14 November 2026), on both VMs, on Windows, `samples/SimpleWebsite` running through `wasp`; what WL-T007 and WL-T008 ask of a host (dependency invalidation, application generations, cancellation and streaming to a response) waits for hosting |
-| M0.13 | WBC, the bytecode's binary format (§5.1, §5.3) | After M0.12; a format for each VM's bytecode, in one container, both VMs kept (15 November 2026), its format's questions asked |
+| M0.13 | WLBC, the bytecode's binary format (§5.1, §5.3) | After M0.12; a format for each VM's bytecode, in one container, both VMs kept (15 November 2026), WASP never writing its files (16 November 2026), its format's questions asked |
 
 **M0.7 parts** (12 November 2026), each landing on its own with its conformance tests, which `WebLingo.Conformance.Tests` runs beside §8.6's:
 
@@ -1080,7 +1083,7 @@ Proposed central props:
 
 **After M0.8** (order approved by the owner, 13 November 2026): M0.9, then M0.10, M0.11, M0.12 and M0.13, as the table gives them (asynchrony put before templates on 13 November 2026, the owner asking for it to be designed first). Each needs syntax, or a format, that this specification does not give yet, which is decided feature by feature before it is built; and each is built on both VMs (§5.6, "Both VMs, for now").
 
-**Immediate next activity:** the owner's questions open in `TO-DO.md`; M0.13, WBC, a format for each VM's bytecode, both VMs kept (WL-BC002, 15 November 2026), whose format's questions are asked. The compiler and both VMs cover M0.6's subset, the language of §3.5 to §3.9, and pages, their includes, components and layouts (§13, M0.12).
+**Immediate next activity:** the owner's questions open in `TO-DO.md`; M0.13, WLBC, a format for each VM's bytecode, both VMs kept (WL-BC002, 15 November 2026), whose format's questions are asked. The compiler and both VMs cover M0.6's subset, the language of §3.5 to §3.9, and pages, their includes, components and layouts (§13, M0.12).
 
 ---
 
@@ -1089,7 +1092,7 @@ Proposed central props:
 These items should be explicitly tracked rather than silently treated as approved:
 
 1. **Register versus stack VM (WL-BC002):** compare equivalent benchmark workloads; register-based remains preferred but provisional. Compared on 13 November 2026 (§5.6, "The comparison"): the register VM is faster on every workload measured, the stack bytecode smaller. The owner kept both VMs, each feature built on both, until property access, async suspension, template output and I/O can be measured too (§5.6, "Both VMs, for now"); every one of them measured, both still, on 15 November 2026, until something more is.
-2. **WBC encoding:** finalize variable-length operand scheme, branch addressing, header/directory layout and binary compatibility.
+2. **WLBC encoding:** finalize variable-length operand scheme, branch addressing, header/directory layout and binary compatibility.
 3. **Decimal128 binary encoding:** choose IEEE BID or alternative representation, define canonicalization, rounding and interoperability.
 4. **Exceptions and cleanup:** freeze table-driven versus handler-stack mechanics; define guaranteed disposal chaining and cleanup errors. Decided 13 November 2026 (§3.7): table-driven regions, and an exception from `dispose()` replaces one already on its way out; and a disposal goes on when one of its methods throws (approved 13 November 2026, §3.7).
 5. **Async disposal:** specify `using` behavior around async operations, cancellation and outstanding native resources. `using` awaits an `async` `dispose()` (§3.8, approved 13 November 2026, and implemented in M0.11.2); cancellation and native resources remain.
@@ -1110,7 +1113,7 @@ These items should be explicitly tracked rather than silently treated as approve
 
 1. **One language semantics across hosts and toolchains.** WebLingo behavior must not change when replacing .NET adapters with native adapters.
 2. **No .NET dependency in the final native product.** The .NET 10 stage is a bootstrap and delivery strategy, not a language requirement.
-3. **Portable source and bytecode.** WBC must be validated before execution and must not expose host memory structures.
+3. **Portable source and bytecode.** WLBC must be validated before execution and must not expose host memory structures.
 4. **Clear ownership boundaries.** Worker-affine mutable heaps, explicit cross-worker transfer, deterministic resource disposal.
 5. **Separation of disposal and GC.** `dispose()` is deterministic resource release; tracing GC reclaims script-object memory.
 6. **Stable host-neutral interfaces.** IIS, FastCGI and standalone hosts adapt to WLHI (§6.2), not the reverse.
@@ -1131,7 +1134,7 @@ These items should be explicitly tracked rather than silently treated as approve
 - **Proposed public-release milestone:** A functioning, independently deployable native WebLingo compiler/runtime that does not require .NET, Node.js, V8, PHP, or the separate Native C# compiler on end-user systems.
 - Continue developing in C#/.NET 10 according to the approved bootstrap architecture. The repository may remain private during implementation.
 - The independent Native C# compiler is a build-time toolchain, **not** a required component of the WebLingo runtime distribution; whether its own source code is published is a separate decision.
-- Publish language semantics, WBC bytecode documentation, host interfaces, build instructions, and conformance tests sufficient for independent evaluation and interoperability.
+- Publish language semantics, WLBC bytecode documentation, host interfaces, build instructions, and conformance tests sufficient for independent evaluation and interoperability.
 
 ### 12.2 Candidate license: MIT
 
@@ -1146,7 +1149,7 @@ Tradeoff: MIT does not require third parties to contribute improvements back. If
 1. **Ownership and provenance:** Track copyright holders, contributors, third-party code, assets, and generated content; verify that the project has the rights necessary to publish each component.
 2. **Dependency review:** Maintain a software bill of materials or equivalent dependency inventory; verify redistribution compatibility, required notices, and transitive dependencies. Avoid introducing restrictive dependencies into the portable core.
 3. **Reproducible releases:** Provide versioned source tags, documented builds, release artifacts, checksums, and automated Windows/Linux conformance tests.
-4. **Specification and compatibility:** Publish versioned language, WBC, PAL/WLHI and extension contracts; state compatibility and deprecation policies.
+4. **Specification and compatibility:** Publish versioned language, WLBC, PAL/WLHI and extension contracts; state compatibility and deprecation policies.
 5. **Community governance:** Establish contribution rules, code review and maintainer authority, a security disclosure process, and a code of conduct before accepting substantial public contributions.
 6. **Trademark and naming:** Conduct a fresh name/trademark and ecosystem-confusion check for **WebLingo** before public launch; the MIT software license does not establish availability of the name or rights to a logo.
 7. **Security:** Document the limitations of capability-based logical isolation and the need for OS-level process isolation in hostile multi-tenant deployments.
@@ -1274,7 +1277,7 @@ The exact component parameter declaration syntax and whether `renderComponent` i
 
 ### WL-T007 — Compilation, caching, and atomic reload
 
-Maintain a dependency graph for pages, includes, layouts, and components. When a shared template changes, invalidate affected compiled artifacts and build a **new application generation**. Publish that generation atomically only after successful compilation/initialization; existing requests finish on their previous generation. Compilation and cache identity must account for transitive dependencies, configuration, compiler version, and relevant security policy. A component invocation must not cause reparsing on every request.
+Maintain a dependency graph for pages, includes, layouts, and components. When a shared template changes, invalidate affected compiled artifacts and build a **new application generation**. Publish that generation atomically only after successful compilation/initialization; existing requests finish on their previous generation. Compilation and cache identity must account for transitive dependencies, configuration, compiler version, and relevant security policy. A component invocation must not cause reparsing on every request. The cache is held in memory: WASP writes no `.wlbc` file (§5.1, the owner's decision of 16 November 2026).
 
 ### WL-T008 — Streaming, scheduling, and delivery gate
 
@@ -1397,7 +1400,7 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Members and indexing in the bytecode | Register: `GetMember`, `CallMethod` (its target and its arguments in consecutive registers), `GetIndex`, `SetIndex`, `NewArray` (its elements in consecutive registers) and `NewMap` (each key, then its value, in consecutive registers); stack: `GetMember`, `CallMethod`, `GetIndex`, `StoreIndex`, which may push the value back, a `GetIndex` operand (register D, stack A) being 1 for `?[`, `NewArray` and `NewMap`, and from M0.9.5 `NewSet` (its values in consecutive registers, or on the stack). From M0.10.1: `MakeClass` (a class of the module's class table, its methods' closures made as their captures say, from M0.10.2 with the class it extends: register C if D is 1, stack popped if B is 1), `GetSuper` (from M0.10.2: a class, `this` and a name, giving the base's method or constructor bound to `this`), `New` (register: the class and the arguments as `Call` takes them; stack: the class below the arguments) and `SetMember` (stack: which may push the value back), a `GetMember` operand (register D, stack B) being 1 for `?.`; a module holds a class table, each class with its constructor and its methods, and a function a flag, `HasThis`, for a method, which both verifiers check: a class's functions are methods, and `MakeClosure` makes no method. From M0.9.4, `ForEachNext` (register: the exit, the collection's register, with the position and the items in the registers after it, and the item count; stack: the exit and the collection's local, with `ForEachNextEntry` for a key and a value), which the verifiers treat as a conditional jump whose way out writes the position only. From M0.10.3, `Dispose` (register: A, the resource's register; stack: the resource, popped), a `using`'s disposal, which does nothing for `null`, and which the verifiers treat as a read; each VM runs an instance's dispose methods in turn in the frame of one call, the first as that call's, each next one as the last returns. From default values, `JumpIfGiven` (register: A, a parameter's register, B, the target; stack: A, the target, B, the parameter's local), which jumps when the caller gave the parameter, and each function's `OptionalCount`, how many of its last parameters may be left out. From typed catches, `IsInstance` (register: A, the destination, B, the value, C, the class; stack: pops the class, then the value, and pushes a Boolean), and a module names its kinds of values' classes, by `WebLingoValueClass` (`WebLingo.Core`), and its runtime errors' classes, by their codes. From M0.10.7, `ToText` (register: A, the destination, and B; stack: pops a value, pushes its text), and a module names its `Object` class, whose `toString()` a VM keeps as every value's. From M0.10.6, `Throw` (register A; stack: popped) and `Rethrow` (register A, the exception, and B, where it was first thrown, an int64 naming a function and an instruction; stack: both popped), and each function's handler table (§5.4's table-driven regions): ranges of its code, innermost first, each with its handler's instruction and the two registers, or locals, its handler receives the exception and its origin in, and on the stack VM the stack's depth there. The verifiers treat every instruction of a range as able to go to its handler, with what is written before it. A jump out of a protected range (`break`, `continue`, `return`) runs the `finally` bodies and disposals it leaves, copied there, outside the ranges they belong to; and a module names its `Error` class, which a VM keeps when it makes it. From M0.10.4, a module's class table gives each class its static methods, functions without `HasThis`, and its static fields' names, which the verifiers check; `MakeClass` makes the static methods' closures too, and `GetMember`, `SetMember` and `CallMethod` on a class reach its static members. From M0.11.1, `Await`, and each function's `IsAsync` (see "Asynchrony"); and from `extend` blocks, `Extend` (see "Extensions"). A member's name is a string constant, which each VM resolves to a member once, when it loads the module; the semantics are `WebLingoMembers`' (`WebLingo.Runtime`), the same for both VMs | Proposed |
 | Use before declaration | A name used before its declaration, or in its own initializer, means the outer declaration, or is undefined (WL2001, at compile time) if there is none (§3.1) | Approved |
 | Evaluation order | Left to right: operands, then arguments; an assignment evaluates its value before it stores it | Approved (12 November 2026) |
-| Instruction model | An in-memory register instruction model, not WBC (§5.3, §8.4): an operation and up to four integer operands A to D, unused ones 0 (`WebLingoBytecodeContracts.cs`); a module holds its constants (int64 and binary64, kept as IEEE bits), the built-ins it imports by name and arity, and one function, with a source span per instruction and the names of its locals for runtime messages | Approved (12 November 2026) |
+| Instruction model | An in-memory register instruction model, not WLBC (§5.3, §8.4): an operation and up to four integer operands A to D, unused ones 0 (`WebLingoBytecodeContracts.cs`); a module holds its constants (int64 and binary64, kept as IEEE bits), the built-ins it imports by name and arity, and one function, with a source span per instruction and the names of its locals for runtime messages | Approved (12 November 2026) |
 | Registers | A function's locals take registers 0 to n − 1 and its temporaries the registers above; at most 65535 registers (§5.3), more is a compile-time error (WL4002) | Approved (12 November 2026) |
 | Operations | `LoadConstant`, `Move`, `Negate`, `Plus`, `Add`, `Subtract`, `Multiply`, `Divide`, `CallBuiltin` (arguments in consecutive registers, §5.4), `Jump`, `Return`; from M0.7.2, `LoadNull`, `LoadBoolean`, `Not`, `Equal`, `NotEqual`, `Less`, `LessOrEqual`, `Greater`, `GreaterOrEqual`, `JumpIfFalse` and `JumpIfTrue` (whose condition must be a Boolean, WL3001), and `CheckBoolean` (the right operand of `&&` and `||`); from M0.7.6, `NewCell`, `BoxRegister`, `CopyCell`, `LoadCell`, `StoreCell`, `LoadCapture`, `StoreCapture`, `MakeClosure`, `LoadBuiltin`, `Call` and `ReturnValue`, and a module holds its functions besides its entry point, each with its parameter count and its captures | Approved (12 November 2026) |
 | Verification | Besides §5.5: unused operands must be 0; no path may run off the end of the code; every register, local or temporary, must be written before it is read on every path, which is what keeps a variable from being read before it has a value (§3.1); a function whose check needs more than 16 million words of state or 100 million steps is rejected rather than verified slowly. The bounds are arbitrary, and are constants that are easy to change (`WebLingoBytecodeVerifier.MaxStateWords`, `WebLingoBytecodeVerifier.MaxSteps`), as is the register limit (`WebLingoFunction.MaxRegisters`) | Approved (12 November 2026) |

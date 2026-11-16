@@ -175,6 +175,27 @@ public sealed class WaspTests : IDisposable
         Assert.EndsWith("layouts/main.wasp(2,5): error WL2001: 'nope' is not defined.", error.TrimEnd());
     }
 
+    [Fact]
+    public void RunAndCheckWriteNothingToDisk()
+    {
+        // WASP compiles pages in memory only and never writes a .wlbc file (specification, section 5.1): a page with a
+        // layout, an include, and a component that imports a module leaves the application's folder as it found it.
+        Write("site/layouts/main.wasp", "<html><% renderBody(); %></html>");
+        Write("site/includes/nav.wasp", "<nav></nav>");
+        Write("site/components/lib.wl", "export function twice(x) { return x * 2; }");
+        Write("site/components/card.wasp", "<% param n; import { twice } from \"lib.wl\"; %><p><%= twice(n) %></p>");
+        var page = Write("site/index.wasp", "<% layout \"/layouts/main.wasp\"; %><% include \"/includes/nav.wasp\"; %>"
+            + "<% await renderComponent(\"/components/card.wasp\", { n: 21 }); %>");
+        var before = Files();
+
+        Assert.Equal((WebLingoCommandLine.Success, "<html><nav></nav><p>42</p></html>", ""), Run(["run", page]));
+        Assert.Equal((WebLingoCommandLine.Success, "", ""), Run(["check", page]));
+        Assert.Equal(before, Files());
+    }
+
+    private string[] Files() =>
+        [.. Directory.GetFiles(_folder, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal)];
+
     private static string SolutionFolder()
     {
         for (var folder = new DirectoryInfo(AppContext.BaseDirectory); folder is not null; folder = folder.Parent)
