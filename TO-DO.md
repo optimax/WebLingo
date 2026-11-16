@@ -34,12 +34,6 @@ A6: (a)
 
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 6.12, A5's `weblingo.config` as the configuration's name, for a script's folder as for an application's root, in place of `weblingo.json`, its content JSON as before (a task of its own, below, "The Configuration File, `weblingo.config`"). Waits for its parts.
 
-## [IDLE] M0.14.2: The Host's Core
-
-The runtime, its applications and their generations, an application's pages and handlers compiled and cached in memory, a request's path found among them, run on a worker, its output written to the response, and a runtime error's response (specification, sections 6.3 to 6.6; section 9, "M0.14 parts", part 2). Added by Claude, 2026-11-16.
-
-2026-11-16: the configuration renamed; taken up.
-
 ## [IDLE] M0.14.3: The Request and the Response in Scripts
 
 What a page and a `.wl` route handler see of their request and response, and what a handler is (specification, section 9, "M0.14 parts", part 3). Added by Claude, 2026-11-16.
