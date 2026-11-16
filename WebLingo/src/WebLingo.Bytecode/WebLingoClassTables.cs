@@ -95,7 +95,7 @@ internal static class WebLingoClassTables
     public static string? CheckRoles(int classCount, IReadOnlyList<int>? valueClasses, IReadOnlyList<WebLingoErrorClass>? errorClasses)
     {
         if (valueClasses is null || errorClasses is null) return "The module has no tables of built-in classes.";
-        if (valueClasses.Count != 0 && valueClasses.Count != (int)WebLingoValueClass.Module + 1)
+        if (valueClasses.Count != 0 && valueClasses.Count != (int)WebLingoValueClass.Iterator + 1)
         {
             return $"The module has {valueClasses.Count} classes of values, not one for each kind.";
         }

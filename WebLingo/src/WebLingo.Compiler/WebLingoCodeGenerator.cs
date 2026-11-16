@@ -794,7 +794,11 @@ public sealed class WebLingoCodeGenerator
 
     /// <summary>
     /// <c>foreach</c>: the collection into its local, the position 0 into the next; then <c>ForEachNext</c>, which
-    /// leaves the loop when there is nothing more, or writes the next item and goes on to the body.
+    /// leaves the loop when there is nothing more, or writes the next item and goes on to the body. For one item, a value
+    /// the VMs do not visit themselves is visited by the protocol (section 3.6): <c>ForEachStart</c> calls its
+    /// <c>iterate()</c> before the loop, the iterator where the position is, and after the body, which <c>ForEachNext</c>
+    /// leaves at once for such a value, <c>ForEachVisits</c> asks the iterator's <c>hasNext()</c>, then its <c>next()</c>,
+    /// the item, and goes back to the body.
     /// </summary>
     private void EmitForEach(WebLingoIrForEach loop)
     {
@@ -802,6 +806,14 @@ public sealed class WebLingoCodeGenerator
         EmitExpression(loop.Collection, collection);
         _nextRegister = _locals;
         Emit(new WebLingoInstruction(WebLingoOpCode.LoadConstant, collection + 1, Int64Constant(0)), loop.Span);
+        if (loop.Iterate is { } iterate)
+        {
+            var start = _code.Count;
+            Emit(new WebLingoInstruction(WebLingoOpCode.ForEachStart, 0, collection), loop.Collection.Span);
+            EmitExpression(iterate, collection + 1);
+            _nextRegister = _locals;
+            _code[start] = _code[start] with { A = _code.Count };
+        }
         var jumps = new LoopJumps { Guards = _guards.Count };
         _loops.Push(jumps);
         var top = _code.Count;
@@ -811,6 +823,20 @@ public sealed class WebLingoCodeGenerator
         foreach (var at in jumps.Continues) PatchJump(at);
         Emit(new WebLingoInstruction(WebLingoOpCode.Jump, top), loop.Span);
         _code[top] = _code[top] with { A = _code.Count };
+        if (loop.HasNext is { } hasNext && loop.Next is { } next)
+        {
+            // The item's register holds hasNext()'s answer until next() gives the item.
+            var visits = _code.Count;
+            Emit(new WebLingoInstruction(WebLingoOpCode.ForEachVisits, 0, collection), loop.Collection.Span);
+            EmitExpression(hasNext, collection + 2);
+            _nextRegister = _locals;
+            var done = EmitJump(WebLingoOpCode.JumpIfFalse, collection + 2, loop.Collection.Span);
+            EmitExpression(next, collection + 2);
+            _nextRegister = _locals;
+            Emit(new WebLingoInstruction(WebLingoOpCode.Jump, top + 1), loop.Span);
+            _code[visits] = _code[visits] with { A = _code.Count };
+            PatchJump(done);
+        }
         foreach (var at in jumps.Breaks) PatchJump(at);
         _loops.Pop();
     }

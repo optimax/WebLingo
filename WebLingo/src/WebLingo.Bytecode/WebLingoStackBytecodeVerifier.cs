@@ -250,6 +250,10 @@ public sealed class WebLingoStackBytecodeVerifier
                     ? null
                     : $"its locals, {b} to {last}, are not all in the function's {function.LocalCount}.";
             }
+            case WebLingoStackOpCode.ForEachStart:
+            case WebLingoStackOpCode.ForEachVisits:
+                if (Index(a, function.Code.Count, "target instruction") is { } protocolError) return protocolError;
+                return b >= 0 && b < function.LocalCount ? null : $"its collection, local {b}, is not one of the function's {function.LocalCount}.";
             case WebLingoStackOpCode.NewMap:
                 return (a is < 0 or > WebLingoFunction.MaxRegisters / 2
                     ? $"its entry count, {a}, is not 0 to {WebLingoFunction.MaxRegisters / 2}."
@@ -496,6 +500,9 @@ public sealed class WebLingoStackBytecodeVerifier
             case WebLingoStackOpCode.ForEachNextEntry:
                 if (!IsSet(written, instruction.B)) return instruction.B;
                 return IsSet(written, instruction.B + 1) ? -1 : instruction.B + 1;
+            case WebLingoStackOpCode.ForEachStart:
+            case WebLingoStackOpCode.ForEachVisits:
+                return IsSet(written, instruction.B) ? -1 : instruction.B;
             case WebLingoStackOpCode.LoadLocal:
             case WebLingoStackOpCode.BoxLocal:
             case WebLingoStackOpCode.CopyCell:
@@ -535,7 +542,8 @@ public sealed class WebLingoStackBytecodeVerifier
 
     private static bool IsJump(WebLingoStackOpCode opCode) =>
         opCode is WebLingoStackOpCode.Jump or WebLingoStackOpCode.JumpIfFalse or WebLingoStackOpCode.JumpIfTrue or WebLingoStackOpCode.ForEachNext
-            or WebLingoStackOpCode.ForEachNextEntry or WebLingoStackOpCode.JumpIfGiven;
+            or WebLingoStackOpCode.ForEachNextEntry or WebLingoStackOpCode.JumpIfGiven or WebLingoStackOpCode.ForEachStart
+            or WebLingoStackOpCode.ForEachVisits;
 
     private static int ItemCount(WebLingoStackOpCode opCode) => opCode == WebLingoStackOpCode.ForEachNextEntry ? 2 : 1;
 

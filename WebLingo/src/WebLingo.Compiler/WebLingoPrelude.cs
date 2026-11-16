@@ -14,7 +14,7 @@ internal static class WebLingoPrelude
         ("Boolean", WebLingoValueClass.Boolean), ("Integer", WebLingoValueClass.Integer), ("Number", WebLingoValueClass.Number),
         ("String", WebLingoValueClass.String), ("Array", WebLingoValueClass.Array), ("Map", WebLingoValueClass.Map), ("Set", WebLingoValueClass.Set),
         ("Function", WebLingoValueClass.Function), ("Class", WebLingoValueClass.Class), ("Task", WebLingoValueClass.Task),
-        ("Module", WebLingoValueClass.Module)
+        ("Module", WebLingoValueClass.Module), ("Iterator", WebLingoValueClass.Iterator)
     ];
 
     public static readonly (string Name, string Code)[] ErrorClasses =
@@ -58,6 +58,10 @@ internal static class WebLingoPrelude
         "Function" => "class Function { constructor(f = function () {}) { hold(this, f); } }",
         // A metaclass's super(name, base) names and bases the class it makes (section 3.7).
         "Class" => "class Class { constructor(name = null, base = null) { hold(this, [name, base]); } }",
+        // The iterator a collection's iterate() gives, its items and its position set by the runtime (section 3.6): next()
+        // past the last item is an index out of range (WL3005).
+        "Iterator" => "class Iterator { hasNext() { return this.position < this.items.length; } "
+            + "next() { var item = this.items[this.position]; this.position = this.position + 1; return item; } }",
         _ => $"class {name} {{}}"
     };
 }

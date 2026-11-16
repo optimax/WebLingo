@@ -98,6 +98,8 @@ public static class WebLingoDisassembler
                                     $"{Arguments(function, b + 2, c)} else {a:D2}",
             WebLingoOpCode.GetIndex => $"GetIndex {Register(function, a)}, {Register(function, b)}{(d == 0 ? "[" : "?[")}{Register(function, c)}]",
             WebLingoOpCode.SetIndex => $"SetIndex {Register(function, a)}[{Register(function, b)}], {Register(function, c)}",
+            WebLingoOpCode.ForEachStart => $"ForEachStart {Register(function, b)} visited {a:D2}",
+            WebLingoOpCode.ForEachVisits => $"ForEachVisits {Register(function, b)} visited {a:D2}",
             _ => $"?{(int)instruction.OpCode} {a}, {b}, {c}, {d}"
         };
     }

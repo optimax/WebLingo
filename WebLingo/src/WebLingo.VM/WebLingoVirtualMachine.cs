@@ -679,6 +679,18 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             pc = done ? ins.A : pc + 1;
                             continue;
                         }
+                        case WebLingoOpCode.ForEachStart:
+                        case WebLingoOpCode.ForEachVisits:
+                        {
+                            // Whether the VMs visit the collection themselves, or its iterate() does (section 3.6).
+                            if (!WebLingoMembers.TryVisit(registers[ins.B], ins.OpCode == WebLingoOpCode.ForEachStart, heap, out var own,
+                                    out error))
+                            {
+                                break;
+                            }
+                            pc = own ? ins.A : pc + 1;
+                            continue;
+                        }
                         case WebLingoOpCode.GetIndex:
                         {
                             if (!WebLingoMembers.TryGetIndex(registers[ins.B], registers[ins.C], heap, ins.D != 0, out var element,
@@ -2074,7 +2086,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             value.Kind is WebLingoValueKind.Instance or WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set;
 
         /// <summary>The kinds of values' classes, by <c>WebLingoValueClass</c>, once the module has made them (section 3.7); a root.</summary>
-        private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.Module + 1];
+        private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.Iterator + 1];
 
         /// <summary>The kinds of runtime errors' classes, as <c>module.ErrorClasses</c> lists them, once made; a root.</summary>
         private readonly WebLingoValue[] _errorClasses = new WebLingoValue[Math.Max(module.ErrorClasses.Count, MaxErrorClasses)];
@@ -2124,6 +2136,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 else if (i == (int)WebLingoValueClass.String) heap.MarkValueClass(made, WebLingoValueKind.String);
                 else if (i == (int)WebLingoValueClass.Function) heap.MarkValueClass(made, WebLingoValueKind.Function);
                 else if (i == (int)WebLingoValueClass.Class) heap.MarkClassClass(made);
+                else if (i == (int)WebLingoValueClass.Iterator) heap.IteratorClass = made; // A plain class (section 3.6).
                 else heap.SealClass(made);
             }
             for (var i = 0; i < module.ErrorClasses.Count; i++)

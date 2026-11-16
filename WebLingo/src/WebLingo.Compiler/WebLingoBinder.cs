@@ -1282,6 +1282,8 @@ public sealed class WebLingoBinder
         {
             // A method, called on its target (specification, section 3.6); every value has Object's toString() (section 3.7).
             if (member.Name is "toString" or "equal") UseObject();
+            // A collection's or a string's iterate() gives an Iterator, which the runtime makes (section 3.6).
+            if (member.Name == "iterate") UseBuiltinClass("Iterator");
             return new WebLingoBoundMethodCall(BindExpression(member.Target), member.Name, arguments, call.Span);
         }
         if (calleeSyntax is WebLingoIntegerLiteralSyntax or WebLingoBinary64LiteralSyntax or WebLingoBooleanLiteralSyntax

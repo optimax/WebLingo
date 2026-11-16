@@ -392,8 +392,21 @@ public sealed class WebLingoLowerer
                 var captured = new List<int>();
                 if (forEach.Item.IsCaptured) captured.Add(forEach.Item.Index);
                 if (forEach.Value is { IsCaptured: true } value) captured.Add(value.Index);
-                return new WebLingoIrForEach(forEach.Collection.Index, LowerExpression(forEach.CollectionValue),
+            {
+                var lowered = new WebLingoIrForEach(forEach.Collection.Index, LowerExpression(forEach.CollectionValue),
                     forEach.Value is null ? 1 : 2, captured, LowerStatement(forEach.Body), forEach.Span);
+                if (forEach.Value is not null) return lowered;
+                // A value the VMs do not visit themselves is visited by its iterate(), the iterator kept where the position
+                // is, its hasNext() asked before each next() (section 3.6).
+                var span = forEach.CollectionValue.Span;
+                var iterator = new WebLingoIrLoadLocal(forEach.Position.Index, span);
+                return lowered with
+                {
+                    Iterate = new WebLingoIrCallMethod(new WebLingoIrLoadLocal(forEach.Collection.Index, span), "iterate", [], span),
+                    HasNext = new WebLingoIrCallMethod(iterator, "hasNext", [], span),
+                    Next = new WebLingoIrCallMethod(iterator, "next", [], span)
+                };
+            }
             }
             case WebLingoBoundUsing usingStatement:
             {

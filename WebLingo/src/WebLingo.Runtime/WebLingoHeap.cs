@@ -82,6 +82,12 @@ public sealed class WebLingoHeap
     public WebLingoValue ObjectClass { get; set; }
 
     /// <summary>
+    /// The class <c>Iterator</c>, once the program has made it, whose instances an array's, a map's, a set's and a string's
+    /// <c>iterate()</c> give (section 3.6); kept as <see cref="ObjectClass"/> is, by the program that made it.
+    /// </summary>
+    public WebLingoValue IteratorClass { get; set; }
+
+    /// <summary>
     /// Seals a class, a kind of value's (section 3.7, "Classes of values"): no class extends it, and <c>new</c> makes
     /// none of its values.
     /// </summary>

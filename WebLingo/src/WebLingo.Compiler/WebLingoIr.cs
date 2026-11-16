@@ -122,7 +122,17 @@ public sealed record WebLingoIrLoop(WebLingoIrExpression? Condition, WebLingoIrS
 public sealed record WebLingoIrForEach(
     int FirstLocal, WebLingoIrExpression Collection, int ItemCount, IReadOnlyList<int> CapturedItems, WebLingoIrStatement Body,
     WebLingoSourceSpan Span)
-    : WebLingoIrStatement(Span);
+    : WebLingoIrStatement(Span)
+{
+    /// <summary>
+    /// For one item, the protocol that visits a value the VMs do not (section 3.6): the collection's <c>iterate()</c>,
+    /// whose iterator goes where the position is, then that iterator's <c>hasNext()</c> and <c>next()</c>; null for a key
+    /// and a value, which only a map has.
+    /// </summary>
+    public WebLingoIrExpression? Iterate { get; init; }
+    public WebLingoIrExpression? HasNext { get; init; }
+    public WebLingoIrExpression? Next { get; init; }
+}
 
 /// <summary>
 /// <c>using</c>: the local's initialization, then the body; the resource, read by <paramref name="Resource"/>, is disposed

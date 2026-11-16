@@ -336,6 +336,9 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                     return $"its registers, {b} to {(long)b + 1 + c}, are not all in the function's {function.RegisterCount}.";
                 }
                 return Unused(d);
+            case WebLingoOpCode.ForEachStart:
+            case WebLingoOpCode.ForEachVisits:
+                return Index(a, function.Code.Count, "target instruction") ?? Register(function, b, "collection") ?? Unused(c, d);
             case WebLingoOpCode.GetIndex:
                 return Register(function, a, "destination") ?? Register(function, b, "target")
                     ?? Register(function, c, "index") ?? (d is 0 or 1 ? null : $"its D is {d}, not 0 or 1.");
@@ -443,6 +446,10 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                 {
                     Flow(instruction.B, state, atBlockStart, pending); // And on to the next instruction.
                 }
+                if (instruction.OpCode is WebLingoOpCode.ForEachStart or WebLingoOpCode.ForEachVisits)
+                {
+                    Flow(instruction.A, state, atBlockStart, pending); // And on to the next instruction.
+                }
                 index++;
                 if (isBlockStart[index])
                 {
@@ -481,7 +488,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
 
     private static int? JumpTarget(WebLingoInstruction instruction) => instruction.OpCode switch
     {
-        WebLingoOpCode.Jump or WebLingoOpCode.ForEachNext => instruction.A,
+        WebLingoOpCode.Jump or WebLingoOpCode.ForEachNext or WebLingoOpCode.ForEachStart or WebLingoOpCode.ForEachVisits => instruction.A,
         WebLingoOpCode.JumpIfFalse or WebLingoOpCode.JumpIfTrue or WebLingoOpCode.JumpIfGiven => instruction.B,
         _ => null
     };
@@ -549,6 +556,8 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             case WebLingoOpCode.Not:
             case WebLingoOpCode.ToText:
             case WebLingoOpCode.Await:
+            case WebLingoOpCode.ForEachStart:
+            case WebLingoOpCode.ForEachVisits:
                 return Unwritten(instruction.B, state, locals);
             case WebLingoOpCode.JumpIfFalse:
             case WebLingoOpCode.JumpIfTrue:

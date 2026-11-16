@@ -497,7 +497,10 @@ public sealed class WebLingoStackCodeGenerator
     /// <summary>
     /// <c>foreach</c>: the collection into its local, the position 0 into the next; then <c>ForEachNext</c> (or
     /// <c>ForEachNextEntry</c>, for a key and a value), which leaves the loop when there is nothing more, or writes the
-    /// next item into the locals after them and goes on to the body.
+    /// next item into the locals after them and goes on to the body. For one item, a value the VMs do not visit
+    /// themselves is visited by the protocol (section 3.6), as the register code generator has it: <c>ForEachStart</c>
+    /// before the loop, which calls its <c>iterate()</c>, and <c>ForEachVisits</c> after the body, which asks the
+    /// iterator's <c>hasNext()</c>, then its <c>next()</c>, the item, and goes back to the body.
     /// </summary>
     private void EmitForEach(WebLingoIrForEach loop)
     {
@@ -506,6 +509,14 @@ public sealed class WebLingoStackCodeGenerator
         Emit(WebLingoStackOpCode.StoreLocal, loop.Span, collection);
         Emit(WebLingoStackOpCode.LoadConstant, loop.Span, Int64Constant(0));
         Emit(WebLingoStackOpCode.StoreLocal, loop.Span, collection + 1);
+        if (loop.Iterate is { } iterate)
+        {
+            var start = _code.Count;
+            Emit(WebLingoStackOpCode.ForEachStart, loop.Collection.Span, 0, collection);
+            EmitValue(iterate);
+            Emit(WebLingoStackOpCode.StoreLocal, loop.Span, collection + 1);
+            PatchJump(start);
+        }
         var jumps = new LoopJumps { Guards = _guards.Count };
         _loops.Push(jumps);
         var top = _code.Count;
@@ -516,6 +527,19 @@ public sealed class WebLingoStackCodeGenerator
         foreach (var at in jumps.Continues) PatchJump(at);
         Emit(WebLingoStackOpCode.Jump, loop.Span, top);
         PatchJump(top);
+        if (loop.HasNext is { } hasNext && loop.Next is { } next)
+        {
+            var visits = _code.Count;
+            Emit(WebLingoStackOpCode.ForEachVisits, loop.Collection.Span, 0, collection);
+            EmitValue(hasNext);
+            var done = _code.Count;
+            Emit(WebLingoStackOpCode.JumpIfFalse, loop.Collection.Span, 0);
+            EmitValue(next);
+            Emit(WebLingoStackOpCode.StoreLocal, loop.Span, collection + 2);
+            Emit(WebLingoStackOpCode.Jump, loop.Span, top + 1);
+            PatchJump(visits);
+            PatchJump(done);
+        }
         foreach (var at in jumps.Breaks) PatchJump(at);
         _loops.Pop();
     }

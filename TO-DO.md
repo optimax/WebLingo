@@ -36,7 +36,7 @@ A4:
 
 A5:
 
-## The `foreach` Protocol
+## [IDLE] The `foreach` Protocol
 
 How `foreach` visits a class's instances, as A2 of "Native Modules, Part 4" has it: the class's `iterate()` gives an iterator, whose `next()` gives each item, which classes written in WebLingo, native classes and COM's collections all implement (specification, section 3.6, approved 15 November 2026). Added by Claude, 2026-11-15. Three decisions it needs, each answerable with a letter.
 
@@ -53,6 +53,8 @@ Q3, arrays, maps, sets and strings: (a) `foreach` visits them as now, the VMs' o
 A3: (b)
 
 2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
+
+2026-11-15 (Claude): done as A1 to A3 have it, on both VMs, recorded as approved in the specification, section 3.6 and its register; the details, guessed, are Proposed in section 15.2 ("The `foreach` protocol"): `iterate()` called once, before the loop, then `hasNext()` before each `next()`; a collection of a class extending `Array`, `Map` or `Set` visited the VMs' own way, its class's `iterate()` aside; a class or a module with a static `iterate()`, and a value an `extend` block gives one, visited by it; the built-in collections' iterators instances of a built-in class `Iterator`, with the fields `items` and `position`, an array's visiting it as it is, a set's, a map's (entries as `[key, value]`) and a string's what it held when `iterate()` was called; `next()` past the end WL3005, a value without `iterate` WL3001 as before, an iterator without `hasNext()` WL3006. Built as two new operations in each bytecode, `ForEachStart` and `ForEachVisits`, around the VMs' own loop, which is unchanged. Measured against `main`, alternately, three rounds of every workload but `io`: all within the machine's noise, `collections` running 1.7 percent more instructions (two for each of its loops). Checks: the Release build, without warnings, the full test suite (2,170 tests, 15 new programs on both VMs), on Windows only; Linux not tried.
 
 ## Optional Indexing Through a Native Class's Indexer
 

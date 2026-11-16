@@ -12,6 +12,8 @@ public enum WebLingoMember : byte
     Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, SetMethod, SetProperty, SetStaticProperty, SetConstant,
     RemoveMethod,
     All, Any, Timeout, Parse,
+    /// <summary>A collection's or a string's <c>iterate()</c>, which gives an <c>Iterator</c> (section 3.6).</summary>
+    Iterate,
     /// <summary>An interpolation's format and alignment, a built-in method of every class that no program can name (section 3.5).</summary>
     Format,
     /// <summary>The names every value, or every class, has (section 3.7), last, so that one comparison finds them.</summary>
@@ -50,6 +52,7 @@ public static class WebLingoMembers
         "any" => WebLingoMember.Any,
         "timeout" => WebLingoMember.Timeout,
         "parse" => WebLingoMember.Parse,
+        "iterate" => WebLingoMember.Iterate,
         WebLingoInterpolation.Format => WebLingoMember.Format,
         "__className" => WebLingoMember.ClassName,
         "__instanceOf" => WebLingoMember.InstanceOf,
@@ -705,6 +708,12 @@ public static class WebLingoMembers
         WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
+        if (member == WebLingoMember.Iterate
+            && target.Kind is WebLingoValueKind.Array or WebLingoValueKind.Set or WebLingoValueKind.Map or WebLingoValueKind.String)
+        {
+            if (count != 0) return WrongArgumentCount(name, 0, count, out error);
+            return TryIterate(target, heap, out result, out error);
+        }
         if (target.Kind == WebLingoValueKind.Array && member == WebLingoMember.Push)
         {
             if (count != 1) return WrongArgumentCount(name, 1, count, out error);
@@ -946,11 +955,125 @@ public static class WebLingoMembers
     }
 
     /// <summary>
+    /// <c>iterate()</c> of an array, a set, a map or a string (section 3.6): an <c>Iterator</c>, made without its
+    /// constructor, whose <c>items</c> are the array itself, visited as it is when each item is read, or what the set, the
+    /// map or the string held when <c>iterate()</c> was called, a map's entries each an array of two, <c>[key, value]</c>,
+    /// and a string's Unicode scalar values each a string of one; and whose <c>position</c> is 0.
+    /// </summary>
+    private static bool TryIterate(WebLingoValue target, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (heap.IteratorClass.Kind != WebLingoValueKind.Class)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.NoSuchMember,
+                "'iterate' gives an Iterator, a class this program has not made.");
+            return false;
+        }
+        var items = target;
+        if (target.Kind != WebLingoValueKind.Array && !TrySnapshot(target, heap, out items, out error)) return false;
+        var roots = new[] { items, WebLingoValue.Null };
+        heap.AddRoots(roots); // While the iterator is made, which may collect.
+        try
+        {
+            if (!heap.TryAllocateInstance(heap.IteratorClass, out var iterator, out error)) return false;
+            roots[1] = iterator;
+            if (!heap.TrySetField(iterator, "items", items, out error)
+                || !heap.TrySetField(iterator, "position", WebLingoValue.FromInt64(0), out error))
+            {
+                return false;
+            }
+            result = iterator;
+            return true;
+        }
+        finally
+        {
+            heap.RemoveLastRoots(roots);
+        }
+    }
+
+    /// <summary>An array of what a set, a map or a string holds now, as its iterator visits it (<see cref="TryIterate"/>).</summary>
+    private static bool TrySnapshot(WebLingoValue target, WebLingoHeap heap, out WebLingoValue items, out WebLingoRuntimeError? error)
+    {
+        items = WebLingoValue.Null;
+        error = null;
+        var values = new List<WebLingoValue>();
+        heap.AddRoots(values); // While the entries' arrays and the strings are made, which may collect.
+        try
+        {
+            if (target.Kind == WebLingoValueKind.Set)
+            {
+                for (var i = 0; i < heap.SetCount(target); i++) values.Add(heap.SetValueAt(target, i));
+            }
+            else if (target.Kind == WebLingoValueKind.Map)
+            {
+                for (var i = 0; i < heap.MapCount(target); i++)
+                {
+                    var (key, value) = heap.MapEntryAt(target, i);
+                    if (!heap.TryAllocateArray([key, value], 0, 2, out var entry, out error)) return false;
+                    values.Add(entry);
+                }
+            }
+            else
+            {
+                var text = heap.GetString(target);
+                for (var start = 0; start < text.Length;)
+                {
+                    var length = start + 1 < text.Length && char.IsSurrogatePair(text[start], text[start + 1]) ? 2 : 1;
+                    if (!heap.TryAllocateString(text.Substring(start, length), out var scalar, out error)) return false;
+                    values.Add(scalar);
+                    start += length;
+                }
+            }
+            return heap.TryAllocateArray([.. values], 0, values.Count, out items, out error);
+        }
+        finally
+        {
+            heap.RemoveLastRoots(values);
+        }
+    }
+
+    /// <summary>
+    /// What <c>foreach</c> asks of the value it is given before its loop, with <paramref name="strict"/>, and after it,
+    /// without (section 3.6): whether the VMs visit it themselves, <paramref name="own"/>, an array, a set, a map or a
+    /// string, an instance holding one included, as <see cref="TryNext"/> does; else whether it has an <c>iterate()</c>,
+    /// which the loop calls, its iterator's <c>hasNext()</c> and <c>next()</c> giving each item; WL3001 for a value that
+    /// has neither, with <paramref name="strict"/>.
+    /// </summary>
+    // Not inlined: a VM's dispatch method calls it, and grows slower when a small method is inlined into it
+    // (Documents/implementation.md, section 11).
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static bool TryVisit(WebLingoValue collection, bool strict, WebLingoHeap heap, out bool own, out WebLingoRuntimeError? error)
+    {
+        error = null;
+        var held = heap.Held(collection);
+        own = held.Kind is WebLingoValueKind.Array or WebLingoValueKind.Set or WebLingoValueKind.Map or WebLingoValueKind.String;
+        if (own || !strict || HasIterate(collection, heap)) return true;
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+            $"{Capitalized(WebLingoValueFormatter.Describe(collection))} cannot be looped over with 'foreach'.");
+        return false;
+    }
+
+    /// <summary>Whether a value has a member <c>iterate</c> that a call finds: a method, a field's function, or a static member.</summary>
+    private static bool HasIterate(WebLingoValue value, WebLingoHeap heap)
+    {
+        const string name = "iterate";
+        return value.Kind switch
+        {
+            WebLingoValueKind.Instance => TryFindCallee(value, name, heap, out _, out _, out _),
+            WebLingoValueKind.Class or WebLingoValueKind.Module => TryGetStaticCallee(value, WebLingoMember.Iterate, name, heap, out _, out _),
+            WebLingoValueKind.Null => false,
+            _ => TryGetValueMethod(value, WebLingoMember.Iterate, name, heap, out _)
+        };
+    }
+
+    /// <summary>
     /// The next step of <c>foreach</c> (section 3.6): from <paramref name="position"/> (an int64, from 0), the next
     /// element of an array, or Unicode scalar value of a string (as a string of one), into
     /// <paramref name="values"/>[<paramref name="first"/>], or the next entry of a map, its key and its value, into it
     /// and the one after, with the position after it; <paramref name="done"/> when there is nothing more. A map is
-    /// looped over with a key and a value, anything else with one item, and anything else again not at all (WL3001).
+    /// looped over with a key and a value, anything else with one item, and anything else again not at all (WL3001); but
+    /// with one item, any other value but <c>null</c> is <paramref name="done"/> at once, for the protocol of
+    /// <c>iterate()</c> to visit (<see cref="TryVisit"/>), which the loop has checked it can before it began.
     /// </summary>
     public static bool TryNext(WebLingoValue collection, WebLingoValue position, int items, WebLingoValue[] values, int first, WebLingoHeap heap,
         out WebLingoValue next, out bool done, out WebLingoRuntimeError? error)
@@ -959,7 +1082,17 @@ public static class WebLingoMembers
         done = false;
         collection = heap.Held(collection); // An instance holding a string is visited as its string (section 3.7).
         error = null;
-        if (position.Kind != WebLingoValueKind.Int64) throw new InvalidOperationException("A loop's position is not an integer.");
+        if (position.Kind != WebLingoValueKind.Int64)
+        {
+            // Only the protocol's iterator stands where the position is (TryVisit), for a value the VMs do not visit.
+            if (items == 1 && collection.Kind is not (WebLingoValueKind.Array or WebLingoValueKind.Set or WebLingoValueKind.Map
+                    or WebLingoValueKind.String or WebLingoValueKind.Null))
+            {
+                done = true;
+                return true;
+            }
+            throw new InvalidOperationException("A loop's position is not an integer.");
+        }
         var at = position.AsInt64;
         switch (collection.Kind)
         {
@@ -1007,6 +1140,10 @@ public static class WebLingoMembers
                 error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
                     $"Only a map's loop takes a key and a value, not {WebLingoValueFormatter.Describe(collection)}'s.");
                 return false;
+            case not WebLingoValueKind.Null when items == 1:
+                // A value the VMs do not visit, which foreach's protocol visits after the loop, by its iterate() (TryVisit).
+                done = true;
+                return true;
             default:
                 error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
                     $"{Capitalized(WebLingoValueFormatter.Describe(collection))} cannot be looped over with 'foreach'.");
