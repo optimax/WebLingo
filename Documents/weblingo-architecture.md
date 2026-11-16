@@ -48,7 +48,8 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WL-BC002 | Register VM preferred, stack VM benchmark required before final decision | **Provisional** |
 | WL-BC002, until decided | Both VMs are kept, and every new feature is built on both, until property access, async suspension, template output and I/O-bound workloads can be measured too; those measured, both still, until something more is; and WLBC, a format for each VM's bytecode in one container (§5.6, §9) | Approved (13 November 2026; both kept still, every workload measured, and WLBC for both, 15 November 2026) |
 | WL-BC002 comparison | The stack VM in a project of its own, `WebLingo.VM.Stack`, its code generator in `WebLingo.Compiler`; a console benchmark, `WebLingo.Benchmarks`, timing with `Stopwatch`, with no new package; the register VM's dispatch tuned for speed before the two are compared (§5.6) | Approved (13 November 2026) |
-| M0.3 encoding | Variable-length register operands; disk byte offsets / decoded instruction indices | Proposed |
+| M0.3 encoding | Variable-length register operands; jump targets as instruction indices, on disk as in memory (§5.3) | Operands Proposed; targets Approved (16 November 2026) |
+| M0.13, WLBC | A `.wlbc` holds one VM's bytecode, its header saying which, each VM refusing the other's; each section's CRC-32 in its directory entry; `weblingo compile`, and `run` and `disasm` of a `.wlbc`, `run` of a `.wl` writing none; the container built as §5.3 proposes, and kept Proposed, nothing frozen until the work is done (§5.3) | Approved (16 November 2026) |
 | WASP and `.wlbc` files | WASP never writes a `.wlbc` file: wherever it runs pages, in `wasp` and in the web hosts, it compiles and caches a page, and what the page includes, imports, renders or is laid out by, in memory only (§5.1, WL-T007) | Approved (16 November 2026) |
 | M0.3 numbers | IEEE 754 decimal128 BID binary representation | Proposed |
 | M0.3 exceptions | Table-driven exception and cleanup regions | Approved (13 November 2026, §3.7) |
@@ -387,9 +388,19 @@ M0.6 implementation default: implement the minimal register VM first and add a s
 - Strings: UTF-8.
 - Register count: proposed maximum **65,535 per function**.
 - Operand encoding: variable-length **proposed**.
-- Serialized control-flow targets: byte offsets; decoded VM representation may use instruction indices **proposed**.
+- Serialized control-flow targets: the instruction's index, as in memory (the owner's decision, 16 November 2026, in place of byte offsets).
 
 The binary layout is **not yet frozen**. M0.6 may begin with an in-memory instruction model.
+
+**The owner's answers** (16 November 2026, M0.13):
+
+- A `.wlbc` holds one VM's bytecode, its header saying which; the compiler writes the one it is asked for, and each VM refuses the other's.
+- A jump's target is its instruction's index, on disk as in memory: both VMs decode a function before they run it.
+- Each section's CRC-32 is in its directory entry, checked when the file is read, in place of an integrity section.
+- The container is built as proposed above, but stays Proposed: nothing is frozen until the work is done, and until then it may change without a new version.
+- `weblingo compile` writes a `.wlbc`, `weblingo run` runs one and `weblingo disasm` shows one as text (§8.4, "CLI"); `weblingo run` of a `.wl` compiles it in memory and writes no `.wlbc`, and WASP never writes one (§5.1).
+
+**As built** (M0.13.1, Proposed; §15.2, "WLBC's layout"): version 0.1, which `WebLingoBytecodeFile` (`WebLingo.Bytecode`) writes and reads, for both VMs' modules. The header names the VM, 1 for the register VM and 2 for the stack VM. Seven kinds of section follow, each once and in this order: the module (its name, flags, special classes, parameters and imports), constants, functions, code, classes and units, handlers, and source positions, the last optional. A file's source positions are the compiler's (UTF-16 indices), with a table for each file of the line and column each of them stands at, so that a runtime error is located without the source. The reader checks the header, the directory, each section's bounds and CRC-32, every count against the bytes left and every value's range, then verifies the module with its VM's verifier (§5.5); a file that fails is WL4001. On a damaged file it never throws, and allocates no more than the file's size and the verifier's own bounds allow.
 
 ### 5.4 Proposed instruction families
 
@@ -1013,7 +1024,7 @@ Proposed central props:
 | M0.10 | Classes, `dispose()` and `using` (§3.2, §3.4, WL-L011) | Implemented (13 November 2026), in parts M0.10.1 to M0.10.7 (below), on both VMs, on Windows; typed catches, `is` and the classes of values implemented too (13 November 2026), but for extending `Array`, `Map` and `Set` |
 | M0.11 | Asynchrony: `async`, `await` and tasks (§3.8) | Implemented (13 November 2026), in parts M0.11.1 and M0.11.2 (below), on both VMs, on Windows |
 | M0.12 | `.wasp` templates: includes, layouts and parameterized components, together (§13, WL-T001 to WL-T008) | Its contracts decided in part (§13, "Contracts", 13 November 2026); after M0.11, and the module system it needs (`import` and `param`), both done; in parts M0.12.1 to M0.12.5 (below, 14 November 2026), all implemented (14 November 2026), on both VMs, on Windows, `samples/SimpleWebsite` running through `wasp`; what WL-T007 and WL-T008 ask of a host (dependency invalidation, application generations, cancellation and streaming to a response) waits for hosting |
-| M0.13 | WLBC, the bytecode's binary format (§5.1, §5.3) | After M0.12; a format for each VM's bytecode, in one container, both VMs kept (15 November 2026), WASP never writing its files (16 November 2026), its format's questions asked |
+| M0.13 | WLBC, the bytecode's binary format (§5.1, §5.3) | In progress, in parts (below): a format for each VM's bytecode, in one container, both VMs kept (15 November 2026); WASP never writing its files, and the format's questions answered (16 November 2026) |
 
 **M0.7 parts** (12 November 2026), each landing on its own with its conformance tests, which `WebLingo.Conformance.Tests` runs beside §8.6's:
 
@@ -1062,6 +1073,11 @@ Proposed central props:
 4. **M0.12.4, layouts:** `<% layout "/layouts/main.wasp", { title: … }; %>`, `renderBody()`, a layout's own layout, and a cycle of them. Implemented (14 November 2026), on both VMs.
 5. **M0.12.5, template output's benchmark workload** (§5.6), the third of the workloads "Both VMs, for now" waits for. Implemented (14 November 2026), on both VMs, and measured (§5.6, "Template output").
 
+**M0.13 parts** (16 November 2026), each landing on its own with its tests, on both VMs:
+
+1. **M0.13.1, the format:** WLBC's writer and reader for both VMs' modules (§5.3, "As built"), each section's CRC-32 checked, a damaged file or one of an unknown version rejected as WL4001, and what is read verified; every conformance program written, read back and run on both VMs. Implemented (16 November 2026), on both VMs.
+2. **M0.13.2, the command line:** `weblingo compile [--vm stack] script.wl`, writing `script.wlbc`; `weblingo run script.wlbc`, on the VM its header names; `weblingo disasm script.wlbc`, with a disassembler of the stack bytecode; the native modules a `.wlbc` names loaded when it runs; its files named from the program's folder; and `weblingo run script.wl` writing no `.wlbc`.
+
 **Extending the classes of values** (§3.7, 13 November 2026), in parts, each landing on its own with its conformance tests, on both VMs:
 
 1. **`extend` blocks:** methods and static members given to a class, a program's or a kind of value's (`extend Integer { … }`), hoisted with its block's classes, reaching every instance and subclass, made before or after, a method replacing one of the same name. Implemented (13 November 2026), on both VMs.
@@ -1083,7 +1099,7 @@ Proposed central props:
 
 **After M0.8** (order approved by the owner, 13 November 2026): M0.9, then M0.10, M0.11, M0.12 and M0.13, as the table gives them (asynchrony put before templates on 13 November 2026, the owner asking for it to be designed first). Each needs syntax, or a format, that this specification does not give yet, which is decided feature by feature before it is built; and each is built on both VMs (§5.6, "Both VMs, for now").
 
-**Immediate next activity:** the owner's questions open in `TO-DO.md`; M0.13, WLBC, a format for each VM's bytecode, both VMs kept (WL-BC002, 15 November 2026), whose format's questions are asked. The compiler and both VMs cover M0.6's subset, the language of §3.5 to §3.9, and pages, their includes, components and layouts (§13, M0.12).
+**Immediate next activity:** M0.13, WLBC, a format for each VM's bytecode, both VMs kept (WL-BC002, 15 November 2026), its questions answered (16 November 2026): M0.13.1, the format, is implemented; M0.13.2, the command line, is next. The compiler and both VMs cover M0.6's subset, the language of §3.5 to §3.9, and pages, their includes, components and layouts (§13, M0.12).
 
 ---
 
@@ -1401,6 +1417,7 @@ M0.6's acceptance criteria (§8.8), as of 12 November 2026:
 | Use before declaration | A name used before its declaration, or in its own initializer, means the outer declaration, or is undefined (WL2001, at compile time) if there is none (§3.1) | Approved |
 | Evaluation order | Left to right: operands, then arguments; an assignment evaluates its value before it stores it | Approved (12 November 2026) |
 | Instruction model | An in-memory register instruction model, not WLBC (§5.3, §8.4): an operation and up to four integer operands A to D, unused ones 0 (`WebLingoBytecodeContracts.cs`); a module holds its constants (int64 and binary64, kept as IEEE bits), the built-ins it imports by name and arity, and one function, with a source span per instruction and the names of its locals for runtime messages | Approved (12 November 2026) |
+| WLBC's layout | From M0.13.1 (§5.3, "As built"): fixed-size fields little-endian. A 32-byte header: `WLBC`, the major and minor version (0 and 1), the VM (1 register, 2 stack), flags (0), the sections' count, the directory's offset and the file's length. A directory of 32-byte entries: the section's kind, 0, its offset, its length, its CRC-32 (IEEE 802.3's, as ZIP's) and 0. Counts and lengths as unsigned LEB128; every other integer, an operand, an index, an arity or an int64 constant, as signed LEB128; a binary64 as its 8 bytes; a string as its UTF-8 bytes' count and the bytes, a lone surrogate as its three bytes (WTF-8). The sections: 1 the module, 2 constants, 3 functions (the entry point first; each its counts, flags, source, native call, captures and instruction count), 4 code (each function's instructions, an operation's byte and its operands, four for the register VM and two for the stack VM, unused ones 0), 5 classes and units, 6 handlers, 7 source positions (each function's spans and its locals' names, then a table for each file of the line and column of each position its spans start at, the program's own first). The writer writes the same bytes for the same module | Proposed |
 | Registers | A function's locals take registers 0 to n − 1 and its temporaries the registers above; at most 65535 registers (§5.3), more is a compile-time error (WL4002) | Approved (12 November 2026) |
 | Operations | `LoadConstant`, `Move`, `Negate`, `Plus`, `Add`, `Subtract`, `Multiply`, `Divide`, `CallBuiltin` (arguments in consecutive registers, §5.4), `Jump`, `Return`; from M0.7.2, `LoadNull`, `LoadBoolean`, `Not`, `Equal`, `NotEqual`, `Less`, `LessOrEqual`, `Greater`, `GreaterOrEqual`, `JumpIfFalse` and `JumpIfTrue` (whose condition must be a Boolean, WL3001), and `CheckBoolean` (the right operand of `&&` and `||`); from M0.7.6, `NewCell`, `BoxRegister`, `CopyCell`, `LoadCell`, `StoreCell`, `LoadCapture`, `StoreCapture`, `MakeClosure`, `LoadBuiltin`, `Call` and `ReturnValue`, and a module holds its functions besides its entry point, each with its parameter count and its captures | Approved (12 November 2026) |
 | Verification | Besides §5.5: unused operands must be 0; no path may run off the end of the code; every register, local or temporary, must be written before it is read on every path, which is what keeps a variable from being read before it has a value (§3.1); a function whose check needs more than 16 million words of state or 100 million steps is rejected rather than verified slowly. The bounds are arbitrary, and are constants that are easy to change (`WebLingoBytecodeVerifier.MaxStateWords`, `WebLingoBytecodeVerifier.MaxSteps`), as is the register limit (`WebLingoFunction.MaxRegisters`) | Approved (12 November 2026) |
