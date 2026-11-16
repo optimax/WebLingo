@@ -2499,3 +2499,11 @@ A1: (a)
 2026-11-16 (Claude): A1 recorded as approved in the specification, sections 1.1 and 9: M0.14, hosting, in seven parts, which section 9 defines ("M0.14 parts"); its questions, and a task for each part, are in `TO-DO.md` ("M0.14: Hosting").
 
 Done (Claude, 2026-11-16, `8bd7002`): hosting is M0.14, the milestone after M0.13, its parts defined in the specification, section 9. Main's checks were not run: only documents changed.
+
+## [DONE] M0.14.1: WLHI's HTTP Contracts
+
+A request's method, path, query, scheme, host, headers and body, and a response's status, headers and body, Uncommitted, then Committed, its status and headers fixed, then Completed (specification, section 6.7); and a request and a response held in memory, for tests and for hosts that buffer (section 9, "M0.14 parts", part 1). Added by Claude, 2026-11-16.
+
+2026-11-16 (Claude): done: WLHI's request and response in `WebLingo.Hosting.Abstractions` (`IWebLingoHttpRequest`, `IWebLingoHttpResponse`, `IWebLingoHeaderCollection`, `IWebLingoBodyReader`, `IWebLingoBodyWriter`), free of .NET's HTTP types, their errors results; `WebLingoHeaderList`, and `WebLingoBufferedRequest` and `WebLingoBufferedResponse`, held in memory. Recorded in the specification, section 6.7, "As built", the details Proposed in section 15.2 ("WLHI's HTTP contracts"). Guessed: a header's name is an HTTP token, compared without regard to ASCII case, and its value visible ASCII, spaces and tabs only, so that no CR or LF can inject a header; a response's status is 200 until set, from 100 to 999; writing its body commits it; bodies are read and written synchronously, their streaming being M0.14.7's. Tests: 15, in a new test project, `WebLingo.Hosting.Tests`. Checks: the Release build, without warnings, the full test suite (2,898 tests), on Windows only; Linux not tried. Neither the CLI nor `wasp` changed.
+
+Done (Claude, 2026-11-16, `3479ad6`): WLHI's HTTP contracts, and a request and a response held in memory. Main's checks passed: the Release build, without warnings, 2,898 tests, on Windows only; Linux not tried.

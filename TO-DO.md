@@ -32,10 +32,6 @@ A5:
 
 A6:
 
-## M0.14.1: WLHI's HTTP Contracts
-
-A request's method, path, query, scheme, host, headers and body, and a response's status, headers and body, Uncommitted, then Committed, its status and headers fixed, then Completed (specification, section 6.7); and a request and a response held in memory, for tests and for hosts that buffer (section 9, "M0.14 parts", part 1). Added by Claude, 2026-11-16.
-
 ## [IDLE] M0.14.2: The Host's Core
 
 The runtime, its applications and their generations, an application's pages and handlers compiled and cached in memory, a request's path found among them, run on a worker, its output written to the response, and a runtime error's response (specification, sections 6.3 to 6.6; section 9, "M0.14 parts", part 2). Added by Claude, 2026-11-16.
