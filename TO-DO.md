@@ -34,21 +34,51 @@ A6: (a)
 
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 6.12, A5's `weblingo.config` as the configuration's name, for a script's folder as for an application's root, in place of `weblingo.json`, its content JSON as before (a task of its own, below, "The Configuration File, `weblingo.config`"). Waits for its parts.
 
-## M0.14.7: Streaming
+## [IDLE] M0.14.7: Streaming
 
 A response's body written as the page runs, with backpressure, and a request's body read as it arrives, neither buffered whole (specification, sections 6.7 and WL-T008; section 9, "M0.14 parts", part 7). Added by Claude, 2026-11-16.
 
 2026-11-16 (Claude): M0.14.4 is done. Today a page's output is kept until the page has run, then sent whole, so that a runtime error is still a 500; and a VM runs a page on its worker to its end, a write never waiting. Streaming changes both. Two decisions, each answerable with a letter:
 
-**Q1, when a page's output is sent, and so what a runtime error after it gives: (a) as the page writes it, in pieces of about 16 KB, the status and headers sent with the first, so that a runtime error after it ends the response there, the connection closed so that the client sees it unfinished, the error in the host's log, and, in development, at the page's end too; (b) kept until it reaches about 64 KB, then sent as it is written, so that most pages, smaller, are still a 500 on an error, and a larger one ends as in (a); (c) kept whole, as now, unless the page sends what it has written with `response.flush()`, after which an error ends it as in (a).**
+Q1, when a page's output is sent, and so what a runtime error after it gives: (a) as the page writes it, in pieces of about 16 KB, the status and headers sent with the first, so that a runtime error after it ends the response there, the connection closed so that the client sees it unfinished, the error in the host's log, and, in development, at the page's end too; (b) kept until it reaches about 64 KB, then sent as it is written, so that most pages, smaller, are still a 500 on an error, and a larger one ends as in (a); (c) kept whole, as now, unless the page sends what it has written with `response.flush()`, after which an error ends it as in (a).
 
 A1: (b)
 
-**Q2, what a page does while a slow client has not yet taken what it wrote: (a) its worker waits for the client, as a file's write waits for the disk, for at most a time the configuration gives (30 seconds by default), the request then cancelled; (b) the page waits as at an `await`, its worker running other requests' tasks meanwhile, a change to both VMs, template output becoming an asynchronous operation (WL-T008).**
+Q2, what a page does while a slow client has not yet taken what it wrote: (a) its worker waits for the client, as a file's write waits for the disk, for at most a time the configuration gives (30 seconds by default), the request then cancelled; (b) the page waits as at an `await`, its worker running other requests' tasks meanwhile, a change to both VMs, template output becoming an asynchronous operation (WL-T008).
 
 A2: (b) but with a timeout.
 
 2026-11-16: M0.14.4 is done; waits for the answers.
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 6.12 ("Streaming"). Too large to land in one piece: in four parts, which the specification defines (section 9, "M0.14.7 parts"), each a task below. Waits for its parts.
+
+## [WORKING] M0.14.7.1: Output Sent as It Is Written
+
+A page's output kept until it reaches 64 KB, then its response committed and its output sent as it is written, in pieces; a runtime error after that ending the response unfinished, its error in the host's log and, in development, at the page's end; and the ASP.NET Core adapter sending a response's body as it comes, rather than once the page has run (specification, section 9, "M0.14.7 parts", part 1). Until part 3, a write the client has not yet taken keeps the worker waiting. Added by Claude, 2026-11-16.
+
+## M0.14.7.2: Executions That Wait Without a Thread
+
+An execution waiting only for work off its worker returns to its host, kept, and goes on where it was once that work is posted back, on both VMs; a host's worker runs other requests' executions meanwhile (specification, sections 6.6 and 6.10; section 9, "M0.14.7 parts", part 2). Today a VM keeps its worker's thread while it waits, so that a request waiting for a file holds a worker. Added by Claude, 2026-11-16.
+
+## [QUESTION] M0.14.7.3: Backpressure
+
+A page whose output the client has not yet taken waits as at an `await`, its worker running other requests meanwhile, template output an asynchronous operation (WL-T008), for at most a time, its request then cancelled (specification, section 9, "M0.14.7 parts", part 3). Builds on part 2. Added by Claude, 2026-11-16.
+
+One decision, answerable with a letter:
+
+**Q1, how long a page waits for a client that has not taken its output, before its request is cancelled, and where that is set: (a) 30 seconds, unless the application's `weblingo.config` gives another, `{ "sendTimeout": 30 }`, in seconds; (b) 30 seconds, for every application, until one needs another; (c) none of WebLingo's own, the web server's limits deciding, as Kestrel's minimum data rate and IIS's connection timeout do now.**
+
+A1:
+
+## [QUESTION] M0.14.7.4: A Request's Body as It Arrives
+
+What a script reads a request's body with, and the ASP.NET Core adapter giving the body as it comes, rather than read whole before the page runs (specification, section 9, "M0.14.7 parts", part 4). Today a request's body is read whole first, and no script can read it. Added by Claude, 2026-11-16.
+
+One decision, answerable with a letter:
+
+**Q1, how a script reads a request's body: (a) `await request.text()`, the whole body as text, UTF-8 unless its `Content-Type` names another charset, and `await request.form()`, an `application/x-www-form-urlencoded` form's fields as a map, as PHP's `$_POST`, each read as the body arrives but given whole; (b) as (a), and `await request.read()`, the body's next piece as text as it arrives, `null` at its end, for a body too large to hold whole; (c) only `await request.read()`, a script joining the pieces itself.**
+
+A1:
 
 # END-OF-TO-DO
 
