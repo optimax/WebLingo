@@ -136,6 +136,28 @@ public sealed class ApplicationTests
         Assert.Contains("cannot be imported: it is outside the application&#39;s root.", Get(app, "/imports").Body);
     }
 
+    [Fact]
+    public void AReloadPublishesANewGeneration_AndOneThatFailsKeepsTheOld()
+    {
+        var files = Site();
+        var app = Load(files);
+        Assert.Equal((1, (200, "<p>Products</p>")), (app.GenerationNumber, Get(app, "/products")));
+        Assert.Equal(404, Get(app, "/news").Status);
+
+        // A page changed and a page added: the new generation compiles them anew, on each worker when first asked for.
+        files.Add("/site/products.wasp", "<p>New products</p>").Add("/site/news.wasp", "<p>News</p>");
+        Assert.Equal((200, "<p>Products</p>"), Get(app, "/products"));
+        Assert.True(app.TryReload(out var error), error);
+        Assert.Equal((2, (200, "<p>New products</p>")), (app.GenerationNumber, Get(app, "/products")));
+        Assert.Equal((200, "<p>News</p>"), Get(app, "/news"));
+
+        // A generation whose routes cannot be made does not displace the one served.
+        files.Add("/site/news.wl", "export function get() { }");
+        Assert.False(app.TryReload(out error));
+        Assert.Equal("'news.wasp' and 'news.wl' are both the route /news", error);
+        Assert.Equal((2, (200, "<p>News</p>")), (app.GenerationNumber, Get(app, "/news")));
+    }
+
     private static MemoryFileSystem Site() => new MemoryFileSystem()
         .Add("/site/index.wasp", "<h1>Home</h1>")
         .Add("/site/products.wasp", "<p>Products</p>")

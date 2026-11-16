@@ -100,6 +100,46 @@ public sealed class AspNetCoreTests : IDisposable
         Assert.Equal([0, 1], workers.Order());
     }
 
+    [Fact]
+    public async Task TheReloaderReloadsTheApplicationWhenAFileChanges()
+    {
+        var application = Load();
+        var reloads = new List<(int, string?)>();
+        using var reloader = new WebLingoReloader(application, _root, (generation, error) => { lock (reloads) reloads.Add((generation, error)); });
+        Assert.Equal(404, (await Serve(application, "GET", "/news")).Response.StatusCode);
+
+        Write("news.wasp", "<p>Fresh</p>");
+        for (var waited = 0; application.GenerationNumber < 2 && waited < 10_000; waited += 50) await Task.Delay(50);
+        Assert.Equal(2, application.GenerationNumber);
+        var context = await Serve(application, "GET", "/news");
+        Assert.Equal((200, "<p>Fresh</p>"), (context.Response.StatusCode, Body(context)));
+        lock (reloads) Assert.Equal((2, (string?)null), reloads[0]);
+    }
+
+    private WebLingoApplication Load()
+    {
+        var application = WebLingoApplication.Load(new WebLingoApplicationOptions(_root, new DotNetFileSystem())
+        {
+            Workers = _workers.Count,
+            WorkerServices = _ => new WebLingoWorkerServices(
+                new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction(), new WebLingoDelayFunction())),
+            Clock = new WebLingoExecutionClock(new DotNetClock()),
+            Scheduler = () => new DotNetSchedulerHost()
+        }, out var error);
+        Assert.True(application is not null, error);
+        return application;
+    }
+
+    private async Task<DefaultHttpContext> Serve(WebLingoApplication application, string method, string path)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = method;
+        context.Request.Path = path;
+        context.Response.Body = new MemoryStream();
+        await WebLingoAspNetCore.Serve(context, application, _root, _workers);
+        return context;
+    }
+
     private async Task<DefaultHttpContext> Serve(string method, string path)
     {
         var application = WebLingoApplication.Load(new WebLingoApplicationOptions(_root, new DotNetFileSystem())

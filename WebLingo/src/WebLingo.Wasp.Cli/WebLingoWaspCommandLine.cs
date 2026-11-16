@@ -79,7 +79,7 @@ public static class WebLingoWaspCommandLine
             output.WriteLine("Usage: wasp serve [--root <folder>] [--port <port>] [--scheme <name>=<folder> …]");
             return WebLingoCommandLine.UsageError;
         }
-        var server = WebLingoWaspServer.Create(root, port, schemes, out var why, out var environment);
+        var server = WebLingoWaspServer.Create(root, port, schemes, out var why, out var environment, output);
         if (server is null)
         {
             error.WriteLine(why);

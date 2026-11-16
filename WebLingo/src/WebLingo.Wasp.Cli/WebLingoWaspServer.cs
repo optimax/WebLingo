@@ -27,10 +27,11 @@ public static class WebLingoWaspServer
     /// <summary>
     /// The server for the application at <paramref name="root"/>, a folder from the current one, or, under IIS, from the
     /// site's; on <paramref name="port"/> (0 for one the system chooses) on the local machine only, unless under IIS; null,
-    /// with why, if the application cannot be loaded.
+    /// with why, if the application cannot be loaded. It reloads the application when its files change (section 6.5),
+    /// each reload told to <paramref name="log"/>, if given.
     /// </summary>
     public static WebApplication? Create(string? root, int port, IReadOnlyDictionary<string, string> givenSchemes, out string? error,
-        out WebLingoEnvironment environment)
+        out WebLingoEnvironment environment, TextWriter? log = null)
     {
         environment = UnderIis ? WebLingoEnvironment.Production : WebLingoEnvironment.Development;
         var site = Environment.GetEnvironmentVariable("ASPNETCORE_IIS_PHYSICAL_PATH") ?? Directory.GetCurrentDirectory();
@@ -67,6 +68,10 @@ public static class WebLingoWaspServer
         var server = builder.Build();
         var pool = new WebLingoWorkerPool(workers);
         server.Lifetime.ApplicationStopped.Register(pool.Dispose);
+        var reloader = new WebLingoReloader(application, full, (generation, why) => log?.WriteLine(why is null
+            ? $"WASP reloaded the application: generation {generation}."
+            : $"WASP cannot reload the application, and serves generation {generation} still: {why}."));
+        server.Lifetime.ApplicationStopping.Register(reloader.Dispose);
         server.UseWebLingo(application, full, pool);
         return server;
     }

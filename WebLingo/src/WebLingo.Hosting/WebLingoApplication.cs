@@ -59,6 +59,24 @@ public sealed class WebLingoApplication
     /// <summary>The routes of the generation requests are served from.</summary>
     public WebLingoRouteTable Routes => _current.Routes;
 
+    /// <summary>The number of the generation requests are served from: 1 when the application loads, one more for each reload.</summary>
+    public int GenerationNumber => _current.Number;
+
+    /// <summary>
+    /// Makes a new generation from the root's files as they are now (section 6.5, WL-T007), and publishes it, at once and
+    /// whole, if its routes can be made: from then on, a request is served from it, its pages compiled anew when first
+    /// requested; a request already running finishes on the generation it began on, which goes when the last such one has.
+    /// False, with why, and the generation served unchanged, if its routes cannot be made. Its host calls it when the files
+    /// change, from any thread, one call at a time.
+    /// </summary>
+    public bool TryReload(out string? error)
+    {
+        var routes = WebLingoRouteTable.Make(_options.FileSystem, _options.Root, out error);
+        if (routes is null) return false;
+        _current = new Generation(routes, _options.Workers) { Number = _current.Number + 1 };
+        return true;
+    }
+
     /// <summary>
     /// Serves <paramref name="request"/> on <paramref name="worker"/>, from 0 to the host's workers − 1, writing and
     /// completing <paramref name="response"/>, but for a file the host serves as it is, which it leaves as it was.
@@ -136,6 +154,9 @@ public sealed class WebLingoApplication
         private readonly Dictionary<string, CompiledPage>[] _pages = MakePages(workers);
 
         public WebLingoRouteTable Routes { get; } = routes;
+
+        /// <summary>Its number: 1 for the application's first, one more for each reload's.</summary>
+        public int Number { get; init; } = 1;
 
         public CompiledPage Page(WebLingoWorkerId worker, string file, WebLingoApplication application)
         {
