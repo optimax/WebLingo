@@ -72,6 +72,13 @@ public static class WebLingoMembers
     public static readonly WebLingoRuntimeError Getter = new(WebLingoDiagnosticCodes.InvalidOperation, "A property's getter, to call.");
     public static readonly WebLingoRuntimeError Setter = new(WebLingoDiagnosticCodes.InvalidOperation, "A property's setter, to call.");
 
+    /// <summary>
+    /// Whether an error is one that <c>?[</c> turns into <c>null</c>: a missing key, or an index out of range (section
+    /// 3.6), as a native class's optional getter does for its indexer's getter (section 3.9).
+    /// </summary>
+    public static bool IsOptionalMiss(WebLingoRuntimeError? error) =>
+        error?.Code is WebLingoDiagnosticCodes.NoSuchKey or WebLingoDiagnosticCodes.IndexOutOfRange;
+
     /// <summary>A property read on a class's instance: its getter, or WL3006 for one that has only a setter (section 3.7).</summary>
     private static bool TryGetProperty(WebLingoValue target, WebLingoValue classValue, string name, WebLingoHeap heap,
         out WebLingoValue getter, out WebLingoRuntimeError? error) =>
@@ -828,14 +835,11 @@ public static class WebLingoMembers
     {
         if (TryGetIndexer(target, false, heap, out result))
         {
-            // Its class's indexer, a native class's, whose getter the VM calls with the index (section 3.9); not yet with
-            // ?[, which would give null for the getter's missing key or index out of range.
-            if (optional)
+            // Its class's indexer, a native class's, whose getter the VM calls with the index (section 3.9); with ?[, its
+            // optional getter, null for the getter's missing key or index out of range (section 3.6).
+            if (optional && heap.TryGetMethod(heap.ClassOf(target), WebLingoIndexers.OptionalGetter, out var optionalGetter))
             {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"'?[' does not call the indexer that the class of {WebLingoValueFormatter.Describe(target, heap)} has.");
-                result = WebLingoValue.Null;
-                return false;
+                result = optionalGetter;
             }
             error = Getter;
             return false;

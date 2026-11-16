@@ -183,7 +183,9 @@ public sealed class WebLingoNativeClass(string name)
     /// <remarks>
     /// After them, each property's getter, <c>.get.name</c>, given the instance, and its setter, if it has one,
     /// <c>.set.name</c>, given the instance and the value; then the indexer's getter, <c>.index.get</c>, given the instance
-    /// and the index, and its setter, <c>.index.set</c>, given the instance, the index and the value.
+    /// and the index, its setter, <c>.index.set</c>, given the instance, the index and the value, and its optional getter,
+    /// <c>.index.optional</c>, which <c>x?[k]</c> calls, the getter giving <c>null</c> where it raises a missing key or an
+    /// index out of range (section 3.6).
     /// </remarks>
     public IReadOnlyList<IWebLingoBuiltinFunction> Builtins(string prefix)
     {
@@ -205,9 +207,21 @@ public sealed class WebLingoNativeClass(string name)
         {
             builtins.Add(new MemberBuiltin(prefix + ".index.get", this, new("[]", 1, indexer.Getter), MemberKind.Method));
             if (indexer.Setter is { } setter) builtins.Add(new MemberBuiltin(prefix + ".index.set", this, new("[]", 2, setter), MemberKind.Method));
+            builtins.Add(new MemberBuiltin(prefix + ".index.optional", this, new("?[]", 1, Optional(indexer.Getter)), MemberKind.Method));
         }
         return builtins;
     }
+
+    /// <summary>An indexer's getter for <c>x?[k]</c>: <c>null</c> where it raises a missing key or an index out of range.</summary>
+    private static WebLingoNativeFunction Optional(WebLingoNativeFunction getter) =>
+        (ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        {
+            if (getter(arguments, heap, out result, out error)) return true;
+            if (!WebLingoMembers.IsOptionalMiss(error)) return false;
+            result = WebLingoValue.Null;
+            error = null;
+            return true;
+        };
 
     private static bool MarksOnly(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {

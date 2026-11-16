@@ -1417,6 +1417,7 @@ public sealed class WebLingoBinder
         }
         if (info.IndexGetter is { } getter) methods.Add(NativeMember(WebLingoIndexers.Getter, getter, false, callees));
         if (info.IndexSetter is { } indexSetter) methods.Add(NativeMember(WebLingoIndexers.Setter, indexSetter, false, callees, returnsLast: true));
+        if (info.IndexOptional is { } optional) methods.Add(NativeMember(WebLingoIndexers.OptionalGetter, optional, false, callees));
         var outer = _nativeCallees;
         _nativeCallees = callees;
         var local = BindBuiltinClass(name, new WebLingoClassDeclarationSyntax(info.Name, default, methods, default), UseObject());

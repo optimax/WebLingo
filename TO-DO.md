@@ -36,9 +36,11 @@ A4:
 
 A5:
 
-## Optional Indexing Through a Native Class's Indexer
+## [IDLE] Optional Indexing Through a Native Class's Indexer
 
 `x?[k]` on an instance whose class has an indexer, a native class's (specification, section 3.9), calls the indexer's getter as `x[k]` does, and gives `null` where the getter raises a missing key (WL3007) or an index out of range (WL3005), as `?[` does for a collection (section 3.6); for now it is WL3001. It needs a pending call that turns those two errors into `null`, in both VMs' dispatch methods, so it is measured against `main`. Added by Claude, 2026-11-15, from "Native Modules, Part 4".
+
+2026-11-15 (Claude): done, on both VMs: `x?[k]` on an instance whose class has a native indexer calls it, and gives `null` where its getter raises WL3007 or WL3005, other errors raised as they are, through a third built-in of the indexer, its optional getter `?[]`, which the runtime gives the VMs as the pending call it gives the getter for `x[k]`, so that neither VM changed (a first version, in the VMs' failure paths, slowed the register VM's `loops`, `strings` and `collections` by 5 to 11 percent, and was not kept). Recorded in the specification, section 3.9 (applying section 3.6's `?[`, no new decision), and in `Documents/implementation.md`. Guessed: an indexer given by a program's `setMethod("[]", …)`, which has no optional getter, is called by `?[` as `x[k]` calls it. Checks: the Release build, without warnings, the full test suite (2,172 tests), on Windows only; Linux not tried.
 
 # END-OF-TO-DO
 

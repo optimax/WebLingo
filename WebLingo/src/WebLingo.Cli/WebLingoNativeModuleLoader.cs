@@ -208,17 +208,19 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
                 var getter = Export(property.Name, members[next++]);
                 properties.Add(new WebLingoNativePropertyInfo(property.Name, getter, property.Setter is null ? null : Export(property.Name, members[next++])));
             }
-            WebLingoNativeExport? indexGetter = null, indexSetter = null;
+            WebLingoNativeExport? indexGetter = null, indexSetter = null, indexOptional = null;
             if (nativeClass.Indexer is { } indexer)
             {
                 indexGetter = Export("[]", members[next++]);
                 if (indexer.Setter is not null) indexSetter = Export("[]=", members[next++]);
+                indexOptional = Export("?[]", members[next++]);
             }
             classes.Add(new WebLingoNativeClassInfo(nativeClass.Name, constructor, methods, statics)
             {
                 Properties = properties,
                 IndexGetter = indexGetter,
-                IndexSetter = indexSetter
+                IndexSetter = indexSetter,
+                IndexOptional = indexOptional
             });
         }
         module = new WebLingoNativeModuleInfo(name, exports) { Classes = classes };

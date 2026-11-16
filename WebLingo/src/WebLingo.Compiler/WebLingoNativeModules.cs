@@ -27,6 +27,12 @@ public sealed record WebLingoNativeClassInfo(string Name, WebLingoNativeExport C
 
     /// <summary>Its indexer's setter's built-in, given the instance, the index and the value, or null.</summary>
     public WebLingoNativeExport? IndexSetter { get; init; }
+
+    /// <summary>
+    /// Its indexer's optional getter's built-in, given the instance and the index, which <c>x?[k]</c> calls, <c>null</c>
+    /// where the getter raises a missing key or an index out of range; or null for a class without an indexer.
+    /// </summary>
+    public WebLingoNativeExport? IndexOptional { get; init; }
 }
 
 /// <summary>A native class's property: its name, its getter's built-in, and its setter's, or null.</summary>
