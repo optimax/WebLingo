@@ -19,6 +19,7 @@
 | `Math.BigMul(long, long, out long)` | Planned | The VMs' int64 multiplication, whose 128-bit product shows an overflow |
 | `Array.Resize`, `Array.Clear`, `Array.Copy` | Planned | The VMs' stacks of frames, and the registers or slots a returning call clears; the bytes of a WLBC file as they are written (`WebLingoBytecodeWriter`) |
 | `char.IsSurrogatePair`, `char.IsHighSurrogate`, `char.IsLowSurrogate`, `string.Substring`, `new string(char[], int, int)` | Planned | A string's `length` and indexing count Unicode scalar values (`WebLingoMembers`), over the UTF-16 text a string is kept as; WLBC's strings, which its writer encodes as UTF-8 and its reader decodes itself, without `System.Text.Encoding` (`WebLingoBytecodeWriter`, `WebLingoBytecodeReader`) |
+| `StringComparer.OrdinalIgnoreCase`, `string.Equals(…, StringComparison.OrdinalIgnoreCase)` | Planned | HTTP headers' names, compared without regard to ASCII case (`WebLingoHeaderList`, `WebLingo.Hosting.Abstractions`); the Native C# runtime need only fold ASCII's case there, since a header's name is ASCII |
 | `[MethodImpl(MethodImplOptions.AggressiveInlining)]` | Planned | A hint to .NET's JIT on the VMs' arithmetic and comparisons; a compiler that ignores it still compiles the code correctly |
 | .NET Task / ValueTask | Adapted only | Not permitted as WebLingo core async contract |
 | .NET `CancellationToken` | Not used | The VM's cancellation is WebLingo's own `WebLingoCancellationSignal` (WL-P007) |
