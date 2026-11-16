@@ -44,12 +44,6 @@ What a page and a `.wl` route handler see of their request and response, and wha
 
 A1:
 
-## [IDLE] M0.14.4: The ASP.NET Core Adapter
-
-ASP.NET Core's requests translated to WLHI's, an application's other files served as they are, and IIS through the ASP.NET Core Module (specification, section 6.1, WL-H009; section 9, "M0.14 parts", part 4). Added by Claude, 2026-11-16.
-
-2026-11-16: waits for M0.14.2.
-
 ## [IDLE] M0.14.5: Serving an Application Locally
 
 An application served on Kestrel from the command line (specification, section 8.4; section 9, "M0.14 parts", part 5). Added by Claude, 2026-11-16.
