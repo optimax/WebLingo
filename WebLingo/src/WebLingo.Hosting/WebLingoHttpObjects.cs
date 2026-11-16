@@ -18,7 +18,10 @@ namespace WebLingo.Hosting;
 /// (section 6.12, "Streaming"; section 9, "M0.14.7 parts", part 4): <c>await request.text()</c>, the whole body as text,
 /// UTF-8 unless its <c>Content-Type</c> names another charset, and <c>await request.form()</c>, an
 /// <c>application/x-www-form-urlencoded</c> form's fields as a map, decoded as a query's are, a name given twice having its
-/// last value; each read as it arrives, off the worker, once, and kept, so that each gives the same again.
+/// last value; each read as it arrives, off the worker, once, and kept, so that each gives the same again. And
+/// <c>await request.read()</c>, the body's next piece as bytes as it arrives, <c>null</c> at its end, for a body too large
+/// to hold whole (section 9, "M0.14.7 parts", part 5): a body read in pieces cannot then be read whole, and one read whole
+/// is given by <c>read()</c> as one piece.
 /// </summary>
 internal sealed class WebLingoHttpObjects
 {
@@ -38,7 +41,8 @@ internal sealed class WebLingoHttpObjects
             .DeclareProperty("query", Query)
             .DeclareProperty("headers", (a, heap, out r, out e) => RequestHeaders(a, heap, out r, out e))
             .DeclareMethod("text", 0, BodyText)
-            .DeclareMethod("form", 0, BodyForm);
+            .DeclareMethod("form", 0, BodyForm)
+            .DeclareMethod("read", 0, BodyRead);
         _response
             .DeclareProperty("status", Status, SetStatus)
             .DeclareProperty("headers", (a, heap, out r, out e) => ResponseHeaders(a, heap, out r, out e));
@@ -159,6 +163,36 @@ internal sealed class WebLingoHttpObjects
             return TryMap(Pairs(WebLingoTextCodec.Decode(body, WebLingoCharset.Utf8)), h, out made, out failed);
         }, out result, out error);
 
+    /// <summary><c>request.read()</c>: a task giving the body's next piece as bytes, as it arrives, or <c>null</c> at its end.</summary>
+    private bool BodyRead(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_request.TryGetHostObject<RequestState>(a[0], heap, out var state, out error)) return false;
+        if (heap.Scheduler is not { } scheduler || heap.SchedulerHost is not { } host)
+        {
+            error = Invalid("This host cannot read a request's body.");
+            return false;
+        }
+        if (state.PieceAwaited)
+        {
+            error = Invalid("request.read() is called again before the piece it gives has come: await each piece first.");
+            return false;
+        }
+        state.PieceAwaited = true;
+        return scheduler.TryWaitForHost<byte[]?>(done => state.ReadPiece(host, done), (byte[]? piece, WebLingoHeap h, out WebLingoValue made,
+            out WebLingoRuntimeError? failed) =>
+        {
+            state.PieceAwaited = false;
+            (made, failed) = (WebLingoValue.Null, null);
+            if (piece is null)
+            {
+                failed = Invalid("The request's body could not be read: its client has gone.");
+                return false;
+            }
+            return piece.Length == 0 || h.TryAllocateBytes(piece, out made, out failed);
+        }, out result, out error);
+    }
+
     private delegate bool BodyFinish(byte[] body, RequestState state, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error);
 
     /// <summary>A task that reads the request's whole body, once, off the worker, then gives what <paramref name="finish"/> makes of it.</summary>
@@ -169,6 +203,11 @@ internal sealed class WebLingoHttpObjects
         if (heap.Scheduler is not { } scheduler)
         {
             error = Invalid("This host cannot read a request's body.");
+            return false;
+        }
+        if (state.ReadInPieces)
+        {
+            error = Invalid("The request's body is being read in pieces, with request.read(), and cannot be read whole too.");
             return false;
         }
         if (heap.SchedulerHost is not { } host)
@@ -431,9 +470,37 @@ internal sealed class WebLingoHttpObjects
         private List<Action<byte[]?>>? _waiting;
         private byte[]? _body;
         private bool _failed;
+        private bool _wholeGiven;
 
         public IWebLingoHttpRequest Request { get; } = request;
         public WebLingoValue[] Roots { get; } = new WebLingoValue[3];
+
+        /// <summary>Whether <c>read()</c> has read a piece of the body, which then cannot be read whole.</summary>
+        public bool ReadInPieces { get; private set; }
+
+        /// <summary>Whether a piece <c>read()</c> asked for has yet to come.</summary>
+        public bool PieceAwaited { get; set; }
+
+        /// <summary>
+        /// On the worker: gives <paramref name="done"/> the body's next piece, an empty one at its end, or null if it cannot be
+        /// read: read off the worker, as it arrives, then posted back; or, for a body read whole, the whole of it, once.
+        /// </summary>
+        public void ReadPiece(WebLingo.Platform.Abstractions.IWebLingoSchedulerHost host, Action<byte[]?> done)
+        {
+            if (_body is not null || _failed || _waiting is not null)
+            {
+                ReadWhole(host, body =>
+                {
+                    var given = _wholeGiven;
+                    _wholeGiven = true;
+                    done(body is null ? null : given ? [] : body);
+                });
+                return;
+            }
+            ReadInPieces = true;
+            var buffer = new byte[16 * 1024];
+            Request.Body.ReadAsync(buffer, 0, buffer.Length, count => done(count < 0 ? null : buffer[..count]));
+        }
 
         /// <summary>
         /// On the worker: gives <paramref name="done"/> the whole body once it has arrived, read once, then kept; null if it

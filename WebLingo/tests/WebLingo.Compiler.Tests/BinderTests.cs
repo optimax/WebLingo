@@ -21,6 +21,17 @@ public sealed class BinderTests
     }
 
     [Fact]
+    public void EveryBuiltInClassCompiles()
+    {
+        // Each built-in class's source, which the compiler parses when a program names the class, and whose faults no
+        // program could fix, so that one that does not parse fails the compiler, here, not a program (section 3.7).
+        var compilation = Compile("var classes = [Object, Error, Boolean, Integer, Number, String, Array, Map, Set, Function, Class, Task, Module, "
+                                  + "Iterator, Bytes, BytesBuilder, InitializationError, CallError, ArgumentError, TypeError, OverflowError, "
+                                  + "IndexError, MemberError, KeyError, TimeoutError, IOError]; writeLn(classes.length);");
+        Assert.Empty(compilation.Diagnostics);
+    }
+
+    [Fact]
     public void AssigningAnUndeclaredNameIsAnError()
     {
         var diagnostic = Assert.Single(Compile("x = 10;").Diagnostics);

@@ -12,6 +12,8 @@ public enum WebLingoMember : byte
     Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, SetMethod, SetProperty, SetStaticProperty, SetConstant,
     RemoveMethod,
     All, Any, Timeout, Parse,
+    /// <summary>Bytes' <c>slice</c> and <c>text</c>, and the class's <c>from</c>, <c>concat</c> and <c>fixedTimeEqual</c> (section 3.2, "Bytes").</summary>
+    Slice, Text, From, Concat, FixedTimeEqual,
     /// <summary>A collection's or a string's <c>iterate()</c>, which gives an <c>Iterator</c> (section 3.6).</summary>
     Iterate,
     /// <summary>An interpolation's format and alignment, a built-in method of every class that no program can name (section 3.5).</summary>
@@ -29,7 +31,7 @@ public readonly record struct WebLingoMemberName(WebLingoMember Member, string T
 /// <c>i</c>-th, as a string of one. A member a value does not have is WL3006, an index outside it WL3005, and an index
 /// of the wrong kind, or a value that cannot be indexed, WL3001.
 /// </summary>
-public static class WebLingoMembers
+public static partial class WebLingoMembers
 {
     public static WebLingoMember Find(string name) => name switch
     {
@@ -52,6 +54,11 @@ public static class WebLingoMembers
         "any" => WebLingoMember.Any,
         "timeout" => WebLingoMember.Timeout,
         "parse" => WebLingoMember.Parse,
+        "slice" => WebLingoMember.Slice,
+        "text" => WebLingoMember.Text,
+        "from" => WebLingoMember.From,
+        "concat" => WebLingoMember.Concat,
+        "fixedTimeEqual" => WebLingoMember.FixedTimeEqual,
         "iterate" => WebLingoMember.Iterate,
         WebLingoInterpolation.Format => WebLingoMember.Format,
         "__className" => WebLingoMember.ClassName,
@@ -215,6 +222,12 @@ public static class WebLingoMembers
         if (target.Kind == WebLingoValueKind.Set && member == WebLingoMember.Length)
         {
             result = WebLingoValue.FromInt64(heap.SetCount(target));
+            error = null;
+            return true;
+        }
+        if (target.Kind == WebLingoValueKind.Bytes && member == WebLingoMember.Length)
+        {
+            result = WebLingoValue.FromInt64(heap.GetBytes(target).Length);
             error = null;
             return true;
         }
@@ -536,6 +549,7 @@ public static class WebLingoMembers
         WebLingoValueKind.Class => (int)WebLingoValueClass.Class,
         WebLingoValueKind.Task => (int)WebLingoValueClass.Task,
         WebLingoValueKind.Module => (int)WebLingoValueClass.Module,
+        WebLingoValueKind.Bytes => (int)WebLingoValueClass.Bytes,
         _ => -1
     };
 
@@ -678,7 +692,8 @@ public static class WebLingoMembers
         (target.Kind == WebLingoValueKind.Array && member is WebLingoMember.Push or WebLingoMember.Pop)
         || (target.Kind == WebLingoValueKind.Map && member is WebLingoMember.Has or WebLingoMember.Remove)
         || (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
-        || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget);
+        || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
+        || (target.Kind == WebLingoValueKind.Bytes && member is WebLingoMember.Slice or WebLingoMember.Text);
 
     /// <summary>
     /// Whether <c>x.name(…)</c> calls a class's built-in method, <c>setMethod</c>, <c>setProperty</c>,
@@ -696,6 +711,8 @@ public static class WebLingoMembers
             || (member is WebLingoMember.All or WebLingoMember.Any or WebLingoMember.Timeout && heap.ValueClasses is { } classes
                 && classes[(int)WebLingoValueClass.Task] == target)
             || (member == WebLingoMember.Parse && ParsedKind(target, heap) != WebLingoValueKind.Null)
+            || (member is WebLingoMember.From or WebLingoMember.Concat or WebLingoMember.FixedTimeEqual && heap.ValueClasses is { } bytesClasses
+                && bytesClasses[(int)WebLingoValueClass.Bytes] == target)
             || member == WebLingoMember.Format);
 
     /// <summary>The kind <c>parse</c> reads a string as, for <c>Integer</c>, <c>Number</c> and <c>Boolean</c>; null's for any other class.</summary>
@@ -759,6 +776,10 @@ public static class WebLingoMembers
             {
                 return TryCombine(member, name, values, first, count, heap, out result, out error);
             }
+            if (member is WebLingoMember.From or WebLingoMember.Concat or WebLingoMember.FixedTimeEqual)
+            {
+                return TryCallBytesClass(member, name, values, first, count, heap, out result, out error);
+            }
             if (member == WebLingoMember.Parse)
             {
                 // Integer.parse("10"), Number.parse("1.5") and Boolean.parse("true") (section 3.7).
@@ -801,6 +822,10 @@ public static class WebLingoMembers
             error = null;
             return true;
         }
+        if (target.Kind == WebLingoValueKind.Bytes && member is WebLingoMember.Slice or WebLingoMember.Text)
+        {
+            return TryCallBytes(target, member, name, values, first, count, heap, out result, out error);
+        }
         if (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
         {
             if (count != 1) return WrongArgumentCount(name, 1, count, out error);
@@ -815,6 +840,7 @@ public static class WebLingoMembers
             return succeeded;
         }
         error = target.Kind is WebLingoValueKind.String or WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set
+                    or WebLingoValueKind.Bytes
                 && member == WebLingoMember.Length
             ? new WebLingoRuntimeError(WebLingoDiagnosticCodes.NotAFunction,
                 $"'{name}' of {WebLingoValueFormatter.Describe(target)} is not a method, and cannot be called.")
@@ -872,6 +898,7 @@ public static class WebLingoMembers
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.NoSuchKey, $"The map has no key {KeyText(index, heap)}.");
             return false;
         }
+        if (target.Kind == WebLingoValueKind.Bytes) return TryGetByte(target, index, heap, optional, out result, out error);
         if (target.Kind != WebLingoValueKind.String)
         {
             error = CannotBeIndexed(target);
@@ -952,9 +979,13 @@ public static class WebLingoMembers
             return true;
         }
         if (target.Kind == WebLingoValueKind.Map) return heap.TrySetInMap(target, index, value, out error);
-        error = target.Kind == WebLingoValueKind.String
-            ? new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "A string cannot be changed: strings are immutable.")
-            : CannotBeIndexed(target);
+        error = target.Kind switch
+        {
+            WebLingoValueKind.String => new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "A string cannot be changed: strings are immutable."),
+            WebLingoValueKind.Bytes => new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                "Bytes cannot be changed: they are immutable; a BytesBuilder builds them."),
+            _ => CannotBeIndexed(target)
+        };
         return false;
     }
 

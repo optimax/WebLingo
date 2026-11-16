@@ -1456,9 +1456,19 @@ public sealed class WebLingoBinder
     }
 
     /// <summary>Binds a built-in class from its source, extending <paramref name="baseLocal"/>, or nothing if null.</summary>
-    private WebLingoLocalSymbol BindBuiltinClass(string name, string source, WebLingoLocalSymbol? baseLocal, bool inPrelude = false) =>
-        BindBuiltinClass(name, (WebLingoClassDeclarationSyntax)new WebLingoParser(source, name).ParseCompilationUnit().Root.Statements[0],
-            baseLocal, inPrelude);
+    private WebLingoLocalSymbol BindBuiltinClass(string name, string source, WebLingoLocalSymbol? baseLocal, bool inPrelude = false)
+    {
+        var tree = new WebLingoParser(source, name).ParseCompilationUnit();
+        foreach (var diagnostic in tree.Diagnostics)
+        {
+            // The compiler's own source, which no program can fix: a fault of the compiler's, never reported as a program's.
+            if (diagnostic.Severity == WebLingoDiagnosticSeverity.Error)
+            {
+                throw new InvalidOperationException($"The built-in class {name}'s source does not parse: {diagnostic.Message}");
+            }
+        }
+        return BindBuiltinClass(name, (WebLingoClassDeclarationSyntax)tree.Root.Statements[0], baseLocal, inPrelude);
+    }
 
     /// <summary>
     /// A native module's class (section 3.9): a class extending <c>Object</c>, bound and made as the built-in ones are, under

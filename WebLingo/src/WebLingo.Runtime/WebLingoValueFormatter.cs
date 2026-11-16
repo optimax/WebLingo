@@ -20,6 +20,7 @@ public static class WebLingoValueFormatter
         return value.Kind switch
         {
             WebLingoValueKind.String => heap.GetString(value),
+            WebLingoValueKind.Bytes => FormatBytes(heap.GetBytes(value)),
             WebLingoValueKind.Instance when heap.IsHolding(value) => Held(value, heap),
             WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Instance => FormatCollection(value, heap),
             WebLingoValueKind.Class => heap.IsNamed(value) ? "class " + heap.ClassName(value) : "class",
@@ -43,6 +44,7 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Missing => "missing",
         WebLingoValueKind.Task => "task",
         WebLingoValueKind.Module => $"module#{value.Handle}",
+        WebLingoValueKind.Bytes => $"bytes#{value.Handle}",
         WebLingoValueKind.Boolean => value.AsBoolean ? "true" : "false",
         WebLingoValueKind.Int64 => value.AsInt64.ToString(CultureInfo.InvariantCulture),
         _ => FormatBinary64(value.AsBinary64)
@@ -63,8 +65,21 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Set => "a set",
         WebLingoValueKind.Task => "a task",
         WebLingoValueKind.Module => "a module",
+        WebLingoValueKind.Bytes => "bytes",
         _ => $"the number {Format(value)}"
     };
+
+    /// <summary>Bytes' text (section 3.2, "Bytes"): their class's name, a colon, and their values, <c>Bytes:[104, 105]</c>.</summary>
+    private static string FormatBytes(byte[] data)
+    {
+        var text = new StringBuilder("Bytes:[", 8 + 5 * data.Length);
+        for (var i = 0; i < data.Length; i++)
+        {
+            if (i > 0) text.Append(", ");
+            text.Append(data[i].ToString(CultureInfo.InvariantCulture));
+        }
+        return text.Append(']').ToString();
+    }
 
     /// <summary>A value described in a message, an instance and a class with their class's name.</summary>
     public static string Describe(WebLingoValue value, WebLingoHeap heap) => value.Kind switch

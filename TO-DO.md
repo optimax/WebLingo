@@ -52,20 +52,18 @@ A2: (b) but with a timeout.
 
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 6.12 ("Streaming"). Too large to land in one piece: in four parts, which the specification defines (section 9, "M0.14.7 parts"), each a task below. Waits for its parts.
 
-## M0.14.7.5: A Body's Bytes
+## [WORKING] M0.14.7.5: A Body's Bytes
 
 `await request.read()`, a request's body's next piece as bytes as it arrives, `null` at its end (the owner's answer to M0.14.7.4's question), and the value that holds bytes, which the language does not have yet (specification, section 3.2, "Bytes": binary data, distinct from strings, proposed), designed first (section 9, "M0.14.7 parts", part 5). Added by Claude, 2026-11-16.
 
 One decision, answerable with a letter:
 
-**Q1, what holds a script's bytes: (a) a value of a kind of its own, `Bytes`, immutable, as a string is, built into both VMs, as strings and arrays are: `b.length`, `b[i]`, an integer from 0 to 255, `b.slice(start, end)`, `b.text()`, decoding UTF-8, or `b.text("latin1")`, `Bytes.from("text")`, encoding it, `==` comparing their contents, and `write(b)` writing `Bytes:[104, 105]`; (b) the same members, on instances of a native class, `Bytes`, which the host and native modules make, the VMs unchanged, `==` then comparing identity, as for any instance; (c) an array of integers from 0 to 255, no new kind of value, `request.read()` giving one, and a standard function decoding it as text.**
+Q1, what holds a script's bytes: (a) a value of a kind of its own, `Bytes`, immutable, as a string is, built into both VMs, as strings and arrays are: `b.length`, `b[i]`, an integer from 0 to 255, `b.slice(start, end)`, `b.text()`, decoding UTF-8, or `b.text("latin1")`, `Bytes.from("text")`, encoding it, `==` comparing their contents, and `write(b)` writing `Bytes:[104, 105]`; (b) the same members, on instances of a native class, `Bytes`, which the host and native modules make, the VMs unchanged, `==` then comparing identity, as for any instance; (c) an array of integers from 0 to 255, no new kind of value, `request.read()` giving one, and a standard function decoding it as text.
 
 A1:(a) with (1) Building bytes without O(n²) cost, a mutable builder and Bytes.concat([parts]); and
 (2) Constant-time comparison for secrets.
 
-## WASP.config
-
-`weblingo.config` should really be `WASP.config`. We are configuring the WASP site, not the language.
+2026-11-16 (Claude): A1 recorded as approved in the specification, sections 1.1 and 3.2; built (sections 9 and 15.2, "Bytes" and "A request's body"), on both VMs, and described in the WebLingo Language Reference and the WASP User Manual. Guessed, and recorded as Proposed: the builder, `BytesBuilder`, a class written in WebLingo, `add(value)` of bytes, an integer from 0 to 255, or a string, giving the builder, its `length`, and `toBytes()`; `Bytes.concat` taking integers from 0 to 255 too, and `Bytes.from` an array of them, or bytes; the constant-time comparison `Bytes.fixedTimeEqual(a, b)`, its time given away only by the lengths; `slice`'s end optional; bytes not keys, not visited by `foreach`, not joined by `+`, and `new Bytes()` WL3001, for now; `read()`'s pieces up to 16 KiB, a body read in pieces then not readable whole, and one read whole given by `read()` as one piece. Tried on Windows only: the tests, on both VMs, and `wasp serve` reading 20 MB posted to a handler in 1,221 pieces; not under IIS, nor on Linux.
 
 # END-OF-TO-DO
 

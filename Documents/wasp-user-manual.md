@@ -392,6 +392,7 @@ makes, each an object whose members you read and set. A page declares only those
 | `request.host` | the host the client asked for, with its port if it gave one: `example.com:8443` |
 | `await request.text()` | the request's body, as text |
 | `await request.form()` | a form's fields, as a map |
+| `await request.read()` | the body's next piece, as bytes, or `null` at its end |
 
 ```html
 <% param request; %>
@@ -429,8 +430,26 @@ A form posted to a page, or anything else a client sends, is its body, which a p
 <% } %>
 ```
 
-The body is read only when a page asks for it, then kept, so that `text()` and `form()` may each be called again, and
-give the same. Files uploaded through a form (`multipart/form-data`) cannot be read yet.
+- `await request.read()` gives the body's next piece as it arrives, as bytes, and `null` at its end, for a body too large to hold
+  whole, such as an upload a page stores as it comes.
+
+The body is read only when a page asks for it. Read whole, it is kept, so that `text()` and `form()` may each be called again,
+and give the same; read in pieces, with `read()`, it cannot then be read whole too. Files uploaded through a form
+(`multipart/form-data`) cannot be read yet.
+
+```javascript
+export async function post(request, response) {
+  var bytes = 0;
+  var piece = await request.read();
+  while (piece != null) {
+    bytes = bytes + piece.length;
+    piece = await request.read();
+  }
+  write($"{bytes} bytes");
+}
+```
+
+Bytes, their members, and how to read them as text, are in the WebLingo Language Reference.
 
 ### The response
 
@@ -739,8 +758,6 @@ The repository's `Examples/example1` is such a site, and `Examples/README.md` wa
 
 WASP is pre-alpha. These are not there yet, and are planned or being designed:
 
-- **A request's body as bytes**, `await request.read()`, for a body too large to hold whole, and the value that holds
-  bytes, which the language does not have yet.
 - **Uploaded files**: forms posted as `multipart/form-data` cannot be read.
 - **Escaping for URLs, scripts and styles**: `<%=` escapes for HTML only ([section 4](#4-escaping)).
 - **JSON**: no module reads or writes it; a handler builds it as text ([section 10](#10-route-handlers)).

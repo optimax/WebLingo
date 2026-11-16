@@ -190,6 +190,7 @@ writeLn(limit);
 | Array | `[1, "two", null]` | `Array` |
 | Map | `{ name: "Ann", age: 30 }` | `Map` |
 | Set | `#{1, 2, 3}` | `Set` |
+| Bytes | `Bytes.from("hi")`, `Bytes.from([104, 105])` | `Bytes` |
 | Function | `function (x) { … }`, `x => x * 2` | `Function` |
 | Class | `class Point { … }` | `Class` |
 | Instance | `new Point(1, 2)` | its class |
@@ -732,6 +733,73 @@ true
 
 `#{a, b}` makes a set, and `#{}` an empty one. `add` gives whether the value was new, and `remove` whether it was there.
 A set's values are what a map's keys may be, and their order is not defined.
+
+### Bytes
+
+Bytes are binary data, distinct from strings: what a file or a request holds as it is, before it is read as text. Like a string,
+they are immutable.
+
+```javascript
+var b = Bytes.from("héllo");
+writeLn(b);
+writeLn([b.length, b[0], b[1]]);
+writeLn(b.text() == "héllo");
+writeLn(b.slice(0, 1).text());
+writeLn(Bytes.from("café", "latin1"));
+writeLn(Bytes.from([104, 105]).text());
+writeLn(Bytes.from("hi") == Bytes.from([104, 105]));
+writeLn(Bytes.concat([Bytes.from("ab"), 99, Bytes.from("d")]).text());
+```
+
+```text
+Bytes:[104, 195, 169, 108, 108, 111]
+[6, 104, 195]
+true
+h
+Bytes:[99, 97, 102, 233]
+hi
+true
+abcd
+```
+
+- **`Bytes.from(value, charset)`** makes bytes from a string, encoded in a charset, UTF-8 unless one is named; from an array of integers
+  from 0 to 255; or from bytes, which are themselves. `new Bytes()` is an error.
+- **`b.length`** is how many bytes there are, and **`b[i]`** the byte at `i`, from 0, an integer from 0 to 255. `b[i] = v` is an error.
+- **`b.slice(start, end)`** gives the bytes from `start` to `end`, `end` left out meaning the end.
+- **`b.text(charset)`** reads the bytes as text, UTF-8 unless a charset is named. What is not a character becomes U+FFFD.
+- **The charsets**: `utf-8`, `utf-16` (or `utf-16le`), `utf-16be`, `us-ascii` and `iso-8859-1` (or `latin1`), named without regard to
+  case.
+- **`==` compares their contents.** Bytes are not keys of a map, nor values of a set, and `+` does not join them.
+- **`Bytes.concat(parts)`** joins an array of bytes, and integers from 0 to 255, into new bytes, copying each part once.
+- **`Bytes.fixedTimeEqual(a, b)`** compares two bytes in a time that does not depend on where they differ, for secrets, such as a
+  signature or a token compared with the one expected, so that the time the comparison takes gives nothing away:
+
+  ```javascript
+  writeLn(Bytes.fixedTimeEqual(Bytes.from("key"), Bytes.from("key")));
+  writeLn(Bytes.fixedTimeEqual(Bytes.from("key"), Bytes.from("kez")));
+  ```
+
+  ```text
+  true
+  false
+  ```
+
+- **A `BytesBuilder` builds bytes from many pieces**, each added once and all joined once at the end, so that building costs no more
+  than the bytes built:
+
+  ```javascript
+  var builder = new BytesBuilder();
+  builder.add("tea").add(32).add(Bytes.from("time"));
+  writeLn(builder.length);
+  writeLn(builder.toBytes().text());
+  ```
+
+  ```text
+  8
+  tea time
+  ```
+
+  `add` takes bytes, an integer from 0 to 255, or a string, added as UTF-8, and gives the builder, so that adds can follow one another.
 
 ### Optional indexing
 
@@ -1512,7 +1580,7 @@ WebLingo is pre-alpha, and some of what other languages have is still to come. T
 - **Operators**: `%` (remainder), compound assignment (`+=`, `-=`), `++` and `--`, the conditional `c ? a : b`, `??`,
   and string comparison with `<`.
 - **Statements**: `switch`.
-- **Values**: decimals (exact decimal arithmetic, `1.5m`), bytes (binary data), dates and times.
+- **Values**: decimals (exact decimal arithmetic, `1.5m`), and dates and times.
 - **Literals**: hexadecimal and binary numbers, and `_` between digits.
 - **Functions**: a variable number of arguments (rest parameters), and spreading an array into a call.
 - **Library**: string methods (searching, splitting, case), array methods beyond `push` and `pop`, regular expressions,

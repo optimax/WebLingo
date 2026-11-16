@@ -183,6 +183,11 @@ public static class WebLingoOperators
                 ? left.Handle == right.Handle
                 : string.Equals(heap.GetString(left), heap.GetString(right), StringComparison.Ordinal);
         }
+        if (left.Kind == WebLingoValueKind.Bytes && right.Kind == WebLingoValueKind.Bytes)
+        {
+            // Bytes are equal when their contents are (section 3.2, "Bytes"); Bytes.fixedTimeEqual compares secrets.
+            return heap is null ? left.Handle == right.Handle : heap.GetBytes(left).AsSpan().SequenceEqual(heap.GetBytes(right));
+        }
         return left == right; // The same kind and payload: null, a Boolean, or a function by identity.
     }
 

@@ -476,6 +476,16 @@ public sealed class WebLingoHeap
     /// <summary>The text of a string value of this heap.</summary>
     public string GetString(WebLingoValue value) => Get<string>(value, WebLingoValueKind.String);
 
+    /// <summary>
+    /// New bytes (section 3.2, "Bytes"), holding <paramref name="data"/>, which the heap keeps and nothing may change after:
+    /// immutable, as a string is. They take a unit for every eight bytes.
+    /// </summary>
+    public bool TryAllocateBytes(byte[] data, out WebLingoValue value, out WebLingoRuntimeError? error) =>
+        TryAllocate(data, WebLingoValueKind.Bytes, (data.Length + 7) / 8, out value, out error);
+
+    /// <summary>The bytes a bytes value of this heap holds, which nothing may change.</summary>
+    public byte[] GetBytes(WebLingoValue value) => Get<byte[]>(value, WebLingoValueKind.Bytes);
+
     /// <summary>A new cell, holding <paramref name="value"/> if <paramref name="hasValue"/>, else nothing yet.</summary>
     public bool TryAllocateCell(WebLingoValue value, bool hasValue, out WebLingoValue cell, out WebLingoRuntimeError? error) =>
         TryAllocate(new Cell { Value = value, HasValue = hasValue }, WebLingoValueKind.Cell, 0, out cell, out error);
@@ -1344,7 +1354,7 @@ public sealed class WebLingoHeap
 
     private static void Mark(WebLingoValue value, bool[] marked, Stack<int> pending)
     {
-        if (value.Kind is not (WebLingoValueKind.String or WebLingoValueKind.Function or WebLingoValueKind.Cell or WebLingoValueKind.Array
+        if (value.Kind is not (WebLingoValueKind.String or WebLingoValueKind.Bytes or WebLingoValueKind.Function or WebLingoValueKind.Cell or WebLingoValueKind.Array
             or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Class or WebLingoValueKind.Instance or WebLingoValueKind.BoundMethod
             or WebLingoValueKind.Task or WebLingoValueKind.Module))
         {
@@ -1399,9 +1409,12 @@ public sealed class WebLingoHeap
         {
             value = WebLingoValue.Null;
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.BudgetExceeded,
-                item is string text
-                    ? $"A string of {text.Length} characters does not fit in the memory this execution may use."
-                    : "The program has used all the memory this execution may use.");
+                item switch
+                {
+                    string text => $"A string of {text.Length} characters does not fit in the memory this execution may use.",
+                    byte[] data => $"{data.Length} bytes do not fit in the memory this execution may use.",
+                    _ => "The program has used all the memory this execution may use."
+                });
             return false;
         }
         int handle;
