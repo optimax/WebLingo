@@ -52,7 +52,7 @@ A2: (b) but with a timeout.
 
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 6.12 ("Streaming"). Too large to land in one piece: in four parts, which the specification defines (section 9, "M0.14.7 parts"), each a task below. Waits for its parts.
 
-## M0.14.7.4: A Request's Body as It Arrives
+## [WORKING] M0.14.7.4: A Request's Body as It Arrives
 
 What a script reads a request's body with, and the ASP.NET Core adapter giving the body as it comes, rather than read whole before the page runs (specification, section 9, "M0.14.7 parts", part 4). Today a request's body is read whole first, and no script can read it. Added by Claude, 2026-11-16.
 
@@ -61,6 +61,18 @@ One decision, answerable with a letter:
 Q1, how a script reads a request's body: (a) `await request.text()`, the whole body as text, UTF-8 unless its `Content-Type` names another charset, and `await request.form()`, an `application/x-www-form-urlencoded` form's fields as a map, as PHP's `$_POST`, each read as the body arrives but given whole; (b) as (a), and `await request.read()`, the body's next piece as text as it arrives, `null` at its end, for a body too large to hold whole; (c) only `await request.read()`, a script joining the pieces itself.
 
 A1: (b) but stream bytes, rather than text.
+
+2026-11-16 (Claude): A1 recorded as approved in the specification, sections 6.12 and 9. Bytes need a value the language does not have yet (specification, section 3.2, "Bytes"), so `request.read()` is a part of its own, "M0.14.7.5: A Body's Bytes", below (section 9, "M0.14.7 parts", part 5); this part builds `request.text()` and `request.form()`, and the body given as it comes.
+
+## [QUESTION] M0.14.7.5: A Body's Bytes
+
+`await request.read()`, a request's body's next piece as bytes as it arrives, `null` at its end (the owner's answer to M0.14.7.4's question), and the value that holds bytes, which the language does not have yet (specification, section 3.2, "Bytes": binary data, distinct from strings, proposed), designed first (section 9, "M0.14.7 parts", part 5). Added by Claude, 2026-11-16.
+
+One decision, answerable with a letter:
+
+**Q1, what holds a script's bytes: (a) a value of a kind of its own, `Bytes`, immutable, as a string is, built into both VMs, as strings and arrays are: `b.length`, `b[i]`, an integer from 0 to 255, `b.slice(start, end)`, `b.text()`, decoding UTF-8, or `b.text("latin1")`, `Bytes.from("text")`, encoding it, `==` comparing their contents, and `write(b)` writing `Bytes:[104, 105]`; (b) the same members, on instances of a native class, `Bytes`, which the host and native modules make, the VMs unchanged, `==` then comparing identity, as for any instance; (c) an array of integers from 0 to 255, no new kind of value, `request.read()` giving one, and a standard function decoding it as text.**
+
+A1:
 
 # END-OF-TO-DO
 
