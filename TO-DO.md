@@ -2,6 +2,14 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
+## [QUESTION] After M0.13: The Next Milestone
+
+The roadmap ends with M0.13, which is done (specification, section 9), so the next milestone is the owner's to choose. Hosting and the platform layer are the parts of the design not yet built (sections 6 and 7): `WebLingo.Hosting.AspNetCore` and `WebLingo.Platform.DotNet` exist, but no web host runs a page yet. Added by Claude, 2026-11-16.
+
+**Q1, which comes next: (a) hosting: a web application served through the ASP.NET Core adapter, for IIS first (section 6), its `.wasp` pages and `.wl` route handlers compiled and cached in memory, its generations reloaded atomically (WL-T007), and `weblingo serve` to run it locally (section 8.4); (b) decimal128, the third numeric category (section 3; open question 3); (c) context-aware template escaping, for attributes, JavaScript, URLs and CSS (open question 9); (d) another, which you name.**
+
+A1:
+
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value
