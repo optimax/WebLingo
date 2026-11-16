@@ -37,7 +37,7 @@ Before changing source, read the specification's decision register (section 1.1)
 
 # 3. Repository Layout and Projects
 
-The repository root holds the files for agents and for planning (`AGENTS.md`, `CLAUDE.md`, `TO-DO.md`, `TO-DO-INSTRUCTIONS.md`, `DONE.md`, `HANDOFF.md`), the `.gitignore` for the whole repository, `.github/workflows/` for CI, `Documents/`, the project's documents, and `Examples/`, example applications, each everything a server needs to run it once its own script has published what it is served by (`Examples/example1`, a website built with WASP, which `WaspServeTests` serves). The solution is in the `WebLingo/` folder:
+The repository root holds the files for agents and for planning (`AGENTS.md`, `CLAUDE.md`, `TO-DO.md`, `TO-DO-INSTRUCTIONS.md`, `DONE.md`, `HANDOFF.md`), the `.gitignore` for the whole repository, `.github/workflows/` for CI, `Documents/`, the project's documents, and `Examples/`, example applications, each a site's own files, which a server runs with WebLingo installed once for all its sites (section 6; `Examples/example1`, a website built with WASP, which `WaspServeTests` serves). The solution is in the `WebLingo/` folder:
 
 ```text
 WebLingo/                      the repository
@@ -49,6 +49,7 @@ WebLingo/                      the repository
     ├── Directory.Build.props
     ├── Directory.Packages.props
     ├── global.json
+    ├── publish.ps1
     ├── benchmarks/WebLingo.Benchmarks/
     ├── samples/
     ├── src/WebLingo.*/
@@ -160,6 +161,7 @@ The specification's guiding invariants (section 11) bind every change. In code t
 - **Every feature on both VMs** (user decision, 2026-11-13, kept on 2026-11-15 once every workload was measured; specification, section 5.6, "Both VMs, for now"). Until WL-BC002 is decided, a feature that reaches the bytecode is built on both VMs in the same change: `WebLingoCodeGenerator`, `WebLingoBytecodeVerifier` and `WebLingoVirtualMachine`, and `WebLingoStackCodeGenerator`, `WebLingoStackBytecodeVerifier` and `WebLingoStackVirtualMachine`, each with its tests. Its conformance cases then run on both (`StackVmTests`), and both must give the same output and errors. Property access, async suspension, template output and I/O-bound work each get a benchmark workload (`WebLingoWorkloads`) when the language can express them.
 - **One implementation of classes** (the owner's request, 14 November 2026; specification, section 3.7). A class's declaration, an `extend` block, and a program building a class while it runs (`new Class`, `setMethod`, `setProperty`, assigning a static member) go through the same methods of `WebLingoHeap`: `TryMakeClass`, `GiveConstructor`, `TrySetMethod`, `TrySetStaticMethod`, `TryDeclareStatic` and `TrySetConstant`; each VM's `TryGiveMembers` only makes the closures it gives them. A new kind of class member gets one such method, which both use; a change to a class's methods gathers anew only that class's, unless another extends it.
 - **WASP writes no bytecode to disk** (user decision, 2026-11-16; specification, section 5.1). Wherever WASP runs pages, in `wasp` and in the web hosts, it compiles and caches them in memory only, and never writes a `.wlbc` file; `WaspTests` checks that `wasp` leaves an application's folder as it found it.
+- **WebLingo is installed once per server** (user decision, 2026-11-16, WebLingo replacing PHP; specification, section 6.9). A server installs WebLingo once, `wasp`, `weblingo` and the standard modules in one folder, which `WebLingo/publish.ps1` publishes, `C:\Program Files\WebLingo` on Windows, and every site shares it, as PHP's sites share PHP: a site is its own files and its `web.config`, never a copy of the runtime, and an example's deployment says so.
 - **Bytecode is verified before it runs.** Malformed bytecode fails verification; it never crashes the VM.
 - **Bad input gives diagnostics, not crashes.** Malformed source produces diagnostics with stable codes and source spans, and the parser recovers far enough to report more than one error. A diagnostic code, once assigned, keeps its meaning; use the codes the specification suggests (section 8.4), and ask before starting a new range.
 - **Secure by default.** Template output is escaped unless it is explicitly raw; filesystem, network, database and native access goes through capabilities; resource use is bounded.

@@ -28,8 +28,7 @@ TestResults/
 # Publish output
 publish/
 
-# An example's host, which its publish.ps1 makes, and IIS's logs of it
-Examples/*/wasp/
+# IIS's logs of an example's site
 Examples/*/logs/
 
 # NuGet packages

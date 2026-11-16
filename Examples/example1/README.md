@@ -5,9 +5,7 @@ layout, a header and a footer, a component that shows a tea, and a module that h
 
 ```text
 example1/
-  web.config            IIS's configuration: the ASP.NET Core Module runs wasp
-  publish.ps1           publishes wasp, WASP's host, into wasp/
-  wasp/                 wasp and its libraries, made by publish.ps1
+  web.config            IIS's configuration: the ASP.NET Core Module runs WebLingo's wasp
   site/                 the application, wasp's root
     index.wasp          /          the home page, with this week's teas
     teas/index.wasp     /teas      every tea, by kind
@@ -51,12 +49,27 @@ under IIS it does not, unless the site's `weblingo.config` says `{ "environment"
 
 ## Deploying it to IIS
 
-1. On the server, install the ASP.NET Core Hosting Bundle for .NET 10, which brings the .NET runtime and IIS's ASP.NET
-   Core Module.
-2. On a machine with the .NET 10 SDK, run `publish.ps1`, which fills `wasp/`.
-3. Copy this folder, `example1`, with `wasp/`, to the server.
-4. In IIS, add a website whose physical path is that folder, in an application pool whose .NET CLR version is
+WebLingo is installed once on a server, and every site shares it, as PHP is installed once for every PHP site: a site
+holds only its own files.
+
+Once for the server:
+
+1. Install the ASP.NET Core Hosting Bundle for .NET 10, which brings the .NET runtime and IIS's ASP.NET Core Module.
+2. On a Windows machine with the .NET 10 SDK, run the solution's `publish.ps1` (`WebLingo/publish.ps1`), which publishes
+   WebLingo into `WebLingo/publish/WebLingo`: `wasp.exe`, `weblingo.exe`, their libraries, and the standard modules,
+   `std\`.
+3. Copy that folder to the server as `C:\Program Files\WebLingo`. On the server itself, `publish.ps1 -Destination
+   "C:\Program Files\WebLingo"`, from an elevated PowerShell, does both.
+
+For this site:
+
+4. Copy this folder, `example1`, to the server.
+5. In IIS, add a website whose physical path is that folder, in an application pool whose .NET CLR version is
    "No Managed Code".
 
-IIS then hands every request to the ASP.NET Core Module, which starts `wasp\wasp.exe serve --root site`, as `web.config`
-says, and passes the requests to it.
+IIS then hands every request to the ASP.NET Core Module, which starts `C:\Program Files\WebLingo\wasp.exe serve --root
+site`, as `web.config` says, and passes the requests to it. If WebLingo is installed in another folder, change
+`processPath` in `web.config` to match.
+
+Updating WebLingo updates every site at once. A running `wasp.exe` keeps its files in use, so stop the sites'
+application pools, or IIS (`iisreset /stop`), before copying the new version over the old, and start them again after.
