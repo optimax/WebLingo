@@ -2,6 +2,8 @@
   <PropertyGroup><OutputType>Library</OutputType></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />
+    <ProjectReference Include="../WebLingo.Hosting/WebLingo.Hosting.csproj" />
+    <ProjectReference Include="../WebLingo.Platform.DotNet/WebLingo.Platform.DotNet.csproj" />
   </ItemGroup>
   <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>
 </Project>
