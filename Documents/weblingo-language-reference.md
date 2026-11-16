@@ -88,6 +88,9 @@ A script's own parameters ([section 14](#script-parameters)) are given after its
 `weblingo.config` file in the script's folder configures where native modules are found
 ([section 15](#native-modules)).
 
+Editors can colour WebLingo's files: the repository's `Editors/` folder has syntax colouring for `.wl` files, and for
+WASP's `.wasp` pages, and its `README.md` says how to install it.
+
 ---
 
 ## 2. Lexical structure

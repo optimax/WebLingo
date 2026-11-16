@@ -661,6 +661,8 @@ which. `wasp serve` reads the file when it starts; after changing it, start `was
   folder.
 - **`wasp check`** reports a page's errors without running it, and `wasp run` runs it, which is quicker than a browser
   for a page that needs no request ([section 16](#16-the-wasp-command-line)).
+- **Editors colour pages and modules**: the repository's `Editors/` folder has syntax colouring for `.wasp` and `.wl`
+  files, and its `README.md` says how to install it.
 
 ---
 

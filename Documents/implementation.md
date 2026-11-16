@@ -39,7 +39,7 @@ Before changing source, read the specification's decision register (section 1.1)
 
 # 3. Repository Layout and Projects
 
-The repository root holds the files for agents and for planning (`AGENTS.md`, `CLAUDE.md`, `TO-DO.md`, `TO-DO-INSTRUCTIONS.md`, `DONE.md`, `HANDOFF.md`), the `.gitignore` for the whole repository, `.github/workflows/` for CI, `Documents/`, the project's documents, and `Examples/`, example applications, which its `README.md` describes, each a site's own files, its pages beside its `web.config`, which a server runs with WebLingo installed once for all its sites (section 6; `Examples/example1`, a website built with WASP, which `WaspServeTests` serves). The solution is in the `WebLingo/` folder:
+The repository root holds the files for agents and for planning (`AGENTS.md`, `CLAUDE.md`, `TO-DO.md`, `TO-DO-INSTRUCTIONS.md`, `DONE.md`, `HANDOFF.md`), the `.gitignore` for the whole repository, `.github/workflows/` for CI, `Documents/`, the project's documents, and `Examples/`, example applications, which its `README.md` describes, each a site's own files, its pages beside its `web.config`, which a server runs with WebLingo installed once for all its sites (section 6; `Examples/example1`, a website built with WASP, which `WaspServeTests` serves), and `Editors/`, syntax colouring for `.wl` and `.wasp` files in editors, a folder for each editor, which its `README.md` describes: `Editors/NotepadPlusPlus`, Notepad++'s user-defined languages. A change to the language's keywords, built-in classes and functions, or templates' syntax updates them in the same change. The solution is in the `WebLingo/` folder:
 
 ```text
 WebLingo/                      the repository

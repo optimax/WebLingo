@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<NotepadPlus>
+    <UserLang name="WASP" ext="wasp" udlVersion="2.1">
+        <Settings>
+            <Global caseIgnored="no" allowFoldOfComments="yes" foldCompact="no" forcePureLC="0" decimalSeparator="0" />
+            <Prefix Keywords1="no" Keywords2="no" Keywords3="no" Keywords4="no" Keywords5="no" Keywords6="no" Keywords7="no" Keywords8="no" />
+        </Settings>
+        <KeywordLists>
+            <Keywords name="Comments">00// 01 02 03/* 04*/</Keywords>
+            <Keywords name="Numbers, prefix1"></Keywords>
+            <Keywords name="Numbers, prefix2"></Keywords>
+            <Keywords name="Numbers, extras1"></Keywords>
+            <Keywords name="Numbers, extras2"></Keywords>
+            <Keywords name="Numbers, suffix1"></Keywords>
+            <Keywords name="Numbers, suffix2"></Keywords>
+            <Keywords name="Numbers, range"></Keywords>
+            <Keywords name="Operators1">( ) [ ] , ; : . + - * / = ! &lt; &gt; &amp; | ? # $</Keywords>
+            <Keywords name="Operators2"></Keywords>
+            <Keywords name="Folders in code1, open">{</Keywords>
+            <Keywords name="Folders in code1, middle"></Keywords>
+            <Keywords name="Folders in code1, close">}</Keywords>
+            <Keywords name="Folders in code2, open"></Keywords>
+            <Keywords name="Folders in code2, middle"></Keywords>
+            <Keywords name="Folders in code2, close"></Keywords>
+            <Keywords name="Folders in comment, open"></Keywords>
+            <Keywords name="Folders in comment, middle"></Keywords>
+            <Keywords name="Folders in comment, close"></Keywords>
+            <Keywords name="Keywords1">async await break catch class const continue do else export extend extends finally for foreach function if import is let new param return static super this throw try using var while</Keywords>
+            <Keywords name="Keywords2">true false null Infinity NaN</Keywords>
+            <Keywords name="Keywords3">constructor destructor field from get in operator property set include layout</Keywords>
+            <Keywords name="Keywords4">Object Error Boolean Integer Number String Array Map Set Function Class Task Module Iterator Bytes BytesBuilder ArgumentError CallError IndexError InitializationError IOError KeyError MemberError OverflowError TimeoutError TypeError File Request Response Headers</Keywords>
+            <Keywords name="Keywords5">write writeLn delay renderComponent renderBody</Keywords>
+            <Keywords name="Keywords6"></Keywords>
+            <Keywords name="Keywords7"></Keywords>
+            <Keywords name="Keywords8"></Keywords>
+            <Keywords name="Delimiters">00%&gt; 00&lt;!DOCTYPE 00&lt;!doctype 00&lt;html 00&lt;head 00&lt;body 00&lt;header 00&lt;footer 00&lt;nav 00&lt;main 00&lt;section 00&lt;article 00&lt;aside 00&lt;div 00&lt;table 00&lt;form 00&lt;ul 00&lt;ol 00&lt;dl 00&lt;h1 00&lt;h2 00&lt;h3 00&lt;h4 00&lt;h5 00&lt;h6 00&lt;p&gt; 00&lt;script 00&lt;style 00&lt;link 00&lt;meta 00&lt;title 00&lt;template 00&lt;span 00&lt;img 00&lt;button 00&lt;label 00&lt;input 00&lt;select 00&lt;textarea 00&lt;pre 00&lt;blockquote 00&lt;figure 00&lt;details 00&lt;svg 01 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 02&lt;% 03&lt;!-- 04 05--&gt; 06&lt;/ 06&lt;! 06&lt;a 06&lt;b 06&lt;c 06&lt;d 06&lt;e 06&lt;f 06&lt;g 06&lt;h 06&lt;i 06&lt;j 06&lt;k 06&lt;l 06&lt;m 06&lt;n 06&lt;o 06&lt;p 06&lt;q 06&lt;r 06&lt;s 06&lt;t 06&lt;u 06&lt;v 06&lt;w 06&lt;x 06&lt;y 06&lt;z 06&lt;A 06&lt;B 06&lt;C 06&lt;D 06&lt;E 06&lt;F 06&lt;G 06&lt;H 06&lt;I 06&lt;J 06&lt;K 06&lt;L 06&lt;M 06&lt;N 06&lt;O 06&lt;P 06&lt;Q 06&lt;R 06&lt;S 06&lt;T 06&lt;U 06&lt;V 06&lt;W 06&lt;X 06&lt;Y 06&lt;Z 07 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 08&gt; 09""" 10 11""" 12''' 13 14''' 15" 16\ 17((EOL ")) 18' 19\ 20((EOL ')) 21 22 23</Keywords>
+        </KeywordLists>
+        <Styles>
+            <WordsStyle name="DEFAULT" fgColor="000000" bgColor="FFFFFF" colorStyle="0" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="COMMENTS" fgColor="008000" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="LINE COMMENTS" fgColor="008000" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="NUMBERS" fgColor="098658" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="KEYWORDS1" fgColor="0000FF" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="1" nesting="0" />
+            <WordsStyle name="KEYWORDS2" fgColor="0000FF" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="KEYWORDS3" fgColor="0000FF" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="KEYWORDS4" fgColor="267F99" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="KEYWORDS5" fgColor="795E26" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="KEYWORDS6" fgColor="000000" bgColor="FFFFFF" colorStyle="0" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="KEYWORDS7" fgColor="000000" bgColor="FFFFFF" colorStyle="0" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="KEYWORDS8" fgColor="000000" bgColor="FFFFFF" colorStyle="0" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="OPERATORS" fgColor="000080" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="FOLDER IN CODE1" fgColor="000080" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="1" nesting="0" />
+            <WordsStyle name="FOLDER IN CODE2" fgColor="000000" bgColor="FFFFFF" colorStyle="0" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="FOLDER IN COMMENT" fgColor="008000" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="DELIMITERS1" fgColor="000000" bgColor="FFFFFF" colorStyle="0" fontName="" fontStyle="0" nesting="6" />
+            <WordsStyle name="DELIMITERS2" fgColor="008000" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="DELIMITERS3" fgColor="800080" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="96" />
+            <WordsStyle name="DELIMITERS4" fgColor="A31515" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="DELIMITERS5" fgColor="A31515" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="DELIMITERS6" fgColor="A31515" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="DELIMITERS7" fgColor="A31515" bgColor="FFFFFF" colorStyle="1" fontName="" fontStyle="0" nesting="0" />
+            <WordsStyle name="DELIMITERS8" fgColor="000000" bgColor="FFFFFF" colorStyle="0" fontName="" fontStyle="0" nesting="0" />
+        </Styles>
+    </UserLang>
+</NotepadPlus>
