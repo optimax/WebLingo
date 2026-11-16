@@ -2601,3 +2601,19 @@ A1: (a)
 2026-11-16 (Claude): built (specification, sections 6.12, 9 and 15.2, "Backpressure"), A1 recorded as approved in sections 1.1 and 6.12. Built in the compiler and the host, the VMs unchanged but for part 2's waiting, rather than in both VMs as the question supposed: after a write where the page can `await`, the compiler adds a wait, taken only while the response is full, so that a write that does not wait costs one more built-in's call, not measured. Guessed, and recorded as Proposed: the writers that wait, the template's, `write` and `writeLn`; a write in a function that is not `async`, where it cannot wait, kept until the page next writes where it can; the ASP.NET Core adapter's response full while four pieces of 16 KiB wait; and a timeout's line in the host's log. Tried on Windows only: the tests, on both VMs, and `wasp serve` sending a 40 MB page to a client that reads, and, with `"sendTimeout": 1`, cancelling one that does not; not under IIS, nor on Linux.
 
 Done (Claude, 2026-11-16, `67c31aa`): a page waiting for a slow client without its worker, for at most its send timeout, 30 seconds or `weblingo.config`'s `"sendTimeout"`. Main's checks passed: the Release build, without warnings, 2,966 tests, `wasp` on `samples/SimpleWebsite`, and `wasp serve` sending a 40 MB page and timing out a client that never reads, on Windows only; Linux and IIS not tried.
+
+## [DONE] M0.14.7.4: A Request's Body as It Arrives
+
+What a script reads a request's body with, and the ASP.NET Core adapter giving the body as it comes, rather than read whole before the page runs (specification, section 9, "M0.14.7 parts", part 4). Today a request's body is read whole first, and no script can read it. Added by Claude, 2026-11-16.
+
+One decision, answerable with a letter:
+
+Q1, how a script reads a request's body: (a) `await request.text()`, the whole body as text, UTF-8 unless its `Content-Type` names another charset, and `await request.form()`, an `application/x-www-form-urlencoded` form's fields as a map, as PHP's `$_POST`, each read as the body arrives but given whole; (b) as (a), and `await request.read()`, the body's next piece as text as it arrives, `null` at its end, for a body too large to hold whole; (c) only `await request.read()`, a script joining the pieces itself.
+
+A1: (b) but stream bytes, rather than text.
+
+2026-11-16 (Claude): A1 recorded as approved in the specification, sections 6.12 and 9. Bytes need a value the language does not have yet (specification, section 3.2, "Bytes"), so `request.read()` is a part of its own, "M0.14.7.5: A Body's Bytes", below (section 9, "M0.14.7 parts", part 5); this part builds `request.text()` and `request.form()`, and the body given as it comes.
+
+2026-11-16 (Claude): built (specification, sections 9 and 15.2, "A request's body"). Guessed, and recorded as Proposed: the body read once, when a script first asks for it, and kept, so that `text()` and `form()` give the same again; the charsets `text()` reads, those .NET knows by name, an unknown one WL3001; `form()` reading only `application/x-www-form-urlencoded`, as UTF-8, another type WL3001, a name without `=` an empty string; no size limit of WebLingo's own. Tried on Windows only: the tests, and `wasp serve` given a form, and 5 MB of text, posted; not under IIS, nor on Linux.
+
+Done (Claude, 2026-11-16, `19c5b46`): a request's body read as it arrives, with `request.text()` and `request.form()`; `request.read()`, as bytes, is "M0.14.7.5: A Body's Bytes". Main's checks passed: the Release build, without warnings, 2,973 tests, and `wasp serve` given a form and a 5 MB body, on Windows only; Linux and IIS not tried.

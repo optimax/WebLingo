@@ -52,20 +52,6 @@ A2: (b) but with a timeout.
 
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 6.12 ("Streaming"). Too large to land in one piece: in four parts, which the specification defines (section 9, "M0.14.7 parts"), each a task below. Waits for its parts.
 
-## [WORKING] M0.14.7.4: A Request's Body as It Arrives
-
-What a script reads a request's body with, and the ASP.NET Core adapter giving the body as it comes, rather than read whole before the page runs (specification, section 9, "M0.14.7 parts", part 4). Today a request's body is read whole first, and no script can read it. Added by Claude, 2026-11-16.
-
-One decision, answerable with a letter:
-
-Q1, how a script reads a request's body: (a) `await request.text()`, the whole body as text, UTF-8 unless its `Content-Type` names another charset, and `await request.form()`, an `application/x-www-form-urlencoded` form's fields as a map, as PHP's `$_POST`, each read as the body arrives but given whole; (b) as (a), and `await request.read()`, the body's next piece as text as it arrives, `null` at its end, for a body too large to hold whole; (c) only `await request.read()`, a script joining the pieces itself.
-
-A1: (b) but stream bytes, rather than text.
-
-2026-11-16 (Claude): A1 recorded as approved in the specification, sections 6.12 and 9. Bytes need a value the language does not have yet (specification, section 3.2, "Bytes"), so `request.read()` is a part of its own, "M0.14.7.5: A Body's Bytes", below (section 9, "M0.14.7 parts", part 5); this part builds `request.text()` and `request.form()`, and the body given as it comes.
-
-2026-11-16 (Claude): built (specification, sections 9 and 15.2, "A request's body"). Guessed, and recorded as Proposed: the body read once, when a script first asks for it, and kept, so that `text()` and `form()` give the same again; the charsets `text()` reads, those .NET knows by name, an unknown one WL3001; `form()` reading only `application/x-www-form-urlencoded`, as UTF-8, another type WL3001, a name without `=` an empty string; no size limit of WebLingo's own. Tried on Windows only: the tests, and `wasp serve` given a form, and 5 MB of text, posted; not under IIS, nor on Linux.
-
 ## [QUESTION] M0.14.7.5: A Body's Bytes
 
 `await request.read()`, a request's body's next piece as bytes as it arrives, `null` at its end (the owner's answer to M0.14.7.4's question), and the value that holds bytes, which the language does not have yet (specification, section 3.2, "Bytes": binary data, distinct from strings, proposed), designed first (section 9, "M0.14.7 parts", part 5). Added by Claude, 2026-11-16.
