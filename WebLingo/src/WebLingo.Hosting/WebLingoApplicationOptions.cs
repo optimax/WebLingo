@@ -38,4 +38,10 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
 
     /// <summary>How many instructions a request may run before it is stopped (WL3003); no limit by default.</summary>
     public long InstructionBudget { get; init; } = long.MaxValue;
+
+    /// <summary>
+    /// Where the application reports what no response can show, a line at a time, from any worker: a page that fails after
+    /// its output was first sent (section 6.12, "Streaming"); nowhere by default.
+    /// </summary>
+    public Action<string>? Log { get; init; }
 }

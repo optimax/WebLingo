@@ -4,18 +4,48 @@ using WebLingo.Runtime;
 namespace WebLingo.Hosting;
 
 /// <summary>
-/// A request's text output, as its page writes it, kept until the page has run (specification, section 6.12), so that a
-/// runtime error can still be a 500; then written to the response as UTF-8, a surrogate without its pair as U+FFFD.
-/// Streaming it as it is written, with backpressure, is M0.14.7's.
+/// A request's text output, as its page writes it (specification, section 6.12, "Streaming"; section 9, "M0.14.7 parts",
+/// part 1): kept until it reaches <see cref="Kept"/> bytes of UTF-8, so that a runtime error before then can still be a
+/// 500; then its response committed, its <c>Content-Type</c> <c>text/html; charset=utf-8</c> unless the page set another,
+/// and the output sent as it is written, in pieces of about <see cref="Piece"/> bytes. Written as UTF-8, a surrogate
+/// without its pair as U+FFFD.
 /// </summary>
-internal sealed class WebLingoResponseText : IWebLingoTextOutput
+internal sealed class WebLingoResponseText(IWebLingoHttpResponse response) : IWebLingoTextOutput
 {
+    /// <summary>How much output is kept before its response is committed and it is sent.</summary>
+    public const int Kept = 64 * 1024;
+
+    /// <summary>How much output, once it is being sent, makes a piece.</summary>
+    public const int Piece = 16 * 1024;
+
     private readonly StringBuilder _text = new();
+    private int _bytes;
 
-    public void Write(string text) => _text.Append(text);
+    /// <summary>Whether the output is being sent: its response committed, and an error then too late for a 500.</summary>
+    public bool Sending { get; private set; }
 
-    /// <summary>Writes the text kept to <paramref name="response"/>'s body.</summary>
-    public void WriteTo(IWebLingoHttpResponse response) => WriteTo(response, _text.ToString());
+    public void Write(string text)
+    {
+        _text.Append(text);
+        _bytes += Encoded(text);
+        if (_bytes >= (Sending ? Piece : Kept)) Send();
+    }
+
+    /// <summary>Sends the output kept, committing the response first if it is not.</summary>
+    public void Send()
+    {
+        if (!Sending)
+        {
+            if (response.Headers.Get("Content-Type") is null) response.Headers.Set("Content-Type", WebLingoErrorPages.HtmlType);
+            response.Commit();
+            Sending = true;
+        }
+        // A surrogate whose pair a later write may give waits for it.
+        var keep = _text.Length > 0 && char.IsHighSurrogate(_text[^1]) ? 1 : 0;
+        WriteTo(response, _text.ToString(0, _text.Length - keep));
+        _text.Remove(0, _text.Length - keep);
+        _bytes = keep * 3;
+    }
 
     /// <summary>Writes <paramref name="text"/> to <paramref name="response"/>'s body as UTF-8.</summary>
     public static void WriteTo(IWebLingoHttpResponse response, string text)

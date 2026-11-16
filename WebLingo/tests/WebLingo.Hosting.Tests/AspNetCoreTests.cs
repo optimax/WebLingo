@@ -24,6 +24,39 @@ public sealed class AspNetCoreTests : IDisposable
         Write("fails.wasp", "<%= [1][5] %>");
         Write("css/site.css", "body { color: red; }");
         Write("data.unknownextension", "?");
+        Write("long.wasp", "<% var i = 0; while (i < 100) { %>" + new string('x', 1024) + "<% i = i + 1; } %>end");
+        Write("longfails.wasp", "<% var i = 0; while (i < 100) { %>" + new string('x', 1024) + "<% i = i + 1; } %><%= [1][5] %>");
+    }
+
+    [Fact]
+    public async Task ALongPageIsSentAsItIsWritten_WithoutALength()
+    {
+        var context = await Serve("GET", "/long");
+        Assert.Equal((200, "text/html; charset=utf-8", (long?)null), (context.Response.StatusCode, context.Response.ContentType, context.Response.ContentLength));
+        Assert.Equal(new string('x', 100 * 1024) + "end", Body(context));
+    }
+
+    [Fact]
+    public async Task ALongPageThatFailsAbortsItsConnection()
+    {
+        var lifetime = new Lifetime();
+        var context = new DefaultHttpContext();
+        context.Features.Set<Microsoft.AspNetCore.Http.Features.IHttpRequestLifetimeFeature>(lifetime);
+        context.Request.Method = "GET";
+        context.Request.Path = "/longfails";
+        context.Response.Body = new MemoryStream();
+        await WebLingoAspNetCore.Serve(context, Load(), _root, _workers);
+        Assert.True(lifetime.Aborted);
+        Assert.Equal(200, context.Response.StatusCode);
+        Assert.Equal(new string('x', 100 * 1024), Body(context));
+    }
+
+    /// <summary>A request's lifetime that records its abort.</summary>
+    private sealed class Lifetime : Microsoft.AspNetCore.Http.Features.IHttpRequestLifetimeFeature
+    {
+        public bool Aborted { get; private set; }
+        public CancellationToken RequestAborted { get; set; }
+        public void Abort() => Aborted = true;
     }
 
     public void Dispose()

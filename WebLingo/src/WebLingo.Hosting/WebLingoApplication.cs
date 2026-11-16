@@ -23,8 +23,10 @@ public sealed record WebLingoRequestOutcome(WebLingoRequestOutcomeKind Kind, str
 /// it is loaded, which a request's path finds. A page is compiled when it is first requested, once on each worker, the
 /// worker's own (a generation's state shared between workers is never changed, so that nothing needs a lock, WL-P013), and
 /// cached, with the components it renders, for the generation's life, all in memory (section 5.1). A request runs on the
-/// worker the host gives, its output kept until it has run, then written, as UTF-8, to the response; a page that does not
-/// compile, or fails, is a 500, its errors shown in development only. <see cref="Handle"/> never throws for a script's error.
+/// worker the host gives, its output kept until it reaches 64 KB, then sent as it is written, as UTF-8
+/// (<see cref="WebLingoResponseText"/>); a page that does not compile, or fails before its output is sent, is a 500, its
+/// errors shown in development only, and one that fails after it ends its response unfinished, its error logged, and shown
+/// at the output's end in development only. <see cref="Handle"/> never throws for a script's error.
 /// A page's <c>param request;</c> and <c>param response;</c> are the request's instances (<see cref="WebLingoHttpObjects"/>).
 /// A <c>.wl</c>'s route is a handler's, a module exporting a function for each method it answers, <c>get</c>,
 /// <c>post</c>, and so on, which is called with the request and the response, and awaited, as a page that imports the
@@ -173,7 +175,7 @@ public sealed class WebLingoApplication
         WebLingoCancellationSignal? cancellation)
     {
         if (page.Module is null) return Failed(response, page.Errors);
-        var output = new WebLingoResponseText();
+        var output = new WebLingoResponseText(response);
         var context = new WebLingoExecutionContext(worker)
         {
             Services = new RequestServices([.. WebLingoTemplateBuiltins.Create(output), .. _http.For(request, response)], _http.Members,
@@ -186,11 +188,28 @@ public sealed class WebLingoApplication
             Cancellation = cancellation
         };
         var result = new WebLingoVirtualMachine { Loader = page.Modules, Components = page.Components }.Execute(page.Module, context);
-        if (!result.Succeeded) return Failed(response, [page.Describe(result.Error!)]);
-        if (response.Headers.Get("Content-Type") is null) response.Headers.Set("Content-Type", WebLingoErrorPages.HtmlType);
-        output.WriteTo(response);
+        if (!result.Succeeded)
+        {
+            var error = page.Describe(result.Error!);
+            if (!output.Sending) return Failed(response, [error]);
+            return FailedWhileSending(output, response, error);
+        }
+        output.Send();
         response.Complete();
         return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Page);
+    }
+
+    /// <summary>
+    /// A page that fails once its output is being sent (section 6.12, "Streaming"): its response ended there, unfinished,
+    /// its error in the host's log and, in development, at the end of what was sent.
+    /// </summary>
+    private WebLingoRequestOutcome FailedWhileSending(WebLingoResponseText output, IWebLingoHttpResponse response, string error)
+    {
+        _options.Log?.Invoke("A page failed after its response was sent: " + error);
+        if (_options.Environment == WebLingoEnvironment.Development) output.Write("\n<pre>" + WebLingoTemplateWriteFunction.Escape(error) + "\n</pre>\n");
+        output.Send(); // What it wrote before it failed.
+        response.Abort();
+        return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
     }
 
     private WebLingoRequestOutcome Failed(IWebLingoHttpResponse response, IReadOnlyList<string> errors)

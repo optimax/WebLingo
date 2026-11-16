@@ -3,8 +3,8 @@ namespace WebLingo.Hosting.Abstractions;
 /// <summary>
 /// A response held in memory (specification, section 6.7; section 9, "M0.14 parts", part 1): for tests, and for a host
 /// that sends a response once it is complete. It goes from uncommitted to committed, its status and headers fixed, when it
-/// is committed or its body is first written, and to completed when it is completed; <see cref="BodyBytes"/> has what was
-/// written.
+/// is committed or its body is first written, and to completed when it is completed, or aborted; <see cref="BodyBytes"/> has
+/// what was written.
 /// </summary>
 public sealed class WebLingoBufferedResponse : IWebLingoHttpResponse
 {
@@ -50,6 +50,16 @@ public sealed class WebLingoBufferedResponse : IWebLingoHttpResponse
     public void Complete()
     {
         Commit();
+        State = WebLingoResponseState.Completed;
+    }
+
+    /// <summary>Whether it was aborted, ended unfinished, rather than completed.</summary>
+    public bool Aborted { get; private set; }
+
+    public void Abort()
+    {
+        if (State == WebLingoResponseState.Completed) return;
+        Aborted = true;
         State = WebLingoResponseState.Completed;
     }
 

@@ -3,7 +3,7 @@ namespace WebLingo.Hosting.Abstractions;
 // WLHI's HTTP request and response (specification, section 6.7; section 9, "M0.14 parts", part 1): what a host gives the
 // runtime of a request, and what the runtime gives back, contracts free of .NET's HTTP types, which every adapter
 // implements, IIS's through ASP.NET Core first, FastCGI's and a standalone server's later. Errors are results, not
-// exceptions. Nothing here is frozen; streaming with backpressure comes with M0.14.7.
+// exceptions. Nothing here is frozen; backpressure comes with M0.14.7's part 3.
 
 /// <summary>A request, as its host received it.</summary>
 public interface IWebLingoHttpRequest
@@ -58,6 +58,12 @@ public interface IWebLingoHttpResponse
 
     /// <summary>Completes it, committing it first if it is not: nothing more can be written to it.</summary>
     void Complete();
+
+    /// <summary>
+    /// Ends it unfinished, as a broken connection would, so that its client sees its body incomplete, rather than whole:
+    /// nothing more can be written to it. Nothing if it is completed already.
+    /// </summary>
+    void Abort();
 }
 
 /// <summary>What a change to headers did: it was made, or why not.</summary>

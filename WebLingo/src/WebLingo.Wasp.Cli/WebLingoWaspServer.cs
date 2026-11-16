@@ -28,7 +28,7 @@ public static class WebLingoWaspServer
     /// The server for the application at <paramref name="root"/>, a folder from the current one, or, under IIS, from the
     /// site's; on <paramref name="port"/> (0 for one the system chooses) on the local machine only, unless under IIS; null,
     /// with why, if the application cannot be loaded. It reloads the application when its files change (section 6.5),
-    /// each reload told to <paramref name="log"/>, if given.
+    /// each reload told to <paramref name="log"/>, if given, as is a page that fails after its response was sent.
     /// </summary>
     public static WebApplication? Create(string? root, int port, IReadOnlyDictionary<string, string> givenSchemes, out string? error,
         out WebLingoEnvironment environment, TextWriter? log = null)
@@ -53,7 +53,8 @@ public static class WebLingoWaspServer
             WorkerServices = _ => Services(schemes, importer),
             Environment = environment,
             Clock = new WebLingoExecutionClock(new DotNetClock()),
-            Scheduler = () => new DotNetSchedulerHost()
+            Scheduler = () => new DotNetSchedulerHost(),
+            Log = log is null ? null : log.WriteLine
         }, out error);
         if (application is null)
         {
