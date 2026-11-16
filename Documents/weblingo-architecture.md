@@ -26,6 +26,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | Product direction | JavaScript-inspired, non-ECMAScript-compatible, native-oriented server scripting | Approved |
 | Project naming | WebLingo, with `weblingo.dev` as the intended project domain; `.wl` and `.wasp` files, `WL` IDs and codes, and `WebLingo` type names in source, in place of WebScript's `.ws`, `.wsp`, `WS` and `Ws`; WASP, Web Application Server Pages, the templates' technology, its command line `wasp`, in place of WebLingo Pages, `.wlp` and `welp`; WLBC, WebLingo ByteCode, the bytecode's format, its files `.wlbc`, in place of WBC (§1) | Approved (the names 14 November 2026; WASP 15 November 2026; WLBC 16 November 2026) |
 | Command lines | `weblingo` is strictly the scripts' runner (`run`, `check`, `compile`, `disasm`); `wasp` is the web handler: its pages, and serving applications, locally and under IIS (§8.4, §6.9) | Approved (16 November 2026) |
+| M0.14, hosting's design | A page's request and response are values its parameters take, `param request;` and `param response;`; a `.wl` route handler is a module exporting a function for each HTTP method it answers, `get(request, response)`, any other method a 405; a request's path finds its file without the extension, `/` and a folder's path their `index`; a runtime error is a 500, its page showing the error in development and not in production; the host's core is a portable project of its own, `WebLingo.Hosting`; and an application's configuration, as a script's, is `weblingo.config`, in place of `weblingo.json` (§6.12) | Approved (16 November 2026) |
 | WL-G001 | Free and open-source project direction; release timing, scope, and MIT licensing proposal | Direction confirmed; release and licensing details proposed |
 | Implementation | C#/.NET 10 initially, later Native C# compilation | Approved |
 | WL-017 | Native C# portability contract and replaceable adapters | Approved |
@@ -650,6 +651,18 @@ The desired deployment model is automatic source detection, compilation and cach
 
 Applications have immutable capability policies for filesystem, network, database, environment, process and native extensions. Enforcement occurs at the service boundary; hiding functions is not sufficient. Diagnostics should include request IDs, latency, VM time, await time, GC pauses, allocations, module cache, generation count, worker utilization, failures and leaks.
 
+### 6.12 Applications, routes and handlers — approved
+
+The owner's answers to M0.14's questions (16 November 2026), which its parts build (§9, "M0.14 parts"):
+
+- **The request and the response in a page:** values its parameters take, `param request;` and `param response;`, rather than values every page has, or a standard module's.
+- **A `.wl` route handler:** a module exporting a function for each HTTP method it answers, `export async function get(request, response) { … }`, `post`, and so on; any other method is a 405.
+- **Routes:** a request's path finds its file under the application's root by the file's path without its extension: `/products` is `products.wasp` or `products.wl`, both being an error; `/` and a folder's path its `index.wasp` or `index.wl`. Any other file of the root is served as it is (CSS, images), but never a `.wl` that is not a handler, a `.wlbc`, or the configuration.
+- **Serving:** `wasp serve [--root site] [--port 8080]`, locally, and under IIS, which the site's `web.config` has run it (§8.4: `weblingo` runs scripts only).
+- **Errors:** a runtime error in a request is a 500, its body a page showing the error, its file, line, column, code and message, when the application runs in development, and a page without them otherwise; the configuration's `"environment"` says which, development for `wasp serve` and production under IIS by default.
+- **The host's core:** the runtime, its applications, their generations, routes and requests (§6.3 to §6.6) are a portable project of their own, `WebLingo.Hosting`, composing the compiler, the templates and the VMs; the ASP.NET Core adapter only translates HTTP to and from WLHI.
+- **Configuration:** `weblingo.config`, in place of `weblingo.json`, for a script's folder as for an application's root.
+
 ---
 
 ## 7. Platform abstraction layer (WL-P001–WL-P016)
@@ -1113,7 +1126,7 @@ Proposed central props:
 
 **After M0.8** (order approved by the owner, 13 November 2026): M0.9, then M0.10, M0.11, M0.12 and M0.13, as the table gives them (asynchrony put before templates on 13 November 2026, the owner asking for it to be designed first). Each needs syntax, or a format, that this specification does not give yet, which is decided feature by feature before it is built; and each is built on both VMs (§5.6, "Both VMs, for now").
 
-**Immediate next activity:** M0.14, hosting (the owner's choice, 16 November 2026), in parts (below): M0.14.1, WLHI's HTTP contracts, is implemented; the owner's questions for the others are open in `TO-DO.md`. M0.13, WLBC, is implemented (16 November 2026). The compiler and both VMs cover M0.6's subset, the language of §3.5 to §3.9, and pages, their includes, components and layouts (§13, M0.12).
+**Immediate next activity:** M0.14, hosting (the owner's choice, 16 November 2026), in parts (below), its design answered (§6.12): M0.14.1, WLHI's HTTP contracts, is implemented; the configuration renamed `weblingo.config`, then M0.14.2, the host's core, are next. M0.13, WLBC, is implemented (16 November 2026). The compiler and both VMs cover M0.6's subset, the language of §3.5 to §3.9, and pages, their includes, components and layouts (§13, M0.12).
 
 ---
 
