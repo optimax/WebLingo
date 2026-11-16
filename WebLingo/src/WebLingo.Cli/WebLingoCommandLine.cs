@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using WebLingo.Bytecode;
 using WebLingo.Compiler;
 using WebLingo.Core;
@@ -174,8 +175,7 @@ public static class WebLingoCommandLine
         if (!run) return Success;
 
         // The VM imports modules while the program runs as the compiler imports them, with the same resolver (section 3.9).
-        var vm = new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(host.Options), Components = compilation.Components };
-        var result = vm.Execute(compiled.Module, Context(host, parameters));
+        var result = OnRegisterVm(compiled.Module, new WebLingoModuleLoader(host.Options), compilation.Components, Context(host, parameters));
         output.Flush();
         if (result.Succeeded) return Success;
         var located = compilation.Locate(result.Error!);
@@ -282,8 +282,8 @@ public static class WebLingoCommandLine
         }
         var loader = new WebLingoModuleLoader(host.Options);
         var result = register is not null
-            ? new WebLingoVirtualMachine { Loader = loader }.Execute(register, Context(host, parameters))
-            : new WebLingoStackVirtualMachine { Loader = loader }.Execute(stack!, Context(host, parameters));
+            ? OnRegisterVm(register, loader, null, Context(host, parameters))
+            : OnStackVm(stack!, loader, Context(host, parameters));
         output.Flush();
         if (result.Succeeded) return Success;
         var diagnostic = result.Error!;
@@ -298,6 +298,22 @@ public static class WebLingoCommandLine
         // A file that cannot be read is one thing, and one that is not WLBC a reader can use is another.
         static int Failed(byte[]? bytes) => bytes is null ? FileUnreadable : CompilationFailed;
     }
+
+    /// <summary>
+    /// A module run on the register VM. Each VM is named only in a method of its own, which .NET does not inline: it loads
+    /// a VM's assembly when it compiles a method naming it, so that a command loads the VM it runs and no other, and
+    /// <c>compile</c>, <c>check</c> and <c>disasm</c> load none.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WebLingoExecutionResult OnRegisterVm(WebLingoCompiledModule module, IWebLingoModuleLoader loader,
+        IWebLingoModuleLoader? components, WebLingoExecutionContext context) =>
+        new WebLingoVirtualMachine { Loader = loader, Components = components }.Execute(module, context);
+
+    /// <summary>A module run on the stack VM, as <see cref="OnRegisterVm"/> runs one on the register VM.</summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WebLingoExecutionResult OnStackVm(WebLingoStackModule module, IWebLingoStackModuleLoader loader,
+        WebLingoExecutionContext context) =>
+        new WebLingoStackVirtualMachine { Loader = loader }.Execute(module, context);
 
     /// <summary><c>disasm</c>: a <c>.wlbc</c>'s bytecode as text, the register VM's or the stack VM's.</summary>
     private static int DisassembleFile(string path, TextWriter output, TextWriter error)

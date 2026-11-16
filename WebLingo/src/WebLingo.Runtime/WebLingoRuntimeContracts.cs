@@ -12,6 +12,9 @@ public readonly record struct WebLingoWorkerId(int Value);
 /// </summary>
 public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
 {
+    /// <summary>How many instructions a VM runs between two looks at the cancellation signal, every VM alike.</summary>
+    public const int CancellationInterval = 1024;
+
     public IWebLingoRuntimeServices Services { get; init; } = WebLingoBuiltinRegistry.None;
     public WebLingoCancellationSignal? Cancellation { get; init; }
     /// <summary>How many instructions the execution may run before it is stopped (WL3003).</summary>

@@ -23,7 +23,7 @@ namespace WebLingo.VM;
 public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
 {
     /// <summary>How many instructions run between two looks at the cancellation signal.</summary>
-    public const int CancellationInterval = 1024;
+    public const int CancellationInterval = WebLingoExecutionContext.CancellationInterval;
 
     private readonly IWebLingoBytecodeVerifier _verifier;
 

@@ -6,7 +6,7 @@ namespace WebLingo.VM.Stack;
 
 /// <summary>
 /// The stack VM (specification, section 5.6, "The comparison's parts", part 3), which runs the stack bytecode of
-/// <see cref="WebLingoStackModule"/> so that it can be compared with the register VM, <see cref="WebLingoVirtualMachine"/>, before
+/// <see cref="WebLingoStackModule"/> so that it can be compared with the register VM, <c>WebLingoVirtualMachine</c>, before
 /// the choice between them is made (WL-BC002, provisional). It shares everything but its instructions with the
 /// register VM: the runtime's values, operators, heap and built-ins (<c>WebLingo.Runtime</c>), the execution context
 /// and its budgets, the result (<see cref="WebLingoExecutionResult"/>), and the messages of its errors, so that a program
@@ -23,7 +23,7 @@ namespace WebLingo.VM.Stack;
 public sealed class WebLingoStackVirtualMachine
 {
     /// <summary>How many instructions run between two looks at the cancellation signal, as in the register VM.</summary>
-    public const int CancellationInterval = WebLingoVirtualMachine.CancellationInterval;
+    public const int CancellationInterval = WebLingoExecutionContext.CancellationInterval;
 
     private readonly WebLingoStackBytecodeVerifier _verifier = new();
 

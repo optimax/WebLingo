@@ -17,10 +17,8 @@ public sealed class DependencyTests
         { "WebLingo.Compiler", ["WebLingo.Core", "WebLingo.Language", "WebLingo.Bytecode"] },
         { "WebLingo.Runtime", ["WebLingo.Core", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.VM", ["WebLingo.Core", "WebLingo.Bytecode", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
-        {
-            "WebLingo.VM.Stack",
-            ["WebLingo.Core", "WebLingo.Bytecode", "WebLingo.Runtime", "WebLingo.VM", "WebLingo.Platform.Abstractions"]
-        },
+        // Not the register VM's: a host running one VM loads that VM's assembly alone.
+        { "WebLingo.VM.Stack", ["WebLingo.Core", "WebLingo.Bytecode", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.Templates", ["WebLingo.Core", "WebLingo.Language", "WebLingo.Compiler"] },
         { "WebLingo.StdLib", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.StdLib.Tasks", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
