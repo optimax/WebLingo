@@ -2587,3 +2587,17 @@ An execution waiting only for work off its worker returns to its host, kept, and
 2026-11-16 (Claude): built (specification, sections 6.6, 9 and 15.2, "Executions that wait without a thread"), on both VMs. Guessed, and recorded as Proposed: an execution context's `Suspends`, which only the web host sets, so that `weblingo` and `wasp run` wait as before; a timer on the host's clock waited for so too, the host resuming at its time; a request's resumption queued for its own worker, taken before new work; at most 64 requests waiting on a worker before it takes no new work; and the pool's disposal cancelling the requests that wait. Tried on Windows only: the tests, and `wasp serve` running 12 pages that each wait 500 milliseconds on 8 workers, all ended by 513 milliseconds, a quick page answered meanwhile; not under IIS, nor on Linux.
 
 Done (Claude, 2026-11-16, `b1eb5c3`): executions that wait without a thread, on both VMs, and a worker pool that runs other requests while one waits. Main's checks passed: the Release build, without warnings, 2,962 tests, and `wasp serve` on pages that wait, on Windows only; Linux and IIS not tried.
+
+## [DONE] M0.14.7.3: Backpressure
+
+A page whose output the client has not yet taken waits as at an `await`, its worker running other requests meanwhile, template output an asynchronous operation (WL-T008), for at most a time, its request then cancelled (specification, section 9, "M0.14.7 parts", part 3). Builds on part 2. Added by Claude, 2026-11-16.
+
+One decision, answerable with a letter:
+
+Q1, how long a page waits for a client that has not taken its output, before its request is cancelled, and where that is set: (a) 30 seconds, unless the application's `weblingo.config` gives another, `{ "sendTimeout": 30 }`, in seconds; (b) 30 seconds, for every application, until one needs another; (c) none of WebLingo's own, the web server's limits deciding, as Kestrel's minimum data rate and IIS's connection timeout do now.
+
+A1: (a)
+
+2026-11-16 (Claude): built (specification, sections 6.12, 9 and 15.2, "Backpressure"), A1 recorded as approved in sections 1.1 and 6.12. Built in the compiler and the host, the VMs unchanged but for part 2's waiting, rather than in both VMs as the question supposed: after a write where the page can `await`, the compiler adds a wait, taken only while the response is full, so that a write that does not wait costs one more built-in's call, not measured. Guessed, and recorded as Proposed: the writers that wait, the template's, `write` and `writeLn`; a write in a function that is not `async`, where it cannot wait, kept until the page next writes where it can; the ASP.NET Core adapter's response full while four pieces of 16 KiB wait; and a timeout's line in the host's log. Tried on Windows only: the tests, on both VMs, and `wasp serve` sending a 40 MB page to a client that reads, and, with `"sendTimeout": 1`, cancelling one that does not; not under IIS, nor on Linux.
+
+Done (Claude, 2026-11-16, `67c31aa`): a page waiting for a slow client without its worker, for at most its send timeout, 30 seconds or `weblingo.config`'s `"sendTimeout"`. Main's checks passed: the Release build, without warnings, 2,966 tests, `wasp` on `samples/SimpleWebsite`, and `wasp serve` sending a 40 MB page and timing out a client that never reads, on Windows only; Linux and IIS not tried.
