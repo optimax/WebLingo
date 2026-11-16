@@ -86,17 +86,30 @@ public sealed class WebLingoStreamingResponse : IWebLingoHttpResponse
 
     private bool IsFull => Volatile.Read(ref _waiting) >= Pieces && !Volatile.Read(ref _ended);
 
-    private void WhenReady(Action ready)
+    /// <summary>
+    /// Calls <paramref name="ready"/> with <c>true</c> once there is room, or the response has ended, at once if there is;
+    /// with <c>false</c> once <paramref name="timeout"/> has passed without, whichever comes first, once.
+    /// </summary>
+    private void WhenReady(TimeSpan timeout, Action<bool> ready)
     {
+        var fired = 0;
+        Timer? timer = null;
+        void Fire(bool inTime)
+        {
+            if (Interlocked.Exchange(ref fired, 1) != 0) return;
+            timer?.Dispose();
+            ready(inTime);
+        }
         lock (_gate)
         {
             if (IsFull)
             {
-                _ready.Add(ready);
+                timer = new Timer(_ => Fire(false), null, timeout, Timeout.InfiniteTimeSpan);
+                _ready.Add(() => Fire(true));
                 return;
             }
         }
-        ready();
+        ready(true);
     }
 
     /// <summary>A piece of the body sent: those waiting for room told, once there is some.</summary>
@@ -193,7 +206,7 @@ public sealed class WebLingoStreamingResponse : IWebLingoHttpResponse
     {
         public bool IsFull => response.IsFull;
 
-        public void WhenReady(Action ready) => response.WhenReady(ready);
+        public void WhenReady(TimeSpan timeout, Action<bool> ready) => response.WhenReady(timeout, ready);
 
         public bool Write(byte[] buffer, int offset, int count)
         {

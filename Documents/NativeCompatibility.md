@@ -25,7 +25,9 @@
 | .NET `CancellationToken` | Not used | The VM's cancellation is WebLingo's own `WebLingoCancellationSignal` (WL-P007) |
 | System.Diagnostics.Stopwatch | Adapted | DotNetClock only |
 | System.IO.File, Directory, their `Info` types, FileStream, StreamReader, StreamWriter | Adapted | CLI/bootstrap, and `DotNetFileSystem` (`WebLingo.Platform.DotNet`), the PAL's file system, which `std:fs` reaches (section 7.4); never the portable core |
-| System.Text.Encoding and its encodings, with exception fallbacks | Adapted | `DotNetFileSystem`'s encodings, named by scripts (`utf-8`, `utf-16`, …), invalid bytes an error |
+| System.Text.Encoding and its encodings, with exception fallbacks | Adapted | `DotNetFileSystem`'s encodings, named by scripts (`utf-8`, `utf-16`, …), invalid bytes an error. The portable core uses its own codec instead, `WebLingoTextCodec` (`WebLingo.Runtime`): UTF-8, UTF-16, US-ASCII and ISO-8859-1, read and written without `System.Text.Encoding` |
+| `System.Threading.Timer`, `Monitor` (`lock`), `Interlocked`, `Volatile` | Adapted | A host's: the ASP.NET Core adapter times a slow client (`WebLingoStreamingResponse`) and synchronizes its own threads. The portable core keeps no timer and takes no lock: an execution's state is its worker's alone, and work done off the worker hands over through the scheduler host's `Post` (`IWebLingoSchedulerHost`) |
+| `System.Uri` | Not used | The core decodes a query's and a form's `%xx` itself (`WebLingoHttpObjects`) |
 | System.IO.Path | Adapted | Paths and their separators are the PAL's, not the platform's |
 | System.Console | Adapted | A host's (the CLI's), never the core's |
 | System.Environment | Adapted | The core must not depend on the platform, its line ending among others |

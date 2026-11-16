@@ -375,10 +375,9 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         if (!heap.TryAllocateTask(out var made, out error)) return false;
         task = made;
         _operations.Add(made);
-        var done = 0;
+        // The host calls it once, from any thread; its scheduler host's Post hands it to the worker.
         start(value =>
         {
-            if (Interlocked.Exchange(ref done, 1) != 0) return;
             host.Post(() =>
             {
                 if (finish(value, heap, out var result, out var failed)) Finished(made, null, result);

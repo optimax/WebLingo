@@ -26,31 +26,24 @@ internal sealed class WebLingoResponseText(IWebLingoHttpResponse response, TimeS
     /// <summary>Whether the output is being sent: its response committed, and an error then too late for a 500.</summary>
     public bool Sending { get; private set; }
 
-    /// <summary>Whether its client has gone longer than the send timeout without taking what waited for it.</summary>
-    public bool TimedOut => Volatile.Read(ref _timedOut) == 1;
-
-    private int _timedOut;
+    /// <summary>
+    /// Whether its client went longer than the send timeout without taking what waited for it. Set off the worker, before
+    /// the page is told to go on, which its scheduler host posts to the worker, so that the worker sees it then.
+    /// </summary>
+    public bool TimedOut { get; private set; }
 
     public bool IsFull => Sending && response.Body.IsFull;
 
-    public void WhenReady(Action ready)
+    /// <summary>Calls <paramref name="ready"/> once the response can take more, or once the send timeout has passed, the request then cancelled.</summary>
+    public void WhenReady(Action ready) => response.Body.WhenReady(sendTimeout, inTime =>
     {
-        var fired = 0;
-        Timer? timer = null;
-        void Fire(bool late)
+        if (!inTime)
         {
-            if (Interlocked.Exchange(ref fired, 1) != 0) return;
-            timer?.Dispose();
-            if (late)
-            {
-                Volatile.Write(ref _timedOut, 1);
-                timedOut();
-            }
-            ready();
+            TimedOut = true;
+            timedOut();
         }
-        timer = new Timer(_ => Fire(true), null, sendTimeout, Timeout.InfiniteTimeSpan);
-        response.Body.WhenReady(() => Fire(false));
-    }
+        ready();
+    });
 
     public void Write(string text)
     {

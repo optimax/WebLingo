@@ -68,7 +68,7 @@ public sealed class WebLingoBufferedResponse : IWebLingoHttpResponse
         /// <summary>Never: it holds whatever is written.</summary>
         public bool IsFull => false;
 
-        public void WhenReady(Action ready) => ready();
+        public void WhenReady(TimeSpan timeout, Action<bool> ready) => ready(true);
 
         public bool Write(byte[] buffer, int offset, int count)
         {

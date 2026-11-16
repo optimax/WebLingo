@@ -38,6 +38,16 @@ public sealed class PortabilityTests
         ("System.Threading.ThreadPool", "OS threads are adapter-only"),
         ("System.Threading.CancellationToken", "cancellation is WebLingo's own WebLingoCancellationSignal"),
         ("System.Threading.CancellationTokenSource", "cancellation is WebLingo's own WebLingoCancellationSignal"),
+        ("System.Threading.Timer", "timers are a host's: the core keeps none of its own"),
+        ("System.Threading.Monitor", "locks are adapter-only: an execution's state is its worker's alone"),
+        ("System.Threading.Interlocked", "the core runs on its worker, and hands over through the scheduler host, not by atomics"),
+        ("System.Threading.Volatile", "the core runs on its worker, and hands over through the scheduler host, not by atomics"),
+        ("System.Text.Encoding", "encodings are adapter-only; the core has its own codec, WebLingoTextCodec"),
+        ("System.Text.UTF8Encoding", "encodings are adapter-only; the core has its own codec, WebLingoTextCodec"),
+        ("System.Text.ASCIIEncoding", "encodings are adapter-only; the core has its own codec, WebLingoTextCodec"),
+        ("System.Text.UnicodeEncoding", "encodings are adapter-only; the core has its own codec, WebLingoTextCodec"),
+        ("System.Text.Latin1Encoding", "encodings are adapter-only; the core has its own codec, WebLingoTextCodec"),
+        ("System.Uri", "the core decodes what it needs of a URL itself"),
     ];
 
     public static TheoryData<string> PortableCore => new()

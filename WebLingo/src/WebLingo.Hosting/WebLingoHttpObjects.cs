@@ -156,7 +156,7 @@ internal sealed class WebLingoHttpObjects
                 failed = Invalid($"request.form() reads a form sent as application/x-www-form-urlencoded, not as '{media}'.");
                 return false;
             }
-            return TryMap(Pairs(System.Text.Encoding.UTF8.GetString(body)), h, out made, out failed);
+            return TryMap(Pairs(WebLingoTextCodec.Decode(body, WebLingoCharset.Utf8)), h, out made, out failed);
         }, out result, out error);
 
     private delegate bool BodyFinish(byte[] body, RequestState state, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error);
@@ -171,7 +171,12 @@ internal sealed class WebLingoHttpObjects
             error = Invalid("This host cannot read a request's body.");
             return false;
         }
-        return scheduler.TryWaitForHost<byte[]?>(state.ReadWhole, (byte[]? body, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? failed) =>
+        if (heap.SchedulerHost is not { } host)
+        {
+            error = Invalid("This host cannot read a request's body.");
+            return false;
+        }
+        return scheduler.TryWaitForHost<byte[]?>(done => state.ReadWhole(host, done), (byte[]? body, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? failed) =>
         {
             if (body is not null) return finish(body, state, h, out made, out failed);
             made = WebLingoValue.Null;
@@ -180,27 +185,26 @@ internal sealed class WebLingoHttpObjects
         }, out result, out error);
     }
 
-    /// <summary>The body as text, in the charset its <c>Content-Type</c> names, UTF-8 if none; WL3001 for one .NET does not know.</summary>
+    /// <summary>
+    /// The body as text, in the charset its <c>Content-Type</c> names, UTF-8 if none (<see cref="WebLingoTextCodec"/>);
+    /// WL3001 for one the core does not read.
+    /// </summary>
     private static bool TryDecode(byte[] body, RequestState state, out string text, out WebLingoRuntimeError? error)
     {
         (text, error) = ("", null);
-        var encoding = System.Text.Encoding.UTF8;
+        var encoding = WebLingoCharset.Utf8;
         foreach (var parameter in (state.Request.Headers.Get("Content-Type") ?? "").Split(';'))
         {
             var equals = parameter.IndexOf('=', StringComparison.Ordinal);
             if (equals < 0 || !parameter[..equals].Trim().Equals("charset", StringComparison.OrdinalIgnoreCase)) continue;
             var charset = parameter[(equals + 1)..].Trim().Trim('"');
-            try
-            {
-                encoding = System.Text.Encoding.GetEncoding(charset);
-            }
-            catch (ArgumentException)
+            if (!WebLingoTextCodec.TryFind(charset, out encoding))
             {
                 error = Invalid($"The request's body is in the charset '{charset}', which this host cannot read.");
                 return false;
             }
         }
-        text = encoding.GetString(body);
+        text = WebLingoTextCodec.Decode(body, encoding);
         return true;
     }
 
@@ -241,8 +245,37 @@ internal sealed class WebLingoHttpObjects
         }
     }
 
-    /// <summary>A query's name or value as the client meant it: <c>+</c> a space, and <c>%xx</c> its byte, as UTF-8.</summary>
-    private static string Decode(string text) => Uri.UnescapeDataString(text.Replace('+', ' '));
+    /// <summary>
+    /// A query's, or a form's, name or value as the client meant it: <c>+</c> a space, and <c>%xx</c> a byte, the bytes read
+    /// as UTF-8, a broken sequence U+FFFD; a <c>%</c> without two hexadecimal digits after it as it is.
+    /// </summary>
+    private static string Decode(string text)
+    {
+        if (text.IndexOf('%', StringComparison.Ordinal) < 0) return text.Replace('+', ' ');
+        var bytes = new List<byte>(text.Length);
+        for (var i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            if (c == '%' && i + 2 < text.Length && Hex(text[i + 1]) is >= 0 and var high && Hex(text[i + 2]) is >= 0 and var low)
+            {
+                bytes.Add((byte)(high * 16 + low));
+                i += 2;
+                continue;
+            }
+            var start = i;
+            if (char.IsHighSurrogate(c) && i + 1 < text.Length) i++;
+            bytes.AddRange(WebLingoTextCodec.Encode(c == '+' ? " " : text.Substring(start, i - start + 1), WebLingoCharset.Utf8));
+        }
+        return WebLingoTextCodec.Decode(bytes.ToArray(), WebLingoCharset.Utf8);
+    }
+
+    private static int Hex(char c) => c switch
+    {
+        >= '0' and <= '9' => c - '0',
+        >= 'a' and <= 'f' => c - 'a' + 10,
+        >= 'A' and <= 'F' => c - 'A' + 10,
+        _ => -1
+    };
 
     private bool Status(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
@@ -388,9 +421,13 @@ internal sealed class WebLingoHttpObjects
     private static WebLingoNativeExport Export(string name, IWebLingoBuiltinFunction builtin) => new(name, builtin.Name, builtin.Arity);
 
     /// <summary>A request as its instance holds it: the request, and the heap's roots of its instance, its headers and its query.</summary>
+    /// <summary>
+    /// A request as its instance holds it: the request, the heap's roots of its instance, its headers and its query, and its
+    /// body once read. Its fields are the worker's alone: the body's reading runs off the worker, its pieces touched by
+    /// nothing else, and hands its end over through the scheduler host, which posts it to the worker.
+    /// </summary>
     private sealed class RequestState(IWebLingoHttpRequest request)
     {
-        private readonly object _gate = new();
         private List<Action<byte[]?>>? _waiting;
         private byte[]? _body;
         private bool _failed;
@@ -399,42 +436,55 @@ internal sealed class WebLingoHttpObjects
         public WebLingoValue[] Roots { get; } = new WebLingoValue[3];
 
         /// <summary>
-        /// Gives <paramref name="done"/> the whole body, from any thread, once it has arrived, read once, then kept; null if it
+        /// On the worker: gives <paramref name="done"/> the whole body once it has arrived, read once, then kept; null if it
         /// cannot be read.
         /// </summary>
-        public void ReadWhole(Action<byte[]?> done)
+        public void ReadWhole(WebLingo.Platform.Abstractions.IWebLingoSchedulerHost host, Action<byte[]?> done)
         {
-            lock (_gate)
+            if (_body is not null || _failed)
             {
-                if (_body is null && !_failed)
-                {
-                    var first = _waiting is null;
-                    (_waiting ??= []).Add(done);
-                    if (first) ReadNext(new MemoryStream(), new byte[16 * 1024]);
-                    return;
-                }
-            }
-            done(_body);
-        }
-
-        private void ReadNext(MemoryStream read, byte[] buffer) => Request.Body.ReadAsync(buffer, 0, buffer.Length, count =>
-        {
-            if (count > 0)
-            {
-                read.Write(buffer, 0, count);
-                ReadNext(read, buffer);
+                done(_body);
                 return;
             }
-            List<Action<byte[]?>> waiting;
-            lock (_gate)
+            var first = _waiting is null;
+            (_waiting ??= []).Add(done);
+            if (first) ReadNext(host, new List<byte[]>(), new byte[16 * 1024]);
+        }
+
+        /// <summary>Off the worker: reads the body's next piece, and at its end posts what was read to the worker.</summary>
+        private void ReadNext(WebLingo.Platform.Abstractions.IWebLingoSchedulerHost host, List<byte[]> pieces, byte[] buffer) =>
+            Request.Body.ReadAsync(buffer, 0, buffer.Length, count =>
             {
-                if (count == 0) _body = read.ToArray();
-                else _failed = true;
-                waiting = _waiting!;
-                _waiting = null;
-            }
+                if (count > 0)
+                {
+                    pieces.Add(buffer[..count]);
+                    ReadNext(host, pieces, buffer);
+                    return;
+                }
+                byte[]? whole = null;
+                if (count == 0)
+                {
+                    var length = 0;
+                    foreach (var piece in pieces) length += piece.Length;
+                    whole = new byte[length];
+                    var at = 0;
+                    foreach (var piece in pieces)
+                    {
+                        piece.CopyTo(whole, at);
+                        at += piece.Length;
+                    }
+                }
+                host.Post(() => Arrived(whole));
+            });
+
+        /// <summary>On the worker: the body, or null if it could not be read, given to everything that waits for it.</summary>
+        private void Arrived(byte[]? whole)
+        {
+            (_body, _failed) = (whole, whole is null);
+            var waiting = _waiting!;
+            _waiting = null;
             foreach (var done in waiting) done(_body);
-        });
+        }
     }
 
     /// <summary>A response as its instance holds it: the response, and the heap's roots of its instance and its headers.</summary>

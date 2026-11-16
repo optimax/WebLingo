@@ -125,8 +125,9 @@ public sealed class StreamingTests
         var host = new PostedHost();
         var app = Load(new MemoryFileSystem().Add("/site/index.wasp", Page(70, "end")), log: log, sendTimeout: TimeSpan.FromMilliseconds(50));
         var outcome = app.Handle(new WebLingoBufferedRequest("GET", "/"), response, new WebLingoWorkerId(0), scheduler: host);
-        Assert.Equal(WebLingoRequestOutcomeKind.Waiting, outcome.Kind);
-        for (var waited = 0; host.Posted == 0 && waited < 5000; waited += 10) Thread.Sleep(10);
+        Assert.Equal((WebLingoRequestOutcomeKind.Waiting, TimeSpan.FromMilliseconds(50)), (outcome.Kind, response.Timeout));
+        response.TimeOut();
+        Assert.Equal(1, host.Posted);
         outcome = outcome.Resume!();
         Assert.Equal((WebLingoRequestOutcomeKind.Failed, true), (outcome.Kind, response.Inner.Aborted));
         Assert.StartsWith("A page's client took nothing of its output for 0.05 seconds, and its request was cancelled: index.wasp", Assert.Single(log));
@@ -191,10 +192,29 @@ public sealed class StreamingTests
 
         public bool IsFull => Writes.Count >= FullAfter;
 
-        public void WhenReady(Action ready)
+        /// <summary>Its client's time to take what waits, given; past it, only <see cref="TimeOut"/> tells the page.</summary>
+        public TimeSpan Timeout { get; private set; }
+
+        private readonly List<Action<bool>> _timing = [];
+
+        public void WhenReady(TimeSpan timeout, Action<bool> ready)
         {
-            if (IsFull) _ready.Add(ready);
-            else ready();
+            Timeout = timeout;
+            if (!IsFull)
+            {
+                ready(true);
+                return;
+            }
+            _ready.Add(() => ready(true));
+            _timing.Add(ready);
+        }
+
+        /// <summary>The send timeout passing, for what waits.</summary>
+        public void TimeOut()
+        {
+            foreach (var ready in _timing) ready(false);
+            _timing.Clear();
+            _ready.Clear();
         }
 
         public void Take()
@@ -202,6 +222,7 @@ public sealed class StreamingTests
             FullAfter = int.MaxValue;
             foreach (var ready in _ready) ready();
             _ready.Clear();
+            _timing.Clear();
         }
 
         public WebLingoResponseState State => Inner.State;

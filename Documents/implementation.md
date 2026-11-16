@@ -275,6 +275,10 @@ Each VM's `Run` is one large method, which keeps the running frame's state in lo
 
 Referencing a project does not load its assembly: .NET loads it when it first compiles a method that names one of its types, whether or not that line runs. So a method naming both VMs loads both, even when it runs one: a host that should load one VM names each in a method of its own, marked `[MethodImpl(MethodImplOptions.NoInlining)]`, so that inlining does not bring the name back into the caller (`WebLingoCommandLine.OnRegisterVm` and `OnStackVm`). A type both VMs use belongs to an assembly both reference, the runtime's (`WebLingoExecutionResult`).
 
+### The Portable Core Uses Nothing the Inventory Keeps Out
+
+`WebLingo.Hosting` is part of the portable core, as the compiler and the runtime are, and `Documents/NativeCompatibility.md` keeps .NET's encodings, timers, locks and atomics out of all of it, though .NET offers them everywhere and the build takes them without a word. Decode and encode text with the runtime's own codec, `WebLingoTextCodec`; leave time to the host (a WLHI response's `WhenReady(timeout, ready)` takes its timeout, which the adapter keeps); and hand work done off the worker back to it through the scheduler host's `Post`, never by a lock, so that an execution's state is its worker's alone. `PortabilityTests` checks the inventory's rules on the core's built assemblies; a rule added to the inventory gets its entry there in the same change, or nothing enforces it (2026-11-16: `System.Text.Encoding`, `Timer`, `lock`, `Interlocked` and `Uri` reached the hosting core unnoticed, since the test lacked their entries).
+
 ### Warnings Are Errors
 
 `TreatWarningsAsErrors` is on for every project, so a nullable or analyzer warning fails the build, locally and in CI.

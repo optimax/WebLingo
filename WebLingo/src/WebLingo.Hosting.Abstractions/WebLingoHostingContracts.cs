@@ -138,6 +138,10 @@ public interface IWebLingoBodyWriter
     /// </summary>
     bool IsFull { get; }
 
-    /// <summary>Calls <paramref name="ready"/> once, from any thread, when the response can take more, or has ended; at once if it can now.</summary>
-    void WhenReady(Action ready);
+    /// <summary>
+    /// Calls <paramref name="ready"/> once, from any thread: with <c>true</c> when the response can take more, or has ended,
+    /// at once if it can now; with <c>false</c> if <paramref name="timeout"/> passes first, its client too slow. Its host
+    /// keeps the time, so that the portable core keeps no timer of its own.
+    /// </summary>
+    void WhenReady(TimeSpan timeout, Action<bool> ready);
 }

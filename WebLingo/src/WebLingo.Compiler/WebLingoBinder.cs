@@ -322,9 +322,10 @@ public sealed class WebLingoBinder
         }
         if (_function == _main) _main.Awaits = true;
         var span = call.Span;
-        var wait = new WebLingoBoundAwait(new WebLingoBoundBuiltinCall(UseBuiltin(drained), [], span), span);
-        var check = new WebLingoBoundIf(new WebLingoBoundBuiltinCall(UseBuiltin(full), [], span), new WebLingoBoundExpressionStatement(wait, span),
-            null, span);
+        var wait = new WebLingoBoundExpressionStatement(new WebLingoBoundAwait(new WebLingoBoundBuiltinCall(UseBuiltin(drained), [], span), span), span);
+        // A template's own writer says itself whether the output is full, which saves a call for each of a page's writes.
+        if (written is WebLingoTemplateWriters.Escaped or WebLingoTemplateWriters.Raw) return new WebLingoBoundIf(call.Expression, wait, null, span);
+        var check = new WebLingoBoundIf(new WebLingoBoundBuiltinCall(UseBuiltin(full), [], span), wait, null, span);
         return new WebLingoBoundBlock([call, check], span);
     }
 

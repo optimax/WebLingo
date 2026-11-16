@@ -2,6 +2,12 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
+## [WORKING] Keep .NET's Encodings, Timers and Locks Out of the Portable Core
+
+`Documents/NativeCompatibility.md` keeps `System.Text.Encoding`, OS threads and `Monitor` out of the portable core, adapter-only, but `PortabilityTests` checks only some of the inventory's rules, and work of 16 November 2026 broke others unnoticed: `System.Text.Encoding` and `Uri` in `WebLingoHttpObjects` (`0387b75`, `19c5b46`), a `lock` there (`19c5b46`), a `Timer`, `Interlocked` and `Volatile` in `WebLingoResponseText` (`67c31aa`), and `Interlocked` in `WebLingoScheduler.TryWaitForHost` (`67c31aa`). The core gets a text codec of its own, the send timeout's timer moves to the adapter, the body's reading hands over through the scheduler host, and `PortabilityTests` gets the rules it lacked. Found by Claude while preparing "M0.14.7.5: A Body's Bytes", which builds on the codec; added 2026-11-16.
+
+2026-11-16 (Claude): done. `WebLingoTextCodec` (`WebLingo.Runtime`) reads and writes UTF-8, UTF-16, US-ASCII and ISO-8859-1 without `System.Text.Encoding`, a broken sequence U+FFFD; `request.text()` reads those charsets, UTF-32 no longer, and a query's and a form's `%xx` are decoded by the core. WLHI's `IWebLingoBodyWriter.WhenReady` takes the timeout, the ASP.NET Core adapter keeping the timer; the body's reading posts its end to the worker, without a lock; and `TryWaitForHost` takes the host at its word that it calls once. `PortabilityTests` now rules out `System.Text.Encoding` and its encodings, `Timer`, `Monitor`, `Interlocked`, `Volatile` and `Uri`, and `Documents/NativeCompatibility.md` and `Documents/implementation.md` (section 11) say so. Benchmarking, which `Documents/implementation.md` asks for before a change to a VM's `Run` lands and M0.14.7.2's work did not do: alternately against the work before it, its waiting changed no workload's time beyond this machine's noise; but M0.14.7.3's check after a page's write made `templates` about a fifth slower, so a template's writer now gives whether the output is full itself, saving a call per write, after which `templates` is level on the register VM and up to a tenth slower on the stack VM, within the noise. Checks: the Release build, without warnings, 2,990 tests, and `wasp serve` timing out a slow client and reading a form and a 5 MB body, on Windows only.
+
 ## [IDLE] M0.14: Hosting
 
 Web applications served through the ASP.NET Core adapter, for IIS first (specification, section 6, WL-H009), their `.wasp` pages and `.wl` route handlers compiled and cached in memory (section 5.1), their generations reloaded atomically (WL-T007), and served locally from the command line (section 8.4); the owner's choice of 16 November 2026 ("After M0.13: The Next Milestone"). In seven parts, which the specification defines (section 9, "M0.14 parts"), each a task below. Added by Claude, 2026-11-16.
@@ -52,7 +58,7 @@ A2: (b) but with a timeout.
 
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 6.12 ("Streaming"). Too large to land in one piece: in four parts, which the specification defines (section 9, "M0.14.7 parts"), each a task below. Waits for its parts.
 
-## [QUESTION] M0.14.7.5: A Body's Bytes
+## M0.14.7.5: A Body's Bytes
 
 `await request.read()`, a request's body's next piece as bytes as it arrives, `null` at its end (the owner's answer to M0.14.7.4's question), and the value that holds bytes, which the language does not have yet (specification, section 3.2, "Bytes": binary data, distinct from strings, proposed), designed first (section 9, "M0.14.7 parts", part 5). Added by Claude, 2026-11-16.
 
@@ -60,7 +66,12 @@ One decision, answerable with a letter:
 
 **Q1, what holds a script's bytes: (a) a value of a kind of its own, `Bytes`, immutable, as a string is, built into both VMs, as strings and arrays are: `b.length`, `b[i]`, an integer from 0 to 255, `b.slice(start, end)`, `b.text()`, decoding UTF-8, or `b.text("latin1")`, `Bytes.from("text")`, encoding it, `==` comparing their contents, and `write(b)` writing `Bytes:[104, 105]`; (b) the same members, on instances of a native class, `Bytes`, which the host and native modules make, the VMs unchanged, `==` then comparing identity, as for any instance; (c) an array of integers from 0 to 255, no new kind of value, `request.read()` giving one, and a standard function decoding it as text.**
 
-A1:
+A1:(a) with (1) Building bytes without O(n²) cost, a mutable builder and Bytes.concat([parts]); and
+(2) Constant-time comparison for secrets.
+
+## WASP.config
+
+`weblingo.config` should really be `WASP.config`. We are configuring the WASP site, not the language.
 
 # END-OF-TO-DO
 

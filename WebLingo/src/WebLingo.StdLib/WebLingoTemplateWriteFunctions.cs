@@ -7,7 +7,9 @@ namespace WebLingo.StdLib;
 /// The built-ins a template's page calls (specification, section 13, "Contracts"; <see cref="WebLingoTemplateWriters"/>),
 /// writing where <c>write</c> writes: <c>&lt;%= value %&gt;</c> the text <c>write</c> would write, an instance's
 /// <c>toString()</c> included, escaped (<see cref="Escape"/>); <c>&lt;%- value %&gt;</c>, and the page's own text, that
-/// text as it stands. Each writes nothing for <c>null</c>, so that an optional read that finds nothing is blank.
+/// text as it stands. Each writes nothing for <c>null</c>, so that an optional read that finds nothing is blank, and gives
+/// whether the output is full (<see cref="IWebLingoWaitingOutput"/>), which a page then waits for (specification, section
+/// 6.12, "Streaming"), so that a write needs no second call to ask.
 /// </summary>
 public sealed class WebLingoTemplateWriteFunction(bool escapes, IWebLingoTextOutput output) : IWebLingoTextBuiltin
 {
@@ -21,7 +23,7 @@ public sealed class WebLingoTemplateWriteFunction(bool escapes, IWebLingoTextOut
             var text = WebLingoValueFormatter.Format(arguments[0], heap);
             output.Write(escapes ? Escape(text) : text);
         }
-        result = WebLingoValue.Null;
+        result = WebLingoValue.FromBoolean(output is IWebLingoWaitingOutput { IsFull: true });
         error = null;
         return true;
     }
