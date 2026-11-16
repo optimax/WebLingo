@@ -50,7 +50,7 @@ dotnet run --project src/WebLingo.Wasp.Cli -- serve --root ../Examples/example1
 ```
 
 and open <http://localhost:8080/>. `--port` chooses another port. Locally, an error in a page shows in the browser;
-under IIS it does not, unless the site's `WASP.config` says `{ "environment": "development" }`.
+under IIS it does not, unless the site's `wasp.config` says `{ "environment": "development" }`.
 
 ### Deploying it to IIS
 

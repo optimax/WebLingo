@@ -3,7 +3,7 @@ namespace WebLingo.Cli;
 
 /// <summary>
 /// A command line's configuration, JSON, in the program's folder, or in an application's root (specification, sections
-/// 3.9 and 6.12): <c>weblingo.config</c> for <c>weblingo</c>'s scripts, and <c>WASP.config</c> for <c>wasp</c>'s pages and
+/// 3.9 and 6.12): <c>weblingo.config</c> for <c>weblingo</c>'s scripts, and <c>wasp.config</c> for <c>wasp</c>'s pages and
 /// sites, its caller naming which. Its schemes, each a name and the full path of a folder of native modules:
 /// <c>std</c>'s, <c>std/</c> beside the program, unless configured; then those of the configuration,
 /// <c>{ "schemes": { "native": "C:/WebLingo/native" } }</c>, a relative folder there being from the file's folder; then
@@ -15,7 +15,7 @@ namespace WebLingo.Cli;
 /// </summary>
 public static class WebLingoSchemes
 {
-    /// <summary>The file a script's folder may hold, configuring <c>weblingo</c>'s host (a site's is <c>WASP.config</c>).</summary>
+    /// <summary>The file a script's folder may hold, configuring <c>weblingo</c>'s host (a site's is <c>wasp.config</c>).</summary>
     public const string ConfigurationFile = "weblingo.config";
 
     /// <summary>

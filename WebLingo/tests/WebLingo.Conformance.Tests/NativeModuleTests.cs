@@ -160,11 +160,11 @@ public sealed class NativeModuleTests : IDisposable
         Assert.Equal(WebLingoCommandLine.CompilationFailed, Weblingo(["run", script]).Exit);
         File.Delete(Path.Combine(_folder, "weblingo.json"));
 
-        // A script's configuration stays weblingo.config, a site's being WASP.config (the owner's decision, 16 November 2026),
+        // A script's configuration stays weblingo.config, a site's being wasp.config (the owner's decision, 16 November 2026),
         // which weblingo does not read.
-        File.WriteAllText(Path.Combine(_folder, "WASP.config"), "{ \"schemes\": { \"lib\": \"native\" } }");
+        File.WriteAllText(Path.Combine(_folder, "wasp.config"), "{ \"schemes\": { \"lib\": \"native\" } }");
         Assert.Equal(WebLingoCommandLine.CompilationFailed, Weblingo(["run", script]).Exit);
-        File.Delete(Path.Combine(_folder, "WASP.config"));
+        File.Delete(Path.Combine(_folder, "wasp.config"));
 
         (exit, _, error) = Weblingo(["run", "--scheme", "lib", script]);
         Assert.Equal(WebLingoCommandLine.UsageError, exit);

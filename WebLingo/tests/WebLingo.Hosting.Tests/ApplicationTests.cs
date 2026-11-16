@@ -167,7 +167,7 @@ public sealed class ApplicationTests
         .Add("/site/lib/util.wl", "export function twice(x) { return x * 2; }")
         .Add("/site/css/site.css", "body { }")
         .Add("/site/app.wlbc", "WLBC")
-        .Add("/site/WASP.config", "{ }")
+        .Add("/site/wasp.config", "{ }")
         .Add("/site/weblingo.config", "{ }")
         .Add("/site/Web.config", "<configuration/>")
         .Add("/site/.git/config", "secret");

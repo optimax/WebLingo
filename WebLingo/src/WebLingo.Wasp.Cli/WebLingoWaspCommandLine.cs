@@ -11,7 +11,7 @@ namespace WebLingo.Wasp.Cli;
 /// (a <c>.wasp</c>) with the template compiler and writes it to standard output, <c>check</c>, and <c>--version</c>, with
 /// <c>weblingo</c>'s diagnostics, errors and exit codes (<see cref="WebLingoCommandLine"/>); <c>--root &lt;folder&gt;</c>,
 /// before the page, names the application's root, which an include's path starting with <c>/</c> is from, the page's
-/// folder when it is left out; and the page's folder's <c>WASP.config</c> gives its schemes. It is the host: it registers
+/// folder when it is left out; and the page's folder's <c>wasp.config</c> gives its schemes. It is the host: it registers
 /// the standard library's built-ins and the ones a page calls
 /// (<see cref="WebLingoTemplateBuiltins"/>), and finds the templates a page includes (<see cref="WebLingoTemplateFileResolver"/>).
 /// </summary>

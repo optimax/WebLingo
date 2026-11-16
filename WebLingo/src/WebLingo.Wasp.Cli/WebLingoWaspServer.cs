@@ -12,7 +12,7 @@ namespace WebLingo.Wasp.Cli;
 /// <summary>
 /// <c>wasp serve</c> (specification, sections 6.12 and 8.4; section 9, "M0.14 parts", part 5): an application served by the
 /// ASP.NET Core adapter, locally on Kestrel, or under IIS, whose ASP.NET Core Module starts it, named in the site's
-/// <c>web.config</c>. Its root's <c>WASP.config</c> gives its schemes, its environment, development locally and
+/// <c>web.config</c>. Its root's <c>wasp.config</c> gives its schemes, its environment, development locally and
 /// production under IIS unless it names one, and how long a page waits for a slow client, 30 seconds unless it gives
 /// another (<c>"sendTimeout"</c>). Each worker loads <c>std:system</c> and the native modules on its own.
 /// </summary>

@@ -31,7 +31,7 @@ public sealed record WebLingoCommandLineProgram(
 
     /// <summary>
     /// The configuration's file in a file's folder (specification, sections 3.9 and 6.12): <c>weblingo.config</c>, a
-    /// script's, unless the program has another, as <c>wasp</c> has <c>WASP.config</c>, a site's.
+    /// script's, unless the program has another, as <c>wasp</c> has <c>wasp.config</c>, a site's.
     /// </summary>
     public string Configuration { get; init; } = WebLingoSchemes.ConfigurationFile;
 }

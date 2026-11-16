@@ -13,13 +13,13 @@ public sealed record WebLingoRoute(WebLingoRouteKind Kind, string File);
 /// <c>index</c> by the folder's path, <c>/</c> and <c>/docs/</c> (and <c>/docs</c>, when nothing else is that), and any
 /// other file by its own path. A path is compared as it is, its case included, on every platform. Never routed: files
 /// and folders whose names start with <c>.</c>, <c>.wlbc</c> files, and, in the root, whatever their names' case, since
-/// Windows finds them so, the site's configuration (<c>WASP.config</c>), a script's (<c>weblingo.config</c>), and IIS's
+/// Windows finds them so, the site's configuration (<c>wasp.config</c>), a script's (<c>weblingo.config</c>), and IIS's
 /// <c>web.config</c>; nor, as files served as they are, a page or a <c>.wl</c> by its own name.
 /// </summary>
 public sealed class WebLingoRouteTable
 {
     /// <summary>A site's configuration, in its root (specification, section 6.12).</summary>
-    public const string ConfigurationFile = "WASP.config";
+    public const string ConfigurationFile = "wasp.config";
 
     private static readonly string[] Unrouted = [ConfigurationFile, "weblingo.config", "web.config"];
 

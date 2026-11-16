@@ -99,25 +99,25 @@ public sealed class WaspServeTests : IDisposable
     [Fact]
     public void TheConfigurationNamesTheEnvironment()
     {
-        // A site's configuration is WASP.config (the owner's decision, 16 November 2026); its weblingo.config is not read.
-        Assert.Equal("WASP.config", WebLingoRouteTable.ConfigurationFile);
+        // A site's configuration is wasp.config (the owner's decision, 16 November 2026); its weblingo.config is not read.
+        Assert.Equal("wasp.config", WebLingoRouteTable.ConfigurationFile);
         Write("weblingo.config", "{ \"environment\": \"production\" }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out _, out var environment));
         Assert.Equal(WebLingoEnvironment.Development, environment);
 
-        Write("WASP.config", "{ \"environment\": \"production\" }");
+        Write("wasp.config", "{ \"environment\": \"production\" }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out _, out environment));
         Assert.Equal(WebLingoEnvironment.Production, environment);
 
-        Write("WASP.config", "{ \"environment\": \"staging\" }");
+        Write("wasp.config", "{ \"environment\": \"staging\" }");
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _));
-        Assert.EndsWith("WASP.config: \"environment\" is \"development\" or \"production\".", error);
+        Assert.EndsWith("wasp.config: \"environment\" is \"development\" or \"production\".", error);
 
-        Write("WASP.config", "{ \"sendTimeout\": 5 }");
+        Write("wasp.config", "{ \"sendTimeout\": 5 }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
-        Write("WASP.config", "{ \"sendTimeout\": 0 }");
+        Write("wasp.config", "{ \"sendTimeout\": 0 }");
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
-        Assert.EndsWith("WASP.config: \"sendTimeout\" is a number of seconds, more than 0.", error);
+        Assert.EndsWith("wasp.config: \"sendTimeout\" is a number of seconds, more than 0.", error);
     }
 
     [Fact]
