@@ -2401,3 +2401,25 @@ A3: (a) but - like (c) says - measure the impact on performance.
 2026-11-15 (Claude): every part is done, the last, part 4, in `5ffbfe8` (the specification, section 9, "Native modules").
 
 Done (Claude, 2026-11-15, `5ffbfe8`): native modules as section 3.9 has them, in the four parts section 9 defines ("Native modules"): native functions, native classes, the standard modules as native modules, and native classes' properties, indexers and direct calls, the built-in classes keeping the VMs' own members (part 4, the owner's decision of 15 November 2026). Each part's checks are in its own entry above.
+
+## [DONE] The `foreach` Protocol
+
+How `foreach` visits a class's instances, as A2 of "Native Modules, Part 4" has it: the class's `iterate()` gives an iterator, whose `next()` gives each item, which classes written in WebLingo, native classes and COM's collections all implement (specification, section 3.6, approved 15 November 2026). Added by Claude, 2026-11-15. Three decisions it needs, each answerable with a letter.
+
+Q1, how an iterator says it has no more items: (a) `next()` gives `null` at the end, so that `null` cannot be an item; (b) the iterator also has `hasNext()`, asked before each `next()`, as Java's has; (c) `next()` gives a map, `{ value: v, done: false }`, and `{ done: true }` at the end, as JavaScript's iterators do, a map made for each item.
+
+A1: (b)
+
+Q2, a key and a value, `foreach (var (key, value) in x)`, for a class's instances: (a) `next()` gives each entry as an array of two, `[key, value]`, which the loop takes apart; (b) not yet: only `foreach (var item in x)` visits a class's instances.
+
+A2: (b)
+
+Q3, arrays, maps, sets and strings: (a) `foreach` visits them as now, the VMs' own way, the protocol for every other class; (b) as now, but each also has `iterate()`, which a script may call itself; (c) through the protocol too, as any class, measured against the VMs' own way first.
+
+A3: (b)
+
+2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
+
+2026-11-15 (Claude): done as A1 to A3 have it, on both VMs, recorded as approved in the specification, section 3.6 and its register; the details, guessed, are Proposed in section 15.2 ("The `foreach` protocol"): `iterate()` called once, before the loop, then `hasNext()` before each `next()`; a collection of a class extending `Array`, `Map` or `Set` visited the VMs' own way, its class's `iterate()` aside; a class or a module with a static `iterate()`, and a value an `extend` block gives one, visited by it; the built-in collections' iterators instances of a built-in class `Iterator`, with the fields `items` and `position`, an array's visiting it as it is, a set's, a map's (entries as `[key, value]`) and a string's what it held when `iterate()` was called; `next()` past the end WL3005, a value without `iterate` WL3001 as before, an iterator without `hasNext()` WL3006. Built as two new operations in each bytecode, `ForEachStart` and `ForEachVisits`, around the VMs' own loop, which is unchanged. Measured against `main`, alternately, three rounds of every workload but `io`: all within the machine's noise, `collections` running 1.7 percent more instructions (two for each of its loops). Checks: the Release build, without warnings, the full test suite (2,170 tests, 15 new programs on both VMs), on Windows only; Linux not tried.
+
+Done (Claude, 2026-11-15, `1302851`): the protocol as A1 to A3 have it, `iterate()`, `hasNext()` and `next()`, on both VMs, one item at a time, arrays, maps, sets and strings visited the VMs' own way and having `iterate()` too; recorded as approved in the specification, section 3.6, the details Proposed in section 15.2 ("The `foreach` protocol"). Main's checks passed: the Release build, without warnings, 2,170 tests, the CLI on the samples and `wasp` on `samples/SimpleWebsite`, on Windows only; Linux not tried.
