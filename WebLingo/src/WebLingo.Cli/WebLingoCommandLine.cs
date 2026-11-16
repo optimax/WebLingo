@@ -49,24 +49,31 @@ public static class WebLingoCommandLine
         if (args.Length == 2 && args[0] == "disasm" && program.Bytecode) return DisassembleFile(args[1], output, error);
         if (args.Length >= 2 && (args[0] is "run" or "check" || (args[0] == "compile" && program.Bytecode)))
         {
-            // run|check|compile [--scheme name=folder]… [--vm register|stack, for compile] file [name=value …, for run]:
-            // the schemes over weblingo.json's (section 3.9).
+            // run|check|compile [--scheme name=folder]… [for compile, --register, the default, or --stack, or their aliases
+            // --vm register and --vm stack] file [name=value …, for run]: the schemes over weblingo.json's (section 3.9).
             var schemes = new Dictionary<string, string>(StringComparer.Ordinal);
-            var vm = WebLingoBytecodeKind.Register;
+            WebLingoBytecodeKind? vm = null;
             var at = 1;
             string? wrong = null;
-            while (wrong is null && at < args.Length && (args[at] == "--scheme" || (args[at] == "--vm" && args[0] == "compile")))
+            while (wrong is null && at < args.Length
+                   && (args[at] == "--scheme" || (args[at] is "--register" or "--stack" or "--vm" && args[0] == "compile")))
             {
-                if (args[at] == "--vm")
+                if (args[at] is "--register" or "--stack" or "--vm")
                 {
-                    if (at + 1 < args.Length && args[at + 1] is "register" or "stack")
+                    var named = args[at] == "--vm" ? (at + 1 < args.Length ? args[at + 1] : "") : args[at][2..];
+                    if (named is not ("register" or "stack"))
                     {
-                        vm = args[at + 1] == "stack" ? WebLingoBytecodeKind.Stack : WebLingoBytecodeKind.Register;
-                        at += 2;
-                        continue;
+                        wrong = $"'{named}' is not a VM: register or stack.";
+                        break;
                     }
-                    wrong = $"'{(at + 1 < args.Length ? args[at + 1] : "")}' is not a VM: register or stack.";
-                    break;
+                    if (vm is not null)
+                    {
+                        wrong = "Only one VM may be given: --register or --stack.";
+                        break;
+                    }
+                    vm = named == "stack" ? WebLingoBytecodeKind.Stack : WebLingoBytecodeKind.Register;
+                    at += args[at] == "--vm" ? 2 : 1;
+                    continue;
                 }
                 var equals = at + 1 < args.Length ? args[at + 1].IndexOf('=', StringComparison.Ordinal) : -1;
                 if (equals > 0 && WebLingoSchemes.IsName(args[at + 1][..equals]) && equals + 1 < args[at + 1].Length
@@ -86,7 +93,7 @@ public static class WebLingoCommandLine
                     if (at + 1 == args.Length)
                     {
                         var none = new Dictionary<string, string>();
-                        return args[0] == "compile" ? CompileFile(program, path, vm, schemes, error)
+                        return args[0] == "compile" ? CompileFile(program, path, vm ?? WebLingoBytecodeKind.Register, schemes, error)
                             : bytecode ? RunBytecode(program, false, path, none, schemes, output, error)
                             : RunFile(program, false, path, none, schemes, output, error);
                     }
@@ -106,14 +113,15 @@ public static class WebLingoCommandLine
 
         var file = program.Options + "[--scheme <name>=<folder> …] <file" + program.Extension + ">";
         var bytecodeUsage = program.Bytecode
-            ? $" | compile [--vm register|stack] [--scheme <name>=<folder> …] <file{program.Extension}> | disasm <file{BytecodeExtension}>"
+            ? $" | compile [--register|--stack] [--scheme <name>=<folder> …] <file{program.Extension}> | disasm <file{BytecodeExtension}>"
             : "";
         output.WriteLine($"Usage: {program.Name} --version | run {file} [name=value …] | check {file}{bytecodeUsage}");
         output.WriteLine("  run       compiles the file and runs it, giving its parameters the values after it, each a string");
         output.WriteLine("  check     compiles the file and reports its errors, without running it");
         if (program.Bytecode)
         {
-            output.WriteLine($"  compile   compiles the file into a {BytecodeExtension} beside it, the register VM's bytecode, or with --vm stack the stack VM's");
+            output.WriteLine($"  compile   compiles the file into a {BytecodeExtension} beside it, the register VM's bytecode (--register, the default) or the stack VM's (--stack)");
+            output.WriteLine("            --vm register and --vm stack are the same as --register and --stack");
             output.WriteLine($"  disasm    shows a {BytecodeExtension}'s bytecode as text");
             output.WriteLine($"            run and check take a {BytecodeExtension} too, which run runs on the VM it is for");
         }

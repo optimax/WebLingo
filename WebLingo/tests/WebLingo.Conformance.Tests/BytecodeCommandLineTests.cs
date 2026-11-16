@@ -16,6 +16,19 @@ public sealed class BytecodeCommandLineTests : IDisposable
     public void Dispose() => Directory.Delete(_folder, recursive: true);
 
     [Theory]
+    [InlineData(1)]
+    [InlineData(1, "--register")]
+    [InlineData(1, "--vm", "register")]
+    [InlineData(2, "--stack")]
+    [InlineData(2, "--vm", "stack")]
+    public void CompileWritesTheRegisterVmsBytecodeUnlessAskedForTheStackVms(int header, params string[] options)
+    {
+        var main = Write("main.wl", "writeLn(42);\n");
+        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo(["compile", .. options, main]));
+        Assert.Equal(header, File.ReadAllBytes(Path.Combine(_folder, "main.wlbc"))[8]);
+    }
+
+    [Theory]
     [InlineData("register", 1)]
     [InlineData("stack", 2)]
     public void ACompiledProgramRunsFromItsFileAsFromItsSource(string vm, int header)
@@ -25,7 +38,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         var fromSource = Weblingo("run", main, "who=WLBC");
         Assert.Equal((WebLingoCommandLine.Success, "Hello, WLBC!\n", ""), fromSource);
 
-        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo("compile", "--vm", vm, main));
+        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo("compile", "--" + vm, main));
         var compiled = Path.Combine(_folder, "main.wlbc");
         Assert.Equal((ulong)header, (ulong)File.ReadAllBytes(compiled)[8]);
         // The program and the file it imports are in the .wlbc: it runs without them.
@@ -46,13 +59,13 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, fromSource.Exit);
         Assert.EndsWith("lib/util.wl(2,10): error WL3005: The index 2 is outside 0 to 0.", fromSource.Error.TrimEnd());
 
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--vm", vm, main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
         File.Delete(Path.Combine(_folder, "lib", "util.wl"));
         Assert.Equal(fromSource, Weblingo("run", Path.Combine(_folder, "main.wlbc")));
 
         // An error in the program's own file names it as the file beside the .wlbc.
         main = Write("main.wl", "var a = 1;\nvar b = a / 0 + null;\n");
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--vm", vm, main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
         var (exit, _, error) = Weblingo("run", Path.Combine(_folder, "main.wlbc"));
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Equal(Weblingo("run", main).Error, error);
@@ -76,7 +89,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     public void DisasmShowsTheBytecode(string vm, string start, string kind)
     {
         var main = Write("main.wl", "var x = 40;\nwriteLn(x + 2);\n");
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--vm", vm, main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
         var (exit, output, error) = Weblingo("disasm", Path.Combine(_folder, "main.wlbc"));
         Assert.Equal((WebLingoCommandLine.Success, ""), (exit, error));
         Assert.StartsWith(start, output);
@@ -110,7 +123,11 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
         Assert.StartsWith(main + "(1,9): error WL1001:", error);
         Assert.False(File.Exists(Path.Combine(_folder, "main.wlbc")));
-        Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("compile", "--vm", "fast", main).Exit);
+        Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("compile", "--fast", main).Exit);
+        var (usage, _, why) = Weblingo("compile", "--stack", "--vm", "register", main);
+        Assert.Equal((WebLingoCommandLine.UsageError, "Only one VM may be given: --register or --stack."), (usage, why.TrimEnd()));
+        (usage, _, why) = Weblingo("compile", "--vm", "fast", main);
+        Assert.Equal((WebLingoCommandLine.UsageError, "'fast' is not a VM: register or stack."), (usage, why.TrimEnd()));
     }
 
     [Fact]
@@ -130,7 +147,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     {
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run([], output, new StringWriter()));
-        Assert.Contains("| compile [--vm register|stack] [--scheme <name>=<folder> …] <file.wl> | disasm <file.wlbc>", output.ToString());
+        Assert.Contains("| compile [--register|--stack] [--scheme <name>=<folder> …] <file.wl> | disasm <file.wlbc>", output.ToString());
     }
 
     private string Write(string relative, string text)

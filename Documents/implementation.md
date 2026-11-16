@@ -201,7 +201,7 @@ dotnet test WebLingo.slnx -c Release --no-build
 dotnet test tests/WebLingo.Language.Tests -c Release --no-build --filter "FullyQualifiedName~LexerTests"
 dotnet run --project src/WebLingo.Cli -c Release --no-build -- --version
 dotnet run --project src/WebLingo.Cli -c Release --no-build -- run samples/Arithmetic/arithmetic.wl
-dotnet run --project src/WebLingo.Cli -c Release --no-build -- compile --vm stack samples/Arithmetic/arithmetic.wl
+dotnet run --project src/WebLingo.Cli -c Release --no-build -- compile --stack samples/Arithmetic/arithmetic.wl
 dotnet run --project src/WebLingo.Wasp.Cli -c Release --no-build -- run page.wasp
 dotnet run --project benchmarks/WebLingo.Benchmarks -c Release --no-build
 ```
