@@ -2710,3 +2710,11 @@ A6: (a)
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 6.12, A5's `weblingo.config` as the configuration's name, for a script's folder as for an application's root, in place of `weblingo.json`, its content JSON as before (a task of its own, below, "The Configuration File, `weblingo.config`"). Waits for its parts.
 
 Done (Claude, 2026-11-16): its seven parts done, the last, "M0.14.7: Streaming", with `d903bd5`; what comes after M0.14 is the owner's to choose (specification, section 9).
+
+## [DONE] Create Notepad++ Syntax Coloring
+
+For WebLingo (.wl) and WASP (.wasp).
+
+2026-11-16 (Claude): `Editors/NotepadPlusPlus`, two user-defined languages of Notepad++ (UDL 2.1), applied by extension: `WebLingo.udl.xml`, for `.wl`, and `WASP.udl.xml`, for `.wasp`, whose HTML is a delimiter from a block's end, `%>`, to the next block's start, `<%`, or from a tag that begins a file, nesting HTML's tags and comments, so that the WebLingo code in a page's blocks is coloured as a `.wl`'s is, and a word of the page's text never as a keyword. `Editors/README.md` says how to install them, and their limits, which a UDL cannot avoid: a template comment, `<%# %>`, coloured as code; a page beginning with an unusual tag coloured as code until its first block; `i<n` in a block, without spaces, taken for a tag; and colours for a light background. Guessed: the folder, `Editors/`, at the repository's root, a folder for each editor; and the colours. The Language Reference, the WASP User Manual and `Documents/implementation.md`, section 3, point to it.
+
+Done (Claude, 2026-11-16, `277f101`): Notepad++'s syntax colouring for `.wl` and `.wasp`, tried with Notepad++ 8.9.8 from a separate settings folder, on the example site's pages, on Windows. Main's checks: syntax files and documentation only, the solution unchanged since its last checks (the Release build, without warnings, and 3,026 tests, on Windows).
