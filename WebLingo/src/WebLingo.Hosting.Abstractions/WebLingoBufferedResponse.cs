@@ -65,6 +65,11 @@ public sealed class WebLingoBufferedResponse : IWebLingoHttpResponse
 
     private sealed class Writer(WebLingoBufferedResponse response) : IWebLingoBodyWriter
     {
+        /// <summary>Never: it holds whatever is written.</summary>
+        public bool IsFull => false;
+
+        public void WhenReady(Action ready) => ready();
+
         public bool Write(byte[] buffer, int offset, int count)
         {
             if (response.State == WebLingoResponseState.Completed || offset < 0 || count < 0 || offset > buffer.Length - count) return false;

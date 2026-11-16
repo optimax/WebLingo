@@ -9,7 +9,8 @@ namespace WebLingo.Cli;
 /// those the command line gives, <c>--scheme native=folder</c>, a relative folder from the current one, each over the
 /// file's of its name. A scheme's name is ASCII letters and digits, a letter first, at least two of them, so that a drive
 /// letter is never one. And an application's environment, <c>"environment": "development"</c> or <c>"production"</c>,
-/// which only <c>wasp serve</c> reads.
+/// and how long, in seconds, a page waits for a client that has not taken its output, <c>"sendTimeout": 30</c>, a number
+/// more than 0 (specification, section 6.12, "Streaming"), which only <c>wasp serve</c> reads.
 /// </summary>
 public static class WebLingoSchemes
 {
@@ -19,15 +20,17 @@ public static class WebLingoSchemes
     /// <summary>The schemes for the program at <paramref name="program"/>, the command line's given; false, with why, otherwise.</summary>
     public static bool TryLoad(string program, IReadOnlyDictionary<string, string> given, out Dictionary<string, string> schemes,
         out string? error) =>
-        TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", given, out schemes, out _, out error);
+        TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", given, out schemes, out _, out _, out error);
 
     /// <summary>
-    /// The configuration in <paramref name="folder"/>: its schemes, the command line's given over them, and its environment,
-    /// <c>development</c>, <c>production</c>, or null if it names none; false, with why, otherwise.
+    /// The configuration in <paramref name="folder"/>: its schemes, the command line's given over them, its environment,
+    /// <c>development</c>, <c>production</c>, or null if it names none, and its send timeout, in seconds, or null if it gives
+    /// none; false, with why, otherwise.
     /// </summary>
     public static bool TryLoadFolder(string folder, IReadOnlyDictionary<string, string> given, out Dictionary<string, string> schemes,
-        out string? environment, out string? error)
+        out string? environment, out double? sendTimeout, out string? error)
     {
+        sendTimeout = null;
         schemes = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["std"] = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "std"))
@@ -35,7 +38,7 @@ public static class WebLingoSchemes
         (environment, error) = (null, null);
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, ConfigurationFile);
-        if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, out error)) return false;
+        if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, ref sendTimeout, out error)) return false;
         foreach (var (name, path) in given) schemes[name] = Path.GetFullPath(path);
         return true;
     }
@@ -51,7 +54,8 @@ public static class WebLingoSchemes
         return true;
     }
 
-    private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? environment, out string? error)
+    private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? environment, ref double? sendTimeout,
+        out string? error)
     {
         error = null;
         try
@@ -74,9 +78,20 @@ public static class WebLingoSchemes
                     environment = setting.Value.GetString();
                     continue;
                 }
+                if (setting.Name == "sendTimeout")
+                {
+                    if (setting.Value.ValueKind != JsonValueKind.Number || !setting.Value.TryGetDouble(out var seconds) || !(seconds > 0)
+                        || seconds > TimeSpan.MaxValue.TotalSeconds / 2)
+                    {
+                        error = $"{file}: \"sendTimeout\" is a number of seconds, more than 0.";
+                        return false;
+                    }
+                    sendTimeout = seconds;
+                    continue;
+                }
                 if (setting.Name != "schemes")
                 {
-                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\" and \"environment\".";
+                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"environment\" and \"sendTimeout\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)

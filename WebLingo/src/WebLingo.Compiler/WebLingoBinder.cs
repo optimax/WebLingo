@@ -307,6 +307,27 @@ public sealed class WebLingoBinder
         return statements;
     }
 
+    /// <summary>
+    /// A statement that calls a built-in which writes output (<see cref="WebLingoBuiltinDeclaration.Writes"/>), followed,
+    /// where the program can <c>await</c>, by a wait for its output, if it holds more than its reader has taken (section
+    /// 6.12, "Streaming"): <c>if (full()) await drained();</c>, each a host's built-in no program can name.
+    /// </summary>
+    private WebLingoBoundStatement AfterWrite(WebLingoBoundExpressionStatement call, string written)
+    {
+        if (!_hostBuiltins.TryGetValue(written, out var declaration) || !declaration.Writes || (_function != _main && !_function.IsAsync)
+            || !_hostBuiltins.TryGetValue(WebLingoTemplateWriters.Full, out var full)
+            || !_hostBuiltins.TryGetValue(WebLingoTemplateWriters.Drained, out var drained))
+        {
+            return call;
+        }
+        if (_function == _main) _main.Awaits = true;
+        var span = call.Span;
+        var wait = new WebLingoBoundAwait(new WebLingoBoundBuiltinCall(UseBuiltin(drained), [], span), span);
+        var check = new WebLingoBoundIf(new WebLingoBoundBuiltinCall(UseBuiltin(full), [], span), new WebLingoBoundExpressionStatement(wait, span),
+            null, span);
+        return new WebLingoBoundBlock([call, check], span);
+    }
+
     /// <summary>The host's parameter of that name, or null (section 6.12).</summary>
     private WebLingoHostParameter? HostParameter(string name)
     {
@@ -598,7 +619,10 @@ public sealed class WebLingoBinder
                     : new WebLingoBoundVariableDeclaration(local, initializer, declaration.Span);
             }
             case WebLingoExpressionStatementSyntax expressionStatement:
-                return new WebLingoBoundExpressionStatement(BindExpression(expressionStatement.Expression), statement.Span);
+            {
+                var bound = new WebLingoBoundExpressionStatement(BindExpression(expressionStatement.Expression), statement.Span);
+                return bound.Expression is WebLingoBoundBuiltinCall { Builtin.Name: var written } ? AfterWrite(bound, written) : bound;
+            }
             case WebLingoIfSyntax conditional:
             {
                 var condition = BindExpression(conditional.Condition);

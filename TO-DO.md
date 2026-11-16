@@ -52,25 +52,27 @@ A2: (b) but with a timeout.
 
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 6.12 ("Streaming"). Too large to land in one piece: in four parts, which the specification defines (section 9, "M0.14.7 parts"), each a task below. Waits for its parts.
 
-## [QUESTION] M0.14.7.3: Backpressure
+## [WORKING] M0.14.7.3: Backpressure
 
 A page whose output the client has not yet taken waits as at an `await`, its worker running other requests meanwhile, template output an asynchronous operation (WL-T008), for at most a time, its request then cancelled (specification, section 9, "M0.14.7 parts", part 3). Builds on part 2. Added by Claude, 2026-11-16.
 
 One decision, answerable with a letter:
 
-**Q1, how long a page waits for a client that has not taken its output, before its request is cancelled, and where that is set: (a) 30 seconds, unless the application's `weblingo.config` gives another, `{ "sendTimeout": 30 }`, in seconds; (b) 30 seconds, for every application, until one needs another; (c) none of WebLingo's own, the web server's limits deciding, as Kestrel's minimum data rate and IIS's connection timeout do now.**
+Q1, how long a page waits for a client that has not taken its output, before its request is cancelled, and where that is set: (a) 30 seconds, unless the application's `weblingo.config` gives another, `{ "sendTimeout": 30 }`, in seconds; (b) 30 seconds, for every application, until one needs another; (c) none of WebLingo's own, the web server's limits deciding, as Kestrel's minimum data rate and IIS's connection timeout do now.
 
-A1:
+A1: (a)
 
-## [QUESTION] M0.14.7.4: A Request's Body as It Arrives
+2026-11-16 (Claude): built (specification, sections 6.12, 9 and 15.2, "Backpressure"), A1 recorded as approved in sections 1.1 and 6.12. Built in the compiler and the host, the VMs unchanged but for part 2's waiting, rather than in both VMs as the question supposed: after a write where the page can `await`, the compiler adds a wait, taken only while the response is full, so that a write that does not wait costs one more built-in's call, not measured. Guessed, and recorded as Proposed: the writers that wait, the template's, `write` and `writeLn`; a write in a function that is not `async`, where it cannot wait, kept until the page next writes where it can; the ASP.NET Core adapter's response full while four pieces of 16 KiB wait; and a timeout's line in the host's log. Tried on Windows only: the tests, on both VMs, and `wasp serve` sending a 40 MB page to a client that reads, and, with `"sendTimeout": 1`, cancelling one that does not; not under IIS, nor on Linux.
+
+## M0.14.7.4: A Request's Body as It Arrives
 
 What a script reads a request's body with, and the ASP.NET Core adapter giving the body as it comes, rather than read whole before the page runs (specification, section 9, "M0.14.7 parts", part 4). Today a request's body is read whole first, and no script can read it. Added by Claude, 2026-11-16.
 
 One decision, answerable with a letter:
 
-**Q1, how a script reads a request's body: (a) `await request.text()`, the whole body as text, UTF-8 unless its `Content-Type` names another charset, and `await request.form()`, an `application/x-www-form-urlencoded` form's fields as a map, as PHP's `$_POST`, each read as the body arrives but given whole; (b) as (a), and `await request.read()`, the body's next piece as text as it arrives, `null` at its end, for a body too large to hold whole; (c) only `await request.read()`, a script joining the pieces itself.**
+Q1, how a script reads a request's body: (a) `await request.text()`, the whole body as text, UTF-8 unless its `Content-Type` names another charset, and `await request.form()`, an `application/x-www-form-urlencoded` form's fields as a map, as PHP's `$_POST`, each read as the body arrives but given whole; (b) as (a), and `await request.read()`, the body's next piece as text as it arrives, `null` at its end, for a body too large to hold whole; (c) only `await request.read()`, a script joining the pieces itself.
 
-A1:
+A1: (b) but stream bytes, rather than text.
 
 # END-OF-TO-DO
 

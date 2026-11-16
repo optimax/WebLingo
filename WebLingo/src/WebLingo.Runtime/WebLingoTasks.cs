@@ -345,6 +345,31 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         return true;
     }
 
+    /// <summary>
+    /// A task that its host completes, with <c>null</c>, by calling, once, from any thread, the action
+    /// <paramref name="start"/> is given; posted back to the worker, as an operation's end is, so that the execution waits
+    /// for it as for an operation off its worker (WL-P007): a page waiting for its client (section 6.12, "Streaming"). WL3001
+    /// for a host without a scheduler of its own (<see cref="WebLingoHeap.SchedulerHost"/>).
+    /// </summary>
+    public bool TryWaitForHost(Action<Action> start, out WebLingoValue task, out WebLingoRuntimeError? error)
+    {
+        task = WebLingoValue.Null;
+        if (heap.SchedulerHost is not { } host)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "This host runs no operations off its worker.");
+            return false;
+        }
+        if (!heap.TryAllocateTask(out var made, out error)) return false;
+        task = made;
+        _operations.Add(made);
+        var done = 0;
+        start(() =>
+        {
+            if (Interlocked.Exchange(ref done, 1) == 0) host.Post(() => Finished(made, null, WebLingoValue.Null));
+        });
+        return true;
+    }
+
     /// <summary>An operation's end, on the worker: its task completed with its result, or faulted with its error.</summary>
     private void Finished(WebLingoValue task, WebLingoRuntimeError? error, WebLingoValue result = default)
     {

@@ -8,22 +8,22 @@ namespace WebLingo.Hosting.AspNetCore;
 /// A response sent to ASP.NET Core's as it is written (specification, section 6.12, "Streaming"; section 9, "M0.14.7 parts",
 /// part 1): its worker commits it, writes its body and completes or aborts it, each a piece passed to the request's own
 /// task, which sends its status and headers, then its body, as they come, through <see cref="SendAsync"/>. A body sent whole,
-/// in one piece, has its <c>Content-Length</c>. At most <see cref="Pieces"/> pieces wait to be sent; a write beyond them
-/// keeps its worker waiting until the client has taken one, or has gone (backpressure without a thread comes with part 3).
+/// in one piece, has its <c>Content-Length</c>. A write never waits: once <see cref="Pieces"/> pieces of the body wait to
+/// be sent, the body is full (<see cref="IWebLingoBodyWriter.IsFull"/>), and a page waits for it, its worker running other
+/// requests meanwhile (backpressure, part 3), until the client has taken one, or has gone.
 /// </summary>
 public sealed class WebLingoStreamingResponse : IWebLingoHttpResponse
 {
-    /// <summary>How many pieces may wait to be sent before a write waits.</summary>
+    /// <summary>How many pieces of the body may wait to be sent before it is full.</summary>
     public const int Pieces = 4;
 
     private readonly WebLingoHeaderList _headers = new();
-    private readonly Channel<Piece> _pieces = Channel.CreateBounded<Piece>(new BoundedChannelOptions(Pieces)
-    {
-        SingleReader = true,
-        SingleWriter = true,
-        FullMode = BoundedChannelFullMode.Wait
-    });
+    private readonly Channel<Piece> _pieces = Channel.CreateUnbounded<Piece>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
     private readonly CancellationToken _gone;
+    private readonly object _gate = new();
+    private readonly List<Action> _ready = [];
+    private int _waiting; // The body's pieces written and not yet sent.
+    private bool _ended;
 
     /// <param name="gone">Signalled when the client has gone, after which nothing written is sent.</param>
     public WebLingoStreamingResponse(CancellationToken gone)
@@ -77,22 +77,45 @@ public sealed class WebLingoStreamingResponse : IWebLingoHttpResponse
     /// </summary>
     public void End() => _pieces.Writer.TryComplete();
 
-    /// <summary>A piece for the request's task, waited for while <see cref="Pieces"/> wait already; dropped once the client has gone.</summary>
+    /// <summary>A piece for the request's task, at once; dropped once its sending has ended.</summary>
     private void Send(Piece piece)
     {
-        if (_pieces.Writer.TryWrite(piece)) return;
-        try
+        if (piece.Kind == PieceKind.Data) Interlocked.Increment(ref _waiting);
+        _pieces.Writer.TryWrite(piece);
+    }
+
+    private bool IsFull => Volatile.Read(ref _waiting) >= Pieces && !Volatile.Read(ref _ended);
+
+    private void WhenReady(Action ready)
+    {
+        lock (_gate)
         {
-            _pieces.Writer.WriteAsync(piece, _gone).AsTask().GetAwaiter().GetResult();
+            if (IsFull)
+            {
+                _ready.Add(ready);
+                return;
+            }
         }
-        catch (OperationCanceledException)
+        ready();
+    }
+
+    /// <summary>A piece of the body sent: those waiting for room told, once there is some.</summary>
+    private void Sent()
+    {
+        if (Interlocked.Decrement(ref _waiting) < Pieces) Release();
+    }
+
+    /// <summary>Tells those waiting for room that there is some, or that nothing more will be sent.</summary>
+    private void Release()
+    {
+        Action[] ready;
+        lock (_gate)
         {
-            // The client has gone: what it would have been sent is dropped, and the request is cancelled.
+            if (_ready.Count == 0 || IsFull) return;
+            ready = [.. _ready];
+            _ready.Clear();
         }
-        catch (ChannelClosedException)
-        {
-            // Ended already.
-        }
+        foreach (var action in ready) action();
     }
 
     /// <summary>
@@ -109,6 +132,8 @@ public sealed class WebLingoStreamingResponse : IWebLingoHttpResponse
         finally
         {
             _pieces.Writer.TryComplete();
+            Volatile.Write(ref _ended, true);
+            Release();
         }
     }
 
@@ -131,10 +156,15 @@ public sealed class WebLingoStreamingResponse : IWebLingoHttpResponse
                     held = piece.Bytes;
                     break;
                 case PieceKind.Data:
-                    if (held is not null) await response.Body.WriteAsync(held, _gone);
+                    if (held is not null)
+                    {
+                        await response.Body.WriteAsync(held, _gone);
+                        Sent();
+                    }
                     held = null;
                     sentAny = true;
                     await response.Body.WriteAsync(piece.Bytes, _gone);
+                    Sent();
                     break;
                 case PieceKind.Abort:
                     if (held is not null) await response.Body.WriteAsync(held, _gone);
@@ -161,6 +191,10 @@ public sealed class WebLingoStreamingResponse : IWebLingoHttpResponse
 
     private sealed class Writer(WebLingoStreamingResponse response) : IWebLingoBodyWriter
     {
+        public bool IsFull => response.IsFull;
+
+        public void WhenReady(Action ready) => response.WhenReady(ready);
+
         public bool Write(byte[] buffer, int offset, int count)
         {
             if (response.State == WebLingoResponseState.Completed || offset < 0 || count < 0 || offset > buffer.Length - count) return false;

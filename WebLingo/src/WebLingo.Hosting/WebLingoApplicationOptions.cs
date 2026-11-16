@@ -44,4 +44,10 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// its output was first sent (section 6.12, "Streaming"); nowhere by default.
     /// </summary>
     public Action<string>? Log { get; init; }
+
+    /// <summary>
+    /// How long a page waits for a client that has not taken its output before its request is cancelled (section 6.12,
+    /// "Streaming"): the configuration's <c>"sendTimeout"</c>, 30 seconds by default.
+    /// </summary>
+    public TimeSpan SendTimeout { get; init; } = TimeSpan.FromSeconds(30);
 }

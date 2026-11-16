@@ -12,6 +12,15 @@ public sealed record WebLingoBuiltinDeclaration(string Name, int Arity)
     /// called. A template compiler declares <c>renderComponent</c> so.
     /// </summary>
     public bool RendersComponent { get; init; }
+
+    /// <summary>
+    /// Whether it writes output a host may have to send before more is written (section 6.12, "Streaming"): a call of it
+    /// as a statement, where the program can <c>await</c>, is followed by a wait for its output, when it holds more than
+    /// its reader has taken, through the built-ins <see cref="WebLingoTemplateWriters.Full"/> and
+    /// <see cref="WebLingoTemplateWriters.Drained"/>, if they are declared. A template compiler declares its writers,
+    /// <c>write</c> and <c>writeLn</c> so.
+    /// </summary>
+    public bool Writes { get; init; }
 }
 
 /// <summary>What the compiler needs from its host: the built-in functions scripts may call.</summary>

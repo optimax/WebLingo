@@ -106,6 +106,12 @@ public sealed class WaspServeTests : IDisposable
         Write("weblingo.config", "{ \"environment\": \"staging\" }");
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _));
         Assert.EndsWith("weblingo.config: \"environment\" is \"development\" or \"production\".", error);
+
+        Write("weblingo.config", "{ \"sendTimeout\": 5 }");
+        Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+        Write("weblingo.config", "{ \"sendTimeout\": 0 }");
+        Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+        Assert.EndsWith("weblingo.config: \"sendTimeout\" is a number of seconds, more than 0.", error);
     }
 
     [Fact]

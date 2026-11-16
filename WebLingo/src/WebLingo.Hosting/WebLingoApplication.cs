@@ -193,7 +193,9 @@ public sealed class WebLingoApplication
         WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler, WebLingoRequestOutcomeKind done)
     {
         if (page.Module is null) return Failed(response, page.Errors);
-        var output = new WebLingoResponseText(response);
+        // A client that takes nothing for too long cancels the request, as a client that goes does.
+        cancellation ??= new WebLingoCancellationSignal();
+        var output = new WebLingoResponseText(response, _options.SendTimeout, cancellation.Cancel);
         var context = new WebLingoExecutionContext(worker)
         {
             Services = new RequestServices([.. WebLingoTemplateBuiltins.Create(output), .. _http.For(request, response)], _http.Members,
@@ -235,10 +237,20 @@ public sealed class WebLingoApplication
 
     /// <summary>
     /// A page that fails once its output is being sent (section 6.12, "Streaming"): its response ended there, unfinished,
-    /// its error in the host's log and, in development, at the end of what was sent.
+    /// its error in the host's log and, in development, at the end of what was sent; or, cancelled because its client took
+    /// nothing for longer than the send timeout, its response ended, the timeout in the log.
     /// </summary>
     private WebLingoRequestOutcome FailedWhileSending(WebLingoResponseText output, IWebLingoHttpResponse response, string error)
     {
+        if (output.TimedOut)
+        {
+            // Its client has taken nothing for too long: nothing more is sent.
+            var seconds = _options.SendTimeout.TotalSeconds;
+            _options.Log?.Invoke($"A page's client took nothing of its output for {seconds.ToString(System.Globalization.CultureInfo.InvariantCulture)} "
+                                 + (seconds == 1 ? "second" : "seconds") + ", and its request was cancelled: " + error);
+            response.Abort();
+            return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
+        }
         _options.Log?.Invoke("A page failed after its response was sent: " + error);
         if (_options.Environment == WebLingoEnvironment.Development) output.Write("\n<pre>" + WebLingoTemplateWriteFunction.Escape(error) + "\n</pre>\n");
         output.Send(); // What it wrote before it failed.

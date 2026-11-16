@@ -12,8 +12,9 @@ namespace WebLingo.Wasp.Cli;
 /// <summary>
 /// <c>wasp serve</c> (specification, sections 6.12 and 8.4; section 9, "M0.14 parts", part 5): an application served by the
 /// ASP.NET Core adapter, locally on Kestrel, or under IIS, whose ASP.NET Core Module starts it, named in the site's
-/// <c>web.config</c>. Its root's <c>weblingo.config</c> gives its schemes and its environment, development locally and
-/// production under IIS unless it names one. Each worker loads <c>std:system</c> and the native modules on its own.
+/// <c>web.config</c>. Its root's <c>weblingo.config</c> gives its schemes, its environment, development locally and
+/// production under IIS unless it names one, and how long a page waits for a slow client, 30 seconds unless it gives
+/// another (<c>"sendTimeout"</c>). Each worker loads <c>std:system</c> and the native modules on its own.
 /// </summary>
 public static class WebLingoWaspServer
 {
@@ -36,7 +37,7 @@ public static class WebLingoWaspServer
         environment = UnderIis ? WebLingoEnvironment.Production : WebLingoEnvironment.Development;
         var site = Environment.GetEnvironmentVariable("ASPNETCORE_IIS_PHYSICAL_PATH") ?? Directory.GetCurrentDirectory();
         var full = Path.GetFullPath(Path.Combine(site, root ?? "."));
-        if (!WebLingoSchemes.TryLoadFolder(full, givenSchemes, out var schemes, out var configured, out error)) return null;
+        if (!WebLingoSchemes.TryLoadFolder(full, givenSchemes, out var schemes, out var configured, out var sendTimeout, out error)) return null;
         if (configured is not null) environment = configured == "production" ? WebLingoEnvironment.Production : WebLingoEnvironment.Development;
 
         // std:system, loaded once here to fail early, then by each worker on its own.
@@ -54,7 +55,8 @@ public static class WebLingoWaspServer
             Environment = environment,
             Clock = new WebLingoExecutionClock(new DotNetClock()),
             Scheduler = () => new DotNetSchedulerHost(),
-            Log = log is null ? null : log.WriteLine
+            Log = log is null ? null : log.WriteLine,
+            SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30)
         }, out error);
         if (application is null)
         {

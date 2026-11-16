@@ -3,7 +3,7 @@ namespace WebLingo.Hosting.Abstractions;
 // WLHI's HTTP request and response (specification, section 6.7; section 9, "M0.14 parts", part 1): what a host gives the
 // runtime of a request, and what the runtime gives back, contracts free of .NET's HTTP types, which every adapter
 // implements, IIS's through ASP.NET Core first, FastCGI's and a standalone server's later. Errors are results, not
-// exceptions. Nothing here is frozen; backpressure comes with M0.14.7's part 3.
+// exceptions. Nothing here is frozen.
 
 /// <summary>A request, as its host received it.</summary>
 public interface IWebLingoHttpRequest
@@ -121,7 +121,16 @@ public interface IWebLingoBodyWriter
 {
     /// <summary>
     /// Writes <paramref name="count"/> bytes of <paramref name="buffer"/> from <paramref name="offset"/>, committing the
-    /// response first; false, nothing written, once it is completed, or for a range outside the buffer.
+    /// response first; false, nothing written, once it is completed, or for a range outside the buffer. It never waits.
     /// </summary>
     bool Write(byte[] buffer, int offset, int count);
+
+    /// <summary>
+    /// Whether what was written waits to be sent beyond what the response holds, so that a writer that can wait should,
+    /// before writing more (backpressure; specification, section 6.12, "Streaming").
+    /// </summary>
+    bool IsFull { get; }
+
+    /// <summary>Calls <paramref name="ready"/> once, from any thread, when the response can take more, or has ended; at once if it can now.</summary>
+    void WhenReady(Action ready);
 }

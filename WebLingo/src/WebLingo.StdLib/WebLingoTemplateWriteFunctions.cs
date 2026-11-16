@@ -46,9 +46,41 @@ public sealed class WebLingoTemplateWriteFunction(bool escapes, IWebLingoTextOut
     }
 }
 
+/// <summary>
+/// The wait for a page's output (specification, section 6.12, "Streaming"; <see cref="WebLingoTemplateWriters.Full"/> and
+/// <see cref="WebLingoTemplateWriters.Drained"/>): whether its output holds more than its reader has taken, which only an
+/// output that waits (<see cref="IWebLingoWaitingOutput"/>) ever does; and a task that completes once it can take more.
+/// </summary>
+public sealed class WebLingoOutputWaitFunction(bool drained, IWebLingoTextOutput output) : IWebLingoBuiltinFunction
+{
+    public string Name => drained ? WebLingoTemplateWriters.Drained : WebLingoTemplateWriters.Full;
+    public int Arity => 0;
+
+    public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        (result, error) = (WebLingoValue.Null, null);
+        if (output is not IWebLingoWaitingOutput { IsFull: true } waiting)
+        {
+            if (!drained) result = WebLingoValue.False;
+            return true;
+        }
+        if (!drained)
+        {
+            result = WebLingoValue.True;
+            return true;
+        }
+        return heap.Scheduler is { } scheduler
+            ? scheduler.TryWaitForHost(waiting.WhenReady, out result, out error)
+            : true;
+    }
+}
+
 /// <summary>The built-ins a host that runs pages registers besides the standard library's, each writing to the one output.</summary>
 public static class WebLingoTemplateBuiltins
 {
     public static IWebLingoBuiltinFunction[] Create(IWebLingoTextOutput output) =>
-        [new WebLingoTemplateWriteFunction(true, output), new WebLingoTemplateWriteFunction(false, output)];
+    [
+        new WebLingoTemplateWriteFunction(true, output), new WebLingoTemplateWriteFunction(false, output),
+        new WebLingoOutputWaitFunction(false, output), new WebLingoOutputWaitFunction(true, output)
+    ];
 }

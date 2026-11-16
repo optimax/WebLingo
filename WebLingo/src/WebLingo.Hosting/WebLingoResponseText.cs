@@ -8,9 +8,11 @@ namespace WebLingo.Hosting;
 /// part 1): kept until it reaches <see cref="Kept"/> bytes of UTF-8, so that a runtime error before then can still be a
 /// 500; then its response committed, its <c>Content-Type</c> <c>text/html; charset=utf-8</c> unless the page set another,
 /// and the output sent as it is written, in pieces of about <see cref="Piece"/> bytes. Written as UTF-8, a surrogate
-/// without its pair as U+FFFD.
+/// without its pair as U+FFFD. Once sent, it is full while its response holds more than its client has taken, and a page
+/// waits for it (section 9, "M0.14.7 parts", part 3), for at most <paramref name="sendTimeout"/>, after which
+/// <paramref name="timedOut"/> is called, to cancel the request, and the page goes on, to see it cancelled.
 /// </summary>
-internal sealed class WebLingoResponseText(IWebLingoHttpResponse response) : IWebLingoTextOutput
+internal sealed class WebLingoResponseText(IWebLingoHttpResponse response, TimeSpan sendTimeout, Action timedOut) : IWebLingoWaitingOutput
 {
     /// <summary>How much output is kept before its response is committed and it is sent.</summary>
     public const int Kept = 64 * 1024;
@@ -23,6 +25,32 @@ internal sealed class WebLingoResponseText(IWebLingoHttpResponse response) : IWe
 
     /// <summary>Whether the output is being sent: its response committed, and an error then too late for a 500.</summary>
     public bool Sending { get; private set; }
+
+    /// <summary>Whether its client has gone longer than the send timeout without taking what waited for it.</summary>
+    public bool TimedOut => Volatile.Read(ref _timedOut) == 1;
+
+    private int _timedOut;
+
+    public bool IsFull => Sending && response.Body.IsFull;
+
+    public void WhenReady(Action ready)
+    {
+        var fired = 0;
+        Timer? timer = null;
+        void Fire(bool late)
+        {
+            if (Interlocked.Exchange(ref fired, 1) != 0) return;
+            timer?.Dispose();
+            if (late)
+            {
+                Volatile.Write(ref _timedOut, 1);
+                timedOut();
+            }
+            ready();
+        }
+        timer = new Timer(_ => Fire(true), null, sendTimeout, Timeout.InfiniteTimeSpan);
+        response.Body.WhenReady(() => Fire(false));
+    }
 
     public void Write(string text)
     {

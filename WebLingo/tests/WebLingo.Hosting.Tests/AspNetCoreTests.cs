@@ -89,6 +89,62 @@ public sealed class AspNetCoreTests : IDisposable
         Assert.DoesNotContain("never", Body(context));
     }
 
+    [Fact]
+    public async Task APageWaitsForASlowClientWithoutItsWorker()
+    {
+        // One worker: a long page whose client takes nothing yet waits for it, and another request is served meanwhile.
+        Write("quick.wasp", "quick");
+        using var one = new WebLingoWorkerPool(1);
+        var application = Load(workers: 1);
+        var slow = new SlowBody();
+        var context = new DefaultHttpContext();
+        context.Request.Method = "GET";
+        context.Request.Path = "/long";
+        context.Response.Body = slow;
+        var serving = WebLingoAspNetCore.Serve(context, application, _root, one);
+        await slow.Blocked.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal("quick", Body(await Serve(application, "GET", "/quick", one)));
+        Assert.False(serving.IsCompleted);
+        slow.Open();
+        await serving.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(new string('x', 100 * 1024) + "end", Encoding.UTF8.GetString(slow.Written.ToArray()));
+    }
+
+    /// <summary>A response's body whose client takes nothing until it is opened, after its first write.</summary>
+    private sealed class SlowBody : Stream
+    {
+        private readonly TaskCompletionSource _open = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Blocked { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public MemoryStream Written { get; } = new();
+
+        public void Open() => _open.TrySetResult();
+
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (Written.Length > 0)
+            {
+                Blocked.TrySetResult();
+                await _open.Task.WaitAsync(cancellationToken);
+            }
+            Written.Write(buffer.Span);
+        }
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+        public override Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public override void Flush() { }
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => Written.Length;
+        public override long Position { get => Written.Length; set => throw new NotSupportedException(); }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
     /// <summary>A request's lifetime that records its abort.</summary>
     private sealed class Lifetime : Microsoft.AspNetCore.Http.Features.IHttpRequestLifetimeFeature
     {

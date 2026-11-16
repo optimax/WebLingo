@@ -89,24 +89,120 @@ public sealed class StreamingTests
         Assert.Contains("error WL3001: The response's status cannot be set: it has been sent.", Assert.Single(log));
     }
 
+    [Theory]
+    [InlineData("/", "<% param response; %>")]
+    [InlineData("/api/rows", null)]
+    public void APageWaitsForAClientThatHasNotTakenItsOutput(string path, string? page)
+    {
+        // A page's writers, and a handler's write, wait once the response is full, its worker free meanwhile.
+        var files = new MemoryFileSystem()
+            .Add("/site/api/rows.wl", "export async function get(request, response) {\n  var i = 0;\n  while (i < 70) { write(\"" + new string('x', 1024)
+                                      + "\"); i = i + 1; }\n  write(\"end\");\n}");
+        if (page is not null) files.Add("/site/index.wasp", page + Page(70, "end"));
+        var response = new RecordingResponse { FullAfter = 1 };
+        var host = new PostedHost();
+        var outcome = Load(files).Handle(new WebLingoBufferedRequest("GET", path), response, new WebLingoWorkerId(0), scheduler: host);
+        Assert.Equal((WebLingoRequestOutcomeKind.Waiting, -1L), (outcome.Kind, outcome.WaitMilliseconds));
+        Assert.Equal([64 * 1024], response.Writes);
+        Assert.Equal(1, response.Waiters);
+
+        // Resumed before the client has taken anything, it waits on.
+        outcome = outcome.Resume!();
+        Assert.Equal(WebLingoRequestOutcomeKind.Waiting, outcome.Kind);
+        response.Take();
+        Assert.Equal(1, host.Posted);
+        outcome = outcome.Resume!();
+        Assert.NotEqual(WebLingoRequestOutcomeKind.Waiting, outcome.Kind);
+        Assert.EndsWith("xxend", Encoding.UTF8.GetString(response.Inner.BodyBytes));
+        Assert.Equal(70 * 1024 + 3, response.Inner.BodyBytes.Length);
+    }
+
+    [Fact]
+    public void AClientThatTakesNothingForTooLongCancelsItsRequest()
+    {
+        var log = new List<string>();
+        var response = new RecordingResponse { FullAfter = 1 };
+        var host = new PostedHost();
+        var app = Load(new MemoryFileSystem().Add("/site/index.wasp", Page(70, "end")), log: log, sendTimeout: TimeSpan.FromMilliseconds(50));
+        var outcome = app.Handle(new WebLingoBufferedRequest("GET", "/"), response, new WebLingoWorkerId(0), scheduler: host);
+        Assert.Equal(WebLingoRequestOutcomeKind.Waiting, outcome.Kind);
+        for (var waited = 0; host.Posted == 0 && waited < 5000; waited += 10) Thread.Sleep(10);
+        outcome = outcome.Resume!();
+        Assert.Equal((WebLingoRequestOutcomeKind.Failed, true), (outcome.Kind, response.Inner.Aborted));
+        Assert.StartsWith("A page's client took nothing of its output for 0.05 seconds, and its request was cancelled: index.wasp", Assert.Single(log));
+        Assert.Contains("error WL3004:", log[0]);
+        Assert.DoesNotContain("end", Encoding.UTF8.GetString(response.Inner.BodyBytes));
+    }
+
+    /// <summary>A scheduler host whose posted work waits for the worker's next look, counted.</summary>
+    private sealed class PostedHost : WebLingo.Platform.Abstractions.IWebLingoSchedulerHost
+    {
+        private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _posted = new();
+        private int _count;
+
+        public int Posted => Volatile.Read(ref _count);
+
+        public void RunBlocking(Action work) => throw new InvalidOperationException();
+
+        public void Post(Action work)
+        {
+            _posted.Enqueue(work);
+            Interlocked.Increment(ref _count);
+        }
+
+        public bool RunPosted(int milliseconds)
+        {
+            var ran = false;
+            while (_posted.TryDequeue(out var work))
+            {
+                work();
+                ran = true;
+            }
+            return ran;
+        }
+    }
+
     private static WebLingoApplication Load(MemoryFileSystem files, WebLingoEnvironment environment = WebLingoEnvironment.Production,
-        List<string>? log = null)
+        List<string>? log = null, TimeSpan? sendTimeout = null)
     {
         var app = WebLingoApplication.Load(new WebLingoApplicationOptions(Root, files)
         {
             WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction())),
             Environment = environment,
-            Log = log is null ? null : log.Add
+            Log = log is null ? null : log.Add,
+            SendTimeout = sendTimeout ?? TimeSpan.FromSeconds(30)
         }, out var error);
         Assert.True(app is not null, error);
         return app;
     }
 
-    /// <summary>A response in memory that records each write's size.</summary>
+    /// <summary>
+    /// A response in memory that records each write's size; full, as a slow client's is, once <see cref="FullAfter"/>
+    /// writes are made, until <see cref="Take"/>, as the client taking what waits.
+    /// </summary>
     private sealed class RecordingResponse : IWebLingoHttpResponse, IWebLingoBodyWriter
     {
+        private readonly List<Action> _ready = [];
+
         public WebLingoBufferedResponse Inner { get; } = new();
         public List<int> Writes { get; } = [];
+        public int FullAfter { get; set; } = int.MaxValue;
+        public int Waiters => _ready.Count;
+
+        public bool IsFull => Writes.Count >= FullAfter;
+
+        public void WhenReady(Action ready)
+        {
+            if (IsFull) _ready.Add(ready);
+            else ready();
+        }
+
+        public void Take()
+        {
+            FullAfter = int.MaxValue;
+            foreach (var ready in _ready) ready();
+            _ready.Clear();
+        }
 
         public WebLingoResponseState State => Inner.State;
         public int StatusCode => Inner.StatusCode;

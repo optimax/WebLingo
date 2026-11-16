@@ -137,3 +137,16 @@ public interface IWebLingoTextOutput
 {
     void Write(string text);
 }
+
+/// <summary>
+/// An output that may hold more than its reader has taken, as a web page's does while its client is slow (specification,
+/// section 6.12, "Streaming"): a writer that can wait, waits for it before writing more.
+/// </summary>
+public interface IWebLingoWaitingOutput : IWebLingoTextOutput
+{
+    /// <summary>Whether it holds more than its reader has taken, so that a writer should wait before writing more.</summary>
+    bool IsFull { get; }
+
+    /// <summary>Calls <paramref name="ready"/> once, from any thread, when it can take more, or will take nothing more; at once if it can now.</summary>
+    void WhenReady(Action ready);
+}
