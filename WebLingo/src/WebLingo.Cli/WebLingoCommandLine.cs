@@ -1,3 +1,4 @@
+using WebLingo.Bytecode;
 using WebLingo.Compiler;
 using WebLingo.Core;
 using WebLingo.Platform.Abstractions;
@@ -5,14 +6,16 @@ using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
 using WebLingo.VM;
+using WebLingo.VM.Stack;
 namespace WebLingo.Cli;
 
 /// <summary>
-/// The <c>weblingo</c> command line (specification, section 8.4, "CLI"): <c>run</c>, <c>check</c> and
-/// <c>--version</c>. It is the host: it registers <c>write</c> and <c>writeLn</c>, writing to standard output, compiles a file, and runs
-/// it in the VM. Diagnostics go to standard error as <c>file(line,column): error CODE: message</c>. Exit codes
-/// (section 15.2): 0 success, 1 compilation errors, 2 a usage error, 3 a runtime error, 4 a file that cannot be
-/// read.
+/// The <c>weblingo</c> command line (specification, section 8.4, "CLI"): <c>run</c>, <c>check</c>, <c>compile</c>,
+/// <c>disasm</c> and <c>--version</c>. It is the host: it registers <c>write</c> and <c>writeLn</c>, writing to standard
+/// output, compiles a file, and runs it in the VM; or it writes the compiled file as WLBC, a <c>.wlbc</c> (section 5.3),
+/// which <c>run</c> runs on the VM it is for, without compiling anything. Diagnostics go to standard error as
+/// <c>file(line,column): error CODE: message</c>. Exit codes (section 15.2): 0 success, 1 compilation errors or a
+/// <c>.wlbc</c> that cannot be used, 2 a usage error, 3 a runtime error, 4 a file that cannot be read or written.
 /// </summary>
 public static class WebLingoCommandLine
 {
@@ -24,9 +27,15 @@ public static class WebLingoCommandLine
 
     public const string Version = "WebLingo M0.6 (pre-alpha)";
 
-    /// <summary><c>weblingo</c>: scripts, <c>.wl</c> files, compiled by the WebLingo compiler.</summary>
+    /// <summary>The extension of a WLBC file (section 5.3).</summary>
+    public const string BytecodeExtension = ".wlbc";
+
+    /// <summary><c>weblingo</c>: scripts, <c>.wl</c> files, compiled by the WebLingo compiler, and their <c>.wlbc</c> files.</summary>
     public static WebLingoCommandLineProgram Scripts { get; } = new("weblingo", Version, ".wl", _ => [],
-        (file, options) => new WebLingoCommandLineCompilation(new WebLingoCompiler(options).Compile(file.Text, file.Name)));
+        (file, options) => new WebLingoCommandLineCompilation(new WebLingoCompiler(options).Compile(file.Text, file.Name)))
+    {
+        Bytecode = true
+    };
 
     public static int Run(string[] args, TextWriter output, TextWriter error) => Run(Scripts, args, output, error);
 
@@ -37,14 +46,28 @@ public static class WebLingoCommandLine
             output.WriteLine(program.Version);
             return Success;
         }
-        if (args.Length >= 2 && args[0] is "run" or "check")
+        if (args.Length == 2 && args[0] == "disasm" && program.Bytecode) return DisassembleFile(args[1], output, error);
+        if (args.Length >= 2 && (args[0] is "run" or "check" || (args[0] == "compile" && program.Bytecode)))
         {
-            // run|check [--scheme name=folder]… file [name=value …]: the schemes over weblingo.json's (section 3.9).
+            // run|check|compile [--scheme name=folder]… [--vm register|stack, for compile] file [name=value …, for run]:
+            // the schemes over weblingo.json's (section 3.9).
             var schemes = new Dictionary<string, string>(StringComparer.Ordinal);
+            var vm = WebLingoBytecodeKind.Register;
             var at = 1;
             string? wrong = null;
-            while (wrong is null && at < args.Length && args[at] == "--scheme")
+            while (wrong is null && at < args.Length && (args[at] == "--scheme" || (args[at] == "--vm" && args[0] == "compile")))
             {
+                if (args[at] == "--vm")
+                {
+                    if (at + 1 < args.Length && args[at + 1] is "register" or "stack")
+                    {
+                        vm = args[at + 1] == "stack" ? WebLingoBytecodeKind.Stack : WebLingoBytecodeKind.Register;
+                        at += 2;
+                        continue;
+                    }
+                    wrong = $"'{(at + 1 < args.Length ? args[at + 1] : "")}' is not a VM: register or stack.";
+                    break;
+                }
                 var equals = at + 1 < args.Length ? args[at + 1].IndexOf('=', StringComparison.Ordinal) : -1;
                 if (equals > 0 && WebLingoSchemes.IsName(args[at + 1][..equals]) && equals + 1 < args[at + 1].Length
                     && schemes.TryAdd(args[at + 1][..equals], args[at + 1][(equals + 1)..]))
@@ -56,13 +79,22 @@ public static class WebLingoCommandLine
             }
             if (wrong is null && at < args.Length)
             {
-                if (args[0] == "check")
+                var path = args[at];
+                var bytecode = program.Bytecode && path.EndsWith(BytecodeExtension, StringComparison.OrdinalIgnoreCase);
+                if (args[0] is "check" or "compile")
                 {
-                    if (at + 1 == args.Length) return RunFile(program, false, args[at], new Dictionary<string, string>(), schemes, output, error);
+                    if (at + 1 == args.Length)
+                    {
+                        var none = new Dictionary<string, string>();
+                        return args[0] == "compile" ? CompileFile(program, path, vm, schemes, error)
+                            : bytecode ? RunBytecode(program, false, path, none, schemes, output, error)
+                            : RunFile(program, false, path, none, schemes, output, error);
+                    }
                 }
                 else if (TryParameters(args, at + 1, out var parameters, out var value))
                 {
-                    return RunFile(program, true, args[at], parameters, schemes, output, error);
+                    return bytecode ? RunBytecode(program, true, path, parameters, schemes, output, error)
+                        : RunFile(program, true, path, parameters, schemes, output, error);
                 }
                 else
                 {
@@ -73,9 +105,18 @@ public static class WebLingoCommandLine
         }
 
         var file = program.Options + "[--scheme <name>=<folder> …] <file" + program.Extension + ">";
-        output.WriteLine($"Usage: {program.Name} --version | run {file} [name=value …] | check {file}");
+        var bytecodeUsage = program.Bytecode
+            ? $" | compile [--vm register|stack] [--scheme <name>=<folder> …] <file{program.Extension}> | disasm <file{BytecodeExtension}>"
+            : "";
+        output.WriteLine($"Usage: {program.Name} --version | run {file} [name=value …] | check {file}{bytecodeUsage}");
         output.WriteLine("  run       compiles the file and runs it, giving its parameters the values after it, each a string");
         output.WriteLine("  check     compiles the file and reports its errors, without running it");
+        if (program.Bytecode)
+        {
+            output.WriteLine($"  compile   compiles the file into a {BytecodeExtension} beside it, the register VM's bytecode, or with --vm stack the stack VM's");
+            output.WriteLine($"  disasm    shows a {BytecodeExtension}'s bytecode as text");
+            output.WriteLine($"            run and check take a {BytecodeExtension} too, which run runs on the VM it is for");
+        }
         output.WriteLine("  --scheme  names a folder of native modules, over weblingo.json's, in the file's folder");
         foreach (var line in program.OptionsHelp) output.WriteLine(line);
         return args.Length == 0 ? Success : UsageError;
@@ -115,62 +156,18 @@ public static class WebLingoCommandLine
     private static int RunFile(WebLingoCommandLineProgram program, bool run, string path, IReadOnlyDictionary<string, string> parameters,
         IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error)
     {
-        string source;
-        try
-        {
-            source = File.ReadAllText(path);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException
-                                              or NotSupportedException)
-        {
-            error.WriteLine($"{path}: cannot read the file: {exception.Message}");
-            return FileUnreadable;
-        }
-
+        if (!TryReadText(path, error, out var source)) return FileUnreadable;
         var text = new WebLingoSourceText(source, path);
-        if (!WebLingoSchemes.TryLoad(path, givenSchemes, out var schemes, out var wrongConfiguration))
-        {
-            error.WriteLine(wrongConfiguration);
-            return FileUnreadable;
-        }
-        var textOutput = new TextWriterOutput(output);
-        var services = new WebLingoBuiltinRegistry();
-        var native = new WebLingoNativeModuleLoader(schemes, services);
-        // std:system, a native module installed with the runtime, in the std scheme's folder: its functions the host's
-        // built-ins, which every module sees, and which std:system exports (section 3.9).
-        if (!native.TryResolve(path, "std:system", out var system, out var why))
-        {
-            error.WriteLine($"std:system cannot be loaded from {schemes["std"]}: {why}.");
-            return FileUnreadable;
-        }
-        var hostBuiltins = new List<IWebLingoBuiltinFunction>(native.FunctionsOf(system));
-        hostBuiltins.AddRange(program.Builtins(textOutput));
-        var declarations = new List<WebLingoBuiltinDeclaration>();
-        foreach (var builtin in hostBuiltins)
-        {
-            services.Register(builtin);
-            declarations.Add(new WebLingoBuiltinDeclaration(builtin.Name, builtin.Arity));
-        }
-        var resolver = new FileResolver(path);
-        var options = new WebLingoCompilerOptions(declarations) { Resolver = resolver, Native = native };
-        var compilation = program.Compile(text, options);
+        if (TryHost(program, path, path, givenSchemes, output, error) is not { } host) return FileUnreadable;
+        var compilation = program.Compile(text, host.Options);
         var compiled = compilation.Result;
         foreach (var diagnostic in compiled.Diagnostics) error.WriteLine(Format(TextOf(diagnostic), diagnostic));
         if (compiled.Module is null) return CompilationFailed;
         if (!run) return Success;
 
-        var context = new WebLingoExecutionContext(new WebLingoWorkerId(0))
-        {
-            Services = services,
-            Clock = new SystemClock(new DotNetClock()),
-            Output = textOutput,
-            Parameters = parameters,
-            FileSystem = new DotNetFileSystem(),
-            SchedulerHost = new DotNetSchedulerHost()
-        };
         // The VM imports modules while the program runs as the compiler imports them, with the same resolver (section 3.9).
-        var vm = new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(options), Components = compilation.Components };
-        var result = vm.Execute(compiled.Module, context);
+        var vm = new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(host.Options), Components = compilation.Components };
+        var result = vm.Execute(compiled.Module, Context(host, parameters));
         output.Flush();
         if (result.Succeeded) return Success;
         var located = compilation.Locate(result.Error!);
@@ -181,8 +178,292 @@ public static class WebLingoCommandLine
         // section 13), or the program's own (section 3.9).
         WebLingoSourceText TextOf(WebLingoDiagnostic diagnostic) =>
             diagnostic.Source is not { } name ? text
-            : resolver.Texts.TryGetValue(name, out var imported) ? imported
+            : host.Resolver.Texts.TryGetValue(name, out var imported) ? imported
             : compilation.TextOf(name) ?? text;
+    }
+
+    /// <summary>
+    /// <c>compile</c>: the file compiled for <paramref name="vm"/>, written as a <c>.wlbc</c> beside it (section 5.3), its files
+    /// named from its folder, the program's own by its name alone, so that the file holds none of the host's paths.
+    /// </summary>
+    private static int CompileFile(WebLingoCommandLineProgram program, string path, WebLingoBytecodeKind vm,
+        IReadOnlyDictionary<string, string> givenSchemes, TextWriter error)
+    {
+        if (!TryReadText(path, error, out var source)) return FileUnreadable;
+        var text = new WebLingoSourceText(source, path);
+        if (TryHost(program, path, path, givenSchemes, TextWriter.Null, error) is not { } host) return FileUnreadable;
+        IReadOnlyList<WebLingoDiagnostic> diagnostics;
+        WebLingoCompiledModule? register = null;
+        WebLingoStackModule? stack = null;
+        if (vm == WebLingoBytecodeKind.Stack)
+        {
+            var compiled = new WebLingoStackCompiler(host.Options).Compile(source, path);
+            (diagnostics, stack) = (compiled.Diagnostics, compiled.Module);
+        }
+        else
+        {
+            var compiled = new WebLingoCompiler(host.Options).Compile(source, path);
+            (diagnostics, register) = (compiled.Diagnostics, compiled.Module);
+        }
+        foreach (var diagnostic in diagnostics)
+        {
+            var file = diagnostic.Source is { } name && host.Resolver.Texts.TryGetValue(name, out var imported) ? imported : text;
+            error.WriteLine(Format(file, diagnostic));
+        }
+        if (register is null && stack is null) return CompilationFailed;
+
+        var folder = Path.GetDirectoryName(Path.GetFullPath(path)) ?? "";
+        var originals = new Dictionary<string, string>(StringComparer.Ordinal);
+        string FromFolder(string name)
+        {
+            var renamed = name == path ? Path.GetFileName(path) : IsScheme(name) ? name : Relative(folder, name);
+            originals.TryAdd(renamed, name);
+            return renamed;
+        }
+        WebLingoSourceText? TextOf(string? name) =>
+            name is null ? text
+            : originals.TryGetValue(name, out var original) && host.Resolver.Texts.TryGetValue(original, out var imported) ? imported
+            : null;
+        var bytes = register is not null
+            ? WebLingoBytecodeFile.Write(Renamed(register, FromFolder), TextOf)
+            : WebLingoBytecodeFile.Write(Renamed(stack!, FromFolder), TextOf);
+
+        var target = Path.ChangeExtension(path, BytecodeExtension);
+        try
+        {
+            File.WriteAllBytes(target, bytes);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException
+                                              or NotSupportedException)
+        {
+            error.WriteLine($"{target}: cannot write the file: {exception.Message}");
+            return FileUnreadable;
+        }
+        return Success;
+    }
+
+    /// <summary>
+    /// <c>run</c> or <c>check</c> of a <c>.wlbc</c>: the file read and verified (section 5.3), its files named again from its
+    /// folder, the program's own as the file beside it, and, for <c>run</c>, the native modules it names loaded and it run on
+    /// the VM it is for, a runtime error located from the file's source positions.
+    /// </summary>
+    private static int RunBytecode(WebLingoCommandLineProgram program, bool run, string path, IReadOnlyDictionary<string, string> parameters,
+        IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error)
+    {
+        if (!TryRead(path, error, out var bytes, out var register, out var stack, out var positions)) return Failed(bytes);
+        var main = register?.Name ?? stack!.Name;
+        var mainName = path[..^Path.GetFileName(path).Length] + main;
+        var folder = Path.GetDirectoryName(Path.GetFullPath(path)) ?? "";
+        string FromHere(string name) =>
+            name == main ? mainName : IsScheme(name) ? name : Relative(Directory.GetCurrentDirectory(), Path.Combine(folder, name));
+        if (register is not null) register = Renamed(register, FromHere);
+        if (stack is not null) stack = Renamed(stack, FromHere);
+        var located = new List<WebLingoSourcePositions>();
+        foreach (var table in positions) located.Add(table with { Source = table.Source is { } source ? FromHere(source) : null });
+        if (!run) return Success;
+
+        if (TryHost(program, path, mainName, givenSchemes, output, error) is not { } host) return FileUnreadable;
+        // The native modules it names, which its compiler had loaded, so that their built-ins are the host's (section 3.9).
+        foreach (var unit in register?.Units ?? stack!.Units)
+        {
+            if (unit.IsNative && !host.Native.TryResolve(mainName, unit.Name, out _, out var why))
+            {
+                error.WriteLine($"{unit.Name} cannot be loaded: {why}.");
+                return FileUnreadable;
+            }
+        }
+        var loader = new WebLingoModuleLoader(host.Options);
+        var result = register is not null
+            ? new WebLingoVirtualMachine { Loader = loader }.Execute(register, Context(host, parameters))
+            : new WebLingoStackVirtualMachine { Loader = loader }.Execute(stack!, Context(host, parameters));
+        output.Flush();
+        if (result.Succeeded) return Success;
+        var diagnostic = result.Error!;
+        var file = diagnostic.Source ?? mainName;
+        var location = located.Find(table => table.Source == diagnostic.Source) is { } positionsOf
+            ? positionsOf.GetLocation(diagnostic.Span.Start)
+            : host.Resolver.Texts.TryGetValue(file, out var imported) ? imported.GetLocation(diagnostic.Span.Start)
+            : new WebLingoSourceLocation(diagnostic.Span.Start, 1, 1);
+        error.WriteLine(Format(file, location, diagnostic));
+        return RuntimeFailed;
+
+        // A file that cannot be read is one thing, and one that is not WLBC a reader can use is another.
+        static int Failed(byte[]? bytes) => bytes is null ? FileUnreadable : CompilationFailed;
+    }
+
+    /// <summary><c>disasm</c>: a <c>.wlbc</c>'s bytecode as text, the register VM's or the stack VM's.</summary>
+    private static int DisassembleFile(string path, TextWriter output, TextWriter error)
+    {
+        if (!TryRead(path, error, out var bytes, out var register, out var stack, out _)) return bytes is null ? FileUnreadable : CompilationFailed;
+        output.Write(register is not null ? WebLingoDisassembler.Format(register) : WebLingoStackDisassembler.Format(stack!));
+        return Success;
+    }
+
+    /// <summary>
+    /// A <c>.wlbc</c> read and verified, the module of the VM it is for; false, the reason written, and
+    /// <paramref name="bytes"/> null if the file cannot be read.
+    /// </summary>
+    private static bool TryRead(string path, TextWriter error, out byte[]? bytes, out WebLingoCompiledModule? register,
+        out WebLingoStackModule? stack, out IReadOnlyList<WebLingoSourcePositions> positions)
+    {
+        (register, stack, positions) = (null, null, []);
+        try
+        {
+            bytes = File.ReadAllBytes(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException
+                                              or NotSupportedException)
+        {
+            error.WriteLine($"{path}: cannot read the file: {exception.Message}");
+            bytes = null;
+            return false;
+        }
+        string? why;
+        var read = WebLingoBytecodeFile.TryReadKind(bytes, out var kind, out why) && (kind == WebLingoBytecodeKind.Register
+            ? WebLingoBytecodeFile.TryReadRegister(bytes, out register, out positions, out why)
+            : WebLingoBytecodeFile.TryReadStack(bytes, out stack, out positions, out why));
+        if (!read) error.WriteLine($"{path}: error {WebLingoDiagnosticCodes.BytecodeVerificationFailure}: {why}");
+        return read;
+    }
+
+    private static bool TryReadText(string path, TextWriter error, out string source)
+    {
+        try
+        {
+            source = File.ReadAllText(path);
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException
+                                              or NotSupportedException)
+        {
+            error.WriteLine($"{path}: cannot read the file: {exception.Message}");
+            source = "";
+            return false;
+        }
+    }
+
+    /// <summary>What a command line gives the programs it compiles and runs: its built-ins, its native modules and its files.</summary>
+    private sealed record Host(WebLingoBuiltinRegistry Services, WebLingoNativeModuleLoader Native, WebLingoCompilerOptions Options,
+        FileResolver Resolver, IWebLingoTextOutput Output);
+
+    /// <summary>
+    /// The host for the file <paramref name="path"/>, whose program's own file is named <paramref name="mainName"/>: its
+    /// schemes, from <c>weblingo.json</c> in its folder and those given, <c>std:system</c> loaded, and the program's built-ins;
+    /// null, the reason written, if they cannot be had.
+    /// </summary>
+    private static Host? TryHost(WebLingoCommandLineProgram program, string path, string mainName, IReadOnlyDictionary<string, string> givenSchemes,
+        TextWriter output, TextWriter error)
+    {
+        if (!WebLingoSchemes.TryLoad(path, givenSchemes, out var schemes, out var wrongConfiguration))
+        {
+            error.WriteLine(wrongConfiguration);
+            return null;
+        }
+        var textOutput = new TextWriterOutput(output);
+        var services = new WebLingoBuiltinRegistry();
+        var native = new WebLingoNativeModuleLoader(schemes, services);
+        // std:system, a native module installed with the runtime, in the std scheme's folder: its functions the host's
+        // built-ins, which every module sees, and which std:system exports (section 3.9).
+        if (!native.TryResolve(path, "std:system", out var system, out var why))
+        {
+            error.WriteLine($"std:system cannot be loaded from {schemes["std"]}: {why}.");
+            return null;
+        }
+        var hostBuiltins = new List<IWebLingoBuiltinFunction>(native.FunctionsOf(system));
+        hostBuiltins.AddRange(program.Builtins(textOutput));
+        var declarations = new List<WebLingoBuiltinDeclaration>();
+        foreach (var builtin in hostBuiltins)
+        {
+            services.Register(builtin);
+            declarations.Add(new WebLingoBuiltinDeclaration(builtin.Name, builtin.Arity));
+        }
+        var resolver = new FileResolver(mainName);
+        return new Host(services, native, new WebLingoCompilerOptions(declarations) { Resolver = resolver, Native = native }, resolver,
+            textOutput);
+    }
+
+    private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters) =>
+        new(new WebLingoWorkerId(0))
+        {
+            Services = host.Services,
+            Clock = new SystemClock(new DotNetClock()),
+            Output = host.Output,
+            Parameters = parameters,
+            FileSystem = new DotNetFileSystem(),
+            SchedulerHost = new DotNetSchedulerHost()
+        };
+
+    /// <summary><c>scheme:module</c>, a native module's name (section 3.9), which is not a file's, a scheme being two or more letters.</summary>
+    private static bool IsScheme(string name)
+    {
+        var colon = name.IndexOf(':', StringComparison.Ordinal);
+        return colon > 1 && WebLingoSchemes.IsName(name[..colon]);
+    }
+
+    /// <summary><paramref name="name"/>, a file's path, from <paramref name="folder"/>, with <c>/</c> between its folders; as it is if it has none.</summary>
+    private static string Relative(string folder, string name)
+    {
+        try
+        {
+            return Path.GetRelativePath(folder, Path.GetFullPath(name)).Replace('\\', '/');
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return name;
+        }
+    }
+
+    /// <summary>
+    /// A module with its files renamed (section 3.9): its own name, its files', its functions' sources, and the names of the
+    /// functions that run its files, which are their files'.
+    /// </summary>
+    private static WebLingoCompiledModule Renamed(WebLingoCompiledModule module, Func<string, string> rename)
+    {
+        var files = Files(module.Name, module.Units);
+        return module with
+        {
+            Name = rename(module.Name),
+            EntryPoint = Renamed(module.EntryPoint, files, rename),
+            Functions = [.. module.Functions.Select(function => Renamed(function, files, rename))],
+            Units = [.. module.Units.Select(unit => unit.IsNative ? unit : unit with { Name = rename(unit.Name) })]
+        };
+    }
+
+    private static WebLingoFunction Renamed(WebLingoFunction function, HashSet<string> files, Func<string, string> rename) =>
+        function with
+        {
+            Name = files.Contains(function.Name) ? rename(function.Name) : function.Name,
+            Source = function.Source is { } source ? rename(source) : null
+        };
+
+    private static WebLingoStackModule Renamed(WebLingoStackModule module, Func<string, string> rename)
+    {
+        var files = Files(module.Name, module.Units);
+        return module with
+        {
+            Name = rename(module.Name),
+            EntryPoint = Renamed(module.EntryPoint, files, rename),
+            Functions = [.. module.Functions.Select(function => Renamed(function, files, rename))],
+            Units = [.. module.Units.Select(unit => unit.IsNative ? unit : unit with { Name = rename(unit.Name) })]
+        };
+    }
+
+    private static WebLingoStackFunction Renamed(WebLingoStackFunction function, HashSet<string> files, Func<string, string> rename) =>
+        function with
+        {
+            Name = files.Contains(function.Name) ? rename(function.Name) : function.Name,
+            Source = function.Source is { } source ? rename(source) : null
+        };
+
+    /// <summary>The names of a program's files, its own and those it imports, but native modules'.</summary>
+    private static HashSet<string> Files(string name, IReadOnlyList<WebLingoUnitInfo> units)
+    {
+        var files = new HashSet<string>(StringComparer.Ordinal) { name };
+        foreach (var unit in units)
+        {
+            if (!unit.IsNative) files.Add(unit.Name);
+        }
+        return files;
     }
 
     /// <summary>
@@ -236,16 +517,19 @@ public static class WebLingoCommandLine
     }
 
     /// <summary>A diagnostic as a line: <c>file(line,column): error CODE: message</c>.</summary>
-    public static string Format(WebLingoSourceText source, WebLingoDiagnostic diagnostic)
+    public static string Format(WebLingoSourceText source, WebLingoDiagnostic diagnostic) =>
+        Format(source.Name, source.GetLocation(diagnostic.Span.Start), diagnostic);
+
+    /// <summary>A diagnostic as a line, in the file <paramref name="name"/>, at <paramref name="location"/>.</summary>
+    public static string Format(string name, WebLingoSourceLocation location, WebLingoDiagnostic diagnostic)
     {
-        var location = source.GetLocation(diagnostic.Span.Start);
         var severity = diagnostic.Severity switch
         {
             WebLingoDiagnosticSeverity.Error => "error",
             WebLingoDiagnosticSeverity.Warning => "warning",
             _ => "info"
         };
-        return $"{source.Name}({location.Line},{location.Column}): {severity} {diagnostic.Code}: {diagnostic.Message}";
+        return $"{name}({location.Line},{location.Column}): {severity} {diagnostic.Code}: {diagnostic.Message}";
     }
 
     /// <summary>

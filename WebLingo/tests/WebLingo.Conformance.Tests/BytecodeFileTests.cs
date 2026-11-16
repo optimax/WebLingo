@@ -28,6 +28,7 @@ public sealed class BytecodeFileTests
             var file = WebLingoBytecodeFile.Write(module, TextOf);
             Assert.True(WebLingoBytecodeFile.TryReadRegister(file, out var read, out var positions, out var error), error);
             Assert.Equal(file, WebLingoBytecodeFile.Write(read, TextOf));
+            Assert.Equal(WebLingoDisassembler.Format(module), WebLingoDisassembler.Format(read));
             Assert.Equal(Run(module, text, null), Run(read, text, positions));
         }
         if (new WebLingoStackCompiler(Options).Compile(source, "program.wl").Module is { } stack)
@@ -35,6 +36,16 @@ public sealed class BytecodeFileTests
             var file = WebLingoBytecodeFile.Write(stack, TextOf);
             Assert.True(WebLingoBytecodeFile.TryReadStack(file, out var read, out var positions, out var error), error);
             Assert.Equal(file, WebLingoBytecodeFile.Write(read, TextOf));
+            var disassembly = WebLingoStackDisassembler.Format(stack);
+            Assert.Equal(disassembly, WebLingoStackDisassembler.Format(read));
+            // Every operation is shown by its name.
+            foreach (var function in read.Functions.Prepend(read.EntryPoint))
+            {
+                foreach (var instruction in function.Code)
+                {
+                    Assert.StartsWith(instruction.OpCode.ToString(), WebLingoStackDisassembler.Format(read, function, instruction));
+                }
+            }
             Assert.Equal(Run(stack, text, null), Run(read, text, positions));
         }
     }
