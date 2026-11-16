@@ -146,36 +146,6 @@ A3: (b)
 
 2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
 
-## [DONE] COM Module
-
-Design and propose a native extension for Windows that would allow the scripts to use COM objects, like old ASP did. Do not code it yet.
-
-2026-11-15 (Claude): designed, not coded, in the specification, section 3.10 ("COM objects on Windows"), all of it Proposed: a native module that only Windows hosts install; `com.create("ADODB.Connection")` and `com.get(moniker)`, as `Server.CreateObject` and `GetObject`, giving a native class's instances that hold the COM objects and release them when disposed; their members through `IDispatch`, `x[k]` their default member, through the indexers part 4 gives native classes; `VARIANT`s mapped to WebLingo's values, currency and decimals as numbers and dates as ISO 8601 strings until WebLingo has those kinds; a failed call a catchable `ComError` (WL3012, with `number`, `source` and `description`, as ASP's `Err`); each COM object its worker's, as COM's apartments ask; and `foreach` over a COM collection waiting for the question part 4 asks. Five decisions, each answerable with a letter.
-
-Q1, its name: (a) `std:com`, a standard module that only a Windows host installs; (b) a scheme of its own for Windows's native modules, `windows:com`.
-
-A1: (b)
-
-Q2, its objects' members, known only while the program runs: (a) as a program writes any member, `conn.Open(text)`, `rs.EOF`, a native class getting a fallback for the members it does not declare (a getter, a setter and a call, each a native function); (b) through methods of `ComObject`'s own, `conn.call("Open", [text])`, `rs.get("EOF")`, `rs.set("Filter", text)`, native classes unchanged.
-
-A2: (a)
-
-Q3, the threads COM runs on: (a) each worker that runs a script a single-threaded apartment's, with a message pump, as ASP's were, every object's calls direct; (b) workers as now, COM's objects made in an apartment of COM's own, every call to one marshalled to it, slower; (c) a thread of its own for COM in each execution, every call sent to it.
-
-A3: (a)
-
-Q4, the objects a script may make: (a) any the process may; (b) only the ProgIDs and CLSIDs an application's configuration lists, `weblingo.json`'s `"com": { "allow": ["ADODB.Connection"] }`, none by default, since objects such as `WScript.Shell` reach the whole machine.
-
-A4: Don't allow com by default. It requires a config permission. (Claude's reading, which the owner did not correct: (b), the permission listing the objects allowed, `"*"` allowing any.)
-
-Q5, how its C# calls COM: (a) `IDispatch` through function pointers on its table of methods, by platform invoke, so that the same source compiles with Native C#; (b) .NET's own COM interop (`dynamic`, `[ComImport]`), simpler, but for .NET only.
-
-A5: (a)
-
-2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
-
-2026-11-15 (Claude): the answers recorded as approved in the specification, section 3.10 and its register: `windows:com`, under a scheme of its own (A1); members written as any member, through a fallback native classes get for members they do not declare (A2); each worker a single-threaded apartment's thread with a message pump (A3); COM not allowed by default, a permission in the application's configuration (A4, read as a list of the ProgIDs and CLSIDs allowed, `"*"` for any, which the owner did not correct, and recorded as Proposed); `IDispatch` through function pointers, by platform invoke (A5). Guessed, and Proposed: the `windows` scheme's folder `windows/` beside the runtime; a COM member hidden by one every value has reached by `ComObject`'s `call`, `get` and `set`; a ProgID the configuration does not list WL3001. Designed only, as the task asks: nothing is built. Documents only.
-
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value
