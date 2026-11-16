@@ -25,15 +25,22 @@ public sealed record WebLingoRequestOutcome(WebLingoRequestOutcomeKind Kind, str
 public sealed class WebLingoApplication
 {
     private readonly WebLingoApplicationOptions _options;
-    private readonly IReadOnlyList<WebLingoBuiltinDeclaration> _declarations;
+    private readonly WebLingoWorkerServices[] _services;
+    private readonly IReadOnlyList<WebLingoBuiltinDeclaration>[] _declarations;
     private volatile Generation _current;
 
     private WebLingoApplication(WebLingoApplicationOptions options, Generation generation)
     {
         _options = options;
-        var declarations = new List<WebLingoBuiltinDeclaration>();
-        foreach (var builtin in options.Services.Builtins) declarations.Add(new WebLingoBuiltinDeclaration(builtin.Name, builtin.Arity));
-        _declarations = declarations;
+        _services = new WebLingoWorkerServices[options.Workers];
+        _declarations = new IReadOnlyList<WebLingoBuiltinDeclaration>[options.Workers];
+        for (var i = 0; i < options.Workers; i++)
+        {
+            _services[i] = options.WorkerServices(new WebLingoWorkerId(i));
+            var declarations = new List<WebLingoBuiltinDeclaration>();
+            foreach (var builtin in _services[i].Builtins.Builtins) declarations.Add(new WebLingoBuiltinDeclaration(builtin.Name, builtin.Arity));
+            _declarations[i] = declarations;
+        }
         _current = generation;
     }
 
@@ -80,7 +87,7 @@ public sealed class WebLingoApplication
         var output = new WebLingoResponseText();
         var context = new WebLingoExecutionContext(worker)
         {
-            Services = new RequestServices(_options.Services, WebLingoTemplateBuiltins.Create(output)),
+            Services = new RequestServices(_services[worker.Value].Builtins, WebLingoTemplateBuiltins.Create(output)),
             Output = output,
             FileSystem = _options.FileSystem,
             Clock = _options.Clock,
@@ -102,12 +109,12 @@ public sealed class WebLingoApplication
         return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
     }
 
-    /// <summary>A page compiled, with its files found from the application's root, or its errors, each as a line.</summary>
-    private CompiledPage Compile(string file)
+    /// <summary>A page compiled on a worker, with its files found from the application's root, or its errors, each as a line.</summary>
+    private CompiledPage Compile(string file, WebLingoWorkerId worker)
     {
         var templates = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wasp");
         var modules = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wl");
-        var options = new WebLingoCompilerOptions(_declarations) { Resolver = modules, Native = _options.Native };
+        var options = new WebLingoCompilerOptions(_declarations[worker.Value]) { Resolver = modules, Native = _services[worker.Value].Native };
         var compiler = new WebLingoTemplateCompiler(options, templates);
         var text = new WebLingoSourceText(templates.Read(file) ?? "", file);
         var page = new CompiledPage(text, compiler, modules, new WebLingoModuleLoader(options));
@@ -135,7 +142,7 @@ public sealed class WebLingoApplication
             var pages = _pages[worker.Value];
             if (!pages.TryGetValue(file, out var page))
             {
-                page = application.Compile(file);
+                page = application.Compile(file, worker);
                 pages.Add(file, page);
             }
             return page;

@@ -1,0 +1,22 @@
+:root { --leaf: #4b7f52; --ink: #23302a; --paper: #fbf8f1; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Georgia, "Times New Roman", serif; color: var(--ink); background: var(--paper); line-height: 1.5; }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 1rem 2rem; background: var(--leaf); }
+header a { color: #fff; text-decoration: none; margin-left: 1.25rem; }
+header a.brand { margin-left: 0; font-size: 1.4rem; font-weight: bold; }
+header a.current { border-bottom: 2px solid #fff; }
+main { max-width: 60rem; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
+.hero { text-align: center; padding: 2rem 0; }
+.button { display: inline-block; padding: .5rem 1.25rem; border-radius: 1.5rem; background: var(--leaf); color: #fff; text-decoration: none; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1rem; }
+.tea { padding: 1rem 1.25rem; border-radius: .5rem; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); border-top: 6px solid var(--leaf); }
+.tea.black { border-top-color: #6b3e26; }
+.tea.white { border-top-color: #c9c2a8; }
+.tea.oolong { border-top-color: #b07d2b; }
+.tea h3 { margin: 0 0 .25rem; }
+.origin, .brew { margin: .25rem 0; font-size: .95rem; }
+.price { margin: .5rem 0 0; font-weight: bold; }
+h2.kind { text-transform: capitalize; }
+table { border-collapse: collapse; width: 100%; background: #fff; }
+th, td { padding: .5rem .75rem; border-bottom: 1px solid #e3ddcc; text-align: left; }
+footer { text-align: center; padding: 1.5rem; font-size: .9rem; color: #6b6b6b; }

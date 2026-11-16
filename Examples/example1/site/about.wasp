@@ -1,0 +1,8 @@
+<% layout "/layouts/main.wasp", { title: "About", section: "about" }; %>
+<% var motto = "Tea & patience <always>"; %>
+<h1>About us</h1>
+<p>We are a small tea house, and this is our example of a website built with WASP: every page here is a <code>.wasp</code> file,
+compiled the first time it is asked for, and then served from memory.</p>
+<p>Our motto, written as text and so escaped: <q><%= motto %></q>.</p>
+<p>The pages share one layout, <code>layouts/main.wasp</code>, which includes the header and the footer; the teas come from a
+module, <code>lib/teas.wl</code>, and each is shown by a component, <code>components/tea-card.wasp</code>.</p>

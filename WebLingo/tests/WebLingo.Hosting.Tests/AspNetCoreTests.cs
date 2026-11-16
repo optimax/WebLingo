@@ -102,11 +102,11 @@ public sealed class AspNetCoreTests : IDisposable
 
     private async Task<DefaultHttpContext> Serve(string method, string path)
     {
-        var services = new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction(), new WebLingoDelayFunction());
         var application = WebLingoApplication.Load(new WebLingoApplicationOptions(_root, new DotNetFileSystem())
         {
             Workers = _workers.Count,
-            Services = services,
+            WorkerServices = _ => new WebLingoWorkerServices(
+                new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction(), new WebLingoDelayFunction())),
             Clock = new WebLingoExecutionClock(new DotNetClock()),
             Scheduler = () => new DotNetSchedulerHost()
         }, out var error);

@@ -7,5 +7,9 @@
     <ProjectReference Include="../WebLingo.Cli/WebLingo.Cli.csproj" />
     <ProjectReference Include="../WebLingo.Templates/WebLingo.Templates.csproj" />
     <ProjectReference Include="../WebLingo.StdLib/WebLingo.StdLib.csproj" />
+    <ProjectReference Include="../WebLingo.Hosting/WebLingo.Hosting.csproj" />
+    <ProjectReference Include="../WebLingo.Hosting.AspNetCore/WebLingo.Hosting.AspNetCore.csproj" />
   </ItemGroup>
+  <!-- wasp serve: an ASP.NET Core application, on Kestrel, or under IIS through the ASP.NET Core Module (section 6.12). -->
+  <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>
 </Project>

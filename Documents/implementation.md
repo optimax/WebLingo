@@ -37,7 +37,7 @@ Before changing source, read the specification's decision register (section 1.1)
 
 # 3. Repository Layout and Projects
 
-The repository root holds the files for agents and for planning (`AGENTS.md`, `CLAUDE.md`, `TO-DO.md`, `TO-DO-INSTRUCTIONS.md`, `DONE.md`, `HANDOFF.md`), the `.gitignore` for the whole repository, `.github/workflows/` for CI, and `Documents/`, the project's documents. The solution is in the `WebLingo/` folder:
+The repository root holds the files for agents and for planning (`AGENTS.md`, `CLAUDE.md`, `TO-DO.md`, `TO-DO-INSTRUCTIONS.md`, `DONE.md`, `HANDOFF.md`), the `.gitignore` for the whole repository, `.github/workflows/` for CI, `Documents/`, the project's documents, and `Examples/`, example applications, each everything a server needs to run it once its own script has published what it is served by (`Examples/example1`, a website built with WASP, which `WaspServeTests` serves). The solution is in the `WebLingo/` folder:
 
 ```text
 WebLingo/                      the repository

@@ -44,6 +44,14 @@ public sealed class WaspTests : IDisposable
     }
 
     [Fact]
+    public void AnImportFromSlashIsFromTheRoot_AsWaspServeHasIt()
+    {
+        Write("site/lib/util.wl", "export function twice(x) { return x * 2; }");
+        var page = Write("site/pages/index.wasp", "<% import { twice } from \"/lib/util.wl\"; %><b><%= twice(21) %></b>");
+        Assert.Equal((WebLingoCommandLine.Success, "<b>42</b>", ""), Run(["run", "--root", Path.Combine(_folder, "site"), page]));
+    }
+
+    [Fact]
     public void ErrorsNameThePageWithTheirLineAndColumn()
     {
         var (exit, output, error) = Wasp("check", "<p>\n  <% var x = 1;\n");

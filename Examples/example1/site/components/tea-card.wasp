@@ -1,0 +1,9 @@
+<% param tea; param detailed = false; import { steeping } from "/lib/teas.wl"; %>
+<article class="tea <%= tea.kind %>">
+  <h3><%= tea.name %></h3>
+  <p class="origin"><%= tea.origin %>, <%= tea.kind %> tea</p>
+<% if (detailed) { %>
+  <p class="brew">Brew at <%= tea.celsius %> °C (<%= $"{tea.fahrenheit():N0}" %> °F) for <%= steeping(tea.minutes) %>.</p>
+<% } %>
+  <p class="price"><%= $"€{tea.price:N2} for 100 g" %></p>
+</article>

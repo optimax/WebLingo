@@ -2,12 +2,14 @@ using System.Text.Json;
 namespace WebLingo.Cli;
 
 /// <summary>
-/// A command line's schemes (specification, section 3.9, "Native modules"), each a name and the full path of a folder of
-/// native modules: <c>std</c>'s, <c>std/</c> beside the program, unless configured; then those of <c>weblingo.config</c>, in
-/// the program's folder, <c>{ "schemes": { "native": "C:/WebLingo/native" } }</c>, a relative folder there being from the
-/// file's folder; then those the command line gives, <c>--scheme native=folder</c>, a relative folder from the current one,
-/// each over the file's of its name. A scheme's name is ASCII letters and digits, a letter first, at least two of them, so
-/// that a drive letter is never one.
+/// A command line's configuration, <c>weblingo.config</c>, JSON, in the program's folder, or in an application's root
+/// (specification, sections 3.9 and 6.12). Its schemes, each a name and the full path of a folder of native modules:
+/// <c>std</c>'s, <c>std/</c> beside the program, unless configured; then those of the configuration,
+/// <c>{ "schemes": { "native": "C:/WebLingo/native" } }</c>, a relative folder there being from the file's folder; then
+/// those the command line gives, <c>--scheme native=folder</c>, a relative folder from the current one, each over the
+/// file's of its name. A scheme's name is ASCII letters and digits, a letter first, at least two of them, so that a drive
+/// letter is never one. And an application's environment, <c>"environment": "development"</c> or <c>"production"</c>,
+/// which only <c>wasp serve</c> reads.
 /// </summary>
 public static class WebLingoSchemes
 {
@@ -16,16 +18,24 @@ public static class WebLingoSchemes
 
     /// <summary>The schemes for the program at <paramref name="program"/>, the command line's given; false, with why, otherwise.</summary>
     public static bool TryLoad(string program, IReadOnlyDictionary<string, string> given, out Dictionary<string, string> schemes,
-        out string? error)
+        out string? error) =>
+        TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", given, out schemes, out _, out error);
+
+    /// <summary>
+    /// The configuration in <paramref name="folder"/>: its schemes, the command line's given over them, and its environment,
+    /// <c>development</c>, <c>production</c>, or null if it names none; false, with why, otherwise.
+    /// </summary>
+    public static bool TryLoadFolder(string folder, IReadOnlyDictionary<string, string> given, out Dictionary<string, string> schemes,
+        out string? environment, out string? error)
     {
         schemes = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["std"] = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "std"))
         };
-        error = null;
-        var folder = Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".";
+        (environment, error) = (null, null);
+        folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, ConfigurationFile);
-        if (File.Exists(file) && !TryRead(file, folder, schemes, out error)) return false;
+        if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, out error)) return false;
         foreach (var (name, path) in given) schemes[name] = Path.GetFullPath(path);
         return true;
     }
@@ -41,7 +51,7 @@ public static class WebLingoSchemes
         return true;
     }
 
-    private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, out string? error)
+    private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? environment, out string? error)
     {
         error = null;
         try
@@ -54,9 +64,19 @@ public static class WebLingoSchemes
             }
             foreach (var setting in document.RootElement.EnumerateObject())
             {
+                if (setting.Name == "environment")
+                {
+                    if (setting.Value.ValueKind != JsonValueKind.String || setting.Value.GetString() is not ("development" or "production"))
+                    {
+                        error = $"{file}: \"environment\" is \"development\" or \"production\".";
+                        return false;
+                    }
+                    environment = setting.Value.GetString();
+                    continue;
+                }
                 if (setting.Name != "schemes")
                 {
-                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\".";
+                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\" and \"environment\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)

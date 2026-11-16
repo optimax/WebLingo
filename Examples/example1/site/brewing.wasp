@@ -1,0 +1,12 @@
+<% import { all, steeping } from "/lib/teas.wl"; %>
+<% layout "/layouts/main.wasp", { title: "Brewing", section: "brewing" }; %>
+<h1>Brewing guide</h1>
+<p>Each tea wants its own water and its own time: too hot or too long, and it turns bitter.</p>
+<table>
+  <thead><tr><th>Tea</th><th>Water</th><th>Steeping</th></tr></thead>
+  <tbody>
+<% foreach (var tea in all()) { %>
+    <tr><td><%= tea.name %></td><td><%= tea.celsius %> °C, <%= $"{tea.fahrenheit():N0}" %> °F</td><td><%= steeping(tea.minutes) %></td></tr>
+<% } %>
+  </tbody>
+</table>

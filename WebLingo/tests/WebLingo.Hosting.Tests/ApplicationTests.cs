@@ -148,9 +148,13 @@ public sealed class ApplicationTests
 
     private static WebLingoApplication Load(MemoryFileSystem files, WebLingoEnvironment environment = WebLingoEnvironment.Production)
     {
-        var services = new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction(), new WebLingoDelayFunction());
-        var app = WebLingoApplication.Load(new WebLingoApplicationOptions(Root, files) { Workers = 2, Services = services, Environment = environment },
-            out var error);
+        var app = WebLingoApplication.Load(new WebLingoApplicationOptions(Root, files)
+        {
+            Workers = 2,
+            WorkerServices = _ => new WebLingoWorkerServices(
+                new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction(), new WebLingoDelayFunction())),
+            Environment = environment
+        }, out var error);
         Assert.True(app is not null, error);
         return app;
     }

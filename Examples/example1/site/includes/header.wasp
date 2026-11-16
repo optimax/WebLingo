@@ -1,0 +1,12 @@
+<header>
+  <a class="brand" href="/">The Lingo Tea House</a>
+  <nav>
+<% foreach (var link in [["/", "Home", "home"], ["/teas", "Our teas", "teas"], ["/brewing", "Brewing", "brewing"], ["/about", "About", "about"]]) { %>
+<%   if (link[2] == section) { %>
+    <a class="current" href="<%= link[0] %>"><%= link[1] %></a>
+<%   } else { %>
+    <a href="<%= link[0] %>"><%= link[1] %></a>
+<%   } %>
+<% } %>
+  </nav>
+</header>
