@@ -44,12 +44,6 @@ What a page and a `.wl` route handler see of their request and response, and wha
 
 A1:
 
-## [IDLE] M0.14.6: Reloading
-
-An application's files watched, a new generation compiled when one changes, and published atomically once healthy, the old one drained (specification, section 6.5, WL-T007; section 9, "M0.14 parts", part 6). Added by Claude, 2026-11-16.
-
-2026-11-16: waits for M0.14.2.
-
 ## [IDLE] M0.14.7: Streaming
 
 A response's body written as the page runs, with backpressure, and a request's body read as it arrives, neither buffered whole (specification, sections 6.7 and WL-T008; section 9, "M0.14 parts", part 7). Added by Claude, 2026-11-16.
