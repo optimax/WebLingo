@@ -146,7 +146,7 @@ A3: (b)
 
 2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
 
-## COM Module
+## [DONE] COM Module
 
 Design and propose a native extension for Windows that would allow the scripts to use COM objects, like old ASP did. Do not code it yet.
 
@@ -173,6 +173,8 @@ Q5, how its C# calls COM: (a) `IDispatch` through function pointers on its table
 A5: (a)
 
 2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
+
+2026-11-15 (Claude): the answers recorded as approved in the specification, section 3.10 and its register: `windows:com`, under a scheme of its own (A1); members written as any member, through a fallback native classes get for members they do not declare (A2); each worker a single-threaded apartment's thread with a message pump (A3); COM not allowed by default, a permission in the application's configuration (A4, read as a list of the ProgIDs and CLSIDs allowed, `"*"` for any, which the owner did not correct, and recorded as Proposed); `IDispatch` through function pointers, by platform invoke (A5). Guessed, and Proposed: the `windows` scheme's folder `windows/` beside the runtime; a COM member hidden by one every value has reached by `ComObject`'s `call`, `get` and `set`; a ProgID the configuration does not list WL3001. Designed only, as the task asks: nothing is built. Documents only.
 
 # END-OF-TO-DO
 
