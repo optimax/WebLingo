@@ -27,8 +27,9 @@ example1/               the site, and wasp's root
 
 - **Pages and routes.** A page is found by its path without `.wasp`: `/brewing` is `brewing.wasp`, and `/teas` is
   `teas/index.wasp`. A page's source, a module's (`/lib/teas.wl`), the configuration and `web.config` are never served.
-- **A layout.** Every page begins `<% layout "/layouts/main.wasp", { title: "…", section: "…" }; %>`; the rest of the
-  page is the body, which the layout writes where it calls `renderBody()`.
+- **A layout.** Every page names its layout at its top, after its imports,
+  `<% layout "/layouts/main.wasp", { title: "…", section: "…" }; %>`; the rest of the page is the body, which the layout
+  writes where it calls `renderBody()`.
 - **Includes.** The layout includes `/includes/header.wasp` and `/includes/footer.wasp` as if their text stood there:
   the header reads the layout's `section` to mark the current page.
 - **A component.** `await renderComponent("/components/tea-card.wasp", { tea: tea, detailed: true });` renders a tea,
@@ -43,13 +44,15 @@ folder.
 
 ### Running it locally
 
-From the repository's `WebLingo` folder, with the .NET 10 SDK:
+With the .NET 10 SDK, from the repository's root, the folder that holds `Examples` and `WebLingo`:
 
 ```bash
-dotnet run --project src/WebLingo.Wasp.Cli -- serve --root ../Examples/example1
+dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples/example1
 ```
 
-and open <http://localhost:8080/>. `--port` chooses another port. Locally, an error in a page shows in the browser;
+and open <http://localhost:8080/>. Both paths are from the folder you run it in: from the solution's folder, `WebLingo`,
+the one that holds `WebLingo.slnx`, the command is `dotnet run --project src/WebLingo.Wasp.Cli -- serve --root
+../Examples/example1`. `--port` chooses another port. Locally, an error in a page shows in the browser;
 under IIS it does not, unless the site's `wasp.config` says `{ "environment": "development" }`.
 
 ### Deploying it to IIS
@@ -59,12 +62,23 @@ holds only its own files.
 
 Once for the server:
 
-1. Install the ASP.NET Core Hosting Bundle for .NET 10, which brings the .NET runtime and IIS's ASP.NET Core Module.
-2. On a Windows machine with the .NET 10 SDK, run the solution's `publish.ps1` (`WebLingo/publish.ps1`), which publishes
-   WebLingo into `WebLingo/publish/WebLingo`: `wasp.exe`, `weblingo.exe`, their libraries, and the standard modules,
-   `std\`.
-3. Copy that folder to the server as `C:\Program Files\WebLingo`. On the server itself, `publish.ps1 -Destination
-   "C:\Program Files\WebLingo"`, from an elevated PowerShell, does both.
+1. Turn on IIS (Windows Features' **Internet Information Services**, or, on Windows Server, the **Web Server (IIS)**
+   role), then install the ASP.NET Core Hosting Bundle for .NET 10, which brings the .NET and ASP.NET Core runtimes
+   and IIS's ASP.NET Core Module. Install the bundle after IIS: one installed before it does not add the module to IIS
+   until it is run again and repaired.
+2. On a Windows machine with the .NET 10 SDK and this repository, publish WebLingo from the solution's folder,
+   `WebLingo`:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File publish.ps1
+   ```
+
+   which publishes it into `WebLingo/publish/WebLingo`: `wasp.exe`, `weblingo.exe`, their libraries, and the standard
+   modules, `std\`. `-ExecutionPolicy Bypass` lets this one script run, without changing the machine's policy, where
+   Windows's default runs no script ("running scripts is disabled on this system").
+3. Copy that folder to the server as `C:\Program Files\WebLingo`. On the server itself, when it has the SDK and the
+   repository, `powershell -ExecutionPolicy Bypass -File publish.ps1 -Destination "C:\Program Files\WebLingo"`, from an
+   elevated prompt, does both.
 
 For this site:
 

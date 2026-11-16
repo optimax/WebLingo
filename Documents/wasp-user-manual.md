@@ -41,14 +41,22 @@ lists what is missing.
 ### What you need
 
 To serve a site you need `wasp`, WASP's command line, and the .NET 10 runtime it runs on. Until WASP has an installer,
-you build it from the repository, with the .NET 10 SDK: in the repository's `WebLingo` folder, either run it directly,
+you build it from the repository, with the .NET 10 SDK: either run it directly, from the repository's root, the folder
+that holds `Examples` and `WebLingo`,
 
 ```bash
-dotnet run --project src/WebLingo.Wasp.Cli -- serve --root ../Examples/example1
+dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples/example1
 ```
 
-or publish it once, with `publish.ps1`, which puts `wasp`, `weblingo` and the standard modules into one folder,
-`publish/WebLingo`, from which you run `wasp` (section 17 installs that folder on a server).
+or publish it once, from the solution's folder, `WebLingo`, the one that holds `WebLingo.slnx`,
+
+```powershell
+powershell -ExecutionPolicy Bypass -File publish.ps1
+```
+
+which puts `wasp`, `weblingo` and the standard modules into one folder, `WebLingo/publish/WebLingo`, from which you run
+`wasp` (section 17 installs that folder on a server). `-ExecutionPolicy Bypass` lets this one script run, without
+changing the machine's policy, where Windows's default runs no script.
 
 ### Your first page
 
@@ -714,12 +722,16 @@ holds only its own files, its pages beside its `web.config`.
 
 Once for the server:
 
-1. Install the **ASP.NET Core Hosting Bundle** for .NET 10, which brings the .NET runtime and IIS's ASP.NET Core
-   Module.
-2. On a Windows machine with the .NET 10 SDK, run the repository's `WebLingo/publish.ps1`, which publishes WebLingo
-   into `WebLingo/publish/WebLingo`: `wasp.exe`, `weblingo.exe`, their libraries, and the standard modules, `std\`.
-3. Copy that folder to the server as `C:\Program Files\WebLingo`. On the server itself, `publish.ps1 -Destination
-   "C:\Program Files\WebLingo"`, from an elevated PowerShell, does both.
+1. Turn on IIS (Windows Features' **Internet Information Services**, or, on Windows Server, the **Web Server (IIS)**
+   role), then install the **ASP.NET Core Hosting Bundle** for .NET 10, which brings the .NET and ASP.NET Core
+   runtimes and IIS's ASP.NET Core Module. Install the bundle after IIS: one installed before it does not add the
+   module to IIS until it is run again and repaired.
+2. On a Windows machine with the .NET 10 SDK and the repository, publish WebLingo from the solution's folder,
+   `WebLingo`, with `powershell -ExecutionPolicy Bypass -File publish.ps1`, which publishes it into
+   `WebLingo/publish/WebLingo`: `wasp.exe`, `weblingo.exe`, their libraries, and the standard modules, `std\`.
+3. Copy that folder to the server as `C:\Program Files\WebLingo`. On the server itself, when it has the SDK and the
+   repository, `powershell -ExecutionPolicy Bypass -File publish.ps1 -Destination "C:\Program Files\WebLingo"`, from
+   an elevated prompt, does both.
 
 For each site:
 
