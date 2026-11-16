@@ -67,7 +67,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | M0.6 testing default | xUnit on .NET 10 | Adopted M0.6 default |
 | M0.6 implementation choices | Lexical, syntax, runtime and CLI choices made where this specification is silent, while implementing M0.6.2 onward (§15.2) | Each row of §15.2 has its own status; the lexical and syntax ones, and the binding ones but "Compilation stages", the bytecode ones but "Compiler output", and the runtime and CLI ones asked about, approved 12 November 2026; the rest are Proposed |
 | Repository documents | One copy of this specification, `Documents/weblingo-architecture.md`; documents in the repository's root `Documents/` folder; a shallow folder structure, with no `docs/architecture/` folder; the whole repository may become public (§8.2) | Approved (12 November 2026) |
-| Milestones after M0.8 | M0.9 collections, M0.10 classes and disposal, M0.11 asynchrony, M0.12 `.wasp` templates, M0.13 WLBC, in that order (§9) | Approved (13 November 2026; asynchrony put before templates the same day) |
+| Milestones after M0.8 | M0.9 collections, M0.10 classes and disposal, M0.11 asynchrony, M0.12 `.wasp` templates, M0.13 WLBC, in that order, then M0.14 hosting (§9) | Approved (13 November 2026; asynchrony put before templates the same day; hosting after WLBC 16 November 2026) |
 
 **Approval boundary:** M0.6 was approved as a specification. This does not imply the repository or implementation already exists. Detailed M0.3 encoding choices were recommended but not separately approved; the architectural decision between stack and register VMs remains open.
 
@@ -1025,6 +1025,7 @@ Proposed central props:
 | M0.11 | Asynchrony: `async`, `await` and tasks (§3.8) | Implemented (13 November 2026), in parts M0.11.1 and M0.11.2 (below), on both VMs, on Windows |
 | M0.12 | `.wasp` templates: includes, layouts and parameterized components, together (§13, WL-T001 to WL-T008) | Its contracts decided in part (§13, "Contracts", 13 November 2026); after M0.11, and the module system it needs (`import` and `param`), both done; in parts M0.12.1 to M0.12.5 (below, 14 November 2026), all implemented (14 November 2026), on both VMs, on Windows, `samples/SimpleWebsite` running through `wasp`; what WL-T007 and WL-T008 ask of a host (dependency invalidation, application generations, cancellation and streaming to a response) waits for hosting |
 | M0.13 | WLBC, the bytecode's binary format (§5.1, §5.3) | Implemented (16 November 2026), in parts (below), on both VMs: a format for each VM's bytecode, in one container, both VMs kept (15 November 2026); WASP never writing its files, and the format's questions answered (16 November 2026) |
+| M0.14 | Hosting: web applications served through the ASP.NET Core adapter, for IIS first (§6, WL-H009), their pages and `.wl` route handlers compiled and cached in memory, their generations reloaded atomically (WL-T007), and served locally from the command line (§8.4) | The owner's choice (16 November 2026); in parts (below), M0.14.1 first |
 
 **M0.7 parts** (12 November 2026), each landing on its own with its conformance tests, which `WebLingo.Conformance.Tests` runs beside §8.6's:
 
@@ -1078,6 +1079,16 @@ Proposed central props:
 1. **M0.13.1, the format:** WLBC's writer and reader for both VMs' modules (§5.3, "As built"), each section's CRC-32 checked, a damaged file or one of an unknown version rejected as WL4001, and what is read verified; every conformance program written, read back and run on both VMs. Implemented (16 November 2026), on both VMs.
 2. **M0.13.2, the command line:** `weblingo compile [--register|--stack] script.wl`, writing `script.wlbc`; `weblingo run script.wlbc`, on the VM its header names; `weblingo disasm script.wlbc`, with a disassembler of the stack bytecode; the native modules a `.wlbc` names loaded when it runs; its files named from the program's folder; and `weblingo run script.wl` writing no `.wlbc`. Implemented (16 November 2026), on both VMs.
 
+**M0.14 parts** (16 November 2026), each landing on its own with its tests:
+
+1. **M0.14.1, WLHI's HTTP contracts** (§6.7): a request's method, path, query, scheme, host, headers and body, and a response's status, headers and body, Uncommitted, then Committed, its status and headers fixed, then Completed; and a request and a response held in memory, for tests and for hosts that buffer.
+2. **M0.14.2, the host's core** (§6.3 to §6.6): the runtime, its applications and their generations, an application's pages and handlers compiled and cached in memory (§5.1), a request's path found among them, run on a worker, its output written to the response, and a runtime error's response.
+3. **M0.14.3, the request and the response in scripts:** what a page and a `.wl` route handler see of them, and what a handler is.
+4. **M0.14.4, the ASP.NET Core adapter** (§6.1, WL-H009): ASP.NET Core's requests translated to WLHI's, an application's other files served as they are, and IIS through the ASP.NET Core Module.
+5. **M0.14.5, serving an application locally** on Kestrel, from the command line (§8.4).
+6. **M0.14.6, reloading** (§6.5, WL-T007): an application's files watched, a new generation compiled when one changes, and published atomically once healthy, the old one drained.
+7. **M0.14.7, streaming** (§6.7, WL-T008): a response's body written as the page runs, with backpressure, and a request's body read as it arrives, neither buffered whole.
+
 **Extending the classes of values** (§3.7, 13 November 2026), in parts, each landing on its own with its conformance tests, on both VMs:
 
 1. **`extend` blocks:** methods and static members given to a class, a program's or a kind of value's (`extend Integer { … }`), hoisted with its block's classes, reaching every instance and subclass, made before or after, a method replacing one of the same name. Implemented (13 November 2026), on both VMs.
@@ -1099,7 +1110,7 @@ Proposed central props:
 
 **After M0.8** (order approved by the owner, 13 November 2026): M0.9, then M0.10, M0.11, M0.12 and M0.13, as the table gives them (asynchrony put before templates on 13 November 2026, the owner asking for it to be designed first). Each needs syntax, or a format, that this specification does not give yet, which is decided feature by feature before it is built; and each is built on both VMs (§5.6, "Both VMs, for now").
 
-**Immediate next activity:** M0.13, WLBC, a format for each VM's bytecode, both VMs kept (WL-BC002, 15 November 2026), implemented (16 November 2026), its format and its command line. The roadmap has no milestone after M0.13: what follows is the owner's to decide. The compiler and both VMs cover M0.6's subset, the language of §3.5 to §3.9, and pages, their includes, components and layouts (§13, M0.12).
+**Immediate next activity:** M0.14, hosting (the owner's choice, 16 November 2026), in parts (below): M0.14.1, WLHI's HTTP contracts, first, while the owner's questions for the others are open in `TO-DO.md`. M0.13, WLBC, is implemented (16 November 2026). The compiler and both VMs cover M0.6's subset, the language of §3.5 to §3.9, and pages, their includes, components and layouts (§13, M0.12).
 
 ---
 
