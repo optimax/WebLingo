@@ -145,6 +145,50 @@ public sealed class AspNetCoreTests : IDisposable
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
+    [Fact]
+    public async Task ARequestsBodyIsReadAsItArrives_OnlyIfAScriptReadsIt()
+    {
+        // A page that reads nothing of a body that never comes is served all the same; one that reads it is given it.
+        Write("body.wasp", "<% param request; %><%= await request.text() %>");
+        var context = new DefaultHttpContext();
+        context.Request.Method = "POST";
+        context.Request.Path = "/quick";
+        context.Request.Body = new NeverEndingBody();
+        context.Response.Body = new MemoryStream();
+        Write("quick.wasp", "quick");
+        await WebLingoAspNetCore.Serve(context, Load(), _root, _workers).WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal("quick", Body(context));
+
+        context = new DefaultHttpContext();
+        context.Request.Method = "POST";
+        context.Request.Path = "/body";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("sent"));
+        context.Response.Body = new MemoryStream();
+        await WebLingoAspNetCore.Serve(context, Load(), _root, _workers);
+        Assert.Equal("sent", Body(context));
+    }
+
+    /// <summary>A request's body that never arrives.</summary>
+    private sealed class NeverEndingBody : Stream
+    {
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return 0;
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => 0; set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
     /// <summary>A request's lifetime that records its abort.</summary>
     private sealed class Lifetime : Microsoft.AspNetCore.Http.Features.IHttpRequestLifetimeFeature
     {
@@ -204,7 +248,7 @@ public sealed class AspNetCoreTests : IDisposable
         context.Request.QueryString = new QueryString("?sort=name&page=2");
         context.Request.Headers["X-Tag"] = new Microsoft.Extensions.Primitives.StringValues(["a", "b"]);
         context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("body"));
-        var request = await WebLingoAspNetCore.Translate(context.Request);
+        var request = WebLingoAspNetCore.Translate(context.Request);
         Assert.Equal(("POST", "/products/7", "sort=name&page=2", "https", "example.com:8443"),
             (request.Method, request.Path, request.QueryString, request.Scheme, request.Host));
         Assert.Equal(["a", "b"], request.Headers.GetValues("x-tag"));

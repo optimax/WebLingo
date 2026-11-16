@@ -14,7 +14,11 @@ namespace WebLingo.Hosting;
 /// response's: <c>status</c>, an integer from 100 to 999, and <c>headers</c>, which can be changed until it is sent. A
 /// header is read by indexing, <c>headers["Accept"]</c>, its values joined with <c>", "</c>, a missing one WL3007, as a
 /// map's key is, <c>?[]</c> giving <c>null</c> for it; set by indexing, its value a string; and <c>has(name)</c>,
-/// <c>add(name, value)</c> and <c>remove(name)</c>. A wrong status or header is WL3001 where it is set.
+/// <c>add(name, value)</c> and <c>remove(name)</c>. A wrong status or header is WL3001 where it is set. A request's body
+/// (section 6.12, "Streaming"; section 9, "M0.14.7 parts", part 4): <c>await request.text()</c>, the whole body as text,
+/// UTF-8 unless its <c>Content-Type</c> names another charset, and <c>await request.form()</c>, an
+/// <c>application/x-www-form-urlencoded</c> form's fields as a map, decoded as a query's are, a name given twice having its
+/// last value; each read as it arrives, off the worker, once, and kept, so that each gives the same again.
 /// </summary>
 internal sealed class WebLingoHttpObjects
 {
@@ -32,7 +36,9 @@ internal sealed class WebLingoHttpObjects
             .DeclareProperty("scheme", (a, heap, out r, out e) => Text(a, heap, s => s.Request.Scheme, out r, out e))
             .DeclareProperty("host", (a, heap, out r, out e) => Text(a, heap, s => s.Request.Host, out r, out e))
             .DeclareProperty("query", Query)
-            .DeclareProperty("headers", (a, heap, out r, out e) => RequestHeaders(a, heap, out r, out e));
+            .DeclareProperty("headers", (a, heap, out r, out e) => RequestHeaders(a, heap, out r, out e))
+            .DeclareMethod("text", 0, BodyText)
+            .DeclareMethod("form", 0, BodyForm);
         _response
             .DeclareProperty("status", Status, SetStatus)
             .DeclareProperty("headers", (a, heap, out r, out e) => ResponseHeaders(a, heap, out r, out e));
@@ -124,34 +130,115 @@ internal sealed class WebLingoHttpObjects
     {
         result = WebLingoValue.Null;
         if (!_request.TryGetHostObject<RequestState>(a[0], heap, out var state, out error)) return false;
-        if (state.Roots[2].Kind == WebLingoValueKind.Null)
+        if (state.Roots[2].Kind == WebLingoValueKind.Null && !TryMap(Pairs(state.Request.QueryString), heap, out state.Roots[2], out error)) return false;
+        result = state.Roots[2];
+        return true;
+    }
+
+    /// <summary><c>request.text()</c>: a task giving the whole body as text, in its charset.</summary>
+    private bool BodyText(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        ReadBody(a, heap, (byte[] body, RequestState state, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? failed) =>
         {
-            var pairs = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var part in state.Request.QueryString.Split('&'))
+            made = WebLingoValue.Null;
+            return TryDecode(body, state, out var text, out failed) && h.TryAllocateString(text, out made, out failed);
+        }, out result, out error);
+
+    /// <summary><c>request.form()</c>: a task giving an <c>application/x-www-form-urlencoded</c> body's fields as a map.</summary>
+    private bool BodyForm(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        ReadBody(a, heap, (byte[] body, RequestState state, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? failed) =>
+        {
+            made = WebLingoValue.Null;
+            var type = state.Request.Headers.Get("Content-Type") ?? "";
+            var semicolon = type.IndexOf(';', StringComparison.Ordinal);
+            var media = (semicolon < 0 ? type : type[..semicolon]).Trim();
+            if (!media.Equals("application/x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase))
             {
-                if (part.Length == 0) continue;
-                var equals = part.IndexOf('=', StringComparison.Ordinal);
-                var name = Decode(equals < 0 ? part : part[..equals]);
-                pairs.Remove(name);
-                pairs.Add(name, equals < 0 ? "" : Decode(part[(equals + 1)..]));
+                failed = Invalid($"request.form() reads a form sent as application/x-www-form-urlencoded, not as '{media}'.");
+                return false;
             }
-            var entries = new WebLingoValue[2 * pairs.Count];
-            heap.AddRoots(entries);
+            return TryMap(Pairs(System.Text.Encoding.UTF8.GetString(body)), h, out made, out failed);
+        }, out result, out error);
+
+    private delegate bool BodyFinish(byte[] body, RequestState state, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error);
+
+    /// <summary>A task that reads the request's whole body, once, off the worker, then gives what <paramref name="finish"/> makes of it.</summary>
+    private bool ReadBody(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, BodyFinish finish, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_request.TryGetHostObject<RequestState>(a[0], heap, out var state, out error)) return false;
+        if (heap.Scheduler is not { } scheduler)
+        {
+            error = Invalid("This host cannot read a request's body.");
+            return false;
+        }
+        return scheduler.TryWaitForHost<byte[]?>(state.ReadWhole, (byte[]? body, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? failed) =>
+        {
+            if (body is not null) return finish(body, state, h, out made, out failed);
+            made = WebLingoValue.Null;
+            failed = Invalid("The request's body could not be read: its client has gone.");
+            return false;
+        }, out result, out error);
+    }
+
+    /// <summary>The body as text, in the charset its <c>Content-Type</c> names, UTF-8 if none; WL3001 for one .NET does not know.</summary>
+    private static bool TryDecode(byte[] body, RequestState state, out string text, out WebLingoRuntimeError? error)
+    {
+        (text, error) = ("", null);
+        var encoding = System.Text.Encoding.UTF8;
+        foreach (var parameter in (state.Request.Headers.Get("Content-Type") ?? "").Split(';'))
+        {
+            var equals = parameter.IndexOf('=', StringComparison.Ordinal);
+            if (equals < 0 || !parameter[..equals].Trim().Equals("charset", StringComparison.OrdinalIgnoreCase)) continue;
+            var charset = parameter[(equals + 1)..].Trim().Trim('"');
+            try
+            {
+                encoding = System.Text.Encoding.GetEncoding(charset);
+            }
+            catch (ArgumentException)
+            {
+                error = Invalid($"The request's body is in the charset '{charset}', which this host cannot read.");
+                return false;
+            }
+        }
+        text = encoding.GetString(body);
+        return true;
+    }
+
+    /// <summary>A query's, or a form's, names and values, decoded, a name given twice having its last value.</summary>
+    private static Dictionary<string, string> Pairs(string encoded)
+    {
+        var pairs = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var part in encoded.Split('&'))
+        {
+            if (part.Length == 0) continue;
+            var equals = part.IndexOf('=', StringComparison.Ordinal);
+            var name = Decode(equals < 0 ? part : part[..equals]);
+            pairs.Remove(name);
+            pairs.Add(name, equals < 0 ? "" : Decode(part[(equals + 1)..]));
+        }
+        return pairs;
+    }
+
+    /// <summary>A map of strings to strings, its entries made where the collector keeps them.</summary>
+    private static bool TryMap(Dictionary<string, string> pairs, WebLingoHeap heap, out WebLingoValue map, out WebLingoRuntimeError? error)
+    {
+        map = WebLingoValue.Null;
+        error = null;
+        var entries = new WebLingoValue[2 * pairs.Count];
+        heap.AddRoots(entries);
+        try
+        {
             var at = 0;
             foreach (var (name, value) in pairs)
             {
-                if (!heap.TryAllocateString(name, out entries[at++], out error) || !heap.TryAllocateString(value, out entries[at++], out error))
-                {
-                    heap.RemoveLastRoots(entries);
-                    return false;
-                }
+                if (!heap.TryAllocateString(name, out entries[at++], out error) || !heap.TryAllocateString(value, out entries[at++], out error)) return false;
             }
-            var made = heap.TryAllocateMap(entries, 0, pairs.Count, out state.Roots[2], out error);
-            heap.RemoveLastRoots(entries);
-            if (!made) return false;
+            return heap.TryAllocateMap(entries, 0, pairs.Count, out map, out error);
         }
-        result = state.Roots[2];
-        return true;
+        finally
+        {
+            heap.RemoveLastRoots(entries);
+        }
     }
 
     /// <summary>A query's name or value as the client meant it: <c>+</c> a space, and <c>%xx</c> its byte, as UTF-8.</summary>
@@ -303,8 +390,51 @@ internal sealed class WebLingoHttpObjects
     /// <summary>A request as its instance holds it: the request, and the heap's roots of its instance, its headers and its query.</summary>
     private sealed class RequestState(IWebLingoHttpRequest request)
     {
+        private readonly object _gate = new();
+        private List<Action<byte[]?>>? _waiting;
+        private byte[]? _body;
+        private bool _failed;
+
         public IWebLingoHttpRequest Request { get; } = request;
         public WebLingoValue[] Roots { get; } = new WebLingoValue[3];
+
+        /// <summary>
+        /// Gives <paramref name="done"/> the whole body, from any thread, once it has arrived, read once, then kept; null if it
+        /// cannot be read.
+        /// </summary>
+        public void ReadWhole(Action<byte[]?> done)
+        {
+            lock (_gate)
+            {
+                if (_body is null && !_failed)
+                {
+                    var first = _waiting is null;
+                    (_waiting ??= []).Add(done);
+                    if (first) ReadNext(new MemoryStream(), new byte[16 * 1024]);
+                    return;
+                }
+            }
+            done(_body);
+        }
+
+        private void ReadNext(MemoryStream read, byte[] buffer) => Request.Body.ReadAsync(buffer, 0, buffer.Length, count =>
+        {
+            if (count > 0)
+            {
+                read.Write(buffer, 0, count);
+                ReadNext(read, buffer);
+                return;
+            }
+            List<Action<byte[]?>> waiting;
+            lock (_gate)
+            {
+                if (count == 0) _body = read.ToArray();
+                else _failed = true;
+                waiting = _waiting!;
+                _waiting = null;
+            }
+            foreach (var done in waiting) done(_body);
+        });
     }
 
     /// <summary>A response as its instance holds it: the response, and the heap's roots of its instance and its headers.</summary>

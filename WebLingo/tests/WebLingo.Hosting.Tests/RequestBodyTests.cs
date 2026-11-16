@@ -1,0 +1,74 @@
+using System.Text;
+using WebLingo.Hosting.Abstractions;
+using WebLingo.Platform.DotNet;
+using WebLingo.Runtime;
+using WebLingo.StdLib;
+using Xunit;
+namespace WebLingo.Hosting.Tests;
+
+/// <summary>
+/// A request's body in scripts (specification, section 6.12, "Streaming"; section 9, "M0.14.7 parts", part 4):
+/// <c>await request.text()</c>, in the charset its <c>Content-Type</c> names, and <c>await request.form()</c>, an
+/// <c>application/x-www-form-urlencoded</c> form's fields, each read once, off the worker, and kept.
+/// </summary>
+public sealed class RequestBodyTests
+{
+    [Fact]
+    public void APageReadsItsBodyAsText()
+    {
+        var app = Load();
+        Assert.Equal((200, "héllo wörld|true"),
+            Post(app, "/text", Encoding.UTF8.GetBytes("héllo wörld"), "text/plain"));
+        Assert.Equal((200, "café|true"),
+            Post(app, "/text", [0x63, 0x61, 0x66, 0xE9], "text/plain; charset=\"ISO-8859-1\""));
+        Assert.Equal((200, "|true"), Post(app, "/text", [], null));
+    }
+
+    [Fact]
+    public void APageReadsAFormsFields()
+    {
+        var (status, body) = Post(Load(), "/form", Encoding.UTF8.GetBytes("a=1&b=tea+%26+caf%C3%A9&a=2&c"), "application/x-www-form-urlencoded");
+        Assert.Equal((200, "2|tea &amp; café||a=1&amp;b=tea+%26+caf%C3%A9&amp;a=2&amp;c"), (status, body));
+    }
+
+    [Fact]
+    public void AHandlerReadsAForm()
+    {
+        Assert.Equal((200, "Ann"), Post(Load(), "/api/names", Encoding.UTF8.GetBytes("name=Ann"), "application/x-www-form-urlencoded; charset=utf-8"));
+    }
+
+    [Theory]
+    [InlineData("/form", "application/json", "WL3001: request.form() reads a form sent as application/x-www-form-urlencoded, not as &#39;application/json&#39;.")]
+    [InlineData("/form", null, "WL3001: request.form() reads a form sent as application/x-www-form-urlencoded, not as &#39;&#39;.")]
+    [InlineData("/text", "text/plain; charset=klingon", "WL3001: The request&#39;s body is in the charset &#39;klingon&#39;, which this host cannot read.")]
+    public void ABodyThatCannotBeReadSoIsAnErrorWhereItIsRead(string path, string? type, string error)
+    {
+        var (status, body) = Post(Load(), path, Encoding.UTF8.GetBytes("x"), type);
+        Assert.Equal(500, status);
+        Assert.Contains(error, body);
+    }
+
+    private static WebLingoApplication Load()
+    {
+        var app = WebLingoApplication.Load(new WebLingoApplicationOptions("/site", new MemoryFileSystem()
+            .Add("/site/text.wasp", "<% param request; var t = await request.text(); %><%= t %>|<%= await request.text() == t %>")
+            .Add("/site/form.wasp", "<% param request; var f = await request.form(); %><%= f[\"a\"] %>|<%= f[\"b\"] %>|<%= f[\"c\"] %>|"
+                                    + "<%= await request.text() %>")
+            .Add("/site/api/names.wl", "export async function post(request, response) { var f = await request.form(); write(f[\"name\"]); }"))
+        {
+            WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction())),
+            Scheduler = () => new DotNetSchedulerHost(),
+            Environment = WebLingoEnvironment.Development
+        }, out var error);
+        Assert.True(app is not null, error);
+        return app;
+    }
+
+    private static (int Status, string Body) Post(WebLingoApplication app, string path, byte[] body, string? type)
+    {
+        var response = new WebLingoBufferedResponse();
+        app.Handle(new WebLingoBufferedRequest("POST", path, headers: type is null ? [] : [("Content-Type", type)], body: body), response,
+            new WebLingoWorkerId(0));
+        return (response.StatusCode, Encoding.UTF8.GetString(response.BodyBytes));
+    }
+}

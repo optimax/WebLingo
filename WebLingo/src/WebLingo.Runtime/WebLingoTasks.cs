@@ -351,7 +351,20 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
     /// for it as for an operation off its worker (WL-P007): a page waiting for its client (section 6.12, "Streaming"). WL3001
     /// for a host without a scheduler of its own (<see cref="WebLingoHeap.SchedulerHost"/>).
     /// </summary>
-    public bool TryWaitForHost(Action<Action> start, out WebLingoValue task, out WebLingoRuntimeError? error)
+    public bool TryWaitForHost(Action<Action> start, out WebLingoValue task, out WebLingoRuntimeError? error) =>
+        TryWaitForHost<bool>(done => start(() => done(true)), (bool _, WebLingoHeap _, out WebLingoValue result, out WebLingoRuntimeError? failed) =>
+        {
+            (result, failed) = (WebLingoValue.Null, null);
+            return true;
+        }, out task, out error);
+
+    /// <summary>
+    /// A task that its host completes by calling, once, from any thread, the action <paramref name="start"/> is given, with
+    /// a value, which <paramref name="finish"/> makes the task's result of, or its error, on the worker, as an operation's
+    /// end is (WL-P007): a request's body read as it arrives (section 6.12, "Streaming"). WL3001 for a host without a
+    /// scheduler of its own.
+    /// </summary>
+    public bool TryWaitForHost<T>(Action<Action<T>> start, WebLingoOffWorkerFinish<T> finish, out WebLingoValue task, out WebLingoRuntimeError? error)
     {
         task = WebLingoValue.Null;
         if (heap.SchedulerHost is not { } host)
@@ -363,9 +376,14 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         task = made;
         _operations.Add(made);
         var done = 0;
-        start(() =>
+        start(value =>
         {
-            if (Interlocked.Exchange(ref done, 1) == 0) host.Post(() => Finished(made, null, WebLingoValue.Null));
+            if (Interlocked.Exchange(ref done, 1) != 0) return;
+            host.Post(() =>
+            {
+                if (finish(value, heap, out var result, out var failed)) Finished(made, null, result);
+                else Finished(made, failed);
+            });
         });
         return true;
     }

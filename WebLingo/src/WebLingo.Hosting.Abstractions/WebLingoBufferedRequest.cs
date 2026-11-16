@@ -2,7 +2,8 @@ namespace WebLingo.Hosting.Abstractions;
 
 /// <summary>
 /// A request held in memory, its body whole (specification, section 6.7; section 9, "M0.14 parts", part 1): for tests, and
-/// for a host that has the whole request before it runs it. Its headers are given when it is made, and fixed.
+/// for a host that has the whole request before it runs it, or one whose body it reads as it arrives, given its reader.
+/// Its headers are given when it is made, and fixed.
 /// </summary>
 public sealed class WebLingoBufferedRequest : IWebLingoHttpRequest
 {
@@ -12,11 +13,18 @@ public sealed class WebLingoBufferedRequest : IWebLingoHttpRequest
     /// <param name="body">Its body's bytes, which it keeps; none if null.</param>
     public WebLingoBufferedRequest(string method, string path, string queryString = "", string scheme = "http", string host = "localhost",
         IEnumerable<(string Name, string Value)>? headers = null, byte[]? body = null)
+        : this(method, path, queryString, scheme, host, headers, new Reader(body ?? []))
+    {
+    }
+
+    /// <param name="body">What reads its body, as it arrives.</param>
+    public WebLingoBufferedRequest(string method, string path, string queryString, string scheme, string host,
+        IEnumerable<(string Name, string Value)>? headers, IWebLingoBodyReader body)
     {
         (Method, Path, QueryString, Scheme, Host) = (method, path, queryString, scheme, host);
         foreach (var (name, value) in headers ?? []) _headers.Add(name, value);
         _headers.MakeReadOnly();
-        Body = new Reader(body ?? []);
+        Body = body;
     }
 
     public string Method { get; }
@@ -39,5 +47,7 @@ public sealed class WebLingoBufferedRequest : IWebLingoHttpRequest
             _at += read;
             return read;
         }
+
+        public void ReadAsync(byte[] buffer, int offset, int count, Action<int> done) => done(Read(buffer, offset, count));
     }
 }

@@ -64,6 +64,8 @@ A1: (b) but stream bytes, rather than text.
 
 2026-11-16 (Claude): A1 recorded as approved in the specification, sections 6.12 and 9. Bytes need a value the language does not have yet (specification, section 3.2, "Bytes"), so `request.read()` is a part of its own, "M0.14.7.5: A Body's Bytes", below (section 9, "M0.14.7 parts", part 5); this part builds `request.text()` and `request.form()`, and the body given as it comes.
 
+2026-11-16 (Claude): built (specification, sections 9 and 15.2, "A request's body"). Guessed, and recorded as Proposed: the body read once, when a script first asks for it, and kept, so that `text()` and `form()` give the same again; the charsets `text()` reads, those .NET knows by name, an unknown one WL3001; `form()` reading only `application/x-www-form-urlencoded`, as UTF-8, another type WL3001, a name without `=` an empty string; no size limit of WebLingo's own. Tried on Windows only: the tests, and `wasp serve` given a form, and 5 MB of text, posted; not under IIS, nor on Linux.
+
 ## [QUESTION] M0.14.7.5: A Body's Bytes
 
 `await request.read()`, a request's body's next piece as bytes as it arrives, `null` at its end (the owner's answer to M0.14.7.4's question), and the value that holds bytes, which the language does not have yet (specification, section 3.2, "Bytes": binary data, distinct from strings, proposed), designed first (section 9, "M0.14.7 parts", part 5). Added by Claude, 2026-11-16.

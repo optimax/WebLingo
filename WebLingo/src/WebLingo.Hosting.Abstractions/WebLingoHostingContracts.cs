@@ -106,14 +106,21 @@ public interface IWebLingoHeaderCollection
     WebLingoHeaderChange Remove(string name);
 }
 
-/// <summary>A request's body, read in pieces.</summary>
+/// <summary>A request's body, read in pieces, as it arrives.</summary>
 public interface IWebLingoBodyReader
 {
     /// <summary>
-    /// Reads up to <paramref name="count"/> bytes into <paramref name="buffer"/> from <paramref name="offset"/>: how many it
-    /// read, 0 at the body's end, or for a range outside the buffer.
+    /// Reads up to <paramref name="count"/> bytes into <paramref name="buffer"/> from <paramref name="offset"/>, waiting for
+    /// them: how many it read, 0 at the body's end, or for a range outside the buffer; -1 if the body cannot be read, its
+    /// client gone. A host reads so on a thread of its own, never a worker's.
     /// </summary>
     int Read(byte[] buffer, int offset, int count);
+
+    /// <summary>
+    /// Reads as <see cref="Read"/> does, but without waiting: <paramref name="done"/> is called once, from any thread, with
+    /// how many bytes it read, 0 at the body's end, or -1 (specification, section 6.12, "Streaming").
+    /// </summary>
+    void ReadAsync(byte[] buffer, int offset, int count, Action<int> done);
 }
 
 /// <summary>A response's body, written in pieces.</summary>
