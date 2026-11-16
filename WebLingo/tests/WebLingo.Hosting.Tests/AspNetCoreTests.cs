@@ -51,6 +51,44 @@ public sealed class AspNetCoreTests : IDisposable
         Assert.Equal(new string('x', 100 * 1024), Body(context));
     }
 
+    [Fact]
+    public async Task AWorkerRunsOtherRequestsWhileOneWaits()
+    {
+        // One worker: the request that waits for its timer lets the other run, and end, first.
+        Write("slow.wasp", "<% await delay(400); %>slow");
+        Write("quick.wasp", "quick");
+        using var one = new WebLingoWorkerPool(1);
+        var application = Load(workers: 1);
+        var ended = new List<string>();
+        async Task Get(string path)
+        {
+            var context = await Serve(application, "GET", path, one);
+            lock (ended) ended.Add(Body(context));
+        }
+        var slow = Get("/slow");
+        await Task.Delay(100);
+        var quick = Get("/quick");
+        await Task.WhenAll(slow, quick);
+        Assert.Equal(["quick", "slow"], ended);
+    }
+
+    [Fact]
+    public async Task ARequestThatWaitsEndsWhenItsClientGoes()
+    {
+        Write("forever.wasp", "<% await delay(60000); %>never");
+        using var gone = new CancellationTokenSource();
+        var context = new DefaultHttpContext { RequestAborted = gone.Token };
+        context.Request.Method = "GET";
+        context.Request.Path = "/forever";
+        context.Response.Body = new MemoryStream();
+        var serving = WebLingoAspNetCore.Serve(context, Load(), _root, _workers);
+        await Task.Delay(200);
+        Assert.False(serving.IsCompleted);
+        gone.Cancel();
+        await serving.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.DoesNotContain("never", Body(context));
+    }
+
     /// <summary>A request's lifetime that records its abort.</summary>
     private sealed class Lifetime : Microsoft.AspNetCore.Http.Features.IHttpRequestLifetimeFeature
     {
@@ -149,11 +187,11 @@ public sealed class AspNetCoreTests : IDisposable
         lock (reloads) Assert.Equal((2, (string?)null), reloads[0]);
     }
 
-    private WebLingoApplication Load()
+    private WebLingoApplication Load(int workers = 0)
     {
         var application = WebLingoApplication.Load(new WebLingoApplicationOptions(_root, new DotNetFileSystem())
         {
-            Workers = _workers.Count,
+            Workers = workers > 0 ? workers : _workers.Count,
             WorkerServices = _ => new WebLingoWorkerServices(
                 new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction(), new WebLingoDelayFunction())),
             Clock = new WebLingoExecutionClock(new DotNetClock()),
@@ -163,13 +201,13 @@ public sealed class AspNetCoreTests : IDisposable
         return application;
     }
 
-    private async Task<DefaultHttpContext> Serve(WebLingoApplication application, string method, string path)
+    private async Task<DefaultHttpContext> Serve(WebLingoApplication application, string method, string path, WebLingoWorkerPool? workers = null)
     {
         var context = new DefaultHttpContext();
         context.Request.Method = method;
         context.Request.Path = path;
         context.Response.Body = new MemoryStream();
-        await WebLingoAspNetCore.Serve(context, application, _root, _workers);
+        await WebLingoAspNetCore.Serve(context, application, _root, workers ?? _workers);
         return context;
     }
 

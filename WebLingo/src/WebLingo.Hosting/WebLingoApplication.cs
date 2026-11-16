@@ -3,6 +3,7 @@ using WebLingo.Compiler;
 using WebLingo.Core;
 using WebLingo.Hosting.Abstractions;
 using WebLingo.Language;
+using WebLingo.Platform.Abstractions;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
 using WebLingo.Templates;
@@ -11,12 +12,22 @@ namespace WebLingo.Hosting;
 
 /// <summary>
 /// What a request came to: a page's response, or a route handler's, a file the host serves as it is, no route, a handler
-/// that does not answer its method, or a 500.
+/// that does not answer its method, or a 500; or, not yet ended, a request that waits (specification, section 6.6).
 /// </summary>
-public enum WebLingoRequestOutcomeKind { Page, File, NotFound, Failed, Handler, MethodNotAllowed }
+public enum WebLingoRequestOutcomeKind { Page, File, NotFound, Failed, Handler, MethodNotAllowed, Waiting }
 
 /// <summary>A request's outcome; for <see cref="WebLingoRequestOutcomeKind.File"/>, the file, from the application's root.</summary>
-public sealed record WebLingoRequestOutcome(WebLingoRequestOutcomeKind Kind, string? File = null);
+public sealed record WebLingoRequestOutcome(WebLingoRequestOutcomeKind Kind, string? File = null)
+{
+    /// <summary>
+    /// For a request that waits: goes on with it, on the worker it began on, giving its next outcome, once the scheduler
+    /// host it was given has been posted work, or <see cref="WaitMilliseconds"/> have passed, or it is cancelled.
+    /// </summary>
+    public Func<WebLingoRequestOutcome>? Resume { get; init; }
+
+    /// <summary>For a request that waits: how long, in milliseconds, until its next timer is due; -1 for none.</summary>
+    public long WaitMilliseconds { get; init; } = -1;
+}
 
 /// <summary>
 /// A web application (specification, sections 6.3 to 6.6 and 6.12): its root's files, as a generation, its routes made when
@@ -94,10 +105,15 @@ public sealed class WebLingoApplication
 
     /// <summary>
     /// Serves <paramref name="request"/> on <paramref name="worker"/>, from 0 to the host's workers − 1, writing and
-    /// completing <paramref name="response"/>, but for a file the host serves as it is, which it leaves as it was.
+    /// completing <paramref name="response"/>, but for a file the host serves as it is, which it leaves as it was. Given
+    /// <paramref name="scheduler"/>, the request's own scheduler host, through which its host resumes it, a request whose
+    /// execution waits for work off its worker, or for a timer, gives <see cref="WebLingoRequestOutcomeKind.Waiting"/>
+    /// rather than hold its worker's thread (section 6.6), and its host calls its <see cref="WebLingoRequestOutcome.Resume"/>
+    /// on the same worker once the scheduler host has been posted work, its wait is over, or it is cancelled; without one,
+    /// the request runs to its end, its scheduler host the options' (<see cref="WebLingoApplicationOptions.Scheduler"/>).
     /// </summary>
     public WebLingoRequestOutcome Handle(IWebLingoHttpRequest request, IWebLingoHttpResponse response, WebLingoWorkerId worker,
-        WebLingoCancellationSignal? cancellation = null)
+        WebLingoCancellationSignal? cancellation = null, IWebLingoSchedulerHost? scheduler = null)
     {
         var generation = _current;
         switch (generation.Routes.Find(request.Path))
@@ -105,9 +121,10 @@ public sealed class WebLingoApplication
             case { Kind: WebLingoRouteKind.File } file:
                 return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.File, file.File);
             case { Kind: WebLingoRouteKind.Page } page:
-                return Run(generation.Page(worker, page.File, this), request, response, worker, cancellation);
+                return Run(generation.Page(worker, page.File, this), request, response, worker, cancellation, scheduler,
+                    WebLingoRequestOutcomeKind.Page);
             case { Kind: WebLingoRouteKind.Handler } handler:
-                return Handler(generation, handler.File, request, response, worker, cancellation);
+                return Handler(generation, handler.File, request, response, worker, cancellation, scheduler);
             default:
                 WebLingoErrorPages.NotFound(response);
                 return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.NotFound);
@@ -120,7 +137,7 @@ public sealed class WebLingoApplication
     /// that does not parse being a handler's, so that its errors are the 500's.
     /// </summary>
     private WebLingoRequestOutcome Handler(Generation generation, string file, IWebLingoHttpRequest request, IWebLingoHttpResponse response,
-        WebLingoWorkerId worker, WebLingoCancellationSignal? cancellation)
+        WebLingoWorkerId worker, WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler)
     {
         var exports = generation.Exports(worker, file, this);
         string? function = null;
@@ -142,8 +159,8 @@ public sealed class WebLingoApplication
             WebLingoErrorPages.MethodNotAllowed(response, string.Join(", ", allowed));
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.MethodNotAllowed);
         }
-        var outcome = Run(generation.Handler(worker, file, function, this), request, response, worker, cancellation);
-        return outcome.Kind == WebLingoRequestOutcomeKind.Page ? new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Handler) : outcome;
+        return Run(generation.Handler(worker, file, function, this), request, response, worker, cancellation, scheduler,
+            WebLingoRequestOutcomeKind.Handler);
     }
 
     /// <summary>The names a <c>.wl</c> exports, read from its text, or null if it does not parse.</summary>
@@ -171,8 +188,9 @@ public sealed class WebLingoApplication
         return names;
     }
 
+    /// <summary>A page run, or a handler's: <paramref name="done"/> once it has run, unless it fails, or waits.</summary>
     private WebLingoRequestOutcome Run(CompiledPage page, IWebLingoHttpRequest request, IWebLingoHttpResponse response, WebLingoWorkerId worker,
-        WebLingoCancellationSignal? cancellation)
+        WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler, WebLingoRequestOutcomeKind done)
     {
         if (page.Module is null) return Failed(response, page.Errors);
         var output = new WebLingoResponseText(response);
@@ -183,11 +201,27 @@ public sealed class WebLingoApplication
             Output = output,
             FileSystem = _options.FileSystem,
             Clock = _options.Clock,
-            SchedulerHost = _options.Scheduler?.Invoke(),
+            SchedulerHost = scheduler ?? _options.Scheduler?.Invoke(),
+            Suspends = scheduler is not null,
             InstructionBudget = _options.InstructionBudget,
             Cancellation = cancellation
         };
-        var result = new WebLingoVirtualMachine { Loader = page.Modules, Components = page.Components }.Execute(page.Module, context);
+        var vm = new WebLingoVirtualMachine { Loader = page.Modules, Components = page.Components };
+        return Ended(vm.Execute(page.Module, context), vm, page, output, response, done);
+    }
+
+    /// <summary>What a run came to: <paramref name="done"/>, a failure, or a wait, which its host resumes.</summary>
+    private WebLingoRequestOutcome Ended(WebLingoExecutionResult result, WebLingoVirtualMachine vm, CompiledPage page, WebLingoResponseText output,
+        IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done)
+    {
+        if (result.Waiting)
+        {
+            return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Waiting)
+            {
+                Resume = () => Ended(vm.Resume(), vm, page, output, response, done),
+                WaitMilliseconds = result.WaitMilliseconds
+            };
+        }
         if (!result.Succeeded)
         {
             var error = page.Describe(result.Error!);
@@ -196,7 +230,7 @@ public sealed class WebLingoApplication
         }
         output.Send();
         response.Complete();
-        return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Page);
+        return new WebLingoRequestOutcome(done);
     }
 
     /// <summary>

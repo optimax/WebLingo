@@ -52,9 +52,11 @@ A2: (b) but with a timeout.
 
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 6.12 ("Streaming"). Too large to land in one piece: in four parts, which the specification defines (section 9, "M0.14.7 parts"), each a task below. Waits for its parts.
 
-## M0.14.7.2: Executions That Wait Without a Thread
+## [WORKING] M0.14.7.2: Executions That Wait Without a Thread
 
 An execution waiting only for work off its worker returns to its host, kept, and goes on where it was once that work is posted back, on both VMs; a host's worker runs other requests' executions meanwhile (specification, sections 6.6 and 6.10; section 9, "M0.14.7 parts", part 2). Today a VM keeps its worker's thread while it waits, so that a request waiting for a file holds a worker. Added by Claude, 2026-11-16.
+
+2026-11-16 (Claude): built (specification, sections 6.6, 9 and 15.2, "Executions that wait without a thread"), on both VMs. Guessed, and recorded as Proposed: an execution context's `Suspends`, which only the web host sets, so that `weblingo` and `wasp run` wait as before; a timer on the host's clock waited for so too, the host resuming at its time; a request's resumption queued for its own worker, taken before new work; at most 64 requests waiting on a worker before it takes no new work; and the pool's disposal cancelling the requests that wait. Tried on Windows only: the tests, and `wasp serve` running 12 pages that each wait 500 milliseconds on 8 workers, all ended by 513 milliseconds, a quick page answered meanwhile; not under IIS, nor on Linux.
 
 ## [QUESTION] M0.14.7.3: Backpressure
 

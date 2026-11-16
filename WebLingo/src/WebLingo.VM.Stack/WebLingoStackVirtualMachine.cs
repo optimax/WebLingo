@@ -11,7 +11,8 @@ namespace WebLingo.VM.Stack;
 /// register VM: the runtime's values, operators, heap and built-ins (<c>WebLingo.Runtime</c>), the execution context
 /// and its budgets, the result (<see cref="WebLingoExecutionResult"/>), and the messages of its errors, so that a program
 /// gives the same output and the same errors on both. Its instruction budget counts its own instructions, which are
-/// more than the register VM's for the same program.
+/// more than the register VM's for the same program. With its context's <c>Suspends</c>, an execution that has nothing to
+/// run but waits returns, waiting, and <see cref="Resume"/> goes on with it (section 6.6), as on the register VM.
 /// <para>
 /// It is tuned as the register VM is (section 5.6): one loop runs every instruction, with the running frame's code,
 /// slots, stack top and position in locals; the budget and the cancellation signal are looked at only when they come
@@ -101,13 +102,36 @@ public sealed class WebLingoStackVirtualMachine
             Loader = Loader,
             Components = Components
         };
+        return Run(execution, heap, resuming: false);
+    }
+
+    /// <summary>The execution that waits (<see cref="WebLingoExecutionResult.Waiting"/>), and its heap, until it is resumed.</summary>
+    private (Execution Execution, WebLingoHeap Heap)? _waiting;
+
+    /// <summary>
+    /// Goes on with the execution that its last <see cref="Execute"/>, or <see cref="Resume"/>, left waiting, once its
+    /// scheduler host has been posted work, or its next timer's time has come (section 6.6), on the same worker.
+    /// </summary>
+    public WebLingoExecutionResult Resume()
+    {
+        if (_waiting is not { } waiting) throw new InvalidOperationException("No execution of this VM waits.");
+        _waiting = null;
+        return Run(waiting.Execution, waiting.Heap, resuming: true);
+    }
+
+    /// <summary>Runs an execution, or goes on with one that waited, keeping it if it waits, and releasing its heap's host objects once it ends.</summary>
+    private WebLingoExecutionResult Run(Execution execution, WebLingoHeap heap, bool resuming)
+    {
+        WebLingoExecutionResult? result = null;
         try
         {
-            return execution.Run();
+            result = execution.Run(resuming);
+            return result;
         }
         finally
         {
-            heap.ReleaseHostObjects(); // What native classes' instances still hold (section 3.9).
+            if (result is { Waiting: true }) _waiting = (execution, heap);
+            else heap.ReleaseHostObjects(); // What native classes' instances still hold (section 3.9).
         }
     }
 
@@ -186,33 +210,44 @@ public sealed class WebLingoStackVirtualMachine
     private sealed class Execution(WebLingoStackModule module, WebLingoStackInstruction[] entryCode, WebLingoStackInstruction[][] codes,
         WebLingoValue[] constants, WebLingoMemberName[] names, IWebLingoBuiltinFunction[] builtins, WebLingoExecutionContext context, WebLingoHeap heap)
     {
-        public WebLingoExecutionResult Run()
+        public WebLingoExecutionResult Run(bool resuming)
         {
-            var frames = new Frame[16];
+            Frame[] frames;
             var depth = 0;
-            var frame = frames[0] = new Frame
+            Frame frame;
+            if (resuming)
             {
-                Function = module.EntryPoint,
-                Code = entryCode,
-                Slots = new WebLingoValue[module.EntryPoint.SlotCount]
-            };
-            heap.AddRoots(_errorClass);
-            heap.AddRoots(_objectClass);
-            heap.AddRoots(_valueClasses);
-            heap.AddRoots(_errorClasses);
-            heap.AddRoots(_main);
-            _modules = new WebLingoModuleTable(module.Units.Count, heap);
-            for (var i = 0; i < module.Units.Count; i++) _unitClosures.Add(WebLingoValue.Null);
-            heap.AddRoots(_unitClosures);
-            heap.AddRoots(_linked);
-            heap.AddRoots(frame.Slots);
-            heap.AddRoots(frame.Closure);
-            _scheduler = new WebLingoScheduler(heap, context.Clock);
-            heap.Scheduler = _scheduler;
-            heap.Output = context.Output;
-            heap.ValueClasses = _valueClasses;
-            if (module.Parameters.Count > 0 && !TryGiveParameters(frame.Slots)) return _ended!;
-            if (module.EntryPoint.IsAsync && !TryStartMain(frame)) return _ended!;
+                // It waited with nothing on the VM's stack: it goes on where the scheduler resumes a task (section 6.6).
+                frames = _frames;
+                frame = new Frame();
+            }
+            else
+            {
+                frames = _frames = new Frame[16];
+                frame = frames[0] = new Frame
+                {
+                    Function = module.EntryPoint,
+                    Code = entryCode,
+                    Slots = new WebLingoValue[module.EntryPoint.SlotCount]
+                };
+                heap.AddRoots(_errorClass);
+                heap.AddRoots(_objectClass);
+                heap.AddRoots(_valueClasses);
+                heap.AddRoots(_errorClasses);
+                heap.AddRoots(_main);
+                _modules = new WebLingoModuleTable(module.Units.Count, heap);
+                for (var i = 0; i < module.Units.Count; i++) _unitClosures.Add(WebLingoValue.Null);
+                heap.AddRoots(_unitClosures);
+                heap.AddRoots(_linked);
+                heap.AddRoots(frame.Slots);
+                heap.AddRoots(frame.Closure);
+                _scheduler = new WebLingoScheduler(heap, context.Clock) { Suspends = context.Suspends };
+                heap.Scheduler = _scheduler;
+                heap.Output = context.Output;
+                heap.ValueClasses = _valueClasses;
+                if (module.Parameters.Count > 0 && !TryGiveParameters(frame.Slots)) return _ended!;
+                if (module.EntryPoint.IsAsync && !TryStartMain(frame)) return _ended!;
+            }
 
             var code = frame.Code;
             var slots = frame.Slots;
@@ -222,8 +257,8 @@ public sealed class WebLingoStackVirtualMachine
             var budget = context.InstructionBudget;
             var cancellation = context.Cancellation;
             var maxCallDepth = context.Resources.MaxCallDepth;
-            var executed = 0L;
-            var dueAt = 0L; // The count of instructions at which the budget and the cancellation signal are looked at.
+            var executed = _executed;
+            var dueAt = executed; // The count of instructions at which the budget and the cancellation signal are looked at.
             WebLingoRuntimeError? error = null;
             // A call being made, which the operations that call set up, and the code after their switch carries out: the
             // value called, the instance a method runs on, where its arguments start in the slots, and, for new, the
@@ -239,6 +274,12 @@ public sealed class WebLingoStackVirtualMachine
                 {
                     if (executed == dueAt)
                     {
+                        if (resuming)
+                        {
+                            resuming = false;
+                            dueAt = Math.Min(budget, (executed / CancellationInterval + 1) * CancellationInterval);
+                            goto schedule;
+                        }
                         if (executed >= budget)
                         {
                             return Failure(WebLingoDiagnosticCodes.BudgetExceeded,
@@ -1154,7 +1195,14 @@ public sealed class WebLingoStackVirtualMachine
 
                 schedule:
                     // Nothing runs on the VM's stack: the next ready task resumes where it awaited, or the execution ends.
-                    if (!TryResume(frames, cancellation, executed)) return _ended!;
+                    if (!TryResume(frames, cancellation, executed))
+                    {
+                        if (!_waits) return _ended!;
+                        _waits = false;
+                        // It waits for work off its worker, or a timer's time: kept, for its host to resume (section 6.6).
+                        (_frames, _executed) = (frames, executed);
+                        return WebLingoExecutionResult.Waits(_scheduler.WaitMilliseconds) with { Instructions = executed };
+                    }
                     depth = 0;
                     frame = frames[0];
                     code = frame.Code;
@@ -2122,6 +2170,13 @@ public sealed class WebLingoStackVirtualMachine
         /// ready. False, with the end in <see cref="_ended"/>, once the top level is done, cancelled, or waits for what
         /// nothing will complete.
         /// </summary>
+        /// <summary>While it waits: its frames, and how many instructions it has run, from which it goes on (section 6.6).</summary>
+        private Frame[] _frames = [];
+        private long _executed;
+
+        /// <summary>Whether <see cref="TryResume"/>'s false is a wait, not the execution's end.</summary>
+        private bool _waits;
+
         private bool TryResume(Frame[] frames, WebLingoCancellationSignal? cancellation, long executed)
         {
             while (true)
@@ -2157,6 +2212,11 @@ public sealed class WebLingoStackVirtualMachine
                 }
                 if (!_scheduler.TryAdvanceTime())
                 {
+                    if (_scheduler.Waiting)
+                    {
+                        _waits = true;
+                        return false;
+                    }
                     _ended = Failure(WebLingoDiagnosticCodes.Deadlock, "The program waits for a task that nothing will complete.",
                         new WebLingoSourceSpan(0, 0)) with { Instructions = executed };
                     return false;

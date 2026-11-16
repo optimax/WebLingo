@@ -367,11 +367,24 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
     /// <remarks>
     /// Operations off the worker that have finished come first; with some still running, it waits for them, up to the next
     /// timer's time on the host's clock, a short while at a time, so that its VM looks at the cancellation signal between
-    /// waits; and true then means only that it may look again (WL-P007).
+    /// waits; and true then means only that it may look again (WL-P007). With <see cref="Suspends"/>, it never waits, but
+    /// gives false, <see cref="Waiting"/>, where it would.
     /// </remarks>
     public bool TryAdvanceTime()
     {
+        Waiting = false;
         if (TryRunFinished(0)) return true;
+        if (Suspends)
+        {
+            // Rather than wait on the worker's thread, for an operation or for a timer's time, the execution returns
+            // to its host, which resumes it once that work is posted back, or the time has come (section 6.6).
+            var dueIn = _timers.Count == 0 ? -1 : clock is null ? 0 : Math.Max(0, EarliestDue() - clock.Milliseconds);
+            if (dueIn != 0 && (_operations.Count > 0 || dueIn > 0))
+            {
+                (Waiting, WaitMilliseconds) = (true, dueIn);
+                return false;
+            }
+        }
         if (_operations.Count > 0)
         {
             if (_timers.Count == 0 || clock is not null)
@@ -417,6 +430,18 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
 
     /// <summary>How long, in milliseconds, it waits for an operation at a time, between looks at the cancellation signal.</summary>
     private const int OperationWait = 100;
+
+    /// <summary>
+    /// Whether, rather than wait, <see cref="TryAdvanceTime"/> gives false with <see cref="Waiting"/> set when it would
+    /// wait for an operation or a timer's time on the host's clock (<see cref="WebLingoExecutionContext.Suspends"/>).
+    /// </summary>
+    public bool Suspends { get; set; }
+
+    /// <summary>Whether <see cref="TryAdvanceTime"/>'s last false was a wait, not a deadlock.</summary>
+    public bool Waiting { get; private set; }
+
+    /// <summary>For a wait: how long, in milliseconds, until the next timer is due; -1 for none.</summary>
+    public long WaitMilliseconds { get; private set; }
 
     private long EarliestDue()
     {

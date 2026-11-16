@@ -26,38 +26,44 @@ public static class WebLingoAspNetCore
         return builder;
     }
 
-    /// <summary>Serves one request, its response sent as its worker writes it (<see cref="WebLingoStreamingResponse"/>).</summary>
+    /// <summary>
+    /// Serves one request, its response sent as its worker writes it (<see cref="WebLingoStreamingResponse"/>), on a worker
+    /// that runs other requests while it waits (section 6.6).
+    /// </summary>
     public static async Task Serve(HttpContext context, WebLingoApplication application, string root, WebLingoWorkerPool workers)
     {
         var request = await Translate(context.Request);
         var response = new WebLingoStreamingResponse(context.RequestAborted);
         var cancellation = new WebLingoCancellationSignal();
-        using var aborted = context.RequestAborted.Register(cancellation.Cancel);
-        WebLingoRequestOutcome? outcome = null;
-        var run = workers.Run(worker =>
+        // The client gone: the request cancelled first, then, if it waits, resumed to see it.
+        using var gone = new CancellationTokenSource();
+        void Cancel()
         {
-            try
-            {
-                outcome = application.Handle(request, response, worker, cancellation);
-            }
-            finally
-            {
-                response.End();
-            }
-        });
+            cancellation.Cancel();
+            gone.Cancel();
+        }
+        using var aborted = context.RequestAborted.Register(Cancel);
+        var run = workers.Serve((worker, scheduler) => application.Handle(request, response, worker, cancellation, scheduler), gone.Token,
+            response.End);
         try
         {
             await response.SendAsync(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // The client has gone: nothing more is sent, and the page stops.
+            Cancel();
+            await run;
+            return;
+        }
         catch
         {
             // What the client cannot take any more: the page stops too.
-            cancellation.Cancel();
+            Cancel();
             await run;
             throw;
         }
-        await run;
-        if (outcome is { Kind: WebLingoRequestOutcomeKind.File, File: { } file }) await SendFile(context, root, file);
+        if (await run is { Kind: WebLingoRequestOutcomeKind.File, File: { } file }) await SendFile(context, root, file);
     }
 
     /// <summary>ASP.NET Core's request as WLHI's: its path without the application's base, its query without the <c>?</c>.</summary>

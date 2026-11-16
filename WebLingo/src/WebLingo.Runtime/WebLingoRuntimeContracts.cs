@@ -46,6 +46,14 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     /// (section 7.8, WL-P007); without one, nothing asynchronous but the execution's own tasks and timers runs.
     /// </summary>
     public WebLingo.Platform.Abstractions.IWebLingoSchedulerHost? SchedulerHost { get; init; }
+
+    /// <summary>
+    /// Whether the VM returns, rather than waits on its worker's thread, when the execution has nothing to run but waits
+    /// for work off its worker, or for a timer's time on the host's clock (section 6.6): its result then says it waits
+    /// (<see cref="WebLingoExecutionResult.Waiting"/>), and its host calls the VM's <c>Resume()</c> once the scheduler host
+    /// has been posted work, or the timer's time has come, on the same worker. False by default, the VM waiting itself.
+    /// </summary>
+    public bool Suspends { get; init; }
 }
 
 /// <summary>
