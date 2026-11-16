@@ -38,12 +38,6 @@ A5: (a)
 
 2026-11-16 (Claude): the answers recorded in the specification (sections 1.1, 5.1, 5.3 and 9), A3's "nothing is frozen until we are done" among them. Split into two parts, which the specification defines (section 9, "M0.13 parts"): "M0.13.1: WLBC's Format" and "M0.13.2: WLBC on the Command Line", below. Waits for them.
 
-## [WORKING] M0.13.1: WLBC's Format
-
-WLBC's writer and reader for both VMs' modules, each section's CRC-32 checked, a damaged file rejected as WL4001, and what is read verified; every conformance program written, read back and run on both VMs (specification, section 9, "M0.13 parts", part 1; section 5.3, "As built"). Added by Claude, 2026-11-16.
-
-2026-11-16 (Claude): done, on both VMs: `WebLingoBytecodeFile` (`WebLingo.Bytecode`) writes a module of either VM as WLBC 0.1 and reads it back, the container as section 5.3 proposes it with the owner's answers applied (one VM's bytecode in a file, its header saying which, each reader refusing the other's; jump targets as instruction indices; each section's CRC-32 in its directory entry, in place of an integrity section), the details Proposed in section 15.2 ("WLBC's layout"). Guessed: version 0.1, since nothing is frozen; counts and lengths as unsigned LEB128, every other integer signed; strings as WTF-8, so that a lone surrogate reads back as it was; source positions kept as the compiler's, with a table of each file's lines and columns, so that a runtime error is located without the source; the source positions' section optional, every other one required, once and in order. Tests: 11 of the format's own (its layout, CRC-32, numbers and strings, and every refusal, with its reason, a fuzz test among them), and all 679 conformance programs written for both VMs, read back, written again as the same bytes, and run, giving the same output and error, its line and column found from the file; files changed at random are refused, or run without crashing either VM. No VM changed, so nothing was benchmarked. Checks: the Release build, without warnings, the full test suite (2,864 tests), on Windows only; Linux not tried.
-
 ## M0.13.2: WLBC on the Command Line
 
 `weblingo compile [--vm stack]`, `weblingo run` of a `.wlbc` on the VM its header names, and `weblingo disasm`, with a disassembler of the stack bytecode; the native modules a `.wlbc` names loaded when it runs; its files named from the program's folder; and `weblingo run` of a `.wl` writing no `.wlbc` (specification, section 9, "M0.13 parts", part 2; A1 and A2 of "M0.13: WLBC"). Added by Claude, 2026-11-16.
