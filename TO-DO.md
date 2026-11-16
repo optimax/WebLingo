@@ -34,11 +34,15 @@ A6: (a)
 
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 6.12, A5's `weblingo.config` as the configuration's name, for a script's folder as for an application's root, in place of `weblingo.json`, its content JSON as before (a task of its own, below, "The Configuration File, `weblingo.config`"). Waits for its parts.
 
-## [IDLE] M0.14.3: The Request and the Response in Scripts
+## [QUESTION] M0.14.3: The Request and the Response in Scripts
 
 What a page and a `.wl` route handler see of their request and response, and what a handler is (specification, section 9, "M0.14 parts", part 3). Added by Claude, 2026-11-16.
 
-2026-11-16: waits for M0.14.2.
+2026-11-16: M0.14.2 is done. A1 has a page's request and response given as values its parameters take, `param request;`; a script's parameters are given values as it starts, before its classes are made, and only strings (`WebLingoExecutionContext.Parameters`), and a map's entries are read by indexing, `m["key"]`, not as members (specification, section 15.2, "Members and indexing"). One decision, answerable with a letter:
+
+**Q1, what a page's `request` and `response` are, and a handler's: (a) instances of two built-in classes, `Request` and `Response`, read and changed through their members, as A1's examples have them: `request.method`, `request.query["id"]`, `request.headers["Accept"]`, `response.status = 404;`, `response.headers["Content-Type"] = "text/plain";`, a wrong status or header an error where it is set; this needs the compiler to give `param request;` its value when the statement runs, once the program's classes are made, a change to the compiler and the runtime, not to the VMs; (b) maps, which a host can give a page as it starts, with no change to the compiler: `request["method"]`, `request["query"]["id"]`, `response["status"] = 404;`, `response["headers"]["Content-Type"] = "text/plain";`, the response's status and headers read once the page has run, a wrong one then a 500 that names no line.**
+
+A1:
 
 ## [IDLE] M0.14.4: The ASP.NET Core Adapter
 
