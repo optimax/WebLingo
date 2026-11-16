@@ -46,7 +46,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | WL-T001–WL-T008 | Includes, layouts, and parameterized components all required in the first template-capable release | **Approved** |
 | Template named sections | Optional page-specific layout sections | Proposed extension; not yet approved |
 | WL-BC002 | Register VM preferred, stack VM benchmark required before final decision | **Provisional** |
-| WL-BC002, until decided | Both VMs are kept, and every new feature is built on both, until property access, async suspension, template output and I/O-bound workloads can be measured too; the choice is made then (§5.6) | Approved (13 November 2026) |
+| WL-BC002, until decided | Both VMs are kept, and every new feature is built on both, until property access, async suspension, template output and I/O-bound workloads can be measured too; those measured, both still, until something more is; and WBC, a format for each VM's bytecode in one container (§5.6, §9) | Approved (13 November 2026; both kept still, every workload measured, and WBC for both, 15 November 2026) |
 | WL-BC002 comparison | The stack VM in a project of its own, `WebLingo.VM.Stack`, its code generator in `WebLingo.Compiler`; a console benchmark, `WebLingo.Benchmarks`, timing with `Stopwatch`, with no new package; the register VM's dispatch tuned for speed before the two are compared (§5.6) | Approved (13 November 2026) |
 | M0.3 encoding | Variable-length register operands; disk byte offsets / decoded instruction indices | Proposed |
 | M0.3 numbers | IEEE 754 decimal128 BID binary representation | Proposed |
@@ -371,7 +371,7 @@ The register VM is the **preferred first implementation**, but the final registe
 | Dataflow/liveness | More explicit | More implicit |
 | Native code / optimization potential | Good | Good |
 
-M0.6 implementation default: implement the minimal register VM first and add a stack VM benchmark prototype later. **This does not approve WL-BC002 permanently.** The stack VM and the comparison exist since 13 November 2026 (§5.6, "The comparison"). The owner kept both VMs that day: every new feature is built on both, and the choice is made once the workloads not yet measurable can be measured.
+M0.6 implementation default: implement the minimal register VM first and add a stack VM benchmark prototype later. **This does not approve WL-BC002 permanently.** The stack VM and the comparison exist since 13 November 2026 (§5.6, "The comparison"). The owner kept both VMs that day: every new feature is built on both, and the choice is made once the workloads not yet measurable can be measured. Those measured, the owner kept both still, on 15 November 2026 (§5.6, "Both VMs, for now").
 
 ### 5.3 Proposed WBC binary container
 
@@ -449,7 +449,7 @@ An initial C# `switch` dispatch loop is **proposed** for clarity and portability
 
 Implementation complexity, in lines of source, the stack VM's against the register VM's: the code generator 375 against 468 (it allocates no registers, and needs no copy of a local that a later operand assigns), the verifier 346 against 402, the VM 633 against 604, and the instruction model 121 against 148. Not measured yet, because the language does not have them: property access, async suspension, template output, and I/O-bound server workloads (this section's list); and startup and latency, which matter once there is a host. The choice between the VMs is the owner's (WL-BC002).
 
-**Both VMs, for now** (owner's decision, 13 November 2026). WL-BC002 stays provisional until property access, async suspension, template output and I/O-bound workloads can be measured too. Until then, every new feature is built on both VMs, from the same lowered IR, each with its code generator, its verifier and its VM, and gives the same results on both; and each of those workloads joins the benchmark when the language can express it, so that the choice is made on all of them.
+**Both VMs, for now** (owner's decision, 13 November 2026). WL-BC002 stays provisional until property access, async suspension, template output and I/O-bound workloads can be measured too. Until then, every new feature is built on both VMs, from the same lowered IR, each with its code generator, its verifier and its VM, and gives the same results on both; and each of those workloads joins the benchmark when the language can express it, so that the choice is made on all of them. Every one of them measured (15 November 2026, "I/O-bound work"), the owner kept both VMs still, each feature built on both, until something more is measured, startup and latency, which matter once there is a host, among what is not yet; and WBC goes ahead, a format for each VM's bytecode in one container (§9, M0.13; the owner's decision, 15 November 2026).
 
 **Collections workload** (M0.9.4, 13 November 2026), measured as part 4 was: `collections` fills an array and a map, and reads, writes and visits them with `foreach` and indexing. The register VM took 3.7 to 4.5 ms over two runs, the stack VM 4.7 to 5.2 ms, running 605,064 and 1,030,106 instructions, from 67 instructions of code (223 bytes) and 115 (218 bytes); both allocated 1.06 MB.
 
@@ -1010,7 +1010,7 @@ Proposed central props:
 | M0.10 | Classes, `dispose()` and `using` (§3.2, §3.4, WL-L011) | Implemented (13 November 2026), in parts M0.10.1 to M0.10.7 (below), on both VMs, on Windows; typed catches, `is` and the classes of values implemented too (13 November 2026), but for extending `Array`, `Map` and `Set` |
 | M0.11 | Asynchrony: `async`, `await` and tasks (§3.8) | Implemented (13 November 2026), in parts M0.11.1 and M0.11.2 (below), on both VMs, on Windows |
 | M0.12 | `.wasp` templates: includes, layouts and parameterized components, together (§13, WL-T001 to WL-T008) | Its contracts decided in part (§13, "Contracts", 13 November 2026); after M0.11, and the module system it needs (`import` and `param`), both done; in parts M0.12.1 to M0.12.5 (below, 14 November 2026), all implemented (14 November 2026), on both VMs, on Windows, `samples/SimpleWebsite` running through `wasp`; what WL-T007 and WL-T008 ask of a host (dependency invalidation, application generations, cancellation and streaming to a response) waits for hosting |
-| M0.13 | WBC, the bytecode's binary format (§5.1, §5.3) | After M0.12 |
+| M0.13 | WBC, the bytecode's binary format (§5.1, §5.3) | After M0.12; a format for each VM's bytecode, in one container, both VMs kept (15 November 2026), its format's questions asked |
 
 **M0.7 parts** (12 November 2026), each landing on its own with its conformance tests, which `WebLingo.Conformance.Tests` runs beside §8.6's:
 
@@ -1080,7 +1080,7 @@ Proposed central props:
 
 **After M0.8** (order approved by the owner, 13 November 2026): M0.9, then M0.10, M0.11, M0.12 and M0.13, as the table gives them (asynchrony put before templates on 13 November 2026, the owner asking for it to be designed first). Each needs syntax, or a format, that this specification does not give yet, which is decided feature by feature before it is built; and each is built on both VMs (§5.6, "Both VMs, for now").
 
-**Immediate next activity:** the owner's questions open in `TO-DO.md`; M0.13 waits for the choice between the VMs (WL-BC002), which every workload of §5.6 can inform now (15 November 2026). The compiler and both VMs cover M0.6's subset, the language of §3.5 to §3.9, and pages, their includes, components and layouts (§13, M0.12).
+**Immediate next activity:** the owner's questions open in `TO-DO.md`; M0.13, WBC, a format for each VM's bytecode, both VMs kept (WL-BC002, 15 November 2026), whose format's questions are asked. The compiler and both VMs cover M0.6's subset, the language of §3.5 to §3.9, and pages, their includes, components and layouts (§13, M0.12).
 
 ---
 
@@ -1088,7 +1088,7 @@ Proposed central props:
 
 These items should be explicitly tracked rather than silently treated as approved:
 
-1. **Register versus stack VM (WL-BC002):** compare equivalent benchmark workloads; register-based remains preferred but provisional. Compared on 13 November 2026 (§5.6, "The comparison"): the register VM is faster on every workload measured, the stack bytecode smaller. The owner kept both VMs, each feature built on both, until property access, async suspension, template output and I/O can be measured too (§5.6, "Both VMs, for now").
+1. **Register versus stack VM (WL-BC002):** compare equivalent benchmark workloads; register-based remains preferred but provisional. Compared on 13 November 2026 (§5.6, "The comparison"): the register VM is faster on every workload measured, the stack bytecode smaller. The owner kept both VMs, each feature built on both, until property access, async suspension, template output and I/O can be measured too (§5.6, "Both VMs, for now"); every one of them measured, both still, on 15 November 2026, until something more is.
 2. **WBC encoding:** finalize variable-length operand scheme, branch addressing, header/directory layout and binary compatibility.
 3. **Decimal128 binary encoding:** choose IEEE BID or alternative representation, define canonicalization, rounding and interoperability.
 4. **Exceptions and cleanup:** freeze table-driven versus handler-stack mechanics; define guaranteed disposal chaining and cleanup errors. Decided 13 November 2026 (§3.7): table-driven regions, and an exception from `dispose()` replaces one already on its way out; and a disposal goes on when one of its methods throws (approved 13 November 2026, §3.7).

@@ -174,7 +174,7 @@ A5: (a)
 
 2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
 
-## The Choice Between the VMs (WL-BC002)
+## [DONE] The Choice Between the VMs (WL-BC002)
 
 The register VM or the stack VM (specification, sections 5.2 and 5.6; WL-BC002, Provisional), which the owner's decision of 13 November 2026 left open until property access, async suspension, template output and I/O-bound work could be measured too; all four can now, the last since `std:fs` ("I/O-Bound Workload", in `DONE.md`). M0.13, WBC, the bytecode's binary format, is the chosen VM's, and waits for it. Added by Claude, 2026-11-15.
 
@@ -207,6 +207,8 @@ Q3, asked in the chat once A1 kept both VMs, M0.13, WBC, which waited for the ch
 A3: (a)
 
 2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
+
+2026-11-15 (Claude): A1 and A3 recorded as approved in the specification (sections 1.1, 5.2, 5.6, 9 and 10) and in `Documents/implementation.md`: both VMs kept, every feature built on both, until something more is measured, startup and latency among what is not; M0.13 goes ahead with a format for each VM's bytecode in one container ("M0.13: WBC", above, asks its format's questions). Documents only: no code changed, so the build and the tests are as on `main`.
 
 # END-OF-TO-DO
 
