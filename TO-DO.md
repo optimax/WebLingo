@@ -44,11 +44,13 @@ What a page and a `.wl` route handler see of their request and response, and wha
 
 A1:
 
-## [IDLE] M0.14.5: Serving an Application Locally
+## [WORKING] M0.14.5: Serving an Application Locally
 
 An application served on Kestrel from the command line (specification, section 8.4; section 9, "M0.14 parts", part 5). Added by Claude, 2026-11-16.
 
-2026-11-16: waits for M0.14.4.
+Create a simple, but non-trivial example application, and put its complete source into `Examples\example1`. It must contain everything that one needs to just copy over to an IIS server to run. It must showcase the use of WASP to build a website.
+
+2026-11-16: M0.14.4 is done; taken up.
 
 ## [IDLE] M0.14.6: Reloading
 
