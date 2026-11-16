@@ -61,11 +61,12 @@ public sealed class WaspServeTests : IDisposable
     [Fact]
     public async Task TheExampleApplicationServesItsPages()
     {
-        // Examples/example1, at the repository's root: the owner's example of a website built with WASP (M0.14.5).
+        // Examples/example1, at the repository's root: the owner's example of a website built with WASP (M0.14.5), its
+        // pages beside its web.config, as a PHP site's are.
         var folder = new DirectoryInfo(AppContext.BaseDirectory);
-        while (folder is not null && !Directory.Exists(Path.Combine(folder.FullName, "Examples", "example1", "site"))) folder = folder.Parent;
+        while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Examples", "example1", "web.config"))) folder = folder.Parent;
         Assert.NotNull(folder);
-        var server = WebLingoWaspServer.Create(Path.Combine(folder.FullName, "Examples", "example1", "site"), 0,
+        var server = WebLingoWaspServer.Create(Path.Combine(folder.FullName, "Examples", "example1"), 0,
             new Dictionary<string, string>(), out var error, out _);
         Assert.True(server is not null, error);
         await server.StartAsync();
@@ -84,7 +85,10 @@ public sealed class WaspServeTests : IDisposable
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                 Assert.Contains(text, await response.Content.ReadAsStringAsync());
             }
-            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/lib/teas.wl")).StatusCode);
+            foreach (var path in new[] { "/lib/teas.wl", "/index.wasp", "/web.config" })
+            {
+                Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(path)).StatusCode);
+            }
         }
         finally
         {

@@ -28,9 +28,6 @@ TestResults/
 # Publish output
 publish/
 
-# IIS's logs of an example's site
-Examples/*/logs/
-
 # NuGet packages
 *.nupkg
 *.snupkg
