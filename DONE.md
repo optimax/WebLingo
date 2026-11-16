@@ -2617,3 +2617,11 @@ A1: (b) but stream bytes, rather than text.
 2026-11-16 (Claude): built (specification, sections 9 and 15.2, "A request's body"). Guessed, and recorded as Proposed: the body read once, when a script first asks for it, and kept, so that `text()` and `form()` give the same again; the charsets `text()` reads, those .NET knows by name, an unknown one WL3001; `form()` reading only `application/x-www-form-urlencoded`, as UTF-8, another type WL3001, a name without `=` an empty string; no size limit of WebLingo's own. Tried on Windows only: the tests, and `wasp serve` given a form, and 5 MB of text, posted; not under IIS, nor on Linux.
 
 Done (Claude, 2026-11-16, `19c5b46`): a request's body read as it arrives, with `request.text()` and `request.form()`; `request.read()`, as bytes, is "M0.14.7.5: A Body's Bytes". Main's checks passed: the Release build, without warnings, 2,973 tests, and `wasp serve` given a form and a 5 MB body, on Windows only; Linux and IIS not tried.
+
+## [DONE] WASP User Manual
+
+Write a comprehensive WASP User Manual with examples. This is not meant to be an exhaustive WebLingo Language Reference though.
+
+2026-11-16 (Claude): written, `Documents/wasp-user-manual.md`, listed among the project's documents (`Documents/implementation.md`, section 2) and linked from both READMEs. Every example in it was run, with `wasp serve` and `wasp run`, and gives the output shown; it describes what is built, what is missing in its last section, and the language only as far as pages need it, the WebLingo Language Reference being the next task. Guessed: its place and its name, and that a change to what a site's author sees updates it in the same change (`Documents/implementation.md`, section 2). Its examples were run on Windows only.
+
+Done (Claude, 2026-11-16, `13a6d90`): `Documents/wasp-user-manual.md`, the WASP User Manual, its examples run. Main's checks: documentation only, the solution unchanged since its last checks (the Release build, without warnings, and 2,973 tests, on Windows).
