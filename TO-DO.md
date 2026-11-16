@@ -174,42 +174,6 @@ A5: (a)
 
 2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
 
-## [DONE] The Choice Between the VMs (WL-BC002)
-
-The register VM or the stack VM (specification, sections 5.2 and 5.6; WL-BC002, Provisional), which the owner's decision of 13 November 2026 left open until property access, async suspension, template output and I/O-bound work could be measured too; all four can now, the last since `std:fs` ("I/O-Bound Workload", in `DONE.md`). M0.13, WBC, the bytecode's binary format, is the chosen VM's, and waits for it. Added by Claude, 2026-11-15.
-
-Every workload, measured together in one run, 11 timed runs after 3 warm-ups, on Windows (the specification, section 5.6, "I/O-bound work"):
-
-| Workload | Register | Stack | Stack ÷ register | Instructions run, register | Instructions run, stack | Code bytes, register | Code bytes, stack |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| loops | 26.9 ms | 33.5 ms | 1.25 | 10,010,008 | 17,514,512 | 76 | 74 |
-| calls | 10.4 ms | 11.4 ms | 1.10 | 2,063,676 | 2,670,639 | 74 | 48 |
-| closures | 13.6 ms | 15.9 ms | 1.17 | 3,120,009 | 4,660,014 | 106 | 93 |
-| strings | 10.9 ms | 12.9 ms | 1.18 | 1,920,008 | 3,100,012 | 83 | 76 |
-| collections | 4.4 ms | 4.9 ms | 1.11 | 605,064 | 1,030,106 | 223 | 218 |
-| objects | 98.5 ms | 102.4 ms | 1.04 | 3,200,026 | 5,000,042 | 187 | 156 |
-| async | 4.0 ms | 5.0 ms | 1.25 | 701,913 | 1,403,221 | 108 | 108 |
-| templates | 6.2 ms | 6.1 ms | 0.98 | 280,010 | 400,015 | 135 | 104 |
-| io | 1,100.5 ms | 1,136.0 ms | 1.03 | 114,080 | 152,109 | 758 | 560 |
-
-The register VM is faster on every workload where the VMs' own work counts, by 1.04 to 1.25 times, running 1.3 to 2.0 times fewer instructions; the stack VM's bytecode is up to 35 percent smaller, and its code generator about a fifth shorter (section 5.6, "The comparison"). Where other work dominates, writing a page's text or files, the two are as close as the machine's noise. Two decisions, each answerable with a letter.
-
-Q1, the VM: (a) the register VM; (b) the stack VM; (c) both still, each feature built on both, until something more is measured.
-
-A1: (c)
-
-Q2, if one is chosen, the other: (a) removed, with its code generator, its verifier and its tests; (b) kept as it is, built on no further, its tests kept for what it has, until it is removed.
-
-A2: does not apply while both VMs are kept (A1).
-
-Q3, asked in the chat once A1 kept both VMs, M0.13, WBC, which waited for the choice: (a) it goes ahead now, a format for each VM's bytecode, the container shared (header, section directory, constants, functions, exceptions, debug information), only the code section's encoding differing; (b) it waits until one VM is chosen, hosting first, so that startup and latency can be measured.
-
-A3: (a)
-
-2026-11-15: answered by the owner in the chat, one question at a time; recorded by Claude.
-
-2026-11-15 (Claude): A1 and A3 recorded as approved in the specification (sections 1.1, 5.2, 5.6, 9 and 10) and in `Documents/implementation.md`: both VMs kept, every feature built on both, until something more is measured, startup and latency among what is not; M0.13 goes ahead with a format for each VM's bytecode in one container ("M0.13: WBC", above, asks its format's questions). Documents only: no code changed, so the build and the tests are as on `main`.
-
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value
