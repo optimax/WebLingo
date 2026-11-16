@@ -38,6 +38,8 @@ A6: (a)
 
 A5 of "M0.14: Hosting": the configuration that `weblingo` and `wasp` read in a script's or a page's folder, its schemes today (specification, section 3.9) and an application's settings from M0.14.2 on, is `weblingo.config`, in place of `weblingo.json`, with nothing kept for `weblingo.json`. Guessed: its content stays JSON. Added by Claude, 2026-11-16.
 
+2026-11-16 (Claude): done: `WebLingoSchemes.ConfigurationFile` is `weblingo.config`, which `weblingo` and `wasp` read as they read `weblingo.json` before, a `weblingo.json` no longer read; recorded in the specification (sections 1.1, 3.9, 3.10, 6.9, 9 and 15.2), `Documents/implementation.md` (the names not to change without asking among them) and the README. Tests: the native modules' test of the configuration, a `weblingo.json` now ignored. Checks: the Release build, without warnings, the full test suite (2,898 tests), the CLI on the samples and `wasp` on `samples/SimpleWebsite`, on Windows only; Linux not tried.
+
 ## [IDLE] M0.14.2: The Host's Core
 
 The runtime, its applications and their generations, an application's pages and handlers compiled and cached in memory, a request's path found among them, run on a worker, its output written to the response, and a runtime error's response (specification, sections 6.3 to 6.6; section 9, "M0.14 parts", part 2). Added by Claude, 2026-11-16.

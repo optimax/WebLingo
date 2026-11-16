@@ -3,7 +3,7 @@ namespace WebLingo.Cli;
 
 /// <summary>
 /// A command line's schemes (specification, section 3.9, "Native modules"), each a name and the full path of a folder of
-/// native modules: <c>std</c>'s, <c>std/</c> beside the program, unless configured; then those of <c>weblingo.json</c>, in
+/// native modules: <c>std</c>'s, <c>std/</c> beside the program, unless configured; then those of <c>weblingo.config</c>, in
 /// the program's folder, <c>{ "schemes": { "native": "C:/WebLingo/native" } }</c>, a relative folder there being from the
 /// file's folder; then those the command line gives, <c>--scheme native=folder</c>, a relative folder from the current one,
 /// each over the file's of its name. A scheme's name is ASCII letters and digits, a letter first, at least two of them, so
@@ -12,7 +12,7 @@ namespace WebLingo.Cli;
 public static class WebLingoSchemes
 {
     /// <summary>The file a program's folder may hold, configuring its host.</summary>
-    public const string ConfigurationFile = "weblingo.json";
+    public const string ConfigurationFile = "weblingo.config";
 
     /// <summary>The schemes for the program at <paramref name="program"/>, the command line's given; false, with why, otherwise.</summary>
     public static bool TryLoad(string program, IReadOnlyDictionary<string, string> given, out Dictionary<string, string> schemes,

@@ -13,7 +13,7 @@ namespace WebLingo.Conformance.Tests;
 /// and 2): a test
 /// module, <c>WebLingo.Native.TestModule</c>, installed as <c>test.dll</c> in a scheme's folder, <c>native/</c>, imported by
 /// programs run on both VMs, which must give the same; and through <c>weblingo</c>, its schemes given by
-/// <c>weblingo.json</c> and <c>--scheme</c>.
+/// <c>weblingo.config</c> and <c>--scheme</c>.
 /// </summary>
 public sealed class NativeModuleTests : IDisposable
 {
@@ -143,7 +143,7 @@ public sealed class NativeModuleTests : IDisposable
         var (exit, output, error) = Weblingo(["run", "--scheme", "lib=" + _native, script]);
         Assert.Equal((WebLingoCommandLine.Success, "8\n", ""), (exit, output, error));
 
-        // weblingo.json, in the script's folder, its folder from the file's; the command line over it.
+        // weblingo.config, in the script's folder, its folder from the file's; the command line over it.
         File.WriteAllText(Path.Combine(_folder, WebLingoSchemes.ConfigurationFile), "{ \"schemes\": { \"lib\": \"native\" } }");
         Assert.Equal((WebLingoCommandLine.Success, "8\n", ""), Weblingo(["run", script]));
         Assert.Equal(WebLingoCommandLine.CompilationFailed, Weblingo(["check", "--scheme", "lib=" + _folder, script]).Exit);
@@ -153,6 +153,12 @@ public sealed class NativeModuleTests : IDisposable
         Assert.Equal(WebLingoCommandLine.FileUnreadable, exit);
         Assert.Contains("'l' is not a scheme's name, given a folder.", error);
         File.Delete(Path.Combine(_folder, WebLingoSchemes.ConfigurationFile));
+
+        // The configuration is weblingo.config (16 November 2026): a weblingo.json is not read.
+        Assert.Equal("weblingo.config", WebLingoSchemes.ConfigurationFile);
+        File.WriteAllText(Path.Combine(_folder, "weblingo.json"), "{ \"schemes\": { \"lib\": \"native\" } }");
+        Assert.Equal(WebLingoCommandLine.CompilationFailed, Weblingo(["run", script]).Exit);
+        File.Delete(Path.Combine(_folder, "weblingo.json"));
 
         (exit, _, error) = Weblingo(["run", "--scheme", "lib", script]);
         Assert.Equal(WebLingoCommandLine.UsageError, exit);
