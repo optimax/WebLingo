@@ -2487,3 +2487,15 @@ A5: (a)
 2026-11-16 (Claude): both parts done ("M0.13.1: WLBC's Format", `6ad6ddd`, and "M0.13.2: WLBC on the Command Line", `3a888b0`); the specification's section 9 has M0.13 implemented.
 
 Done (Claude, 2026-11-16, `6ad6ddd` and `3a888b0`): WLBC, WebLingo ByteCode, for both VMs, as the owner's answers have it: one VM's bytecode in a `.wlbc`, jump targets as instruction indices, each section's CRC-32 in its directory, the container kept Proposed; `weblingo compile`, `run`, `check` and `disasm` of a `.wlbc`, `weblingo run` of a `.wl` and WASP writing none. Main's checks passed: the Release build, without warnings, 2,875 tests, the CLI on the samples and `wasp` on `samples/SimpleWebsite`, on Windows only; Linux not tried.
+
+## [DONE] After M0.13: The Next Milestone
+
+The roadmap ends with M0.13, which is done (specification, section 9), so the next milestone is the owner's to choose. Hosting and the platform layer are the parts of the design not yet built (sections 6 and 7): `WebLingo.Hosting.AspNetCore` and `WebLingo.Platform.DotNet` exist, but no web host runs a page yet. Added by Claude, 2026-11-16.
+
+Q1, which comes next: (a) hosting: a web application served through the ASP.NET Core adapter, for IIS first (section 6), its `.wasp` pages and `.wl` route handlers compiled and cached in memory, its generations reloaded atomically (WL-T007), and `weblingo serve` to run it locally (section 8.4); (b) decimal128, the third numeric category (section 3; open question 3); (c) context-aware template escaping, for attributes, JavaScript, URLs and CSS (open question 9); (d) another, which you name.
+
+A1: (a)
+
+2026-11-16 (Claude): A1 recorded as approved in the specification, sections 1.1 and 9: M0.14, hosting, in seven parts, which section 9 defines ("M0.14 parts"); its questions, and a task for each part, are in `TO-DO.md` ("M0.14: Hosting").
+
+Done (Claude, 2026-11-16, `8bd7002`): hosting is M0.14, the milestone after M0.13, its parts defined in the specification, section 9. Main's checks were not run: only documents changed.
