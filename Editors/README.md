@@ -39,3 +39,30 @@ Their limits, which come from what a user-defined language of Notepad++ can tell
   Language → Define your language…**, each language's **Styler** buttons.
 
 They were tried with Notepad++ 8.9.8, on Windows.
+
+## VS Code
+
+`VSCode/` is an extension of VS Code, in source, which gives it two languages, WebLingo, for `.wl` files, and WASP, for
+`.wasp` files, each with its TextMate grammar (`weblingo.tmLanguage.json` and `wasp.tmLanguage.json`) and its language
+configuration (comments, brackets, and the pairs VS Code closes as you type).
+
+To install it, in VS Code, open the Command Palette (**Ctrl+Shift+P**), run **Developer: Install Extension from
+Location…**, and choose the `VSCode` folder. VS Code uses the folder where it is, so keep it there; a change to it, a
+`git pull` for one, is used once VS Code reloads its window. To remove it, uninstall **WebLingo** in the Extensions view.
+
+What is coloured:
+
+- **In WebLingo:** its keywords and declarations, the names a declaration gives (a class's, a function's, a property's),
+  `true`, `false`, `null`, `Infinity` and `NaN`, the built-in classes and functions, calls, strings of every kind, their
+  escapes and their interpolations (`$"…{x}…"`, `$"""…{x}…"""` and `$$"""…{{x}}…"""`), numbers, comments, and
+  operators, each with the scopes VS Code's themes know, so that a theme colours WebLingo as it colours JavaScript.
+- **In WASP:** a page's HTML, by VS Code's own grammar for HTML, its scripts and styles included; and the WebLingo code
+  in its blocks, `<% … %>`, `<%= … %>` and `<%- … %>`, wherever they are, in a tag, in an attribute's value or in a
+  script too, `include` and `layout` among its keywords; and a template's comment, `<%# … %>`, as a comment. A `%>` in
+  a string or a comment of a block does not end the block, as it does not for WASP.
+
+In a `.wasp` file, **Toggle Block Comment** (**Shift+Alt+A**) writes a template's comment, `<%# … %>`, and typing `<%`
+adds its `%>`. Emmet's abbreviations for HTML work in pages once `"emmet.includeLanguages": { "wasp": "html" }` is in
+VS Code's settings.
+
+Its colouring was tried with VS Code 1.146, on Windows.

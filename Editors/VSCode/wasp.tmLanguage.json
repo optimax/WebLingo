@@ -1,0 +1,37 @@
+{
+  "name": "WASP",
+  "scopeName": "text.html.wasp",
+  "comment": "VS Code's HTML for grammars that embed it, and WebLingo in blocks, found anywhere by the injection.",
+  "patterns": [
+    { "include": "#template" },
+    { "include": "text.html.derivative" }
+  ],
+  "injections": {
+    "L:text.html.wasp - (meta.embedded.block.wasp | comment.block.wasp)": {
+      "patterns": [ { "include": "#template" } ]
+    }
+  },
+  "repository": {
+    "template": {
+      "patterns": [ { "include": "#comment" }, { "include": "#block" } ]
+    },
+    "comment": {
+      "name": "comment.block.wasp",
+      "begin": "<%#",
+      "end": "%>",
+      "captures": { "0": { "name": "punctuation.definition.comment.wasp" } }
+    },
+    "block": {
+      "name": "meta.embedded.block.wasp",
+      "begin": "<%[=-]?",
+      "beginCaptures": { "0": { "name": "punctuation.section.embedded.begin.wasp" } },
+      "end": "%>",
+      "endCaptures": { "0": { "name": "punctuation.section.embedded.end.wasp" } },
+      "contentName": "source.weblingo",
+      "patterns": [
+        { "name": "keyword.control.import.wasp", "match": "(?<![\\w.])(?:include|layout)\\b" },
+        { "include": "source.weblingo" }
+      ]
+    }
+  }
+}

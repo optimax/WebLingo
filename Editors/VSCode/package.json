@@ -1,0 +1,44 @@
+{
+  "name": "weblingo",
+  "displayName": "WebLingo",
+  "description": "Syntax highlighting for WebLingo's scripts and modules (.wl) and WASP's pages (.wasp).",
+  "version": "0.1.0",
+  "publisher": "weblingo",
+  "engines": { "vscode": "^1.80.0" },
+  "categories": [ "Programming Languages" ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "weblingo",
+        "aliases": [ "WebLingo", "weblingo" ],
+        "extensions": [ ".wl" ],
+        "configuration": "./weblingo.language-configuration.json"
+      },
+      {
+        "id": "wasp",
+        "aliases": [ "WASP", "wasp" ],
+        "extensions": [ ".wasp" ],
+        "configuration": "./wasp.language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "weblingo",
+        "scopeName": "source.weblingo",
+        "path": "./weblingo.tmLanguage.json"
+      },
+      {
+        "language": "wasp",
+        "scopeName": "text.html.wasp",
+        "path": "./wasp.tmLanguage.json",
+        "embeddedLanguages": {
+          "source.weblingo": "weblingo",
+          "text.html": "html",
+          "source.css": "css",
+          "source.js": "javascript"
+        },
+        "tokenTypes": { "meta.tag string.quoted": "other" }
+      }
+    ]
+  }
+}

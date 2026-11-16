@@ -1,0 +1,242 @@
+{
+  "name": "WebLingo",
+  "scopeName": "source.weblingo",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#declarations" },
+    { "include": "#keywords" },
+    { "include": "#constants" },
+    { "include": "#support" },
+    { "include": "#calls" },
+    { "include": "#operators" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.weblingo",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "captures": { "0": { "name": "punctuation.definition.comment.weblingo" } }
+        },
+        {
+          "name": "comment.line.double-slash.weblingo",
+          "begin": "//",
+          "end": "(?=$)",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.weblingo" } }
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "comment": "A raw multi-line string with interpolations of two braces or more: $$\"\"\"…{{x}}…\"\"\".",
+          "name": "string.quoted.multi.interpolated.weblingo",
+          "begin": "(\\${2,})(\"{3,}|'{3,})",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.string.template.weblingo" },
+            "2": { "name": "punctuation.definition.string.begin.weblingo" }
+          },
+          "end": "\\2",
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.weblingo" } },
+          "patterns": [ { "include": "#interpolation-double" } ]
+        },
+        {
+          "comment": "A raw multi-line string with interpolations: $\"\"\"…{x}…\"\"\".",
+          "name": "string.quoted.multi.interpolated.weblingo",
+          "begin": "(\\$)(\"{3,}|'{3,})",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.string.template.weblingo" },
+            "2": { "name": "punctuation.definition.string.begin.weblingo" }
+          },
+          "end": "\\2",
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.weblingo" } },
+          "patterns": [ { "include": "#interpolation" } ]
+        },
+        {
+          "comment": "A raw multi-line string: \"\"\"…\"\"\" or '''…'''.",
+          "name": "string.quoted.multi.weblingo",
+          "begin": "(\"{3,}|'{3,})",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.weblingo" } },
+          "end": "\\1",
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.weblingo" } }
+        },
+        {
+          "name": "string.quoted.double.interpolated.weblingo",
+          "begin": "(\\$)(\")",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.string.template.weblingo" },
+            "2": { "name": "punctuation.definition.string.begin.weblingo" }
+          },
+          "end": "\"|(?=$)",
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.weblingo" } },
+          "patterns": [ { "include": "#interpolated-escapes" }, { "include": "#interpolation" } ]
+        },
+        {
+          "name": "string.quoted.single.interpolated.weblingo",
+          "begin": "(\\$)(')",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.string.template.weblingo" },
+            "2": { "name": "punctuation.definition.string.begin.weblingo" }
+          },
+          "end": "'|(?=$)",
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.weblingo" } },
+          "patterns": [ { "include": "#interpolated-escapes" }, { "include": "#interpolation" } ]
+        },
+        {
+          "name": "string.quoted.double.weblingo",
+          "begin": "\"",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.weblingo" } },
+          "end": "\"|(?=$)",
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.weblingo" } },
+          "patterns": [ { "include": "#escapes" } ]
+        },
+        {
+          "name": "string.quoted.single.weblingo",
+          "begin": "'",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.weblingo" } },
+          "end": "'|(?=$)",
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.weblingo" } },
+          "patterns": [ { "include": "#escapes" } ]
+        }
+      ]
+    },
+    "escapes": {
+      "patterns": [
+        { "name": "constant.character.escape.weblingo", "match": "\\\\(?:[nrt0\\\\'\"]|u\\{[0-9A-Fa-f]{1,6}\\})" },
+        { "name": "invalid.illegal.escape.weblingo", "match": "\\\\." }
+      ]
+    },
+    "interpolated-escapes": {
+      "patterns": [
+        { "name": "constant.character.escape.weblingo", "match": "\\\\(?:[nrt0\\\\'\"{}]|u\\{[0-9A-Fa-f]{1,6}\\})" },
+        { "name": "invalid.illegal.escape.weblingo", "match": "\\\\." },
+        { "name": "constant.character.escape.weblingo", "match": "\\{\\{|\\}\\}" }
+      ]
+    },
+    "interpolation": {
+      "name": "meta.interpolation.weblingo",
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.weblingo" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.weblingo" } },
+      "contentName": "meta.embedded.expression.weblingo",
+      "patterns": [ { "include": "$self" } ]
+    },
+    "interpolation-double": {
+      "name": "meta.interpolation.weblingo",
+      "begin": "\\{\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.weblingo" } },
+      "end": "\\}\\}",
+      "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.weblingo" } },
+      "contentName": "meta.embedded.expression.weblingo",
+      "patterns": [ { "include": "$self" } ]
+    },
+    "numbers": {
+      "name": "constant.numeric.decimal.weblingo",
+      "match": "(?<![\\w.])\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b"
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "(?<![\\w.])(function)\\s+([A-Za-z_]\\w*)",
+          "captures": { "1": { "name": "storage.type.function.weblingo" }, "2": { "name": "entity.name.function.weblingo" } }
+        },
+        {
+          "match": "(?<![\\w.])(class)\\s+([A-Za-z_]\\w*)",
+          "captures": { "1": { "name": "storage.type.class.weblingo" }, "2": { "name": "entity.name.type.class.weblingo" } }
+        },
+        {
+          "match": "(?<![\\w.])(extends)\\s+([A-Za-z_][\\w.]*)",
+          "captures": {
+            "1": { "name": "storage.modifier.extends.weblingo" },
+            "2": { "name": "entity.other.inherited-class.weblingo" }
+          }
+        },
+        {
+          "match": "(?<![\\w.])(extend)\\s+([A-Za-z_]\\w*)",
+          "captures": { "1": { "name": "storage.type.extend.weblingo" }, "2": { "name": "entity.name.type.class.weblingo" } }
+        },
+        {
+          "match": "(?<![\\w.])(property)\\s+([A-Za-z_]\\w*)",
+          "captures": { "1": { "name": "storage.type.property.weblingo" }, "2": { "name": "variable.other.property.weblingo" } }
+        },
+        {
+          "match": "(?<![\\w.])(new)\\s+([A-Za-z_]\\w*)",
+          "captures": { "1": { "name": "keyword.operator.new.weblingo" }, "2": { "name": "entity.name.type.class.weblingo" } }
+        },
+        { "name": "storage.type.accessor.weblingo", "match": "(?<![\\w.])(?:get|set)\\b(?=\\s*[({])" },
+        { "name": "storage.type.operator.weblingo", "match": "(?<![\\w.])operator\\b" }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        { "name": "keyword.control.import.weblingo", "match": "(?<![\\w.])import\\b" },
+        { "name": "keyword.control.export.weblingo", "match": "(?<![\\w.])export\\b" },
+        { "name": "keyword.control.from.weblingo", "match": "(?<![\\w.])from\\b(?=\\s*[\"'])" },
+        {
+          "name": "keyword.control.weblingo",
+          "match": "(?<![\\w.])(?:if|else|while|for|foreach|do|break|continue|return|throw|try|catch|finally|using|await)\\b"
+        },
+        { "name": "storage.type.weblingo", "match": "(?<![\\w.])(?:var|const|param|function|class|extend)\\b" },
+        { "name": "storage.modifier.weblingo", "match": "(?<![\\w.])(?:async|static|extends)\\b" },
+        { "name": "keyword.other.reserved.weblingo", "match": "(?<![\\w.])let\\b" },
+        { "name": "keyword.operator.new.weblingo", "match": "(?<![\\w.])new\\b" },
+        { "name": "keyword.operator.expression.weblingo", "match": "(?<![\\w.])(?:is|in)\\b" },
+        { "name": "variable.language.weblingo", "match": "(?<![\\w.])(?:this|super)\\b" }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        { "name": "constant.language.boolean.weblingo", "match": "(?<![\\w.])(?:true|false)\\b" },
+        { "name": "constant.language.null.weblingo", "match": "(?<![\\w.])null\\b" },
+        { "name": "constant.language.weblingo", "match": "(?<![\\w.])(?:Infinity|NaN)\\b" }
+      ]
+    },
+    "support": {
+      "patterns": [
+        {
+          "name": "support.class.weblingo",
+          "match": "(?<![\\w.])(?:Object|Error|Boolean|Integer|Number|String|Array|Map|Set|Function|Class|Task|Module)\\b"
+        },
+        {
+          "name": "support.class.weblingo",
+          "match": "(?<![\\w.])(?:Iterator|Bytes|BytesBuilder|File|Request|Response|Headers)\\b"
+        },
+        {
+          "name": "support.class.error.weblingo",
+          "match": "(?<![\\w.])(?:Argument|Call|Index|Initialization|IO|Key|Member|Overflow|Timeout|Type)Error\\b"
+        },
+        {
+          "name": "support.function.weblingo",
+          "match": "(?<![\\w.])(?:write|writeLn|delay|renderComponent|renderBody)\\b(?=\\s*\\()"
+        }
+      ]
+    },
+    "calls": {
+      "name": "entity.name.function.weblingo",
+      "match": "[A-Za-z_]\\w*(?=\\s*\\()"
+    },
+    "operators": {
+      "patterns": [
+        { "name": "storage.type.function.arrow.weblingo", "match": "=>" },
+        { "name": "keyword.operator.optional.weblingo", "match": "\\?\\.|\\?(?=\\[)" },
+        { "name": "punctuation.definition.set.weblingo", "match": "#(?=\\{)" },
+        { "name": "keyword.operator.comparison.weblingo", "match": "==|!=|<=|>=|<|>" },
+        { "name": "keyword.operator.logical.weblingo", "match": "&&|\\|\\||!" },
+        { "name": "keyword.operator.assignment.weblingo", "match": "=" },
+        { "name": "keyword.operator.arithmetic.weblingo", "match": "[+\\-*/]" }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        { "name": "punctuation.terminator.statement.weblingo", "match": ";" },
+        { "name": "punctuation.separator.comma.weblingo", "match": "," },
+        { "name": "punctuation.accessor.weblingo", "match": "\\." }
+      ]
+    }
+  }
+}
