@@ -2726,3 +2726,21 @@ Self-explanatory.
 2026-11-16 (Claude): `Editors/VSCode`, an extension of VS Code, in source: two languages, WebLingo for `.wl` and WASP for `.wasp`, each with a TextMate grammar and a language configuration. WebLingo's grammar gives its keywords, declarations, constants, built-in classes and functions, calls, strings with their escapes and interpolations, numbers, comments and operators the scopes themes know; WASP's is VS Code's grammar for HTML that others embed (`text.html.derivative`), with an injection finding a page's blocks anywhere, in a tag, an attribute's value or a script, `<%# %>` a comment, and a `%>` in a block's string or comment not ending it. `Editors/README.md` says how to install it (**Developer: Install Extension from Location…**). Guessed: the extension's name and publisher, `weblingo`, its version, 0.1.0, and the scopes; it has no license metadata, as the repository has none.
 
 Done (Claude, 2026-11-16, `d54aa3f`): VS Code's syntax highlighting for `.wl` and `.wasp`, tried with VS Code 1.146 on Windows: tokenized with VS Code's own TextMate engine, and shown in a separate profile, in a light and a dark theme; the comment toggle and `<%`'s closing `%>` configured, not tried by typing. Main's checks: editor files and documentation only, the solution unchanged since its last checks (the Release build, without warnings, and 3,026 tests, on Windows).
+
+## [DONE] WASP.config
+
+`weblingo.config` should really be `WASP.config`. We are configuring the WASP site, not the language.
+
+2026-11-16 (Claude): `weblingo.config` is read in two places: by `wasp`, from a site's root (`"environment"`, `"sendTimeout"`, `"schemes"`), and from a page's folder for `wasp run` and `wasp check`; and by `weblingo run` and `weblingo check`, from a script's folder, for its `"schemes"`, the folders of native modules. One decision, answerable with a letter:
+
+Q1, what configures a script's folder, for `weblingo`: (a) `weblingo.config`, still, `WASP.config` being what configures a site, and a page's folder, for `wasp` only; (b) `WASP.config` too, one name for both, `weblingo.config` no longer read anywhere.
+
+A1: (a), in the chat, 2026-11-16.
+
+Either way, as the renames before it: a site's `weblingo.config` no longer read, nothing kept for backward compatibility; the name exactly `WASP.config`, which matters on Linux; and neither name ever served from a site's root.
+
+TODO: For Linux's sake, change it to `wasp.config`.
+
+2026-11-16 (Claude): A1 recorded as approved in the specification, sections 1.1 and 6.12, and built, first as `WASP.config` (`94993ee`), then, as the TODO above asks, in lower case: a site's configuration, in its root, and a page's folder's under `wasp run` and `wasp check`, is `wasp.config` (`WebLingoRouteTable.ConfigurationFile`, `WebLingoCommandLineProgram.Configuration`), a script's folder's under `weblingo` `weblingo.config`, `wasp` reading no `weblingo.config`. The specification (sections 3.9, 3.10, 6.9, 9 and 15.2), the WASP User Manual, the READMEs and `Documents/implementation.md` say so. Guessed, and recorded as Proposed (section 15.2, "The host's core"): neither name served from a site's root, nor `web.config`, whatever their names' case, since Windows reads `WASP.config` as `wasp.config`.
+
+Done (Claude, 2026-11-16, `94993ee` and `e838ba0`): a site's configuration named `wasp.config`. Main's checks passed: the Release build, without warnings, 3,030 tests, `wasp serve` with `weblingo.config`, then `wasp.config`, and `weblingo` and `wasp` on the samples, on Windows only; Linux and IIS not tried.
