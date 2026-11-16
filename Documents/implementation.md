@@ -26,6 +26,7 @@ The current state (specification, sections 9 and 15): a compiler and two VMs, a 
 
 - `Documents/weblingo-architecture.md` is the architecture specification, and its only copy (user decision, 2026-11-12; specification, section 8.2): the language, the runtime values and the GC, the bytecode and the VM, hosting, the platform abstraction layer, templates, the solution's structure, the milestone roadmap, the open questions, and the register of decisions with their status. In this document, "the specification" means that document. It is the design document that `AGENTS.md` and `TO-DO-INSTRUCTIONS.md` refer to.
 - `WebLingo/README.md` says how to build, test and run the solution.
+- `Documents/wasp-user-manual.md` is the WASP User Manual, for those who build sites with WASP: how to write, serve and deploy one, each example in it run, its output as shown. It describes what is built, not what is planned, so that a change to what a site's author sees or writes updates it in the same change.
 - `Documents/M0.6.1-status.md` records what the current milestone delivered and what it does not implement.
 - `Documents/NativeCompatibility.md` is the inventory of .NET facilities and how the portable core may use each (section 6).
 - `HANDOFF.md` at the root, when present, records the current state of the work and its next steps.

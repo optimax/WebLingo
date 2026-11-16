@@ -62,6 +62,12 @@ One decision, answerable with a letter:
 
 A1:
 
+## [WORKING] WASP User Manual
+
+Write a comprehensive WASP User Manual with examples. This is not meant to be an exhaustive WebLingo Language Reference though.
+
+2026-11-16 (Claude): written, `Documents/wasp-user-manual.md`, listed among the project's documents (`Documents/implementation.md`, section 2) and linked from both READMEs. Every example in it was run, with `wasp serve` and `wasp run`, and gives the output shown; it describes what is built, what is missing in its last section, and the language only as far as pages need it, the WebLingo Language Reference being the next task. Guessed: its place and its name, and that a change to what a site's author sees updates it in the same change (`Documents/implementation.md`, section 2). Its examples were run on Windows only.
+
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value

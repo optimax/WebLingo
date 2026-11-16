@@ -1,7 +1,8 @@
 # Examples
 
 Each folder here is a site's own files, as a server runs them: its pages, its modules, its other files and its
-`web.config`, side by side, as a PHP site's are. WebLingo itself is installed once on the server, for every site.
+`web.config`, side by side, as a PHP site's are. WebLingo itself is installed once on the server, for every site. The
+WASP User Manual, `Documents/wasp-user-manual.md`, explains what the examples use.
 
 ## example1: The Lingo Tea House, a website built with WASP
 
