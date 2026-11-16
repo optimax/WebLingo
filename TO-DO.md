@@ -2,9 +2,9 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [QUESTION] M0.13: WBC
+## [QUESTION] M0.13: WLBC
 
-WBC, the bytecode's binary format, its writing and its reading, with verification (specification, sections 5.1, 5.3 and 5.5). Its encoding choices are proposed in the specification and not yet approved, and the format is the chosen VM's, so this waits for the choice between the VMs (WL-BC002) as well. Added by Claude, 2026-11-13.
+WLBC, the bytecode's binary format, its writing and its reading, with verification (specification, sections 5.1, 5.3 and 5.5). Its encoding choices are proposed in the specification and not yet approved, and the format is the chosen VM's, so this waits for the choice between the VMs (WL-BC002) as well. Added by Claude, 2026-11-13.
 
 2026-11-13: waits for M0.11.
 
@@ -14,17 +14,17 @@ WBC, the bytecode's binary format, its writing and its reading, with verificatio
 
 2026-11-15: the I/O-bound workload is done; waits for the owner's choice between the VMs ("The Choice Between the VMs (WL-BC002)", below).
 
-2026-11-15 (Claude): the owner kept both VMs, and has M0.13 go ahead now, a format for each VM's bytecode in one container (A1 and A3 of "The Choice Between the VMs (WL-BC002)"). The specification proposes the container (section 5.3), none of it approved, and does not say what uses it. Guessed, for now: a `.wbc` holds a whole program as the compiler joins it, its static imports included, the native modules and dynamic imports it names found when it runs, as from source; its fixed-size fields little-endian; the files its source positions name written as the compiler was given them, relative to the program's folder, never as the host's own paths; a file of a version its reader does not know rejected, as WL4001. Five decisions, each answerable with a letter.
+2026-11-15 (Claude): the owner kept both VMs, and has M0.13 go ahead now, a format for each VM's bytecode in one container (A1 and A3 of "The Choice Between the VMs (WL-BC002)"). The specification proposes the container (section 5.3), none of it approved, and does not say what uses it. Guessed, for now: a `.wlbc` holds a whole program as the compiler joins it, its static imports included, the native modules and dynamic imports it names found when it runs, as from source; its fixed-size fields little-endian; the files its source positions name written as the compiler was given them, relative to the program's folder, never as the host's own paths; a file of a version its reader does not know rejected, as WL4001. Five decisions, each answerable with a letter.
 
-**Q1, what uses WBC in M0.13: (a) the command line: `weblingo compile script.wl` writes `script.wbc`, `weblingo run script.wbc` runs one, and `weblingo disasm script.wbc` shows one as text, commands section 8.4 lists for later; (b) nothing but its tests yet: the format, its writer and its reader, with verification, the command line and a host's cache coming with hosting.**
+**Q1, what uses WLBC in M0.13: (a) the command line: `weblingo compile script.wl` writes `script.wlbc`, `weblingo run script.wlbc` runs one, and `weblingo disasm script.wlbc` shows one as text, commands section 8.4 lists for later; (b) nothing but its tests yet: the format, its writer and its reader, with verification, the command line and a host's cache coming with hosting.**
 
 A1:
 
-**Q2, which VM's bytecode a `.wbc` holds: (a) one, its header saying which, the compiler writing the one it is asked for (`--vm stack`), a VM refusing the other's; (b) either or both, each in a code section of its own, each VM taking its own.**
+**Q2, which VM's bytecode a `.wlbc` holds: (a) one, its header saying which, the compiler writing the one it is asked for (`--vm stack`), a VM refusing the other's; (b) either or both, each in a code section of its own, each VM taking its own.**
 
 A2:
 
-**Q3, the container as section 5.3 proposes it (a 32-byte header with the magic `WBC\0`, a major and a minor version, flags, the sections' count, the directory's offset and the file's length; a directory of 32-byte entries; sections for constants, functions, code, classes and modules, exception tables, source positions and integrity; operands in LEB128, strings in UTF-8, binary64s as their 8 bytes): (a) approved, and frozen as version 1.0, every later change a new version; (b) built as proposed, but kept Proposed, free to change without a new version until the owner freezes it.**
+**Q3, the container as section 5.3 proposes it (a 32-byte header with the magic `WLBC`, a major and a minor version, flags, the sections' count, the directory's offset and the file's length; a directory of 32-byte entries; sections for constants, functions, code, classes and modules, exception tables, source positions and integrity; operands in LEB128, strings in UTF-8, binary64s as their 8 bytes): (a) approved, and frozen as version 1.0, every later change a new version; (b) built as proposed, but kept Proposed, free to change without a new version until the owner freezes it.**
 
 A3:
 
