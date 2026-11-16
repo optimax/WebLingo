@@ -5,5 +5,6 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <ProjectReference Include="../../src/WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />
+    <ProjectReference Include="../../src/WebLingo.Hosting/WebLingo.Hosting.csproj" />
   </ItemGroup>
 </Project>

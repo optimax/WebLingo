@@ -17,6 +17,9 @@ public interface IWebLingoFileSystem
     /// <summary>Whether a file or a folder is there.</summary>
     bool Exists(string path);
 
+    /// <summary>Whether a folder is there; a file is not one.</summary>
+    bool IsFolder(string path);
+
     /// <summary>Removes a file.</summary>
     void Remove(string path);
 

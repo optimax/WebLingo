@@ -34,6 +34,8 @@ public sealed class DotNetFileSystem : IWebLingoFileSystem
 
     public bool Exists(string path) => Translated(() => File.Exists(path) || Directory.Exists(path));
 
+    public bool IsFolder(string path) => Translated(() => Directory.Exists(path));
+
     public void Remove(string path) => Translated(() =>
     {
         // File.Delete does nothing for a file that is not there, which is an error here.

@@ -10,6 +10,7 @@
   <Project Path="src/WebLingo.Templates/WebLingo.Templates.csproj" />
   <Project Path="src/WebLingo.Platform.DotNet/WebLingo.Platform.DotNet.csproj" />
   <Project Path="src/WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />
+  <Project Path="src/WebLingo.Hosting/WebLingo.Hosting.csproj" />
   <Project Path="src/WebLingo.Hosting.AspNetCore/WebLingo.Hosting.AspNetCore.csproj" />
   <Project Path="src/WebLingo.StdLib/WebLingo.StdLib.csproj" />
   <Project Path="src/WebLingo.StdLib.Tasks/WebLingo.StdLib.Tasks.csproj" />

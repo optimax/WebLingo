@@ -1,0 +1,94 @@
+using WebLingo.Platform.Abstractions;
+namespace WebLingo.Hosting;
+
+/// <summary>What a route leads to: a page, a <c>.wl</c> that may be a route handler, or a file served as it is.</summary>
+public enum WebLingoRouteKind { Page, Handler, File }
+
+/// <summary>A route: its kind, and its file, from the application's root, with <c>/</c> between its folders.</summary>
+public sealed record WebLingoRoute(WebLingoRouteKind Kind, string File);
+
+/// <summary>
+/// An application's routes (specification, section 6.12, "Routes"), made once for each generation from the files under its
+/// root: a page or a <c>.wl</c> by its path without its extension, <c>/products</c> for <c>products.wasp</c>, a folder's
+/// <c>index</c> by the folder's path, <c>/</c> and <c>/docs/</c> (and <c>/docs</c>, when nothing else is that), and any
+/// other file by its own path. A path is compared as it is, its case included, on every platform. Never routed: files
+/// and folders whose names start with <c>.</c>, <c>.wlbc</c> files, the configuration (<c>weblingo.config</c>), and IIS's
+/// <c>web.config</c>; nor, as files served as they are, a page or a <c>.wl</c> by its own name.
+/// </summary>
+public sealed class WebLingoRouteTable
+{
+    public const string ConfigurationFile = "weblingo.config";
+
+    private readonly Dictionary<string, WebLingoRoute> _routes = new(StringComparer.Ordinal);
+
+    private WebLingoRouteTable() { }
+
+    /// <summary>How many paths have routes.</summary>
+    public int Count => _routes.Count;
+
+    /// <summary>The route of a request's path, or null if it has none.</summary>
+    public WebLingoRoute? Find(string path) => _routes.TryGetValue(path, out var route) ? route : null;
+
+    /// <summary>The routes of the files under <paramref name="root"/>; null, with why, if two files are one route or the root cannot be read.</summary>
+    public static WebLingoRouteTable? Make(IWebLingoFileSystem files, string root, out string? error)
+    {
+        var table = new WebLingoRouteTable();
+        error = null;
+        try
+        {
+            if (!files.IsFolder(root))
+            {
+                error = "the application's root is not a folder";
+                return null;
+            }
+            table.Add(files, root, "", ref error);
+        }
+        catch (WebLingoFileSystemException exception)
+        {
+            error = "the application's files cannot be read: " + exception.Message;
+        }
+        if (error is null)
+        {
+            // A folder's path without its closing slash leads to its index too, unless something else is that path.
+            foreach (var (path, route) in new List<KeyValuePair<string, WebLingoRoute>>(table._routes))
+            {
+                if (path.Length > 1 && path.EndsWith('/') && route.Kind != WebLingoRouteKind.File) table._routes.TryAdd(path[..^1], route);
+            }
+        }
+        return error is null ? table : null;
+    }
+
+    private void Add(IWebLingoFileSystem files, string root, string folder, ref string? error)
+    {
+        foreach (var name in files.List(folder.Length == 0 ? root : root + "/" + folder))
+        {
+            if (error is not null) return;
+            if (name.StartsWith('.')) continue;
+            var file = folder.Length == 0 ? name : folder + "/" + name;
+            if (files.IsFolder(root + "/" + file))
+            {
+                Add(files, root, file, ref error);
+                continue;
+            }
+            if (folder.Length == 0 && name is ConfigurationFile or "web.config") continue;
+            var dot = name.LastIndexOf('.');
+            var extension = dot > 0 ? name[dot..] : "";
+            if (extension == ".wlbc") continue;
+            if (extension is not (".wasp" or ".wl"))
+            {
+                // A page or a handler of the same path is the route, whichever is listed first.
+                _routes.TryAdd("/" + file, new WebLingoRoute(WebLingoRouteKind.File, file));
+                continue;
+            }
+            var stem = name[..dot];
+            var path = "/" + (folder.Length == 0 ? "" : folder + "/") + (stem == "index" ? "" : stem);
+            var route = new WebLingoRoute(extension == ".wasp" ? WebLingoRouteKind.Page : WebLingoRouteKind.Handler, file);
+            if (_routes.TryGetValue(path, out var other) && other.Kind != WebLingoRouteKind.File)
+            {
+                error = $"'{other.File}' and '{file}' are both the route {path}";
+                return;
+            }
+            _routes[path] = route;
+        }
+    }
+}
