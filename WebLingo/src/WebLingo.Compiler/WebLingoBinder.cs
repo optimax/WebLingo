@@ -57,9 +57,16 @@ public sealed class WebLingoBinder
     /// <summary>The host's built-ins, in the order it gives them, which <c>std:system</c> exports (section 3.9).</summary>
     private readonly IReadOnlyList<WebLingoBuiltinDeclaration> _builtinDeclarations;
 
+    /// <summary>The program's parameters its host gives as instances of native classes (section 6.12).</summary>
+    private readonly IReadOnlyList<WebLingoHostParameter> _hostParameters;
+
+    /// <summary>The native classes the host's parameters are instances of, each bound once, by name.</summary>
+    private readonly Dictionary<string, WebLingoLocalSymbol> _hostClasses = new(StringComparer.Ordinal);
+
     public WebLingoBinder(WebLingoCompilerOptions options)
     {
         _builtinDeclarations = options.Builtins;
+        _hostParameters = options.HostParameters;
         foreach (var builtin in options.Builtins) _hostBuiltins[builtin.Name] = builtin;
         _function = _main = new FunctionContext(null, "main");
         _prelude = new Scope(null, _function);
@@ -127,7 +134,7 @@ public sealed class WebLingoBinder
         var units = new List<WebLingoBoundUnit>();
         // An import's top level, or a program's with parameters: the values given, its one parameter, first (section 3.9).
         var mainParameters = ParametersOf(modules[0].Root);
-        var importedValues = isImport || mainParameters.Count > 0 ? DeclareHidden("values", default) : null;
+        var importedValues = isImport || mainParameters.Exists(p => HostParameter(p.Name) is null) ? DeclareHidden("values", default) : null;
         // A program that imports, itself included, has a table of its files.
         var mainInstance = modules.Count > 1 || modules[0].Imports.Count > 0 ? DeclareHidden("module", default) : null;
         var programParameters = new List<WebLingoModuleParameter>();
@@ -277,6 +284,19 @@ public sealed class WebLingoBinder
         var statements = new List<WebLingoBoundStatement>();
         foreach (var parameter in parameters)
         {
+            if (HostParameter(parameter.Name) is { } hosted)
+            {
+                // The host's (section 6.12): an instance its built-in makes, given its classes, when the statement runs.
+                var arguments = new List<WebLingoBoundExpression>();
+                foreach (var info in hosted.Classes) arguments.Add(Reference(HostClass(info), parameter.Span));
+                var made = new WebLingoBoundBuiltinCall(UseBuiltin(new WebLingoBuiltinDeclaration(hosted.Builtin, arguments.Count)), arguments,
+                    parameter.Span);
+                if (Declare(parameter.Name, WebLingoDeclarationKind.Const, parameter.NameSpan, null) is { } hostLocal)
+                {
+                    statements.Add(new WebLingoBoundVariableDeclaration(hostLocal, made, parameter.Span));
+                }
+                continue;
+            }
             var value = parameter.Default is { } given ? BindExpression(given) : null;
             if (Declare(parameter.Name, WebLingoDeclarationKind.Const, parameter.NameSpan, null) is { } local)
             {
@@ -285,6 +305,27 @@ public sealed class WebLingoBinder
             }
         }
         return statements;
+    }
+
+    /// <summary>The host's parameter of that name, or null (section 6.12).</summary>
+    private WebLingoHostParameter? HostParameter(string name)
+    {
+        foreach (var parameter in _hostParameters)
+        {
+            if (parameter.Name == name) return parameter;
+        }
+        return null;
+    }
+
+    /// <summary>A native class a host's parameter is an instance of, bound once, as a native module's class is, under <c>host</c>.</summary>
+    private WebLingoLocalSymbol HostClass(WebLingoNativeClassInfo info)
+    {
+        if (!_hostClasses.TryGetValue(info.Name, out var local))
+        {
+            local = BindNativeClass("host", info);
+            _hostClasses.Add(info.Name, local);
+        }
+        return local;
     }
 
     /// <summary>

@@ -49,7 +49,21 @@ public sealed record WebLingoCompilerOptions(IReadOnlyList<WebLingoBuiltinDeclar
 
     /// <summary>How the host finds the native modules a program imports, or null for a host that has none (section 3.9).</summary>
     public IWebLingoNativeResolver? Native { get; init; }
+
+    /// <summary>
+    /// The program's parameters its host gives as instances of native classes, a page's <c>request</c> and <c>response</c>
+    /// (section 6.12); none by default. Only the program's own file's parameters are given so, never an import's.
+    /// </summary>
+    public IReadOnlyList<WebLingoHostParameter> HostParameters { get; init; } = [];
 }
+
+/// <summary>
+/// A program's parameter that its host gives as an instance of a native class (specification, section 6.12), <c>param
+/// request;</c>: when the parameter's statement runs, once the program's classes are made, it is what the host's built-in
+/// <paramref name="Builtin"/> gives, given <paramref name="Classes"/>, each made as a native module's class is, which the
+/// built-in makes its instances of. A default the parameter declares is not used, and the host gives it no other way.
+/// </summary>
+public sealed record WebLingoHostParameter(string Name, string Builtin, IReadOnlyList<WebLingoNativeClassInfo> Classes);
 
 /// <summary>A name the binder resolved. Symbols are compared by identity.</summary>
 public abstract class WebLingoSymbol(string name)

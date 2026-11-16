@@ -48,6 +48,15 @@ public sealed class WebLingoHeap
 
     public void AddRoots(List<WebLingoValue> roots) => _listRoots.Add(roots);
 
+    /// <summary>Roots kept for the heap's life, which nothing removes, as a host's instances for its execution are.</summary>
+    private readonly List<WebLingoValue[]> _lastingRoots = [];
+
+    /// <summary>
+    /// Registers values the collector must keep, and everything they refer to, as long as the heap lives: what a host makes
+    /// once for an execution, outside the frames' order, such as a request's instances (section 6.12).
+    /// </summary>
+    public void AddLastingRoots(WebLingoValue[] roots) => _lastingRoots.Add(roots);
+
     public void RemoveLastRoots(List<WebLingoValue> roots)
     {
         if (_listRoots.Count == 0 || _listRoots[^1] != roots) throw new InvalidOperationException("The roots are not the last added.");
@@ -1244,6 +1253,10 @@ public sealed class WebLingoHeap
             foreach (var value in roots) Mark(value, marked, pending);
         }
         foreach (var roots in _listRoots)
+        {
+            foreach (var value in roots) Mark(value, marked, pending);
+        }
+        foreach (var roots in _lastingRoots)
         {
             foreach (var value in roots) Mark(value, marked, pending);
         }

@@ -2,14 +2,18 @@ using WebLingo.Bytecode;
 using WebLingo.Compiler;
 using WebLingo.Core;
 using WebLingo.Hosting.Abstractions;
+using WebLingo.Language;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
 using WebLingo.Templates;
 using WebLingo.VM;
 namespace WebLingo.Hosting;
 
-/// <summary>What a request came to: a page's response, a file the host serves as it is, no route, or a 500.</summary>
-public enum WebLingoRequestOutcomeKind { Page, File, NotFound, Failed }
+/// <summary>
+/// What a request came to: a page's response, or a route handler's, a file the host serves as it is, no route, a handler
+/// that does not answer its method, or a 500.
+/// </summary>
+public enum WebLingoRequestOutcomeKind { Page, File, NotFound, Failed, Handler, MethodNotAllowed }
 
 /// <summary>A request's outcome; for <see cref="WebLingoRequestOutcomeKind.File"/>, the file, from the application's root.</summary>
 public sealed record WebLingoRequestOutcome(WebLingoRequestOutcomeKind Kind, string? File = null);
@@ -21,9 +25,18 @@ public sealed record WebLingoRequestOutcome(WebLingoRequestOutcomeKind Kind, str
 /// cached, with the components it renders, for the generation's life, all in memory (section 5.1). A request runs on the
 /// worker the host gives, its output kept until it has run, then written, as UTF-8, to the response; a page that does not
 /// compile, or fails, is a 500, its errors shown in development only. <see cref="Handle"/> never throws for a script's error.
+/// A page's <c>param request;</c> and <c>param response;</c> are the request's instances (<see cref="WebLingoHttpObjects"/>).
+/// A <c>.wl</c>'s route is a handler's, a module exporting a function for each method it answers, <c>get</c>,
+/// <c>post</c>, and so on, which is called with the request and the response, and awaited, as a page that imports the
+/// module would call it; <c>HEAD</c> calls <c>head</c>, or <c>get</c> if it has none; any other method is a 405, whose
+/// <c>Allow</c> names the ones it answers; and a <c>.wl</c> exporting none is not a handler, its path a 404.
 /// </summary>
 public sealed class WebLingoApplication
 {
+    /// <summary>The methods a handler may answer, each by the function it exports of that name, in lower case.</summary>
+    private static readonly string[] Methods = ["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"];
+
+    private readonly WebLingoHttpObjects _http = new();
     private readonly WebLingoApplicationOptions _options;
     private readonly WebLingoWorkerServices[] _services;
     private readonly IReadOnlyList<WebLingoBuiltinDeclaration>[] _declarations;
@@ -90,22 +103,81 @@ public sealed class WebLingoApplication
             case { Kind: WebLingoRouteKind.File } file:
                 return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.File, file.File);
             case { Kind: WebLingoRouteKind.Page } page:
-                return Run(generation.Page(worker, page.File, this), response, worker, cancellation);
+                return Run(generation.Page(worker, page.File, this), request, response, worker, cancellation);
+            case { Kind: WebLingoRouteKind.Handler } handler:
+                return Handler(generation, handler.File, request, response, worker, cancellation);
             default:
-                // A .wl's route is a handler's from M0.14.3 on.
                 WebLingoErrorPages.NotFound(response);
                 return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.NotFound);
         }
     }
 
-    private WebLingoRequestOutcome Run(CompiledPage page, IWebLingoHttpResponse response, WebLingoWorkerId worker,
+    /// <summary>
+    /// A <c>.wl</c>'s route: its function for the request's method run as a page that imports it and calls it would run;
+    /// a 405 if it has none, and a 404 if it is no handler. Its exports are read from its text, once on each worker, a text
+    /// that does not parse being a handler's, so that its errors are the 500's.
+    /// </summary>
+    private WebLingoRequestOutcome Handler(Generation generation, string file, IWebLingoHttpRequest request, IWebLingoHttpResponse response,
+        WebLingoWorkerId worker, WebLingoCancellationSignal? cancellation)
+    {
+        var exports = generation.Exports(worker, file, this);
+        string? function = null;
+        var allowed = new List<string>();
+        foreach (var method in Methods)
+        {
+            var name = method.ToLowerInvariant();
+            var answers = exports is null || exports.Contains(name) || (method == "HEAD" && exports.Contains("get"));
+            if (answers) allowed.Add(method);
+            if (answers && method == request.Method) function = method == "HEAD" && exports?.Contains("head") == false ? "get" : name;
+        }
+        if (allowed.Count == 0)
+        {
+            WebLingoErrorPages.NotFound(response);
+            return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.NotFound);
+        }
+        if (function is null)
+        {
+            WebLingoErrorPages.MethodNotAllowed(response, string.Join(", ", allowed));
+            return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.MethodNotAllowed);
+        }
+        var outcome = Run(generation.Handler(worker, file, function, this), request, response, worker, cancellation);
+        return outcome.Kind == WebLingoRequestOutcomeKind.Page ? new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Handler) : outcome;
+    }
+
+    /// <summary>The names a <c>.wl</c> exports, read from its text, or null if it does not parse.</summary>
+    private HashSet<string>? ExportsOf(string file)
+    {
+        var text = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wl").Read(file) ?? "";
+        var tree = new WebLingoParser(text, file).ParseCompilationUnit();
+        foreach (var diagnostic in tree.Diagnostics)
+        {
+            if (diagnostic.Severity == WebLingoDiagnosticSeverity.Error) return null;
+        }
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var statement in tree.Root.Statements)
+        {
+            if (statement is not WebLingoExportSyntax export) continue;
+            var name = export.Declaration switch
+            {
+                WebLingoFunctionDeclarationSyntax declared => declared.Name,
+                WebLingoClassDeclarationSyntax declared => declared.Name,
+                WebLingoVariableDeclarationSyntax declared => declared.Name,
+                _ => null
+            };
+            if (name is not null) names.Add(name);
+        }
+        return names;
+    }
+
+    private WebLingoRequestOutcome Run(CompiledPage page, IWebLingoHttpRequest request, IWebLingoHttpResponse response, WebLingoWorkerId worker,
         WebLingoCancellationSignal? cancellation)
     {
         if (page.Module is null) return Failed(response, page.Errors);
         var output = new WebLingoResponseText();
         var context = new WebLingoExecutionContext(worker)
         {
-            Services = new RequestServices(_services[worker.Value].Builtins, WebLingoTemplateBuiltins.Create(output)),
+            Services = new RequestServices([.. WebLingoTemplateBuiltins.Create(output), .. _http.For(request, response)], _http.Members,
+                _services[worker.Value].Builtins),
             Output = output,
             FileSystem = _options.FileSystem,
             Clock = _options.Clock,
@@ -127,14 +199,26 @@ public sealed class WebLingoApplication
         return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
     }
 
-    /// <summary>A page compiled on a worker, with its files found from the application's root, or its errors, each as a line.</summary>
-    private CompiledPage Compile(string file, WebLingoWorkerId worker)
+    /// <summary>
+    /// A page compiled on a worker, with its files found from the application's root, or its errors, each as a line: the
+    /// file's, or, for a handler's <paramref name="function"/>, a page that imports the file and calls it, named
+    /// <c>file#function</c>, whose errors are the file's, but where it calls a function that it does not have.
+    /// </summary>
+    private CompiledPage Compile(string file, WebLingoWorkerId worker, string? function = null)
     {
         var templates = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wasp");
         var modules = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wl");
-        var options = new WebLingoCompilerOptions(_declarations[worker.Value]) { Resolver = modules, Native = _services[worker.Value].Native };
+        var options = new WebLingoCompilerOptions(_declarations[worker.Value])
+        {
+            Resolver = modules,
+            Native = _services[worker.Value].Native,
+            HostParameters = _http.Parameters
+        };
         var compiler = new WebLingoTemplateCompiler(options, templates);
-        var text = new WebLingoSourceText(templates.Read(file) ?? "", file);
+        var text = function is null
+            ? new WebLingoSourceText(templates.Read(file) ?? "", file)
+            : new WebLingoSourceText("<% param request; param response; import handler from \"/" + Escaped(file) + "\"; await handler."
+                                     + function + "(request, response); %>", file + "#" + function);
         var page = new CompiledPage(text, compiler, modules, new WebLingoModuleLoader(options));
         var result = compiler.Compile(text);
         page.Module = result.Module;
@@ -145,13 +229,49 @@ public sealed class WebLingoApplication
         return page;
     }
 
+    /// <summary>A file's name as a string literal's text in a page's block: <c>"</c> escaped, and <c>&gt;</c>, so that <c>%&gt;</c> cannot end it.</summary>
+    private static string Escaped(string file) => file.Replace("\"", "\\\"", StringComparison.Ordinal).Replace(">", "\\u{3E}", StringComparison.Ordinal);
+
     /// <summary>
-    /// A generation (section 6.5): its routes, and, for each worker, the pages compiled on it, which only that worker reads
-    /// and adds to.
+    /// A generation (section 6.5): its routes, and, for each worker, the pages and handlers compiled on it, and the
+    /// handlers' exports, which only that worker reads and adds to.
     /// </summary>
     private sealed class Generation(WebLingoRouteTable routes, int workers)
     {
         private readonly Dictionary<string, CompiledPage>[] _pages = MakePages(workers);
+        private readonly Dictionary<string, HashSet<string>?>[] _exports = MakeExports(workers);
+
+        /// <summary>A handler's exports on a worker, read once; null for one that does not parse.</summary>
+        public HashSet<string>? Exports(WebLingoWorkerId worker, string file, WebLingoApplication application)
+        {
+            var exports = _exports[worker.Value];
+            if (!exports.TryGetValue(file, out var names))
+            {
+                names = application.ExportsOf(file);
+                exports.Add(file, names);
+            }
+            return names;
+        }
+
+        /// <summary>A handler's function as a page that calls it, compiled once on each worker, kept by a name no file has.</summary>
+        public CompiledPage Handler(WebLingoWorkerId worker, string file, string function, WebLingoApplication application)
+        {
+            var pages = _pages[worker.Value];
+            var key = file + "#" + function;
+            if (!pages.TryGetValue(key, out var page))
+            {
+                page = application.Compile(file, worker, function);
+                pages.Add(key, page);
+            }
+            return page;
+        }
+
+        private static Dictionary<string, HashSet<string>?>[] MakeExports(int workers)
+        {
+            var exports = new Dictionary<string, HashSet<string>?>[workers];
+            for (var i = 0; i < workers; i++) exports[i] = new Dictionary<string, HashSet<string>?>(StringComparer.Ordinal);
+            return exports;
+        }
 
         public WebLingoRouteTable Routes { get; } = routes;
 
@@ -221,10 +341,14 @@ public sealed class WebLingoApplication
         }
     }
 
-    /// <summary>A request's built-ins: the page's writers, writing to its output, then the host's.</summary>
-    private sealed class RequestServices(WebLingoBuiltinRegistry host, IWebLingoBuiltinFunction[] request) : IWebLingoRuntimeServices
+    /// <summary>
+    /// A request's built-ins: the page's writers, writing to its output, and the makers of its request's and its response's
+    /// instances; then the members of their classes; then the host's.
+    /// </summary>
+    private sealed class RequestServices(IWebLingoBuiltinFunction[] request, WebLingoBuiltinRegistry members, WebLingoBuiltinRegistry host)
+        : IWebLingoRuntimeServices
     {
-        public IReadOnlyList<IWebLingoBuiltinFunction> Builtins { get; } = [.. request, .. host.Builtins];
+        public IReadOnlyList<IWebLingoBuiltinFunction> Builtins { get; } = [.. request, .. members.Builtins, .. host.Builtins];
 
         public bool TryGetBuiltin(string name, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out IWebLingoBuiltinFunction builtin)
         {
@@ -236,7 +360,7 @@ public sealed class WebLingoApplication
                     return true;
                 }
             }
-            return host.TryGetBuiltin(name, out builtin);
+            return members.TryGetBuiltin(name, out builtin) || host.TryGetBuiltin(name, out builtin);
         }
     }
 }
