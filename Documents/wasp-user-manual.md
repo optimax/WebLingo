@@ -6,7 +6,8 @@ handlers (also `.wl`), which answer a path with code alone, and any other files,
 are sent as they are. WebLingo is installed once on a server, and every site uses it.
 
 This manual shows how to write and serve such a site. It explains as much of the WebLingo language as pages need, but
-it is not a reference to the language; the WebLingo Language Reference is that.
+it is not a reference to the language; the WebLingo Language Reference, `Documents/weblingo-language-reference.md`, is
+that.
 
 WASP is pre-alpha. Everything here works as described, and every example in this manual was run and gave the output
 shown, but names and details may still change before a first release. [What is not there yet](#18-what-is-not-there-yet)
