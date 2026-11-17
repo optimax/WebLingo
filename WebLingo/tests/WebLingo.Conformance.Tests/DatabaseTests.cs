@@ -43,8 +43,11 @@ public sealed class DatabaseTests : IDisposable
                 "var row = (await db.query(\"SELECT Name, Price, Added, Photo FROM Fish WHERE Id = 3\"))[0]; writeLn(row);",
         "{\"Name\": \"Guppy\", \"Price\": null, \"Added\": DateTime:2026-11-16T09:30:00Z, \"Photo\": Bytes:[104, 105]}")]
     [InlineData("writeLn([db.provider, db.serverVersion.startsWith(\"3.\"), db is Database]);", "[\"sqlite\", true, true]")]
-    [InlineData("var all = await Task.all([db.query(\"SELECT COUNT(*) AS n FROM Fish\"), db.execute(\"DELETE FROM Fish WHERE Id = 2\")]); writeLn(all);",
-        "[[{\"n\": 2}], 1]")]
+    // Operations started without being awaited run one at a time, in no defined order (section 7.11): neither touches the
+    // other's row.
+    [InlineData("var all = await Task.all([db.query(\"SELECT COUNT(*) AS n FROM Fish WHERE Id = 1\"), db.execute(\"DELETE FROM Fish WHERE Id = 2\")]); " +
+                "writeLn(all);",
+        "[[{\"n\": 1}], 1]")]
     public void StatementsGiveRowsAndCounts(string source, string printed)
     {
         var (exit, output, error) = Weblingo(Setup + source);
