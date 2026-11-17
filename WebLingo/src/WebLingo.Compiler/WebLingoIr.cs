@@ -226,6 +226,9 @@ public sealed record WebLingoIrIs(WebLingoIrExpression Value, WebLingoIrExpressi
 /// <summary>The text of a value, an instance as its fields, as <c>Object</c>'s <c>toString()</c> gives it (section 3.7).</summary>
 public sealed record WebLingoIrToText(WebLingoIrExpression Value, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
 
+/// <summary>A value's JSON text, with an indent (section 3.6, "JSON").</summary>
+public sealed record WebLingoIrToJson(WebLingoIrExpression Value, WebLingoIrExpression Indent, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
+
 /// <summary>An instance holding a value, of its class's kind; gives null (section 3.7).</summary>
 public sealed record WebLingoIrHold(WebLingoIrExpression Instance, WebLingoIrExpression Value, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
 

@@ -226,6 +226,7 @@ public sealed class WebLingoStackBytecodeVerifier
             }
             case WebLingoStackOpCode.CallSpread:
             case WebLingoStackOpCode.NewSpread:
+            case WebLingoStackOpCode.ToJson:
                 return Unused(a, b);
             case WebLingoStackOpCode.CallMethodSpread:
                 return Name(module, a) ?? Unused(b);
@@ -485,7 +486,8 @@ public sealed class WebLingoStackBytecodeVerifier
         WebLingoStackOpCode.NewArray or WebLingoStackOpCode.NewSet => (instruction.A, 1),
         WebLingoStackOpCode.NewMap => (2 * instruction.A, 1),
         WebLingoStackOpCode.CallMethod => (instruction.B + 1, 1),
-        WebLingoStackOpCode.CallSpread or WebLingoStackOpCode.CallMethodSpread or WebLingoStackOpCode.NewSpread => (2, 1),
+        WebLingoStackOpCode.CallSpread or WebLingoStackOpCode.CallMethodSpread or WebLingoStackOpCode.NewSpread
+            or WebLingoStackOpCode.ToJson => (2, 1),
         WebLingoStackOpCode.GetIndex => (2, 1),
         WebLingoStackOpCode.StoreIndex => (3, instruction.A),
         _ => (0, 0) // Jump, NewCell, BoxLocal, CopyCell and Return.

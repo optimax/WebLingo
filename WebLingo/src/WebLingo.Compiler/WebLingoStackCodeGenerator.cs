@@ -387,6 +387,11 @@ public sealed class WebLingoStackCodeGenerator
                 EmitValue(text.Value);
                 Emit(WebLingoStackOpCode.ToText, text.Span);
                 return;
+            case WebLingoIrToJson json:
+                EmitValue(json.Value);
+                EmitValue(json.Indent);
+                Emit(WebLingoStackOpCode.ToJson, json.Span);
+                return;
             case WebLingoIrUnary unary:
                 EmitValue(unary.Operand);
                 Emit(unary.Operator switch
@@ -782,7 +787,8 @@ public sealed class WebLingoStackCodeGenerator
             WebLingoStackOpCode.NewMap => (2 * a, 1),
             WebLingoStackOpCode.NewSet => (a, 1),
             WebLingoStackOpCode.CallMethod => (b + 1, 1),
-            WebLingoStackOpCode.CallSpread or WebLingoStackOpCode.CallMethodSpread or WebLingoStackOpCode.NewSpread => (2, 1),
+            WebLingoStackOpCode.CallSpread or WebLingoStackOpCode.CallMethodSpread or WebLingoStackOpCode.NewSpread
+                or WebLingoStackOpCode.ToJson => (2, 1),
             WebLingoStackOpCode.GetIndex => (2, 1),
             WebLingoStackOpCode.StoreIndex => (3, a),
             WebLingoStackOpCode.Negate or WebLingoStackOpCode.Plus or WebLingoStackOpCode.Not or WebLingoStackOpCode.CheckBoolean => (1, 1),

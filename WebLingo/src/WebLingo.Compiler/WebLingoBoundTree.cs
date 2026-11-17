@@ -237,6 +237,10 @@ public sealed record WebLingoBoundIs(WebLingoBoundExpression Value, WebLingoBoun
 
 public sealed record WebLingoBoundToText(WebLingoBoundExpression Value, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);
 
+/// <summary>The prelude's <c>toJson(value, indent)</c>: a value's JSON text, which <c>Json.stringify</c> gives (section 3.6).</summary>
+public sealed record WebLingoBoundToJson(WebLingoBoundExpression Value, WebLingoBoundExpression Indent, WebLingoSourceSpan Span)
+    : WebLingoBoundExpression(Span);
+
 /// <summary>The built-in classes' <c>hold(this, value)</c>: the instance holds the value, of its class's kind (section 3.7).</summary>
 public sealed record WebLingoBoundHold(WebLingoBoundExpression Instance, WebLingoBoundExpression Value, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);
 

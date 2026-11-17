@@ -210,9 +210,9 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
     /// whose result goes where <see cref="Destination"/> says; and whether its VM keeps its values as roots, as it
     /// does while a toString() it waits for runs.
     /// </summary>
-    private sealed class TextCall(WebLingoTextBuilder builder, IWebLingoBuiltinFunction? builtin, int destination)
+    private sealed class TextCall(IWebLingoTextBuilder builder, IWebLingoBuiltinFunction? builtin, int destination)
     {
-        public WebLingoTextBuilder Builder { get; } = builder;
+        public IWebLingoTextBuilder Builder { get; } = builder;
         public IWebLingoBuiltinFunction? Builtin { get; } = builtin;
         /// <summary>The register its result goes to.</summary>
         public int Destination { get; } = destination;
@@ -841,6 +841,10 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         case WebLingoOpCode.ToText:
                             _text = new TextCall(new WebLingoTextBuilder(heap, registers[ins.B], true), null, ins.A);
                             goto text;
+                        case WebLingoOpCode.ToJson:
+                            // Json.stringify(value, indent): its text, built as a value's is, a toJson() called on the way (section 3.6).
+                            _text = new TextCall(new WebLingoJsonBuilder(heap, registers[ins.B], registers[ins.C]), null, ins.A);
+                            goto text;
                         case WebLingoOpCode.Await:
                             _awaited = registers[ins.B];
                             frame.AwaitDestination = ins.A;
@@ -1083,6 +1087,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         _text = null;
                         if (!building.Builder.TryBuild(out var instance, out var method))
                         {
+                            error = building.Builder.Error; // JSON's: a value it cannot write (section 3.6).
+                            if (error is not null)
+                            {
+                                if (building.Rooted) heap.RemoveLastRoots(building.Builder.Roots);
+                                goto failed;
+                            }
                             if (!building.Rooted)
                             {
                                 heap.AddRoots(building.Builder.Roots);
@@ -1130,16 +1140,13 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         var building = _text!;
                         _text = null;
                         pc = frame.Pc - 1;
-                        if (_returned.Kind != WebLingoValueKind.String)
+                        error = building.Builder.Supply(_returned);
+                        _returned = WebLingoValue.Null;
+                        if (error is not null)
                         {
                             if (building.Rooted) heap.RemoveLastRoots(building.Builder.Roots);
-                            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                                $"'toString()' gave {WebLingoValueFormatter.Describe(_returned, heap)}, not a string, to be written.");
-                            _returned = WebLingoValue.Null;
                             goto failed;
                         }
-                        building.Builder.Supply(heap.GetString(_returned));
-                        _returned = WebLingoValue.Null;
                         _text = building;
                         goto text;
                     }
@@ -2205,7 +2212,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             value.Kind is WebLingoValueKind.Instance or WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set;
 
         /// <summary>The kinds of values' classes, by <c>WebLingoValueClass</c>, once the module has made them (section 3.7); a root.</summary>
-        private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.Regex + 1];
+        private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.Json + 1];
 
         /// <summary>The kinds of runtime errors' classes, as <c>module.ErrorClasses</c> lists them, once made; a root.</summary>
         private readonly WebLingoValue[] _errorClasses = new WebLingoValue[Math.Max(module.ErrorClasses.Count, MaxErrorClasses)];

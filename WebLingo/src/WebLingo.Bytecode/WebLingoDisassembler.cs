@@ -77,6 +77,7 @@ public static class WebLingoDisassembler
             WebLingoOpCode.Dispose => $"Dispose {Register(function, a)}",
             WebLingoOpCode.Throw => $"Throw {Register(function, a)}",
             WebLingoOpCode.ToText => $"ToText {Register(function, a)}, {Register(function, b)}",
+            WebLingoOpCode.ToJson => $"ToJson {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
             WebLingoOpCode.Await => $"Await {Register(function, a)}, {Register(function, b)}",
             WebLingoOpCode.Extend => $"Extend {Register(function, a)}, class{b}",
             WebLingoOpCode.Hold => $"Hold {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",

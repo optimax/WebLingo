@@ -27,5 +27,7 @@ public enum WebLingoValueClass
     BytesBuilder,
     DateTime,
     Decimal,
-    Regex
+    Regex,
+    /// <summary>No kind's: the class of <c>Json.parse</c> and <c>Json.stringify</c> (section 3.6, "JSON").</summary>
+    Json
 }

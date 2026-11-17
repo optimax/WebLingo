@@ -196,7 +196,9 @@ public enum WebLingoStackOpCode : byte
     /// <summary><c>x.m(...values)</c>, A = the method's name, a constant: as <see cref="CallMethod"/>, with the array's elements.</summary>
     CallMethodSpread,
     /// <summary><c>new Class(...values)</c>: as <see cref="New"/>, with the array's elements.</summary>
-    NewSpread
+    NewSpread,
+    /// <summary>Pops an indent, then a value, and pushes the value's JSON text, as the register bytecode's <c>ToJson</c> gives it.</summary>
+    ToJson
 }
 
 public readonly record struct WebLingoStackInstruction(WebLingoStackOpCode OpCode, int A = 0, int B = 0);

@@ -16,7 +16,7 @@ internal static class WebLingoPrelude
         ("Function", WebLingoValueClass.Function), ("Class", WebLingoValueClass.Class), ("Task", WebLingoValueClass.Task),
         ("Module", WebLingoValueClass.Module), ("Iterator", WebLingoValueClass.Iterator), ("Bytes", WebLingoValueClass.Bytes),
         ("BytesBuilder", WebLingoValueClass.BytesBuilder), ("DateTime", WebLingoValueClass.DateTime),
-        ("Decimal", WebLingoValueClass.Decimal), ("Regex", WebLingoValueClass.Regex)
+        ("Decimal", WebLingoValueClass.Decimal), ("Regex", WebLingoValueClass.Regex), ("Json", WebLingoValueClass.Json)
     ];
 
     public static readonly (string Name, string Code)[] ErrorClasses =
@@ -59,6 +59,7 @@ internal static class WebLingoPrelude
         "Number" => "class Number { constructor(value = 0.0) { hold(this, value); } }",
         "Decimal" => "class Decimal { constructor(value = 0) { hold(this, value); } }",
         // new Regex(…) makes the value itself; a class extending Regex holds one, made by the class's own new.
+        "Json" => "class Json { static stringify(value, indent = 0) { return toJson(value, indent); } }",
         "Regex" => "class Regex { constructor(pattern, flags = \"\") { hold(this, new Regex(pattern, flags)); } }",
         "String" => "class String { constructor(value = \"\") { hold(this, value); } }",
         "Function" => "class Function { constructor(f = function () {}) { hold(this, f); } }",

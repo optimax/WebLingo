@@ -1559,6 +1559,10 @@ public sealed class WebLingoBinder
         {
             return new WebLingoBoundBuiltinCall(UseBuiltin(nativeMember), arguments, call.Span); // A native class's member (section 3.9).
         }
+        if (_inPrelude && calleeSyntax is WebLingoNameSyntax { Name: "toJson" } && arguments.Count == 2)
+        {
+            return new WebLingoBoundToJson(arguments[0], arguments[1], call.Span);
+        }
         if (_inPrelude && calleeSyntax is WebLingoNameSyntax { Name: "toText" } && arguments.Count == 1)
         {
             return new WebLingoBoundToText(arguments[0], call.Span);
@@ -1832,7 +1836,12 @@ public sealed class WebLingoBinder
         {
             if (builtin == name) return declaration.Local; // UseError() makes every runtime error's class.
         }
-        return BindBuiltinClass(name, WebLingoPrelude.Source(name), baseLocal, inPrelude: true);
+        // Json's functions are native, so that an error in stringify is reported where it was called (section 3.6).
+        var outer = _nativeCallees;
+        if (name == "Json") _nativeCallees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
+        var made = BindBuiltinClass(name, WebLingoPrelude.Source(name), baseLocal, inPrelude: true);
+        _nativeCallees = outer;
+        return made;
     }
 
     /// <summary>Binds a built-in class from its source, extending <paramref name="baseLocal"/>, or nothing if null.</summary>

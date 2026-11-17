@@ -294,6 +294,8 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                     return $"its arguments, registers {c} to {(long)c + d - 1}, are not all in the function's {function.RegisterCount}.";
                 }
                 return null;
+            case WebLingoOpCode.ToJson:
+                return Register(function, a, "destination") ?? Register(function, b, "value") ?? Register(function, c, "indent") ?? Unused(d);
             case WebLingoOpCode.CallSpread:
             case WebLingoOpCode.NewSpread:
                 return Register(function, a, "destination") ?? Register(function, b, instruction.OpCode == WebLingoOpCode.NewSpread ? "class" : "callee")
@@ -602,6 +604,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             }
             case WebLingoOpCode.CallSpread:
             case WebLingoOpCode.NewSpread:
+            case WebLingoOpCode.ToJson:
             {
                 var spreadCallee = Unwritten(instruction.B, state, locals);
                 return spreadCallee >= 0 ? spreadCallee : Unwritten(instruction.C, state, locals);
@@ -759,7 +762,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             or WebLingoOpCode.Call or WebLingoOpCode.GetMember or WebLingoOpCode.CallMethod or WebLingoOpCode.GetIndex
             or WebLingoOpCode.NewArray or WebLingoOpCode.NewMap or WebLingoOpCode.NewSet or WebLingoOpCode.MakeClass or WebLingoOpCode.New
             or WebLingoOpCode.GetSuper or WebLingoOpCode.TakeRest or WebLingoOpCode.CallSpread or WebLingoOpCode.CallMethodSpread
-            or WebLingoOpCode.NewSpread => instruction.A,
+            or WebLingoOpCode.NewSpread or WebLingoOpCode.ToJson => instruction.A,
         _ => null
     };
 

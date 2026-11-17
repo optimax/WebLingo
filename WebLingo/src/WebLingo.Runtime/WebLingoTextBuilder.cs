@@ -7,7 +7,7 @@ namespace WebLingo.Runtime;
 /// to be written, so that its VM can call that method, as a call of its own, and going on with the text it gives. A
 /// VM that runs no such method needs none of this: the formatter gives the same text.
 /// </summary>
-public sealed class WebLingoTextBuilder
+public sealed class WebLingoTextBuilder : IWebLingoTextBuilder
 {
     private readonly WebLingoHeap _heap;
     private readonly WebLingoValue _value;
@@ -137,8 +137,23 @@ public sealed class WebLingoTextBuilder
         return true;
     }
 
-    /// <summary>The text the <c>toString()</c> that <see cref="TryBuild"/> waited for gave, written as it is.</summary>
-    public void Supply(string text) => _text.Append(text);
+    /// <summary>Never set: a value's text is always built.</summary>
+    public WebLingoRuntimeError? Error => null;
+
+    /// <summary>
+    /// The text the <c>toString()</c> that <see cref="TryBuild"/> waited for gave, written as it is; anything but a
+    /// string is WL3001.
+    /// </summary>
+    public WebLingoRuntimeError? Supply(WebLingoValue returned)
+    {
+        if (returned.Kind != WebLingoValueKind.String)
+        {
+            return new WebLingoRuntimeError(WebLingo.Core.WebLingoDiagnosticCodes.InvalidOperation,
+                $"'toString()' gave {WebLingoValueFormatter.Describe(returned, _heap)}, not a string, to be written.");
+        }
+        _text.Append(_heap.GetString(returned));
+        return null;
+    }
 
     /// <summary>Whether an instance's class overrides <c>Object</c>'s <c>toString()</c>, and with which method.</summary>
     private bool Overrides(WebLingoValue instance, out WebLingoValue method)

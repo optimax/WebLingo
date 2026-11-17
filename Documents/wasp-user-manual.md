@@ -509,16 +509,7 @@ import { teas } from "/lib/catalog.wl";
 
 export function get(request, response) {
   response.headers["Content-Type"] = "application/json";
-  var parts = [];
-  foreach (var tea in teas) parts.push($"{{\"name\": \"{tea.name}\", \"price\": {tea.price}}}");
-  write("[");
-  var first = true;
-  foreach (var part in parts) {
-    if (!first) write(", ");
-    write(part);
-    first = false;
-  }
-  write("]");
+  write(Json.stringify(teas));
 }
 
 export async function post(request, response) {
@@ -532,7 +523,7 @@ export async function post(request, response) {
 As `api/teas.wl`, `GET /api/teas` gives
 
 ```json
-[{"name": "Sencha", "price": 6.5}, {"name": "Assam", "price": 4.25}]
+[{"name":"Sencha","price":6.5},{"name":"Assam","price":4.25}]
 ```
 
 and `POST /api/teas`, a 201 and `Received 5 characters.` for a body of `hello`.
@@ -546,8 +537,8 @@ and `POST /api/teas`, a 201 and `Received 5 characters.` for a body of `hello`.
 - A handler's `Content-Type` is `text/html; charset=utf-8` unless it sets another.
 - The module runs anew for each request, its top level first, then the function: nothing in it lasts between requests.
 
-WebLingo has no JSON module yet, so a handler builds JSON as text, as above. In an interpolated string, `{{` and `}}`
-write `{` and `}`.
+`Json.stringify` writes a value as JSON, an instance as its fields, and `Json.parse(await request.text())` reads a
+JSON body (the Standard Library Reference, "`Json`").
 
 ---
 
@@ -790,7 +781,6 @@ WASP is pre-alpha. These are not there yet, and are planned or being designed:
 
 - **Uploaded files**: forms posted as `multipart/form-data` cannot be read.
 - **Escaping for URLs, scripts and styles**: `<%=` escapes for HTML only ([section 4](#4-escaping)).
-- **JSON**: no module reads or writes it; a handler builds it as text ([section 10](#10-route-handlers)).
 - **Sessions and cookies**: a page reads the `Cookie` header and sets `Set-Cookie` itself, with `response.headers.add`.
 - **Hosts other than ASP.NET Core**: FastCGI and a standalone server are planned. WASP has been tried on Windows;
   Linux is built and tested, but no site has been served on it yet.

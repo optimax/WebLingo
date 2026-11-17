@@ -643,6 +643,42 @@ true
 - **A pattern is written in a string**, so its backslashes are doubled: `"\\d+"` is the pattern `\d+`.
 - **A pattern that takes more than a second** to match, as some do on some text, stops with a `TimeoutError`.
 
+### JSON
+
+```javascript
+var order = Json.parse("{\"tea\": \"Sencha\", \"cups\": 2, \"price\": 6.5, \"extras\": [\"milk\"]}");
+writeLn([order["tea"], order["cups"] is Integer, order["price"] is Number, order["extras"][0]]);
+writeLn(Json.stringify({ tea: "Assam", cups: 1, paid: true, note: null }));
+class Tea {
+  constructor(name, price) { this.name = name; this.price = price; }
+}
+class Money {
+  constructor(amount) { this.amount = amount; }
+  toJson() { return $"{this.amount} EUR"; }
+}
+writeLn(Json.stringify([new Tea("Sencha", 6.5), new Money(4.25)]));
+writeLn(Json.stringify({ list: [1, 2] }, 2));
+```
+
+```text
+["Sencha", true, true, "milk"]
+{"tea":"Assam","cups":1,"paid":true,"note":null}
+[{"name":"Sencha","price":6.5},"4.25 EUR"]
+{
+  "list": [
+    1,
+    2
+  ]
+}
+```
+
+- **`Json.parse(text)`** gives a map for an object, an array for an array, and strings, `true`, `false` and `null`;
+  a number is an integer when it has no fraction or exponent and fits 64 bits, else a number. Text that is not JSON
+  is an error, which names where.
+- **`Json.stringify(value, indent)`** writes maps, arrays, sets, strings, numbers, decimals, Booleans, `null`, and
+  dates, as their ISO text; an instance as its fields, or as what its class's `toJson()` gives. `indent`, 0 unless
+  given, up to 10, puts each element on a line of its own. A function, or a value that contains itself, is an error.
+
 ### Multi-line strings
 
 Three quotes, `"""` or `'''`, begin a string that may span lines. It is raw: `\` is an ordinary character. The spaces
@@ -1948,4 +1984,4 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Library**: JSON, and network access.
+- **Library**: network access.

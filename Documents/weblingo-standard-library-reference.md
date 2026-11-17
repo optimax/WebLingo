@@ -22,9 +22,10 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 10. [`Bytes` and `BytesBuilder`](#10-bytes-and-bytesbuilder)
 11. [`DateTime`](#11-datetime)
 12. [`Regex`](#12-regex)
-13. [`std:fs`](#13-stdfs)
-14. [Native modules](#14-native-modules)
-15. [In WASP's pages](#15-in-wasps-pages)
+13. [`Json`](#13-json)
+14. [`std:fs`](#14-stdfs)
+15. [Native modules](#15-native-modules)
+16. [In WASP's pages](#16-in-wasps-pages)
 
 ---
 
@@ -470,7 +471,27 @@ writes a regular expression as `Regex:/pattern/flags`.
 
 ---
 
-## 13. `std:fs`
+## 13. `Json`
+
+| Member | What it is |
+|---|---|
+| `Json.parse(text)` | the value JSON's text writes: an object a map, an array an array, a number an integer when it has no fraction or exponent and fits 64 bits, else a number; WL3001 for text that is not JSON |
+| `Json.stringify(value, indent)` | the value's JSON text, `indent` 0 to 10 spaces, 0 unless given: maps, arrays, sets, strings, numbers, decimals, Booleans, `null`, dates as their ISO text, and instances as their fields, or as their class's `toJson()` gives |
+
+```javascript
+var data = Json.parse("[1, 2.5, \"three\", {\"four\": null}]");
+writeLn([data, data[0] is Integer, data[1] is Number]);
+writeLn(Json.stringify(data));
+```
+
+```text
+[[1, 2.5, "three", {"four": null}], true, true]
+[1,2.5,"three",{"four":null}]
+```
+
+---
+
+## 14. `std:fs`
 
 Files and folders, through the platform's file system. Each function is asynchronous, giving a task, and has a
 synchronous form whose name ends in `Sync`: `readText` and `readTextSync`.
@@ -523,7 +544,7 @@ false
 
 ---
 
-## 14. Native modules
+## 15. Native modules
 
 A native module is code compiled for .NET that extends what scripts can use: functions and classes, imported as any
 module's are, by a scheme naming a folder of them, `import db from "native:sqlite";`. The folders are named by the
@@ -533,7 +554,7 @@ configuration, `weblingo.config` beside a script and `wasp.config` in a site, `{
 
 ---
 
-## 15. In WASP's pages
+## 16. In WASP's pages
 
 A page, a layout and a component that declare `param request;` and `param response;` are given the request they
 answer and the response they make; a `.wl` route handler is given them as its function's arguments. Their members are

@@ -799,7 +799,12 @@ public static partial class WebLingoMembers
             || (member is WebLingoMember.From or WebLingoMember.Concat or WebLingoMember.FixedTimeEqual && heap.ValueClasses is { } bytesClasses
                 && bytesClasses[(int)WebLingoValueClass.Bytes] == target)
             || (IsDateTimeClassMethod(member) && heap.ValueClasses is { } dateClasses && dateClasses[(int)WebLingoValueClass.DateTime] == target)
+            || (member == WebLingoMember.Parse && IsJson(target, heap))
             || member == WebLingoMember.Format);
+
+    /// <summary>Whether a class is <c>Json</c>, whose <c>parse</c> the runtime gives (section 3.6, "JSON").</summary>
+    private static bool IsJson(WebLingoValue target, WebLingoHeap heap) =>
+        heap.ValueClasses is { Length: > (int)WebLingoValueClass.Json } classes && classes[(int)WebLingoValueClass.Json] == target;
 
     /// <summary>The kind <c>parse</c> reads a string as, for <c>Integer</c>, <c>Number</c> and <c>Boolean</c>; null's for any other class.</summary>
     private static WebLingoValueKind ParsedKind(WebLingoValue target, WebLingoHeap heap)
@@ -874,6 +879,13 @@ public static partial class WebLingoMembers
             if (IsDateTimeClassMethod(member) && heap.ValueClasses is { } classes && classes[(int)WebLingoValueClass.DateTime] == target)
             {
                 return TryCallDateTimeClass(member, name, values, first, count, heap, out result, out error);
+            }
+            if (member == WebLingoMember.Parse && IsJson(target, heap))
+            {
+                // Json.parse(text): a value made from JSON's text (section 3.6).
+                if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+                if (!TryText(name, values[first], heap, out var json, out error)) return false;
+                return WebLingoJsonParser.TryParse(json, heap, out result, out error);
             }
             if (member == WebLingoMember.Parse)
             {

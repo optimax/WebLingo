@@ -467,6 +467,16 @@ public sealed class WebLingoCodeGenerator
                 Emit(new WebLingoInstruction(WebLingoOpCode.ToText, destination, operand), text.Span);
                 return destination;
             }
+            case WebLingoIrToJson json:
+            {
+                var mark = _nextRegister;
+                var value = KeptIfAssigned(EmitExpression(json.Value, null), json.Value.Span, [json.Indent]);
+                var indent = EmitExpression(json.Indent, null);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WebLingoInstruction(WebLingoOpCode.ToJson, destination, value, indent), json.Span);
+                return destination;
+            }
             case WebLingoIrHold hold:
             {
                 var mark = _nextRegister;
@@ -710,6 +720,7 @@ public sealed class WebLingoCodeGenerator
         WebLingoIrStoreLocal store => store.Local == local || Assigns(store.Value, local),
         WebLingoIrUnary unary => Assigns(unary.Operand, local),
         WebLingoIrToText text => Assigns(text.Value, local),
+        WebLingoIrToJson json => Assigns(json.Value, local) || Assigns(json.Indent, local),
         WebLingoIrHold hold => Assigns(hold.Instance, local) || Assigns(hold.Value, local),
         WebLingoIrAwait awaited => Assigns(awaited.Value, local),
         WebLingoIrIs test => Assigns(test.Value, local) || Assigns(test.Class, local),
