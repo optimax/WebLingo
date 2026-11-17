@@ -170,19 +170,19 @@ As example1, with WebLingo installed once on the server, and then:
 
 ## example3: Lingo To-Do, a to-do list on SQL Server
 
-A to-do list, an example of a site on SQL Server: four lists and three dozen items, in a database on SQL Server
-Express LocalDB, which its pages read, add to, change, mark done and delete through `std:db`. The database is made by
-a script the example holds, `setup.sql`, the site naming it in its `wasp.config`.
+A to-do list, an example of a site on SQL Server: four lists and three dozen items, in a database on the SQL Server of
+the machine the site runs on, which its pages read, add to, change, mark done and delete through `std:db`. The
+database is made by a script the example holds, `setup.sql`, the site naming it in its `wasp.config`.
 
 ```text
 example3/
   database/             outside the site: the script that makes the database, and what runs it
     setup.sql           makes the database WebLingoTodo: its tables, Lists and Items, and the items, due around today
     setup.wl            runs setup.sql through std:db, batch by batch, as sqlcmd would
-    weblingo.config     names LocalDB's master database "server" for setup.wl
+    weblingo.config     names the server's master database "server" for setup.wl
   site/                 the site, and wasp's root
     web.config          IIS's configuration, as example1's
-    wasp.config         names the database "todo": "sqlserver:Server=(localdb)\\MSSQLLocalDB;Database=WebLingoTodo;…"
+    wasp.config         names the database "todo": "sqlserver:Server=localhost;Database=WebLingoTodo;…"
     index.wasp          /                 the items to do, ?show=done or ?show=all, of one list, ?list=2, or by a word, ?q=bulbs;
                                           and a form that adds one
     add.wasp            /add              an item, posted by that form, added, and the browser sent back to the list
@@ -208,24 +208,34 @@ example3/
 - **A route handler that only redirects.** `toggle.wl` exports `post`, which marks an item done, or to do again, and sends
   the browser back to the list it came from, but only to an address on this site.
 
-### Installing SQL Server Express LocalDB
+### Setting up SQL Server
 
-LocalDB is SQL Server Express's own small engine, for development: it starts when a program first connects to it, as
-the user who runs that program, and stops when it is no longer used. On Windows:
+The example uses the default instance of a SQL Server on your own machine, `localhost`, reaching it as you, by Windows
+authentication, by TCP/IP. On Windows:
 
-1. Download SQL Server Express from Microsoft's SQL Server downloads page (its "Express" edition, free), run the
-   installer, choose **Download Media**, then **LocalDB**, which downloads `SqlLocalDB.msi`.
-2. Run `SqlLocalDB.msi`. It installs LocalDB, and `SqlLocalDB.exe`, which manages its instances.
-3. In a new command prompt, `sqllocaldb info` lists `MSSQLLocalDB`, the instance the example uses, which LocalDB makes
-   the first time it is asked for.
+1. Download SQL Server from Microsoft's SQL Server downloads page, its Developer edition, free for development, or its
+   Express edition, and install its database engine as the default instance, `MSSQLSERVER`, with Windows
+   authentication, adding yourself as one of its administrators, as the installer offers.
+2. Enable TCP/IP, which those editions leave off when they are installed: in SQL Server Configuration Manager
+   (`SQLServerManager17.msc` for SQL Server 2025), under **SQL Server Network Configuration**, **Protocols for
+   MSSQLSERVER**, right-click **TCP/IP** and choose **Enable**; then, under **SQL Server Services**, right-click **SQL
+   Server (MSSQLSERVER)** and choose **Restart**. Or, in PowerShell run as administrator, for SQL Server 2025, whose
+   instance's folder is `MSSQL17.MSSQLSERVER` (SQL Server 2022's `MSSQL16`):
 
-WebLingo reaches SQL Server through SqlClient's managed network layer, which LocalDB answers by its named pipe;
-nothing else needs installing. SQL Server's own tools, `sqlcmd` among them, are not needed, though `setup.sql` runs
-with them too.
+   ```powershell
+   Set-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL17.MSSQLSERVER\MSSQLServer\SuperSocketNetLib\Tcp' -Name Enabled -Value 1
+   Restart-Service MSSQLSERVER
+   ```
+
+The server then listens on port 1433; Windows Firewall keeps other machines out unless a rule of yours lets them in.
+WebLingo reaches SQL Server through SqlClient's managed network layer, which speaks TCP/IP to it, never its shared
+memory, the one protocol those editions enable at first; nothing else needs installing. SQL Server's own tools,
+`sqlcmd` among them, are not needed, though `setup.sql` runs with them too. `TrustServerCertificate=true`, in both
+configurations, accepts the certificate the server made for itself when it was installed.
 
 ### Running it locally
 
-With the .NET 10 SDK and LocalDB, make the database from the `database` folder, where `setup.sql` is, since a
+With the .NET 10 SDK and the server, make the database from the `database` folder, where `setup.sql` is, since a
 relative path is from the current folder:
 
 ```bash
@@ -240,13 +250,13 @@ dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples/exa
 ```
 
 and open <http://localhost:8080/>. Run `setup.wl` again to put the items back as they were: it drops the database
-first. LocalDB keeps the database's files in your user profile's folder, `WebLingoTodo.mdf` and `WebLingoTodo_log.ldf`.
+first. The server keeps the database's files in its own data folder, `WebLingoTodo.mdf` and `WebLingoTodo_log.ldf`.
 
 ### Another SQL Server
 
-To use a SQL Server you already have, change the server in both configurations, `database/weblingo.config`'s
-`"server"` and `site/wasp.config`'s `"todo"`, to SqlClient's connection string for it,
-`"sqlserver:Server=myserver;Database=WebLingoTodo;Integrated Security=true;TrustServerCertificate=true"`, and run
-`setup.wl` as above. Under IIS, the site reaches the database as its application pool's account, which needs a login on
-that server, and the rights to read and change the database: LocalDB, which serves only the user who started it, suits
-`wasp serve` on your own machine rather than IIS.
+To use another SQL Server, change the server in both configurations, `database/weblingo.config`'s `"server"` and
+`site/wasp.config`'s `"todo"`, to SqlClient's connection string for it,
+`"sqlserver:Server=myserver;Database=WebLingoTodo;Integrated Security=true"`, and run `setup.wl` as above; a server
+reached over a network should have a certificate its clients trust, in place of `TrustServerCertificate=true`. Under
+IIS, the site reaches the database as its application pool's account, which needs a login on that server, and the
+rights to read and change the database.

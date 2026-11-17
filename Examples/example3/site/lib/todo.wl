@@ -1,5 +1,5 @@
-// The to-do list, read from and written to its database: the one wasp.config names "todo", on SQL Server Express
-// LocalDB. Each function opens the database, does its work, and closes it again at the end of its using; SqlClient keeps
+// The to-do list, read from and written to its database: the one wasp.config names "todo", on this machine's SQL
+// Server. Each function opens the database, does its work, and closes it again at the end of its using; SqlClient keeps
 // the connection in its pool for the next request.
 
 import { Database } from "std:db";

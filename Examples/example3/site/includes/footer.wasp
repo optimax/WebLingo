@@ -1,4 +1,4 @@
 <footer>
-  <p>Served by WASP, WebLingo's server pages, from SQL Server Express LocalDB through <code>std:db</code>. The items are
+  <p>Served by WASP, WebLingo's server pages, from SQL Server through <code>std:db</code>. The items are
   also at <a href="/api/items">/api/items</a>, as JSON.</p>
 </footer>

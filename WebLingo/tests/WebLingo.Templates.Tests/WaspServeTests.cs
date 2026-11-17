@@ -163,10 +163,10 @@ public sealed class WaspServeTests : IDisposable
         }
     }
 
-    [LocalDbFact]
+    [SqlServerFact]
     public async Task TheToDoListServesItsSqlServerDatabase()
     {
-        // Examples/example3, the owner's example of a site on SQL Server: copied, its database made on LocalDB by its
+        // Examples/example3, the owner's example of a site on SQL Server: copied, its database made on the machine's by its
         // setup.wl running its setup.sql, under a name of the test's own, which the copy's wasp.config names, then served,
         // its items added, changed, marked done and deleted (section 7.11). The database is dropped after it.
         var folder = new DirectoryInfo(AppContext.BaseDirectory);

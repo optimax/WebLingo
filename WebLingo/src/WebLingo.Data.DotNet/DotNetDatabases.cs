@@ -12,11 +12,11 @@ namespace WebLingo.Data.DotNet;
 /// Microsoft.Data.Sqlite, <c>sqlite</c>, and SQL Server's, Microsoft.Data.SqlClient, <c>sqlserver</c>. A connection
 /// string is its provider's name, a colon, and, for SQLite, a file's path, or the provider's own connection string, which
 /// holds an <c>=</c>, <c>"sqlite:Data Source=shop.db;Mode=ReadOnly"</c>, <c>:memory:</c> being a database in memory; for
-/// SQL Server, SqlClient's own, <c>"sqlserver:Server=(localdb)\MSSQLLocalDB;Database=Todo;Integrated Security=true"</c>. A
-/// name the configuration gives stands for its connection string, a relative path in which is from the configuration's
-/// folder, <paramref name="folder"/>; one in a script's, from the program's current folder. SQLite makes a file that is
-/// not there; both providers pool connections. SqlClient uses its managed network layer on Windows too, as it does
-/// elsewhere, its native one, under Microsoft's own terms, not shipped.
+/// SQL Server, SqlClient's own, <c>"sqlserver:Server=localhost;Database=Todo;Integrated Security=true"</c>. A name the
+/// configuration gives stands for its connection string, a relative path in which is from the configuration's folder,
+/// <paramref name="folder"/>; one in a script's, from the program's current folder. SQLite makes a file that is not
+/// there; both providers pool connections. SqlClient uses its managed network layer on Windows too, as it does elsewhere,
+/// its native one, under Microsoft's own terms, not shipped: it reaches a server by TCP/IP, never by its shared memory.
 /// </summary>
 public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configured, string folder) : IWebLingoDatabases
 {

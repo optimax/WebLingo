@@ -687,9 +687,11 @@ A database's connection string is its provider's name, a colon, and what the pro
 path, from the configuration's folder when it is relative. Keep the database outside the site's folder,
 `../database/fish.db`, since `wasp` would serve a file in it to whoever asked for it, and give the site's application
 pool write access to the folder it is in, where SQLite writes its journal. SQL Server's is SqlClient's own connection
-string, its backslash doubled in JSON:
-`{ "todo": "sqlserver:Server=(localdb)\\MSSQLLocalDB;Database=Todo;Integrated Security=true" }`. With
-`Integrated Security`, the site reaches the database as the account it runs as: under IIS, its application pool's.
+string: `{ "todo": "sqlserver:Server=localhost;Database=Todo;Integrated Security=true;TrustServerCertificate=true" }`.
+With `Integrated Security`, the site reaches the database as the account it runs as: under IIS, its application pool's.
+`TrustServerCertificate` accepts the certificate a server made for itself when it was installed; a server the site
+reaches over a network should have one its clients trust instead. WebLingo reaches SQL Server by TCP/IP, which the
+server must have enabled, as SQL Server's Developer and Express editions do not when they are installed.
 
 Its name is `wasp.config`, in lower case: Linux tells `WASP.config` from it. A `weblingo.config` configures a folder of
 scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run` and `wasp check` read the

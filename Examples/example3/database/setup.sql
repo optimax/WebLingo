@@ -1,11 +1,11 @@
--- The to-do list's database, WebLingoTodo, on SQL Server Express LocalDB: its lists, and a few dozen items on them, due
+-- The to-do list's database, WebLingoTodo, on this machine's SQL Server: its lists, and a few dozen items on them, due
 -- around the day it is run. Run it again to start afresh: it drops the database first. From this folder, either
 --
 --   weblingo run setup.wl
 --
 -- which runs it through WebLingo's std:db, or, where SQL Server's own tools are installed,
 --
---   sqlcmd -S "(localdb)\MSSQLLocalDB" -i setup.sql
+--   sqlcmd -S localhost -E -C -i setup.sql
 --
 -- Each batch ends with GO. The scripting variable Database is the database's name, which setup.wl's parameter
 -- database=Name changes.

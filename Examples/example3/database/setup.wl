@@ -1,4 +1,4 @@
-// Makes the to-do list's database on SQL Server Express LocalDB by running setup.sql, through the server weblingo.config
+// Makes the to-do list's database on this machine's SQL Server by running setup.sql, through the server weblingo.config
 // names "server": its batches one by one, each ending with a line that says GO, as sqlcmd runs them, its :setvar giving
 // the database's name, which database=Name changes. A relative path is from the current folder, so run it from this
 // folder, where setup.sql is:

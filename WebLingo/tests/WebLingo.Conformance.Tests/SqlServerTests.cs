@@ -5,8 +5,8 @@ namespace WebLingo.Conformance.Tests;
 
 /// <summary>
 /// <c>std:db</c> (specification, section 7.11), through <c>weblingo</c>, on SQL Server: a database of the test's own on
-/// LocalDB, made by a script and dropped after it, through SqlClient's managed network layer, the only one WebLingo
-/// ships. Skipped where LocalDB is not installed.
+/// the machine's default instance, made by a script and dropped after it, through SqlClient's managed network layer, the
+/// only one WebLingo ships. Skipped where no SQL Server answers on the machine by TCP/IP.
 /// </summary>
 public sealed class SqlServerTests : IDisposable
 {
@@ -29,7 +29,7 @@ public sealed class SqlServerTests : IDisposable
         }
     }
 
-    [LocalDbFact]
+    [SqlServerFact]
     public void StatementsGiveRowsCountsAndValues()
     {
         Make();
@@ -57,7 +57,7 @@ public sealed class SqlServerTests : IDisposable
             "true\n[{\"Title\": \"Café\"}, {\"Title\": \"Cake\"}]\n[\"sqlserver\", true]\n", ""), (exit, output, error));
     }
 
-    [LocalDbFact]
+    [SqlServerFact]
     public void TransactionsAndFailures()
     {
         Make();
@@ -80,14 +80,14 @@ public sealed class SqlServerTests : IDisposable
             "[\"WL3015\", true]\n[{\"n\": 1}]\n[{\"Id\": 1}, {\"Id\": 3}]\nInvalid object name 'Nowhere'.\n", ""), (exit, output, error));
     }
 
-    /// <summary>The test's database, made on LocalDB, and a configuration naming it "shop", and LocalDB's master "master".</summary>
+    /// <summary>The test's database, made on the server, and a configuration naming it "shop", and the server's master "master".</summary>
     private void Make()
     {
         Directory.CreateDirectory(_folder);
         var databases = new Dictionary<string, string>
         {
-            ["master"] = LocalDbFactAttribute.ConnectionString("master"),
-            ["shop"] = LocalDbFactAttribute.ConnectionString(_database)
+            ["master"] = SqlServerFactAttribute.ConnectionString("master"),
+            ["shop"] = SqlServerFactAttribute.ConnectionString(_database)
         };
         File.WriteAllText(Path.Combine(_folder, WebLingoSchemes.ConfigurationFile), JsonSerializer.Serialize(new { databases }));
         var (exit, output, error) = Weblingo($"using (var db = await Database.open(\"master\")) {{ await db.execute(\"CREATE DATABASE [{_database}]\"); }}");
