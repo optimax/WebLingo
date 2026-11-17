@@ -626,6 +626,39 @@ writeLn("");
 - `break;` leaves the innermost loop, and `continue;` goes on to its next turn. Either outside a loop is an error
   (WL2007).
 
+### `switch`
+
+```javascript
+class Tea { constructor(name) { this.name = name; } }
+function describe(item) {
+  switch (item) {
+    case 1, 2 { return "a few"; }
+    case "water" { return "just water"; }
+    case Tea t { return "a tea: " + t.name; }
+    default { return "something else"; }
+  }
+}
+writeLn(describe(2));
+writeLn(describe(new Tea("Sencha")));
+writeLn(describe(true));
+var cups = 3;
+writeLn(cups switch { 0 => "none", 1 => "one cup", _ => $"{cups} cups" });
+```
+
+```text
+a few
+a tea: Sencha
+something else
+3 cups
+```
+
+- **A case** lists values, matched by `==`, `case 1, 2`, or a class and a name for the value, `case Tea t`, which
+  matches an instance of `Tea`, or of a class extending it, as a typed `catch` does.
+- **The first case that matches runs**, its block only; `default` runs when none does. No case runs into the next,
+  and none needs a `break`: a `break` or a `continue` in a case acts on the loop around the `switch`, as in an `if`.
+- **A `switch` expression**, `value switch { … }`, gives the result of its first arm that matches; it needs a
+  `_ => …` arm, for any other value. Its patterns are a case's.
+
 ### `foreach`
 
 `foreach (var item in collection)` visits a collection's items:
@@ -1699,7 +1732,6 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Statements**: `switch`.
 - **Values**: decimals (exact decimal arithmetic, `1.5m`), and time zones other than UTC and the server's.
 - **Literals**: hexadecimal and binary numbers, and `_` between digits.
 - **Functions**: a variable number of arguments (rest parameters), and spreading an array into a call.

@@ -29,6 +29,30 @@ public sealed record WebLingoExpressionStatementSyntax(WebLingoExpressionSyntax 
 /// <summary>A block, <c>{ statements }</c>, which opens a scope (specification, section 3.5).</summary>
 public sealed record WebLingoBlockSyntax(IReadOnlyList<WebLingoStatementSyntax> Statements, WebLingoSourceSpan Span) : WebLingoStatementSyntax(Span);
 
+/// <summary>
+/// A <c>switch</c>'s pattern (section 3.5): a value, matched by <c>==</c>, or a class, matched as <c>is</c> matches it, its
+/// value then named by <paramref name="Binding"/>, <c>case Point p</c>; or, in an expression, <c>_</c>, any value.
+/// </summary>
+public sealed record WebLingoSwitchPattern(WebLingoExpressionSyntax? Value, WebLingoExpressionSyntax? Class, string? Binding,
+    WebLingoSourceSpan Span);
+
+/// <summary><c>case patterns { … }</c>, a <c>switch</c> statement's case.</summary>
+public sealed record WebLingoSwitchCase(IReadOnlyList<WebLingoSwitchPattern> Patterns, WebLingoBlockSyntax Body);
+
+/// <summary>
+/// <c>switch (value) { case 1, 2 { … } case Point p { … } default { … } }</c> (section 3.5): the first case whose
+/// pattern matches runs, else <c>default</c>; no case runs into the next, and none needs a <c>break</c>.
+/// </summary>
+public sealed record WebLingoSwitchSyntax(WebLingoExpressionSyntax Subject, IReadOnlyList<WebLingoSwitchCase> Cases,
+    WebLingoBlockSyntax? Default, WebLingoSourceSpan Span) : WebLingoStatementSyntax(Span);
+
+/// <summary><c>patterns =&gt; value</c>, a <c>switch</c> expression's arm, <c>_</c> its pattern for any value.</summary>
+public sealed record WebLingoSwitchArm(IReadOnlyList<WebLingoSwitchPattern> Patterns, WebLingoExpressionSyntax Value, bool IsDefault);
+
+/// <summary><c>value switch { 1 =&gt; "one", Point p =&gt; p.x, _ =&gt; "many" }</c>, as C#'s (section 3.5).</summary>
+public sealed record WebLingoSwitchExpressionSyntax(WebLingoExpressionSyntax Subject, IReadOnlyList<WebLingoSwitchArm> Arms,
+    WebLingoSourceSpan Span) : WebLingoExpressionSyntax(Span);
+
 /// <summary><c>if (condition) then</c>, with an optional <c>else</c> (specification, section 3.5).</summary>
 public sealed record WebLingoIfSyntax(WebLingoExpressionSyntax Condition, WebLingoStatementSyntax Then, WebLingoStatementSyntax? Else, WebLingoSourceSpan Span)
     : WebLingoStatementSyntax(Span);

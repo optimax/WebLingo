@@ -91,6 +91,11 @@ public sealed class WebLingoParser : IWebLingoParser
         if (Current.Kind is WebLingoTokenKind.Var or WebLingoTokenKind.Const or WebLingoTokenKind.Let) return ParseVariableDeclaration(start);
         if (Current.Kind == WebLingoTokenKind.OpenBrace) return ParseBlock(start);
         if (Current.Kind == WebLingoTokenKind.If) return ParseIf(start);
+        if (Current is { Kind: WebLingoTokenKind.Identifier, Text: "switch" } && Peek(1).Kind == WebLingoTokenKind.OpenParen
+            && AfterParentheses(1) == WebLingoTokenKind.OpenBrace)
+        {
+            return ParseSwitch(start);
+        }
         if (Current.Kind == WebLingoTokenKind.While) return ParseWhile(start);
         if (Current.Kind == WebLingoTokenKind.Do) return ParseDoWhile(start);
         if (Current.Kind == WebLingoTokenKind.For) return ParseFor(start);
@@ -597,6 +602,114 @@ public sealed class WebLingoParser : IWebLingoParser
         return name;
     }
 
+    /// <summary>The kind of the token after the parentheses that open at <paramref name="offset"/> tokens from here.</summary>
+    private WebLingoTokenKind AfterParentheses(int offset)
+    {
+        var depth = 0;
+        for (var i = _index + offset; i < _tokens.Count; i++)
+        {
+            var kind = _tokens[i].Kind;
+            if (kind == WebLingoTokenKind.OpenParen) depth++;
+            else if (kind == WebLingoTokenKind.CloseParen && --depth == 0) return i + 1 < _tokens.Count ? _tokens[i + 1].Kind : WebLingoTokenKind.EndOfFile;
+            else if (kind == WebLingoTokenKind.EndOfFile) break;
+        }
+        return WebLingoTokenKind.EndOfFile;
+    }
+
+    /// <summary>
+    /// <c>switch (value) { case … { … } default { … } }</c> (section 3.5): <c>switch</c>, <c>case</c> and <c>default</c>
+    /// words of their own there only, so that a program's names are left as they are.
+    /// </summary>
+    private WebLingoStatementSyntax ParseSwitch(int start)
+    {
+        Advance();
+        Expect(WebLingoTokenKind.OpenParen, "'('");
+        var subject = ParseExpression();
+        Expect(WebLingoTokenKind.CloseParen, "')'");
+        Expect(WebLingoTokenKind.OpenBrace, "'{'");
+        var cases = new List<WebLingoSwitchCase>();
+        WebLingoBlockSyntax? otherwise = null;
+        while (Current.Kind is not (WebLingoTokenKind.CloseBrace or WebLingoTokenKind.EndOfFile))
+        {
+            if (Current is { Kind: WebLingoTokenKind.Identifier, Text: "default" })
+            {
+                var keyword = Advance();
+                if (otherwise is not null) Report(WebLingoDiagnosticCodes.UnexpectedToken, "A 'switch' has at most one 'default'.", keyword.Span);
+                otherwise = ParseRequiredBlock("'{'") ?? otherwise;
+                continue;
+            }
+            if (Current is not { Kind: WebLingoTokenKind.Identifier, Text: "case" })
+            {
+                ReportUnexpected("'case' or 'default'");
+                break;
+            }
+            Advance();
+            var patterns = ParsePatterns(allowDiscard: false);
+            if (ParseRequiredBlock("'{'") is not { } body) break;
+            cases.Add(new WebLingoSwitchCase(patterns, body));
+        }
+        Expect(WebLingoTokenKind.CloseBrace, "'}'");
+        return new WebLingoSwitchSyntax(subject, cases, otherwise, SpanFrom(start));
+    }
+
+    /// <summary>
+    /// A case's or an arm's patterns, separated by commas: values, or a class and the name its value takes,
+    /// <c>Point p</c>, which stands alone; and, in an expression, <c>_</c>.
+    /// </summary>
+    private List<WebLingoSwitchPattern> ParsePatterns(bool allowDiscard)
+    {
+        var patterns = new List<WebLingoSwitchPattern>();
+        while (true)
+        {
+            var start = Current.Span.Start;
+            if (IsClassPattern())
+            {
+                var type = ParseDottedName();
+                var binding = Advance();
+                patterns.Add(new WebLingoSwitchPattern(null, type, binding.Text, SpanFrom(start)));
+            }
+            else if (allowDiscard && Current is { Kind: WebLingoTokenKind.Identifier, Text: "_" })
+            {
+                Advance();
+                patterns.Add(new WebLingoSwitchPattern(null, null, null, SpanFrom(start)));
+            }
+            else if (Current.Kind == WebLingoTokenKind.Identifier && Peek(1).Kind == WebLingoTokenKind.Arrow)
+            {
+                // A name before an arm's =>, its value, not an arrow function's parameter.
+                var name = Advance();
+                patterns.Add(new WebLingoSwitchPattern(new WebLingoNameSyntax(name.Text, name.Span), null, null, name.Span));
+            }
+            else
+            {
+                var value = ParseOr();
+                patterns.Add(new WebLingoSwitchPattern(value, null, null, value.Span));
+            }
+            if (Current.Kind != WebLingoTokenKind.Comma) break;
+            Advance();
+        }
+        if (patterns.Count > 1)
+        {
+            foreach (var pattern in patterns)
+            {
+                if (pattern.Class is not null)
+                {
+                    Report(WebLingoDiagnosticCodes.UnexpectedToken, "A class's pattern, which names its value, stands alone in its case.", pattern.Span);
+                }
+            }
+        }
+        return patterns;
+    }
+
+    /// <summary>Whether a class's pattern begins here: a name or a dotted name, then the name its value takes.</summary>
+    private bool IsClassPattern()
+    {
+        var i = 0;
+        if (Peek(i).Kind != WebLingoTokenKind.Identifier) return false;
+        while (Peek(i + 1).Kind == WebLingoTokenKind.Dot && Peek(i + 2).Kind == WebLingoTokenKind.Identifier) i += 2;
+        return Peek(i + 1).Kind == WebLingoTokenKind.Identifier
+            && Peek(i + 2).Kind is WebLingoTokenKind.OpenBrace or WebLingoTokenKind.Comma or WebLingoTokenKind.Arrow;
+    }
+
     /// <summary>A block that a statement needs, which must begin here; null, reported, if it does not.</summary>
     private WebLingoBlockSyntax? ParseRequiredBlock(string expected)
     {
@@ -1081,13 +1194,45 @@ public sealed class WebLingoParser : IWebLingoParser
         return left;
     }
 
+    /// <summary><c>value switch { patterns =&gt; result, …, _ =&gt; result }</c>, after a unary expression (section 3.5).</summary>
+    private WebLingoExpressionSyntax ParseSwitchExpression()
+    {
+        var subject = ParseUnary();
+        while (Current is { Kind: WebLingoTokenKind.Identifier, Text: "switch" } && Peek(1).Kind == WebLingoTokenKind.OpenBrace)
+        {
+            if (!EnterRecursion()) return new WebLingoErrorExpressionSyntax(new WebLingoSourceSpan(Current.Span.Start, 0));
+            try
+            {
+                Advance();
+                Advance();
+                var arms = new List<WebLingoSwitchArm>();
+                while (Current.Kind is not (WebLingoTokenKind.CloseBrace or WebLingoTokenKind.EndOfFile))
+                {
+                    var patterns = ParsePatterns(allowDiscard: true);
+                    var isDefault = patterns.Count == 1 && patterns[0] is { Value: null, Class: null };
+                    Expect(WebLingoTokenKind.Arrow, "'=>'");
+                    arms.Add(new WebLingoSwitchArm(patterns, ParseExpression(), isDefault));
+                    if (Current.Kind != WebLingoTokenKind.Comma) break;
+                    Advance();
+                }
+                Expect(WebLingoTokenKind.CloseBrace, "'}'");
+                subject = new WebLingoSwitchExpressionSyntax(subject, arms, SpanFrom(subject.Span.Start));
+            }
+            finally
+            {
+                _recursionDepth--;
+            }
+        }
+        return subject;
+    }
+
     private WebLingoExpressionSyntax ParseMultiplicative()
     {
-        var left = ParseUnary();
+        var left = ParseSwitchExpression();
         while (Current.Kind is WebLingoTokenKind.Star or WebLingoTokenKind.Slash or WebLingoTokenKind.Percent)
         {
             var op = Advance();
-            var right = ParseUnary();
+            var right = ParseSwitchExpression();
             var kind = op.Kind switch
             {
                 WebLingoTokenKind.Star => WebLingoBinaryOperator.Multiply,
@@ -1489,6 +1634,11 @@ public sealed class WebLingoParser : IWebLingoParser
                 statements.Push(conditional.Then);
             }
             if (statement is WebLingoWhileSyntax whileLoop) statements.Push(whileLoop.Body);
+            if (statement is WebLingoSwitchSyntax switchStatement)
+            {
+                if (switchStatement.Default is { } otherwise) statements.Push(otherwise);
+                foreach (var switchCase in switchStatement.Cases) statements.Push(switchCase.Body);
+            }
             if (statement is WebLingoFunctionDeclarationSyntax function)
             {
                 statements.Push(function.Body);
@@ -1536,6 +1686,7 @@ public sealed class WebLingoParser : IWebLingoParser
                 WebLingoVariableDeclarationSyntax { Initializer: { } initializer } => initializer,
                 WebLingoExpressionStatementSyntax expressionStatement => expressionStatement.Expression,
                 WebLingoIfSyntax ifStatement => ifStatement.Condition,
+                WebLingoSwitchSyntax switchSubject => switchSubject.Subject,
                 WebLingoWhileSyntax whileStatement => whileStatement.Condition,
                 WebLingoDoWhileSyntax doStatement => doStatement.Condition,
                 WebLingoForEachSyntax forEachStatement => forEachStatement.Collection,
@@ -1579,6 +1730,10 @@ public sealed class WebLingoParser : IWebLingoParser
                         pending.Push((compound.Value, depth + 1));
                         break;
                     case WebLingoIncrementSyntax increment: pending.Push((increment.Target, depth + 1)); break;
+                    case WebLingoSwitchExpressionSyntax switched:
+                        pending.Push((switched.Subject, depth + 1));
+                        foreach (var arm in switched.Arms) pending.Push((arm.Value, depth + 1));
+                        break;
                     case WebLingoFunctionExpressionSyntax functionExpression:
                         statements.Push(functionExpression.Body);
                         PushDefaults(functionExpression.Parameters, statements);

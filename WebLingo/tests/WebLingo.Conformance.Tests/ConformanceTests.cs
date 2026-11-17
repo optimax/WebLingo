@@ -154,6 +154,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var o = null; o?.a += 1;", "WL1007", 1, 15)]
     [InlineData("5++;", "WL1007", 1, 1)]
     [InlineData("writeLn(if (true) 1);", "WL1001", 1, 20)]
+    [InlineData("var x = 1 switch { 1 => 2 };", "WL1001", 1, 9)]
+    [InlineData("switch (1) { case Point p, 2 { } }", "WL1001", 1, 19)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -536,6 +538,12 @@ public sealed class ConformanceTests : IDisposable
     // Strings compared by their Unicode scalar values (the owner's answers, 16 November 2026).
     [InlineData("writeLn([\"a\" < \"b\", \"b\" <= \"a\", \"abc\" > \"ab\", \"\" >= \"\", \"B\" < \"a\", \"é\" > \"z\"]);", "[true, false, true, true, true, true]")]
     [InlineData("writeLn([\"\\u{FFFD}\" < \"\\u{1F375}\", \"\\u{1F375}\".compare(\"\\u{FFFD}\"), \"a\".compare(\"a\"), \"a\".compare(\"b\")]);", "[true, 1, 0, -1]")]
+    // switch, a statement of case blocks and an expression of arms (the owner's answers, 16 November 2026).
+    [InlineData("class Point { constructor(x) { this.x = x; } } function d(v) { switch (v) { case 1, 2 { return \"low\"; } case Point p { return p.x; } default { return \"other\"; } } } writeLn([d(1), d(2), d(new Point(7)), d(null)]);", "[\"low\", \"low\", 7, \"other\"]")]
+    [InlineData("var total = 0; var i = 0; while (i < 6) { i++; switch (i % 3) { case 0 { continue; } case 1 { total += 10; } default { total += 1; } } if (i == 5) break; } writeLn([total, i]);", "[22, 5]")]
+    [InlineData("switch (\"x\") { case \"y\" { writeLn(\"no\"); } } writeLn(\"after\");", "after")]
+    [InlineData("var calls = 0; function next() { calls++; return 2; } writeLn([next() switch { 1 => \"one\", 2 => \"two\", _ => \"many\" }, calls]);", "[\"two\", 1]")]
+    [InlineData("class C { constructor(r) { this.r = r; } } writeLn([new C(2) switch { C c => c.r * 3, _ => 0 }, 7 switch { 1, 2 => \"a\", _ => \"b\" } + \"!\"]);", "[6, \"b!\"]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));

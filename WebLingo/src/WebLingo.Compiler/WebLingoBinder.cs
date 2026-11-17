@@ -615,6 +615,7 @@ public sealed class WebLingoBinder
 
     private WebLingoBoundStatement BindStatement(WebLingoStatementSyntax statement)
     {
+        if (statement is WebLingoSwitchSyntax switched) return BindSwitch(switched);
         switch (statement)
         {
             case WebLingoVariableDeclarationSyntax declaration:
@@ -1110,6 +1111,89 @@ public sealed class WebLingoBinder
         return reference;
     }
 
+    /// <summary>Whether the subject held in <paramref name="subject"/> matches any of the patterns: by <c>==</c>, or by its class.</summary>
+    private static WebLingoExpressionSyntax Matches(WebLingoNameSyntax subject, IReadOnlyList<WebLingoSwitchPattern> patterns)
+    {
+        WebLingoExpressionSyntax? any = null;
+        foreach (var pattern in patterns)
+        {
+            WebLingoExpressionSyntax test = pattern.Class is { } type
+                ? new WebLingoIsExpressionSyntax(subject, type, pattern.Span)
+                : new WebLingoBinaryExpressionSyntax(WebLingoBinaryOperator.Equal, subject, pattern.Value!, pattern.Span, pattern.Span);
+            any = any is null ? test : new WebLingoBinaryExpressionSyntax(WebLingoBinaryOperator.Or, any, test, pattern.Span, pattern.Span);
+        }
+        return any!;
+    }
+
+    /// <summary>
+    /// <c>switch (value) { … }</c> as the <c>if</c>s it means (section 3.5): its value held once, each case's patterns
+    /// tested in order, a class's pattern naming the value in its block; so that <c>break</c> and <c>continue</c> in a
+    /// case act on the loop around the <c>switch</c>, as in an <c>if</c>.
+    /// </summary>
+    private WebLingoBoundStatement BindSwitch(WebLingoSwitchSyntax switched)
+    {
+        var name = "<temporary " + (_temporaries++).ToString(System.Globalization.CultureInfo.InvariantCulture) + ">";
+        var subject = new WebLingoNameSyntax(name, switched.Subject.Span);
+        WebLingoStatementSyntax? chain = switched.Default;
+        for (var i = switched.Cases.Count - 1; i >= 0; i--)
+        {
+            var (patterns, body) = (switched.Cases[i].Patterns, switched.Cases[i].Body);
+            WebLingoStatementSyntax then = body;
+            if (patterns is [{ Binding: { } binding } pattern])
+            {
+                then = new WebLingoBlockSyntax(
+                    [new WebLingoVariableDeclarationSyntax(WebLingoDeclarationKind.Var, binding, pattern.Span, subject, pattern.Span), body], body.Span);
+            }
+            chain = new WebLingoIfSyntax(Matches(subject, patterns), then, chain, body.Span);
+        }
+        var held = new WebLingoVariableDeclarationSyntax(WebLingoDeclarationKind.Var, name, switched.Subject.Span, switched.Subject,
+            switched.Subject.Span);
+        return BindStatement(new WebLingoBlockSyntax(chain is null ? [held] : [held, chain], switched.Span));
+    }
+
+    /// <summary>
+    /// <c>value switch { … }</c> as the conditionals it means (section 3.5): its value held once, its arms tested in order,
+    /// <c>_</c>'s last, which it must have, a class's pattern naming the value in its arm's result only.
+    /// </summary>
+    private WebLingoBoundExpression BindSwitchExpression(WebLingoSwitchExpressionSyntax switched)
+    {
+        var subject = Temporary(switched.Subject, switched.Subject.Span, out var store);
+        var stored = BindExpression(store);
+        WebLingoSwitchArm? otherwise = null;
+        foreach (var arm in switched.Arms)
+        {
+            if (arm.IsDefault) otherwise ??= arm;
+        }
+        if (otherwise is null)
+        {
+            Report(WebLingoDiagnosticCodes.UnexpectedToken, "A 'switch' expression needs a '_ => …' arm, for a value no other arm matches.",
+                switched.Span);
+            return new WebLingoBoundError(switched.Span);
+        }
+        var chain = BindExpression(otherwise.Value);
+        for (var i = switched.Arms.Count - 1; i >= 0; i--)
+        {
+            var arm = switched.Arms[i];
+            if (arm.IsDefault) continue;
+            var test = BindExpression(Matches(subject, arm.Patterns));
+            WebLingoBoundExpression result;
+            if (arm.Patterns is [{ Binding: { } binding } pattern])
+            {
+                _scope = new Scope(_scope, _function);
+                Declare(binding, WebLingoDeclarationKind.Var, pattern.Span, null);
+                var named = BindExpression(new WebLingoAssignmentExpressionSyntax(new WebLingoNameSyntax(binding, pattern.Span), subject, pattern.Span));
+                result = new WebLingoBoundSequence(named, BindExpression(arm.Value), arm.Value.Span);
+                _scope = _scope.Parent!;
+            }
+            else
+            {
+                result = BindExpression(arm.Value);
+            }
+            chain = new WebLingoBoundConditional(test, result, chain, arm.Value.Span);
+        }
+        return new WebLingoBoundSequence(stored, chain, switched.Span);
+    }
+
     private static WebLingoExpressionSyntax IsNull(WebLingoExpressionSyntax value, WebLingoSourceSpan span) =>
         new WebLingoBinaryExpressionSyntax(WebLingoBinaryOperator.Equal, value, new WebLingoNullLiteralSyntax(span), span, span);
 
@@ -1218,6 +1302,8 @@ public sealed class WebLingoBinder
                 return BindExpression(Compound(compound));
             case WebLingoIncrementSyntax increment:
                 return BindExpression(Increment(increment));
+            case WebLingoSwitchExpressionSyntax switched:
+                return BindSwitchExpression(switched);
             case WebLingoIntegerLiteralSyntax literal:
                 return new WebLingoBoundIntegerLiteral(literal.Value, literal.Span);
             case WebLingoBinary64LiteralSyntax literal:
