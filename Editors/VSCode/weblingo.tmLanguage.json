@@ -137,7 +137,7 @@
     },
     "numbers": {
       "name": "constant.numeric.decimal.weblingo",
-      "match": "(?<![\\w.])\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b"
+      "match": "(?<![\\w.])(?:0[xX][0-9A-Fa-f]+|0[bB][01]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?[mM]?)\\b"
     },
     "declarations": {
       "patterns": [

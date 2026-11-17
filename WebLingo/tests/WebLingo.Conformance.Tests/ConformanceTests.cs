@@ -157,6 +157,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var x = 1 switch { 1 => 2 };", "WL1001", 1, 9)]
     [InlineData("switch (1) { case Point p, 2 { } }", "WL1001", 1, 19)]
     [InlineData("var d = 79228162514264337593543950336m;", "WL1004", 1, 9)]
+    [InlineData("var x = 0xFFFFFFFFFFFFFFFF;", "WL1004", 1, 9)]
+    [InlineData("var x = 0b2;", "WL1004", 1, 9)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -557,6 +559,9 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var d = DateTime.utc(2026, 7, 1, 12); writeLn([d.toZone(\"Europe/Warsaw\"), d.addMonths(6).toZone(\"Europe/Warsaw\"), d.toZone(\"Asia/Kolkata\"), d.toZone(\"UTC\")]);", "[DateTime:2026-07-01T14:00:00+02:00, DateTime:2027-01-01T13:00:00+01:00, DateTime:2026-07-01T17:30:00+05:30, DateTime:2026-07-01T12:00:00Z]")]
     [InlineData("var d = DateTime.inZone(\"America/New_York\", 2026, 11, 16, 9, 30); writeLn([d, d.toUtc(), d.toZone(\"Europe/Warsaw\").hour]);", "[DateTime:2026-11-16T09:30:00-05:00, DateTime:2026-11-16T14:30:00Z, 15]")]
     [InlineData("writeLn([DateTime.inZone(\"Europe/Warsaw\", 2026, 3, 29, 2, 30), DateTime.inZone(\"Europe/Warsaw\", 2026, 10, 25, 2, 30)]);", "[DateTime:2026-03-29T02:30:00+01:00, DateTime:2026-10-25T02:30:00+01:00]")]
+    // Hexadecimal and binary literals (the owner's answers, 16 November 2026): int64s, their letters in either case.
+    [InlineData("writeLn([0x1F, 0X1f, 0b1010, 0B11, 0xff + 1, -0x10, 0x7FFFFFFFFFFFFFFF, 0b0]);", "[31, 31, 10, 3, 256, -16, 9223372036854775807, 0]")]
+    [InlineData("var flags = 0b0101; writeLn([flags == 5, 0x10 * 0b10, $\"{0xFF:X4}\"]);", "[true, 32, \"00FF\"]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));

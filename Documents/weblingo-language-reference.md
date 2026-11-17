@@ -100,6 +100,8 @@ WASP's `.wasp` pages, and its `README.md` says how to install it.
 - **Comments.** `//` runs to the end of the line; `/* … */` may span lines, and does not nest.
 - **Names** are ASCII letters, digits and `_`, not starting with a digit, and case matters: `count` and `Count` are two
   names.
+- **Numbers** are written in decimal, `42`, `3.5`, `1e21` and the decimal `1.5m`; an integer in hexadecimal too,
+  `0x1F`, or in binary, `0b1010`, the prefix's letter and the digits in either case.
 - **Whitespace and line breaks** separate tokens and otherwise mean nothing. A file may use any line ending.
 - **Keywords**, which cannot be names: `async`, `await`, `break`, `catch`, `class`, `const`, `continue`, `do`, `else`,
   `export`, `extend`, `extends`, `false`, `finally`, `for`, `foreach`, `function`, `if`, `import`, `Infinity`, `is`,
@@ -188,7 +190,7 @@ writeLn(limit);
 |---|---|---|
 | null | `null` | none |
 | Boolean | `true`, `false` | `Boolean` |
-| Integer, 64 bits | `42`, `-7`, `9223372036854775807` | `Integer` |
+| Integer, 64 bits | `42`, `-7`, `9223372036854775807`, `0xFF`, `0b1010` | `Integer` |
 | Number, binary64 | `3.5`, `1e21`, `2.5E-3`, `Infinity`, `NaN` | `Number` |
 | String | `"tea"`, `'tea'` | `String` |
 | Array | `[1, "two", null]` | `Array` |
@@ -1784,7 +1786,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Literals**: hexadecimal and binary numbers, and `_` between digits.
+- **Literals**: `_` between digits.
 - **Functions**: a variable number of arguments (rest parameters), and spreading an array into a call.
 - **Library**: string methods (searching, splitting, case), array methods beyond `push` and `pop`, regular expressions,
   JSON, and network access.

@@ -114,6 +114,15 @@ public sealed class LexerTests
     [InlineData("10", 10L)]
     [InlineData("007", 7L)]
     [InlineData("9223372036854775807", long.MaxValue)]
+    [InlineData("0x1F", 31L)]
+    [InlineData("0X1f", 31L)]
+    [InlineData("0xff", 255L)]
+    [InlineData("0x0", 0L)]
+    [InlineData("0x7FFFFFFFFFFFFFFF", long.MaxValue)]
+    [InlineData("0b1010", 10L)]
+    [InlineData("0B11", 3L)]
+    [InlineData("0b0", 0L)]
+    [InlineData("0b111111111111111111111111111111111111111111111111111111111111111", long.MaxValue)]
     public void IntegerLiteralsCarryTheirValue(string text, long value)
     {
         var token = new WebLingoLexer(text).NextToken();
@@ -129,6 +138,20 @@ public sealed class LexerTests
         var diagnostic = Assert.Single(diagnostics);
         Assert.Equal((WebLingoDiagnosticCodes.InvalidNumericLiteral, new WebLingoSourceSpan(0, 19)), (diagnostic.Code, diagnostic.Span));
         Assert.Equal(WebLingoDiagnosticSeverity.Error, diagnostic.Severity);
+    }
+
+    [Theory]
+    [InlineData("0x8000000000000000")]
+    [InlineData("0xFFFFFFFFFFFFFFFF")]
+    [InlineData("0b1000000000000000000000000000000000000000000000000000000000000000")]
+    public void AHexadecimalOrBinaryLiteralBeyondInt64IsReported(string text)
+    {
+        var tokens = WebLingoLexer.Tokenize(text + ";", out var diagnostics);
+        Assert.Equal(new[] { WebLingoTokenKind.Bad, WebLingoTokenKind.Semicolon, WebLingoTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal((WebLingoDiagnosticCodes.InvalidNumericLiteral, new WebLingoSourceSpan(0, text.Length),
+                $"The integer {text} is too large; the largest is 9223372036854775807."),
+            (diagnostic.Code, diagnostic.Span, diagnostic.Message));
     }
 
     [Theory]
@@ -362,6 +385,13 @@ public sealed class LexerTests
     [InlineData("1.5mm")]
     [InlineData("1e")]
     [InlineData("2.5e3x")]
+    [InlineData("0x")]
+    [InlineData("0b")]
+    [InlineData("0x1G")]
+    [InlineData("0b102")]
+    [InlineData("0b12")]
+    [InlineData("0x10m")]
+    [InlineData("0xx1")]
     public void DigitsRunningIntoLettersAreOneInvalidLiteral(string text)
     {
         var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);

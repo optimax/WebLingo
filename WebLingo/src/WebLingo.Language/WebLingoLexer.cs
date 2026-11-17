@@ -227,6 +227,7 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
     /// </summary>
     private WebLingoToken ReadNumericLiteral(int start)
     {
+        if (source[start] == '0' && At(1) is 'x' or 'X' or 'b' or 'B') return ReadRadixLiteral(start, At(1) is 'x' or 'X' ? 16 : 2);
         SkipDigits();
         var isBinary64 = false;
         if (At(0) == '.' && IsDigit(At(1)))
@@ -285,6 +286,43 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
         return new WebLingoToken(WebLingoTokenKind.IntegerLiteral, source[start.._position], new WebLingoSourceSpan(start, _position - start),
             value);
     }
+
+    /// <summary>
+    /// A hexadecimal or a binary integer, <c>0x1F</c> or <c>0b1010</c>, its prefix's letter and its digits in either case
+    /// (specification, section 3.5, "Literals"; the owner's answers, 16 November 2026): an int64, one beyond it WL1004, as
+    /// a decimal one beyond it is; a prefix without digits, or digits running into letters, one invalid literal.
+    /// </summary>
+    private WebLingoToken ReadRadixLiteral(int start, int radix)
+    {
+        _position += 2;
+        var digits = _position;
+        while (_position < source.Length && DigitValue(source[_position], radix) is not null) _position++;
+        if (_position == digits || (_position < source.Length && IsIdentifierPart(source[_position])))
+        {
+            while (_position < source.Length && IsIdentifierPart(source[_position])) _position++;
+            Report(WebLingoDiagnosticCodes.InvalidNumericLiteral, $"'{source[start.._position]}' is not a valid number.",
+                new WebLingoSourceSpan(start, _position - start));
+            return Token(WebLingoTokenKind.Bad, start);
+        }
+        long value = 0;
+        for (var i = digits; i < _position; i++)
+        {
+            var digit = DigitValue(source[i], radix)!.Value;
+            if (value > (long.MaxValue - digit) / radix)
+            {
+                Report(WebLingoDiagnosticCodes.InvalidNumericLiteral,
+                    $"The integer {source[start.._position]} is too large; the largest is {LargestInteger}.",
+                    new WebLingoSourceSpan(start, _position - start));
+                return Token(WebLingoTokenKind.Bad, start);
+            }
+            value = value * radix + digit;
+        }
+        return new WebLingoToken(WebLingoTokenKind.IntegerLiteral, source[start.._position], new WebLingoSourceSpan(start, _position - start),
+            value);
+    }
+
+    /// <summary>A digit's value in base 16 or 2, or null for a character that is not one of its digits.</summary>
+    private static int? DigitValue(char c, int radix) => radix == 16 ? HexValue(c) : c is '0' or '1' ? c - '0' : null;
 
     private WebLingoToken ReadBinary64(int start)
     {
