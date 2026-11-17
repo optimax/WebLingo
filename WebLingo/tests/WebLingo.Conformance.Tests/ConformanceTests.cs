@@ -533,6 +533,9 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var f = v => if (v % 2 == 0) \"even\" else \"odd\"; writeLn([f(2), f(3), if (true) 1 else 2]);", "[\"even\", \"odd\", 1]")]
     [InlineData("var calls = 0; function f() { calls = calls + 1; return null; } writeLn([f() ?? \"x\", calls, true ? \"a\" : f(), calls]);", "[\"x\", 1, \"a\", 1]")]
     [InlineData("var x = 2; writeLn($\"{(x > 1 ? \"big\" : \"small\")}\");", "big")]
+    // Strings compared by their Unicode scalar values (the owner's answers, 16 November 2026).
+    [InlineData("writeLn([\"a\" < \"b\", \"b\" <= \"a\", \"abc\" > \"ab\", \"\" >= \"\", \"B\" < \"a\", \"é\" > \"z\"]);", "[true, false, true, true, true, true]")]
+    [InlineData("writeLn([\"\\u{FFFD}\" < \"\\u{1F375}\", \"\\u{1F375}\".compare(\"\\u{FFFD}\"), \"a\".compare(\"a\"), \"a\".compare(\"b\")]);", "[true, 1, 0, -1]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -552,7 +555,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("for (; 1; ) writeLn(1);")]
     [InlineData("writeLn(\"a\" + 1);")]
     [InlineData("writeLn(1 + \"a\");")]
-    [InlineData("writeLn(\"a\" < \"b\");")]
+    [InlineData("writeLn(\"a\" < 1);")]
     [InlineData("writeLn(-\"a\");")]
     [InlineData("if (\"true\") writeLn(1);")]
     [InlineData("writeLn(function () {} + 1);")]
@@ -577,6 +580,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(1 ? 2 : 3);", "WL3001")]
     [InlineData("var s = \"a\"; s -= 1;", "WL3001")]
     [InlineData("writeLn(if (null) 1 else 2);", "WL3001")]
+    [InlineData("writeLn(\"a\".compare(1));", "WL3001")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

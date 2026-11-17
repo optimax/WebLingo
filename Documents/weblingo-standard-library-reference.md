@@ -104,6 +104,7 @@ binary64, and `"tea"` a `String`.
 | `s.length` | a string's length, in Unicode scalar values |
 | `s[i]` | the string's `i`-th Unicode scalar value, as a string of one; `s?[i]` gives `null` outside it |
 | `s.iterate()` | an `Iterator` of its characters, each a string of one |
+| `s.compare(other)` | -1, 0 or 1, as `s` comes before `other`, equals it or comes after it, by their Unicode values, as `<` orders them |
 
 ```javascript
 writeLn([Integer.parse("42") + 1, Number.parse("1.5") * 2, Boolean.parse("true")]);

@@ -21,6 +21,8 @@ public enum WebLingoMember : byte
     Year, Month, Day, Hour, Minute, Second, Millisecond, DayOfWeek, DayOfYear, Offset, UnixMilliseconds,
     AddYears, AddMonths, AddDays, AddHours, AddMinutes, AddSeconds, AddMilliseconds, ToUtc, ToLocal, FormatWith,
     Now, UtcNow, Local, Utc, FromUnixMilliseconds,
+    /// <summary>A string's <c>compare(other)</c>, -1, 0 or 1 (section 3.5).</summary>
+    Compare,
     /// <summary>A collection's or a string's <c>iterate()</c>, which gives an <c>Iterator</c> (section 3.6).</summary>
     Iterate,
     /// <summary>An interpolation's format and alignment, a built-in method of every class that no program can name (section 3.5).</summary>
@@ -92,6 +94,7 @@ public static partial class WebLingoMembers
         "local" => WebLingoMember.Local,
         "utc" => WebLingoMember.Utc,
         "fromUnixMilliseconds" => WebLingoMember.FromUnixMilliseconds,
+        "compare" => WebLingoMember.Compare,
         "iterate" => WebLingoMember.Iterate,
         WebLingoInterpolation.Format => WebLingoMember.Format,
         "__className" => WebLingoMember.ClassName,
@@ -734,7 +737,8 @@ public static partial class WebLingoMembers
         || (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
         || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
         || (target.Kind == WebLingoValueKind.Bytes && member is WebLingoMember.Slice or WebLingoMember.Text)
-        || (target.Kind == WebLingoValueKind.DateTime && IsDateTimeMethod(member));
+        || (target.Kind == WebLingoValueKind.DateTime && IsDateTimeMethod(member))
+        || (target.Kind == WebLingoValueKind.String && member == WebLingoMember.Compare);
 
     /// <summary>
     /// Whether <c>x.name(…)</c> calls a class's built-in method, <c>setMethod</c>, <c>setProperty</c>,
@@ -875,6 +879,20 @@ public static partial class WebLingoMembers
         if (target.Kind == WebLingoValueKind.DateTime && IsDateTimeMethod(member))
         {
             return TryCallDateTime(target, member, name, values, first, count, heap, out result, out error);
+        }
+        if (target.Kind == WebLingoValueKind.String && member == WebLingoMember.Compare)
+        {
+            // s.compare(other): -1, 0 or 1, by their Unicode scalar values, as < orders them (section 3.5).
+            if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+            if (values[first].Kind != WebLingoValueKind.String)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"'compare' compares two strings, not a string and {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                return false;
+            }
+            result = WebLingoValue.FromInt64(WebLingoOperators.CompareStrings(heap.GetString(target), heap.GetString(values[first])));
+            error = null;
+            return true;
         }
         if (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
         {

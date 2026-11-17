@@ -83,7 +83,7 @@ public sealed class DateTimeTests
     [InlineData("writeLn(DateTime.parse(\"2026\", \"dd/MM/yyyy\"));", "WL3001", "\"2026\" is not a date and time of the format 'dd/MM/yyyy'.")]
     [InlineData("writeLn(DateTime.utc(2026, 1, 1).format(\"q\"));", "WL3001", "'q' is not a format of a date and time.")]
     [InlineData("writeLn(DateTime.utc(2026, 1, 1) + 1);", "WL3001", "'+' needs two numbers or two strings, not the date and time 2026-01-01T00:00:00Z.")]
-    [InlineData("writeLn(DateTime.utc(2026, 1, 1) < 1);", "WL3001", "'<' compares numbers, not the date and time 2026-01-01T00:00:00Z.")]
+    [InlineData("writeLn(DateTime.utc(2026, 1, 1) < 1);", "WL3001", "'<' compares two numbers, two strings or two dates, not the date and time 2026-01-01T00:00:00Z and the integer 1.")]
     [InlineData("var m = {}; m[DateTime.utc(2026, 1, 1)] = 1;", "WL3001",
         "The date and time 2026-01-01T00:00:00Z cannot be a key: keys are strings, integers, Booleans and null.")]
     [InlineData("writeLn(DateTime.utc(2026, 1, 1).year());", "WL2005", "'year' of the date and time 2026-01-01T00:00:00Z is not a method, and cannot be called.")]

@@ -129,11 +129,24 @@ public static class WebLingoOperators
             });
             return true;
         }
+        if (left.Kind == WebLingoValueKind.String && right.Kind == WebLingoValueKind.String && heap is not null)
+        {
+            // Two strings, by their Unicode scalar values, never by culture (the owner's answer, 16 November 2026).
+            var texts = CompareStrings(heap.GetString(left), heap.GetString(right));
+            result = WebLingoValue.FromBoolean(op switch
+            {
+                WebLingoComparisonOperator.Less => texts < 0,
+                WebLingoComparisonOperator.LessOrEqual => texts <= 0,
+                WebLingoComparisonOperator.Greater => texts > 0,
+                _ => texts >= 0
+            });
+            return true;
+        }
         if (!IsNumber(left) || !IsNumber(right))
         {
-            var bad = IsNumber(left) ? right : left;
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'{Symbol(op)}' compares numbers, not {WebLingoValueFormatter.Describe(bad)}.");
+                $"'{Symbol(op)}' compares two numbers, two strings or two dates, not {WebLingoValueFormatter.Describe(left)} "
+                + $"and {WebLingoValueFormatter.Describe(right)}.");
             return false;
         }
         var order = Compare(left, right);
@@ -230,6 +243,28 @@ public static class WebLingoOperators
     }
 
     private static bool IsNumber(WebLingoValue value) => value.Kind is WebLingoValueKind.Int64 or WebLingoValueKind.Binary64;
+
+    /// <summary>
+    /// Two strings' order, by their Unicode scalar values (section 3.5): -1, 0 or 1. Unlike .NET's ordinal comparison of
+    /// UTF-16 code units, a character beyond U+FFFF comes after every one below it.
+    /// </summary>
+    public static int CompareStrings(string left, string right)
+    {
+        var (i, j) = (0, 0);
+        while (i < left.Length && j < right.Length)
+        {
+            var (a, b) = (ScalarAt(left, ref i), ScalarAt(right, ref j));
+            if (a != b) return a < b ? -1 : 1;
+        }
+        return i < left.Length ? 1 : j < right.Length ? -1 : 0;
+    }
+
+    private static int ScalarAt(string text, ref int at)
+    {
+        var c = text[at++];
+        if (char.IsHighSurrogate(c) && at < text.Length && char.IsLowSurrogate(text[at])) return char.ConvertToUtf32(c, text[at++]);
+        return c;
+    }
 
     /// <summary>The order of two numbers, exact even between an int64 and a binary64; null if either is NaN.</summary>
     private static int? Compare(WebLingoValue left, WebLingoValue right)

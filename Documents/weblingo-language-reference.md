@@ -406,7 +406,9 @@ There is no `===`; `==` is already strict. A class may give its instances a mean
 
 ### Comparisons and logic
 
-`<`, `<=`, `>` and `>=` compare numbers. `!`, `&&` and `||` take Booleans only, and so does every condition: there is
+`<`, `<=`, `>` and `>=` compare two numbers, two strings or two dates. Strings compare by their characters' Unicode
+values, never by language, so that `"B" < "a"`; `s.compare(other)` gives -1, 0 or 1 by the same order. `!`, `&&` and
+`||` take Booleans only, and so does every condition: there is
 no "truthiness".
 
 ```javascript
@@ -1697,7 +1699,6 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Operators**: string comparison with `<`.
 - **Statements**: `switch`.
 - **Values**: decimals (exact decimal arithmetic, `1.5m`), and time zones other than UTC and the server's.
 - **Literals**: hexadecimal and binary numbers, and `_` between digits.

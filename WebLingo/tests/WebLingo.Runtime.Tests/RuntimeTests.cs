@@ -181,7 +181,12 @@ public sealed class HeapTests
         heap.TryAllocateString("x", out var second, out _);
         Assert.True(WebLingoOperators.TryCompare(WebLingoComparisonOperator.Equal, first, second, heap, out var equal, out _));
         Assert.True(equal.AsBoolean);
-        Assert.False(WebLingoOperators.TryCompare(WebLingoComparisonOperator.Less, first, second, heap, out _, out _));
+        // Ordered by their Unicode scalar values (the owner's answer, 16 November 2026): "x" is not less than "x", but is
+        // less than or equal to it.
+        Assert.True(WebLingoOperators.TryCompare(WebLingoComparisonOperator.Less, first, second, heap, out var less, out _));
+        Assert.False(less.AsBoolean);
+        Assert.True(WebLingoOperators.TryCompare(WebLingoComparisonOperator.LessOrEqual, first, second, heap, out var lessOrEqual, out _));
+        Assert.True(lessOrEqual.AsBoolean);
     }
 }
 
