@@ -76,6 +76,7 @@ public sealed class WebLingoStackVirtualMachine
         heap.Network = context.Network;
         heap.Databases = context.Databases;
         heap.Allowed = context.Allowed;
+        heap.Crypto = context.Crypto;
         heap.WallClock = context.WallClock;
         heap.TimeZone = context.TimeZone;
         heap.SchedulerHost = context.SchedulerHost;

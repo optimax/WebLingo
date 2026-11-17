@@ -27,9 +27,10 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 15. [`std:http`](#15-stdhttp)
 16. [`std:net`](#16-stdnet)
 17. [`std:db`](#17-stddb)
-18. [Native modules](#18-native-modules)
-19. [In WASP's pages](#19-in-wasps-pages)
-20. [`windows:com`](#20-windowscom)
+18. [`std:crypto`](#18-stdcrypto)
+19. [Native modules](#19-native-modules)
+20. [In WASP's pages](#20-in-wasps-pages)
+21. [`windows:com`](#21-windowscom)
 
 ---
 
@@ -293,7 +294,7 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `NetworkError` | WL3014 | a host that cannot be reached, a connection that fails, a request that takes too long |
 | `DatabaseError` | WL3015 | a statement a database refuses, a database that cannot be opened |
 | `PermissionError` | WL3016 | a file or a folder a site's scripts may not reach, outside the folders its `wasp.config` allows |
-| `ComError` | WL3012 | a COM object's failure, with its `number`, `source` and `description` (section 20) |
+| `ComError` | WL3012 | a COM object's failure, with its `number`, `source` and `description` (section 21) |
 
 ```javascript
 try {
@@ -680,7 +681,48 @@ using (var db = await Database.open("sqlite::memory:")) {
 
 ---
 
-## 18. Native modules
+## 18. `std:crypto`
+
+Cryptography, through the platform's: random bytes, hashes, HMAC, a comparison in constant time, and passwords'
+hashes. Data, a key and a password are a string, as UTF-8, or `Bytes`; a hash is `Bytes`.
+
+| Function | What it gives |
+|---|---|
+| `randomBytes(n)` | `n` secure random bytes, 0 to 1,048,576 |
+| `sha256(data)`, `sha512(data)` | the data's SHA-256 or SHA-512 |
+| `hmac(algorithm, key, data)` | the data's HMAC with the key, `"sha256"` or `"sha512"` |
+| `equal(a, b)` | whether two values are the same bytes, compared in a time that does not tell where they differ |
+| `hashPassword(password)` | a password's hash, PBKDF2 with HMAC-SHA-256, 600,000 iterations and a random salt, `"pbkdf2-sha256$600000$salt$hash"` |
+| `verifyPassword(password, hash)` | whether the password is the one the hash was made of |
+| `hashPasswordAsync(password)`, `verifyPasswordAsync(password, hash)` | the same, as a task, run off the worker |
+
+`hashPassword` takes a large part of a second by design, as a password's hash should, and blocks its worker meanwhile:
+a site's page awaits `hashPasswordAsync` instead, so that its worker serves other requests. A hash names its iterations
+and its salt, so that one made with today's defaults still verifies after they change.
+
+```javascript
+import crypto from "std:crypto";
+function hex(bytes) { var text = ""; for (var i = 0; i < bytes.length; i++) text += $"{bytes[i]:x2}"; return text; }
+writeLn(hex(crypto.sha256("abc")));
+writeLn(hex(crypto.hmac("sha256", "Jefe", "what do ya want for nothing?")));
+writeLn(crypto.randomBytes(16).length);
+var stored = await crypto.hashPasswordAsync("correct horse");
+writeLn([stored.startsWith("pbkdf2-sha256$600000$"), await crypto.verifyPasswordAsync("correct horse", stored),
+  crypto.verifyPassword("wrong", stored)]);
+```
+
+```text
+ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843
+16
+[true, true, false]
+```
+
+An algorithm it does not have, a value that is not data, and a hash it did not make are each WL3001.
+
+---
+
+## 19. Native modules
 
 A native module is code compiled for .NET that extends what scripts can use: functions and classes, imported as any
 module's are, by a scheme naming a folder of them, `import db from "native:sqlite";`. The folders are named by the
@@ -690,7 +732,7 @@ configuration, `weblingo.config` beside a script and `wasp.config` in a site, `{
 
 ---
 
-## 19. In WASP's pages
+## 20. In WASP's pages
 
 A page, a layout and a component that declare `param request;` and `param response;` are given the request they
 answer and the response they make; a `.wl` route handler is given them as its function's arguments. Their members are
@@ -745,7 +787,7 @@ zWebLingoz
 
 ---
 
-## 20. `windows:com`
+## 21. `windows:com`
 
 COM's objects, on Windows only, as classic ASP's pages used them, `Server.CreateObject("ADODB.Connection")`: a native
 module installed with the runtime in `windows/`, beside `std/`. Elsewhere, importing it is WL2015.

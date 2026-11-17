@@ -70,6 +70,12 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     public IReadOnlyDictionary<string, IReadOnlyList<string>>? Allowed { get; init; }
 
     /// <summary>
+    /// The platform's cryptography, which <c>std:crypto</c> reaches through the heap (<see cref="WebLingoHeap.Crypto"/>,
+    /// section 7.10); none by default, its functions then WL3001.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoCrypto? Crypto { get; init; }
+
+    /// <summary>
     /// The host's side of the execution's scheduler, on which work runs off the worker, its outcome posted back to it
     /// (section 7.8, WL-P007); without one, nothing asynchronous but the execution's own tasks and timers runs.
     /// </summary>

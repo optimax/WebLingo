@@ -426,6 +426,7 @@ public static class WebLingoCommandLine
             FileSystem = host.Files,
             Network = host.Network,
             Allowed = host.Allowed,
+            Crypto = new DotNetCrypto(),
             Databases = host.Databases,
             SchedulerHost = new DotNetSchedulerHost()
         };

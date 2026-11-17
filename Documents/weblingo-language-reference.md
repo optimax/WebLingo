@@ -1948,6 +1948,14 @@ using (var db = await Database.open("sqlite::memory:")) {
 
 A database's own failure, a statement it refuses, is a `DatabaseError`, WL3015. SQLite and SQL Server are the databases there are for now; the Standard Library Reference describes the module.
 
+### `std:crypto`
+
+Cryptography, through the platform's: `randomBytes(n)`, `sha256(data)`, `sha512(data)`, `hmac("sha256", key, data)`,
+`equal(a, b)`, which compares in constant time, and passwords' hashes, `hashPassword(password)` and
+`verifyPassword(password, hash)`, PBKDF2 with HMAC-SHA-256, with `hashPasswordAsync` and `verifyPasswordAsync`, which
+run off the worker, since a password's hash takes a large part of a second by design. Data is a string, as UTF-8, or
+`Bytes`, and a hash `Bytes`; the Standard Library Reference describes the module.
+
 ### Native modules
 
 A native module is code compiled for .NET, an assembly that extends what scripts can use, as Python's C extensions do.

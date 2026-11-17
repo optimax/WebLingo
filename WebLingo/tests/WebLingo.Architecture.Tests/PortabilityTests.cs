@@ -21,6 +21,7 @@ public sealed class PortabilityTests
         ("Microsoft.AspNetCore", "ASP.NET Core is adapter-only"),
         ("System.Net.Http", "HTTP is a platform service, adapter-only"),
         ("System.Linq", "LINQ is kept out of the portable core"),
+        ("System.Security.Cryptography", "cryptography is the platform's, IWebLingoCrypto (section 7.10)"),
     ];
 
     /// <summary>Single types the portable core must not use, with the inventory's reason.</summary>
@@ -64,7 +65,8 @@ public sealed class PortabilityTests
     {
         "WebLingo.Core", "WebLingo.Language", "WebLingo.Bytecode", "WebLingo.Compiler", "WebLingo.Runtime",
         "WebLingo.VM", "WebLingo.VM.Stack", "WebLingo.Templates", "WebLingo.StdLib", "WebLingo.StdLib.Tasks", "WebLingo.Platform.Abstractions",
-        "WebLingo.StdLib.Fs", "WebLingo.StdLib.Http", "WebLingo.StdLib.Net", "WebLingo.StdLib.Db", "WebLingo.Hosting.Abstractions", "WebLingo.Hosting",
+        "WebLingo.StdLib.Fs", "WebLingo.StdLib.Http", "WebLingo.StdLib.Net", "WebLingo.StdLib.Db", "WebLingo.StdLib.Crypto", "WebLingo.Hosting.Abstractions",
+        "WebLingo.Hosting",
     };
 
     [Theory]

@@ -204,6 +204,7 @@ public sealed class WebLingoApplication
             FileSystem = _options.ScriptFileSystem ?? _options.FileSystem,
             Network = _options.Network,
             Allowed = _options.Allowed,
+            Crypto = _options.Crypto,
             Databases = _options.Databases,
             Clock = _options.Clock,
             WallClock = _options.WallClock,

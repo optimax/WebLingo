@@ -56,6 +56,7 @@ public static class WebLingoWaspServer
         {
             ScriptFileSystem = new DotNetFileSystem(files),
             Allowed = allowed, // The COM objects wasp.config allows (section 3.10).
+            Crypto = new DotNetCrypto(),
             Workers = workers,
             WorkerServices = _ => Services(schemes, importer),
             Environment = environment,

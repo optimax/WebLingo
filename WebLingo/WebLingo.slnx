@@ -19,6 +19,7 @@
   <Project Path="src/WebLingo.StdLib.Http/WebLingo.StdLib.Http.csproj" />
   <Project Path="src/WebLingo.StdLib.Net/WebLingo.StdLib.Net.csproj" />
   <Project Path="src/WebLingo.StdLib.Db/WebLingo.StdLib.Db.csproj" />
+  <Project Path="src/WebLingo.StdLib.Crypto/WebLingo.StdLib.Crypto.csproj" />
   <Project Path="src/WebLingo.Windows.Com/WebLingo.Windows.Com.csproj" />
   <Project Path="src/WebLingo.Cli/WebLingo.Cli.csproj" />
   <Project Path="src/WebLingo.Wasp.Cli/WebLingo.Wasp.Cli.csproj" />

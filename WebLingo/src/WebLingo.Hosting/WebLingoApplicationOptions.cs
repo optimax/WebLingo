@@ -48,6 +48,9 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// </summary>
     public IWebLingoFileSystem? ScriptFileSystem { get; init; }
 
+    /// <summary>The platform's cryptography, which <c>std:crypto</c> reaches (section 7.10); none without it.</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoCrypto? Crypto { get; init; }
+
     /// <summary>What its configuration allows its native modules, <c>"com"</c>'s objects (section 3.10); none without it.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>>? Allowed { get; init; }
 

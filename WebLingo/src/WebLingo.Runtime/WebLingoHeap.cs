@@ -87,6 +87,9 @@ public sealed class WebLingoHeap
     /// <summary>What the configuration allows native modules (<see cref="WebLingoExecutionContext.Allowed"/>), COM's objects (section 3.10).</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>>? Allowed { get; set; }
 
+    /// <summary>The platform's cryptography (<see cref="WebLingoExecutionContext.Crypto"/>), for <c>std:crypto</c>'s functions (section 7.10).</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoCrypto? Crypto { get; set; }
+
     /// <summary>The class values of the native classes whose modules make their instances, each its class's (section 3.10).</summary>
     private Dictionary<object, WebLingoValue>? _nativeClassValues;
 
