@@ -3018,3 +3018,17 @@ A1: (b)
 2026-11-16 (Claude): the answer recorded as approved in the specification, sections 1.1 and 3.5, and built in the lexer, for decimal, hexadecimal and binary digits, fractions and exponents, and decimals. Guessed, and recorded as Proposed (section 15.2, "Digit separators"): a `_` that is not between two digits of the literal's base makes the literal run into it, one invalid literal (WL1004), as digits running into letters do; a token's text keeps them, the value and a decimal's constant do not. The editors' colouring reads them. Described in the Language Reference, whose list of what is not in the language yet no longer names literals.
 
 Done (Claude, 2026-11-16, `ad83018`): digit separators. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
+
+## [DONE] Rest Parameters
+
+A function taking any number of arguments, the last parameter an array of those left (specification, section 3.2: "Functions have defined arity/default/rest behavior"), its arity checked for the others (WL2006). Built as every feature is: in the lexer and the parser where it is syntax, the binder and the lowered IR, both VMs or the runtime they share, with its conformance tests on both VMs, and the Language Reference. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, its form: (a) JavaScript's, `function f(first, ...rest)`; (b) C#'s, `function f(first, params rest)`.
+
+A: (a) 
+
+2026-11-16 (Claude): the answer recorded as approved in the specification, sections 1.1 and 3.5, and built through the lexer, the parser, the binder, the IR, both code generators, WLBC, both verifiers and both VMs. Guessed, and recorded as Proposed (section 15.2, "Rest parameters"): a rest parameter after any with defaults, without a default of its own, the last; a new array each call; WL2006 "takes at least N arguments", at compile time for a function called by its name; in the bytecode, a function counting only the parameters before it, `HasRest` (WLBC's function flag 16), and a new instruction of both VMs, `TakeRest`, its first, which takes the array a call with more arguments than its parameters gathered on the VMs' existing slow path, so that the fast call path is as it was: a first build that looked for a rest parameter on every call made the stack VM's `objects` 2.5% slower, and the landed one measured within the machine's noise against `main` (`objects` and `calls`, both VMs, five rounds alternately, and the stack VM's `calls` seven more). Described in the Language Reference, its example run with `weblingo`; the working copy's other, uncommitted edit to that file, in the `if` example's output, is not in the commit.
+
+Done (Claude, 2026-11-16, `b74d9d5`): rest parameters. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
