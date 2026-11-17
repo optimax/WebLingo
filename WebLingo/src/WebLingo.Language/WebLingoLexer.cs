@@ -244,13 +244,15 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
         }
         if (At(0) is 'm' or 'M' && (_position + 1 >= source.Length || !IsIdentifierPart(source[_position + 1])))
         {
-            // A decimal, 1.5m (section 3.2): .NET's decimal for now, its digits as written, which must fit it.
-            var digits = source[start.._position];
+            // A decimal, 1.5m (section 3.2): .NET's decimal for now, its digits as written, without separators, which must
+            // fit it.
+            var written = source[start.._position];
+            var digits = written.Replace("_", "");
             _position++;
             if (!decimal.TryParse(digits, System.Globalization.NumberStyles.AllowDecimalPoint | System.Globalization.NumberStyles.AllowExponent,
                     System.Globalization.CultureInfo.InvariantCulture, out _))
             {
-                Report(WebLingoDiagnosticCodes.InvalidNumericLiteral, $"The decimal {digits}m is beyond a decimal's range.",
+                Report(WebLingoDiagnosticCodes.InvalidNumericLiteral, $"The decimal {written}m is beyond a decimal's range.",
                     new WebLingoSourceSpan(start, _position - start));
                 return Token(WebLingoTokenKind.Bad, start);
             }
@@ -273,6 +275,7 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
         long value = 0;
         for (var i = start; i < _position; i++)
         {
+            if (source[i] == '_') continue;
             var digit = source[i] - '0';
             if (value > (long.MaxValue - digit) / 10)
             {
@@ -296,7 +299,7 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
     {
         _position += 2;
         var digits = _position;
-        while (_position < source.Length && DigitValue(source[_position], radix) is not null) _position++;
+        SkipDigits(radix);
         if (_position == digits || (_position < source.Length && IsIdentifierPart(source[_position])))
         {
             while (_position < source.Length && IsIdentifierPart(source[_position])) _position++;
@@ -307,6 +310,7 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
         long value = 0;
         for (var i = digits; i < _position; i++)
         {
+            if (source[i] == '_') continue;
             var digit = DigitValue(source[i], radix)!.Value;
             if (value > (long.MaxValue - digit) / radix)
             {
@@ -321,13 +325,19 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
             value);
     }
 
-    /// <summary>A digit's value in base 16 or 2, or null for a character that is not one of its digits.</summary>
-    private static int? DigitValue(char c, int radix) => radix == 16 ? HexValue(c) : c is '0' or '1' ? c - '0' : null;
+    /// <summary>A digit's value in base 16, 10 or 2, or null for a character that is not one of its digits.</summary>
+    private static int? DigitValue(char c, int radix) => radix switch
+    {
+        16 => HexValue(c),
+        10 => IsDigit(c) ? c - '0' : null,
+        _ => c is '0' or '1' ? c - '0' : null
+    };
 
     private WebLingoToken ReadBinary64(int start)
     {
         var text = source[start.._position];
-        var value = double.Parse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
+        var value = double.Parse(text.Replace("_", ""), System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture);
         var span = new WebLingoSourceSpan(start, _position - start);
         if (double.IsInfinity(value))
         {
@@ -745,9 +755,20 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
         _ => null
     };
 
-    private void SkipDigits()
+    /// <summary>
+    /// A run of digits of a base, 10 unless another is given, with <c>_</c> between two of them, one at a time, a separator
+    /// that means nothing (specification, section 3.5, "Literals"; the owner's answer, 16 November 2026): a <c>_</c> first,
+    /// last, doubled, or beside anything but a digit is not read, so that the literal runs into it and is invalid.
+    /// </summary>
+    private void SkipDigits(int radix = 10)
     {
-        while (_position < source.Length && IsDigit(source[_position])) _position++;
+        var first = _position;
+        while (_position < source.Length)
+        {
+            if (DigitValue(source[_position], radix) is not null) _position++;
+            else if (source[_position] == '_' && _position > first && DigitValue(At(1), radix) is not null) _position += 2;
+            else break;
+        }
     }
 
     private char At(int offset) => _position + offset < source.Length ? source[_position + offset] : '\0';

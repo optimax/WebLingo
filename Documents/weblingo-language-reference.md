@@ -101,7 +101,8 @@ WASP's `.wasp` pages, and its `README.md` says how to install it.
 - **Names** are ASCII letters, digits and `_`, not starting with a digit, and case matters: `count` and `Count` are two
   names.
 - **Numbers** are written in decimal, `42`, `3.5`, `1e21` and the decimal `1.5m`; an integer in hexadecimal too,
-  `0x1F`, or in binary, `0b1010`, the prefix's letter and the digits in either case.
+  `0x1F`, or in binary, `0b1010`, the prefix's letter and the digits in either case. A `_` may stand between two
+  digits, one at a time, to group them, and means nothing: `1_000_000`, `0.000_1`, `0xFF_FF`.
 - **Whitespace and line breaks** separate tokens and otherwise mean nothing. A file may use any line ending.
 - **Keywords**, which cannot be names: `async`, `await`, `break`, `catch`, `class`, `const`, `continue`, `do`, `else`,
   `export`, `extend`, `extends`, `false`, `finally`, `for`, `foreach`, `function`, `if`, `import`, `Infinity`, `is`,
@@ -1786,7 +1787,6 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Literals**: `_` between digits.
 - **Functions**: a variable number of arguments (rest parameters), and spreading an array into a call.
 - **Library**: string methods (searching, splitting, case), array methods beyond `push` and `pop`, regular expressions,
   JSON, and network access.

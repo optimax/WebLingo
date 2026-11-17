@@ -159,6 +159,9 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var d = 79228162514264337593543950336m;", "WL1004", 1, 9)]
     [InlineData("var x = 0xFFFFFFFFFFFFFFFF;", "WL1004", 1, 9)]
     [InlineData("var x = 0b2;", "WL1004", 1, 9)]
+    [InlineData("var x = 1__000;", "WL1004", 1, 9)]
+    [InlineData("var x = 1_000_;", "WL1004", 1, 9)]
+    [InlineData("var x = 1_.5;", "WL1004", 1, 9)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -562,6 +565,8 @@ public sealed class ConformanceTests : IDisposable
     // Hexadecimal and binary literals (the owner's answers, 16 November 2026): int64s, their letters in either case.
     [InlineData("writeLn([0x1F, 0X1f, 0b1010, 0B11, 0xff + 1, -0x10, 0x7FFFFFFFFFFFFFFF, 0b0]);", "[31, 31, 10, 3, 256, -16, 9223372036854775807, 0]")]
     [InlineData("var flags = 0b0101; writeLn([flags == 5, 0x10 * 0b10, $\"{0xFF:X4}\"]);", "[true, 32, \"00FF\"]")]
+    // Digit separators (the owner's answer, 16 November 2026): `_` between two digits, one at a time.
+    [InlineData("writeLn([1_000_000, 0.000_1, 1e1_0, 0xFF_FF, 0b1010_0101, 1_000.50m, 9_223_372_036_854_775_807]);", "[1000000, 0.0001, 10000000000.0, 65535, 165, 1000.5m, 9223372036854775807]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));

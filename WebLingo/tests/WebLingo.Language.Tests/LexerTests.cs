@@ -123,6 +123,10 @@ public sealed class LexerTests
     [InlineData("0B11", 3L)]
     [InlineData("0b0", 0L)]
     [InlineData("0b111111111111111111111111111111111111111111111111111111111111111", long.MaxValue)]
+    [InlineData("1_000_000", 1_000_000L)]
+    [InlineData("9_223_372_036_854_775_807", long.MaxValue)]
+    [InlineData("0xFF_FF", 0xFFFFL)]
+    [InlineData("0b1010_0101", 0b1010_0101L)]
     public void IntegerLiteralsCarryTheirValue(string text, long value)
     {
         var token = new WebLingoLexer(text).NextToken();
@@ -164,6 +168,10 @@ public sealed class LexerTests
     [InlineData("2.5E+3", 2500.0)]
     [InlineData("1.7976931348623157e308", double.MaxValue)]
     [InlineData("1e-400", 0.0)]
+    [InlineData("0.000_1", 0.0001)]
+    [InlineData("1_000.5", 1000.5)]
+    [InlineData("1e1_0", 1e10)]
+    [InlineData("1_0.2_5e-0_1", 1.025)]
     public void Binary64LiteralsCarryTheNearestValue(string text, double value)
     {
         var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);
@@ -381,7 +389,6 @@ public sealed class LexerTests
     [Theory]
     [InlineData("10abc")]
     [InlineData("10mx")]
-    [InlineData("1_000")]
     [InlineData("1.5mm")]
     [InlineData("1e")]
     [InlineData("2.5e3x")]
@@ -392,6 +399,15 @@ public sealed class LexerTests
     [InlineData("0b12")]
     [InlineData("0x10m")]
     [InlineData("0xx1")]
+    [InlineData("1__000")]
+    [InlineData("1_")]
+    [InlineData("1_e5")]
+    [InlineData("1e_5")]
+    [InlineData("1.5_")]
+    [InlineData("1_m")]
+    [InlineData("0x_FF")]
+    [InlineData("0b1_")]
+    [InlineData("0xF__F")]
     public void DigitsRunningIntoLettersAreOneInvalidLiteral(string text)
     {
         var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);
