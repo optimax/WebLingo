@@ -2906,3 +2906,21 @@ A1: (a)
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.5, and built with the compound assignment, `++` and `--`, `??` and `??=`, and `?:` and `if` expressions together, in one change (`89ab22a`): the binder writes each with two new expressions, a conditional and a sequence, and temporaries that hold what is evaluated once, which both code generators emit with the jumps the VMs have, neither VM changed. Guessed, and recorded as Proposed (section 15.2, "Assignment's operators and choosing a value"): `?[` written together always an optional index; an interpolation's conditional in parentheses. Tested by conformance cases on both VMs; described in the Language Reference, section 5.
 
 Done (Claude, 2026-11-16, `89ab22a`): `??` and `??=`. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs gave the same output; the benchmark within the machine's noise; Windows only, Linux not tried.
+
+## [DONE] Comparing Strings with `<`
+
+`<`, `<=`, `>` and `>=` between two strings, which take numbers only today (specification, section 3.5: "Strings may be added to them later"), never by culture (`Documents/implementation.md`, section 7); a string and a number still WL3001. Two strings' `==` is unchanged. Built as every feature is: in the lexer and the parser where it is syntax, the binder and the lowered IR, both VMs or the runtime they share, with its conformance tests on both VMs, and the Language Reference. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, their order: (a) by Unicode scalar values, as a string's length and indexing count them; (b) by UTF-16 code units, as .NET's ordinal comparison does, which orders some characters beyond U+FFFF before others below it.
+
+A1: (a)
+
+Q2, a method too: (a) `a.compare(b)`, giving -1, 0 or 1, for sorting; (b) not now.
+
+A2: (a)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.5, and built: two strings compared by their Unicode scalar values (`WebLingoOperators.CompareStrings`), and `s.compare(other)`; a comparison of other kinds now names every kind it takes, and both operands. Tested by conformance cases on both VMs; described in the Language Reference and the Standard Library Reference.
+
+Done (Claude, 2026-11-16, `e3421f0`): strings compared with `<`, and `compare()`. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; Windows only, Linux not tried.
