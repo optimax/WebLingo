@@ -3468,3 +3468,15 @@ Found, and fixed, each with a test of its own in `FastCgiTests`: nginx sends a r
 Not tried: the manual's systemd service, and Linux; a `wasp.exe` path with spaces in `mod_fcgid`'s `FcgidWrapper`, the tests' having none, though written quoted, as the manual writes it.
 
 Done (Claude, 2026-11-17, `edd3655`): FastCGI tried behind nginx and Apache httpd. Main's checks: the Release build, without warnings; every test, `WebServerTests` among them, but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail; Windows only, Linux not tried.
+
+## [DONE] Permissions: The Folders' Class's Name
+
+Added by Claude, 2026-11-17, after "Permissions: Hosts and COM Objects as `PermissionError`" (`DONE.md`): a host `"network"` does not allow is now a `NetworkPermissionError`, WL3017, and a COM object `"com"` does not list a `ComPermissionError`, WL3018, each a class of its own; a folder `"files"` does not list stays a `PermissionError`, WL3016, as you named it, whose name now reads as if it were all three's.
+
+Q1, a folder's refusal's class: (a) renamed `FilePermissionError`, beside the other two, nothing kept for the old name; (b) `PermissionError`, as it is.
+
+A1: (a)
+
+2026-11-17 (Claude): done with A1's (a), and landed: a folder's refusal, WL3016, is a `FilePermissionError`, beside `NetworkPermissionError` and `ComPermissionError`, nothing kept for `PermissionError`, which a script now finds undefined (WL2001); the C# constant followed, `FilePermissionDenied`. The rename is recorded in the specification (section 1.1's "Refusals' errors", and section 7.13); the references, the WASP User Manual, `Documents/implementation.md`, Notepad++'s languages and the tests use the new name.
+
+Done (Claude, 2026-11-17, `033694f`): `PermissionError` renamed `FilePermissionError`. Main's checks: the Release build, without warnings; every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail; `wasp run` and `wasp serve` catching the renamed class, in `WaspTests` and `WaspServeTests`; Windows only, Linux not tried.
