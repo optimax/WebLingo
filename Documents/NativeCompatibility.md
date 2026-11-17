@@ -38,7 +38,7 @@
 | System.IO.Path | Adapted | Paths and their separators are the PAL's, not the platform's |
 | System.Console | Adapted | A host's (the CLI's), never the core's |
 | System.Environment | Adapted | The core must not depend on the platform, its line ending among others |
-| OS threads (`Thread`, `ThreadPool`), `Monitor` | Adapted | Adapter-only (§7.14); the CLI's clock sleeps while an execution waits for a timer (`Thread.Sleep`, M0.11.1); `DotNetSchedulerHost` runs blocking work on the thread pool and holds the work posted back in a queue that `Monitor` guards (section 7.8) |
+| OS threads (`Thread`, `ThreadPool`), `Monitor` | Adapted | Adapter-only (§7.14); the CLI's clock sleeps while an execution waits for a timer (`Thread.Sleep`, M0.11.1); `DotNetSchedulerHost` runs blocking work on the thread pool and holds the work posted back in a queue that `Monitor` guards (section 7.8); the command lines and the web hosts compile on threads of their own, with the stack the compiler needs (`WebLingoParser.CompilerStackSize`, a number, the core's only part in it) |
 | P/Invoke | Adapted | Adapter-only (§7.14) |
 | ASP.NET Core | Adapted | Hosting adapter only |
 | ADO.NET (`System.Data`, `System.Data.Common`, Microsoft.Data.Sqlite, Microsoft.Data.SqlClient) | Adapted | `DotNetDatabases` (`WebLingo.Data.DotNet`), which `std:db` reaches through `IWebLingoDatabases` (§7.11); never the portable core |

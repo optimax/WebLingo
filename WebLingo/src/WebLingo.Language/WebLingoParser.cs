@@ -14,6 +14,14 @@ public sealed class WebLingoParser : IWebLingoParser
     public const int MaxRecursionDepth = 256;
     /// <summary>How deep a parsed expression may be, so that every later stage can walk it recursively.</summary>
     public const int MaxExpressionDepth = 1000;
+    /// <summary>
+    /// The stack a thread needs to compile source as deep as <see cref="MaxRecursionDepth"/> and
+    /// <see cref="MaxExpressionDepth"/> allow, the parser and every later stage recursing that deep, before .NET has
+    /// optimized them, when their frames are larger: a thread's 1 MB on Windows held about 200 levels. The command lines
+    /// run their commands on a thread with it, and the web hosts their workers, where pages are compiled (the owner's
+    /// answer, 17 November 2026).
+    /// </summary>
+    public const int CompilerStackSize = 16 * 1024 * 1024;
 
     /// <summary>
     /// The class an interpolated string's values are written by, <c>&lt;text&gt;.of(value)</c>, which the binder makes,

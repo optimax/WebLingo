@@ -296,6 +296,10 @@ Microsoft.Data.SqlClient brings, on Windows, a native network layer, Microsoft.D
 
 When a test host crashes, by a stack overflow among others, `dotnet test` still prints `Passed!` for that project, with the count of the tests that finished before the crash, then `Test Run Aborted.`, and exits with a failure: a check that reads only the summary lines misses it. Look for `Test Run Aborted` too, and compare each project's total with the last run's (17 November 2026: the language tests' host had been crashing unnoticed, their count varying from run to run).
 
+### The Compiler Needs a Stack of Its Own
+
+The parser recurses up to 256 levels, and every later stage as deep, and before .NET has optimized those methods their frames are large: a thread's 1 MB, Windows's default, held about 200 levels, and a deeper program crashed the process with a stack overflow, which nothing can catch. So whatever compiles runs on a thread whose stack is `WebLingoParser.CompilerStackSize`, 16 MB (the owner's answer, 17 November 2026): `weblingo`'s and `wasp`'s commands (`WebLingoCommandThread`, which their `Main`s call), and the web hosts' workers (`WebLingoWorkerPool`). A new host, or a new place that compiles, does the same; and a test that compiles source near the limits does it on such a thread (`ParserTests.ParseOnCompilerStack`, `CompilerStackTests`), xUnit's own threads having the platform's default.
+
 ### Warnings Are Errors
 
 `TreatWarningsAsErrors` is on for every project, so a nullable or analyzer warning fails the build, locally and in CI.

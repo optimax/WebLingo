@@ -188,7 +188,7 @@ public sealed class ParserTests
     public void BlocksNestOnlySoDeep()
     {
         var source = new string('{', WebLingoParser.MaxRecursionDepth + 1) + new string('}', WebLingoParser.MaxRecursionDepth + 1);
-        Assert.Contains(Parse(source).Diagnostics, d => d.Code == WebLingoDiagnosticCodes.NestingTooDeep);
+        Assert.Contains(ParseOnCompilerStack(source).Diagnostics, d => d.Code == WebLingoDiagnosticCodes.NestingTooDeep);
     }
 
     [Fact]
@@ -336,7 +336,7 @@ public sealed class ParserTests
     {
         var source = "var x = " + string.Concat(Enumerable.Repeat(open, 100_000)) + "1"
             + string.Concat(Enumerable.Repeat(close, 100_000)) + ";\nvar y = 2;";
-        var tree = Parse(source);
+        var tree = ParseOnCompilerStack(source);
         Assert.Equal(WebLingoDiagnosticCodes.NestingTooDeep, Assert.Single(tree.Diagnostics).Code);
         Assert.Equal("y", Assert.IsType<WebLingoVariableDeclarationSyntax>(tree.Root.Statements[^1]).Name);
     }
@@ -344,7 +344,7 @@ public sealed class ParserTests
     [Fact]
     public void AVeryLongChainOfOperationsIsADiagnosticNotACrash()
     {
-        var tree = Parse("var x = 1" + string.Concat(Enumerable.Repeat(" + 1", 100_000)) + ";");
+        var tree = ParseOnCompilerStack("var x = 1" + string.Concat(Enumerable.Repeat(" + 1", 100_000)) + ";");
         Assert.Equal(WebLingoDiagnosticCodes.NestingTooDeep, Assert.Single(tree.Diagnostics).Code);
     }
 
@@ -358,6 +358,19 @@ public sealed class ParserTests
     }
 
     private static WebLingoSyntaxTree Parse(string source) => new WebLingoParser(source).ParseCompilationUnit();
+
+    /// <summary>
+    /// Parses on a thread whose stack is the one the hosts compile on (<see cref="WebLingoParser.CompilerStackSize"/>), as
+    /// source nested as deep as the parser allows needs, before .NET has optimized the parser.
+    /// </summary>
+    private static WebLingoSyntaxTree ParseOnCompilerStack(string source)
+    {
+        WebLingoSyntaxTree? tree = null;
+        var thread = new Thread(() => tree = Parse(source), WebLingoParser.CompilerStackSize);
+        thread.Start();
+        thread.Join();
+        return tree!;
+    }
 
     private static string Show(WebLingoExpressionSyntax expression) => expression switch
     {

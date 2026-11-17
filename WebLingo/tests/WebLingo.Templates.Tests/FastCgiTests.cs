@@ -36,6 +36,7 @@ public sealed class FastCgiTests : IDisposable
         Write("big.wasp", "<% for (var i = 0; i < 20000; i++) { %>0123456789<% } %>");
         Write("broken.wasp", "<%= [1][2] %>");
         Write("css/site.css", "h1 { }");
+        Write("deep.wasp", "<%= " + new string('(', 250) + "1" + new string(')', 250) + " %>");
         var application = WebLingoWaspServer.Load(_root, new Dictionary<string, string>(), WebLingoEnvironment.Production, null, out _, out _, out var error);
         Assert.True(application is not null, error);
         _server = new WebLingoFastCgiServer(application, _root, _workers);
@@ -166,6 +167,18 @@ public sealed class FastCgiTests : IDisposable
             Assert.Equal(("Status: 200 OK", $"<p>GET / {query}  http localhost</p>"), (head[0], body));
             if (!keep) Assert.Equal(0, await client.ReadAsync(new byte[1])); // Closed by the host.
         }
+    }
+
+    /// <summary>
+    /// A page nested as deep as the parser allows, compiled on the worker it is first requested on, whose stack is the
+    /// compiler's (<see cref="WebLingo.Language.WebLingoParser.CompilerStackSize"/>), before .NET has optimized the compiler.
+    /// </summary>
+    [Fact]
+    public async Task ADeepPageCompilesOnAWorker()
+    {
+        using var connection = await Connect();
+        var (head, body, _) = await RequestAsync(connection, 1, Get("/deep"), []);
+        Assert.Equal(("Status: 200 OK", "1"), (head[0], body));
     }
 
     /// <summary><c>wasp fastcgi --root site --port n</c> itself: it says where it listens, serves there, and stops when told.</summary>

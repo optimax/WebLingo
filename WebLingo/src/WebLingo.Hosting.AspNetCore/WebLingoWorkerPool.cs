@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using WebLingo.Language;
 using WebLingo.Platform.Abstractions;
 using WebLingo.Runtime;
 namespace WebLingo.Hosting.AspNetCore;
@@ -10,7 +11,8 @@ namespace WebLingo.Hosting.AspNetCore;
 /// own, resumed only by it (WL-P013), when the request's scheduler host is posted work, its wait is over, or its client
 /// goes, its resumption queued for that worker alone, and taken before new work; meanwhile the worker runs other requests,
 /// up to <see cref="WaitingPerWorker"/> waiting at once, beyond which it takes no new work. Disposed, it finishes the work
-/// queued, cancels the requests that wait, then stops.
+/// queued, cancels the requests that wait, then stops. Each worker's stack is the one a compiler needs
+/// (<see cref="WebLingoParser.CompilerStackSize"/>), since a page is compiled on the worker it is first requested on.
 /// </summary>
 public sealed class WebLingoWorkerPool : IDisposable
 {
@@ -30,7 +32,7 @@ public sealed class WebLingoWorkerPool : IDisposable
         for (var i = 0; i < workers; i++)
         {
             var worker = new WebLingoWorkerId(i);
-            _threads[i] = new Thread(() => Serve(worker)) { IsBackground = true, Name = $"WebLingo worker {i}" };
+            _threads[i] = new Thread(() => Serve(worker), WebLingoParser.CompilerStackSize) { IsBackground = true, Name = $"WebLingo worker {i}" };
             // Each worker a single-threaded apartment's thread on Windows, its COM objects its own, its waits pumping (section 3.10).
             if (OperatingSystem.IsWindows()) _threads[i].SetApartmentState(ApartmentState.STA);
             _threads[i].Start();
