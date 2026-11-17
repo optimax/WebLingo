@@ -2846,3 +2846,63 @@ A2: (b)
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1, 3.5 and 8.4, and built on both VMs: a `Percent` token, read after a template block's `%>`; a `Remainder` operation appended to both VMs' instructions; the dividend's sign; by -1 always 0; an integer's by 0 WL3013, `DivisionByZeroError`, a new class of runtime error; a number's IEEE 754's; `static operator %`. Guessed: the class's name, `DivisionByZeroError`, and the code, WL3013, WL3012 being COM's (section 3.10). Tested by the operator cross-check of both VMs against the runtime and by conformance cases; described in the Language Reference and the Standard Library Reference.
 
 Done (Claude, 2026-11-16, `99a84f1`): `%`. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; `weblingo` and `wasp` tried, on Windows only; Linux not tried.
+
+## [DONE] Compound Assignment: `+=` and Its Kin
+
+`x += 1` for `x = x + 1`, its target evaluated once (`a[f()] += 1` calls `f` once), on a variable, a member, an element and a property, with the same errors as the operator and the assignment. Built as every feature is: in the lexer and the parser where it is syntax, the binder and the lowered IR, both VMs or the runtime they share, with its conformance tests on both VMs, and the Language Reference. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, which: (a) `+=`, `-=`, `*=`, `/=` and `%=`, and `??=` with `??`; (b) `+=` and `-=` only.
+
+A1: (a)
+
+Q2, what it is: (a) an expression, giving the value assigned, as in C# (`y = x += 1`); (b) a statement only.
+
+A2: (a)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.5, and built with the compound assignment, `++` and `--`, `??` and `??=`, and `?:` and `if` expressions together, in one change (`89ab22a`): the binder writes each with two new expressions, a conditional and a sequence, and temporaries that hold what is evaluated once, which both code generators emit with the jumps the VMs have, neither VM changed. Guessed, and recorded as Proposed (section 15.2, "Assignment's operators and choosing a value"): `?[` written together always an optional index; an interpolation's conditional in parentheses. Tested by conformance cases on both VMs; described in the Language Reference, section 5.
+
+Done (Claude, 2026-11-16, `89ab22a`): compound assignment. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs gave the same output; the benchmark within the machine's noise; Windows only, Linux not tried.
+
+## [DONE] Increment and Decrement: `++` and `--`
+
+`i++` and `--i`, adding or subtracting 1, an int64's overflow WL3002 as `+`'s is. Built as every feature is: in the lexer and the parser where it is syntax, the binder and the lowered IR, both VMs or the runtime they share, with its conformance tests on both VMs, and the Language Reference. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, what they are: (a) prefix and postfix, as expressions, as in C# (`a[i++]`); (b) statements only, `i++;`, giving no value; (c) none: `i += 1` suffices.
+
+A1: (a)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.5, and built with the compound assignment, `++` and `--`, `??` and `??=`, and `?:` and `if` expressions together, in one change (`89ab22a`): the binder writes each with two new expressions, a conditional and a sequence, and temporaries that hold what is evaluated once, which both code generators emit with the jumps the VMs have, neither VM changed. Guessed, and recorded as Proposed (section 15.2, "Assignment's operators and choosing a value"): `?[` written together always an optional index; an interpolation's conditional in parentheses. Tested by conformance cases on both VMs; described in the Language Reference, section 5.
+
+Done (Claude, 2026-11-16, `89ab22a`): `++` and `--`. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs gave the same output; the benchmark within the machine's noise; Windows only, Linux not tried.
+
+## [DONE] The Conditional Operator: `c ? a : b`
+
+A choice between two values by a Boolean, which the parser tells apart from `?[` and `?.` (specification, section 3.6), the condition a Boolean or WL3001, as `if`'s is, only the chosen value evaluated. Built as every feature is: in the lexer and the parser where it is syntax, the binder and the lowered IR, both VMs or the runtime they share, with its conformance tests on both VMs, and the Language Reference. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, its form: (a) C#'s, `c ? a : b`, right-associative, looser than `||` and tighter than assignment; (b) an `if` expression, `if (c) a else b`, as Kotlin's.
+
+A1: (a) and (b), both.
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.5, and built with the compound assignment, `++` and `--`, `??` and `??=`, and `?:` and `if` expressions together, in one change (`89ab22a`): the binder writes each with two new expressions, a conditional and a sequence, and temporaries that hold what is evaluated once, which both code generators emit with the jumps the VMs have, neither VM changed. Guessed, and recorded as Proposed (section 15.2, "Assignment's operators and choosing a value"): `?[` written together always an optional index; an interpolation's conditional in parentheses. Tested by conformance cases on both VMs; described in the Language Reference, section 5.
+
+Done (Claude, 2026-11-16, `89ab22a`): `c ? a : b` and `if (c) a else b`. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs gave the same output; the benchmark within the machine's noise; Windows only, Linux not tried.
+
+## [DONE] Null Coalescing: `??`
+
+`a ?? b`, `a` unless it is `null`, `b` evaluated only then, looser than `||`, as in C#; with `?.` and `?[`, `user?.name ?? "stranger"`. Built as every feature is: in the lexer and the parser where it is syntax, the binder and the lowered IR, both VMs or the runtime they share, with its conformance tests on both VMs, and the Language Reference. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, `??=`: (a) with `??`, `x ??= v` assigning `v` only when `x` is `null`; (b) not now.
+
+A1: (a)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.5, and built with the compound assignment, `++` and `--`, `??` and `??=`, and `?:` and `if` expressions together, in one change (`89ab22a`): the binder writes each with two new expressions, a conditional and a sequence, and temporaries that hold what is evaluated once, which both code generators emit with the jumps the VMs have, neither VM changed. Guessed, and recorded as Proposed (section 15.2, "Assignment's operators and choosing a value"): `?[` written together always an optional index; an interpolation's conditional in parentheses. Tested by conformance cases on both VMs; described in the Language Reference, section 5.
+
+Done (Claude, 2026-11-16, `89ab22a`): `??` and `??=`. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs gave the same output; the benchmark within the machine's noise; Windows only, Linux not tried.
