@@ -3416,3 +3416,19 @@ Guessed, recorded as Proposed: the classes' names, `NetworkPermissionError` and 
 Tests: `ComTests` catches a `ComPermissionError`, WL3018, for a ProgID and a moniker the configuration does not list, and for one it does not list among other failures; `WaspTests` catches a `NetworkPermissionError`, WL3017, from `std:http` and `std:net`. Docs: the specification, the Standard Library Reference, the Language Reference, the WASP User Manual and Notepad++'s languages.
 
 Done (Claude, 2026-11-17, `a9d695f`): refused hosts and COM objects, errors of their own. Main's checks: the Release build, without warnings; every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail, and the language tests, whose host `ParserTests.DeepNestingIsADiagnosticNotACrash` crashes, as before ("Parser: Deep Nesting Overflows the Stack"); `wasp run` on pages that reach a refused host, in `WaspTests`; `windows:com` on Windows; Windows only, Linux not tried.
+
+## [DONE] Bytes as Text: Hexadecimal and Base64
+
+Added by Claude, 2026-11-17, after "Cryptography: `std:crypto`" (`DONE.md`): a hash, an HMAC and random bytes are `Bytes`, which a script stores, compares or sends as text, a token in a URL, a hash in a database, a key in a configuration; today it formats each byte itself, `$"{b[i]:x2}"`, and cannot read such text back. `Bytes` has `b.text()` and `Bytes.from(text)` for text's own encodings (specification, section 3.2, "Bytes"), but neither hexadecimal nor Base64.
+
+Q1, `Bytes` as hexadecimal and Base64 text: (a) members of `Bytes`, `b.toHex()` and `b.toBase64()`, and its class's `Bytes.fromHex(text)` and `Bytes.fromBase64(text)`, Base64 RFC 4648's with its padding, and its URL-safe alphabet by an argument, `b.toBase64(true)`; (b) functions of `std:crypto`, `crypto.toHex(b)` and the like; (c) neither, a script formatting its bytes itself.
+
+A1: (a)
+
+2026-11-17 (Claude): built with A1's (a), and landed: `b.toHex()`, `b.toBase64()` and `b.toBase64(true)`, and `Bytes.fromHex(text)`, `Bytes.fromBase64(text)` and `Bytes.fromBase64(text, true)`, in the runtime, so on both VMs alike, by the runtime's own codec, `WebLingoBinaryText`, which `std:crypto` now writes and reads its passwords' hashes with, in place of its own copy. The answer is recorded in the specification (section 1.1's "Bytes" and section 3.2), the details as built in section 15.2, "Bytes", Proposed.
+
+Guessed, each recorded as Proposed: hexadecimal written in lower case, read in either case; URL-safe Base64 written unpadded, since a URL would escape `=`, and read padded or not, `Bytes.fromBase64(text, true)` taking the alphabet as `toBase64` does; standard Base64 read with its padding only; `""` no bytes; anything else, white space included, WL3001, the text quoted in the message, as `Integer.parse` quotes it.
+
+Tests: `BytesTests` (`WebLingo.VM.Tests`), on both VMs: RFC 4648's vectors written and read, the URL-safe alphabet padded and not, round trips, and eleven errors. Docs: the specification, the Standard Library Reference, whose crypto example now writes its hashes with `toHex()`, and the Language Reference, each example run with `weblingo`.
+
+Done (Claude, 2026-11-17, `7912e4d`): bytes as hexadecimal and Base64. Main's checks: the Release build, without warnings; every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail, and the language tests, whose host `ParserTests.DeepNestingIsADiagnosticNotACrash` crashes, as before ("Parser: Deep Nesting Overflows the Stack"); `weblingo` on the references' examples; both VMs; Windows only, Linux not tried.
