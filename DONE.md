@@ -3108,3 +3108,25 @@ A2: (a)
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.6, and built as a kind of value of its own, its class `Regex`, in the runtime and both VMs. Guessed, and recorded as Proposed (section 15.2, "Regular expressions"): the flags `i`, `m`, `s`, `x` and `n`; the invariant culture, never `RegexOptions.Compiled`; a match as an array of its groups' text, the whole match first, an unmatched group `null`; aliases `isMatch`, `exec` and `matches`; .NET's substitutions in replacements and its splitting; a second for each operation, then a `TimeoutError` (WL3010, catchable); text `Regex:/pattern/flags`; identity for `==`; no map key. The inventory lists `System.Text.RegularExpressions` as Planned. The editors' colouring knows `Regex`, and `DateTime`, `Decimal` and `DivisionByZeroError`, which earlier tasks had left out. Described in the Language Reference, its example run with `weblingo`, and the Standard Library Reference, in a section of its own, the sections after it renumbered.
 
 Done (Claude, 2026-11-16, `09f4e36`): regular expressions. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
+
+## [DONE] JSON
+
+Reading and writing JSON, which a route handler builds as text today (the WASP User Manual, section 10): objects as maps, arrays as arrays, strings, `true`, `false` and `null`, and text that is not JSON an error of its own or WL3001. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, where: (a) a standard module, `std:json`, `json.parse(text)` and `json.stringify(value, indent)`; (b) a built-in class, `Json.parse(text)` and `Json.stringify(value)`.
+
+A1: (b)
+
+Q2, its numbers: (a) an integer when it has no fraction or exponent and fits int64, a number otherwise; (b) always a number, binary64, as JavaScript reads them.
+
+A2: (a)
+
+Q3, an instance written: (a) its fields, as `write` writes them, a class's `toJson()` replacing them; (b) WL3001 unless its class has a `toJson()`.
+
+A3: (a)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.6, and built: `Json.parse` in the runtime, `Json.stringify` through a new instruction of both VMs, `ToJson`, which calls a class's `toJson()` as `ToText` calls a `toString()`. Guessed, and recorded as Proposed (section 15.2, "JSON"): an optional indent, 0 to 10 spaces; integer map keys written as their digits, others WL3001; sets as arrays, decimals without their `m`, dates as ISO text, classes of values as what they hold; a number written as `write` writes it, `5.0` reading back as a number; a number too large for a binary64 read as its infinity; nesting at most 512 deep; every error WL3001, with a line and a column for text that is not JSON. The WASP User Manual's route handler now writes its JSON with `Json.stringify`, its output checked with `weblingo`, not served; the editors know `Json`. Described in the Language Reference, its examples run with `weblingo`, and the Standard Library Reference, in a section of its own, the sections after it renumbered.
+
+Done (Claude, 2026-11-16, `de93ff5`): JSON. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
