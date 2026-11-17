@@ -1440,6 +1440,19 @@ public sealed class WebLingoHeap
     };
 
     /// <summary>Makes room for <paramref name="units"/> more, collecting first if the next collection is due.</summary>
+    /// <summary>
+    /// Whether a string of <paramref name="length"/> characters would fit in the memory the execution may use, collecting
+    /// first where it must; WL3003 otherwise, so that an operation that builds one, a string's <c>repeat(n)</c>, refuses it
+    /// before building it (section 3.5, "String methods").
+    /// </summary>
+    public bool TryMakeRoom(long length, out WebLingoRuntimeError? error)
+    {
+        if (length <= int.MaxValue / 2 && TryReserve(length + ObjectOverhead, out error)) return true;
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.BudgetExceeded,
+            $"A string of {length} characters does not fit in the memory this execution may use.");
+        return false;
+    }
+
     private bool TryReserve(long units, out WebLingoRuntimeError? error)
     {
         if (Units + units > _nextCollectionAt || Units + units > _maxUnits) Collect();

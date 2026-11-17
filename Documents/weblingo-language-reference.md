@@ -574,6 +574,40 @@ tab:	end
 - **`==` compares text**: `"tea" == "tea"` is true.
 - A string cannot be changed: `s[0] = "H"` is an error.
 
+### String methods
+
+```javascript
+var s = "Green tea, black tea";
+writeLn([s.indexOf("tea"), s.lastIndexOf("tea"), s.contains("black"), s.startsWith("Green")]);
+writeLn(s.slice(6, 9));
+writeLn(s.split(", "));
+writeLn(["  tea  ".trim(), s.toUpper(), s.replace("tea", "coffee")]);
+writeLn(["ab".repeat(3), "7".padStart(3, "0"), ", ".join(["a", 1, true])]);
+```
+
+```text
+[6, 17, true, true]
+tea
+["Green tea", "black tea"]
+["tea", "GREEN TEA, BLACK TEA", "Green coffee, black coffee"]
+["ababab", "007", "a, 1, true"]
+```
+
+- **Their names** are C#'s, and JavaScript's and C#'s others work too: `includes` is `contains`, `toUpperCase` and
+  `toLowerCase` are `toUpper` and `toLower`, `replaceAll` is `replace`, and `padLeft` and `padRight` are `padStart` and
+  `padEnd`.
+- **Positions count Unicode characters**, as indexing does: `indexOf` and `lastIndexOf` give one, or -1;
+  `indexOf(search, from)` starts at `from`; `slice(start, end)` takes the characters from `start` to before `end`, `end`
+  left out its end, and a range outside the string is an error.
+- **Searching is exact**, character by character, never by the server's language.
+- **`split(separator)`** keeps empty parts, `"a,,b".split(",")` giving `["a", "", "b"]`; an empty separator gives
+  each character.
+- **Case** changes the same way on every server, character by character: `"Straße".toUpper()` is `"STRAßE"`.
+- **`replace(old, new)`** replaces every `old`, not only the first.
+- **`padStart(width, pad)` and `padEnd`** pad to a width in characters, with a space unless a pad is given.
+- **`separator.join(array)`** joins strings, numbers, Booleans, decimals and dates, `null` as nothing; give anything
+  else's text first, `x.toString()`.
+
 ### Multi-line strings
 
 Three quotes, `"""` or `'''`, begin a string that may span lines. It is raw: `\` is an ordinary character. The spaces
@@ -1847,5 +1881,4 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Library**: string methods (searching, splitting, case), array methods beyond `push` and `pop`, regular expressions,
-  JSON, and network access.
+- **Library**: array methods beyond `push` and `pop`, regular expressions, JSON, and network access.

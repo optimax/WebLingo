@@ -23,6 +23,12 @@ public enum WebLingoMember : byte
     Now, UtcNow, Local, Utc, FromUnixMilliseconds, InZone,
     /// <summary>A string's <c>compare(other)</c>, -1, 0 or 1 (section 3.5).</summary>
     Compare,
+    /// <summary>
+    /// Strings' searching, splitting, trimming, case, replacing, repeating, padding and joining, besides <c>slice</c>
+    /// (section 3.5, "String methods"), each of the aliases a member's names.
+    /// </summary>
+    IndexOf, LastIndexOf, Contains, StartsWith, EndsWith, Split, Trim, TrimStart, TrimEnd, ToUpper, ToLower, Replace, Repeat,
+    PadStart, PadEnd, Join,
     /// <summary>A collection's or a string's <c>iterate()</c>, which gives an <c>Iterator</c> (section 3.6).</summary>
     Iterate,
     /// <summary>An interpolation's format and alignment, a built-in method of every class that no program can name (section 3.5).</summary>
@@ -97,6 +103,22 @@ public static partial class WebLingoMembers
         "fromUnixMilliseconds" => WebLingoMember.FromUnixMilliseconds,
         "inZone" => WebLingoMember.InZone,
         "compare" => WebLingoMember.Compare,
+        "indexOf" => WebLingoMember.IndexOf,
+        "lastIndexOf" => WebLingoMember.LastIndexOf,
+        "contains" or "includes" => WebLingoMember.Contains,
+        "startsWith" => WebLingoMember.StartsWith,
+        "endsWith" => WebLingoMember.EndsWith,
+        "split" => WebLingoMember.Split,
+        "trim" => WebLingoMember.Trim,
+        "trimStart" => WebLingoMember.TrimStart,
+        "trimEnd" => WebLingoMember.TrimEnd,
+        "toUpper" or "toUpperCase" => WebLingoMember.ToUpper,
+        "toLower" or "toLowerCase" => WebLingoMember.ToLower,
+        "replace" or "replaceAll" => WebLingoMember.Replace,
+        "repeat" => WebLingoMember.Repeat,
+        "padStart" or "padLeft" => WebLingoMember.PadStart,
+        "padEnd" or "padRight" => WebLingoMember.PadEnd,
+        "join" => WebLingoMember.Join,
         "iterate" => WebLingoMember.Iterate,
         WebLingoInterpolation.Format => WebLingoMember.Format,
         "__className" => WebLingoMember.ClassName,
@@ -741,7 +763,7 @@ public static partial class WebLingoMembers
         || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
         || (target.Kind == WebLingoValueKind.Bytes && member is WebLingoMember.Slice or WebLingoMember.Text)
         || (target.Kind == WebLingoValueKind.DateTime && IsDateTimeMethod(member))
-        || (target.Kind == WebLingoValueKind.String && member == WebLingoMember.Compare);
+        || (target.Kind == WebLingoValueKind.String && IsStringMethod(member));
 
     /// <summary>
     /// Whether <c>x.name(…)</c> calls a class's built-in method, <c>setMethod</c>, <c>setProperty</c>,
@@ -884,19 +906,9 @@ public static partial class WebLingoMembers
         {
             return TryCallDateTime(target, member, name, values, first, count, heap, out result, out error);
         }
-        if (target.Kind == WebLingoValueKind.String && member == WebLingoMember.Compare)
+        if (target.Kind == WebLingoValueKind.String && IsStringMethod(member))
         {
-            // s.compare(other): -1, 0 or 1, by their Unicode scalar values, as < orders them (section 3.5).
-            if (count != 1) return WrongArgumentCount(name, 1, count, out error);
-            if (values[first].Kind != WebLingoValueKind.String)
-            {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"'compare' compares two strings, not a string and {WebLingoValueFormatter.Describe(values[first], heap)}.");
-                return false;
-            }
-            result = WebLingoValue.FromInt64(WebLingoOperators.CompareStrings(heap.GetString(target), heap.GetString(values[first])));
-            error = null;
-            return true;
+            return TryCallString(target, member, name, values, first, count, heap, out result, out error);
         }
         if (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
         {

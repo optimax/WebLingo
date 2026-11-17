@@ -589,6 +589,18 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var big = []; for (var i = 0; i < 1000; i++) big.push(i); function count(...xs) { return xs.length; } writeLn([count(...big), count(...big, ...big)]);", "[1000, 2000]")]
     [InlineData("var log = []; function f(...xs) { return xs; } function t(x) { log.push(x); return [x]; } var r = f(...t(1), t(2), ...t(3)); writeLn([log, r]);", "[[1, 2, 3], [1, [2], 3]]")]
     [InlineData("async function later(...xs) { await null; return xs.length; } writeLn(await later(...[1, 2, 3]));", "3")]
+    // Strings' methods (the owner's answers, 16 November 2026): C#'s names and JavaScript's; case by the invariant culture.
+    [InlineData("var s = \"Green tea, black tea\"; writeLn([s.indexOf(\"tea\"), s.indexOf(\"tea\", 7), s.lastIndexOf(\"tea\"), s.indexOf(\"coffee\"), s.lastIndexOf(\"\")]);", "[6, 17, 17, -1, 20]")]
+    [InlineData("var s = \"Green tea, black tea\"; writeLn([s.contains(\"black\"), s.includes(\"white\"), s.startsWith(\"Green\"), s.endsWith(\"tea\")]);", "[true, false, true, true]")]
+    [InlineData("var s = \"Green tea, black tea\"; writeLn([s.slice(6), s.slice(0, 5), s.slice(5, 5)]);", "[\"tea, black tea\", \"Green\", \"\"]")]
+    [InlineData("var s = \"Green tea, black tea\"; writeLn([s.split(\", \"), \"a,,b\".split(\",\"), \"hé😀\".split(\"\")]);", "[[\"Green tea\", \"black tea\"], [\"a\", \"\", \"b\"], [\"h\", \"é\", \"😀\"]]")]
+    [InlineData("writeLn([\"  x  \".trim(), \"  x  \".trimStart(), \"  x  \".trimEnd()]);", "[\"x\", \"x  \", \"  x\"]")]
+    [InlineData("var s = \"Green tea, black tea\"; writeLn([s.toUpper(), s.toUpperCase(), \"ÉCOLE\".toLower(), \"Straße\".toUpperCase(), \"ABC\".toLowerCase()]);", "[\"GREEN TEA, BLACK TEA\", \"GREEN TEA, BLACK TEA\", \"école\", \"STRAßE\", \"abc\"]")]
+    [InlineData("var s = \"Green tea, black tea\"; writeLn([s.replace(\"tea\", \"coffee\"), s.replaceAll(\"tea\", \"chai\"), \"aaa\".replace(\"aa\", \"b\")]);", "[\"Green coffee, black coffee\", \"Green chai, black chai\", \"ba\"]")]
+    [InlineData("writeLn([\"ab\".repeat(3), \"x\".repeat(0), \"\".repeat(1000000000000)]);", "[\"ababab\", \"\", \"\"]")]
+    [InlineData("writeLn([\"7\".padStart(3, \"0\"), \"7\".padLeft(3), \"7\".padEnd(4, \"ab\"), \"7\".padRight(2), \"long\".padStart(2), \"😀\".padStart(3, \"é\")]);", "[\"007\", \"  7\", \"7aba\", \"7 \", \"long\", \"éé😀\"]")]
+    [InlineData("writeLn([\", \".join([\"a\", 1, 2.5, true, null, 1.5m]), \"\".join([]), \"-\".join([\"x\"])]);", "[\"a, 1, 2.5, true, , 1.5m\", \"\", \"x\"]")]
+    [InlineData("writeLn([\"😀x😀\".indexOf(\"x\"), \"😀x😀\".lastIndexOf(\"😀\"), \"😀x😀\".slice(1, 2), \"😀x\".padEnd(3, \"y\")]);", "[1, 2, \"x\", \"😀xy\"]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -647,6 +659,16 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var m = { ...[1] };", "WL3001")]
     [InlineData("function f(a) { return a; } var g = f; g(...[1, 2]);", "WL2006")]
     [InlineData("writeLn(...[1, 2]);", "WL2006")]
+    [InlineData("writeLn(\"tea\".slice(1, 9));", "WL3005")]
+    [InlineData("writeLn(\"tea\".indexOf(\"a\", 4));", "WL3005")]
+    [InlineData("writeLn(\"tea\".indexOf(1));", "WL3001")]
+    [InlineData("writeLn(\"tea\".replace(\"\", \"x\"));", "WL3001")]
+    [InlineData("writeLn(\"x\".repeat(-1));", "WL3001")]
+    [InlineData("writeLn(\"x\".repeat(10000000000));", "WL3003")]
+    [InlineData("writeLn(\",\".join([[1]]));", "WL3001")]
+    [InlineData("writeLn(\",\".join(\"ab\"));", "WL3001")]
+    [InlineData("writeLn(\"tea\".toUpper);", "WL3001")]
+    [InlineData("writeLn(\"tea\".trim(1));", "WL2006")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

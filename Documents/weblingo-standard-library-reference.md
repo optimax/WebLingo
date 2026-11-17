@@ -107,6 +107,16 @@ binary64, and `"tea"` a `String`.
 | `Decimal.parse(text)`, `new Decimal(value)` | a decimal, `1.5m`, read from its digits, or made from an integer, exactly, or a number, converted |
 | `new Number(d)`, `new Integer(d)` | a decimal converted to a number, or to an integer when it is whole |
 | `s.compare(other)` | -1, 0 or 1, as `s` comes before `other`, equals it or comes after it, by their Unicode values, as `<` orders them |
+| `s.indexOf(search, from)`, `s.lastIndexOf(search)` | where `search` first starts, at `from` or after it, `from` optional, or where it last starts; -1 if nowhere |
+| `s.contains(search)` or `s.includes(…)`, `s.startsWith(prefix)`, `s.endsWith(suffix)` | whether `s` has it, begins with it, ends with it |
+| `s.slice(start, end)` | the characters from `start` to before `end`, `end` optional; an error outside the string |
+| `s.split(separator)` | an array of the parts between separators, empty ones included; each character for `""` |
+| `s.trim()`, `s.trimStart()`, `s.trimEnd()` | `s` without the white space at its ends, its start or its end |
+| `s.toUpper()` or `s.toUpperCase()`, `s.toLower()` or `s.toLowerCase()` | `s` in capitals, or small letters, the same on every server |
+| `s.replace(old, new)` or `s.replaceAll(…)` | `s` with every `old` replaced by `new` |
+| `s.repeat(n)` | `s` `n` times over |
+| `s.padStart(width, pad)` or `s.padLeft(…)`, `s.padEnd(width, pad)` or `s.padRight(…)` | `s` padded to `width` characters, with spaces unless `pad` is given |
+| `separator.join(array)` | the array's strings, numbers, Booleans, decimals and dates, `null` as nothing, with `separator` between them |
 
 ```javascript
 writeLn([Integer.parse("42") + 1, Number.parse("1.5") * 2, Boolean.parse("true")]);
