@@ -11,7 +11,7 @@ that, and the WebLingo Standard Library Reference, `Documents/weblingo-standard-
 built-in classes and the standard modules have.
 
 WASP is pre-alpha. Everything here works as described, and every example in this manual was run and gave the output
-shown, but names and details may still change before a first release. [What is not there yet](#18-what-is-not-there-yet)
+shown, but names and details may still change before a first release. [What is not there yet](#19-what-is-not-there-yet)
 lists what is missing.
 
 ## Contents
@@ -33,7 +33,8 @@ lists what is missing.
 15. [While you work](#15-while-you-work)
 16. [The `wasp` command line](#16-the-wasp-command-line)
 17. [Deploying to IIS](#17-deploying-to-iis)
-18. [What is not there yet](#18-what-is-not-there-yet)
+18. [Serving through nginx or Apache: FastCGI](#18-serving-through-nginx-or-apache-fastcgi)
+19. [What is not there yet](#19-what-is-not-there-yet)
 
 ---
 
@@ -819,6 +820,7 @@ scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run
 
 ```text
 wasp serve [--root <folder>] [--port <port>] [--scheme <name>=<folder> …]
+wasp fastcgi [--root <folder>] [--port <port> | --socket <path> | --stdin] [--scheme <name>=<folder> …]
 wasp run [--root <folder>] [--scheme <name>=<folder> …] <page.wasp> [name=value …]
 wasp check [--root <folder>] [--scheme <name>=<folder> …] <page.wasp>
 wasp --version
@@ -826,6 +828,9 @@ wasp --version
 
 - **`wasp serve`** serves the site whose root is `--root`, the current folder by default, on `--port`, 8080 by default,
   to the local machine only. Under IIS, IIS starts it ([section 17](#17-deploying-to-iis)).
+- **`wasp fastcgi`** serves the site whose root is `--root` to a web server other than IIS, nginx or Apache, through
+  FastCGI, on `--port`, 9000 by default, on a Unix socket, `--socket`, or on the socket or pipe a web server that starts
+  it gives it as its standard input, `--stdin` ([section 18](#18-serving-through-nginx-or-apache-fastcgi)).
 - **`wasp run`** compiles a page and runs it, writing its output to the console. `--root` names the site's root, from
   which a path that starts with `/` is found; without it, the page's own folder is the root. The values after the page,
   `name=value`, are given to its parameters, each a string:
@@ -909,11 +914,113 @@ The repository's `Examples/example1` is such a site, and `Examples/README.md` wa
 
 ---
 
-## 18. What is not there yet
+## 18. Serving through nginx or Apache: FastCGI
+
+A web server other than IIS, nginx or Apache httpd, runs a WASP site through FastCGI, as it runs PHP's: `wasp fastcgi`
+serves the site to the web server, which passes it every request.
+
+```text
+wasp fastcgi [--root <folder>] [--port <port> | --socket <path> | --stdin] [--scheme <name>=<folder> …]
+```
+
+It runs in one of two ways:
+
+- **As PHP-FPM runs, kept running.** `wasp fastcgi --root /var/www/mysite --port 9000` listens on the local machine's
+  port, 9000 by default, PHP-FPM's, and writes `WASP serving FastCGI on 127.0.0.1:9000 (Production); Ctrl+C stops it.`;
+  `--socket /run/wasp/mysite.sock` listens on a Unix socket instead, made at that path and removed when it stops. The
+  server's service manager starts it and keeps it running: systemd on Linux, or whatever starts services on Windows.
+  Each site has its own `wasp fastcgi`, on a port or a socket of its own.
+- **As Apache's mod_fcgid starts PHP, on demand.** The web server starts `wasp fastcgi` itself, giving it a socket, or
+  on Windows a named pipe, as its standard input. `wasp` notices one and serves it, with no `--port` or `--socket`;
+  `--stdin` says so outright. What it writes then goes to its error output, which the web server logs.
+
+Either way, a site runs in production unless its `wasp.config` says otherwise ([section 14](#14-configuration-waspconfig)),
+and `wasp` reloads it when its files change, as `wasp serve` does. Pass the web server every request, the site's other
+files' included: `wasp` serves those too, and never serves the site's modules or its configuration, which a web server
+serving the folder itself would.
+
+**These configurations have not been tried yet**: `wasp fastcgi` has been tried with its tests, which speak FastCGI to
+it as a web server does, on Windows only, and not yet with nginx or Apache.
+
+### nginx
+
+With `wasp fastcgi --root /var/www/mysite --port 9000` running:
+
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+
+    location / {
+        include fastcgi_params;
+        fastcgi_pass 127.0.0.1:9000;
+    }
+}
+```
+
+`fastcgi_params`, which comes with nginx, gives `wasp` the request's method, path, query and headers. On a Unix socket,
+`fastcgi_pass unix:/run/wasp/mysite.sock;`. On Linux, a systemd service keeps `wasp` running, for example
+`/etc/systemd/system/wasp-mysite.service`, with WebLingo installed in `/opt/weblingo`:
+
+```ini
+[Unit]
+Description=WASP site mysite (FastCGI)
+After=network.target
+
+[Service]
+ExecStart=/opt/weblingo/wasp fastcgi --root /var/www/mysite --port 9000
+User=www-data
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Apache httpd, to a running `wasp`
+
+Through `mod_proxy_fcgi`, as Apache reaches PHP-FPM, with `wasp fastcgi` running as for nginx:
+
+```apache
+LoadModule proxy_module modules/mod_proxy.so
+LoadModule proxy_fcgi_module modules/mod_proxy_fcgi.so
+
+<VirtualHost *:80>
+    ServerName example.com
+    ProxyPass "/" "fcgi://127.0.0.1:9000/"
+</VirtualHost>
+```
+
+### Apache httpd, starting `wasp` itself
+
+Through `mod_fcgid`, which starts `wasp fastcgi` when the site is first requested, and more of them as requests come,
+each serving one request at a time, as it starts PHP:
+
+```apache
+LoadModule fcgid_module modules/mod_fcgid.so
+
+<VirtualHost *:80>
+    ServerName example.com
+    DocumentRoot "C:/Sites/mysite"
+    <Directory "C:/Sites/mysite">
+        SetHandler fcgid-script
+        Options +ExecCGI
+        FcgidWrapper "\"C:/Program Files/WebLingo/wasp.exe\" fastcgi --root C:/Sites/mysite" virtual
+        Require all granted
+    </Directory>
+</VirtualHost>
+```
+
+mod_fcgid starts `wasp` in a folder of its own choosing, so `--root` names the site's. Each `wasp` it starts loads the
+site anew, so the first request to each is slower than the rest.
+
+---
+
+## 19. What is not there yet
 
 WASP is pre-alpha. These are not there yet, and are planned or being designed:
 
 - **Uploaded files**: forms posted as `multipart/form-data` cannot be read.
 - **Sessions and cookies**: a page reads the `Cookie` header and sets `Set-Cookie` itself, with `response.headers.add`.
-- **Hosts other than ASP.NET Core**: FastCGI and a standalone server are planned. WASP has been tried on Windows;
-  Linux is built and tested, but no site has been served on it yet.
+- **A standalone server**, without IIS, nginx or Apache, is planned. WASP has been tried on Windows, through IIS's
+  ASP.NET Core Module and, with its tests, through FastCGI, but not yet with nginx or Apache; Linux is built and
+  tested, but no site has been served on it yet.

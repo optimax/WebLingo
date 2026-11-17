@@ -20,6 +20,8 @@ public sealed class PortabilityTests
         ("Microsoft.Data", "ADO.NET is adapter-only"),
         ("Microsoft.AspNetCore", "ASP.NET Core is adapter-only"),
         ("System.Net.Http", "HTTP is a platform service, adapter-only"),
+        ("System.Net.Sockets", "sockets are the platform's network, or a host's, adapter-only"),
+        ("System.IO.Pipes", "pipes are a host's, adapter-only"),
         ("System.Linq", "LINQ is kept out of the portable core"),
         ("System.Security.Cryptography", "cryptography is the platform's, IWebLingoCrypto (section 7.10)"),
     ];

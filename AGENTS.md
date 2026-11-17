@@ -322,6 +322,10 @@ An IDE may recreate `bin`, `obj`, or similar directories immediately after a cle
 
 Antivirus scanning, Explorer preview handlers, an IDE, a test host, or a still-running program may temporarily lock files, built assemblies and documents included. Consider file locking before modifying code to work around what appears to be a filesystem failure.
 
+### Git Bash Rewrites Arguments That Look Like Paths
+
+On Windows, Git Bash (MSYS2) turns an argument that looks like a POSIX path, such as `/` or `/api/items`, into a Windows path under Git's own folder before a Windows program sees it: `python client.py 9000 /` passes `C:/Program Files/Git/`. Set `MSYS_NO_PATHCONV=1` for such a command. Suspect this first when a program run from Git Bash sees a path it was not given.
+
 ------
 
 # 13. Things Not to Change Without Asking

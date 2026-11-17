@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The FastCGI host (specification, sections 6.1 and 6.2; section 9, M0.19): FastCGI's records, written here, on .NET's
+       sockets, translated to WLHI's, its workers, reloads and responses the ASP.NET Core adapter's, no package. -->
+  <PropertyGroup><OutputType>Library</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />
+    <ProjectReference Include="../WebLingo.Hosting/WebLingo.Hosting.csproj" />
+    <ProjectReference Include="../WebLingo.Hosting.AspNetCore/WebLingo.Hosting.AspNetCore.csproj" />
+    <ProjectReference Include="../WebLingo.Platform.DotNet/WebLingo.Platform.DotNet.csproj" />
+  </ItemGroup>
+  <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>
+</Project>

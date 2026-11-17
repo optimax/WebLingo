@@ -1,0 +1,294 @@
+using System.Globalization;
+using System.IO.Pipes;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using WebLingo.Cli;
+using WebLingo.Hosting;
+using WebLingo.Hosting.AspNetCore;
+using WebLingo.Hosting.FastCgi;
+using WebLingo.Wasp.Cli;
+using Xunit;
+namespace WebLingo.Templates.Tests;
+
+/// <summary>
+/// The FastCGI host (specification, sections 6.1 and 6.2; section 9, M0.19), each test the web server, speaking FastCGI's
+/// records to it: a page, its request's method, path, query, headers, scheme and host, translated from CGI's variables; a
+/// form posted in <c>FCGI_STDIN</c>; a status and a header; a 404 and a 500; a file sent as it is; a page larger than one
+/// record, streamed; a connection kept for a second request; a second request on a busy connection refused; and
+/// <c>FCGI_GET_VALUES</c>, an unknown record's type and an unknown role answered; over TCP, and on Windows a named pipe,
+/// connected to anew for each request; and <c>wasp fastcgi</c> itself, on a port and on a Unix socket.
+/// </summary>
+public sealed class FastCgiTests : IDisposable
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "wasp-fastcgi-" + Guid.NewGuid().ToString("N"));
+    private readonly CancellationTokenSource _stop = new();
+    private readonly WebLingoWorkerPool _workers = new(2);
+    private readonly WebLingoFastCgiServer _server;
+    private readonly Socket _listener;
+
+    public FastCgiTests()
+    {
+        Write("index.wasp", "<% param request; %><p><%= request.method %> <%= request.path %> <%= request.query?[\"q\"] %> "
+                            + "<%= request.headers?[\"Accept-Language\"] %> <%= request.scheme %> <%= request.host %></p>");
+        Write("form.wasp", "<% param request; var form = await request.form(); %><%= form[\"tea\"] %>");
+        Write("made.wasp", "<% param response; response.status = 201; response.headers[\"X-Tea\"] = \"Sencha\"; %>made");
+        Write("big.wasp", "<% for (var i = 0; i < 20000; i++) { %>0123456789<% } %>");
+        Write("broken.wasp", "<%= [1][2] %>");
+        Write("css/site.css", "h1 { }");
+        var application = WebLingoWaspServer.Load(_root, new Dictionary<string, string>(), WebLingoEnvironment.Production, null, out _, out _, out var error);
+        Assert.True(application is not null, error);
+        _server = new WebLingoFastCgiServer(application, _root, _workers);
+        _listener = WebLingoWaspFastCgi.Listen(0, null, out _);
+        _ = _server.ServeAsync(_listener, _stop.Token);
+    }
+
+    public void Dispose()
+    {
+        _stop.Cancel();
+        _listener.Dispose();
+        _workers.Dispose();
+        Directory.Delete(_root, recursive: true);
+    }
+
+    private static Dictionary<string, string> Get(string uri, params (string, string)[] more)
+    {
+        var question = uri.IndexOf('?');
+        var parameters = new Dictionary<string, string>
+        {
+            ["REQUEST_METHOD"] = "GET", ["REQUEST_URI"] = uri, ["QUERY_STRING"] = question >= 0 ? uri[(question + 1)..] : "",
+            ["SCRIPT_NAME"] = question >= 0 ? uri[..question] : uri, ["SERVER_NAME"] = "localhost", ["SERVER_PROTOCOL"] = "HTTP/1.1"
+        };
+        foreach (var (name, value) in more) parameters[name] = value;
+        return parameters;
+    }
+
+    [Fact]
+    public async Task APageIsServedFromCgisVariables()
+    {
+        using var connection = await Connect();
+        var (head, body, status) = await RequestAsync(connection, 1, Get("/?q=Sencha", ("HTTP_HOST", "tea.example"), ("HTTP_ACCEPT_LANGUAGE", "pl"),
+            ("HTTPS", "on")), []);
+        Assert.Equal(0, status);
+        Assert.Equal("Status: 200 OK", head[0]);
+        Assert.Contains("Content-Type: text/html; charset=utf-8", head);
+        Assert.Equal("<p>GET / Sencha pl https tea.example</p>", body);
+        Assert.Contains($"Content-Length: {Encoding.UTF8.GetByteCount(body)}", head);
+    }
+
+    [Fact]
+    public async Task AFormIsReadFromStdin()
+    {
+        using var connection = await Connect();
+        var posted = Encoding.UTF8.GetBytes("tea=Sencha&cups=2");
+        var parameters = Get("/form", ("CONTENT_TYPE", "application/x-www-form-urlencoded"), ("CONTENT_LENGTH", posted.Length.ToString()));
+        parameters["REQUEST_METHOD"] = "POST";
+        var (head, body, _) = await RequestAsync(connection, 1, parameters, posted);
+        Assert.Equal(("Status: 200 OK", "Sencha"), (head[0], body));
+    }
+
+    [Fact]
+    public async Task AStatusAHeaderAndErrorsAreCgis()
+    {
+        using var connection = await Connect();
+        var (head, body, _) = await RequestAsync(connection, 1, Get("/made"), [], keep: true);
+        Assert.Equal(("Status: 201 Created", "made"), (head[0], body));
+        Assert.Contains("X-Tea: Sencha", head);
+        (head, _, _) = await RequestAsync(connection, 2, Get("/nowhere"), [], keep: true);
+        Assert.Equal("Status: 404 Not Found", head[0]);
+        (head, body, _) = await RequestAsync(connection, 3, Get("/broken"), [], keep: true);
+        Assert.Equal("Status: 500 Internal Server Error", head[0]);
+        Assert.DoesNotContain("broken.wasp", body, StringComparison.Ordinal); // Production shows no error's details.
+        (head, body, _) = await RequestAsync(connection, 4, Get("/css/site.css"), []);
+        Assert.Equal(("Status: 200 OK", "h1 { }"), (head[0], body));
+        Assert.Contains("Content-Type: text/css", head);
+        Assert.Contains("Content-Length: 6", head);
+    }
+
+    [Fact]
+    public async Task ALargePageIsStreamedInSeveralRecords()
+    {
+        using var connection = await Connect();
+        var (head, body, _) = await RequestAsync(connection, 1, Get("/big"), []);
+        Assert.Equal("Status: 200 OK", head[0]);
+        Assert.Equal(200_000, body.Length);
+        Assert.DoesNotContain(head, line => line.StartsWith("Content-Length", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AConnectionCarriesOneRequestAtATime()
+    {
+        using var connection = await Connect();
+        var stream = connection.GetStream();
+        await stream.WriteAsync(Begin(1, keep: true));
+        await stream.WriteAsync(Begin(2, keep: true));
+        var refused = await ReadAsync(stream);
+        Assert.Equal((WebLingoFastCgiType.EndRequest, 2, (byte)1), (refused!.Value.Type, refused.Value.RequestId, refused.Value.Content[4])); // FCGI_CANT_MPX_CONN
+        await stream.WriteAsync(Records(1, Get("/"), []));
+        var (head, _, status) = await ReadResponseAsync(stream, 1);
+        Assert.Equal(("Status: 200 OK", 0), (head[0], status));
+    }
+
+    [Fact]
+    public async Task ManagementRecordsAreAnswered()
+    {
+        using var connection = await Connect();
+        var stream = connection.GetStream();
+        await stream.WriteAsync(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.GetValues, 0,
+            WebLingoFastCgiRecords.WritePairs([new("FCGI_MPXS_CONNS", ""), new("FCGI_MAX_REQS", ""), new("NOT_A_VALUE", "")])));
+        var values = await ReadAsync(stream);
+        Assert.Equal(WebLingoFastCgiType.GetValuesResult, values!.Value.Type);
+        Assert.Equal([new("FCGI_MPXS_CONNS", "0"), new("FCGI_MAX_REQS", "1024")], WebLingoFastCgiRecords.ReadPairs(values.Value.Content));
+        await stream.WriteAsync(WebLingoFastCgiRecords.Make((WebLingoFastCgiType)42, 0, []));
+        var unknown = await ReadAsync(stream);
+        Assert.Equal((WebLingoFastCgiType.UnknownType, (byte)42), (unknown!.Value.Type, unknown.Value.Content[0]));
+        await stream.WriteAsync(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.BeginRequest, 7, [0, 2, 0, 0, 0, 0, 0, 0])); // FCGI_AUTHORIZER
+        var role = await ReadAsync(stream);
+        Assert.Equal((WebLingoFastCgiType.EndRequest, 7, (byte)3), (role!.Value.Type, role.Value.RequestId, role.Value.Content[4])); // FCGI_UNKNOWN_ROLE
+    }
+
+    [Fact]
+    public async Task ARequestOnANamedPipeIsServed()
+    {
+        if (!OperatingSystem.IsWindows()) return; // A web server's pipe, on Windows, as IIS and mod_fcgid give one.
+        var name = "wasp-fastcgi-" + Guid.NewGuid().ToString("N");
+        using var pipe = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.None);
+        _ = _server.ServePipeAsync(pipe.SafePipeHandle, _stop.Token);
+        // One instance of the pipe, as mod_fcgid makes it, connected to anew for each request: the host disconnects it after a
+        // request whose web server did not ask to keep it, and after a web server that kept it goes.
+        foreach (var (query, keep) in new[] { ("one", false), ("two", true), ("three", false) })
+        {
+            await using var client = new NamedPipeClientStream(".", name, PipeDirection.InOut);
+            await client.ConnectAsync(10_000);
+            await client.WriteAsync(Begin(1, keep));
+            await client.WriteAsync(Records(1, Get("/?q=" + query), []));
+            var (head, body, _) = await ReadResponseAsync(client, 1);
+            Assert.Equal(("Status: 200 OK", $"<p>GET / {query}  http localhost</p>"), (head[0], body));
+            if (!keep) Assert.Equal(0, await client.ReadAsync(new byte[1])); // Closed by the host.
+        }
+    }
+
+    /// <summary><c>wasp fastcgi --root site --port n</c> itself: it says where it listens, serves there, and stops when told.</summary>
+    [Fact]
+    public async Task WaspFastCgiServesARootOnAPort()
+    {
+        int port;
+        using (var free = new TcpListener(IPAddress.Loopback, 0))
+        {
+            free.Start();
+            port = ((IPEndPoint)free.LocalEndpoint).Port;
+        }
+        await ServesThroughWaspFastCgiAsync(["--port", port.ToString(CultureInfo.InvariantCulture)], $"127.0.0.1:{port}",
+                                            new IPEndPoint(IPAddress.Loopback, port), AddressFamily.InterNetwork, ProtocolType.Tcp);
+    }
+
+    /// <summary><c>wasp fastcgi --socket path</c>, as PHP-FPM listens on Linux: a Unix socket made at the path, removed when it stops.</summary>
+    [Fact]
+    public async Task WaspFastCgiServesARootOnAUnixSocket()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "wasp-" + Guid.NewGuid().ToString("N")[..12] + ".sock");
+        await ServesThroughWaspFastCgiAsync(["--socket", path], path, new UnixDomainSocketEndPoint(path), AddressFamily.Unix, ProtocolType.Unspecified);
+        Assert.False(File.Exists(path));
+    }
+
+    /// <summary><c>wasp fastcgi</c> run on the root, listening <paramref name="where"/>, which it names; a request; then stopped.</summary>
+    private async Task ServesThroughWaspFastCgiAsync(string[] where, string named, EndPoint endPoint, AddressFamily family, ProtocolType protocol)
+    {
+        var (output, error) = (new StringWriter(), new StringWriter());
+        using var stop = new CancellationTokenSource();
+        var running = Task.Run(() => WebLingoWaspFastCgi.Run(["fastcgi", "--root", _root, .. where], output, error, stop.Token));
+        for (var i = 0; i < 100 && !output.ToString().Contains("WASP serving FastCGI", StringComparison.Ordinal); i++) await Task.Delay(100);
+        Assert.Contains($"WASP serving FastCGI on {named} (Production); Ctrl+C stops it.", output.ToString(), StringComparison.Ordinal);
+        using (var socket = new Socket(family, SocketType.Stream, protocol))
+        {
+            await socket.ConnectAsync(endPoint);
+            await using var stream = new NetworkStream(socket);
+            await stream.WriteAsync(Begin(1, keep: false));
+            await stream.WriteAsync(Records(1, Get("/?q=cli"), []));
+            var (head, body, _) = await ReadResponseAsync(stream, 1);
+            Assert.Equal(("Status: 200 OK", "<p>GET / cli  http localhost</p>"), (head[0], body));
+        }
+        stop.Cancel();
+        Assert.Equal(WebLingoCommandLine.Success, await running);
+        Assert.Equal("", error.ToString());
+    }
+
+    [Theory]
+    [InlineData("--port", "x")]
+    [InlineData("--port", "70000")]
+    [InlineData("--nonsense", "1")]
+    public void WaspFastCgiTakesWhereItListens(string option, string value)
+    {
+        var (output, error) = (new StringWriter(), new StringWriter());
+        Assert.Equal(WebLingoCommandLine.UsageError, WebLingoWaspCommandLine.Run(["fastcgi", option, value], output, error));
+        Assert.Contains("is not --root <folder>, --port <port>, --socket <path>, --stdin or --scheme <name>=<folder>", error.ToString(),
+            StringComparison.Ordinal);
+        Assert.Contains(WebLingoWaspFastCgi.Usage, output.ToString(), StringComparison.Ordinal);
+        (output, error) = (new StringWriter(), new StringWriter());
+        Assert.Equal(WebLingoCommandLine.UsageError, WebLingoWaspCommandLine.Run(["fastcgi", "--port", "9001", "--stdin"], output, error));
+        Assert.Contains("wasp fastcgi listens on one of --port, --socket and --stdin.", error.ToString(), StringComparison.Ordinal);
+    }
+
+    private async Task<TcpClient> Connect()
+    {
+        var client = new TcpClient();
+        await client.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)_listener.LocalEndPoint!).Port);
+        return client;
+    }
+
+    private static byte[] Begin(int id, bool keep) =>
+        WebLingoFastCgiRecords.Make(WebLingoFastCgiType.BeginRequest, id, [0, 1, (byte)(keep ? 1 : 0), 0, 0, 0, 0, 0]);
+
+    /// <summary>A request's parameters and body, as a web server sends them, each stream ended by an empty record.</summary>
+    private static byte[] Records(int id, Dictionary<string, string> parameters, byte[] body)
+    {
+        var made = new MemoryStream();
+        made.Write(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.Params, id, WebLingoFastCgiRecords.WritePairs(parameters)));
+        made.Write(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.Params, id, []));
+        if (body.Length > 0) made.Write(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.Stdin, id, body));
+        made.Write(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.Stdin, id, []));
+        return made.ToArray();
+    }
+
+    private static async Task<(List<string> Head, string Body, int Status)> RequestAsync(TcpClient connection, int id,
+        Dictionary<string, string> parameters, byte[] body, bool keep = false)
+    {
+        var stream = connection.GetStream();
+        await stream.WriteAsync(Begin(id, keep));
+        await stream.WriteAsync(Records(id, parameters, body));
+        return await ReadResponseAsync(stream, id);
+    }
+
+    /// <summary>The response's <c>FCGI_STDOUT</c>, its head's lines and its body, to its <c>FCGI_END_REQUEST</c>, whose protocol's status it gives.</summary>
+    private static async Task<(List<string> Head, string Body, int Status)> ReadResponseAsync(Stream stream, int id)
+    {
+        var stdout = new MemoryStream();
+        while (true)
+        {
+            var record = await ReadAsync(stream) ?? throw new IOException("the host closed the connection");
+            Assert.Equal(id, record.RequestId);
+            if (record.Type == WebLingoFastCgiType.Stdout)
+            {
+                stdout.Write(record.Content);
+                continue;
+            }
+            Assert.Equal(WebLingoFastCgiType.EndRequest, record.Type);
+            var text = Encoding.UTF8.GetString(stdout.ToArray());
+            var split = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+            return ([.. text[..split].Split("\r\n")], text[(split + 4)..], record.Content[4]);
+        }
+    }
+
+    private static async Task<WebLingoFastCgiRecord?> ReadAsync(Stream stream)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        return await WebLingoFastCgiRecords.ReadAsync(stream, timeout.Token);
+    }
+
+    private void Write(string relative, string text)
+    {
+        var path = Path.Combine(_root, relative);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, text);
+    }
+}

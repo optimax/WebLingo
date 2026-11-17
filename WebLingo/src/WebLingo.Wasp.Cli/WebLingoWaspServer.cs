@@ -35,9 +35,41 @@ public static class WebLingoWaspServer
     public static WebApplication? Create(string? root, int port, IReadOnlyDictionary<string, string> givenSchemes, out string? error,
         out WebLingoEnvironment environment, TextWriter? log = null)
     {
-        environment = UnderIis ? WebLingoEnvironment.Production : WebLingoEnvironment.Development;
         var site = Environment.GetEnvironmentVariable("ASPNETCORE_IIS_PHYSICAL_PATH") ?? Directory.GetCurrentDirectory();
         var full = Path.GetFullPath(Path.Combine(site, root ?? "."));
+        var application = Load(full, givenSchemes, UnderIis ? WebLingoEnvironment.Production : WebLingoEnvironment.Development, log, out var workers,
+            out environment, out error);
+        if (application is null) return null;
+
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = AppContext.BaseDirectory });
+        builder.Logging.SetMinimumLevel(LogLevel.Warning);
+        // Kestrel chooses a port only for an address: 127.0.0.1 for port 0, localhost, IPv4's and IPv6's, otherwise.
+        if (!UnderIis) builder.WebHost.UseUrls(port == 0 ? "http://127.0.0.1:0" : $"http://localhost:{port}");
+        var server = builder.Build();
+        var pool = new WebLingoWorkerPool(workers);
+        server.Lifetime.ApplicationStopped.Register(pool.Dispose);
+        var reloader = Reloader(application, full, log);
+        server.Lifetime.ApplicationStopping.Register(reloader.Dispose);
+        server.UseWebLingo(application, full, pool);
+        return server;
+    }
+
+    /// <summary>What watches an application's files, and reloads it, each reload told to <paramref name="log"/> (section 6.5).</summary>
+    internal static WebLingoReloader Reloader(WebLingoApplication application, string full, TextWriter? log) =>
+        new(application, full, (generation, why) => log?.WriteLine(why is null
+            ? $"WASP reloaded the application: generation {generation}."
+            : $"WASP cannot reload the application, and serves generation {generation} still: {why}."));
+
+    /// <summary>
+    /// The application at <paramref name="full"/>, as <c>wasp serve</c> and <c>wasp fastcgi</c> load it: its configuration,
+    /// <c>wasp.config</c>, giving its schemes, its environment, <paramref name="defaultEnvironment"/> unless it names one, how
+    /// long a page waits for a slow client, the hosts, the folders and the COM objects its scripts may reach, and its
+    /// databases; its workers, one for each processor; null, with why, if it cannot be loaded.
+    /// </summary>
+    public static WebLingoApplication? Load(string full, IReadOnlyDictionary<string, string> givenSchemes, WebLingoEnvironment defaultEnvironment,
+        TextWriter? log, out int workers, out WebLingoEnvironment environment, out string? error)
+    {
+        (workers, environment) = (Math.Max(1, Environment.ProcessorCount), defaultEnvironment);
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
             out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out error)) return null;
         if (configured is not null) environment = configured == "production" ? WebLingoEnvironment.Production : WebLingoEnvironment.Development;
@@ -49,7 +81,6 @@ public static class WebLingoWaspServer
             error = $"std:system cannot be loaded from {schemes["std"]}: {why}.";
             return null;
         }
-        var workers = Math.Max(1, Environment.ProcessorCount);
         // Its scripts reach only the folders wasp.config allows, a relative path from the root (section 7.13).
         var files = new DotNetFileCapabilities(full, folders.Read, folders.Write);
         var application = WebLingoApplication.Load(new WebLingoApplicationOptions(full, new DotNetFileSystem())
@@ -70,25 +101,8 @@ public static class WebLingoWaspServer
             Log = log is null ? null : log.WriteLine,
             SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30)
         }, out error);
-        if (application is null)
-        {
-            error = $"{full}: {error}.";
-            return null;
-        }
-
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = AppContext.BaseDirectory });
-        builder.Logging.SetMinimumLevel(LogLevel.Warning);
-        // Kestrel chooses a port only for an address: 127.0.0.1 for port 0, localhost, IPv4's and IPv6's, otherwise.
-        if (!UnderIis) builder.WebHost.UseUrls(port == 0 ? "http://127.0.0.1:0" : $"http://localhost:{port}");
-        var server = builder.Build();
-        var pool = new WebLingoWorkerPool(workers);
-        server.Lifetime.ApplicationStopped.Register(pool.Dispose);
-        var reloader = new WebLingoReloader(application, full, (generation, why) => log?.WriteLine(why is null
-            ? $"WASP reloaded the application: generation {generation}."
-            : $"WASP cannot reload the application, and serves generation {generation} still: {why}."));
-        server.Lifetime.ApplicationStopping.Register(reloader.Dispose);
-        server.UseWebLingo(application, full, pool);
-        return server;
+        if (application is null) error = $"{full}: {error}.";
+        return application;
     }
 
     /// <summary>A worker's built-ins and native modules, its own: std:system's functions, and a loader of the others.</summary>

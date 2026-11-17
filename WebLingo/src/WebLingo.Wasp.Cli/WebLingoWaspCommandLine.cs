@@ -32,13 +32,16 @@ public static class WebLingoWaspCommandLine
             [
                 "  --root the application's root, which an include's path starting with / is from; the page's folder when left out",
                 $"  serve     wasp serve [--root <folder>] [--port <port>] [--scheme <name>=<folder> …] serves the application at the root, "
-                + $"the current folder by default, on port {WebLingoWaspServer.DefaultPort}"
+                + $"the current folder by default, on port {WebLingoWaspServer.DefaultPort}",
+                $"  fastcgi   wasp fastcgi [--root <folder>] [--port <port> | --socket <path> | --stdin] [--scheme <name>=<folder> …] serves "
+                + $"the application to a web server through FastCGI, on port {WebLingoWaspFastCgi.DefaultPort} by default"
             ]
         };
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
         if (args.Length >= 1 && args[0] == "serve") return Serve(args, output, error);
+        if (args.Length >= 1 && args[0] == "fastcgi") return WebLingoWaspFastCgi.Run(args, output, error);
         // wasp run|check [--root <folder>] [--scheme name=folder]… <page.wasp> …: --root taken out, among the options before
         // the page, the rest what weblingo's command line takes.
         string? root = null;
