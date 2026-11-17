@@ -9,7 +9,9 @@ namespace WebLingo.Runtime;
 // DateTime.parse(text, format) and DateTime.fromUnixMilliseconds(ms); a date's year, month, day, hour, minute, second,
 // millisecond, dayOfWeek, dayOfYear, offset and unixMilliseconds; its addYears(n) to addMilliseconds(n), toUtc(),
 // toLocal() and format(format). The server's zone is the host's (IWebLingoTimeZone), UTC without one; the time is the
-// host's wall clock's. Formats are .NET's date and time format strings, with the invariant culture.
+// host's wall clock's. Formats are .NET's date and time format strings, with the invariant culture. Other zones (section
+// 3.2, "Time zones"; the owner's answers, 16 November 2026), the platform's, by their IANA names: d.toZone(name) and
+// DateTime.inZone(name, year, month, day, …), found through the host's zone, which a host without one cannot.
 public static partial class WebLingoMembers
 {
     /// <summary>The first instant a date may have, 0001-01-01T00:00:00Z, in milliseconds since 1970-01-01T00:00:00Z.</summary>
@@ -48,11 +50,11 @@ public static partial class WebLingoMembers
     private static bool IsDateTimeMethod(WebLingoMember member) =>
         member is WebLingoMember.AddYears or WebLingoMember.AddMonths or WebLingoMember.AddDays or WebLingoMember.AddHours
             or WebLingoMember.AddMinutes or WebLingoMember.AddSeconds or WebLingoMember.AddMilliseconds or WebLingoMember.ToUtc
-            or WebLingoMember.ToLocal or WebLingoMember.FormatWith;
+            or WebLingoMember.ToLocal or WebLingoMember.ToZone or WebLingoMember.FormatWith;
 
     private static bool IsDateTimeClassMethod(WebLingoMember member) =>
         member is WebLingoMember.Now or WebLingoMember.UtcNow or WebLingoMember.Local or WebLingoMember.Utc or WebLingoMember.Parse
-            or WebLingoMember.FromUnixMilliseconds;
+            or WebLingoMember.FromUnixMilliseconds or WebLingoMember.InZone;
 
     /// <summary><c>d.year</c>, <c>d.month</c>, from 1, …, <c>d.dayOfWeek</c>, from 0 for Sunday, <c>d.offset</c>, in minutes.</summary>
     private static WebLingoValue GetDateTimeProperty(WebLingoValue target, WebLingoMember member)
@@ -74,7 +76,10 @@ public static partial class WebLingoMembers
         });
     }
 
-    /// <summary><c>d.addYears(n)</c> to <c>d.addMilliseconds(n)</c>, <c>d.toUtc()</c>, <c>d.toLocal()</c> and <c>d.format(format)</c>.</summary>
+    /// <summary>
+    /// <c>d.addYears(n)</c> to <c>d.addMilliseconds(n)</c>, <c>d.toUtc()</c>, <c>d.toLocal()</c>, <c>d.toZone(name)</c> and
+    /// <c>d.format(format)</c>.
+    /// </summary>
     private static bool TryCallDateTime(WebLingoValue target, WebLingoMember member, string name, WebLingoValue[] values, int first, int count,
         WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
@@ -88,6 +93,12 @@ public static partial class WebLingoMembers
             case WebLingoMember.ToLocal:
                 if (count != 0) return WrongArgumentCount(name, 0, count, out error);
                 return TryMakeDateTime(instant, heap.TimeZone?.OffsetMinutesAt(instant) ?? 0, out result, out error);
+            case WebLingoMember.ToZone:
+            {
+                if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+                if (!TryFindZone(name, values[first], heap, out var zone, out error)) return false;
+                return TryMakeDateTime(instant, zone.OffsetMinutesAt(instant), out result, out error);
+            }
             case WebLingoMember.FormatWith:
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
                 if (!TryFormatDateTime(target, values[first], heap, out var text, out error)) return false;
@@ -152,8 +163,9 @@ public static partial class WebLingoMembers
 
     /// <summary>
     /// <c>DateTime.now()</c>, <c>DateTime.utcNow()</c>, <c>DateTime.local(year, month, day, hour, minute, second,
-    /// millisecond)</c>, <c>DateTime.utc(…)</c>, <c>DateTime.parse(text, format)</c> and
-    /// <c>DateTime.fromUnixMilliseconds(ms)</c>, the methods of the class <c>DateTime</c>.
+    /// millisecond)</c>, <c>DateTime.utc(…)</c>, <c>DateTime.inZone(name, year, month, day, …)</c>,
+    /// <c>DateTime.parse(text, format)</c> and <c>DateTime.fromUnixMilliseconds(ms)</c>, the methods of the class
+    /// <c>DateTime</c>.
     /// </summary>
     private static bool TryCallDateTimeClass(WebLingoMember member, string name, WebLingoValue[] values, int first, int count, WebLingoHeap heap,
         out WebLingoValue result, out WebLingoRuntimeError? error)
@@ -174,10 +186,15 @@ public static partial class WebLingoMembers
                 var offset = member == WebLingoMember.Now ? heap.TimeZone?.OffsetMinutesAt(instant) ?? 0 : 0;
                 return TryMakeDateTime(instant, offset, out result, out error);
             }
-            case WebLingoMember.Local or WebLingoMember.Utc:
+            case WebLingoMember.Local or WebLingoMember.Utc or WebLingoMember.InZone:
             {
-                // Its parts, year, month and day, then hour, minute, second and millisecond, 0 when left out.
-                if (count is < 3 or > 7) return WrongArgumentCount(name, 3, 7, count, out error);
+                // Its parts, year, month and day, then hour, minute, second and millisecond, 0 when left out; inZone's
+                // after the zone's name.
+                var named = member == WebLingoMember.InZone ? 1 : 0;
+                if (count - named is < 3 or > 7) return WrongArgumentCount(name, 3 + named, 7 + named, count, out error);
+                var zone = member == WebLingoMember.Local ? heap.TimeZone : null;
+                if (named == 1 && !TryFindZone(name, values[first], heap, out zone, out error)) return false;
+                (first, count) = (first + named, count - named);
                 Span<long> parts = [0, 0, 0, 0, 0, 0, 0];
                 ReadOnlySpan<string> names = ["year", "month", "day", "hour", "minute", "second", "millisecond"];
                 for (var i = 0; i < count; i++)
@@ -191,7 +208,7 @@ public static partial class WebLingoMembers
                     parts[i] = values[first + i].AsInt64;
                 }
                 if (!TryWallClockMilliseconds(parts, names, out var wall, out error)) return false;
-                var offset = member == WebLingoMember.Local ? heap.TimeZone?.OffsetMinutesOfLocal(wall) ?? 0 : 0;
+                var offset = zone?.OffsetMinutesOfLocal(wall) ?? 0;
                 return TryMakeDateTime(wall - offset * MillisecondsPerMinute, offset, out result, out error);
             }
             case WebLingoMember.FromUnixMilliseconds:
@@ -220,6 +237,52 @@ public static partial class WebLingoMembers
                 return TryParseDateTime(text, format, heap, out result, out error);
             }
         }
+    }
+
+    /// <summary>
+    /// A zone of the platform's, by its IANA name, found through the host's zone: WL3001 for a name that is not a string,
+    /// is not written as IANA writes its names, letters, digits, <c>_</c>, <c>-</c> and <c>+</c>, its parts between
+    /// <c>/</c>, or that the platform does not know, and for a host that gives no zone.
+    /// </summary>
+    private static bool TryFindZone(string member, WebLingoValue name, WebLingoHeap heap,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out WebLingo.Platform.Abstractions.IWebLingoTimeZone? zone,
+        out WebLingoRuntimeError? error)
+    {
+        zone = null;
+        if (name.Kind != WebLingoValueKind.String)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"'{member}' takes a time zone's name, a string, not {WebLingoValueFormatter.Describe(name, heap)}.");
+            return false;
+        }
+        if (heap.TimeZone is not { } server)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"'{member}' reads the host's time zones, and this host gives none.");
+            return false;
+        }
+        var text = heap.GetString(name);
+        zone = IsZoneName(text) ? server.Find(text) : null;
+        if (zone is null)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"\"{text}\" is not a time zone this server knows: a zone is named as IANA names it, such as Europe/Warsaw.");
+            return false;
+        }
+        error = null;
+        return true;
+    }
+
+    /// <summary>Whether a name is written as IANA writes a zone's, <c>America/Argentina/Buenos_Aires</c>, <c>Etc/GMT+5</c>.</summary>
+    private static bool IsZoneName(string name)
+    {
+        if (name.Length is 0 or > 64 || name[0] == '/' || name[^1] == '/') return false;
+        for (var i = 0; i < name.Length; i++)
+        {
+            var c = name[i];
+            if (c == '/' ? name[i - 1] == '/' : !(char.IsAsciiLetterOrDigit(c) || c is '_' or '-' or '+')) return false;
+        }
+        return true;
     }
 
     /// <summary>A date's text by a format of .NET's, standard or custom, with the invariant culture (section 3.2).</summary>

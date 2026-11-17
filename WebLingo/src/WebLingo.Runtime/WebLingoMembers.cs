@@ -15,12 +15,12 @@ public enum WebLingoMember : byte
     /// <summary>Bytes' <c>slice</c> and <c>text</c>, and the class's <c>from</c>, <c>concat</c> and <c>fixedTimeEqual</c> (section 3.2, "Bytes").</summary>
     Slice, Text, From, Concat, FixedTimeEqual,
     /// <summary>
-    /// A date's properties, its methods, and the class's <c>now</c>, <c>utcNow</c>, <c>local</c>, <c>utc</c> and
-    /// <c>fromUnixMilliseconds</c>, besides <c>parse</c> (section 3.2, "Dates and times").
+    /// A date's properties, its methods, and the class's <c>now</c>, <c>utcNow</c>, <c>local</c>, <c>utc</c>,
+    /// <c>fromUnixMilliseconds</c> and <c>inZone</c>, besides <c>parse</c> (section 3.2, "Dates and times" and "Time zones").
     /// </summary>
     Year, Month, Day, Hour, Minute, Second, Millisecond, DayOfWeek, DayOfYear, Offset, UnixMilliseconds,
-    AddYears, AddMonths, AddDays, AddHours, AddMinutes, AddSeconds, AddMilliseconds, ToUtc, ToLocal, FormatWith,
-    Now, UtcNow, Local, Utc, FromUnixMilliseconds,
+    AddYears, AddMonths, AddDays, AddHours, AddMinutes, AddSeconds, AddMilliseconds, ToUtc, ToLocal, ToZone, FormatWith,
+    Now, UtcNow, Local, Utc, FromUnixMilliseconds, InZone,
     /// <summary>A string's <c>compare(other)</c>, -1, 0 or 1 (section 3.5).</summary>
     Compare,
     /// <summary>A collection's or a string's <c>iterate()</c>, which gives an <c>Iterator</c> (section 3.6).</summary>
@@ -88,12 +88,14 @@ public static partial class WebLingoMembers
         "addMilliseconds" => WebLingoMember.AddMilliseconds,
         "toUtc" => WebLingoMember.ToUtc,
         "toLocal" => WebLingoMember.ToLocal,
+        "toZone" => WebLingoMember.ToZone,
         "format" => WebLingoMember.FormatWith,
         "now" => WebLingoMember.Now,
         "utcNow" => WebLingoMember.UtcNow,
         "local" => WebLingoMember.Local,
         "utc" => WebLingoMember.Utc,
         "fromUnixMilliseconds" => WebLingoMember.FromUnixMilliseconds,
+        "inZone" => WebLingoMember.InZone,
         "compare" => WebLingoMember.Compare,
         "iterate" => WebLingoMember.Iterate,
         WebLingoInterpolation.Format => WebLingoMember.Format,

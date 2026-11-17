@@ -12,7 +12,8 @@ namespace WebLingo.VM.Tests;
 /// the millisecond with its offset from UTC, made by <c>DateTime</c>'s methods, read by its members, moved by its
 /// <c>add…</c> methods, compared by their instants, formatted and parsed by .NET's formats, and written as
 /// <c>DateTime:</c> and ISO 8601. The clock and the server's zone are the host's, here a fixed clock and a zone an hour
-/// ahead of UTC, two from April to September.
+/// ahead of UTC, two from April to September; and the zones found through it (section 3.2, "Time zones"), here that zone,
+/// <c>Test/Summer</c>, and one five and a half hours ahead, <c>Test/Kolkata</c>.
 /// </summary>
 public sealed class DateTimeTests
 {
@@ -58,6 +59,12 @@ public sealed class DateTimeTests
                 + "writeLn([DateTime.utc(2026, 11, 15).isWeekend(), DateTime.utc(2026, 11, 16).isWeekend()]);", "[true, false]\n")]
     [InlineData("writeLn([DateTime.utc(1, 1, 1), DateTime.utc(9999, 12, 31, 23, 59, 59, 999)]);",
         "[DateTime:0001-01-01T00:00:00Z, DateTime:9999-12-31T23:59:59.999Z]\n")]
+    [InlineData("writeLn(DateTime.utc(2026, 11, 16, 14, 30).toZone(\"Test/Kolkata\"));", "DateTime:2026-11-16T20:00:00+05:30\n")]
+    [InlineData("writeLn([DateTime.inZone(\"Test/Kolkata\", 2026, 11, 16, 9, 30), DateTime.inZone(\"Test/Summer\", 2026, 7, 1)]);",
+        "[DateTime:2026-11-16T09:30:00+05:30, DateTime:2026-07-01T00:00:00+02:00]\n")]
+    [InlineData("var d = DateTime.inZone(\"Test/Kolkata\", 2026, 11, 16); "
+                + "writeLn([d.toUtc(), d == DateTime.utc(2026, 11, 15, 18, 30), d.toZone(\"Test/Summer\"), d.addDays(1).offset]);",
+        "[DateTime:2026-11-15T18:30:00Z, true, DateTime:2026-11-15T19:30:00+01:00, 330]\n")]
     public void DatesBehaveAlikeOnBothVms(string program, string output)
     {
         foreach (var stack in new[] { false, true })
@@ -89,6 +96,14 @@ public sealed class DateTimeTests
     [InlineData("writeLn(DateTime.utc(2026, 1, 1).year());", "WL2005", "'year' of the date and time 2026-01-01T00:00:00Z is not a method, and cannot be called.")]
     [InlineData("writeLn(DateTime.utc(2026, 1, 1).toUtc);", "WL3001",
         "'toUtc' is a method of the date and time 2026-01-01T00:00:00Z, and can only be called.")]
+    [InlineData("writeLn(DateTime.utc(2026, 1, 1).toZone(\"Mars/Olympus\"));", "WL3001",
+        "\"Mars/Olympus\" is not a time zone this server knows: a zone is named as IANA names it, such as Europe/Warsaw.")]
+    [InlineData("writeLn(DateTime.utc(2026, 1, 1).toZone(\"../Test/Kolkata\"));", "WL3001",
+        "\"../Test/Kolkata\" is not a time zone this server knows: a zone is named as IANA names it, such as Europe/Warsaw.")]
+    [InlineData("writeLn(DateTime.utc(2026, 1, 1).toZone(1));", "WL3001", "'toZone' takes a time zone's name, a string, not the integer 1.")]
+    [InlineData("writeLn(DateTime.utc(2026, 1, 1).toZone());", "WL2006", "'toZone' takes 1 argument, not 0.")]
+    [InlineData("writeLn(DateTime.inZone(\"Test/Kolkata\", 2026, 1));", "WL2006", "'inZone' takes 4 to 8 arguments, not 3.")]
+    [InlineData("writeLn(DateTime.inZone(\"Test/Kolkata\", 2026, 1, 32));", "WL3001", "A date's day is from 1 to 31, not 32.")]
     public void WrongUsesAreErrorsAlikeOnBothVms(string program, string code, string message)
     {
         foreach (var stack in new[] { false, true })
@@ -108,6 +123,9 @@ public sealed class DateTimeTests
             Assert.NotNull(error);
             Assert.Equal(("WL3001", "'now' reads the host's clock, and this host gives none."), (error.Code, error.Message));
             Assert.Equal(("DateTime:2026-07-01T09:00:00Z\n", null), Run("writeLn(DateTime.local(2026, 7, 1, 9));", stack, clock: false));
+            (_, error) = Run("writeLn(DateTime.inZone(\"Test/Kolkata\", 2026, 7, 1));", stack, clock: false);
+            Assert.NotNull(error);
+            Assert.Equal(("WL3001", "'inZone' reads the host's time zones, and this host gives none."), (error.Code, error.Message));
         }
     }
 
@@ -143,12 +161,30 @@ public sealed class DateTimeTests
         public long MonotonicFrequency => 1;
     }
 
-    /// <summary>A zone an hour ahead of UTC, and two from April to September, by the month of the time asked about.</summary>
+    /// <summary>
+    /// A zone an hour ahead of UTC, and two from April to September, by the month of the time asked about, which finds
+    /// itself as <c>Test/Summer</c> and <see cref="KolkataZone"/> as <c>Test/Kolkata</c>.
+    /// </summary>
     private sealed class SummerZone : IWebLingoTimeZone
     {
         public int OffsetMinutesAt(long unixMilliseconds) => OffsetIn(unixMilliseconds);
         public int OffsetMinutesOfLocal(long localMilliseconds) => OffsetIn(localMilliseconds);
 
+        public IWebLingoTimeZone? Find(string name) => name switch
+        {
+            "Test/Summer" => this,
+            "Test/Kolkata" => new KolkataZone(),
+            _ => null
+        };
+
         private static int OffsetIn(long milliseconds) => DateTimeOffset.FromUnixTimeMilliseconds(milliseconds).Month is >= 4 and <= 9 ? 120 : 60;
+    }
+
+    /// <summary>A zone five and a half hours ahead of UTC all year, which finds no other.</summary>
+    private sealed class KolkataZone : IWebLingoTimeZone
+    {
+        public int OffsetMinutesAt(long unixMilliseconds) => 330;
+        public int OffsetMinutesOfLocal(long localMilliseconds) => 330;
+        public IWebLingoTimeZone? Find(string name) => null;
     }
 }

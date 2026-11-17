@@ -399,6 +399,7 @@ A date and time: an instant, to the millisecond, with its offset from UTC, immut
 | `DateTime.utcNow()` | the same instant, in UTC |
 | `DateTime.local(year, month, day, hour, minute, second, millisecond)` | a date in the server's time zone, those after the day optional, 0 when left out |
 | `DateTime.utc(year, month, day, …)` | the same, in UTC |
+| `DateTime.inZone(name, year, month, day, …)` | the same, in the zone of that IANA name, `"Europe/Warsaw"` |
 | `DateTime.parse(text, format)` | a date read from ISO 8601's text, or from a format of .NET's; a time without a zone the server's |
 | `DateTime.fromUnixMilliseconds(ms)` | the date `ms` milliseconds after 1970-01-01T00:00:00Z, in UTC |
 | `d.year`, `d.month`, `d.day`, `d.hour`, `d.minute`, `d.second`, `d.millisecond` | its time on its own clocks, months and days from 1 |
@@ -407,6 +408,7 @@ A date and time: an instant, to the millisecond, with its offset from UTC, immut
 | `d.addYears(n)`, `d.addMonths(n)` | a date that many calendar years or months away, its day kept, or its month's last |
 | `d.addDays(n)`, `d.addHours(n)`, `d.addMinutes(n)`, `d.addSeconds(n)`, `d.addMilliseconds(n)` | a date that much later, or earlier, a number rounded to the millisecond |
 | `d.toUtc()`, `d.toLocal()` | the same instant in UTC, or in the server's time zone |
+| `d.toZone(name)` | the same instant in the zone of that IANA name, `"Asia/Kolkata"` |
 | `d.format(format)` | its text by a .NET date and time format, standard (`"o"`, `"d"`) or custom (`"d MMMM yyyy"`), in English |
 
 `==`, `<` and the other comparisons compare instants; `b - a` is the milliseconds between them. `write` writes a date
@@ -424,7 +426,8 @@ writeLn([(closed - opened) / 3600000, closed > opened]);
 [8.5, true]
 ```
 
-The time is the host's clock's, and the server's time zone the host's; WebLingo knows no other zones yet.
+The time is the host's clock's, and the time zones, the server's and the others, the host's: those the server knows,
+which may differ from one server to another, a name it does not know an error.
 
 ---
 

@@ -335,7 +335,30 @@ true
 - **From text.** `DateTime.parse(text)` reads ISO 8601: `2026-11-16T14:30:00Z`, `2026-11-16T15:30:00+01:00`, and,
   in the server's time zone, `2026-11-16T14:30` and `2026-11-16`. `DateTime.parse(text, format)` reads by a format of
   .NET's, a time without a zone being the server's.
-- **Time zones.** UTC and the server's own, for now.
+- **Time zones.** Besides UTC and the server's own, any zone the server knows, by its IANA name:
+  `d.toZone("Europe/Warsaw")` is the same instant on Warsaw's clocks, and
+  `DateTime.inZone("America/New_York", 2026, 11, 16, 9, 30)` makes a date from its parts there, as
+  `DateTime.local(…)` makes one in the server's zone:
+
+```javascript
+var call = DateTime.inZone("America/New_York", 2026, 11, 16, 9, 30);
+writeLn(call);
+writeLn(call.toZone("Europe/Warsaw"));
+writeLn(call.toZone("Asia/Kolkata").format("HH:mm"));
+writeLn(call.toUtc() == call);
+```
+
+```text
+DateTime:2026-11-16T09:30:00-05:00
+DateTime:2026-11-16T15:30:00+01:00
+20:00
+true
+```
+
+  The zones are the server's, Windows' or its operating system's, and may differ from one server to another; a
+  name it does not know is an error. A date keeps its offset, not its zone: moved past a change of its zone's
+  clocks, it keeps the offset it had, until `toZone` again. A time a zone's clocks skip, or have twice, takes the
+  zone's standard offset.
 
 ---
 
@@ -1761,7 +1784,6 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Values**: time zones other than UTC and the server's.
 - **Literals**: hexadecimal and binary numbers, and `_` between digits.
 - **Functions**: a variable number of arguments (rest parameters), and spreading an array into a call.
 - **Library**: string methods (searching, splitting, case), array methods beyond `push` and `pop`, regular expressions,

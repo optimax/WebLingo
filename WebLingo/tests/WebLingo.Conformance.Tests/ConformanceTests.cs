@@ -552,6 +552,11 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var p = 1.5m; writeLn($\"{p:0.00} {1234.5m:N1} {p}\");", "1.50 1,234.5 1.5m")]
     [InlineData("var total = 0m; foreach (var x in [1.10m, 2.20m, 3.30m]) total += x; writeLn(total);", "6.6m")]
     [InlineData("class Money extends Decimal {} var m = new Money(1.25m); writeLn([m, m + 1, m is Decimal]);", "[Money:1.25m, Money:2.25m, true]")]
+    // Time zones (the owner's answers, 16 November 2026): the platform's, by their IANA names; a time skipped or had twice
+    // takes the zone's standard offset.
+    [InlineData("var d = DateTime.utc(2026, 7, 1, 12); writeLn([d.toZone(\"Europe/Warsaw\"), d.addMonths(6).toZone(\"Europe/Warsaw\"), d.toZone(\"Asia/Kolkata\"), d.toZone(\"UTC\")]);", "[DateTime:2026-07-01T14:00:00+02:00, DateTime:2027-01-01T13:00:00+01:00, DateTime:2026-07-01T17:30:00+05:30, DateTime:2026-07-01T12:00:00Z]")]
+    [InlineData("var d = DateTime.inZone(\"America/New_York\", 2026, 11, 16, 9, 30); writeLn([d, d.toUtc(), d.toZone(\"Europe/Warsaw\").hour]);", "[DateTime:2026-11-16T09:30:00-05:00, DateTime:2026-11-16T14:30:00Z, 15]")]
+    [InlineData("writeLn([DateTime.inZone(\"Europe/Warsaw\", 2026, 3, 29, 2, 30), DateTime.inZone(\"Europe/Warsaw\", 2026, 10, 25, 2, 30)]);", "[DateTime:2026-03-29T02:30:00+01:00, DateTime:2026-10-25T02:30:00+01:00]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -604,6 +609,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(79228162514264337593543950335m + 1);", "WL3002")]
     [InlineData("writeLn(new Integer(2.5m));", "WL3001")]
     [InlineData("writeLn(Decimal.parse(\"1.5m\"));", "WL3001")]
+    [InlineData("writeLn(DateTime.utc(2026, 1, 1).toZone(\"Nowhere/Atlantis\"));", "WL3001")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);
