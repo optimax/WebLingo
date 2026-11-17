@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using WebLingo.Core;
+using WebLingo.Language;
 namespace WebLingo.Compiler;
 
 /// <summary>
@@ -33,6 +35,41 @@ public sealed record WebLingoNativeClassInfo(string Name, WebLingoNativeExport C
     /// where the getter raises a missing key or an index out of range; or null for a class without an indexer.
     /// </summary>
     public WebLingoNativeExport? IndexOptional { get; init; }
+
+    /// <summary>Its methods written in WebLingo (section 3.9), as <see cref="TryParseMethods"/> read them.</summary>
+    public IReadOnlyList<WebLingoMethodSyntax> WebLingoMethods { get; init; } = [];
+
+    /// <summary>
+    /// A native class's methods written in WebLingo, as a class's body declares them, read; false, with why, for a source
+    /// that does not parse, that declares anything but methods, or a method whose name <paramref name="taken"/> holds or
+    /// another of them has.
+    /// </summary>
+    public static bool TryParseMethods(string source, ISet<string> taken, out IReadOnlyList<WebLingoMethodSyntax> methods, out string? error)
+    {
+        methods = [];
+        var tree = new WebLingoParser("class Native {\n" + source + "\n}", "native").ParseCompilationUnit();
+        foreach (var diagnostic in tree.Diagnostics)
+        {
+            if (diagnostic.Severity != WebLingoDiagnosticSeverity.Error) continue;
+            error = $"its methods written in WebLingo do not parse: {diagnostic.Message}";
+            return false;
+        }
+        if (tree.Root.Statements is not [WebLingoClassDeclarationSyntax { StaticFields.Count: 0 } declaration])
+        {
+            error = "its methods written in WebLingo are not methods alone";
+            return false;
+        }
+        foreach (var method in declaration.Methods)
+        {
+            if (method.Name == "constructor" || !taken.Add(method.Name))
+            {
+                error = $"its method written in WebLingo '{method.Name}' has a name another member has";
+                return false;
+            }
+        }
+        (methods, error) = (declaration.Methods, null);
+        return true;
+    }
 }
 
 /// <summary>A native class's property: its name, its getter's built-in, and its setter's, or null.</summary>

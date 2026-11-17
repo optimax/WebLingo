@@ -248,6 +248,29 @@ public sealed class WaspTests : IDisposable
     }
 
     [Fact]
+    public void APageOpensTheDatabasesWaspConfigNames()
+    {
+        // A site's database outside its folder, its path from the configuration's folder (section 7.11).
+        var data = _folder + "-data";
+        Directory.CreateDirectory(data);
+        try
+        {
+            File.WriteAllText(Path.Combine(_folder, "wasp.config"),
+                "{ \"databases\": { \"shop\": \"sqlite:../" + Path.GetFileName(data) + "/shop.db\" } }");
+            const string page = "<% import { Database } from \"std:db\"; using (var db = await Database.open(\"shop\")) { " +
+                                "await db.execute(\"CREATE TABLE Fish (Name TEXT)\"); await db.execute(\"INSERT INTO Fish VALUES (@name)\", { name: \"<Neon>\" }); " +
+                                "foreach (var fish in await db.query(\"SELECT Name FROM Fish\")) { %><p><%= fish[\"Name\"] %></p><% } } %>";
+            Assert.Equal((WebLingoCommandLine.Success, "<p>&lt;Neon&gt;</p>", ""), Wasp("run", page));
+            Assert.True(File.Exists(Path.Combine(data, "shop.db")));
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Directory.Delete(data, recursive: true);
+        }
+    }
+
+    [Fact]
     public void APageThatCannotBeReadIsReported()
     {
         var path = Path.Combine(_folder, "missing.wasp");

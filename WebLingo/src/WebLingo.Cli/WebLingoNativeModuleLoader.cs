@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using WebLingo.Compiler;
+using WebLingo.Language;
 using WebLingo.Runtime;
 namespace WebLingo.Cli;
 
@@ -215,8 +216,23 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
                 if (indexer.Setter is not null) indexSetter = Export("[]=", members[next++]);
                 indexOptional = Export("?[]", members[next++]);
             }
+            // Its methods written in WebLingo, read now, so that a module whose source is wrong does not load.
+            var written = new List<WebLingoMethodSyntax>();
+            var taken = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var member in methods) taken.Add(member.Name);
+            foreach (var property in properties) taken.Add(property.Name);
+            foreach (var source in nativeClass.WebLingoMethods)
+            {
+                if (!WebLingoNativeClassInfo.TryParseMethods(source, taken, out var parsed, out var wrongMethods))
+                {
+                    error = $"its class '{nativeClass.Name}': {wrongMethods}";
+                    return false;
+                }
+                written.AddRange(parsed);
+            }
             classes.Add(new WebLingoNativeClassInfo(nativeClass.Name, constructor, methods, statics)
             {
+                WebLingoMethods = written,
                 Properties = properties,
                 IndexGetter = indexGetter,
                 IndexSetter = indexSetter,

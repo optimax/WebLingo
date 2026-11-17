@@ -571,6 +571,13 @@ The standard modules `std:http` and `std:net` reach other servers: `import http 
 the response's `"status"`, `"headers"` and `"body"`, and TCP connections, `Socket.connect(host, port)`. A site
 reaches only the hosts its `wasp.config` allows ([section 14](#14-configuration-waspconfig)).
 
+The standard module `std:db` reaches databases: `import { Database } from "std:db";`, then
+`using (var db = await Database.open("fish")) { … }`, its `await db.query(sql, { name: value })` the rows, an array
+of maps, `await db.execute(sql, values)` the number of rows changed, and `await db.transaction(async () => { … })`,
+which commits what its function does, or rolls it back where it throws. A site names its databases in its
+`wasp.config` ([section 14](#14-configuration-waspconfig)); `Examples/example2` is a fish store whose pages read and
+change one.
+
 ---
 
 ## 12. Errors
@@ -660,6 +667,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"sendTimeout"` | how many seconds a page waits for a client that has taken nothing of its output, more than 0 | 30 |
 | `"schemes"` | folders of native modules, each a name and a folder: `{ "native": "C:/WebLingo/native" }` | `std`, WebLingo's own |
 | `"network"` | the hosts the site's pages and handlers may reach, through `std:http` and `std:net`: `{ "allow": ["api.example.com"] }` | none |
+| `"databases"` | the site's databases, each a name its scripts open it by and its connection string: `{ "fish": "sqlite:../database/fish.db" }` | none |
 
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
 which. `wasp serve` reads the file when it starts; after changing it, start `wasp serve`, or the IIS site, again.
@@ -674,6 +682,11 @@ address, `api.example.com` or `127.0.0.1`, at any of its ports, its letters' cas
 A request to any other host is an error where the script makes it, WL3001,
 `'example.com' is not a host this application may reach.`, which a `catch` may catch; without the setting, a site
 reaches no host. A script that `weblingo` runs reaches any.
+
+A database's connection string is its provider's name, a colon, and what the provider reads: SQLite's, a file's
+path, from the configuration's folder when it is relative. Keep the database outside the site's folder,
+`../database/fish.db`, since `wasp` would serve a file in it to whoever asked for it, and give the site's application
+pool write access to the folder it is in, where SQLite writes its journal.
 
 Its name is `wasp.config`, in lower case: Linux tells `WASP.config` from it. A `weblingo.config` configures a folder of
 scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run` and `wasp check` read the

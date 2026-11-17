@@ -13,7 +13,8 @@ namespace WebLingo.Cli;
 /// and how long, in seconds, a page waits for a client that has not taken its output, <c>"sendTimeout": 30</c>, a number
 /// more than 0 (specification, section 6.12, "Streaming"), which only <c>wasp serve</c> reads; and the hosts its scripts may
 /// reach, <c>"network": { "allow": ["api.example.com"] }</c>, which <c>wasp</c> reads, <c>weblingo</c>'s scripts reaching
-/// any (section 7.9).
+/// any (section 7.9); and its databases, each a name and a connection string, a provider's name, a colon, and what the
+/// provider reads, <c>"databases": { "shop": "sqlite:../data/shop.db" }</c>, which both read (section 7.11).
 /// </summary>
 public static class WebLingoSchemes
 {
@@ -26,13 +27,17 @@ public static class WebLingoSchemes
     /// </summary>
     public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? error) =>
-        TryLoad(program, configuration, given, out schemes, out _, out error);
+        TryLoad(program, configuration, given, out schemes, out _, out _, out error);
 
-    /// <summary>As the other, and the hosts the configuration allows its scripts to reach, none when it names none.</summary>
+    /// <summary>
+    /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, and its databases,
+    /// each name's connection string.
+    /// </summary>
     public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
-        out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out string? error) =>
+        out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out IReadOnlyDictionary<string, string> databases,
+        out string? error) =>
         TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
-            out error);
+            out databases, out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
@@ -41,16 +46,21 @@ public static class WebLingoSchemes
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out string? error) =>
-        TryLoadFolder(folder, configuration, given, out schemes, out environment, out sendTimeout, out _, out error);
+        TryLoadFolder(folder, configuration, given, out schemes, out environment, out sendTimeout, out _, out _, out error);
 
-    /// <summary>As the other, and the hosts the configuration allows its scripts to reach, none when it names none.</summary>
+    /// <summary>
+    /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, and its databases,
+    /// each name's connection string.
+    /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
-        out string? error)
+        out IReadOnlyDictionary<string, string> databases, out string? error)
     {
         sendTimeout = null;
         var hosts = new List<string>();
         allowedHosts = hosts;
+        var named = new Dictionary<string, string>(StringComparer.Ordinal);
+        databases = named;
         schemes = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["std"] = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "std"))
@@ -58,7 +68,7 @@ public static class WebLingoSchemes
         (environment, error) = (null, null);
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
-        if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, ref sendTimeout, hosts, out error)) return false;
+        if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, ref sendTimeout, hosts, named, out error)) return false;
         foreach (var (name, path) in given) schemes[name] = Path.GetFullPath(path);
         return true;
     }
@@ -75,7 +85,7 @@ public static class WebLingoSchemes
     }
 
     private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? environment, ref double? sendTimeout,
-        List<string> hosts, out string? error)
+        List<string> hosts, Dictionary<string, string> databases, out string? error)
     {
         error = null;
         try
@@ -129,9 +139,30 @@ public static class WebLingoSchemes
                     }
                     continue;
                 }
+                if (setting.Name == "databases")
+                {
+                    // Its databases, each a name a script opens it by, without a colon, and a connection string (section 7.11).
+                    if (setting.Value.ValueKind != JsonValueKind.Object)
+                    {
+                        error = $"{file}: \"databases\" is an object, {{ \"shop\": \"sqlite:../data/shop.db\" }}.";
+                        return false;
+                    }
+                    foreach (var database in setting.Value.EnumerateObject())
+                    {
+                        var connection = database.Value.ValueKind == JsonValueKind.String ? database.Value.GetString()! : "";
+                        if (database.Name.Length == 0 || database.Name.Contains(':') || connection.IndexOf(':') < 1)
+                        {
+                            error = $"{file}: \"databases\" names each database, without a colon, and gives its connection string, "
+                                    + "its provider's name, a colon, and what the provider reads, \"sqlite:../data/shop.db\".";
+                            return false;
+                        }
+                        databases[database.Name] = connection;
+                    }
+                    continue;
+                }
                 if (setting.Name != "schemes")
                 {
-                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"environment\", \"sendTimeout\" and \"network\".";
+                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"environment\", \"sendTimeout\", \"network\" and \"databases\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)

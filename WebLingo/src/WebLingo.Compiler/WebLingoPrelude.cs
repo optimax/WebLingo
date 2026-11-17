@@ -26,7 +26,8 @@ internal static class WebLingoPrelude
         ("OverflowError", WebLingoDiagnosticCodes.IntegerOverflow), ("IndexError", WebLingoDiagnosticCodes.IndexOutOfRange),
         ("MemberError", WebLingoDiagnosticCodes.NoSuchMember), ("KeyError", WebLingoDiagnosticCodes.NoSuchKey),
         ("TimeoutError", WebLingoDiagnosticCodes.Timeout), ("IOError", WebLingoDiagnosticCodes.IOFailure),
-        ("DivisionByZeroError", WebLingoDiagnosticCodes.DivisionByZero), ("NetworkError", WebLingoDiagnosticCodes.NetworkFailure)
+        ("DivisionByZeroError", WebLingoDiagnosticCodes.DivisionByZero), ("NetworkError", WebLingoDiagnosticCodes.NetworkFailure),
+        ("DatabaseError", WebLingoDiagnosticCodes.DatabaseFailure)
     ];
 
     public static bool IsValueClass(string name)

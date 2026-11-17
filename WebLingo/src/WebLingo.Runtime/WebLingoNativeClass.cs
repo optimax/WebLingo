@@ -43,6 +43,7 @@ public sealed class WebLingoNativeClass(string name)
     private readonly List<WebLingoNativeMember> _methods = [];
     private readonly List<WebLingoNativeMember> _staticMethods = [];
     private readonly List<WebLingoNativeProperty> _properties = [];
+    private readonly List<string> _webLingoMethods = [];
 
     public string Name { get; } = name;
     public WebLingoNativeMember? Constructor { get; private set; }
@@ -50,6 +51,9 @@ public sealed class WebLingoNativeClass(string name)
     public IReadOnlyList<WebLingoNativeMember> StaticMethods => _staticMethods;
     public IReadOnlyList<WebLingoNativeProperty> Properties => _properties;
     public WebLingoNativeIndexer? Indexer { get; private set; }
+
+    /// <summary>Its methods written in WebLingo, each source as <see cref="DeclareWebLingoMethods"/> was given it.</summary>
+    public IReadOnlyList<string> WebLingoMethods => _webLingoMethods;
 
     /// <summary>
     /// A property, <c>x.name</c>, read by its getter, given the instance, and assigned by its setter, given the instance and
@@ -70,6 +74,19 @@ public sealed class WebLingoNativeClass(string name)
     {
         if (Error is null && Indexer is not null) Error = $"class '{Name}' declares its indexer twice";
         if (Error is null) Indexer = new(getter, setter);
+        return this;
+    }
+
+    /// <summary>
+    /// Methods written in WebLingo, as a class's body declares them, <c>async transaction(work) { … }</c>, for what a native
+    /// function cannot do, calling a script's function and awaiting what it gives; they reach the class's native members
+    /// through <c>this</c>, and an error in one is reported where it was called, as a native member's is (section 3.9). The
+    /// host reads them when it loads the module: a source that does not parse, or a method whose name another member has,
+    /// fails the module.
+    /// </summary>
+    public WebLingoNativeClass DeclareWebLingoMethods(string source)
+    {
+        if (Error is null) _webLingoMethods.Add(source);
         return this;
     }
 

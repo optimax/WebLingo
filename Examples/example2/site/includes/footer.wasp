@@ -1,0 +1,4 @@
+<footer>
+  <p>Served by WASP, WebLingo's server pages, from a SQLite database through <code>std:db</code>. The photos are from
+  Wikimedia Commons, each under the licence its <a href="/credits">credits</a> name.</p>
+</footer>

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using WebLingo.Cli;
+using WebLingo.Data.DotNet;
 using WebLingo.Hosting;
 using WebLingo.Hosting.AspNetCore;
 using WebLingo.Platform.DotNet;
@@ -38,7 +39,7 @@ public static class WebLingoWaspServer
         var site = Environment.GetEnvironmentVariable("ASPNETCORE_IIS_PHYSICAL_PATH") ?? Directory.GetCurrentDirectory();
         var full = Path.GetFullPath(Path.Combine(site, root ?? "."));
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
-            out var sendTimeout, out var allowedHosts, out error)) return null;
+            out var sendTimeout, out var allowedHosts, out var databases, out error)) return null;
         if (configured is not null) environment = configured == "production" ? WebLingoEnvironment.Production : WebLingoEnvironment.Development;
 
         // std:system, loaded once here to fail early, then by each worker on its own.
@@ -58,6 +59,7 @@ public static class WebLingoWaspServer
             WallClock = new DotNetClock(),
             TimeZone = new DotNetTimeZone(),
             Network = new DotNetNetwork(allowedHosts), // Only the hosts wasp.config allows (section 7.9).
+            Databases = new DotNetDatabases(databases, full), // Those wasp.config names, their files from its folder (section 7.11).
             Scheduler = () => new DotNetSchedulerHost(),
             Log = log is null ? null : log.WriteLine,
             SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30)

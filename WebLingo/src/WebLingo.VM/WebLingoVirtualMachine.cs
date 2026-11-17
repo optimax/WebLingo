@@ -79,6 +79,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         var heap = new WebLingoHeap(context.Resources.MaxHeapUnits);
         heap.FileSystem = context.FileSystem;
         heap.Network = context.Network;
+        heap.Databases = context.Databases;
         heap.WallClock = context.WallClock;
         heap.TimeZone = context.TimeZone;
         heap.SchedulerHost = context.SchedulerHost;

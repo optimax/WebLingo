@@ -1,0 +1,20 @@
+<% import { featured, waters, heading } from "/lib/store.wl"; %>
+<% layout "/layouts/main.wasp", { title: "Welcome", section: "home" }; %>
+<section class="hero">
+  <h1>Fish from rivers and reefs.</h1>
+  <p>Fourteen kinds of tropical fish, freshwater and marine, each with what it needs to thrive.</p>
+  <p><a class="button" href="/fish">See all our fish</a></p>
+</section>
+<h2>In the shop</h2>
+<div class="waters">
+<% foreach (var water in await waters()) { %>
+  <a class="water <%= water["Water"] %>" href="/fish?water=<%= water["Water"] %>">
+    <h3><%= heading(water["Water"]) %></h3>
+    <p><%= water["Kinds"] %> kinds, <%= water["InStock"] %> fish in the tanks, from <%= $"€{water['FromPrice']:N2}" %></p>
+  </a>
+<% } %>
+</div>
+<h2>This week's favourites</h2>
+<div class="cards">
+<% foreach (var fish in await featured()) { await renderComponent("/components/fish-card.wasp", { fish: fish }); } %>
+</div>

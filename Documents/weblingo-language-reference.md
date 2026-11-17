@@ -1602,6 +1602,7 @@ An error the runtime raises becomes an instance of a class extending `Error`, wi
 | `IOError` | WL3011 | a file that cannot be read or written |
 | `DivisionByZeroError` | WL3013 | an integer's remainder by 0 |
 | `NetworkError` | WL3014 | a host that cannot be reached, or a connection that fails |
+| `DatabaseError` | WL3015 | a statement a database refuses, or a database that cannot be opened |
 
 Two errors cannot be caught, and always end the program: running past the execution's limits (WL3003) and being
 cancelled (WL3004).
@@ -1925,6 +1926,25 @@ Genmaicha
 
 A script `weblingo` runs may reach any host, and a site's only those its `wasp.config` allows. A host that cannot be reached, or a connection that fails, is a `NetworkError`, WL3014. The Standard Library Reference describes both modules.
 
+### `std:db`
+
+Databases, one module for every database, the SQL passed on as it is. `Database.open(name)` opens one by a name the configuration gives, `{ "databases": { "fish": "sqlite:../data/fish.db" } }` in `weblingo.config` or a site's `wasp.config`, or by a connection string, its provider's name, a colon, and what the provider reads, SQLite's a file's path or `:memory:`; `query(sql, values)` gives an array of maps, a map for each row, `execute(sql, values)` the number of rows it changed, and `transaction(async () => { … })` commits what its function does, or rolls it back where it throws. A statement's values are a map, each named `@name` in its SQL, never written into its text:
+
+```javascript
+import { Database } from "std:db";
+using (var db = await Database.open("sqlite::memory:")) {
+  await db.execute("CREATE TABLE Fish (Name TEXT, Price DECIMAL(10, 2))");
+  await db.execute("INSERT INTO Fish VALUES (@name, @price)", { name: "Guppy", price: 3.9m });
+  foreach (var row in await db.query("SELECT Name, Price FROM Fish")) writeLn(row);
+}
+```
+
+```text
+{"Name": "Guppy", "Price": 3.9m}
+```
+
+A database's own failure, a statement it refuses, is a `DatabaseError`, WL3015. SQLite is the database there is for now; the Standard Library Reference describes the module.
+
 ### Native modules
 
 A native module is code compiled for .NET, an assembly that extends what scripts can use, as Python's C extensions do.
@@ -1987,6 +2007,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL3011 | a file that cannot be read or written |
 | WL3013 | an integer's remainder by 0 |
 | WL3014 | a host that cannot be reached, or a connection that fails |
+| WL3015 | a statement a database refuses, or a database that cannot be opened |
 | **WL4xxx** | **bytecode** |
 | WL4001 | bytecode that fails verification, such as a damaged `.wlbc` |
 | WL4002 | a program too large for the bytecode |
@@ -2005,4 +2026,4 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Library**: database access.
+- **Library**: a database's rows read one at a time, for results too large to hold whole; databases other than SQLite.

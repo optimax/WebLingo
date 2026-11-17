@@ -26,8 +26,9 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 14. [`std:fs`](#14-stdfs)
 15. [`std:http`](#15-stdhttp)
 16. [`std:net`](#16-stdnet)
-17. [Native modules](#17-native-modules)
-18. [In WASP's pages](#18-in-wasps-pages)
+17. [`std:db`](#17-stddb)
+18. [Native modules](#18-native-modules)
+19. [In WASP's pages](#19-in-wasps-pages)
 
 ---
 
@@ -289,6 +290,7 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `IOError` | WL3011 | a file or a folder that cannot be read, written or removed |
 | `DivisionByZeroError` | WL3013 | an integer's remainder by 0, `7 % 0` |
 | `NetworkError` | WL3014 | a host that cannot be reached, a connection that fails, a request that takes too long |
+| `DatabaseError` | WL3015 | a statement a database refuses, a database that cannot be opened |
 
 ```javascript
 try {
@@ -630,17 +632,60 @@ HTTP/1.0 200 OK
 
 ---
 
-## 17. Native modules
+## 17. `std:db`
+
+Databases, through the platform's: one module for every database, the SQL passed on as it is, so that each database's own SQL works. Its class, `Database`:
+
+| Member | What it does |
+|---|---|
+| `Database.open(name)` | a task of a connection to the database the configuration names, or to the one a connection string describes, `"sqlite:C:/data/fish.db"` |
+| `db.query(sql, values, options)` | a task of its rows, an array of maps, each from a column's name to its value |
+| `db.execute(sql, values, options)` | a task of the number of rows the statement changed |
+| `db.transaction(work, options)` | begins a transaction, awaits the function `work`, and commits, or rolls back where `work` throws, throwing on; a task of what `work` gave |
+| `db.begin(options)`, `db.commit()`, `db.rollback()` | a transaction's steps, each a task; a connection's transactions do not nest |
+| `db.provider`, `db.serverVersion` | the database's kind, `"sqlite"`, and its version |
+| `db.dispose()` | closes it, as `using` does, rolling back a transaction still open |
+
+A configuration names a script's or a site's databases, `weblingo.config` beside a script and a site's `wasp.config`, `{ "databases": { "fish": "sqlite:../database/fish.db" } }`, a relative path there being from the configuration's folder, and a script opens one by its name, `Database.open("fish")`, or by a connection string of its own, a relative path then from the current folder. SQLite's connection string is a file's path, the file made when it is not there, `:memory:`, a database in memory, or SQLite's own, which holds an `=`, `"sqlite:Data Source=fish.db;Mode=ReadOnly"`.
+
+A statement's values are a map, `{ max: 10 }`, each named `@max` in its SQL, never written into its text: `null`, Booleans, integers, numbers, decimals, strings, bytes and dates. Its options are a map, a statement's `{ timeout: 30 }`, in seconds, and a transaction's `{ isolation: "serializable" }`, one of `readUncommitted`, `readCommitted`, `repeatableRead`, `serializable` and `snapshot`, one the database does not take an error. SQLite's values come back as integers, numbers, strings and bytes, a column declared a decimal, `DECIMAL(10, 2)`, as a decimal, a Boolean, `BOOLEAN`, as one, and a date, `DATETIME`, as one. A connection's operations run one at a time. What cannot be asked for, a name no configuration gives, a value of another kind, an option it does not take, is WL3001; the database's own failure, a statement it refuses or a file it cannot open, a `DatabaseError`, WL3015.
+
+```javascript
+import { Database } from "std:db";
+using (var db = await Database.open("sqlite::memory:")) {
+  await db.execute("CREATE TABLE Fish (Id INTEGER PRIMARY KEY, Name TEXT, Price DECIMAL(10, 2), Stock INTEGER)");
+  foreach (var fish in [{ name: "Neon tetra", price: 2.5m, stock: 120 }, { name: "Discus", price: 49m, stock: 6 }]) {
+    await db.execute("INSERT INTO Fish (Name, Price, Stock) VALUES (@name, @price, @stock)", fish);
+  }
+  writeLn(await db.query("SELECT Name, Price FROM Fish WHERE Price < @max", { max: 10 }));
+  var left = await db.transaction(async () => {
+    await db.execute("UPDATE Fish SET Stock = Stock - @sold WHERE Name = @name", { sold: 2, name: "Discus" });
+    return (await db.query("SELECT Stock FROM Fish WHERE Name = 'Discus'"))[0]["Stock"];
+  });
+  writeLn([left, db.provider]);
+  try { await db.query("SELECT * FROM Tanks"); } catch (DatabaseError e) { writeLn([e.code, e.message]); }
+}
+```
+
+```text
+[{"Name": "Neon tetra", "Price": 2.5m}]
+[4, "sqlite"]
+["WL3015", "SQLite Error 1: 'no such table: Tanks'."]
+```
+
+---
+
+## 18. Native modules
 
 A native module is code compiled for .NET that extends what scripts can use: functions and classes, imported as any
 module's are, by a scheme naming a folder of them, `import db from "native:sqlite";`. The folders are named by the
 configuration, `weblingo.config` beside a script and `wasp.config` in a site, `{ "schemes": { "native":
 "C:/WebLingo/native" } }`, and by the command line's `--scheme native=folder`. The standard modules, `std:system`,
-`std:tasks`, `std:fs`, `std:http` and `std:net`, are native modules themselves, in the `std` folder beside `weblingo` and `wasp`.
+`std:tasks`, `std:fs`, `std:http`, `std:net` and `std:db`, are native modules themselves, in the `std` folder beside `weblingo` and `wasp`.
 
 ---
 
-## 18. In WASP's pages
+## 19. In WASP's pages
 
 A page, a layout and a component that declare `param request;` and `param response;` are given the request they
 answer and the response they make; a `.wl` route handler is given them as its function's arguments. Their members are

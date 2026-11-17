@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The platform's databases on .NET, through ADO.NET's providers: an adapter, outside the portable core (section 7.11). -->
+  <PropertyGroup><OutputType>Library</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../WebLingo.Platform.Abstractions/WebLingo.Platform.Abstractions.csproj" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+</Project>

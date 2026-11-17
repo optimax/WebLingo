@@ -1,8 +1,9 @@
 # Examples
 
-Each folder here is a site's own files, as a server runs them: its pages, its modules, its other files and its
-`web.config`, side by side, as a PHP site's are. WebLingo itself is installed once on the server, for every site. The
-WASP User Manual, `Documents/wasp-user-manual.md`, explains what the examples use.
+Each example is a site's own files, as a server runs them: its pages, its modules, its other files and its
+`web.config`, side by side, as a PHP site's are; example2's site is its `site` folder, its database in a folder
+beside it. WebLingo itself is installed once on the server, for every site. The WASP User Manual,
+`Documents/wasp-user-manual.md`, explains what the examples use.
 
 ## example1: The Lingo Tea House, a website built with WASP
 
@@ -96,3 +97,73 @@ the module then writes it to `C:\inetpub\logs\WebLingo`, outside the site, in fi
 
 Updating WebLingo updates every site at once. A running `wasp.exe` keeps its files in use, so stop the sites'
 application pools, or IIS (`iisreset /stop`), before copying the new version over the old, and start them again after.
+
+## example2: Lingo Aquatics, a fish store with a database
+
+A tropical fish store's site, an example of a site with a database: its fourteen fish, their photos' credits and its
+orders are in a SQLite database, which its pages read and change through `std:db`, WebLingo's module for databases.
+The database is outside the site's folder, so that it is never served, its place named by the site's `wasp.config`.
+
+```text
+example2/
+  database/             outside the site: the database, and the script that makes it
+    setup.wl            makes fish.db: its tables, the fish and a few orders
+    weblingo.config     names the database "fish" for setup.wl: { "databases": { "fish": "sqlite:fish.db" } }
+    fish.db             made by setup.wl, not in the repository
+  site/                 the site, and wasp's root
+    web.config          IIS's configuration, as example1's
+    wasp.config         names the database "fish" for the pages: "sqlite:../database/fish.db"
+    index.wasp          /                 the two waters, and this week's favourites
+    fish/index.wasp     /fish             the fish, of one water, ?water=marine, up to a price, ?max=10, or by name, ?q=tetra
+    fish/item.wasp      /fish/item?id=6   one fish, and a form to order it
+    order.wasp          /order            an order, posted by that form, placed in a transaction
+    orders.wasp         /orders           the latest orders, a join of two tables
+    credits.wasp        /credits          each photo's author and licence, from the database
+    api/fish.wl         /api/fish         the fish as JSON, a route handler
+    lib/store.wl        the module the pages ask the database through
+    layouts/, includes/, components/, css/   as example1's
+    images/             the fish's photos, 1024 x 768, and their credits, CREDITS.md
+```
+
+### What it shows
+
+- **A database a site names.** `wasp.config` names it, `{ "databases": { "fish": "sqlite:../database/fish.db" } }`, a
+  relative path being from the configuration's folder, and a script opens it by that name, so that where it is, and
+  which database it is, stay out of the scripts: `using (var db = await Database.open("fish")) { … }`.
+- **Queries with values.** `await db.query(sql, { water: water, max: max })` gives an array of maps, a map for each row,
+  each value named in the SQL as `@water` and `@max`, never pasted into its text; `lib/store.wl` asks the database for
+  each page.
+- **A transaction.** `order.wasp` checks a fish's stock, lowers it and records the order in one
+  `await db.transaction(async () => { … })`, which commits, or rolls back where its function throws, as it does when
+  fewer fish are left than ordered.
+- **Values a database holds.** A price is a decimal, `DECIMAL(10, 2)`, read as one, `24.90m`; an order's time a date,
+  `DATETIME`, formatted by an interpolation, `{order['Placed']:yyyy-MM-dd HH:mm}`.
+- **The photos' provenance.** Each photo is from Wikimedia Commons, its author, licence and page in the database, which
+  `/credits` lists, and in `images/CREDITS.md`.
+
+### Running it locally
+
+With the .NET 10 SDK, from the repository's root, make the database first, then serve the site:
+
+```bash
+dotnet run --project WebLingo/src/WebLingo.Cli -- run Examples/example2/database/setup.wl
+```
+
+```bash
+dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples/example2/site
+```
+
+and open <http://localhost:8080/>. `setup.wl` makes `fish.db` beside itself, anew each time it runs: run it again to
+put the stock and the orders back as they were.
+
+### Deploying it to IIS
+
+As example1, with WebLingo installed once on the server, and then:
+
+1. Copy both folders, `site` and `database`, to the server, side by side, so that `../database/fish.db` from the site
+   is the database; or put the database elsewhere, and change the path in `wasp.config`.
+2. Make the database there, `weblingo run setup.wl` in the `database` folder, with `C:\Program Files\WebLingo\weblingo.exe`.
+3. Give the site's application pool (`IIS AppPool\<pool>`) write access to the `database` folder: SQLite writes its
+   journal beside the database while it changes it.
+4. In IIS, add a website whose physical path is the `site` folder, in an application pool whose .NET CLR version is
+   "No Managed Code".

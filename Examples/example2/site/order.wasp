@@ -1,0 +1,59 @@
+<% param request; param response; import { Database } from "std:db"; %>
+<% layout "/layouts/main.wasp", { title: "Your order", section: "orders" }; %>
+<%
+  // An order, posted by a fish's page: its fields read, then, in one transaction, the fish's stock checked and lowered
+  // and the order recorded, so that two customers ordering the last fish at once cannot both have it.
+  var problem = null;
+  var placed = null;
+  var quantity = null;
+  var customer = "";
+  if (request.method != "POST") {
+    problem = "Choose a fish, and order it from its page.";
+  } else {
+    var form = await request.form();
+    var id = null;
+    try {
+      id = Integer.parse(form?["fish"] ?? "");
+      quantity = Integer.parse(form?["quantity"] ?? "");
+    } catch (e) {
+    }
+    customer = (form?["customer"] ?? "").trim();
+    if (id == null || quantity == null || quantity < 1 || quantity > 100) {
+      problem = "An order is of 1 to 100 fish.";
+    } else if (customer == "" || customer.length > 60) {
+      problem = "Please give your name, in 60 letters at most.";
+    } else {
+      using (var db = await Database.open("fish")) {
+        try {
+          placed = await db.transaction(async () => {
+            var fish = (await db.query("SELECT Id, Name, Price, Stock FROM Fish WHERE Id = @id", { id: id }))?[0];
+            if (fish == null) {
+              throw new Error("We have no such fish.");
+            }
+            if (fish["Stock"] < quantity) {
+              throw new Error($"We have only {fish['Stock']} {fish['Name']} left.");
+            }
+            await db.execute("UPDATE Fish SET Stock = Stock - @quantity WHERE Id = @id", { quantity: quantity, id: id });
+            await db.execute("INSERT INTO Orders (FishId, Quantity, Customer, Placed) VALUES (@id, @quantity, @customer, @placed)",
+              { id: id, quantity: quantity, customer: customer, placed: DateTime.now() });
+            return { name: fish["Name"], total: fish["Price"] * quantity, left: fish["Stock"] - quantity };
+          });
+        } catch (e) {
+          problem = e.message;
+        }
+      }
+    }
+  }
+  if (problem != null) {
+    response.status = 400;
+  }
+%>
+<% if (problem != null) { %>
+<h1>Not ordered</h1>
+<p class="problem"><%= problem %></p>
+<p><a href="/fish">Back to our fish</a></p>
+<% } else { %>
+<h1>Thank you, <%= customer %></h1>
+<p>Your order of <%= quantity %> <%= placed["name"] %> comes to <%= $"€{placed['total']:N2}" %>. We have <%= placed["left"] %> left.</p>
+<p><a href="/orders">See the orders</a> or <a href="/fish">order more fish</a>.</p>
+<% } %>

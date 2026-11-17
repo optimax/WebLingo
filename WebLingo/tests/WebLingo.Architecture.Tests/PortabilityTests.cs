@@ -64,7 +64,7 @@ public sealed class PortabilityTests
     {
         "WebLingo.Core", "WebLingo.Language", "WebLingo.Bytecode", "WebLingo.Compiler", "WebLingo.Runtime",
         "WebLingo.VM", "WebLingo.VM.Stack", "WebLingo.Templates", "WebLingo.StdLib", "WebLingo.StdLib.Tasks", "WebLingo.Platform.Abstractions",
-        "WebLingo.StdLib.Fs", "WebLingo.StdLib.Http", "WebLingo.StdLib.Net", "WebLingo.Hosting.Abstractions", "WebLingo.Hosting",
+        "WebLingo.StdLib.Fs", "WebLingo.StdLib.Http", "WebLingo.StdLib.Net", "WebLingo.StdLib.Db", "WebLingo.Hosting.Abstractions", "WebLingo.Hosting",
     };
 
     [Theory]

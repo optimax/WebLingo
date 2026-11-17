@@ -1,0 +1,17 @@
+<% import { credits } from "/lib/store.wl"; %>
+<% layout "/layouts/main.wasp", { title: "Photo credits", section: "credits" }; %>
+<h1>Photo credits</h1>
+<p>Every photo is from Wikimedia Commons, cropped to 4:3 and scaled to 1024 by 768 pixels. Each is its author's,
+under the licence named, which its link shows on Commons; those under CC BY-SA are shared under it in turn.</p>
+<table class="credits">
+  <thead><tr><th>Fish</th><th>Photo by</th><th>Licence</th></tr></thead>
+  <tbody>
+<% foreach (var photo in await credits()) { %>
+    <tr>
+      <td><a href="/images/<%= photo["Slug"] %>.jpg"><%= photo["Name"] %></a></td>
+      <td><%= photo["PhotoAuthor"] %></td>
+      <td><a href="<%= photo["PhotoSource"] %>"><%= photo["PhotoLicence"] %></a></td>
+    </tr>
+<% } %>
+  </tbody>
+</table>

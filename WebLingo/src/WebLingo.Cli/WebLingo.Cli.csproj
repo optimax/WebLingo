@@ -9,12 +9,14 @@
     <ProjectReference Include="../WebLingo.VM.Stack/WebLingo.VM.Stack.csproj" />
     <ProjectReference Include="../WebLingo.StdLib/WebLingo.StdLib.csproj" />
     <ProjectReference Include="../WebLingo.Platform.DotNet/WebLingo.Platform.DotNet.csproj" />
+    <ProjectReference Include="../WebLingo.Data.DotNet/WebLingo.Data.DotNet.csproj" />
     <ProjectReference Include="../WebLingo.Templates/WebLingo.Templates.csproj" />
     <!-- Built first, not referenced: a standard module the host loads as any native module is (section 3.9). -->
     <ProjectReference Include="../WebLingo.StdLib.Tasks/WebLingo.StdLib.Tasks.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Fs/WebLingo.StdLib.Fs.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Http/WebLingo.StdLib.Http.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Net/WebLingo.StdLib.Net.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../WebLingo.StdLib.Db/WebLingo.StdLib.Db.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <!-- std:system, a native module installed with the runtime, in std/ beside its program (section 3.9); and so beside
@@ -28,6 +30,8 @@
     <None Include="../WebLingo.StdLib.Http/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Http.dll" Link="std/http.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.StdLib.Net/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Net.dll" Link="std/net.dll"
+          CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="../WebLingo.StdLib.Db/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Db.dll" Link="std/db.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
 </Project>

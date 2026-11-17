@@ -1,0 +1,30 @@
+<% param request; import { catalogue, waterOf, heading } from "/lib/store.wl"; %>
+<% layout "/layouts/main.wasp", { title: heading(waterOf(request.query?["water"])), section: waterOf(request.query?["water"]) ?? "fish" }; %>
+<%
+  // The filters, from the query's text: ?water=marine&max=10&q=tetra, each left out when it is not given or not one.
+  var water = waterOf(request.query?["water"]);
+  var search = request.query?["q"] ?? "";
+  var max = null;
+  try {
+    max = Number.parse(request.query?["max"] ?? "");
+  } catch (e) {
+  }
+  var fish = await catalogue(water, max, search == "" ? null : search);
+%>
+<h1><%= heading(water) %></h1>
+<form class="filters" method="get" action="/fish">
+<% if (water != null) { %>
+  <input type="hidden" name="water" value="<%= water %>">
+<% } %>
+  <label>Name <input type="search" name="q" value="<%= search %>"></label>
+  <label>Up to € <input type="number" name="max" min="0" step="0.5" value="<%= max ?? "" %>"></label>
+  <button>Show</button>
+</form>
+<% if (fish.length == 0) { %>
+<p>No fish match: try another name, or a higher price.</p>
+<% } else { %>
+<p><%= fish.length %> <%= fish.length == 1 ? "kind" : "kinds" %> of fish.</p>
+<div class="cards">
+<%   foreach (var one in fish) { await renderComponent("/components/fish-card.wasp", { fish: one }); } %>
+</div>
+<% } %>

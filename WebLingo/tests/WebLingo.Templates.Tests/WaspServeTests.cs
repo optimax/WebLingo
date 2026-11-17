@@ -97,6 +97,72 @@ public sealed class WaspServeTests : IDisposable
     }
 
     [Fact]
+    public async Task TheFishStoreServesItsDatabase()
+    {
+        // Examples/example2, the owner's example of a site with a database: copied, its database made by its setup.wl, as
+        // its README says, outside the site's folder, then served (section 7.11).
+        var folder = new DirectoryInfo(AppContext.BaseDirectory);
+        while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Examples", "example2", "site", "web.config"))) folder = folder.Parent;
+        Assert.NotNull(folder);
+        var copy = Path.Combine(Path.GetTempPath(), "wasp-example2-" + Guid.NewGuid().ToString("N"));
+        foreach (var file in Directory.GetFiles(Path.Combine(folder.FullName, "Examples", "example2"), "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(Path.Combine(folder.FullName, "Examples", "example2"), file);
+            if (relative.EndsWith(".db", StringComparison.Ordinal)) continue;
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(copy, relative))!);
+            File.Copy(file, Path.Combine(copy, relative));
+        }
+        try
+        {
+            var (made, setupError) = (new StringWriter(), new StringWriter());
+            Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.Combine(copy, "database", "setup.wl")], made, setupError));
+            Assert.Equal(("fish.db has 14 fish and 3 orders.\n", ""), (made.ToString(), setupError.ToString()));
+            var server = WebLingoWaspServer.Create(Path.Combine(copy, "site"), 0, new Dictionary<string, string>(), out var error, out _);
+            Assert.True(server is not null, error);
+            await server.StartAsync();
+            try
+            {
+                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                using var client = new HttpClient { BaseAddress = new Uri(address) };
+                foreach (var (path, text) in new[]
+                         {
+                             ("/", "4 kinds, 41 fish in the tanks, from €24.90"), ("/fish?water=marine", "4 kinds of fish."),
+                             ("/fish?q=tetra&max=3", "<h3>Neon tetra</h3>"), ("/fish/item?id=6", "<td>26 to 31 °C</td>"),
+                             ("/orders", "<td>Tomás</td>"), ("/credits", "CC BY-SA 3.0"), ("/api/fish?water=marine", "\"Slug\":\"royal-gramma\"")
+                         })
+                {
+                    var response = await client.GetAsync(path);
+                    var body = await response.Content.ReadAsStringAsync();
+                    Assert.True(response.StatusCode == HttpStatusCode.OK, path + ": " + body);
+                    Assert.Contains(text, body);
+                }
+                Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/fish/item?id=99")).StatusCode);
+                Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/lib/store.wl")).StatusCode);
+
+                // An order, in a transaction: the stock lowered, the order recorded; one for more than is left refused.
+                var order = await client.PostAsync("/order", new FormUrlEncodedContent(
+                    [new("fish", "13"), new("quantity", "3"), new("customer", "Mia")]));
+                Assert.Equal(HttpStatusCode.OK, order.StatusCode);
+                Assert.Contains("Your order of 3 Mandarinfish comes to €117.00. We have 1 left.", await order.Content.ReadAsStringAsync());
+                var refused = await client.PostAsync("/order", new FormUrlEncodedContent(
+                    [new("fish", "13"), new("quantity", "2"), new("customer", "Leo")]));
+                Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+                Assert.Contains("We have only 1 Mandarinfish left.", await refused.Content.ReadAsStringAsync());
+                Assert.Contains("<td>Mia</td>", await client.GetStringAsync("/orders"));
+            }
+            finally
+            {
+                await server.StopAsync();
+            }
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Directory.Delete(copy, recursive: true);
+        }
+    }
+
+    [Fact]
     public void TheConfigurationNamesTheEnvironment()
     {
         // A site's configuration is wasp.config (the owner's decision, 16 November 2026); its weblingo.config is not read.

@@ -45,6 +45,9 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// <summary>The network its scripts may reach, the hosts its configuration allows; none without one (section 7.9).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoNetwork? Network { get; init; }
 
+    /// <summary>The databases its scripts may open, those its configuration names among them; none without them (section 7.11).</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoDatabases? Databases { get; init; }
+
     /// <summary>The host's side of an execution's scheduler, a new one for each request, or none.</summary>
     public Func<IWebLingoSchedulerHost>? Scheduler { get; init; }
 

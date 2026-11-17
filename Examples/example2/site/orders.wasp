@@ -1,0 +1,18 @@
+<% import { recentOrders } from "/lib/store.wl"; %>
+<% layout "/layouts/main.wasp", { title: "Orders", section: "orders" }; %>
+<h1>The latest orders</h1>
+<table class="orders">
+  <thead><tr><th>No.</th><th>Placed</th><th>Customer</th><th>Fish</th><th>How many</th><th>Total</th></tr></thead>
+  <tbody>
+<% foreach (var order in await recentOrders()) { %>
+    <tr>
+      <td><%= order["Id"] %></td>
+      <td><%= $"{order['Placed']:yyyy-MM-dd HH:mm}" %></td>
+      <td><%= order["Customer"] %></td>
+      <td><a href="/fish/item?id=<%= order["FishId"] %>"><%= order["Name"] %></a></td>
+      <td><%= order["Quantity"] %></td>
+      <td><%= $"€{order['Total']:N2}" %></td>
+    </tr>
+<% } %>
+  </tbody>
+</table>

@@ -96,6 +96,8 @@ public static class WebLingoDiagnosticCodes
     public const string DivisionByZero = "WL3013";
     /// <summary>A network's failure: a host not found, a connection refused or lost, a request too slow (proposed, section 7.9, <c>NetworkError</c>).</summary>
     public const string NetworkFailure = "WL3014";
+    /// <summary>A database's failure: a statement it refuses, a file it cannot open (proposed, section 7.11, <c>DatabaseError</c>).</summary>
+    public const string DatabaseFailure = "WL3015";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";

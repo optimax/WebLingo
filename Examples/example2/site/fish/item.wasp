@@ -1,0 +1,36 @@
+<% param request; param response; import { one, idOf, heading } from "/lib/store.wl"; %>
+<% layout "/layouts/main.wasp", { title: (await one(idOf(request.query?["id"])))?["Name"] ?? "No such fish", section: "fish" }; %>
+<% var fish = await one(idOf(request.query?["id"])); %>
+<% if (fish == null) { response.status = 404; %>
+<h1>No such fish</h1>
+<p>We have no fish of that number: <a href="/fish">see all our fish</a>.</p>
+<% } else { %>
+<article class="detail <%= fish["Water"] %>">
+  <img src="/images/<%= fish["Slug"] %>.jpg" alt="<%= fish["Name"] %>" width="1024" height="768">
+  <div>
+    <h1><%= fish["Name"] %></h1>
+    <p class="species"><%= fish["Species"] %>, from <%= fish["Origin"] %></p>
+    <p><%= fish["Description"] %></p>
+    <table>
+      <tr><th>Water</th><td><a href="/fish?water=<%= fish["Water"] %>"><%= heading(fish["Water"]) %></a></td></tr>
+      <tr><th>Adult size</th><td><%= $"{fish['SizeCm']:0.#} cm" %></td></tr>
+      <tr><th>Temperature</th><td><%= fish["LowC"] %> to <%= fish["HighC"] %> °C</td></tr>
+      <tr><th>Care</th><td><%= fish["Care"] %></td></tr>
+      <tr><th>Temperament</th><td><%= fish["Temperament"] %></td></tr>
+      <tr><th>Price</th><td><%= $"€{fish['Price']:N2}" %> each</td></tr>
+      <tr><th>In the tanks</th><td><%= fish["Stock"] %></td></tr>
+    </table>
+<%   if (fish["Stock"] > 0) { %>
+    <form class="order" method="post" action="/order">
+      <input type="hidden" name="fish" value="<%= fish["Id"] %>">
+      <label>How many <input type="number" name="quantity" min="1" max="<%= fish["Stock"] %>" value="1" required></label>
+      <label>Your name <input type="text" name="customer" maxlength="60" required></label>
+      <button>Order</button>
+    </form>
+<%   } else { %>
+    <p class="out">Sold out for now.</p>
+<%   } %>
+    <p class="credit">Photo: <%= fish["PhotoAuthor"] %>, <a href="<%= fish["PhotoSource"] %>"><%= fish["PhotoLicence"] %></a>.</p>
+  </div>
+</article>
+<% } %>

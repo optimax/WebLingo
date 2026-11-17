@@ -1,0 +1,9 @@
+<% param fish; %>
+<article class="fish <%= fish["Water"] %>">
+  <a href="/fish/item?id=<%= fish["Id"] %>">
+    <img src="/images/<%= fish["Slug"] %>.jpg" alt="<%= fish["Name"] %>" width="1024" height="768" loading="lazy">
+    <h3><%= fish["Name"] %></h3>
+  </a>
+  <p class="species"><%= fish["Species"] %></p>
+  <p class="price"><%= $"€{fish['Price']:N2}" %><% if (fish["Stock"] == 0) { %> <span class="out">sold out</span><% } %></p>
+</article>

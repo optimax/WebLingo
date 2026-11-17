@@ -1,0 +1,234 @@
+using System.Data;
+using System.Data.Common;
+using System.Globalization;
+using Microsoft.Data.Sqlite;
+using WebLingo.Platform.Abstractions;
+namespace WebLingo.Data.DotNet;
+
+/// <summary>
+/// The platform's databases on .NET (specification, section 7.11), through ADO.NET's providers: SQLite's,
+/// Microsoft.Data.Sqlite, <c>sqlite</c>. A connection string is its provider's name, a colon, and, for SQLite, a file's
+/// path, or the provider's own connection string, which holds an <c>=</c>, <c>"sqlite:Data Source=shop.db;Mode=ReadOnly"</c>;
+/// <c>:memory:</c> is a database in memory. A name the configuration gives stands for its connection string, a relative
+/// path in which is from the configuration's folder, <paramref name="folder"/>; one in a script's, from the program's
+/// current folder. SQLite makes a file that is not there, and its provider pools connections.
+/// </summary>
+public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configured, string folder) : IWebLingoDatabases
+{
+    /// <summary>The providers this platform has.</summary>
+    public static readonly IReadOnlyList<string> Providers = ["sqlite"];
+
+    public IWebLingoDatabaseConnection Open(string nameOrConnection)
+    {
+        string connection;
+        string? relativeTo = null;
+        if (nameOrConnection.Contains(':')) connection = nameOrConnection;
+        else if (configured.TryGetValue(nameOrConnection, out var found)) (connection, relativeTo) = (found, folder);
+        else throw Invalid($"'{nameOrConnection}' is not a database the configuration names");
+        var colon = connection.IndexOf(':');
+        var (provider, rest) = (connection[..colon], connection[(colon + 1)..]);
+        DbConnection opened = provider switch
+        {
+            "sqlite" => Sqlite(rest, relativeTo),
+            _ => throw Invalid($"'{provider}' is not a database's provider WebLingo has, which are \"{string.Join("\", \"", Providers)}\"")
+        };
+        try
+        {
+            opened.Open();
+            return new Connection(provider, opened);
+        }
+        catch (Exception exception) when (exception is DbException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            opened.Dispose();
+            throw new WebLingoDatabaseException(WebLingoDatabaseErrorKind.Failed, $"the database cannot be opened: {exception.Message}");
+        }
+    }
+
+    /// <summary>A SQLite connection, not yet open, to a file's path or by SQLite's own connection string.</summary>
+    private static SqliteConnection Sqlite(string rest, string? relativeTo)
+    {
+        SqliteConnectionStringBuilder builder;
+        try
+        {
+            builder = rest.Contains('=') ? new SqliteConnectionStringBuilder(rest) : new SqliteConnectionStringBuilder { DataSource = rest };
+        }
+        catch (Exception exception) when (exception is ArgumentException or FormatException)
+        {
+            throw Invalid($"'{rest}' is not a SQLite connection string: {exception.Message}");
+        }
+        if (builder.DataSource.Length == 0) throw Invalid("a SQLite database is a file's path, or :memory:");
+        if (builder.DataSource != ":memory:" && !builder.DataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.DataSource = relativeTo is null ? Path.GetFullPath(builder.DataSource) : Path.GetFullPath(builder.DataSource, relativeTo);
+        }
+        return new SqliteConnection(builder.ConnectionString);
+    }
+
+    private static WebLingoDatabaseException Invalid(string message) => new(WebLingoDatabaseErrorKind.Invalid, message);
+
+    /// <summary>An open connection: one operation at a time, a transaction at most, each command given it.</summary>
+    private sealed class Connection(string provider, DbConnection connection) : IWebLingoDatabaseConnection
+    {
+        private readonly object _gate = new();
+        private DbTransaction? _transaction;
+        private bool _closed;
+
+        public string Provider => provider;
+        public string ServerVersion { get; } = connection.ServerVersion;
+
+        public WebLingoDatabaseRows Query(string sql, IReadOnlyList<KeyValuePair<string, object?>> values, int? timeoutSeconds) => Run(() =>
+        {
+            using var command = Command(sql, values, timeoutSeconds);
+            using var reader = command.ExecuteReader();
+            var columns = new string[reader.FieldCount];
+            for (var i = 0; i < columns.Length; i++) columns[i] = reader.GetName(i);
+            var rows = new List<object?[]>();
+            while (reader.Read())
+            {
+                var row = new object?[columns.Length];
+                for (var i = 0; i < row.Length; i++) row[i] = Value(reader, i);
+                rows.Add(row);
+            }
+            return new WebLingoDatabaseRows(columns, rows);
+        });
+
+        public long Execute(string sql, IReadOnlyList<KeyValuePair<string, object?>> values, int? timeoutSeconds) => Run(() =>
+        {
+            using var command = Command(sql, values, timeoutSeconds);
+            return Math.Max(0L, command.ExecuteNonQuery());
+        });
+
+        public void Begin(string? isolation) => Run(() =>
+        {
+            if (_transaction is not null) throw Invalid("a transaction is open already: a connection's transactions do not nest");
+            try
+            {
+                _transaction = connection.BeginTransaction(Isolation(isolation));
+            }
+            catch (ArgumentException exception)
+            {
+                throw Invalid($"{provider} does not take the isolation '{isolation}': {exception.Message}");
+            }
+            return true;
+        });
+
+        public void Commit() => Run(() =>
+        {
+            var transaction = _transaction ?? throw Invalid("no transaction is open to commit");
+            _transaction = null;
+            using (transaction) transaction.Commit();
+            return true;
+        });
+
+        public void Rollback() => Run(() =>
+        {
+            var transaction = _transaction ?? throw Invalid("no transaction is open to roll back");
+            _transaction = null;
+            using (transaction) transaction.Rollback();
+            return true;
+        });
+
+        public void Dispose()
+        {
+            lock (_gate)
+            {
+                if (_closed) return;
+                _closed = true;
+                _transaction?.Dispose(); // An open transaction is rolled back.
+                _transaction = null;
+                connection.Dispose();
+            }
+        }
+
+        /// <summary>An operation, one at a time, its provider's failures the database's, its script's mistakes WL3001's.</summary>
+        private T Run<T>(Func<T> operation)
+        {
+            lock (_gate)
+            {
+                if (_closed) throw Invalid("the database is closed");
+                try
+                {
+                    return operation();
+                }
+                catch (DbException exception)
+                {
+                    throw new WebLingoDatabaseException(WebLingoDatabaseErrorKind.Failed, exception.Message);
+                }
+                catch (Exception exception) when (exception is InvalidOperationException or ArgumentException or FormatException
+                                                  or InvalidCastException or OverflowException)
+                {
+                    throw Invalid(exception.Message);
+                }
+            }
+        }
+
+        private DbCommand Command(string sql, IReadOnlyList<KeyValuePair<string, object?>> values, int? timeoutSeconds)
+        {
+            var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.Transaction = _transaction;
+            if (timeoutSeconds is { } seconds) command.CommandTimeout = seconds;
+            foreach (var (name, value) in values)
+            {
+                var parameter = command.CreateParameter();
+                parameter.ParameterName = "@" + name;
+                parameter.Value = value ?? DBNull.Value;
+                command.Parameters.Add(parameter);
+            }
+            return command;
+        }
+
+        private static IsolationLevel Isolation(string? name) => name switch
+        {
+            null => IsolationLevel.Unspecified,
+            "readUncommitted" => IsolationLevel.ReadUncommitted,
+            "readCommitted" => IsolationLevel.ReadCommitted,
+            "repeatableRead" => IsolationLevel.RepeatableRead,
+            "serializable" => IsolationLevel.Serializable,
+            "snapshot" => IsolationLevel.Snapshot,
+            _ => throw Invalid($"'{name}' is not an isolation")
+        };
+
+        /// <summary>
+        /// A column's value as one the contract allows. SQLite's are an integer, a real, text or a blob, a column declared
+        /// a decimal (<c>DECIMAL</c>, <c>NUMERIC</c>, <c>MONEY</c>) read as a decimal, a Boolean (<c>BOOL</c>) as one, and a date
+        /// (<c>DATE</c>, <c>DATETIME</c>, <c>TIMESTAMP</c>) as one where its text reads as a date; another provider's as
+        /// its type says.
+        /// </summary>
+        private static object? Value(DbDataReader reader, int i)
+        {
+            if (reader.IsDBNull(i)) return null;
+            var declared = reader.GetDataTypeName(i).ToUpperInvariant();
+            if (reader is SqliteDataReader)
+            {
+                if (declared.Contains("DECIMAL") || declared.Contains("NUMERIC") || declared.Contains("MONEY")) return reader.GetDecimal(i);
+                if (declared.Contains("BOOL")) return reader.GetInt64(i) != 0;
+                if ((declared.Contains("DATE") || declared.Contains("TIMESTAMP")) && reader.GetValue(i) is string text
+                    && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var date))
+                {
+                    return date;
+                }
+            }
+            return reader.GetValue(i) switch
+            {
+                bool b => b,
+                long l => l,
+                int n => (long)n,
+                short s => (long)s,
+                byte b => (long)b,
+                sbyte b => (long)b,
+                ushort u => (long)u,
+                uint u => (long)u,
+                ulong u => u <= long.MaxValue ? (long)u : (decimal)u,
+                double d => d,
+                float f => (double)f,
+                decimal m => m,
+                string s => s,
+                byte[] bytes => bytes,
+                DateTimeOffset date => date,
+                DateTime date => new DateTimeOffset(DateTime.SpecifyKind(date, date.Kind == DateTimeKind.Unspecified ? DateTimeKind.Local : date.Kind)),
+                var other => Convert.ToString(other, CultureInfo.InvariantCulture)
+            };
+        }
+    }
+}
