@@ -122,7 +122,8 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
     /// <c>REQUEST_URI</c>'s before any <c>?</c>, decoded, else <c>SCRIPT_NAME</c> and <c>PATH_INFO</c>; its query,
     /// <c>QUERY_STRING</c>; its scheme, <c>https</c> where <c>HTTPS</c> is on, else <c>REQUEST_SCHEME</c>'s or <c>http</c>; its
     /// host, <c>HTTP_HOST</c>'s, else <c>SERVER_NAME</c>'s; its headers, each <c>HTTP_</c> variable's, its name's words
-    /// joined by <c>-</c>, and <c>CONTENT_TYPE</c> and <c>CONTENT_LENGTH</c>; and its body, <paramref name="body"/>.
+    /// joined by <c>-</c>, and <c>CONTENT_TYPE</c> and <c>CONTENT_LENGTH</c>, which nginx sends as headers too,
+    /// <c>HTTP_CONTENT_TYPE</c> and <c>HTTP_CONTENT_LENGTH</c>, read once; and its body, <paramref name="body"/>.
     /// </summary>
     public static WebLingoBufferedRequest Translate(IReadOnlyList<KeyValuePair<string, string>> parameters, IWebLingoBodyReader body)
     {
@@ -141,7 +142,10 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
         var headers = new List<(string, string)>();
         foreach (var (name, value) in parameters)
         {
-            if (name.StartsWith("HTTP_", StringComparison.Ordinal) && name.Length > 5) headers.Add((HeaderName(name[5..]), value));
+            if (name.StartsWith("HTTP_", StringComparison.Ordinal) && name.Length > 5)
+            {
+                if (name is not ("HTTP_CONTENT_TYPE" or "HTTP_CONTENT_LENGTH")) headers.Add((HeaderName(name[5..]), value));
+            }
             else if (name == "CONTENT_TYPE" && value.Length > 0) headers.Add(("Content-Type", value));
             else if (name == "CONTENT_LENGTH" && value.Length > 0) headers.Add(("Content-Length", value));
         }
@@ -159,7 +163,11 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
     /// <summary>A connection: its records read in turn, its one request at a time, and what is written to it, one write at a time.</summary>
     private sealed class Connection(WebLingoFastCgiServer server, Stream stream, bool ownsStream, bool sequential)
     {
+        /// <summary>How long a connection closed for writing is read, and what comes dropped, before it is closed whole.</summary>
+        private static readonly TimeSpan Draining = TimeSpan.FromSeconds(30);
+
         private readonly SemaphoreSlim _writing = new(1, 1);
+        private readonly CancellationTokenSource _reading = new();
         private readonly object _gate = new();
         private Request? _current;
         private bool _closed;
@@ -172,60 +180,73 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
             }
         }
 
+        /// <summary>
+        /// Reads the web server's records until it closes the connection; once the connection is closed for writing, what
+        /// still comes is read and dropped (<see cref="Close"/>), for at most <see cref="Draining"/>, a pipe's not at all.
+        /// </summary>
         public async Task RunAsync(CancellationToken stop)
         {
-            while (!IsClosed && await WebLingoFastCgiRecords.ReadAsync(stream, stop) is { } record)
+            try
             {
-                switch (record.Type)
+                using var reading = CancellationTokenSource.CreateLinkedTokenSource(stop, _reading.Token);
+                while (!(IsClosed && !ownsStream) && await WebLingoFastCgiRecords.ReadAsync(stream, reading.Token) is { } record)
                 {
-                    case WebLingoFastCgiType.GetValues:
-                        await WriteAsync(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.GetValuesResult, 0, WebLingoFastCgiRecords.WritePairs(Values(record.Content))));
-                        break;
-                    case WebLingoFastCgiType.BeginRequest:
-                        await BeginAsync(record);
-                        break;
-                    case WebLingoFastCgiType.Params when Current(record.RequestId) is { Started: false, HasParams: false } request:
-                        if (record.Content.Length == 0)
-                        {
-                            request.HasParams = true;
-                            if (!sequential)
-                            {
-                                request.Started = true;
-                                _ = server.HandleAsync(this, request);
-                            }
-                        }
-                        else if (request.Params.Length + record.Content.Length > MaxParams)
-                        {
-                            throw new InvalidDataException($"a request's parameters beyond {MaxParams} bytes");
-                        }
-                        else
-                        {
-                            request.Params.Write(record.Content);
-                        }
-                        break;
-                    case WebLingoFastCgiType.Stdin when Current(record.RequestId) is { } request:
-                        if (record.Content.Length > 0)
-                        {
-                            request.Body.Add(record.Content);
+                    if (IsClosed) continue;
+                    switch (record.Type)
+                    {
+                        case WebLingoFastCgiType.GetValues:
+                            await WriteAsync(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.GetValuesResult, 0, WebLingoFastCgiRecords.WritePairs(Values(record.Content))));
                             break;
-                        }
-                        request.Body.End();
-                        if (sequential && request is { HasParams: true, Started: false })
-                        {
-                            // Read whole: it runs, and is answered, before anything more is read.
-                            request.Started = true;
-                            await server.HandleAsync(this, request);
-                        }
-                        break;
-                    case WebLingoFastCgiType.AbortRequest when Current(record.RequestId) is { } request:
-                        request.Gone();
-                        break;
-                    case WebLingoFastCgiType.Params or WebLingoFastCgiType.Stdin or WebLingoFastCgiType.Data or WebLingoFastCgiType.AbortRequest:
-                        break; // A request that is not this connection's, or not any more.
-                    default:
-                        await WriteAsync(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.UnknownType, 0, [(byte)record.Type, 0, 0, 0, 0, 0, 0, 0]));
-                        break;
+                        case WebLingoFastCgiType.BeginRequest:
+                            await BeginAsync(record);
+                            break;
+                        case WebLingoFastCgiType.Params when Current(record.RequestId) is { Started: false, HasParams: false } request:
+                            if (record.Content.Length == 0)
+                            {
+                                request.HasParams = true;
+                                if (!sequential)
+                                {
+                                    request.Started = true;
+                                    _ = server.HandleAsync(this, request);
+                                }
+                            }
+                            else if (request.Params.Length + record.Content.Length > MaxParams)
+                            {
+                                throw new InvalidDataException($"a request's parameters beyond {MaxParams} bytes");
+                            }
+                            else
+                            {
+                                request.Params.Write(record.Content);
+                            }
+                            break;
+                        case WebLingoFastCgiType.Stdin when Current(record.RequestId) is { } request:
+                            if (record.Content.Length > 0)
+                            {
+                                request.Body.Add(record.Content);
+                                break;
+                            }
+                            request.Body.End();
+                            if (sequential && request is { HasParams: true, Started: false })
+                            {
+                                // Read whole: it runs, and is answered, before anything more is read.
+                                request.Started = true;
+                                await server.HandleAsync(this, request);
+                            }
+                            break;
+                        case WebLingoFastCgiType.AbortRequest when Current(record.RequestId) is { } request:
+                            request.Gone();
+                            break;
+                        case WebLingoFastCgiType.Params or WebLingoFastCgiType.Stdin or WebLingoFastCgiType.Data or WebLingoFastCgiType.AbortRequest:
+                            break; // A request that is not this connection's, or not any more.
+                        default:
+                            await WriteAsync(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.UnknownType, 0, [(byte)record.Type, 0, 0, 0, 0, 0, 0, 0]));
+                            break;
+                    }
                 }
+            }
+            finally
+            {
+                _reading.Dispose(); // Its timer, once CancelAfter has run, gone with it.
             }
         }
 
@@ -293,8 +314,11 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
         }
 
         /// <summary>
-        /// Closes the connection, its request gone, as a client that goes is: its stream closed, or, a web server's pipe,
-        /// which the server keeps for the next connection, disconnected.
+        /// Closes the connection, its request gone, as a client that goes is: a socket for writing only, once what was
+        /// written has been sent, its reader going on until the web server closes it too, as PHP-FPM closes one, since a
+        /// socket closed whole with input unread, a request's last <c>FCGI_STDIN</c> that came after its response, is reset,
+        /// and its response's end may be lost; a web server's pipe, which the server keeps for the next connection,
+        /// disconnected; any other stream closed.
         /// </summary>
         public void Close()
         {
@@ -313,9 +337,17 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
             }
             try
             {
-                stream.Close();
+                if (stream is NetworkStream { Socket: var socket })
+                {
+                    socket.Shutdown(SocketShutdown.Send);
+                    _reading.CancelAfter(Draining);
+                }
+                else
+                {
+                    stream.Close();
+                }
             }
-            catch (Exception exception) when (exception is IOException or ObjectDisposedException)
+            catch (Exception exception) when (exception is IOException or ObjectDisposedException or SocketException)
             {
             }
         }

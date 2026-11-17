@@ -108,3 +108,6 @@ secrets.json
 # Backup files
 *.backup
 *.Backup
+
+# Web servers downloaded to try the FastCGI host with (Documents/implementation.md, "Trying FastCGI with nginx and Apache")
+WebServers/

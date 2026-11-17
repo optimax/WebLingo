@@ -939,8 +939,9 @@ and `wasp` reloads it when its files change, as `wasp serve` does. Pass the web 
 files' included: `wasp` serves those too, and never serves the site's modules or its configuration, which a web server
 serving the folder itself would.
 
-**These configurations have not been tried yet**: `wasp fastcgi` has been tried with its tests, which speak FastCGI to
-it as a web server does, on Windows only, and not yet with nginx or Apache.
+**These configurations have been tried on Windows**, with nginx 1.30.6 and Apache httpd 2.4.71, Apache Lounge's build,
+with mod_fcgid 2.3.10, each as written here but for its paths, which had no spaces; not yet on Linux, nor the systemd
+service below.
 
 ### nginx
 
@@ -1022,5 +1023,5 @@ WASP is pre-alpha. These are not there yet, and are planned or being designed:
 - **Uploaded files**: forms posted as `multipart/form-data` cannot be read.
 - **Sessions and cookies**: a page reads the `Cookie` header and sets `Set-Cookie` itself, with `response.headers.add`.
 - **A standalone server**, without IIS, nginx or Apache, is planned. WASP has been tried on Windows, through IIS's
-  ASP.NET Core Module and, with its tests, through FastCGI, but not yet with nginx or Apache; Linux is built and
-  tested, but no site has been served on it yet.
+  ASP.NET Core Module, and through FastCGI behind nginx and Apache httpd; Linux is built and tested, but no site has
+  been served on it yet.

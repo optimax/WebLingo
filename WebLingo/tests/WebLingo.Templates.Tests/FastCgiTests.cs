@@ -88,6 +88,44 @@ public sealed class FastCgiTests : IDisposable
         Assert.Equal(("Status: 200 OK", "Sencha"), (head[0], body));
     }
 
+    /// <summary>
+    /// A form as nginx sends one: its <c>Content-Type</c> and <c>Content-Length</c> both as CGI's <c>CONTENT_TYPE</c> and
+    /// <c>CONTENT_LENGTH</c> and as headers, <c>HTTP_CONTENT_TYPE</c> and <c>HTTP_CONTENT_LENGTH</c>, which are read once.
+    /// </summary>
+    [Fact]
+    public async Task AFormIsReadAsNginxSendsIt()
+    {
+        using var connection = await Connect();
+        var posted = Encoding.UTF8.GetBytes("tea=Genmaicha");
+        var length = posted.Length.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var parameters = Get("/form", ("CONTENT_TYPE", "application/x-www-form-urlencoded"), ("CONTENT_LENGTH", length),
+            ("HTTP_CONTENT_TYPE", "application/x-www-form-urlencoded"), ("HTTP_CONTENT_LENGTH", length));
+        parameters["REQUEST_METHOD"] = "POST";
+        var (head, body, _) = await RequestAsync(connection, 1, parameters, posted);
+        Assert.Equal(("Status: 200 OK", "Genmaicha"), (head[0], body));
+    }
+
+    /// <summary>
+    /// A request answered before the web server has sent all of it, as nginx's GET often is, its empty <c>FCGI_STDIN</c>
+    /// coming after the response: the response is not lost, the connection ended only for writing until the web server has
+    /// sent what it had, so that nothing is left unread, which would reset the connection.
+    /// </summary>
+    [Fact]
+    public async Task AResponseIsNotLostToInputSentAfterIt()
+    {
+        using var connection = await Connect();
+        var stream = connection.GetStream();
+        await stream.WriteAsync(Begin(1, keep: false));
+        await stream.WriteAsync(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.Params, 1, WebLingoFastCgiRecords.WritePairs(Get("/css/site.css"))));
+        await stream.WriteAsync(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.Params, 1, []));
+        await Task.Delay(500); // The response sent meanwhile, and the connection ended.
+        await stream.WriteAsync(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.Stdin, 1, []));
+        await Task.Delay(200);
+        var (head, body, _) = await ReadResponseAsync(stream, 1);
+        Assert.Equal(("Status: 200 OK", "h1 { }"), (head[0], body));
+        Assert.Equal(0, await stream.ReadAsync(new byte[1]));
+    }
+
     [Fact]
     public async Task AStatusAHeaderAndErrorsAreCgis()
     {

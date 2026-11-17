@@ -220,6 +220,18 @@ The benchmark (section 3) writes a Markdown table: each workload's median and fa
 - Tests must pass on Windows and on Linux: no hard-coded `\` or `\r\n`, drive letters, absolute paths, or culture-dependent formatting and parsing.
 - A test of language semantics is changed only after the new behavior was approved (section 5).
 
+### Trying FastCGI with nginx and Apache
+
+`WebServerTests` (`WebLingo.Templates.Tests`) runs `wasp fastcgi` behind nginx, and behind Apache httpd through `mod_proxy_fcgi` and through `mod_fcgid`, as the WASP User Manual's section 18 configures them, on Windows, each unpacked from its download into a folder of its own, listening on 127.0.0.1 only, and stopped. The downloads are kept in the repository's `WebServers` folder, which git ignores, the one zip file of each in a folder of its own; a test whose download is not there is skipped, and so is each on another platform. Those tried (the owner's go-ahead, 17 November 2026), to download again, the same files, for the same results:
+
+| Folder | File | From | Bytes | SHA-256 |
+|---|---|---|---:|---|
+| `WebServers/nginx` | `nginx-1.30.6.zip` | `https://nginx.org/download/nginx-1.30.6.zip` | 2,773,293 | `c6ee35edb0a861063323f709192ae50d1eefaf2ea7d00678bd2b22d8542dc61e` |
+| `WebServers/httpd` | `httpd-2.4.71-261112-Win64-VS18.zip` | `https://www.apachelounge.com/download/VS18/binaries/httpd-2.4.71-261112-Win64-VS18.zip` | 14,518,924 | `44961a929dff16b767b3adbcea55760a942a00239b2891dc55806be34029e1fc` |
+| `WebServers/mod_fcgid` | `mod_fcgid-2.3.10-win64-VS18.zip` | `https://www.apachelounge.com/download/VS18/modules/mod_fcgid-2.3.10-win64-VS18.zip` | 44,638 | `a92808ef3069366c8fcc939f5449f119ed4f0e37eda5575d1fe265e6937ab88a` |
+
+Apache Lounge's build needs Microsoft's Visual C++ Redistributable for Visual Studio 2017–2026, 14.52 or later. A console's httpd stops on Ctrl+C alone, Ctrl+Break restarting it, and no other process can send it Ctrl+C: the tests stop it by force, with what it started, `mod_fcgid`'s `wasp` among them; nginx stops by `nginx -s stop`.
+
 ## A Finished Task's Checks
 
 These are the checks that `TO-DO-INSTRUCTIONS.md` runs after each task and calls main's checks when they are run again on `main`, after the task has landed:
