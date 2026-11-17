@@ -23,6 +23,12 @@ public sealed record WebLingoBoundProgram(
     public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];
     /// <summary>Its files, if it imports others, its own first (section 3.9); empty if it imports none.</summary>
     public IReadOnlyList<WebLingoBoundUnit> Units { get; init; } = [];
+    /// <summary>
+    /// The built-ins the compiler writes in WebLingo for it, among its statements, made with the built-in classes, before
+    /// its imports run: a native function's optional parameters and the methods of arrays that take a function (sections
+    /// 3.6 and 3.9).
+    /// </summary>
+    public IReadOnlyList<WebLingoBoundStatement> MadeFirst { get; init; } = [];
 }
 
 /// <summary>

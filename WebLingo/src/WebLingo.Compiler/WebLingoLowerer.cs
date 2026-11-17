@@ -52,7 +52,7 @@ public sealed class WebLingoLowerer
             // A standard or native module, made with the program's own instance, before any import (section 3.9).
             if (program.Units[i].Builtins is { } builtins) prologue.Add(MakeModule(program.Units[i], i));
         }
-        var statements = lowerer.LowerBlock(program.Statements, prologue);
+        var statements = lowerer.LowerBlock(program.Statements, prologue, program.MadeFirst);
         return new WebLingoIrProgram(statements, Names(program.Locals), program.Builtins)
         {
             Functions = lowerer._functions!,
@@ -107,9 +107,13 @@ public sealed class WebLingoLowerer
         return names;
     }
 
-    /// <summary>A block's statements, after the cells of its captured locals and the closures of its functions.</summary>
+    /// <summary>
+    /// A block's statements, after the cells of its captured locals and the closures of its functions; for a program's
+    /// top level, its <paramref name="prologue"/>, and the built-ins the compiler writes for it, <paramref name="madeFirst"/>,
+    /// made before its imports run.
+    /// </summary>
     private List<WebLingoIrStatement> LowerBlock(IReadOnlyList<WebLingoBoundStatement> block,
-        IReadOnlyList<WebLingoIrStatement>? prologue = null)
+        IReadOnlyList<WebLingoIrStatement>? prologue = null, IReadOnlyList<WebLingoBoundStatement>? madeFirst = null)
     {
         var lowered = new List<WebLingoIrStatement>();
         foreach (var statement in block)
@@ -126,15 +130,23 @@ public sealed class WebLingoLowerer
             if (local is { IsCaptured: true }) lowered.Add(new WebLingoIrNewCell(local.Index, statement.Span));
         }
         // A file's instance, and its imports, each awaited, before its functions and classes, whose bases they may be;
-        // and before those, the built-in classes, which the files it imports use (section 3.9).
-        var madeFirst = new HashSet<WebLingoBoundClassDeclaration>();
+        // and before those, the built-in classes, then the built-ins written in WebLingo for it, a native function's
+        // optional parameters and the methods of arrays that take a function, which the files it imports use, and a
+        // page's body, which its layout's import runs (sections 3.6, 3.9 and 13).
+        var made = new HashSet<WebLingoBoundStatement>();
         if (prologue is not null)
         {
             foreach (var statement in block)
             {
                 if (statement is not WebLingoBoundClassDeclaration declaration || !IsBuiltin(declaration.Class)) continue;
                 lowered.Add(LowerClassDeclaration(declaration));
-                madeFirst.Add(declaration);
+                made.Add(declaration);
+            }
+            foreach (var statement in madeFirst ?? [])
+            {
+                if (statement is WebLingoBoundExtension extension) LowerExtension(extension, lowered);
+                else lowered.Add(LowerStatement(statement));
+                made.Add(statement);
             }
             lowered.AddRange(prologue);
         }
@@ -161,7 +173,7 @@ public sealed class WebLingoLowerer
                 lowered.Add(Initialize(function.Local, new WebLingoIrMakeClosure(LowerFunction(function.Function), function.Span),
                     function.Span));
             }
-            if (statement is WebLingoBoundClassDeclaration declaration && !madeFirst.Contains(declaration))
+            if (statement is WebLingoBoundClassDeclaration declaration && !made.Contains(declaration))
             {
                 lowered.Add(LowerClassDeclaration(declaration));
             }
@@ -179,25 +191,30 @@ public sealed class WebLingoLowerer
         }
         foreach (var statement in block)
         {
-            // An extension, in its order once the block's classes are made and their static fields set, then its own
-            // static fields, set in their order (section 3.7).
-            if (statement is not WebLingoBoundExtension extension) continue;
-            lowered.Add(new WebLingoIrExtend(LowerExpression(extension.Target), LowerClass(extension.Class), extension.Span));
-            foreach (var (name, value, span) in extension.Class.StaticFields)
-            {
-                lowered.Add(SetStatic(LowerExpression(extension.Target), name, value, span));
-            }
+            // An extension, in its order once the block's classes are made and their static fields set.
+            if (statement is WebLingoBoundExtension extension && !made.Contains(extension)) LowerExtension(extension, lowered);
         }
         foreach (var statement in block)
         {
             if (statement is not (WebLingoBoundFunctionDeclaration or WebLingoBoundClassDeclaration or WebLingoBoundExtension
                 or WebLingoBoundImport or WebLingoBoundModuleParameter)
-                && !(prologue is not null && statement is WebLingoBoundVariableDeclaration { IsHostParameter: true }))
+                && !(prologue is not null && statement is WebLingoBoundVariableDeclaration { IsHostParameter: true })
+                && !made.Contains(statement))
             {
                 lowered.Add(LowerStatement(statement));
             }
         }
         return lowered;
+    }
+
+    /// <summary>An extension, then its own static fields, set in their order (section 3.7).</summary>
+    private void LowerExtension(WebLingoBoundExtension extension, List<WebLingoIrStatement> lowered)
+    {
+        lowered.Add(new WebLingoIrExtend(LowerExpression(extension.Target), LowerClass(extension.Class), extension.Span));
+        foreach (var (name, value, span) in extension.Class.StaticFields)
+        {
+            lowered.Add(SetStatic(LowerExpression(extension.Target), name, value, span));
+        }
     }
 
     /// <summary>

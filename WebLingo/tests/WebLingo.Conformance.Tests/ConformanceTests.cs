@@ -1136,6 +1136,25 @@ public sealed class ConformanceTests : IDisposable
     }
 
     [Fact]
+    public void AnImportedModulesTopLevelHasTheBuiltinsWrittenInWebLingo()
+    {
+        // A native function's optional parameters and the methods of arrays that take a function are made with the built-in
+        // classes, before the program's imports run, so that a module's top level has them too (sections 3.6 and 3.9), on
+        // either VM.
+        Directory.CreateDirectory(Path.Combine(_folder, "lib"));
+        File.WriteAllText(Path.Combine(_folder, "lib", "top.wl"),
+            "import fs from \"std:fs\";\nexport var code = null;\ntry { fs.readTextSync(\"no-such-file.txt\"); } catch (IOError e) { code = e.code; }\n" +
+            "export const found = [1, 2, 3].find(x => x > 1);\nexport const doubled = [1, 2].map(x => x * 2);");
+        var source = "import { code, found, doubled } from \"lib/top.wl\";\nwriteLn([code, found, doubled]);";
+        Assert.Equal((WebLingoCommandLine.Success, "[\"WL3011\", 2, [2, 4]]\n", ""), Weblingo("run", source));
+        var program = Path.Combine(_folder, "program.wl");
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
+        var output = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], output, new StringWriter()));
+        Assert.Equal("[\"WL3011\", 2, [2, 4]]\n", output.ToString());
+    }
+
+    [Fact]
     public void TheCliImportsModulesWhileTheProgramRuns()
     {
         Directory.CreateDirectory(Path.Combine(_folder, "lib"));

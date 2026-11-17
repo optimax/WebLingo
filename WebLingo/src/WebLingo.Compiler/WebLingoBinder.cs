@@ -235,8 +235,9 @@ public sealed class WebLingoBinder
             builtins.Add(declaration);
             builtinClasses.Add((name, declaration.Class));
         }
-        builtins.AddRange(_nativeFunctions);
-        if (_arrayMethods is not null) builtins.Add(_arrayMethods); // After the classes it extends and uses (section 3.6).
+        var madeFirst = new List<WebLingoBoundStatement>(_nativeFunctions);
+        if (_arrayMethods is not null) madeFirst.Add(_arrayMethods); // After the classes it extends and uses (section 3.6).
+        builtins.AddRange(madeFirst);
         statements.InsertRange(0, builtins);
         return new WebLingoBoundProgram(statements, _function.Locals, _builtinsInOrder)
         {
@@ -246,7 +247,8 @@ public sealed class WebLingoBinder
             IsAsync = _main.Awaits,
             IsImport = isImport,
             Parameters = programParameters,
-            Units = units
+            Units = units,
+            MadeFirst = madeFirst
         };
     }
 

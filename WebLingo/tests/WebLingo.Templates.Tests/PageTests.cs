@@ -223,6 +223,9 @@ public sealed class PageTests
     [InlineData("<% param who = \"x\"; %>\n<% layout \"/l.wasp\", { who: who, }; %>\nhi", "l.wasp=<% param who; %><%= who %>:<% renderBody(); %>", "x:hi")]
     [InlineData("<% layout \"/l.wasp\"; %>x", "l.wasp=<% param title = \"Home\"; %><%= title %>:<% renderBody(); %>", "Home:x")]
     [InlineData("<% layout \"/l.wasp\"; %>x", "l.wasp=<% renderBody(); renderBody(); %>", "xx")]
+    // The body, which the layout's import runs, has the methods of arrays that take a function (section 3.6) and spreading.
+    [InlineData("<% layout \"/l.wasp\"; %><%= [1, 2, 3].find(x => x > 1) %>,<%= [...[1, 2], 3].map(x => x * 2) %>",
+        "l.wasp=[<% renderBody(); %>]", "[2,[2, 4, 6]]")]
     // A layout may have a layout of its own.
     [InlineData("<% layout \"/l1.wasp\", { title: \"T\" }; %>body",
         "l1.wasp=<% param title; %><% layout \"l2.wasp\", { t: title }; %><main><% renderBody(); %></main>|l2.wasp=<% param t; %><html><%= t %><% renderBody(); %></html>",
