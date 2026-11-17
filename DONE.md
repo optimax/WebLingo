@@ -2822,3 +2822,9 @@ Add from `weblingo-language-reference.md` the items listed in "What is not in th
 2026-11-16 (Claude): each item of the Language Reference's "What is not in the language yet" is a task of its own in `TO-DO.md`, eighteen of them, from `%` to network access, each saying what the specification already decides, what it touches, and its open decisions as questions, so each is marked [QUESTION].
 
 Done (Claude, 2026-11-16): the tasks added to `TO-DO.md`, which is left uncommitted while their questions are open. Main's checks: none needed, nothing of the solution changed.
+
+## [DONE] Standard Library Reference
+
+2026-11-16 (Claude): the task had its title only, read as a reference for the standard library, beside the Language Reference: `Documents/weblingo-standard-library-reference.md`, the built-in functions, every built-in class's members, the standard modules `std:system`, `std:tasks` and `std:fs`, native modules, and the request and the response of WASP's pages, a table and an example for each, every example run with `weblingo`. Linked from the Language Reference, the WASP User Manual, the solution's README and `Documents/implementation.md`, section 2, which says that a change to a built-in class or a standard module updates it in the same change. Guessed: what the title asks for, the document's name, and that the Language Reference keeps its own short section on the standard library, pointing to it.
+
+Done (Claude, 2026-11-16, `d175e0d`): the WebLingo Standard Library Reference. Main's checks: documentation only, the solution unchanged since its last checks.
