@@ -11,7 +11,9 @@ namespace WebLingo.Cli;
 /// file's of its name. A scheme's name is ASCII letters and digits, a letter first, at least two of them, so that a drive
 /// letter is never one. And an application's environment, <c>"environment": "development"</c> or <c>"production"</c>,
 /// and how long, in seconds, a page waits for a client that has not taken its output, <c>"sendTimeout": 30</c>, a number
-/// more than 0 (specification, section 6.12, "Streaming"), which only <c>wasp serve</c> reads.
+/// more than 0 (specification, section 6.12, "Streaming"), which only <c>wasp serve</c> reads; and the hosts its scripts may
+/// reach, <c>"network": { "allow": ["api.example.com"] }</c>, which <c>wasp</c> reads, <c>weblingo</c>'s scripts reaching
+/// any (section 7.9).
 /// </summary>
 public static class WebLingoSchemes
 {
@@ -24,7 +26,13 @@ public static class WebLingoSchemes
     /// </summary>
     public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? error) =>
-        TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out error);
+        TryLoad(program, configuration, given, out schemes, out _, out error);
+
+    /// <summary>As the other, and the hosts the configuration allows its scripts to reach, none when it names none.</summary>
+    public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
+        out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out string? error) =>
+        TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
+            out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
@@ -32,9 +40,17 @@ public static class WebLingoSchemes
     /// timeout, in seconds, or null if it gives none; false, with why, otherwise.
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
-        out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out string? error)
+        out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out string? error) =>
+        TryLoadFolder(folder, configuration, given, out schemes, out environment, out sendTimeout, out _, out error);
+
+    /// <summary>As the other, and the hosts the configuration allows its scripts to reach, none when it names none.</summary>
+    public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
+        out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
+        out string? error)
     {
         sendTimeout = null;
+        var hosts = new List<string>();
+        allowedHosts = hosts;
         schemes = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["std"] = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "std"))
@@ -42,7 +58,7 @@ public static class WebLingoSchemes
         (environment, error) = (null, null);
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
-        if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, ref sendTimeout, out error)) return false;
+        if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, ref sendTimeout, hosts, out error)) return false;
         foreach (var (name, path) in given) schemes[name] = Path.GetFullPath(path);
         return true;
     }
@@ -59,7 +75,7 @@ public static class WebLingoSchemes
     }
 
     private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? environment, ref double? sendTimeout,
-        out string? error)
+        List<string> hosts, out string? error)
     {
         error = null;
         try
@@ -93,9 +109,29 @@ public static class WebLingoSchemes
                     sendTimeout = seconds;
                     continue;
                 }
+                if (setting.Name == "network")
+                {
+                    // The hosts its scripts may reach, by name or address (section 7.9).
+                    if (setting.Value.ValueKind != JsonValueKind.Object || !setting.Value.TryGetProperty("allow", out var allow)
+                        || allow.ValueKind != JsonValueKind.Array)
+                    {
+                        error = $"{file}: \"network\" is an object, {{ \"allow\": [\"api.example.com\"] }}.";
+                        return false;
+                    }
+                    foreach (var host in allow.EnumerateArray())
+                    {
+                        if (host.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(host.GetString()))
+                        {
+                            error = $"{file}: \"network\"'s \"allow\" lists hosts, each a name or an address.";
+                            return false;
+                        }
+                        hosts.Add(host.GetString()!);
+                    }
+                    continue;
+                }
                 if (setting.Name != "schemes")
                 {
-                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"environment\" and \"sendTimeout\".";
+                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"environment\", \"sendTimeout\" and \"network\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)

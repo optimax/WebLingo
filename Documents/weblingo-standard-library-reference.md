@@ -24,8 +24,10 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 12. [`Regex`](#12-regex)
 13. [`Json`](#13-json)
 14. [`std:fs`](#14-stdfs)
-15. [Native modules](#15-native-modules)
-16. [In WASP's pages](#16-in-wasps-pages)
+15. [`std:http`](#15-stdhttp)
+16. [`std:net`](#16-stdnet)
+17. [Native modules](#17-native-modules)
+18. [In WASP's pages](#18-in-wasps-pages)
 
 ---
 
@@ -286,6 +288,7 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `TimeoutError` | WL3010 | a task that did not complete within `Task.timeout`'s time |
 | `IOError` | WL3011 | a file or a folder that cannot be read, written or removed |
 | `DivisionByZeroError` | WL3013 | an integer's remainder by 0, `7 % 0` |
+| `NetworkError` | WL3014 | a host that cannot be reached, a connection that fails, a request that takes too long |
 
 ```javascript
 try {
@@ -544,17 +547,100 @@ false
 
 ---
 
-## 15. Native modules
+## 15. `std:http`
+
+HTTP requests to other servers. Each function is asynchronous, a task of the response, and its request is made off the worker, so that a page's other tasks go on while it waits.
+
+| Function | What it does |
+|---|---|
+| `get(url, headers)` | a `GET` of `url` |
+| `post(url, body, headers)` | a `POST` of `body` to `url` |
+| `request(method, url, body, headers)` | a request of any method, `"PUT"`, `"DELETE"`, `"HEAD"`, its name sent in upper case |
+
+`headers` and `body` may be left out: headers are a map of names to strings, `{ "Accept": "application/json" }`, and a body a string, sent as UTF-8, or bytes. A response is a map:
+
+| Key | What it holds |
+|---|---|
+| `"status"` | its status, an integer, `200` |
+| `"headers"` | its headers, each name in lower case, `"content-type"`, with its value, a header sent more than once with its values joined by `, ` |
+| `"body"` | its body as text, in the charset its `Content-Type` names, UTF-8 unless it names another |
+| `"bytes"` | its body as bytes |
+
+A status that is not a success, `404`, is a response as any other. A redirect is given as it is, its status `301` or `302` and its `"location"`, not followed, so that a script reaches only the hosts it names. A request waits at most 30 seconds to connect and 100 seconds in all, and a body is at most 64 MB. An address that is not an `http` or `https` one, and a host the script may not reach, are WL3001; a host that cannot be reached, a connection that fails and a request that takes too long are a `NetworkError`, WL3014. A script `weblingo` runs may reach any host, and a site's only those its `wasp.config` allows, `{ "network": { "allow": ["api.example.com"] } }`.
+
+Given a server on this machine, at port 8080, that has `teas.json`, `[{"name": "Sencha", "price": 4.5}, {"name": "Genmaicha", "price": 3.75}]`, and `menu.txt`, but no `green.json`:
+
+```javascript
+import http from "std:http";
+var r = await http.get("http://localhost:8080/teas.json", { "Accept": "application/json" });
+writeLn(r["status"]);
+writeLn(r["headers"]["content-type"]);
+var teas = Json.parse(r["body"]);
+writeLn(teas[0]["name"]);
+writeLn(r["bytes"].length);
+var missing = await http.get("http://localhost:8080/green.json");
+writeLn(missing["status"]);
+var head = await http.request("HEAD", "http://localhost:8080/menu.txt");
+writeLn([head["status"], head["body"]]);
+try { await http.get("http://localhost:1/"); } catch (NetworkError e) { writeLn(e.code); }
+```
+
+```text
+200
+application/json
+Sencha
+72
+404
+[200, ""]
+WL3014
+```
+
+---
+
+## 16. `std:net`
+
+TCP connections to other servers, through the native class `Socket`. Each operation but `dispose()` is asynchronous, a task, and runs off the worker.
+
+| Member | What it does |
+|---|---|
+| `Socket.connect(host, port)` | a connection to `host`, a name or an address, at `port`, from 1 to 65535 |
+| `socket.read()` | the bytes that have come, at least one and at most 64 KB, waiting for them, or `null` once the other end has closed |
+| `socket.write(data)` | sends `data`, a string, as UTF-8, or bytes |
+| `socket.dispose()` | closes it, as `using` does |
+
+A host the script may not reach is WL3001, as for `std:http`; a host that cannot be reached, and a connection that fails, are a `NetworkError`, WL3014. Given the server above:
+
+```javascript
+import { Socket } from "std:net";
+using (var socket = await Socket.connect("localhost", 8080)) {
+  await socket.write("HEAD /menu.txt HTTP/1.0\r\nHost: localhost\r\n\r\n");
+  var reply = "";
+  var piece = await socket.read();
+  while (piece != null) {
+    reply += piece.text();
+    piece = await socket.read();
+  }
+  writeLn(reply.split("\r\n")[0]);
+}
+```
+
+```text
+HTTP/1.0 200 OK
+```
+
+---
+
+## 17. Native modules
 
 A native module is code compiled for .NET that extends what scripts can use: functions and classes, imported as any
 module's are, by a scheme naming a folder of them, `import db from "native:sqlite";`. The folders are named by the
 configuration, `weblingo.config` beside a script and `wasp.config` in a site, `{ "schemes": { "native":
 "C:/WebLingo/native" } }`, and by the command line's `--scheme native=folder`. The standard modules, `std:system`,
-`std:tasks` and `std:fs`, are native modules themselves, in the `std` folder beside `weblingo` and `wasp`.
+`std:tasks`, `std:fs`, `std:http` and `std:net`, are native modules themselves, in the `std` folder beside `weblingo` and `wasp`.
 
 ---
 
-## 16. In WASP's pages
+## 18. In WASP's pages
 
 A page, a layout and a component that declare `param request;` and `param response;` are given the request they
 answer and the response they make; a `.wl` route handler is given them as its function's arguments. Their members are

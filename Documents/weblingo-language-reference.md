@@ -1601,6 +1601,7 @@ An error the runtime raises becomes an instance of a class extending `Error`, wi
 | `TimeoutError` | WL3010 | a task that took longer than `Task.timeout` gave it |
 | `IOError` | WL3011 | a file that cannot be read or written |
 | `DivisionByZeroError` | WL3013 | an integer's remainder by 0 |
+| `NetworkError` | WL3014 | a host that cannot be reached, or a connection that fails |
 
 Two errors cannot be caught, and always end the program: running past the execution's limits (WL3003) and being
 cancelled (WL3004).
@@ -1905,6 +1906,25 @@ Each is asynchronous, giving a task, and each has a synchronous form whose name 
 A relative path is from the program's current folder. A file that cannot be read or written is an `IOError`, WL3011,
 naming the path as the script gave it.
 
+### `std:http` and `std:net`
+
+Other servers, reached by HTTP, `std:http`'s `get(url, headers)`, `post(url, body, headers)` and `request(method, url, body, headers)`, each a task of the response, a map of its `"status"`, `"headers"`, `"body"` and `"bytes"`, or by TCP, `std:net`'s `Socket.connect(host, port)`, with `read()`, `write(data)` and `dispose()`. Given a server on this machine, at port 8080, that has a file `menu.txt`:
+
+```javascript
+import http from "std:http";
+var response = await http.get("http://localhost:8080/menu.txt");
+writeLn(response["status"]);
+write(response["body"]);
+```
+
+```text
+200
+Sencha
+Genmaicha
+```
+
+A script `weblingo` runs may reach any host, and a site's only those its `wasp.config` allows. A host that cannot be reached, or a connection that fails, is a `NetworkError`, WL3014. The Standard Library Reference describes both modules.
+
 ### Native modules
 
 A native module is code compiled for .NET, an assembly that extends what scripts can use, as Python's C extensions do.
@@ -1966,6 +1986,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL3010 | a task that took longer than `Task.timeout` gave it |
 | WL3011 | a file that cannot be read or written |
 | WL3013 | an integer's remainder by 0 |
+| WL3014 | a host that cannot be reached, or a connection that fails |
 | **WL4xxx** | **bytecode** |
 | WL4001 | bytecode that fails verification, such as a damaged `.wlbc` |
 | WL4002 | a program too large for the bytecode |
@@ -1984,4 +2005,4 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Library**: network access.
+- **Library**: database access.

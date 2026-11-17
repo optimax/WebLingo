@@ -38,7 +38,7 @@ public static class WebLingoWaspServer
         var site = Environment.GetEnvironmentVariable("ASPNETCORE_IIS_PHYSICAL_PATH") ?? Directory.GetCurrentDirectory();
         var full = Path.GetFullPath(Path.Combine(site, root ?? "."));
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
-            out var sendTimeout, out error)) return null;
+            out var sendTimeout, out var allowedHosts, out error)) return null;
         if (configured is not null) environment = configured == "production" ? WebLingoEnvironment.Production : WebLingoEnvironment.Development;
 
         // std:system, loaded once here to fail early, then by each worker on its own.
@@ -57,6 +57,7 @@ public static class WebLingoWaspServer
             Clock = new WebLingoExecutionClock(new DotNetClock()),
             WallClock = new DotNetClock(),
             TimeZone = new DotNetTimeZone(),
+            Network = new DotNetNetwork(allowedHosts), // Only the hosts wasp.config allows (section 7.9).
             Scheduler = () => new DotNetSchedulerHost(),
             Log = log is null ? null : log.WriteLine,
             SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30)

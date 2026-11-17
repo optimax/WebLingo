@@ -566,6 +566,11 @@ The standard module `std:fs` reads and writes files: `import fs from "std:fs";`,
 whose name ends in `Sync`, `fs.readTextSync(path)`. A relative path is from the server process's current folder, not
 the page's, so a page should build an absolute one.
 
+The standard modules `std:http` and `std:net` reach other servers: `import http from "std:http";`, then
+`await http.get(url)`, `http.post(url, body, headers)` and `http.request(method, url, body, headers)`, each giving
+the response's `"status"`, `"headers"` and `"body"`, and TCP connections, `Socket.connect(host, port)`. A site
+reaches only the hosts its `wasp.config` allows ([section 14](#14-configuration-waspconfig)).
+
 ---
 
 ## 12. Errors
@@ -654,9 +659,21 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"environment"` | `"development"`, errors shown in their pages, or `"production"`, not shown | development under `wasp serve`, production under IIS |
 | `"sendTimeout"` | how many seconds a page waits for a client that has taken nothing of its output, more than 0 | 30 |
 | `"schemes"` | folders of native modules, each a name and a folder: `{ "native": "C:/WebLingo/native" }` | `std`, WebLingo's own |
+| `"network"` | the hosts the site's pages and handlers may reach, through `std:http` and `std:net`: `{ "allow": ["api.example.com"] }` | none |
 
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
 which. `wasp serve` reads the file when it starts; after changing it, start `wasp serve`, or the IIS site, again.
+
+A site reaches other servers only as its `"network"` allows, each host named as an address names it, a name or an
+address, `api.example.com` or `127.0.0.1`, at any of its ports, its letters' case aside:
+
+```json
+{ "network": { "allow": ["api.example.com", "localhost"] } }
+```
+
+A request to any other host is an error where the script makes it, WL3001,
+`'example.com' is not a host this application may reach.`, which a `catch` may catch; without the setting, a site
+reaches no host. A script that `weblingo` runs reaches any.
 
 Its name is `wasp.config`, in lower case: Linux tells `WASP.config` from it. A `weblingo.config` configures a folder of
 scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run` and `wasp check` read the

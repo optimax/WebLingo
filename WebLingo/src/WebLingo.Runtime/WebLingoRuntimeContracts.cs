@@ -51,6 +51,12 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     public WebLingo.Platform.Abstractions.IWebLingoFileSystem? FileSystem { get; init; }
 
     /// <summary>
+    /// The platform's network, which <c>std:http</c> and <c>std:net</c> reach through the heap (<see cref="WebLingoHeap.Network"/>,
+    /// section 7.9), the hosts the application may reach its own; none by default, their functions then WL3001.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoNetwork? Network { get; init; }
+
+    /// <summary>
     /// The host's side of the execution's scheduler, on which work runs off the worker, its outcome posted back to it
     /// (section 7.8, WL-P007); without one, nothing asynchronous but the execution's own tasks and timers runs.
     /// </summary>

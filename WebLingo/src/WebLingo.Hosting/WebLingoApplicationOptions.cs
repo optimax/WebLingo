@@ -42,6 +42,9 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// <summary>The server's own time zone, a date's local time's; without one, UTC.</summary>
     public WebLingo.Platform.Abstractions.IWebLingoTimeZone? TimeZone { get; init; }
 
+    /// <summary>The network its scripts may reach, the hosts its configuration allows; none without one (section 7.9).</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoNetwork? Network { get; init; }
+
     /// <summary>The host's side of an execution's scheduler, a new one for each request, or none.</summary>
     public Func<IWebLingoSchedulerHost>? Scheduler { get; init; }
 

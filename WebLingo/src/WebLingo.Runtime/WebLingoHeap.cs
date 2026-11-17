@@ -78,6 +78,9 @@ public sealed class WebLingoHeap
     /// <summary>The platform's files (<see cref="WebLingoExecutionContext.FileSystem"/>), for native functions, <c>std:fs</c>'s (section 7.4).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoFileSystem? FileSystem { get; set; }
 
+    /// <summary>The platform's network (<see cref="WebLingoExecutionContext.Network"/>), for <c>std:http</c>'s and <c>std:net</c>'s functions (section 7.9).</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoNetwork? Network { get; set; }
+
     /// <summary>The platform's wall clock (<see cref="WebLingoExecutionContext.WallClock"/>), which dates read (section 3.2).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoClock? WallClock { get; set; }
 

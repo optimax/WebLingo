@@ -368,7 +368,7 @@ public static class WebLingoCommandLine
 
     /// <summary>What a command line gives the programs it compiles and runs: its built-ins, its native modules and its files.</summary>
     private sealed record Host(WebLingoBuiltinRegistry Services, WebLingoNativeModuleLoader Native, WebLingoCompilerOptions Options,
-        FileResolver Resolver, IWebLingoTextOutput Output);
+        FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoNetwork Network);
 
     /// <summary>
     /// The host for the file <paramref name="path"/>, whose program's own file is named <paramref name="mainName"/>: its
@@ -378,7 +378,7 @@ public static class WebLingoCommandLine
     private static Host? TryHost(WebLingoCommandLineProgram program, string path, string mainName, IReadOnlyDictionary<string, string> givenSchemes,
         TextWriter output, TextWriter error)
     {
-        if (!WebLingoSchemes.TryLoad(path, program.Configuration, givenSchemes, out var schemes, out var wrongConfiguration))
+        if (!WebLingoSchemes.TryLoad(path, program.Configuration, givenSchemes, out var schemes, out var allowedHosts, out var wrongConfiguration))
         {
             error.WriteLine(wrongConfiguration);
             return null;
@@ -402,8 +402,9 @@ public static class WebLingoCommandLine
             declarations.Add(new WebLingoBuiltinDeclaration(builtin.Name, builtin.Arity));
         }
         var resolver = new FileResolver(mainName);
+        // Any host for a script's, only those its configuration allows for a page's (section 7.9).
         return new Host(services, native, new WebLingoCompilerOptions(declarations) { Resolver = resolver, Native = native }, resolver,
-            textOutput);
+            textOutput, new DotNetNetwork(program.ReachesAnyHost ? null : allowedHosts));
     }
 
     private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters) =>
@@ -416,6 +417,7 @@ public static class WebLingoCommandLine
             Output = host.Output,
             Parameters = parameters,
             FileSystem = new DotNetFileSystem(),
+            Network = host.Network,
             SchedulerHost = new DotNetSchedulerHost()
         };
 

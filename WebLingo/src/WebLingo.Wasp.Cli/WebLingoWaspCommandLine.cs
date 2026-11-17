@@ -24,6 +24,7 @@ public static class WebLingoWaspCommandLine
         new("wasp", Version, ".wasp", WebLingoTemplateBuiltins.Create, (page, options) => Compile(page, options, root))
         {
             Configuration = WebLingoRouteTable.ConfigurationFile,
+            ReachesAnyHost = false,
             Options = "[--root <folder>] ",
             OptionsHelp =
             [

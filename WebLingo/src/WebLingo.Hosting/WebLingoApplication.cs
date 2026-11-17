@@ -202,6 +202,7 @@ public sealed class WebLingoApplication
                 _services[worker.Value].Builtins),
             Output = output,
             FileSystem = _options.FileSystem,
+            Network = _options.Network,
             Clock = _options.Clock,
             WallClock = _options.WallClock,
             TimeZone = _options.TimeZone,

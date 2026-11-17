@@ -34,6 +34,12 @@ public sealed record WebLingoCommandLineProgram(
     /// script's, unless the program has another, as <c>wasp</c> has <c>wasp.config</c>, a site's.
     /// </summary>
     public string Configuration { get; init; } = WebLingoSchemes.ConfigurationFile;
+
+    /// <summary>
+    /// Whether its scripts may reach any host on the network (specification, section 7.9): <c>weblingo</c>'s; else only
+    /// those its configuration allows, as <c>wasp</c>'s pages may.
+    /// </summary>
+    public bool ReachesAnyHost { get; init; } = true;
 }
 
 /// <summary>

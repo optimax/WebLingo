@@ -229,6 +229,24 @@ public sealed class WaspTests : IDisposable
         return (exit, output.ToString(), error.ToString());
     }
 
+    /// <summary>
+    /// A page reaches only the hosts its folder's <c>wasp.config</c> allows (specification, section 7.9): none without one,
+    /// WL3001 where it tries; with <c>127.0.0.1</c> allowed, a port nothing listens on is a <c>NetworkError</c>, its request
+    /// having been made.
+    /// </summary>
+    [Fact]
+    public void APageReachesOnlyTheHostsWaspConfigAllows()
+    {
+        const string page = "<% import http from \"std:http\"; try { await http.get(\"http://127.0.0.1:1/\"); } catch (e) { write(e.code); } %>";
+        Assert.Equal((WebLingoCommandLine.Success, "WL3001", ""), Wasp("run", page));
+        File.WriteAllText(Path.Combine(_folder, "wasp.config"), "{ \"network\": { \"allow\": [\"127.0.0.1\"] } }");
+        Assert.Equal((WebLingoCommandLine.Success, "WL3014", ""), Wasp("run", page));
+        File.WriteAllText(Path.Combine(_folder, "wasp.config"), "{ \"network\": [\"127.0.0.1\"] }");
+        var (exit, _, error) = Wasp("run", page);
+        Assert.Equal(WebLingoCommandLine.FileUnreadable, exit);
+        Assert.Contains("\"network\" is an object", error, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void APageThatCannotBeReadIsReported()
     {

@@ -40,7 +40,7 @@
 | P/Invoke | Adapted | Adapter-only (§7.14) |
 | ASP.NET Core | Adapted | Hosting adapter only |
 | ADO.NET | Adapted | Future database adapters only |
-| System.Net.Http | Adapted | HTTP is a platform service (§7.2) |
+| System.Net.Http, System.Net.Sockets | Adapted | the platform's network, `DotNetNetwork` (`WebLingo.Platform.DotNet`), which `std:http` and `std:net` reach through `IWebLingoNetwork` (§7.2, §7.9) |
 | Reflection.Emit | Prohibited | No dynamic CLR codegen in portable core |
 
 **Checks.** Dependency direction is enforced by the project references and by `DependencyTests`; the rows above classified Adapted, Prohibited or Not used are checked on the portable core's built assemblies by `PortabilityTests` (both in `WebLingo.Architecture.Tests`), which fail when the core references such a type or declares a P/Invoke. A new rule for the portable core goes into this table and into `PortabilityTests`. The CI workflow (`.github/workflows/build.yml` at the repository root) runs these tests on both OSes on every push; its first run passed (CI run 1, 12 November 2026, commit `5229806`). The Planned rows are not checked: they record what the Native C# compiler and runtime must provide.

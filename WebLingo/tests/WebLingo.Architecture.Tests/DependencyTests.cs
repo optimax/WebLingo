@@ -23,6 +23,8 @@ public sealed class DependencyTests
         { "WebLingo.StdLib", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.StdLib.Tasks", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.StdLib.Fs", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
+        { "WebLingo.StdLib.Http", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
+        { "WebLingo.StdLib.Net", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.Platform.Abstractions", ["WebLingo.Core"] },
         { "WebLingo.Hosting.Abstractions", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         // The host's core composes the engine for every adapter (section 6.12), the register VM its pages' only.
@@ -61,7 +63,7 @@ public sealed class DependencyTests
     [Fact]
     public void TheRulesCoverEveryPortableAssembly()
     {
-        Assert.Equal(14, PortableCore.Count); // Section 3 of Documents/implementation.md lists fourteen.
+        Assert.Equal(16, PortableCore.Count); // Section 3 of Documents/implementation.md lists sixteen.
     }
 
     private static IEnumerable<string> References(string assembly) =>

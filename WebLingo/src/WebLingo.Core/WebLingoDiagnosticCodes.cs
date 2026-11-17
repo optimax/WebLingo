@@ -94,6 +94,8 @@ public static class WebLingoDiagnosticCodes
     public const string IOFailure = "WL3011";
     /// <summary>An integer's remainder by 0, <c>7 % 0</c> (the owner's answer, 16 November 2026, section 3.5).</summary>
     public const string DivisionByZero = "WL3013";
+    /// <summary>A network's failure: a host not found, a connection refused or lost, a request too slow (proposed, section 7.9, <c>NetworkError</c>).</summary>
+    public const string NetworkFailure = "WL3014";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";
