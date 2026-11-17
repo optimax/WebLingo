@@ -3068,3 +3068,25 @@ A2: (a)
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.5, and built in the runtime both VMs share. Guessed, and recorded as Proposed (section 15.2, "String methods"): ordinal searching; `indexOf`'s optional `from` and `slice` strict, as bytes' `slice` is, WL3005 outside the string, never counting from its end; `lastIndexOf` without a `from`; `split("")` into scalar values, empty parts kept; .NET's white space for `trim`; case per UTF-16 code unit (`"Straße"` stays `"STRAßE"`); `replace` of an empty string WL3001; a result too large WL3003 before it is built (a new `WebLingoHeap.TryMakeRoom`); `separator.join(array)` of strings, numbers, Booleans, decimals, dates and `null` (as nothing), anything else WL3001; JavaScript's `substring` left out, its meaning differing from C#'s; an array's `join(separator)` left to the array methods. The inventory lists the .NET string methods used, Planned. Described in the Language Reference, its example run with `weblingo`, and the Standard Library Reference.
 
 Done (Claude, 2026-11-16, `0ea51e7`): string methods. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
+
+## [DONE] Array Methods
+
+Arrays have `push`, `pop`, `length`, indexing and `iterate()` only: a proposed first set, `insert(i, v)`, `removeAt(i)`, `indexOf(v)`, `contains(v)`, `slice(start, end)`, `concat(other)`, `join(separator)`, `reverse()`, `sort(compare)`, `map(f)`, `filter(f)`, `reduce(f, initial)`, `find(f)`, `any(f)` and `all(f)`; in the runtime, on both VMs, a function argument called as the VMs call any function, `await`ed where it is `async`. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, their names: (a) as the proposed set has them, `contains`, `any`, `all`, `map`, `filter`; (b) JavaScript's, `includes`, `some`, `every`; (c) C#'s LINQ's, `contains`, `any`, `all`, `select`, `where`.
+
+a1: (a) but provide aliases whenever possible so that both C# developers and JS devs feel at home.
+
+Q2, `sort()` and `reverse()`: (a) change the array, as JavaScript's do; (b) give a new one, the array unchanged.
+
+A2: (b) with a compiler warning for a discarded result.
+
+Q3, `sort()` without a function: (a) integers and numbers by value, strings by `<` (the task above), anything else, or a mix, WL3001; (b) by their text, as JavaScript's.
+
+A3: (a)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.6, and built: the methods that take no function in the runtime, those that take one in WebLingo, an extension of `Array` the compiler adds where a program names one. Guessed, and recorded as Proposed (section 15.2, "Array methods"): `insert` and `removeAt` changing the array, a position outside it WL3005; `indexOf` and `contains` by `==`'s own comparison; `slice` strict; `concat` of an array; `join`'s separator a comma unless given; `reduce`'s initial value required; callbacks given the element alone; an `async` callback awaited, the method then giving a task; `sort(compare)` stable, its compare never awaited, without one by `<`; aliases `includes`, `select`, `where`, `some` and `every`, not `splice`, `Aggregate` or `First`; the warning WL2017 for `x.sort();` or `x.reverse();` whatever `x` is, the compilation now stopping for the binder's errors only. Described in the Language Reference, its example run with `weblingo`, and the Standard Library Reference.
+
+Done (Claude, 2026-11-16, `f5e9047`): array methods. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
