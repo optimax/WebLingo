@@ -8,7 +8,8 @@ value, and integers do not silently overflow.
 This reference describes the language as it is built today, which is pre-alpha: what it says works, and every example
 in it was run with `weblingo`, its output shown as it came. What the language does not have yet is listed at the end,
 in [What is not in the language yet](#17-what-is-not-in-the-language-yet). Pages, which put WebLingo into HTML, are the
-WASP User Manual's (`Documents/wasp-user-manual.md`).
+WASP User Manual's (`Documents/wasp-user-manual.md`). Every built-in class's members, and the standard modules, are
+listed in the WebLingo Standard Library Reference (`Documents/weblingo-standard-library-reference.md`).
 
 An example is a program, followed by what it writes:
 
@@ -1505,7 +1506,8 @@ Hello, Ann!
 
 ## 15. The standard library
 
-The standard library is a set of modules named `std:` and a name, imported as any module is.
+The standard library is a set of modules named `std:` and a name, imported as any module is. The WebLingo Standard
+Library Reference (`Documents/weblingo-standard-library-reference.md`) lists them, and every built-in class's members.
 
 ### `std:system`
 
