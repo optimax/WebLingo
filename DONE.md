@@ -3246,3 +3246,15 @@ Q1, the next milestone, each a part of the specification not built yet: (a) file
 A1: (c), then (a), then (b), then (d), then (e). Write the tasks into TODO.
 
 Done (Claude, 2026-11-17, `d24a9e7`): the owner's order after M0.14 recorded as approved in the specification, M0.15 context-aware escaping in pages, M0.16 file capabilities, M0.17 COM objects on Windows, M0.18 cryptography and M0.19 FastCGI, each a task in TO-DO.md. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail; Windows only, Linux not tried.
+
+## [DONE] std:db: The Order of a Connection's Operations
+
+Found by Claude, 2026-11-17, running the complete test suite: `DatabaseTests.StatementsGiveRowsAndCounts` failed once, and passed run again. Its case `Task.all([db.query("SELECT COUNT(*) AS n FROM Fish"), db.execute("DELETE FROM Fish WHERE Id = 2")])` starts two operations on one connection without awaiting the first; `DotNetDatabases` runs a connection's operations one at a time, each off the worker, behind a lock, but in whichever order they reach it, so that the `DELETE` sometimes runs first and the count is 1, not 2. The specification does not say which order they run in (section 7.11).
+
+Q1, the order of operations a script starts on one connection without awaiting them: (a) the order it started them in, each waiting for the one before, as node-postgres queues a client's queries, the test kept as it is; (b) any order, as now, the test changed not to depend on it, a script awaiting each operation whose order matters.
+
+A1: (b)
+
+2026-11-17 (Claude): A1's (b) recorded as approved in the specification (section 1.1's "Database access", section 7.11, section 15.2) and in the Standard Library Reference: a connection's operations run one at a time, those a script starts without awaiting them in no defined order. `DotNetDatabases` is unchanged; the test's case of `Task.all` now counts a row the delete does not touch, and passed three runs in a row.
+
+Done (Claude, 2026-11-17, `ea51bad`): the order of a connection's operations left undefined. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail; Windows only, Linux not tried.
