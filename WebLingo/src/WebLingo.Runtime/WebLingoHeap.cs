@@ -590,6 +590,26 @@ public sealed class WebLingoHeap
     }
 
     /// <summary>Removes an array's last element, which must exist, and gives it.</summary>
+    /// <summary>Puts a value into an array at an index, from 0 to its length: one more unit, within the budget (WL3003).</summary>
+    public bool TryInsertIntoArray(WebLingoValue array, int index, WebLingoValue value, out WebLingoRuntimeError? error)
+    {
+        var elements = GetArray(array);
+        if (!TryReserve(1, out error)) return false;
+        elements.Insert(index, value);
+        Units++;
+        return true;
+    }
+
+    /// <summary>Removes an array's element at an index within it, and gives it.</summary>
+    public WebLingoValue RemoveFromArray(WebLingoValue array, int index)
+    {
+        var elements = GetArray(array);
+        var removed = elements[index];
+        elements.RemoveAt(index);
+        Units--;
+        return removed;
+    }
+
     public WebLingoValue RemoveLastOfArray(WebLingoValue array)
     {
         var elements = GetArray(array);

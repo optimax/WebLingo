@@ -973,6 +973,37 @@ null
   coll-index-error.wl(2,9): error WL3005: The index 5 is outside 0 to 1.
   ```
 
+### Array methods
+
+```javascript
+var a = [3, 1, 2];
+writeLn([a.map(x => x * 10), a.filter(x => x > 1), a.reduce((sum, x) => sum + x, 0)]);
+writeLn([a.find(x => x > 1), a.any(x => x > 2), a.all(x => x > 2), a.indexOf(2), a.contains(5)]);
+var sorted = a.sort();
+writeLn([sorted, a, a.reverse(), a.sort((x, y) => y - x)]);
+writeLn([a.slice(1), a.concat([4]), a.join("-")]);
+a.insert(0, 9);
+writeLn([a.removeAt(1), a]);
+```
+
+```text
+[[30, 10, 20], [3, 2], 6]
+[3, true, false, 2, false]
+[[1, 2, 3], [3, 1, 2], [2, 1, 3], [3, 2, 1]]
+[[1, 2], [3, 1, 2, 4], "3-1-2"]
+[3, [9, 1, 2]]
+```
+
+- **`sort()` and `reverse()` give a new array**, and leave the array as it was; the compiler warns where their result
+  is not used, `a.sort();` alone. `insert(i, v)`, `removeAt(i)`, `push` and `pop` change the array.
+- **`sort()` without a function** orders numbers by value and strings as `<` does; a mix of them is an error.
+  `sort((x, y) => …)` orders by its function, which gives a negative number when `x` comes first; elements it calls
+  equal keep their order.
+- **The functions** `map`, `filter`, `reduce`, `find`, `any` and `all` take are given each element; an `async` one is
+  awaited, and the method then gives a task, `await a.map(load)`.
+- **Other names** work too: `includes` for `contains`, `select` for `map`, `where` for `filter`, `some` for `any` and
+  `every` for `all`.
+
 ### Maps
 
 ```javascript
@@ -1850,6 +1881,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL2014 | `await` outside an `async` function |
 | WL2015 | a module that cannot be found |
 | WL2016 | a module's or a script's parameter missing, or not declared |
+| WL2017 | a warning: the new array `sort()` or `reverse()` gives, discarded |
 | **WL3xxx** | **the program fails as it runs** |
 | WL3001 | an operation on values it does not take |
 | WL3002 | an integer result that does not fit in 64 bits |
@@ -1881,4 +1913,4 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Library**: array methods beyond `push` and `pop`, regular expressions, JSON, and network access.
+- **Library**: regular expressions, JSON, and network access.

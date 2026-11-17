@@ -146,6 +146,14 @@ instances holding a value of that kind (the Language Reference, "Classes of valu
 | `a[i]`, `a[i] = v` | its element `i`, from 0; WL3005 outside it, `a?[i]` `null` there |
 | `a.push(v)` | adds `v` at its end |
 | `a.pop()` | removes its last element, and gives it; WL3005 when it is empty |
+| `a.insert(i, v)`, `a.removeAt(i)` | puts `v` at `i`, from 0 to its length; removes the element at `i`, and gives it |
+| `a.indexOf(v)`, `a.contains(v)` or `a.includes(v)` | where `v` first is, by `==`, or -1; whether it is there |
+| `a.slice(start, end)`, `a.concat(other)` | a new array of its elements from `start` to before `end`, `end` optional; of its elements, then `other`'s |
+| `a.join(separator)` | its strings, numbers, Booleans, decimals and dates, `null` as nothing, with `separator`, a comma unless given, between them |
+| `a.reverse()`, `a.sort(compare)` | a new array, its elements the other way round, or in order: numbers by value, strings as `<` orders them, or by `compare(x, y)`, negative when `x` comes first |
+| `a.map(f)` or `a.select(f)`, `a.filter(f)` or `a.where(f)` | a new array of `f(x)` for each element, or of the elements `f` gives `true` for |
+| `a.reduce(f, initial)` | `f(total, x)` for each element in turn, starting from `initial` |
+| `a.find(f)`, `a.any(f)` or `a.some(f)`, `a.all(f)` or `a.every(f)` | the first element `f` gives `true` for, or `null`; whether it gives `true` for one; for all |
 | `m.length` | how many entries a map has |
 | `m[k]`, `m[k] = v` | its value of the key `k`, WL3007 when it has none, `m?[k]` `null` there; adds or replaces it |
 | `m.has(k)` | whether it has the key `k` |

@@ -28,6 +28,8 @@ public sealed class WebLingoBinder
     private WebLingoBoundClassDeclaration? _object;
     /// <summary>The class that spreads values into a collection's literal or a call's arguments, once a program spreads one.</summary>
     private WebLingoLocalSymbol? _spread;
+    /// <summary>The extension of <c>Array</c> with the methods that take a function, once a program names one.</summary>
+    private WebLingoBoundStatement? _arrayMethods;
 
     /// <summary>
     /// <c>Object</c>, which every class without <c>extends</c> extends: <c>equal(other)</c> gives <c>this == other</c>,
@@ -234,6 +236,7 @@ public sealed class WebLingoBinder
             builtinClasses.Add((name, declaration.Class));
         }
         builtins.AddRange(_nativeFunctions);
+        if (_arrayMethods is not null) builtins.Add(_arrayMethods); // After the classes it extends and uses (section 3.6).
         statements.InsertRange(0, builtins);
         return new WebLingoBoundProgram(statements, _function.Locals, _builtinsInOrder)
         {
@@ -633,6 +636,16 @@ public sealed class WebLingoBinder
             }
             case WebLingoExpressionStatementSyntax expressionStatement:
             {
+                if (expressionStatement.Expression is WebLingoCallExpressionSyntax
+                    {
+                        Callee: WebLingoMemberAccessSyntax { Name: "sort" or "reverse", Target: not WebLingoSuperSyntax } discarded
+                    })
+                {
+                    // An array's sort() and reverse() give a new array, the array as it was (the owner's answer, 16 November 2026).
+                    _diagnostics.Add(new WebLingoDiagnostic(WebLingoDiagnosticCodes.DiscardedResult, WebLingoDiagnosticSeverity.Warning,
+                        $"'{discarded.Name}' gives a new array, and leaves the one it is called on as it was: its result is discarded here.",
+                        discarded.NameSpan) { Source = _source });
+                }
                 var bound = new WebLingoBoundExpressionStatement(BindExpression(expressionStatement.Expression), statement.Span);
                 return bound.Expression is WebLingoBoundBuiltinCall { Builtin.Name: var written } ? AfterWrite(bound, written) : bound;
             }
@@ -1372,6 +1385,7 @@ public sealed class WebLingoBinder
             case WebLingoMemberAccessSyntax { Target: WebLingoSuperSyntax } superMember:
                 return BindSuper(superMember.Name, superMember.Span);
             case WebLingoMemberAccessSyntax member:
+                if (IsArrayMethodName(member.Name)) UseArrayMethods();
                 if (member.Name is "toString" or "equal") UseObject(); // Every value has Object's (section 3.7).
                 if (member.Name == "__instanceOf")
                 {
@@ -1577,6 +1591,7 @@ public sealed class WebLingoBinder
         if (calleeSyntax is WebLingoMemberAccessSyntax member)
         {
             // A method, called on its target (specification, section 3.6); every value has Object's toString() (section 3.7).
+            if (IsArrayMethodName(member.Name)) UseArrayMethods();
             if (member.Name is "toString" or "equal") UseObject();
             // A collection's or a string's iterate() gives an Iterator, which the runtime makes (section 3.6).
             if (member.Name == "iterate") UseBuiltinClass("Iterator");
@@ -1677,6 +1692,7 @@ public sealed class WebLingoBinder
                 callee = BindSuper(superMember.Name, superMember.Span);
                 break;
             case WebLingoMemberAccessSyntax member:
+                if (IsArrayMethodName(member.Name)) UseArrayMethods();
                 if (member.Name is "toString" or "equal") UseObject();
                 if (member.Name == "iterate") UseBuiltinClass("Iterator");
                 return new WebLingoBoundMethodCall(BindExpression(member.Target), member.Name, [values], call.Span) { IsSpread = true };
@@ -1981,6 +1997,194 @@ public sealed class WebLingoBinder
 
     private const string SpreadSource =
         "class Spread { static array(...parts) { var result = []; foreach (var part in parts) { foreach (var item in part) result.push(item); } return result; } static set(...parts) { var result = #{}; foreach (var part in parts) { foreach (var item in part) result.add(item); } return result; } static map(...parts) { var result = {}; foreach (var part in parts) { foreach (var (key, value) in part) result[key] = value; } return result; } }";
+
+    private static bool IsArrayMethodName(string name) =>
+        name is "map" or "select" or "filter" or "where" or "reduce" or "find" or "any" or "some" or "all" or "every" or "sort";
+
+    /// <summary>
+    /// The methods of arrays that take a function (section 3.6, "Array methods"), written in WebLingo, an extension of
+    /// <c>Array</c> made where the program begins, once it names one of them, on an array or on anything else, its kind
+    /// being known only when it runs: <c>map</c> or <c>select</c>, <c>filter</c> or <c>where</c>, <c>reduce</c>,
+    /// <c>find</c>, <c>any</c> or <c>some</c>, <c>all</c> or <c>every</c>, and <c>sort</c>. A function that gives a task
+    /// is awaited, the method then giving a task of its result. Its functions are native, so that an error in one is
+    /// reported where it was called.
+    /// </summary>
+    private void UseArrayMethods()
+    {
+        if (_arrayMethods is not null) return;
+        _arrayMethods = new WebLingoBoundBlock([], default); // Its place, while it is bound.
+        var tree = new WebLingoParser(ArrayMethodsSource, "Array").ParseCompilationUnit();
+        foreach (var diagnostic in tree.Diagnostics)
+        {
+            if (diagnostic.Severity == WebLingoDiagnosticSeverity.Error)
+            {
+                throw new InvalidOperationException($"The array methods' source does not parse: {diagnostic.Message}");
+            }
+        }
+        var extension = (WebLingoExtendSyntax)tree.Root.Statements[0];
+        var array = UseBuiltinClass("Array");
+        UseBuiltinClass("Task");
+        var (outerScope, outerFunction, outerClass, outerCallees) = (_scope, _function, _class, _nativeCallees);
+        (_scope, _function, _class) = (_prelude, _main, null);
+        _nativeCallees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
+        var bound = BindExtension(extension, []);
+        (_scope, _function, _class, _nativeCallees) = (outerScope, outerFunction, outerClass, outerCallees);
+        _arrayMethods = new WebLingoBoundExtension(new WebLingoBoundLocalReference(array, default), bound, default);
+    }
+
+    private const string ArrayMethodsSource =
+        "extend Array {\n" +
+        "  map(f) {\n" +
+        "    var items = this;\n" +
+        "    var result = [];\n" +
+        "    for (var i = 0; i < items.length; i++) {\n" +
+        "      var value = f(items[i]);\n" +
+        "      if (value is Task) {\n" +
+        "        var from = i;\n" +
+        "        var later = async () => {\n" +
+        "          result.push(await value);\n" +
+        "          for (var j = from + 1; j < items.length; j++) result.push(await f(items[j]));\n" +
+        "          return result;\n" +
+        "        };\n" +
+        "        return later();\n" +
+        "      }\n" +
+        "      result.push(value);\n" +
+        "    }\n" +
+        "    return result;\n" +
+        "  }\n" +
+        "  select(f) { return this.map(f); }\n" +
+        "  filter(f) {\n" +
+        "    var items = this;\n" +
+        "    var result = [];\n" +
+        "    for (var i = 0; i < items.length; i++) {\n" +
+        "      var item = items[i];\n" +
+        "      var keep = f(item);\n" +
+        "      if (keep is Task) {\n" +
+        "        var from = i;\n" +
+        "        var later = async () => {\n" +
+        "          if (await keep) result.push(item);\n" +
+        "          for (var j = from + 1; j < items.length; j++) {\n" +
+        "            var next = items[j];\n" +
+        "            if (await f(next)) result.push(next);\n" +
+        "          }\n" +
+        "          return result;\n" +
+        "        };\n" +
+        "        return later();\n" +
+        "      }\n" +
+        "      if (keep) result.push(item);\n" +
+        "    }\n" +
+        "    return result;\n" +
+        "  }\n" +
+        "  where(f) { return this.filter(f); }\n" +
+        "  reduce(f, initial) {\n" +
+        "    var items = this;\n" +
+        "    var total = initial;\n" +
+        "    for (var i = 0; i < items.length; i++) {\n" +
+        "      total = f(total, items[i]);\n" +
+        "      if (total is Task) {\n" +
+        "        var from = i;\n" +
+        "        var pending = total;\n" +
+        "        var later = async () => {\n" +
+        "          var sum = await pending;\n" +
+        "          for (var j = from + 1; j < items.length; j++) sum = await f(sum, items[j]);\n" +
+        "          return sum;\n" +
+        "        };\n" +
+        "        return later();\n" +
+        "      }\n" +
+        "    }\n" +
+        "    return total;\n" +
+        "  }\n" +
+        "  find(f) {\n" +
+        "    var items = this;\n" +
+        "    for (var i = 0; i < items.length; i++) {\n" +
+        "      var item = items[i];\n" +
+        "      var found = f(item);\n" +
+        "      if (found is Task) {\n" +
+        "        var from = i;\n" +
+        "        var later = async () => {\n" +
+        "          if (await found) return item;\n" +
+        "          for (var j = from + 1; j < items.length; j++) {\n" +
+        "            var next = items[j];\n" +
+        "            if (await f(next)) return next;\n" +
+        "          }\n" +
+        "          return null;\n" +
+        "        };\n" +
+        "        return later();\n" +
+        "      }\n" +
+        "      if (found) return item;\n" +
+        "    }\n" +
+        "    return null;\n" +
+        "  }\n" +
+        "  any(f) {\n" +
+        "    var items = this;\n" +
+        "    for (var i = 0; i < items.length; i++) {\n" +
+        "      var found = f(items[i]);\n" +
+        "      if (found is Task) {\n" +
+        "        var from = i;\n" +
+        "        var later = async () => {\n" +
+        "          if (await found) return true;\n" +
+        "          for (var j = from + 1; j < items.length; j++) {\n" +
+        "            if (await f(items[j])) return true;\n" +
+        "          }\n" +
+        "          return false;\n" +
+        "        };\n" +
+        "        return later();\n" +
+        "      }\n" +
+        "      if (found) return true;\n" +
+        "    }\n" +
+        "    return false;\n" +
+        "  }\n" +
+        "  some(f) { return this.any(f); }\n" +
+        "  all(f) {\n" +
+        "    var items = this;\n" +
+        "    for (var i = 0; i < items.length; i++) {\n" +
+        "      var kept = f(items[i]);\n" +
+        "      if (kept is Task) {\n" +
+        "        var from = i;\n" +
+        "        var later = async () => {\n" +
+        "          if (!(await kept)) return false;\n" +
+        "          for (var j = from + 1; j < items.length; j++) {\n" +
+        "            if (!(await f(items[j]))) return false;\n" +
+        "          }\n" +
+        "          return true;\n" +
+        "        };\n" +
+        "        return later();\n" +
+        "      }\n" +
+        "      if (!kept) return false;\n" +
+        "    }\n" +
+        "    return true;\n" +
+        "  }\n" +
+        "  every(f) { return this.all(f); }\n" +
+        "  sort(compare = null) {\n" +
+        "    var a = [];\n" +
+        "    foreach (var item in this) a.push(item);\n" +
+        "    var b = [];\n" +
+        "    foreach (var item in a) b.push(item);\n" +
+        "    var n = a.length;\n" +
+        "    for (var width = 1; width < n; width *= 2) {\n" +
+        "      for (var low = 0; low < n; low += 2 * width) {\n" +
+        "        var middle = low + width < n ? low + width : n;\n" +
+        "        var high = low + 2 * width < n ? low + 2 * width : n;\n" +
+        "        var i = low;\n" +
+        "        var j = middle;\n" +
+        "        for (var k = low; k < high; k++) {\n" +
+        "          var right = j < high && (i >= middle || (compare == null ? a[j] < a[i] : compare(a[j], a[i]) < 0));\n" +
+        "          if (right) {\n" +
+        "            b[k] = a[j];\n" +
+        "            j++;\n" +
+        "          } else {\n" +
+        "            b[k] = a[i];\n" +
+        "            i++;\n" +
+        "          }\n" +
+        "        }\n" +
+        "      }\n" +
+        "      var swap = a;\n" +
+        "      a = b;\n" +
+        "      b = swap;\n" +
+        "    }\n" +
+        "    return a;\n" +
+        "  }\n" +
+        "}\n";
 
     private void Report(string code, string message, WebLingoSourceSpan span) =>
         _diagnostics.Add(new WebLingoDiagnostic(code, WebLingoDiagnosticSeverity.Error, message, span) { Source = _source });

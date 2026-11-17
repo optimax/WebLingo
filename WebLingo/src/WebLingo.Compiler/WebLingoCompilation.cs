@@ -63,7 +63,11 @@ public sealed class WebLingoCompilation
         var boundProgram = binder.Bind(modules, imported is not null);
         var diagnostics = new List<WebLingoDiagnostic>(syntaxTree.Diagnostics);
         diagnostics.AddRange(binder.Diagnostics);
-        if (binder.Diagnostics.Count > 0) return new WebLingoCompilation(syntaxTree, boundProgram, null, diagnostics);
+        // A warning, as for a result discarded, does not stop the compilation; an error does.
+        foreach (var diagnostic in binder.Diagnostics)
+        {
+            if (diagnostic.Severity == WebLingoDiagnosticSeverity.Error) return new WebLingoCompilation(syntaxTree, boundProgram, null, diagnostics);
+        }
 
         return new WebLingoCompilation(syntaxTree, boundProgram, WebLingoLowerer.Lower(boundProgram), diagnostics);
     }

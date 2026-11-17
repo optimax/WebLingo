@@ -179,6 +179,22 @@ public sealed class ConformanceTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// An array's sort() or reverse() whose result is discarded is a warning, WL2017, at the method's name, and the program
+    /// still runs (the owner's answer, 16 November 2026), as it does for a call of any value's sort() or reverse().
+    /// </summary>
+    [Theory]
+    [InlineData("var a = [2, 1]; a.sort(); writeLn(a);", 19, "[2, 1]")]
+    [InlineData("var a = [2, 1];\na.reverse();", 3, "")]
+    public void ADiscardedSortOrReverseIsAWarning(string source, int column, string printed)
+    {
+        var (exit, output, error) = Weblingo("run", source);
+        Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n"), (exit, output));
+        var line = source.Contains('\n') ? 2 : 1;
+        Assert.StartsWith($"program.wl({line},{column}): warning WL2017:", error);
+        Assert.Equal((WebLingoCommandLine.Success, ""), (Weblingo("check", "var a = [2, 1]; var b = a.sort();").Exit, Weblingo("check", "var a = [2, 1]; var b = a.sort();").Error));
+    }
+
     [Theory]
     [InlineData("var x = 10 + 20; writeLn(x);", "30")]
     [InlineData("var x = 10 / 2; writeLn(x);", "5.0")]
@@ -601,6 +617,16 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn([\"7\".padStart(3, \"0\"), \"7\".padLeft(3), \"7\".padEnd(4, \"ab\"), \"7\".padRight(2), \"long\".padStart(2), \"😀\".padStart(3, \"é\")]);", "[\"007\", \"  7\", \"7aba\", \"7 \", \"long\", \"éé😀\"]")]
     [InlineData("writeLn([\", \".join([\"a\", 1, 2.5, true, null, 1.5m]), \"\".join([]), \"-\".join([\"x\"])]);", "[\"a, 1, 2.5, true, , 1.5m\", \"\", \"x\"]")]
     [InlineData("writeLn([\"😀x😀\".indexOf(\"x\"), \"😀x😀\".lastIndexOf(\"😀\"), \"😀x😀\".slice(1, 2), \"😀x\".padEnd(3, \"y\")]);", "[1, 2, \"x\", \"😀xy\"]")]
+    // Arrays' methods (the owner's answers, 16 November 2026): with aliases; sort() and reverse() a new array; sort by value.
+    [InlineData("var a = [3, 1, 2]; writeLn([a.map(x => x * 2), a.select(x => x + 1), a.filter(x => x > 1), a.where(x => x < 3)]);", "[[6, 2, 4], [4, 2, 3], [3, 2], [1, 2]]")]
+    [InlineData("var a = [3, 1, 2]; writeLn([a.reduce((sum, x) => sum + x, 0), a.find(x => x > 1), a.find(x => x > 5), a.any(x => x == 2), a.some(x => x > 9)]);", "[6, 3, null, true, false]")]
+    [InlineData("var a = [3, 1, 2]; writeLn([a.all(x => x > 0), a.every(x => x > 1), a.sort(), a, a.reverse(), a.sort((x, y) => y - x)]);", "[true, false, [1, 2, 3], [3, 1, 2], [2, 1, 3], [3, 2, 1]]")]
+    [InlineData("writeLn([[\"b\", \"a\", \"c\"].sort(), [2.5, 1, 3].sort(), [].sort(), [1].sort(), [\"bb\", \"a\"].sort((x, y) => x.length - y.length)]);", "[[\"a\", \"b\", \"c\"], [1, 2.5, 3], [], [1], [\"a\", \"bb\"]]")]
+    [InlineData("var a = [3, 1, 2]; writeLn([a.indexOf(2), a.indexOf(9), a.contains(1), a.includes(1.0), a.slice(1), a.concat([4, 5]), a.join(\"-\"), a.join()]);", "[2, -1, true, true, [1, 2], [3, 1, 2, 4, 5], \"3-1-2\", \"3,1,2\"]")]
+    [InlineData("var b = [1, 2, 3]; b.insert(0, 0); b.insert(4, 4); writeLn([b.removeAt(1), b]);", "[1, [0, 2, 3, 4]]")]
+    [InlineData("var people = [{ name: \"Ann\", age: 30 }, { name: \"Bob\", age: 25 }, { name: \"Cy\", age: 30 }]; writeLn(people.sort((x, y) => x[\"age\"] - y[\"age\"]).map(p => p[\"name\"]));", "[\"Bob\", \"Ann\", \"Cy\"]")]
+    [InlineData("var a = [3, 1, 2]; async function twice(x) { await null; return x * 2; } writeLn([await a.map(twice), await a.filter(async x => { await null; return x != 1; }), await a.reduce(async (s, x) => { await null; return s + x; }, 10), await a.find(async x => x == 2), await a.any(async x => x == 7), await a.all(async x => x < 4)]);", "[[6, 2, 4], [3, 2], 16, 2, false, true]")]
+    [InlineData("class Stack extends Array {} var s = new Stack(); s.push(5); s.push(4); writeLn([s.sort(), s.map(x => x + 1), s.contains(4)]);", "[[4, 5], [6, 5], true]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -669,6 +695,15 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(\",\".join(\"ab\"));", "WL3001")]
     [InlineData("writeLn(\"tea\".toUpper);", "WL3001")]
     [InlineData("writeLn(\"tea\".trim(1));", "WL2006")]
+    [InlineData("var b = [1, \"a\"].sort();", "WL3001")]
+    [InlineData("var b = [1].filter(x => 1);", "WL3001")]
+    [InlineData("var b = [1].removeAt(3);", "WL3005")]
+    [InlineData("var b = [].removeAt(0);", "WL3005")]
+    [InlineData("var b = [1].insert(2, 0);", "WL3005")]
+    [InlineData("var b = [1].slice(0, 2);", "WL3005")]
+    [InlineData("var b = [1].concat(2);", "WL3001")]
+    [InlineData("var b = [1].map();", "WL2006")]
+    [InlineData("var b = [[1]].join();", "WL3001")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

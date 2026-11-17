@@ -64,6 +64,11 @@ public static class WebLingoDiagnosticCodes
     public const string ModuleNotFound = "WL2015";
     /// <summary>A module's parameter that its import does not give, or a value given for one it does not declare (proposed, section 3.9).</summary>
     public const string ModuleParameter = "WL2016";
+    /// <summary>
+    /// A warning: a result discarded that the call exists to give, an array's <c>sort()</c> or <c>reverse()</c>, which give
+    /// a new array and leave the array as it is (proposed, section 3.6, "Array methods").
+    /// </summary>
+    public const string DiscardedResult = "WL2017";
 
     /// <summary>Invalid operation.</summary>
     public const string InvalidOperation = "WL3001";

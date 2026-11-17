@@ -29,6 +29,8 @@ public enum WebLingoMember : byte
     /// </summary>
     IndexOf, LastIndexOf, Contains, StartsWith, EndsWith, Split, Trim, TrimStart, TrimEnd, ToUpper, ToLower, Replace, Repeat,
     PadStart, PadEnd, Join,
+    /// <summary>Arrays' methods that take no function, besides those strings have too (section 3.6, "Array methods").</summary>
+    Insert, RemoveAt, Reverse,
     /// <summary>A collection's or a string's <c>iterate()</c>, which gives an <c>Iterator</c> (section 3.6).</summary>
     Iterate,
     /// <summary>An interpolation's format and alignment, a built-in method of every class that no program can name (section 3.5).</summary>
@@ -119,6 +121,9 @@ public static partial class WebLingoMembers
         "padStart" or "padLeft" => WebLingoMember.PadStart,
         "padEnd" or "padRight" => WebLingoMember.PadEnd,
         "join" => WebLingoMember.Join,
+        "insert" => WebLingoMember.Insert,
+        "removeAt" => WebLingoMember.RemoveAt,
+        "reverse" => WebLingoMember.Reverse,
         "iterate" => WebLingoMember.Iterate,
         WebLingoInterpolation.Format => WebLingoMember.Format,
         "__className" => WebLingoMember.ClassName,
@@ -757,7 +762,7 @@ public static partial class WebLingoMembers
     }
 
     private static bool IsMethod(WebLingoValue target, WebLingoMember member) =>
-        (target.Kind == WebLingoValueKind.Array && member is WebLingoMember.Push or WebLingoMember.Pop)
+        (target.Kind == WebLingoValueKind.Array && (member is WebLingoMember.Push or WebLingoMember.Pop || IsArrayMethod(member)))
         || (target.Kind == WebLingoValueKind.Map && member is WebLingoMember.Has or WebLingoMember.Remove)
         || (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
         || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
@@ -827,6 +832,10 @@ public static partial class WebLingoMembers
             result = heap.RemoveLastOfArray(target);
             error = null;
             return true;
+        }
+        if (target.Kind == WebLingoValueKind.Array && IsArrayMethod(member))
+        {
+            return TryCallArray(target, member, name, values, first, count, heap, out result, out error);
         }
         if (target.Kind == WebLingoValueKind.Map && member == WebLingoMember.Has)
         {
