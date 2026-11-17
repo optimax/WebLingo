@@ -2924,3 +2924,25 @@ A2: (a)
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.5, and built: two strings compared by their Unicode scalar values (`WebLingoOperators.CompareStrings`), and `s.compare(other)`; a comparison of other kinds now names every kind it takes, and both operands. Tested by conformance cases on both VMs; described in the Language Reference and the Standard Library Reference.
 
 Done (Claude, 2026-11-16, `e3421f0`): strings compared with `<`, and `compare()`. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; Windows only, Linux not tried.
+
+## [DONE] `switch`
+
+A choice among cases by a value, with no implicit fallthrough (specification, section 3.2), its cases matched as `==` matches, a `break` leaving it. Built as every feature is: in the lexer and the parser where it is syntax, the binder and the lowered IR, both VMs or the runtime they share, with its conformance tests on both VMs, and the Language Reference. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, its form: (a) C#'s statement, `switch (x) { case 1: case 2: … break; default: … }`, a section that does not end in `break`, `return`, `throw` or `continue` a compile-time error; (b) cases with blocks and no `break`, `switch (x) { case 1, 2 { … } default { … } }`.
+
+A1: (b), break is unnecessary.
+
+Q2, an expression too: (a) C#'s `x switch { 1 => "one", 2 => "two", _ => "many" }`; (b) not now.
+
+A2: (a)
+
+Q3, how a case matches: (a) by `==` only; (b) by a class too, `case Point p:`, as a typed catch does.
+
+A3: (b)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.5, and built on both VMs, with no instruction of their own: the statement as the `if`s it means, the expression as the conditionals it means. Guessed, and recorded as Proposed (section 15.2, "`switch`"): `switch`, `case` and `default` words of their own only where a `switch` stands; `break` and `continue` in a case acting on the loop around it, as in an `if`, since a case needs no `break`; a switch expression needing a `_` arm; a class's pattern standing alone. Tested by conformance cases; described in the Language Reference, section 7.
+
+Done (Claude, 2026-11-16, `4d3355b`): `switch`. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs gave the same output; Windows only, Linux not tried.
