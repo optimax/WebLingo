@@ -3130,3 +3130,21 @@ A3: (a)
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.6, and built: `Json.parse` in the runtime, `Json.stringify` through a new instruction of both VMs, `ToJson`, which calls a class's `toJson()` as `ToText` calls a `toString()`. Guessed, and recorded as Proposed (section 15.2, "JSON"): an optional indent, 0 to 10 spaces; integer map keys written as their digits, others WL3001; sets as arrays, decimals without their `m`, dates as ISO text, classes of values as what they hold; a number written as `write` writes it, `5.0` reading back as a number; a number too large for a binary64 read as its infinity; nesting at most 512 deep; every error WL3001, with a line and a column for text that is not JSON. The WASP User Manual's route handler now writes its JSON with `Json.stringify`, its output checked with `weblingo`, not served; the editors know `Json`. Described in the Language Reference, its examples run with `weblingo`, and the Standard Library Reference, in a section of its own, the sections after it renumbered.
 
 Done (Claude, 2026-11-16, `de93ff5`): JSON. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
+
+## [DONE] Network Access
+
+Reaching other servers, through the platform layer's networking (specification, section 7.9, WL-P009), its capabilities checked where the connection is made (section 7.13), asynchronous, on WebLingo's own operations. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, what first: (a) an HTTP client, `std:http`, `await http.get(url)` and `await http.post(url, body, headers)`, giving the status, the headers and the body; (b) sockets too.
+
+A1: (b)
+
+Q2, which hosts a script may reach: (a) any under `weblingo`, and under `wasp` only those `wasp.config` allows, `"network": { "allow": ["api.example.com"] }`, as COM's objects are allowed; (b) any, everywhere, for now.
+
+A2: (a)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 7.9, and built: the platform's network, `IWebLingoNetwork`, `DotNetNetwork` on .NET, which checks a host where the connection is made; `std:http`, `get`, `post` and `request`, each a task of a map of the status, the headers, the body and its bytes; and `std:net`, `Socket.connect(host, port)`, `read()`, `write(data)` and `dispose()`, both native modules installed with the runtime, each operation off the worker. Guessed, and recorded as Proposed (section 15.2, "Network access"): headers' names in lower case, a header sent more than once joined by `, `; a redirect given, not followed; 30 seconds to connect, 100 in all, a body at most 64 MB; a read at most 64 KB; a host not allowed, or an address not `http` or `https`, WL3001; a failure a new class, `NetworkError`, with a new code, WL3014 (Proposed); a host compared by its name or address as written, ignoring case, at any port; under `wasp`, none without the setting; the addresses a name resolves to not checked, so DNS rebinding is still open (section 7.9). Tested against a local server of the tests' own, and by hand against one on this machine, with `weblingo`, and with `wasp run` for the allow list. Described in the Language Reference, the Standard Library Reference, sections of their own, the sections after them renumbered, and the WASP User Manual's `"network"`; their examples run with `weblingo` against a server on this machine; the editors know `NetworkError` and `Socket`.
+
+Done (Claude, 2026-11-16, `c8cc3fe`): network access. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs; Windows only, Linux not tried.
