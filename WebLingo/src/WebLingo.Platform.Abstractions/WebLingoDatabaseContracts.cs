@@ -57,7 +57,7 @@ public sealed record WebLingoDatabaseRows(IReadOnlyList<string> Columns, IReadOn
 /// What a database's operation failed of: something the script asked for that cannot be, a name no configuration gives, a
 /// provider that is not there, an option or a value the provider does not take, a transaction that is not open (WL3001);
 /// or the database's own failure, a statement it refuses, a file it cannot open (WL3015, <c>DatabaseError</c>); or a
-/// database's file a site's scripts may not reach (WL3016, <c>PermissionError</c>, section 7.13, "File capabilities").
+/// database's file a site's scripts may not reach (WL3016, <c>FilePermissionError</c>, section 7.13, "File capabilities").
 /// </summary>
 public enum WebLingoDatabaseErrorKind { Invalid, Failed, NotAllowed }
 

@@ -210,12 +210,12 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
 
     /// <summary>
     /// A file system's failure as a runtime error: an encoding that is not there a <c>TypeError</c>; a path the site may not
-    /// reach a <c>PermissionError</c> (WL3016, section 7.13, "File capabilities"); any other an <c>IOError</c>.
+    /// reach a <c>FilePermissionError</c> (WL3016, section 7.13, "File capabilities"); any other an <c>IOError</c>.
     /// </summary>
     private static WebLingoRuntimeError Failed(string doing, string path, WebLingoFileSystemException failure) => new(failure.Kind switch
     {
         WebLingoFileErrorKind.UnknownEncoding => WebLingoDiagnosticCodes.InvalidOperation,
-        WebLingoFileErrorKind.NotAllowed => WebLingoDiagnosticCodes.PermissionDenied,
+        WebLingoFileErrorKind.NotAllowed => WebLingoDiagnosticCodes.FilePermissionDenied,
         _ => WebLingoDiagnosticCodes.IOFailure
     }, $"'{path}' cannot be {doing}: {failure.Message}.");
 

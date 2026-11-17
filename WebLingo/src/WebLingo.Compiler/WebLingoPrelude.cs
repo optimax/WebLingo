@@ -28,7 +28,7 @@ internal static class WebLingoPrelude
         ("MemberError", WebLingoDiagnosticCodes.NoSuchMember), ("KeyError", WebLingoDiagnosticCodes.NoSuchKey),
         ("TimeoutError", WebLingoDiagnosticCodes.Timeout), ("IOError", WebLingoDiagnosticCodes.IOFailure),
         ("DivisionByZeroError", WebLingoDiagnosticCodes.DivisionByZero), ("NetworkError", WebLingoDiagnosticCodes.NetworkFailure),
-        ("DatabaseError", WebLingoDiagnosticCodes.DatabaseFailure), ("PermissionError", WebLingoDiagnosticCodes.PermissionDenied),
+        ("DatabaseError", WebLingoDiagnosticCodes.DatabaseFailure), ("FilePermissionError", WebLingoDiagnosticCodes.FilePermissionDenied),
         ("ComError", WebLingoDiagnosticCodes.ComFailure),
         ("NetworkPermissionError", WebLingoDiagnosticCodes.NetworkPermissionDenied),
         ("ComPermissionError", WebLingoDiagnosticCodes.ComPermissionDenied)

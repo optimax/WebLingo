@@ -261,7 +261,7 @@ public sealed class WaspServeTests : IDisposable
         Write("wasp.config", "{ \"files\": { \"read\": [\"data\"] } }");
         Write("data/teas.txt", "Sencha");
         Write("reads.wasp", "<% import fs from \"std:fs\"; %><%= await fs.readText(\"data/teas.txt\") %>|" +
-                            "<% try { await fs.readText(\"index.wasp\"); } catch (PermissionError e) { %><%= e.code %><% } %>");
+                            "<% try { await fs.readText(\"index.wasp\"); } catch (FilePermissionError e) { %><%= e.code %><% } %>");
         var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
         Assert.True(server is not null, error);
         await server.StartAsync();

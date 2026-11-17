@@ -1619,7 +1619,7 @@ An error the runtime raises becomes an instance of a class extending `Error`, wi
 | `DivisionByZeroError` | WL3013 | an integer's remainder by 0 |
 | `NetworkError` | WL3014 | a host that cannot be reached, or a connection that fails |
 | `DatabaseError` | WL3015 | a statement a database refuses, or a database that cannot be opened |
-| `PermissionError` | WL3016 | a file a site's scripts may not reach, outside the folders its `wasp.config` allows |
+| `FilePermissionError` | WL3016 | a file a site's scripts may not reach, outside the folders its `wasp.config` allows |
 | `ComError` | WL3012 | a COM object's failure, on Windows (`windows:com`) |
 | `NetworkPermissionError` | WL3017 | a host a script's configuration does not let it reach |
 | `ComPermissionError` | WL3018 | a COM object a script's configuration does not let it make |
@@ -1926,7 +1926,7 @@ false
 Each is asynchronous, giving a task, and each has a synchronous form whose name ends in `Sync`: `readTextSync(path)`.
 A relative path is from the program's current folder. A file that cannot be read or written is an `IOError`, WL3011,
 naming the path as the script gave it. A site's pages, under `wasp`, reach only the folders its `wasp.config` allows, a
-relative path from the site's root, and a path outside them is a `PermissionError`, WL3016.
+relative path from the site's root, and a path outside them is a `FilePermissionError`, WL3016.
 
 ### `std:http` and `std:net`
 

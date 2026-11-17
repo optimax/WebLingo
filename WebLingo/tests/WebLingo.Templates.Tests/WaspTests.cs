@@ -304,7 +304,7 @@ public sealed class WaspTests : IDisposable
     /// <summary>
     /// A page's scripts reach only the folders its <c>wasp.config</c> allows (specification, section 7.13, "File
     /// capabilities"): none without them; a folder listed to be read, read only; one listed to be written, read and written;
-    /// a relative path from the root; <c>..</c> followed to where it leads; a refusal a <c>PermissionError</c>, WL3016.
+    /// a relative path from the root; <c>..</c> followed to where it leads; a refusal a <c>FilePermissionError</c>, WL3016.
     /// </summary>
     [Fact]
     public void APagesScriptsReachOnlyTheFoldersWaspConfigAllows()
@@ -389,7 +389,7 @@ public sealed class WaspTests : IDisposable
         {
             var page = Write("site/page.wasp", "<% import { Database } from \"std:db\"; " +
                 "async function open(name) { try { using (var db = await Database.open(name)) { return db.provider; } } " +
-                "catch (PermissionError e) { return e.code + \" \" + e.message; } catch (DatabaseError e) { return e.code; } } %>" +
+                "catch (FilePermissionError e) { return e.code + \" \" + e.message; } catch (DatabaseError e) { return e.code; } } %>" +
                 "<%- await open(\"sqlite:../uploads/own.db\") %>\n<%- await open(\"sqlite:../data/own.db\") %>\n" +
                 "<%- await open(\"sqlite:Data Source=../data/missing.db;Mode=ReadOnly\") %>\n<%- await open(\"sqlite:file:../uploads/own.db\") %>\n" +
                 "<%- await open(\"named\") %>\n");
@@ -422,10 +422,10 @@ public sealed class WaspTests : IDisposable
             StringComparison.Ordinal);
     }
 
-    /// <summary>A page that tries each operation, written as <c>&lt;%- %&gt;</c>, a line each, a <c>PermissionError</c> as its code and message.</summary>
+    /// <summary>A page that tries each operation, written as <c>&lt;%- %&gt;</c>, a line each, a <c>FilePermissionError</c> as its code and message.</summary>
     private static string Reaching(params string[] operations)
     {
-        var page = "<% import fs from \"std:fs\"; function t(f) { try { return f(); } catch (PermissionError e) { return e.code + \" \" + e.message; } } %>";
+        var page = "<% import fs from \"std:fs\"; function t(f) { try { return f(); } catch (FilePermissionError e) { return e.code + \" \" + e.message; } } %>";
         foreach (var operation in operations)
         {
             var body = operation.StartsWith('{') ? operation : "{ return " + operation + "; }";

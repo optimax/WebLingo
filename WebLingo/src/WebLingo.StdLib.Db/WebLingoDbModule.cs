@@ -329,7 +329,7 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
         ? new WebLingoRuntimeError(failure.Kind switch
         {
             WebLingoDatabaseErrorKind.Failed => WebLingoDiagnosticCodes.DatabaseFailure,
-            WebLingoDatabaseErrorKind.NotAllowed => WebLingoDiagnosticCodes.PermissionDenied,
+            WebLingoDatabaseErrorKind.NotAllowed => WebLingoDiagnosticCodes.FilePermissionDenied,
             _ => WebLingoDiagnosticCodes.InvalidOperation
         }, Sentence(failure.Message))
         : null;

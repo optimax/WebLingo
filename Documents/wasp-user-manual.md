@@ -771,11 +771,11 @@ a path in a script from the site's root, its folder, under `wasp serve` and IIS 
 ```javascript
 var teas = await fs.readText("../data/teas.json");        // read, as ../data is listed
 await fs.writeText("../uploads/order.txt", order);         // written, as ../uploads is listed to be written
-await fs.writeText("../data/teas.json", "[]");             // a PermissionError: ../data is listed to be read only
+await fs.writeText("../data/teas.json", "[]");             // a FilePermissionError: ../data is listed to be read only
 ```
 
 A path is checked by where it really leads: `..`, a link and a junction followed, its letters' case aside on Windows;
-and a Windows device's name, `NUL` or `COM1`, is never reached. A path the site may not reach is a `PermissionError`,
+and a Windows device's name, `NUL` or `COM1`, is never reached. A path the site may not reach is a `FilePermissionError`,
 WL3016, where the script tries it, which a `catch` may catch: `'../data/teas.json' cannot be written: it is not in a
 folder this site may write.`; without the setting, a site reaches no file. A SQLite database a script names by its
 own connection string, `Database.open("sqlite:../uploads/orders.db")`, is checked as a file is, to be written unless
