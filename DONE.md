@@ -3148,3 +3148,51 @@ A2: (a)
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 7.9, and built: the platform's network, `IWebLingoNetwork`, `DotNetNetwork` on .NET, which checks a host where the connection is made; `std:http`, `get`, `post` and `request`, each a task of a map of the status, the headers, the body and its bytes; and `std:net`, `Socket.connect(host, port)`, `read()`, `write(data)` and `dispose()`, both native modules installed with the runtime, each operation off the worker. Guessed, and recorded as Proposed (section 15.2, "Network access"): headers' names in lower case, a header sent more than once joined by `, `; a redirect given, not followed; 30 seconds to connect, 100 in all, a body at most 64 MB; a read at most 64 KB; a host not allowed, or an address not `http` or `https`, WL3001; a failure a new class, `NetworkError`, with a new code, WL3014 (Proposed); a host compared by its name or address as written, ignoring case, at any port; under `wasp`, none without the setting; the addresses a name resolves to not checked, so DNS rebinding is still open (section 7.9). Tested against a local server of the tests' own, and by hand against one on this machine, with `weblingo`, and with `wasp run` for the allow list. Described in the Language Reference, the Standard Library Reference, sections of their own, the sections after them renumbered, and the WASP User Manual's `"network"`; their examples run with `weblingo` against a server on this machine; the editors know `NetworkError` and `Socket`.
 
 Done (Claude, 2026-11-16, `c8cc3fe`): network access. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs; Windows only, Linux not tried.
+
+## [DONE] Database Access: SQLite
+
+Create `example2` that illustrates the use of a database. Use SQLite with a database of tropical fish, and the example being of a tropical fish store site. Obtain free images of fish (with provenance/license) and scale them to the same size, e.g. 1024 x 768.
+
+2026-11-16 (Claude): WebLingo has no database access yet: the specification proposes provider-neutral connections, parameters, transactions, cancellation, streamed rows and disposal, SQL Server and SQLite first, through ADO.NET (section 7.11, WL-P011, its API "not yet frozen"). This machine has neither SQLite's tools nor a SQL Server, nor their .NET packages, which a new dependency would bring (`AGENTS.md`, sections 9 and 13). One decision each, answerable with a letter:
+
+Q1, how a script reaches a database: (a) one standard module for every database, `std:db`, `var db = await Database.open("fish")`, `await db.query(sql, values)` giving an array of maps, one for each row, `await db.execute(sql, values)` giving the rows changed, `await db.transaction(async () => { … })`, and `using`, as the specification's example has it; (b) a module for each database, `std:sqlite` and `std:sqlserver`, each with its own API.
+
+How (a) would still reach what one database has and another has not (Claude, 2026-11-16, at the owner's request), as JDBC, ADO.NET, PHP's PDO and Go's `database/sql` do:
+
+- The SQL text carries most of the differences: `std:db` passes it on unchanged, translating no dialect, so that `TOP` or `LIMIT`, `OUTPUT` or `RETURNING`, JSON operators and window functions are each database's own SQL.
+- Which database, and how it is reached, is the host's configuration, not the script's (Q3): `Database.open("fish")` names a configured connection, so that credentials never appear in a script or its output, the host grants a script a database by its name (section 7.13, capabilities), and one script can run on SQLite in development and SQL Server in production, where its SQL allows. HOWEVER, there has to be a way of specifying that in script, too, like in classic ASP.
+- A script may ask what it is talking to, `db.provider` (`"sqlserver"`, `"sqlite"`) and `db.serverVersion`, and choose its SQL by it.
+
+- What is common but tunable is an options map, so that the API's shape stays fixed: `db.query(sql, values, { timeout: 30 })`, `db.transaction(async () => { … }, { isolation: "serializable" })`; an option a provider does not support is a runtime error, never silently ignored.
+- What only one database has (SQL Server's bulk copy, SQLite's own functions, PostgreSQL's `LISTEN`) is a provider's extension module, taking the common `db`: `import { bulkCopy } from "std:db/sqlserver"; await bulkCopy(db, "orders", rows);`, an error on another provider's `db`. Code that imports only `std:db` stays portable, and an import of an extension module marks, where it can be seen, the code that is not; a host may grant an extension module apart from `std:db`; and the extension reaches its provider's .NET connection through the instance's host object (Q1 of "Native Modules, Part 2: Native Classes", if (a)), which no script sees.
+- Left for questions of their own: placeholders (Q2); how each database type becomes a WebLingo value (decimals, dates and times, bytes, a provider's own types such as a geography, by its text); a cursor for results too large to hold whole, `for await (row of db.rows(sql, values))`, later, as a request body's streaming; and connection pooling, the host's, for each configured connection, which `using` and transactions must agree with.
+
+(b) fits each module's API to its database exactly, but shares nothing: a library for any database adapts to each module itself, and each module repeats transactions, parameters, pooling, `using` and the mapping of types.
+
+A1: (a). 
+
+Q2, how a statement takes values: (a) named, `@name`, from a map, `db.query("SELECT * FROM Fish WHERE Price < @max", { max: 10 })`, as the specification's example has it; (b) by position, `?`, from an array.
+
+A2: (a)
+
+Q3, how a site names its databases: (a) in `wasp.config`, `"databases": { "fish": "sqlite:data/fish.db" }`, a script naming one by its name, and `weblingo.config` the same for scripts; (b) a connection string in the script.
+
+A3: (a) and (b), both.
+
+Q4, where a site's SQLite database file is: (a) a folder of the site's, `data/`, which `wasp` never serves, as it never serves `wasp.config`; (b) outside the site's folder, as the IIS logs are.
+
+A4: (b), specified in the config.
+
+Q5, the packages: (a) ADO.NET's providers, Microsoft.Data.Sqlite (MIT, with SQLitePCLRaw and the native SQLite it brings) and Microsoft.Data.SqlClient (MIT), in a new adapter project, `WebLingo.Data.DotNet`, outside the portable core, the dependencies listed in the task's notes; (b) another way, which you name.
+
+A5: (a)
+
+2026-11-16 (Claude): waiting for two things before the work can start. Your go-ahead in chat to reach nuget.org, to restore Microsoft.Data.Sqlite and the SQLitePCLRaw packages it brings, and Wikimedia Commons, to choose the fish photos and download them; the harness refuses both without it, and I will list each file, its source and its size before downloading anything. And one question about A4:
+
+Q6, A4's "or taken from PATH": (a) a database file named without a folder, `"fish": "sqlite:fish.db"`, is looked for in the folders of the `PATH` environment variable, the first that has it, as a program is; (b) something else, which you name.
+
+A6: N/A any more.
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 7.11, and built: the platform's databases, `IWebLingoDatabases`, `DotNetDatabases` on .NET in a new adapter, `WebLingo.Data.DotNet`, SQLite's provider for now; `std:db`, its class `Database`, `open`, `query`, `execute`, `begin`, `commit`, `rollback`, `transaction`, `provider`, `serverVersion` and `dispose`; `"databases"` in `weblingo.config` and `wasp.config`; and `Examples/example2`, Lingo Aquatics, a fish store whose pages read and change a SQLite database outside the site, made by `database/setup.wl`, with fourteen fish from rivers and reefs, ordered in a transaction. `transaction` calls a script's function and awaits it, as a native function cannot, so native classes may now have methods written in WebLingo (`DeclareWebLingoMethods`), read when the module loads. Guessed, and recorded as Proposed (section 15.2, "Database access" and "Native classes' methods written in WebLingo"): a connection string as a provider's name, a colon, and what the provider reads, SQLite's a path, `:memory:` or its own connection string; a relative path from the configuration's folder, or a script's current folder; a file made when it is not there; options `timeout` and `isolation`, any other WL3001; columns declared `DECIMAL`, `BOOL` and `DATE` read as decimals, Booleans and dates; one operation at a time on a connection; transactions not nesting; a script's connection string allowed under `wasp` too; and a database's failure a new class, `DatabaseError`, with a new code, WL3015 (Proposed). Packages, in `WebLingo.Data.DotNet` only: Microsoft.Data.Sqlite and Microsoft.Data.Sqlite.Core 10.0.15 (MIT), and SQLitePCLRaw.bundle_e_sqlite3, .core, .provider.e_sqlite3 and .lib.e_sqlite3 2.1.13 (Apache-2.0), the last holding SQLite (public domain); a published installation is 35 MB, SQLite's native library for every platform included. The photos are from Wikimedia Commons, 1920-pixel renderings, the clownfish's 1280, cropped to 4:3 and scaled to 1024 x 768, each credited in `images/CREDITS.md` and on `/credits`. The example was tried with `wasp serve` in a browser, its pages, an order and a refused one; the documents' examples run with `weblingo`.
+
+Done (Claude, 2026-11-16, `ece0740`): database access, SQLite. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs; Windows only, Linux not tried.
