@@ -3276,3 +3276,41 @@ Guessed, where Go's `html/template` leaves a choice or does what WASP cannot, ea
 Tests: `EscapingTests` (`WebLingo.Templates.Tests`), every context on both VMs, includes and components, eleven WL5008 cases and a layout's, the escapers themselves and the writers' names; conformance cases of `Html`, on both VMs and through WLBC. Docs: the specification, the WASP User Manual (section 4, rewritten), the Standard Library Reference (section 19, `Html`), the Language Reference's diagnostic codes, `Documents/implementation.md`, the README and the editors' colouring.
 
 Done (Claude, 2026-11-17, `7aa54fa`): context-aware escaping in pages, M0.15. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail (its footer's `DateTime.Now`); `weblingo` on the samples, and `wasp` on `samples/SimpleWebsite` and the pages of example2 and example3, which compile unchanged; both VMs; the benchmark not run, neither VM's dispatch having changed; Windows only, Linux not tried.
+
+## [DONE] File Capabilities: A Site's Folders
+
+The owner's second milestone, M0.16 (A1 of "What Comes After M0.14", 2026-11-17; specification, section 9). Under `wasp`, a site's pages reach only the folders its `wasp.config` allows, as `"network"` allows hosts (section 7.9), where today `std:fs` reaches any file the server's process may (sections 3.9, "Files: `std:fs`", 7.4 and 7.13, open question 13); under `weblingo`, a script reaching any file, as now. Added by Claude, 2026-11-17.
+
+2026-11-17 (Claude): its questions, while "Context-Aware Escaping in Pages", above, waits for its answer. Today a host `"network"` does not allow is WL3001 where the connection is made (`DotNetNetwork`), and a relative path in `std:fs` is from the process's current folder, which `wasp serve` and IIS set differently. One decision each:
+
+Q1, how a site lists its folders in configuration: (a) two lists, `"files": { "read": ["../data"], "write": ["../uploads"] }`, a folder listed for writing readable too, so that a site that only reads its catalog cannot change it; (b) one list, `"files": { "allow": ["../data"] }`, each folder read and written, as `"network"`'s one list allows hosts.
+
+A1: (a)
+
+Q2, what a site reaches that lists none: (a) no file, as a site without `"network"` reaches no host; (b) the files below its own root, its pages' folder, besides those it lists.
+
+A2: (a)
+
+Q3, a relative path in a page's script, `fs.readText("../data/teas.json")`, under `wasp`: (a) from the site's root, as an `include`'s and the configuration's own paths are, the same under `wasp serve` and IIS; (b) from the process's current folder, as now and as under `weblingo`. A folder in the list, relative, is from the site's root either way, as a SQLite database's path in `"databases"` is from the configuration's folder.
+
+A3: (a)
+
+Q4, how a path is checked against the folders: (a) its real path, made absolute, `.` and `..` resolved and its links and junctions followed, compared as the file system compares names (ignoring case on Windows), Windows' device names (`CON`, `NUL`, `\\.\…`) always refused; (b) the path as written, made absolute and `..` resolved, its links not followed, so that a link inside an allowed folder reaches wherever it points.
+
+A4: (a)
+
+Q5, what a path a site may not reach is: (a) WL3001, a `TypeError`, as a host `"network"` does not allow is, its message naming the path as the script gave it; (b) an `IOError`, WL3011, as a file that cannot be opened is.
+
+A5: (c) `PermissionError`
+
+Q6, a SQLite database a page's script names by its own connection string, `Database.open("sqlite:../data/shop.db")`: (a) checked as `std:fs`'s paths are, for reading and writing, those the configuration names in `"databases"` trusted, the configuration being the site's own; (b) not checked, file capabilities being `std:fs`'s only.
+
+A6: (a)
+
+2026-11-17 (Claude): built with A1's (a), A2's (a), A3's (a), A4's (a), A5's (c), `PermissionError`, and A6's (a), and landed: the platform's `IWebLingoFileCapabilities` and, on .NET, `DotNetFileCapabilities`, which resolve a script's path from the site's root to its real path, its links and junctions followed, and refuse one outside the folders `wasp.config`'s `"files"` lists, or a Windows device's; a site's scripts reach files through a file system given them (`WebLingoApplicationOptions.ScriptFileSystem`), which opens the real path, the host reading its own pages as before; `wasp run` and `wasp serve` both; a SQLite database a script names by its own connection string checked the same way; `PermissionError`, WL3016, a new code and class. The answers are recorded in the specification (section 1.1's "File capabilities (M0.16)", sections 3.9, 7.4 and 7.13's "File capabilities"), the details as built in section 15.2, Proposed.
+
+Guessed, each recorded as Proposed in section 15.2: `..` is resolved as written before the links are followed, the real path then being what is opened, so that `link/..` means the link's folder, not its target's parent; the listed folders are resolved once, when the site loads; names are compared ignoring case on macOS too; a look (`exists`) at a path the site may not reach is a `PermissionError`, not `false`; a SQLite database opened read-only (`Mode=ReadOnly`) needs a folder to read only, any other one to write, a `file:` URI is refused, and `:memory:` is as before; SQL Server's `AttachDbFilename`, which the server's own process reads, is not checked; a link made between the check and the opening is not guarded against, no script being able to make one. A host that `"network"` does not allow is still WL3001, as approved; a question of its own asks whether it, and COM's, should be a `PermissionError` too.
+
+Tests: `WaspTests`, through `wasp run`, no folders, read and write folders, `..`, the root and `--root`, a junction leading out of a folder (a symbolic link elsewhere), on Windows another case and device names, a page's own databases, and the configuration's errors; `WaspServeTests`, through `wasp serve`. Docs: the specification, the WASP User Manual (section 14), the Standard Library Reference, the Language Reference, `Documents/implementation.md`, the portability inventory and the editors' colouring.
+
+Done (Claude, 2026-11-17, `4b520e8`): file capabilities, M0.16. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail; `weblingo` on the samples and `wasp` on `samples/SimpleWebsite`; Windows only, Linux not tried, where links are symbolic links and names' case counts.
