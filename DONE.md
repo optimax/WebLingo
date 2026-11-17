@@ -2828,3 +2828,21 @@ Done (Claude, 2026-11-16): the tasks added to `TO-DO.md`, which is left uncommit
 2026-11-16 (Claude): the task had its title only, read as a reference for the standard library, beside the Language Reference: `Documents/weblingo-standard-library-reference.md`, the built-in functions, every built-in class's members, the standard modules `std:system`, `std:tasks` and `std:fs`, native modules, and the request and the response of WASP's pages, a table and an example for each, every example run with `weblingo`. Linked from the Language Reference, the WASP User Manual, the solution's README and `Documents/implementation.md`, section 2, which says that a change to a built-in class or a standard module updates it in the same change. Guessed: what the title asks for, the document's name, and that the Language Reference keeps its own short section on the standard library, pointing to it.
 
 Done (Claude, 2026-11-16, `d175e0d`): the WebLingo Standard Library Reference. Main's checks: documentation only, the solution unchanged since its last checks.
+
+## [DONE] Remainder: `%`
+
+`a % b`, the remainder of a division, of integers and of numbers, beside `*` and `/` in precedence. Built as every feature is: in the lexer and the parser where it is syntax, the binder and the lowered IR, both VMs or the runtime they share, with its conformance tests on both VMs, and the Language Reference. A number's remainder is IEEE 754's as C# gives it (`5.5 % 2` is `1.5`), and an int64's cannot overflow but for `long.MinValue % -1`, which C# gives as 0. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, the sign of an integer's remainder: (a) the dividend's, as C# and JavaScript give it, `-7 % 3` being `-1`; (b) the divisor's, as Python gives it, `-7 % 3` being `2`.
+
+A1: (a)
+
+Q2, an integer's remainder by 0: (a) WL3001, invalid operation; (b) an error of a code of its own, division by zero, which `/` does not need, since its result is a number (`7 / 0` is `Infinity`).
+
+A2: (b)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1, 3.5 and 8.4, and built on both VMs: a `Percent` token, read after a template block's `%>`; a `Remainder` operation appended to both VMs' instructions; the dividend's sign; by -1 always 0; an integer's by 0 WL3013, `DivisionByZeroError`, a new class of runtime error; a number's IEEE 754's; `static operator %`. Guessed: the class's name, `DivisionByZeroError`, and the code, WL3013, WL3012 being COM's (section 3.10). Tested by the operator cross-check of both VMs against the runtime and by conformance cases; described in the Language Reference and the Standard Library Reference.
+
+Done (Claude, 2026-11-16, `99a84f1`): `%`. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; `weblingo` and `wasp` tried, on Windows only; Linux not tried.
