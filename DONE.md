@@ -2986,3 +2986,21 @@ A2: (a)
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.2, and built in the runtime both VMs share: `IWebLingoTimeZone.Find(name)`, `DotNetTimeZone` asking .NET; `d.toZone(name)` and `DateTime.inZone(name, year, month, day, …)`. Guessed, and recorded as Proposed (section 15.2, "Time zones"): a name looked for only when written as IANA writes them, so that Windows' own names are not, and none reaches the platform as a path; a skipped or repeated time taking the zone's standard offset, as the server's does; a date keeping its offset, not its zone, when moved; WL3001 for an unknown name and under a host without a zone. The inventory's row for .NET's clock and zones names `TimeZoneInfo.TryFindSystemTimeZoneById`. Described in the Language Reference and the Standard Library Reference, their examples run with `weblingo`.
 
 Done (Claude, 2026-11-16, `0d15d6d`): time zones. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail (`DateTime.Now`, a member dates do not have: `DateTime.now()`), the committed site serving its pages; both VMs; Windows only, Linux not tried.
+
+## [DONE] Hexadecimal and Binary Literals
+
+`0x1F` and `0b1010`, int64s, in the lexer, which reads decimal literals only today. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, which: (a) `0x` and `0b`, their letters in either case; (b) octal too, `0o17`.
+
+A2: (a)
+
+Q2, one beyond int64, `0xFFFFFFFFFFFFFFFF`: (a) WL1004, as a decimal literal beyond int64 is; (b) its bits, `-1`, as C#'s `unchecked` gives them.
+
+A2: (a)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.5, and built in the lexer: `0x`/`0X` and `0b`/`0B`, int64s. Guessed, and recorded as Proposed (section 15.2, "Hexadecimal and binary literals"): a prefix without digits, or digits running into a letter, a digit or `_`, one invalid literal (WL1004); the message for one beyond int64 naming the largest in decimal. The editors' colouring (Notepad++ and VS Code) reads them, and the decimal's `m`, which the decimals' task had left out. Described in the Language Reference.
+
+Done (Claude, 2026-11-16, `e4ead72`): hexadecimal and binary literals. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
