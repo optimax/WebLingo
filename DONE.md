@@ -2968,3 +2968,21 @@ A3: (b) `1.5` written as `1.5m`.
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.2, the change from decimal128 to .NET's `decimal` for now noted in the register's M0.1 row and open question 3, and built on both VMs: a literal, a constant of its own kind in modules and WLBC, a kind of value in the heap, its class `Decimal`, arithmetic, comparisons, text and formats. Guessed, and recorded as Proposed (section 15.2, "Decimals"): `new Decimal(x)` of a number converted as .NET converts it; `new Integer(d)` only of a whole decimal; `Decimal.parse` reading a sign, digits and a point; a decimal never equal to a binary64; decimals no key of a map. The inventory lists `System.Decimal` as Planned. Described in the Language Reference and the Standard Library Reference.
 
 Done (Claude, 2026-11-16, `afa79ca`): decimals. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
+
+## [DONE] Time Zones Other Than UTC and the Server's
+
+A date in any time zone, by its IANA name, `"Europe/Warsaw"`, beside UTC and the server's own, which is all dates have today (the owner's answer, 16 November 2026, specification, section 3.2, "Dates and times"), through the platform layer's time zones (section 7.6). From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, where the zones come from: (a) the platform's (Windows' and ICU's, through .NET), which may differ from one server to another; (b) a time zone database shipped with WebLingo, the same everywhere.
+
+A1: (a)
+
+Q2, how a script names one: (a) `d.toZone("Europe/Warsaw")` and `DateTime.inZone("Europe/Warsaw", year, month, day, …)`; (b) a class, `TimeZone.find("Europe/Warsaw")`, `d.toZone(zone)`.
+
+A2: (a)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.2, and built in the runtime both VMs share: `IWebLingoTimeZone.Find(name)`, `DotNetTimeZone` asking .NET; `d.toZone(name)` and `DateTime.inZone(name, year, month, day, …)`. Guessed, and recorded as Proposed (section 15.2, "Time zones"): a name looked for only when written as IANA writes them, so that Windows' own names are not, and none reaches the platform as a path; a skipped or repeated time taking the zone's standard offset, as the server's does; a date keeping its offset, not its zone, when moved; WL3001 for an unknown name and under a host without a zone. The inventory's row for .NET's clock and zones names `TimeZoneInfo.TryFindSystemTimeZoneById`. Described in the Language Reference and the Standard Library Reference, their examples run with `weblingo`.
+
+Done (Claude, 2026-11-16, `0d15d6d`): time zones. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail (`DateTime.Now`, a member dates do not have: `DateTime.now()`), the committed site serving its pages; both VMs; Windows only, Linux not tried.
