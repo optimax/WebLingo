@@ -1,8 +1,8 @@
 # Examples
 
 Each example is a site's own files, as a server runs them: its pages, its modules, its other files and its
-`web.config`, side by side, as a PHP site's are; example2's site is its `site` folder, its database in a folder
-beside it. WebLingo itself is installed once on the server, for every site. The WASP User Manual,
+`web.config`, side by side, as a PHP site's are; example2's and example3's sites are their `site` folders, what makes
+their databases in a folder beside them. WebLingo itself is installed once on the server, for every site. The WASP User Manual,
 `Documents/wasp-user-manual.md`, explains what the examples use.
 
 ## example1: The Lingo Tea House, a website built with WASP
@@ -167,3 +167,86 @@ As example1, with WebLingo installed once on the server, and then:
    journal beside the database while it changes it.
 4. In IIS, add a website whose physical path is the `site` folder, in an application pool whose .NET CLR version is
    "No Managed Code".
+
+## example3: Lingo To-Do, a to-do list on SQL Server
+
+A to-do list, an example of a site on SQL Server: four lists and three dozen items, in a database on SQL Server
+Express LocalDB, which its pages read, add to, change, mark done and delete through `std:db`. The database is made by
+a script the example holds, `setup.sql`, the site naming it in its `wasp.config`.
+
+```text
+example3/
+  database/             outside the site: the script that makes the database, and what runs it
+    setup.sql           makes the database WebLingoTodo: its tables, Lists and Items, and the items, due around today
+    setup.wl            runs setup.sql through std:db, batch by batch, as sqlcmd would
+    weblingo.config     names LocalDB's master database "server" for setup.wl
+  site/                 the site, and wasp's root
+    web.config          IIS's configuration, as example1's
+    wasp.config         names the database "todo": "sqlserver:Server=(localdb)\\MSSQLLocalDB;Database=WebLingoTodo;…"
+    index.wasp          /                 the items to do, ?show=done or ?show=all, of one list, ?list=2, or by a word, ?q=bulbs;
+                                          and a form that adds one
+    add.wasp            /add              an item, posted by that form, added, and the browser sent back to the list
+    edit.wasp           /edit?id=1        an item's form, and the item changed when it is posted
+    delete.wasp         /delete?id=1      asks, then deletes the item when its form is posted
+    toggle.wl           /toggle           an item marked done, or to do again, by its checkbox: a route handler
+    api/items.wl        /api/items        the items as JSON
+    lib/todo.wl         the module the pages ask the database through, and what checks a form
+    layouts/, includes/, components/, css/   as example1's, components/item.wasp an item on the list
+```
+
+### What it shows
+
+- **SQL Server, through the same module.** `std:db` is the same for every database; only the connection string in
+  `wasp.config` says that this one is SQL Server's, `sqlserver:` and SqlClient's own connection string, and the SQL is
+  SQL Server's own: `OUTPUT INSERTED.Id` gives a new item's id, `SYSDATETIME()` the server's time.
+- **Changing data, safely.** Each change is a form posted to its page, `/add`, `/edit?id=1`, `/delete?id=1`, its values
+  named in the SQL, `@title`, never pasted into its text; the page then sends the browser back to the list, a 303
+  (See Other), so that reloading the list does not post the form again. A form with something wrong, an empty title or a
+  date that is not one, is shown again with what is wrong, a 400.
+- **SQL Server's values.** `BIT` columns come back as Booleans, `DATE` ones as dates, `TINYINT` ones as integers; a date
+  from the form goes in as a date, `DateTime.parse(due, "yyyy-MM-dd")`.
+- **A route handler that only redirects.** `toggle.wl` exports `post`, which marks an item done, or to do again, and sends
+  the browser back to the list it came from, but only to an address on this site.
+
+### Installing SQL Server Express LocalDB
+
+LocalDB is SQL Server Express's own small engine, for development: it starts when a program first connects to it, as
+the user who runs that program, and stops when it is no longer used. On Windows:
+
+1. Download SQL Server Express from Microsoft's SQL Server downloads page (its "Express" edition, free), run the
+   installer, choose **Download Media**, then **LocalDB**, which downloads `SqlLocalDB.msi`.
+2. Run `SqlLocalDB.msi`. It installs LocalDB, and `SqlLocalDB.exe`, which manages its instances.
+3. In a new command prompt, `sqllocaldb info` lists `MSSQLLocalDB`, the instance the example uses, which LocalDB makes
+   the first time it is asked for.
+
+WebLingo reaches SQL Server through SqlClient's managed network layer, which LocalDB answers by its named pipe;
+nothing else needs installing. SQL Server's own tools, `sqlcmd` among them, are not needed, though `setup.sql` runs
+with them too.
+
+### Running it locally
+
+With the .NET 10 SDK and LocalDB, make the database from the `database` folder, where `setup.sql` is, since a
+relative path is from the current folder:
+
+```bash
+cd Examples/example3/database
+dotnet run --project ../../../WebLingo/src/WebLingo.Cli -- run setup.wl
+```
+
+which writes `WebLingoTodo has 4 lists and 36 items, 30 of them open.`; then, from the repository's root, serve the site:
+
+```bash
+dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples/example3/site
+```
+
+and open <http://localhost:8080/>. Run `setup.wl` again to put the items back as they were: it drops the database
+first. LocalDB keeps the database's files in your user profile's folder, `WebLingoTodo.mdf` and `WebLingoTodo_log.ldf`.
+
+### Another SQL Server
+
+To use a SQL Server you already have, change the server in both configurations, `database/weblingo.config`'s
+`"server"` and `site/wasp.config`'s `"todo"`, to SqlClient's connection string for it,
+`"sqlserver:Server=myserver;Database=WebLingoTodo;Integrated Security=true;TrustServerCertificate=true"`, and run
+`setup.wl` as above. Under IIS, the site reaches the database as its application pool's account, which needs a login on
+that server, and the rights to read and change the database: LocalDB, which serves only the user who started it, suits
+`wasp serve` on your own machine rather than IIS.

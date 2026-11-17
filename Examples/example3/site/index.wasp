@@ -1,0 +1,63 @@
+<% param request; import { lists, counts, items, showOf, idOf, priorities } from "/lib/todo.wl"; %>
+<% layout "/layouts/main.wasp", { title: "Your lists", section: showOf(request.query?["show"]) }; %>
+<%
+  // The items to show, chosen by the query: ?show=done or ?show=all, ?list=2 for one list, ?q=word to search.
+  var show = showOf(request.query?["show"]);
+  var list = idOf(request.query?["list"]);
+  var search = (request.query?["q"] ?? "").trim();
+  var all = await lists();
+  var current = all.find(l => l["Id"] == list);
+  var shown = await items(show, current == null ? null : list, search == "" ? null : search);
+  var total = await counts();
+  var back = current == null ? $"/?show={show}" : $"/?show={show}&list={list}";
+  var heading = show switch { "done" => "Done", "all" => "Everything", _ => "To do" };
+%>
+<section class="summary">
+  <p><strong><%= total["Open"] %></strong> to do<% if (total["Overdue"] > 0) { %>, <strong class="late"><%= total["Overdue"] %></strong> overdue<% } %>,
+  <strong><%= total["Done"] %></strong> done.</p>
+</section>
+<form class="add" method="post" action="/add">
+  <input name="title" placeholder="Something to do" maxlength="200" required aria-label="What to do">
+  <select name="list" aria-label="List">
+<% foreach (var l in all) { %>
+    <option value="<%= l["Id"] %>"<%- l["Id"] == list ? " selected" : "" %>><%= l["Name"] %></option>
+<% } %>
+  </select>
+  <select name="priority" aria-label="Priority">
+<% foreach (var p in priorities) { %>
+    <option value="<%= p[0] %>"<%- p[0] == 2 ? " selected" : "" %>><%= p[1] %></option>
+<% } %>
+  </select>
+  <input type="date" name="due" aria-label="Due">
+  <button>Add</button>
+</form>
+<div class="board">
+  <aside>
+    <h2>Lists</h2>
+    <ul class="lists">
+      <li><a<%- current == null ? " class=\"current\"" : "" %> href="/?show=<%= show %>">All lists</a></li>
+<% foreach (var l in all) { %>
+      <li><a<%- l["Id"] == list ? " class=\"current\"" : "" %> href="/?show=<%= show %>&amp;list=<%= l["Id"] %>"
+             style="--list: <%= l["Colour"] %>"><%= l["Name"] %> <span><%= l["Open"] %></span></a></li>
+<% } %>
+    </ul>
+  </aside>
+  <section>
+    <h1><%= heading %><%= current == null ? "" : ": " + current["Name"] %></h1>
+    <form class="search" method="get" action="/">
+      <input type="hidden" name="show" value="<%= show %>">
+<% if (current != null) { %>
+      <input type="hidden" name="list" value="<%= list %>">
+<% } %>
+      <input type="search" name="q" value="<%= search %>" placeholder="Search" aria-label="Search">
+    </form>
+<% if (shown.length == 0) { %>
+    <p class="empty">Nothing here<%= search == "" ? "" : " with “" + search + "”" %>.</p>
+<% } else { %>
+    <ul class="items">
+<%   foreach (var item in shown) { await renderComponent("/components/item.wasp", { item: item, back: back }); } %>
+    </ul>
+    <p class="count"><%= shown.length %> <%= shown.length == 1 ? "item" : "items" %>.</p>
+<% } %>
+  </section>
+</div>

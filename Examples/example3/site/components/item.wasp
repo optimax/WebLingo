@@ -1,0 +1,17 @@
+<% param item; param back; import { dueText } from "/lib/todo.wl"; %>
+<li class="item p<%= item["Priority"] %><%= item["Done"] ? " done" : "" %><%= item["Overdue"] ? " overdue" : "" %>">
+  <form method="post" action="/toggle">
+    <input type="hidden" name="id" value="<%= item["Id"] %>">
+    <input type="hidden" name="back" value="<%= back %>">
+    <button class="check" title="<%= item["Done"] ? "Mark it to do again" : "Mark it done" %>"><%= item["Done"] ? "✓" : "" %></button>
+  </form>
+  <div class="what">
+    <a class="title" href="/edit?id=<%= item["Id"] %>"><%= item["Title"] %></a>
+<% if (item["Notes"] != null) { %>
+    <p class="notes"><%= item["Notes"] %></p>
+<% } %>
+  </div>
+  <span class="list" style="--list: <%= item["Colour"] %>"><%= item["List"] %></span>
+  <span class="due"><%= dueText(item["Due"]) %></span>
+  <a class="delete" href="/delete?id=<%= item["Id"] %>" title="Delete it">×</a>
+</li>

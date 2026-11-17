@@ -1,0 +1,29 @@
+<% param request; param response; import { lists, read, add } from "/lib/todo.wl"; %>
+<% layout "/layouts/main.wasp", { title: "Add" }; %>
+<%
+  // A new item, posted by the list's form: added, then the browser sent back to the list (303, See Other), so that
+  // reloading the list does not post it again; or its form's problem, with a link back.
+  var problem = "Add an item from the list's form.";
+  var item = null;
+  if (request.method == "POST") {
+    var given = read(await request.form(), await lists());
+    problem = given["problem"];
+    item = given["item"];
+    if (problem == null) {
+      await add(item);
+      response.status = 303;
+      response.headers["Location"] = $"/?list={item['ListId']}";
+    }
+  }
+  if (problem != null) {
+    response.status = 400;
+  }
+%>
+<% if (problem != null) { %>
+<h1>Not added</h1>
+<p class="problem"><%= problem %></p>
+<% } else { %>
+<h1>Added</h1>
+<p>“<%= item["Title"] %>” is on your list.</p>
+<% } %>
+<p><a href="/">Back to your list</a></p>

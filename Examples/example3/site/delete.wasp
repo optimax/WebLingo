@@ -1,0 +1,28 @@
+<% param request; param response; import { one, remove, idOf } from "/lib/todo.wl"; %>
+<% layout "/layouts/main.wasp", { title: "Delete" }; %>
+<%
+  // /delete?id=12: asks first, then, when its form is posted, deletes the item and sends the browser back to its list.
+  var id = idOf(request.query?["id"]);
+  var item = id == null ? null : await one(id);
+  var deleted = false;
+  if (item == null) {
+    response.status = 404;
+  } else if (request.method == "POST") {
+    deleted = await remove(id) == 1;
+    response.status = 303;
+    response.headers["Location"] = $"/?list={item['ListId']}";
+  }
+%>
+<% if (item == null) { %>
+<h1>No such item</h1>
+<p>It may have been deleted already. <a href="/">Back to your list</a></p>
+<% } else if (deleted) { %>
+<h1>Deleted</h1>
+<p>“<%= item["Title"] %>” is gone. <a href="/">Back to your list</a></p>
+<% } else { %>
+<h1>Delete this item?</h1>
+<p class="question">“<%= item["Title"] %>”, on <%= item["List"] %>.</p>
+<form method="post" action="/delete?id=<%= id %>">
+  <p class="buttons"><button class="danger">Delete it</button> <a href="/edit?id=<%= id %>">Keep it</a></p>
+</form>
+<% } %>

@@ -39,7 +39,7 @@
 | OS threads (`Thread`, `ThreadPool`), `Monitor` | Adapted | Adapter-only (§7.14); the CLI's clock sleeps while an execution waits for a timer (`Thread.Sleep`, M0.11.1); `DotNetSchedulerHost` runs blocking work on the thread pool and holds the work posted back in a queue that `Monitor` guards (section 7.8) |
 | P/Invoke | Adapted | Adapter-only (§7.14) |
 | ASP.NET Core | Adapted | Hosting adapter only |
-| ADO.NET (`System.Data`, `System.Data.Common`, Microsoft.Data.Sqlite) | Adapted | `DotNetDatabases` (`WebLingo.Data.DotNet`), which `std:db` reaches through `IWebLingoDatabases` (§7.11); never the portable core |
+| ADO.NET (`System.Data`, `System.Data.Common`, Microsoft.Data.Sqlite, Microsoft.Data.SqlClient) | Adapted | `DotNetDatabases` (`WebLingo.Data.DotNet`), which `std:db` reaches through `IWebLingoDatabases` (§7.11); never the portable core |
 | System.Net.Http, System.Net.Sockets | Adapted | the platform's network, `DotNetNetwork` (`WebLingo.Platform.DotNet`), which `std:http` and `std:net` reach through `IWebLingoNetwork` (§7.2, §7.9) |
 | Reflection.Emit | Prohibited | No dynamic CLR codegen in portable core |
 

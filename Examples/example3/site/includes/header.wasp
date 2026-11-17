@@ -1,0 +1,12 @@
+<header>
+  <a class="brand" href="/">Lingo To-Do</a>
+  <nav>
+<% foreach (var link in [["/", "To do", "open"], ["/?show=done", "Done", "done"], ["/?show=all", "Everything", "all"]]) { %>
+<%   if (link[2] == section) { %>
+    <a class="current" href="<%= link[0] %>"><%= link[1] %></a>
+<%   } else { %>
+    <a href="<%= link[0] %>"><%= link[1] %></a>
+<%   } %>
+<% } %>
+  </nav>
+</header>

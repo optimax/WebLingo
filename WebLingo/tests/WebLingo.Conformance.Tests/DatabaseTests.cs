@@ -78,7 +78,11 @@ public sealed class DatabaseTests : IDisposable
     [InlineData("try { await Database.open(\"nowhere\"); } catch (e) { writeLn([e.code, e.message]); }",
         "[\"WL3001\", \"'nowhere' is not a database the configuration names.\"]")]
     [InlineData("try { await Database.open(\"postgres:x\"); } catch (e) { writeLn(e.message); }",
-        "'postgres' is not a database's provider WebLingo has, which are \"sqlite\".")]
+        "'postgres' is not a database's provider WebLingo has, which are \"sqlite\", \"sqlserver\".")]
+    [InlineData("try { await Database.open(\"sqlserver:Nonsense=1\"); } catch (e) { writeLn([e.code, e.message]); }",
+        "[\"WL3001\", \"'Nonsense=1' is not a SQL Server connection string: Keyword not supported: 'nonsense'.\"]")]
+    [InlineData("try { await Database.open(\"sqlserver:Database=Todo\"); } catch (e) { writeLn([e.code, e.message]); }",
+        "[\"WL3001\", \"A SQL Server connection string names its server, as Server=name does.\"]")]
     [InlineData("db.dispose(); db.dispose(); try { await db.query(\"SELECT 1\"); } catch (e) { writeLn(e.code); }", "WL3001")]
     public void FailuresAreErrors(string source, string printed)
     {
@@ -99,6 +103,27 @@ public sealed class DatabaseTests : IDisposable
                      "try { await db.execute(\"CREATE TABLE T (x INTEGER)\"); } catch (DatabaseError e) { writeLn(e.code); } }";
         var (exit, output, error) = Weblingo(source);
         Assert.Equal((WebLingoCommandLine.Success, "[{\"two\": 2}]\nWL3015\n", ""), (exit, output, error));
+    }
+
+    [Fact]
+    public void ASqlServerThatIsNotThereIsADatabaseError()
+    {
+        // Nothing listens on port 1, so SqlClient's managed network layer, the one WebLingo ships, fails to connect,
+        // where its native one, left out, would fail to load.
+        var source = "import { Database } from \"std:db\"; " +
+                     "try { await Database.open(\"sqlserver:Server=tcp:127.0.0.1,1;Connect Timeout=1;Encrypt=false\"); } " +
+                     "catch (DatabaseError e) { writeLn([e.code, e.message.startsWith(\"The database cannot be opened: \")]); }";
+        var (exit, output, error) = Weblingo(source);
+        Assert.Equal((WebLingoCommandLine.Success, "[\"WL3015\", true]\n", ""), (exit, output, error));
+    }
+
+    [Fact]
+    public void SqlClientsNativeNetworkLayerIsNotShipped()
+    {
+        // Microsoft.Data.SqlClient.SNI.runtime, under Microsoft's own terms, is left out (specification, section 7.11).
+        var found = Directory.GetFiles(AppContext.BaseDirectory, "Microsoft.Data.SqlClient.SNI*", SearchOption.AllDirectories);
+        Assert.Empty(found);
+        Assert.True(File.Exists(Path.Combine(AppContext.BaseDirectory, "Microsoft.Data.SqlClient.dll")));
     }
 
     [Fact]

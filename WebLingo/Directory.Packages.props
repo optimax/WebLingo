@@ -3,6 +3,10 @@
   <ItemGroup>
     <!-- SQLite's ADO.NET provider, MIT, with SQLitePCLRaw 2.1.13, Apache-2.0, and SQLite, public domain: WebLingo.Data.DotNet only. -->
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.15" />
+    <!-- SQL Server's ADO.NET provider, MIT, with its dependencies, MIT: WebLingo.Data.DotNet only. Its native network layer
+         on Windows, SNI.runtime, under Microsoft's own terms, is referenced only to be left out (specification, section 7.11). -->
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.2" />
+    <PackageVersion Include="Microsoft.Data.SqlClient.SNI.runtime" Version="7.1.2" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />

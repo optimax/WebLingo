@@ -1,0 +1,66 @@
+<% param request; param response; import { lists, one, read, update, idOf, priorities, dateValue } from "/lib/todo.wl"; %>
+<% layout "/layouts/main.wasp", { title: "Edit" }; %>
+<%
+  // One item's form, /edit?id=12: shown, and, when it is posted, the item changed and the browser sent back to its
+  // list, or the form shown again with what was wrong.
+  var id = idOf(request.query?["id"]);
+  var item = id == null ? null : await one(id);
+  var all = await lists();
+  var problem = null;
+  if (item == null) {
+    response.status = 404;
+  } else if (request.method == "POST") {
+    var given = read(await request.form(), all);
+    problem = given["problem"];
+    if (problem == null && await update(id, given["item"]) == 0) {
+      problem = "This item has been deleted meanwhile.";
+    }
+    if (problem == null) {
+      response.status = 303;
+      response.headers["Location"] = $"/?list={given['item']['ListId']}";
+    } else {
+      response.status = 400;
+      item = { ...item, ...given["item"] };
+    }
+  }
+%>
+<% if (item == null) { %>
+<h1>No such item</h1>
+<p>It may have been deleted. <a href="/">Back to your list</a></p>
+<% } else if (request.method == "POST" && problem == null) { %>
+<h1>Saved</h1>
+<p><a href="/">Back to your list</a></p>
+<% } else { %>
+<h1>Edit</h1>
+<% if (problem != null) { %>
+<p class="problem"><%= problem %></p>
+<% } %>
+<form class="edit" method="post" action="/edit?id=<%= id %>">
+  <label>What<input name="title" value="<%= item["Title"] %>" maxlength="200" required></label>
+  <label>Notes<textarea name="notes" rows="4" maxlength="1000"><%= item["Notes"] %></textarea></label>
+  <label>List
+    <select name="list">
+<% foreach (var l in all) { %>
+      <option value="<%= l["Id"] %>"<%- l["Id"] == item["ListId"] ? " selected" : "" %>><%= l["Name"] %></option>
+<% } %>
+    </select>
+  </label>
+  <label>Priority
+    <select name="priority">
+<% foreach (var p in priorities) { %>
+      <option value="<%= p[0] %>"<%- p[0] == item["Priority"] ? " selected" : "" %>><%= p[1] %></option>
+<% } %>
+    </select>
+  </label>
+  <label>Due<input type="date" name="due" value="<%= dateValue(item["Due"]) %>"></label>
+  <label class="done"><input type="checkbox" name="done" value="1"<%- item["Done"] ? " checked" : "" %>> Done</label>
+  <p class="buttons">
+    <button>Save</button>
+    <a href="/?list=<%= item["ListId"] %>">Cancel</a>
+    <a class="delete" href="/delete?id=<%= id %>">Delete</a>
+  </p>
+</form>
+<% if (item["Completed"] != null) { %>
+<p class="meta">Done on <%= item["Completed"].format("d MMMM yyyy, HH:mm") %>.</p>
+<% } %>
+<% } %>

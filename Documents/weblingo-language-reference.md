@@ -1943,7 +1943,7 @@ using (var db = await Database.open("sqlite::memory:")) {
 {"Name": "Guppy", "Price": 3.9m}
 ```
 
-A database's own failure, a statement it refuses, is a `DatabaseError`, WL3015. SQLite is the database there is for now; the Standard Library Reference describes the module.
+A database's own failure, a statement it refuses, is a `DatabaseError`, WL3015. SQLite and SQL Server are the databases there are for now; the Standard Library Reference describes the module.
 
 ### Native modules
 
@@ -2026,4 +2026,4 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Library**: a database's rows read one at a time, for results too large to hold whole; databases other than SQLite.
+- **Library**: a database's rows read one at a time, for results too large to hold whole; databases other than SQLite and SQL Server.

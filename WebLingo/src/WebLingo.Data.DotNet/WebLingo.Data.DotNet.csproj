@@ -4,5 +4,9 @@
   <ItemGroup>
     <ProjectReference Include="../WebLingo.Platform.Abstractions/WebLingo.Platform.Abstractions.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <!-- SqlClient's native network layer on Windows, under Microsoft's own terms, left out: SqlClient uses its managed one
+         there too, as on Linux (DotNetDatabases), so that everything WebLingo ships is MIT. -->
+    <PackageReference Include="Microsoft.Data.SqlClient.SNI.runtime" ExcludeAssets="all" PrivateAssets="all" />
   </ItemGroup>
 </Project>

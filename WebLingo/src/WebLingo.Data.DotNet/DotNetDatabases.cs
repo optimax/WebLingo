@@ -1,22 +1,33 @@
 using System.Data;
 using System.Data.Common;
 using System.Globalization;
+using System.Runtime.CompilerServices;
+using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using WebLingo.Platform.Abstractions;
 namespace WebLingo.Data.DotNet;
 
 /// <summary>
 /// The platform's databases on .NET (specification, section 7.11), through ADO.NET's providers: SQLite's,
-/// Microsoft.Data.Sqlite, <c>sqlite</c>. A connection string is its provider's name, a colon, and, for SQLite, a file's
-/// path, or the provider's own connection string, which holds an <c>=</c>, <c>"sqlite:Data Source=shop.db;Mode=ReadOnly"</c>;
-/// <c>:memory:</c> is a database in memory. A name the configuration gives stands for its connection string, a relative
-/// path in which is from the configuration's folder, <paramref name="folder"/>; one in a script's, from the program's
-/// current folder. SQLite makes a file that is not there, and its provider pools connections.
+/// Microsoft.Data.Sqlite, <c>sqlite</c>, and SQL Server's, Microsoft.Data.SqlClient, <c>sqlserver</c>. A connection
+/// string is its provider's name, a colon, and, for SQLite, a file's path, or the provider's own connection string, which
+/// holds an <c>=</c>, <c>"sqlite:Data Source=shop.db;Mode=ReadOnly"</c>, <c>:memory:</c> being a database in memory; for
+/// SQL Server, SqlClient's own, <c>"sqlserver:Server=(localdb)\MSSQLLocalDB;Database=Todo;Integrated Security=true"</c>. A
+/// name the configuration gives stands for its connection string, a relative path in which is from the configuration's
+/// folder, <paramref name="folder"/>; one in a script's, from the program's current folder. SQLite makes a file that is
+/// not there; both providers pool connections. SqlClient uses its managed network layer on Windows too, as it does
+/// elsewhere, its native one, under Microsoft's own terms, not shipped.
 /// </summary>
 public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configured, string folder) : IWebLingoDatabases
 {
     /// <summary>The providers this platform has.</summary>
-    public static readonly IReadOnlyList<string> Providers = ["sqlite"];
+    public static readonly IReadOnlyList<string> Providers = ["sqlite", "sqlserver"];
+
+    static DotNetDatabases()
+    {
+        // Read once, when SqlClient first connects: its managed network layer on Windows, its native one not being there.
+        AppContext.SetSwitch("Switch.Microsoft.Data.SqlClient.UseManagedNetworkingOnWindows", true);
+    }
 
     public IWebLingoDatabaseConnection Open(string nameOrConnection)
     {
@@ -30,6 +41,7 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
         DbConnection opened = provider switch
         {
             "sqlite" => Sqlite(rest, relativeTo),
+            "sqlserver" => SqlServer(rest),
             _ => throw Invalid($"'{provider}' is not a database's provider WebLingo has, which are \"{string.Join("\", \"", Providers)}\"")
         };
         try
@@ -62,6 +74,26 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
             builder.DataSource = relativeTo is null ? Path.GetFullPath(builder.DataSource) : Path.GetFullPath(builder.DataSource, relativeTo);
         }
         return new SqliteConnection(builder.ConnectionString);
+    }
+
+    /// <summary>
+    /// A SQL Server connection, not yet open, by SqlClient's own connection string. It returns a <see cref="DbConnection"/>
+    /// in a method of its own, so that .NET loads SqlClient, and what it needs, only for a script that opens SQL Server.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static DbConnection SqlServer(string rest)
+    {
+        SqlConnectionStringBuilder builder;
+        try
+        {
+            builder = new SqlConnectionStringBuilder(rest);
+        }
+        catch (Exception exception) when (exception is ArgumentException or FormatException or KeyNotFoundException)
+        {
+            throw Invalid($"'{rest}' is not a SQL Server connection string: {exception.Message}");
+        }
+        if (builder.DataSource.Length == 0) throw Invalid("a SQL Server connection string names its server, as Server=name does");
+        return new SqlConnection(builder.ConnectionString);
     }
 
     private static WebLingoDatabaseException Invalid(string message) => new(WebLingoDatabaseErrorKind.Invalid, message);
@@ -193,7 +225,8 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
         /// A column's value as one the contract allows. SQLite's are an integer, a real, text or a blob, a column declared
         /// a decimal (<c>DECIMAL</c>, <c>NUMERIC</c>, <c>MONEY</c>) read as a decimal, a Boolean (<c>BOOL</c>) as one, and a date
         /// (<c>DATE</c>, <c>DATETIME</c>, <c>TIMESTAMP</c>) as one where its text reads as a date; another provider's as
-        /// its type says.
+        /// its type says, SQL Server's <c>BIT</c> a Boolean, a date without an offset (<c>DATE</c>, <c>DATETIME2</c>) one
+        /// on the server's clocks, a <c>UNIQUEIDENTIFIER</c> or a <c>TIME</c> its text.
         /// </summary>
         private static object? Value(DbDataReader reader, int i)
         {

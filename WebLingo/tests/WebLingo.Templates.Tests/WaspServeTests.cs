@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using WebLingo.Cli;
+using WebLingo.Conformance.Tests;
 using WebLingo.Hosting;
 using WebLingo.Wasp.Cli;
 using Xunit;
@@ -158,6 +159,93 @@ public sealed class WaspServeTests : IDisposable
         finally
         {
             Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Directory.Delete(copy, recursive: true);
+        }
+    }
+
+    [LocalDbFact]
+    public async Task TheToDoListServesItsSqlServerDatabase()
+    {
+        // Examples/example3, the owner's example of a site on SQL Server: copied, its database made on LocalDB by its
+        // setup.wl running its setup.sql, under a name of the test's own, which the copy's wasp.config names, then served,
+        // its items added, changed, marked done and deleted (section 7.11). The database is dropped after it.
+        var folder = new DirectoryInfo(AppContext.BaseDirectory);
+        while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Examples", "example3", "site", "web.config"))) folder = folder.Parent;
+        Assert.NotNull(folder);
+        var example = Path.Combine(folder.FullName, "Examples", "example3");
+        var copy = Path.Combine(Path.GetTempPath(), "wasp-example3-" + Guid.NewGuid().ToString("N"));
+        foreach (var file in Directory.GetFiles(example, "*", SearchOption.AllDirectories))
+        {
+            var relative = Path.GetRelativePath(example, file);
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(copy, relative))!);
+            File.Copy(file, Path.Combine(copy, relative));
+        }
+        var database = "WebLingoTodoTests" + Guid.NewGuid().ToString("N");
+        var config = Path.Combine(copy, "site", "wasp.config");
+        File.WriteAllText(config, File.ReadAllText(config).Replace("Database=WebLingoTodo;", $"Database={database};", StringComparison.Ordinal));
+        try
+        {
+            var (made, setupError) = (new StringWriter(), new StringWriter());
+            var setup = Path.Combine(copy, "database", "setup.wl");
+            var script = Path.Combine(copy, "database", "setup.sql");
+            Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", setup, "database=" + database, "script=" + script], made, setupError));
+            Assert.Equal(($"{database} has 4 lists and 36 items, 30 of them open.\n", ""), (made.ToString(), setupError.ToString()));
+            var server = WebLingoWaspServer.Create(Path.Combine(copy, "site"), 0, new Dictionary<string, string>(), out var error, out _);
+            Assert.True(server is not null, error);
+            await server.StartAsync();
+            try
+            {
+                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                using var client = new HttpClient { BaseAddress = new Uri(address) };
+                foreach (var (path, text) in new[]
+                         {
+                             ("/", "<strong>30</strong> to do, <strong class=\"late\">3</strong> overdue"), ("/?show=done", "Rake the leaves on the lawn"),
+                             ("/?list=4", "<h1>To do: Shopping</h1>"), ("/?q=bulbs", "<p class=\"count\">2 items.</p>"),
+                             ("/edit?id=1", "value=\"Pay the electricity bill\""), ("/api/items?list=3", "\"Title\":\"Plant the tulip bulbs\"")
+                         })
+                {
+                    var response = await client.GetAsync(path);
+                    var body = await response.Content.ReadAsStringAsync();
+                    Assert.True(response.StatusCode == HttpStatusCode.OK, path + ": " + body);
+                    Assert.Contains(text, body);
+                }
+                Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/edit?id=999")).StatusCode);
+                Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/lib/todo.wl")).StatusCode);
+
+                // Added, then the browser sent back to the list (303), which shows it; a form without a title refused.
+                var added = await client.PostAsync("/add", new FormUrlEncodedContent(
+                    [new("title", "Water the plants"), new("list", "1"), new("priority", "1"), new("due", "")]));
+                Assert.Equal(HttpStatusCode.OK, added.StatusCode);
+                var list = await added.Content.ReadAsStringAsync();
+                Assert.Contains("Water the plants", list);
+                Assert.Contains("<strong>31</strong> to do", list);
+                var refused = await client.PostAsync("/add", new FormUrlEncodedContent([new("title", " "), new("list", "1")]));
+                Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+                Assert.Contains("Say what is to be done", await refused.Content.ReadAsStringAsync());
+
+                // Marked done, changed, and deleted.
+                var toggled = await client.PostAsync("/toggle", new FormUrlEncodedContent([new("id", "1"), new("back", "/?show=done")]));
+                Assert.Contains("Pay the electricity bill", await toggled.Content.ReadAsStringAsync());
+                var edited = await client.PostAsync("/edit?id=2", new FormUrlEncodedContent(
+                    [new("title", "Book the boiler service"), new("list", "1"), new("priority", "2"), new("due", "2026-12-01"), new("notes", "")]));
+                Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+                Assert.Contains("value=\"2026-12-01\"", await client.GetStringAsync("/edit?id=2"));
+                var deleted = await client.PostAsync("/delete?id=3", new FormUrlEncodedContent([]));
+                Assert.Equal(HttpStatusCode.OK, deleted.StatusCode);
+                Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/edit?id=3")).StatusCode);
+            }
+            finally
+            {
+                await server.StopAsync();
+            }
+        }
+        finally
+        {
+            var drop = Path.Combine(copy, "database", "drop.wl");
+            File.WriteAllText(drop, "import { Database } from \"std:db\"; using (var db = await Database.open(\"server\")) { " +
+                                    $"await db.execute(\"IF DB_ID(N'{database}') IS NOT NULL BEGIN ALTER DATABASE [{database}] " +
+                                    $"SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{database}]; END\"); }}");
+            WebLingoCommandLine.Run(["run", drop], new StringWriter(), new StringWriter());
             Directory.Delete(copy, recursive: true);
         }
     }
