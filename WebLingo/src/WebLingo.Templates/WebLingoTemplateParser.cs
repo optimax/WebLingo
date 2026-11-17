@@ -20,6 +20,15 @@ namespace WebLingo.Templates;
 /// among the program's (<see cref="WebLingoTemplateFiles"/>).
 /// </para>
 /// <para>
+/// The page's HTML is read as its text is (<see cref="WebLingoHtmlContext"/>; section 13, "Context-aware escaping"), so
+/// that each <c>&lt;%= … %&gt;</c> calls the writer that escapes for where it stands
+/// (<see cref="WebLingoTemplateWriters.EscapedAs"/>), as Go's <c>html/template</c> escapes an action: a block of code ends
+/// where the HTML stood when it began, the branches of an <c>if</c> and its <c>else</c>s where each other's end, a statement
+/// without braces writes text that leaves the HTML where it was, a component is rendered and a layout's body written in
+/// HTML's text, and a page ends there; HTML that browsers read in more than one way, or that any of these leave unknown, is
+/// WL5008. <c>&lt;%- … %&gt;</c>, and <c>write</c>, are taken to leave the HTML where it was.
+/// </para>
+/// <para>
 /// <c>layout "path", { name: value, … };</c>, at most once in a page's own text, after its parameters and imports and
 /// before anything else, makes the rest of the page its body: the page imports the layout, a template of its own scope,
 /// read as <see cref="WebLingoTemplateKind.Layout"/> (<see cref="LayoutScheme"/> before its path), giving it the
@@ -88,6 +97,27 @@ public sealed class WebLingoTemplateParser
     }
     private long _includedLength;
 
+    /// <summary>Where the page's HTML stands, after what has been read (section 13, "Context-aware escaping").</summary>
+    private WebLingoHtmlContext _html = WebLingoHtmlContext.Text;
+    /// <summary>Whether a WL5008 has been reported: one for a page, the HTML after it being unknown.</summary>
+    private bool _htmlReported;
+    /// <summary>The blocks of code open, each with where the HTML stood at its <c>{</c>.</summary>
+    private readonly Stack<CodeBlock> _blocks = new();
+    /// <summary>After an <c>if</c>'s branch's <c>}</c>: where its chain began, and where its branches end.</summary>
+    private (WebLingoHtmlContext Start, WebLingoHtmlContext End)? _branched;
+    /// <summary>After an <c>else</c>: the chain it goes on.</summary>
+    private (WebLingoHtmlContext Start, WebLingoHtmlContext End)? _chain;
+    /// <summary>Whether an <c>if</c>'s header is being read, and the depth of parentheses it stands at.</summary>
+    private bool _inIf;
+    private int _ifParentheses;
+    private int _parentheses;
+    /// <summary>The kind of the last token of code, a write's <c>;</c> after a write, which says whether text follows a header without braces.</summary>
+    private WebLingoTokenKind _lastCode = WebLingoTokenKind.Semicolon;
+
+    /// <summary>A block of code: where the HTML stood at its <c>{</c>, and, for an <c>if</c>'s branch or an <c>else</c>'s, its chain.</summary>
+    private sealed record CodeBlock(WebLingoHtmlContext Start, bool Branch, bool Else,
+        (WebLingoHtmlContext Start, WebLingoHtmlContext? End) Chain, WebLingoSourceSpan At);
+
     /// <summary>The page's layout statement, once read: its keyword's span, its path, and its values' entries.</summary>
     private (WebLingoSourceSpan At, WebLingoToken Path, List<WebLingoToken> Entries)? _layout;
     /// <summary>Where the page's body, after its layout statement, begins among the tokens.</summary>
@@ -122,6 +152,7 @@ public sealed class WebLingoTemplateParser
             parser._tokens.Add(new WebLingoToken(WebLingoTokenKind.Semicolon, ";", start));
         }
         parser.Emit(page.Name, page.Text, Read(page.Text, 0, parser._diagnostics), 0);
+        parser.EndHtml(new WebLingoSourceSpan(page.Text.Length, 0));
         parser.AddLayoutImport();
         parser._tokens.Add(new WebLingoToken(WebLingoTokenKind.EndOfFile, "", new WebLingoSourceSpan(page.Text.Length, 0)));
         files = parser._files;
@@ -295,7 +326,8 @@ public sealed class WebLingoTemplateParser
                         Shift(piece.Closing, shift));
                     break;
                 case BlockKind.Escaped or BlockKind.Raw:
-                    var writer = kind == BlockKind.Escaped ? WebLingoTemplateWriters.Escaped : WebLingoTemplateWriters.Raw;
+                    var writer = kind == BlockKind.Escaped ? EscapedHere(Shift(piece.Opening, shift)) : WebLingoTemplateWriters.Raw;
+                    if (kind == BlockKind.Raw) EndBranches(Shift(piece.Opening, shift));
                     var expression = new List<WebLingoToken>(piece.Tokens.Count);
                     for (var i = 0; i < piece.Tokens.Count; i++) AddToken(expression, piece.Tokens, i, shift);
                     AddWrite(writer, Shift(piece.Opening, shift), expression, Shift(piece.Closing, shift));
@@ -305,10 +337,11 @@ public sealed class WebLingoTemplateParser
         if (runStart >= 0) AddText(text, run, runStart, runEnd, shift);
     }
 
-    /// <summary>A run of a file's text, written as it stands.</summary>
+    /// <summary>A run of a file's text, written as it stands, the page's HTML read through it.</summary>
     private void AddText(string text, StringBuilder run, int start, int end, int shift)
     {
         var span = new WebLingoSourceSpan(start + shift, end - start);
+        ReadHtml(run.ToString(), start + shift);
         var literal = new WebLingoToken(WebLingoTokenKind.StringLiteral, text[start..end], span, StringValue: run.ToString());
         AddWrite(WebLingoTemplateWriters.Raw, span, [literal], span);
         run.Clear();
@@ -332,6 +365,7 @@ public sealed class WebLingoTemplateParser
             }
             if (!directive)
             {
+                TrackCode(code, i, shift);
                 AddToken(_tokens, code, i, shift);
                 continue;
             }
@@ -647,11 +681,155 @@ public sealed class WebLingoTemplateParser
     /// <summary><c>writer(expression);</c>, the call at <paramref name="opening"/>, and its <c>)</c> and <c>;</c> at <paramref name="closing"/>.</summary>
     private void AddWrite(string writer, WebLingoSourceSpan opening, IReadOnlyList<WebLingoToken> expression, WebLingoSourceSpan closing)
     {
+        _lastCode = WebLingoTokenKind.Semicolon;
         _tokens.Add(new WebLingoToken(WebLingoTokenKind.Identifier, writer, opening));
         _tokens.Add(new WebLingoToken(WebLingoTokenKind.OpenParen, "(", opening));
         _tokens.AddRange(expression);
         _tokens.Add(new WebLingoToken(WebLingoTokenKind.CloseParen, ")", closing));
         _tokens.Add(new WebLingoToken(WebLingoTokenKind.Semicolon, ";", closing));
+    }
+
+    /// <summary>
+    /// The page's HTML read through a run of its text at <paramref name="at"/> in the program: an error where it arises; and,
+    /// where the text is a statement's body without braces, after <c>if (…)</c>, <c>else</c>, <c>do</c> or <c>=&gt;</c>,
+    /// one if it moves the HTML.
+    /// </summary>
+    private void ReadHtml(string text, int at)
+    {
+        var braceless = _lastCode is WebLingoTokenKind.CloseParen or WebLingoTokenKind.Else or WebLingoTokenKind.Do or WebLingoTokenKind.Arrow;
+        if (!braceless) EndBranches(new WebLingoSourceSpan(at, 0));
+        var before = _html;
+        for (var i = 0; i < text.Length && !_html.IsError;)
+        {
+            var (next, read) = WebLingoHtmlReader.AfterText(_html, text, i);
+            if (read == 0 && next == _html) break;
+            if (next.IsError) ReportHtml($"The page's HTML cannot be read here: {next.Error}.", new WebLingoSourceSpan(at + i, 0));
+            (_html, i) = (next, i + read);
+        }
+        if (braceless && !_html.IsError && _html != before)
+        {
+            ReportHtml($"This text, a statement's body without braces, moves the page's HTML from {before.Describe()} to {_html.Describe()}; "
+                + "put the statement's body in braces.", new WebLingoSourceSpan(at, text.Length));
+            _html = WebLingoHtmlContext.Failed("reported");
+        }
+        if (braceless && _chain is { } chain)
+        {
+            _html = Joined(chain.End, _html, "An 'if' and its 'else' end", new WebLingoSourceSpan(at, 0));
+            _chain = null;
+        }
+    }
+
+    /// <summary>The writer of a <c>&lt;%= … %&gt;</c> at <paramref name="at"/>, which escapes for where the HTML stands there.</summary>
+    private string EscapedHere(WebLingoSourceSpan at)
+    {
+        EndBranches(at);
+        if (_html.IsError) return WebLingoTemplateWriters.Escaped;
+        if (!_html.TryEscape(out var escape, out var quoting, out var after))
+        {
+            ReportHtml($"A value cannot be escaped here: {after.Error ?? after.Describe()}.", at);
+            _html = WebLingoHtmlContext.Failed("reported");
+            return WebLingoTemplateWriters.Escaped;
+        }
+        _html = after;
+        return WebLingoTemplateWriters.EscapedAs(escape, quoting);
+    }
+
+    /// <summary>
+    /// A token of a statement block's code read for the HTML's sake: the blocks it opens and closes, the branches of an
+    /// <c>if</c> and its <c>else</c>s, and a component rendered, or a layout's body written, where the HTML is not text.
+    /// </summary>
+    private void TrackCode(List<WebLingoToken> code, int i, int shift)
+    {
+        var token = code[i];
+        var span = Shift(token.Span, shift);
+        if (token.Kind != WebLingoTokenKind.Else) EndBranches(span);
+        switch (token.Kind)
+        {
+            case WebLingoTokenKind.Else when _branched is { } branched:
+                (_chain, _branched, _html) = (branched, null, branched.Start);
+                break;
+            case WebLingoTokenKind.If:
+                (_inIf, _ifParentheses) = (true, _parentheses);
+                break;
+            case WebLingoTokenKind.OpenParen:
+                _parentheses++;
+                break;
+            case WebLingoTokenKind.CloseParen:
+                _parentheses--;
+                break;
+            case WebLingoTokenKind.OpenBrace or WebLingoTokenKind.HashBrace:
+                var branch = _inIf && _lastCode == WebLingoTokenKind.CloseParen && _parentheses == _ifParentheses;
+                var isElse = !branch && _lastCode == WebLingoTokenKind.Else && _chain is not null;
+                var chain = _chain is { } going && (branch || isElse) ? (going.Start, (WebLingoHtmlContext?)going.End) : (_html, null);
+                _blocks.Push(new CodeBlock(_html, branch, isElse, chain, span));
+                (_inIf, _chain) = (false, null);
+                break;
+            case WebLingoTokenKind.CloseBrace when _blocks.Count > 0:
+                CloseBlock(_blocks.Pop(), span);
+                break;
+            case WebLingoTokenKind.Semicolon:
+                (_inIf, _chain) = (false, null);
+                break;
+            case WebLingoTokenKind.Identifier when (token.Text == WebLingoTemplateCompiler.RenderComponent
+                    || (token.Text == RenderBody && _kind == WebLingoTemplateKind.Layout)) && !AfterDot(code, i):
+                if (!_html.IsError && _html.State != WebLingoHtmlState.Text)
+                {
+                    var what = token.Text == RenderBody ? "A layout's body is written" : "A component is rendered";
+                    ReportHtml($"{what} here, in {_html.Describe()}; it writes HTML's text, where it must stand.", span);
+                }
+                break;
+        }
+        _lastCode = token.Kind;
+    }
+
+    /// <summary>A block's <c>}</c>: an <c>if</c>'s branch's, which the chain's next may follow; an <c>else</c>'s, which ends it; any other's.</summary>
+    private void CloseBlock(CodeBlock block, WebLingoSourceSpan at)
+    {
+        if (block.Branch)
+        {
+            var end = block.Chain.End is { } ended ? Joined(ended, _html, "The branches of an 'if' end", at) : _html;
+            (_branched, _html) = ((block.Chain.Start, end), end);
+            return;
+        }
+        if (block.Else)
+        {
+            _html = Joined(block.Chain.End!.Value, _html, "The branches of an 'if' end", at);
+            return;
+        }
+        if (_html != block.Start) _html = Joined(block.Start, _html, "A block of code begins and ends", at);
+    }
+
+    /// <summary>After an <c>if</c>'s branches with no <c>else</c> to follow them: the HTML where they and the way past them meet.</summary>
+    private void EndBranches(WebLingoSourceSpan at)
+    {
+        if (_branched is not { } branched) return;
+        _branched = null;
+        _html = Joined(branched.Start, branched.End, "An 'if' without an 'else' and its branches end", at);
+    }
+
+    /// <summary>Where two ways meet (<see cref="WebLingoHtmlContext.Join"/>), WL5008 at <paramref name="at"/> if nowhere.</summary>
+    private WebLingoHtmlContext Joined(WebLingoHtmlContext a, WebLingoHtmlContext b, string what, WebLingoSourceSpan at)
+    {
+        var joined = WebLingoHtmlContext.Join(a, b, what);
+        if (joined.IsError && !a.IsError && !b.IsError) ReportHtml(joined.Error + ".", at);
+        return joined;
+    }
+
+    /// <summary>The page's end, which must leave its HTML in HTML's text.</summary>
+    private void EndHtml(WebLingoSourceSpan at)
+    {
+        EndBranches(at);
+        if (!_html.IsError && _html.State != WebLingoHtmlState.Text)
+        {
+            ReportHtml($"The page ends in {_html.Describe()}, not in HTML's text: every tag, comment, script and style it begins must end in it.", at);
+        }
+    }
+
+    private void ReportHtml(string message, WebLingoSourceSpan span)
+    {
+        if (_htmlReported) return;
+        _htmlReported = true;
+        Report(WebLingoDiagnosticCodes.HtmlContext, message, span);
     }
 
     private void Report(string code, string message, WebLingoSourceSpan span) =>

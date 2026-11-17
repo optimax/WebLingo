@@ -118,4 +118,10 @@ public static class WebLingoDiagnosticCodes
     public const string ComponentParameter = "WL5006";
     /// <summary>A layout statement where a page cannot have one: a second one, one after the page has done or written something, or one in an include (proposed, section 13).</summary>
     public const string MisplacedLayout = "WL5007";
+    /// <summary>
+    /// A page's HTML that the escaping of its values cannot follow (proposed, section 13, "Context-aware escaping"): HTML that
+    /// browsers read in more than one way, branches or blocks of code that leave it in different contexts, a value where a URL
+    /// is ambiguous, a component rendered or a layout's body written outside HTML's text, or a page that ends outside it.
+    /// </summary>
+    public const string HtmlContext = "WL5008";
 }

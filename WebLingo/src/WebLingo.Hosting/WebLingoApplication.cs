@@ -198,8 +198,8 @@ public sealed class WebLingoApplication
         var output = new WebLingoResponseText(response, _options.SendTimeout, cancellation.Cancel);
         var context = new WebLingoExecutionContext(worker)
         {
-            Services = new RequestServices([.. WebLingoTemplateBuiltins.Create(output), .. _http.For(request, response)], _http.Members,
-                _services[worker.Value].Builtins),
+            Services = new RequestServices([.. WebLingoTemplateBuiltins.Common(output), .. _http.For(request, response)], _http.Members,
+                _services[worker.Value].Builtins, output),
             Output = output,
             FileSystem = _options.FileSystem,
             Network = _options.Network,
@@ -411,10 +411,12 @@ public sealed class WebLingoApplication
     }
 
     /// <summary>
-    /// A request's built-ins: the page's writers, writing to its output, and the makers of its request's and its response's
-    /// instances; then the members of their classes; then the host's.
+    /// A request's built-ins: the page's writers, writing to its output, those of <c>&lt;%= … %&gt;</c> that escape outside
+    /// HTML's text made when the page names them (section 13, "Context-aware escaping"), and the makers of its request's and
+    /// its response's instances; then the members of their classes; then the host's.
     /// </summary>
-    private sealed class RequestServices(IWebLingoBuiltinFunction[] request, WebLingoBuiltinRegistry members, WebLingoBuiltinRegistry host)
+    private sealed class RequestServices(IWebLingoBuiltinFunction[] request, WebLingoBuiltinRegistry members, WebLingoBuiltinRegistry host,
+        IWebLingoTextOutput output)
         : IWebLingoRuntimeServices
     {
         public IReadOnlyList<IWebLingoBuiltinFunction> Builtins { get; } = [.. request, .. members.Builtins, .. host.Builtins];
@@ -429,6 +431,7 @@ public sealed class WebLingoApplication
                     return true;
                 }
             }
+            if (WebLingoTemplateBuiltins.TryCreateWriter(name, output, out builtin)) return true;
             return members.TryGetBuiltin(name, out builtin) || host.TryGetBuiltin(name, out builtin);
         }
     }

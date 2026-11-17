@@ -645,6 +645,13 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class Point { constructor(x, y) { this.x = x; this.y = y; } } class Money { constructor(amount) { this.amount = amount; } toJson() { return { amount: this.amount, currency: \"EUR\" }; } } class Celsius extends Number {} writeLn(Json.stringify([new Point(1, 2), new Money(5), new Celsius(21.5)]));", "[{\"x\":1,\"y\":2},{\"amount\":5,\"currency\":\"EUR\"},21.5]")]
     [InlineData("var m = {}; m[1] = \"one\"; writeLn([Json.stringify(m), Json.parse(\"  [ ]  \"), Json.parse(\"\\\"\\\\u0041\\\\/\\\"\"), Json.parse(\"-0.5e-1\")]);", "[\"{\\\"1\\\":\\\"one\\\"}\", [], \"A/\", -0.05]")]
     [InlineData("var text = Json.stringify({ list: [1, 2.5, \"three\", null, true] }); writeLn(Json.stringify(Json.parse(text)) == text);", "true")]
+    // Html's escapers (section 13, "Context-aware escaping"): what a page's author calls where the compiler cannot tell.
+    [InlineData("writeLn(Html.escape(\"<a href='x'>&\")); writeLn(Html.url(\"javascript:alert(1)\")); writeLn(Html.url(\"/a b?c\")); "
+        + "writeLn(Html.urlPart(\"a b&c=d\")); writeLn(Html.jsString(\"it's </script>\")); writeLn(Html.css(\"red\")); writeLn(Html.css(\"x;y\")); "
+        + "writeLn(Html.escape(null)); writeLn(Html.escape(5));",
+        "&lt;a href=&#39;x&#39;&gt;&amp;\n#zWebLingoz\n/a%20b?c\na%20b%26c%3Dd\nit\\u0027s \\u003c\\/script\\u003e\nred\nzWebLingoz\n\n5")]
+    [InlineData("writeLn(Html.js([1, \"<b>\", null])); writeLn(Html.js(5)); writeLn(Html.js({ a: true }));", "[1,\"\\u003cb\\u003e\",null]\n 5 \n{\"a\":true}")]
+    [InlineData("class Html { static js(v) { return \"mine\"; } } writeLn(Html.js(1));", "mine")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -698,6 +705,9 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(new Integer(2.5m));", "WL3001")]
     [InlineData("writeLn(Decimal.parse(\"1.5m\"));", "WL3001")]
     [InlineData("writeLn(DateTime.utc(2026, 1, 1).toZone(\"Nowhere/Atlantis\"));", "WL3001")]
+    [InlineData("var h = new Html();", "WL3001")]
+    [InlineData("Html.url();", "WL2006")]
+    [InlineData("writeLn(Html.js(writeLn));", "WL3001")]
     [InlineData("function g(a, ...rest) { return rest; } var h = g; h();", "WL2006")]
     [InlineData("writeLn([...5]);", "WL3001")]
     [InlineData("var m = { ...[1] };", "WL3001")]

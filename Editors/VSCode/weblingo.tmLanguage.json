@@ -204,7 +204,7 @@
         },
         {
           "name": "support.class.weblingo",
-          "match": "(?<![\\w.])(?:Iterator|Bytes|BytesBuilder|DateTime|Decimal|Regex|Json|File|Socket|Database|Request|Response|Headers)\\b"
+          "match": "(?<![\\w.])(?:Iterator|Bytes|BytesBuilder|DateTime|Decimal|Regex|Json|Html|File|Socket|Database|Request|Response|Headers)\\b"
         },
         {
           "name": "support.class.error.weblingo",

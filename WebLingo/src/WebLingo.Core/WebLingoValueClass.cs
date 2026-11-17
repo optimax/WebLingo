@@ -29,5 +29,7 @@ public enum WebLingoValueClass
     Decimal,
     Regex,
     /// <summary>No kind's: the class of <c>Json.parse</c> and <c>Json.stringify</c> (section 3.6, "JSON").</summary>
-    Json
+    Json,
+    /// <summary>No kind's: the class of the escapers a page's author calls, <c>Html.url(x)</c> and the like (section 13, "Context-aware escaping").</summary>
+    Html
 }

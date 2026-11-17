@@ -16,7 +16,8 @@ internal static class WebLingoPrelude
         ("Function", WebLingoValueClass.Function), ("Class", WebLingoValueClass.Class), ("Task", WebLingoValueClass.Task),
         ("Module", WebLingoValueClass.Module), ("Iterator", WebLingoValueClass.Iterator), ("Bytes", WebLingoValueClass.Bytes),
         ("BytesBuilder", WebLingoValueClass.BytesBuilder), ("DateTime", WebLingoValueClass.DateTime),
-        ("Decimal", WebLingoValueClass.Decimal), ("Regex", WebLingoValueClass.Regex), ("Json", WebLingoValueClass.Json)
+        ("Decimal", WebLingoValueClass.Decimal), ("Regex", WebLingoValueClass.Regex), ("Json", WebLingoValueClass.Json),
+        ("Html", WebLingoValueClass.Html)
     ];
 
     public static readonly (string Name, string Code)[] ErrorClasses =
@@ -61,6 +62,20 @@ internal static class WebLingoPrelude
         "Decimal" => "class Decimal { constructor(value = 0) { hold(this, value); } }",
         // new Regex(…) makes the value itself; a class extending Regex holds one, made by the class's own new.
         "Json" => "class Json { static stringify(value, indent = 0) { return toJson(value, indent); } }",
+        // A value as a script takes it, Html.js(value) (section 13, "Context-aware escaping"): its JSON, its <, >, & and line
+        // separators, which JSON leaves only in strings, as escapes, so that neither the script nor its attribute ends; a
+        // number or a keyword between spaces, so that it runs into no name or operator beside it. Html's other members are
+        // the runtime's.
+        "Html" => """
+            class Html {
+                static js(value) {
+                    var text = Json.stringify(value).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+                        .replace("\u{2028}", "\\u2028").replace("\u{2029}", "\\u2029");
+                    if (text.startsWith("\"") || text.startsWith("[") || text.startsWith("{")) return text;
+                    return " " + text + " ";
+                }
+            }
+            """,
         "Regex" => "class Regex { constructor(pattern, flags = \"\") { hold(this, new Regex(pattern, flags)); } }",
         "String" => "class String { constructor(value = \"\") { hold(this, value); } }",
         "Function" => "class Function { constructor(f = function () {}) { hold(this, f); } }",

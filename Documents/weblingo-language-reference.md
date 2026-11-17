@@ -2019,6 +2019,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL5005 | a component that cannot be found or compiled |
 | WL5006 | a component's or a layout's value not declared, or missing |
 | WL5007 | a layout statement where a page cannot have one |
+| WL5008 | a page's HTML that the escaping of its values cannot follow |
 
 ---
 

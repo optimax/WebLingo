@@ -160,7 +160,7 @@ A page is text, which is sent as it stands, and blocks of WebLingo:
 | Block | What it does |
 |---|---|
 | `<% statements %>` | runs WebLingo statements |
-| `<%= value %>` | writes a value, escaped for HTML ([section 4](#4-escaping)) |
+| `<%= value %>` | writes a value, escaped for where it stands in the page's HTML ([section 4](#4-escaping)) |
 | `<%- value %>` | writes a value as it stands, not escaped |
 | `<%# anything %>` | nothing: a comment |
 
@@ -249,8 +249,82 @@ writes:
 Use `<%=` for anything that comes from a visitor or a database, and `<%-` only for HTML you made yourself. An instance
 of a class of yours is written as its `toString()` gives it, and escaped the same way.
 
-WASP escapes for HTML only, for now: a value put into a URL, a `<script>` or a `<style>` is not escaped for those, and
-a page must take care of it itself.
+### Where a value stands
+
+WASP reads the page's HTML as it compiles it, and escapes each `<%= value %>` for where it stands, as Go's
+`html/template` does:
+
+| Where | How the value is escaped |
+|---|---|
+| HTML's text, a quoted attribute's value, a `<title>`, a `<textarea>`, a comment | the five characters above |
+| an unquoted attribute's value, `title=<%= x %>` | also spaces, `=` and `` ` ``; an empty value is `zWebLingoz` |
+| where an attribute's name stands, `<input <%= x %>>` | only a plain attribute's name, in lower case |
+| a URL's beginning, `href="<%= x %>"` | a scheme other than `http`, `https` and `mailto` refused, the rest percent-encoded as a URL needs |
+| a URL's path, `href="/teas/<%= x %>"` | percent-encoded as a URL needs |
+| a URL's query or fragment, `href="/?q=<%= x %>"` | percent-encoded whole |
+| a script, `<script>var x = <%= x %>;</script>`, `onclick="f(<%= x %>)"` | written as JSON, which the script reads as a value |
+| a script's string, `"…<%= x %>…"` | JavaScript's escapes |
+| a style, `color: <%= x %>` | refused if it could change what the style means |
+| a style's string, `"…<%= x %>…"` | CSS's escapes |
+| a script's or a style's comment | nothing |
+
+A value that cannot stand where it is safely is written `zWebLingoz`, so that you see it in the page:
+
+```html
+<% var name = "Tea & \"Biscuits\""; var link = "javascript:alert(1)"; var query = "green tea"; %>
+<p title="<%= name %>"><%= name %></p>
+<a href="<%= link %>">a visitor's link</a>
+<a href="/search?q=<%= query %>">search</a>
+<script>var shop = <%= { name: name, open: true } %>; var greeting = "Hello, <%= name %>";</script>
+<div style="color: <%= "red; background: url(x)" %>"></div>
+```
+
+writes:
+
+```html
+<p title="Tea &amp; &quot;Biscuits&quot;">Tea &amp; &quot;Biscuits&quot;</p>
+<a href="#zWebLingoz">a visitor's link</a>
+<a href="/search?q=green%20tea">search</a>
+<script>var shop = {"name":"Tea \u0026 \"Biscuits\"","open":true}; var greeting = "Hello, Tea \u0026 \u0022Biscuits\u0022";</script>
+<div style="color: zWebLingoz"></div>
+```
+
+In a script, `<%= null %>` writes `null`; elsewhere it writes nothing. Quote your attributes: an unquoted value is
+easy to get wrong. A `<script>` whose `type` is not JavaScript's or JSON's, a template's, holds HTML's text.
+
+WASP follows the page's code between its blocks, so that it knows where each value stands however the page runs: a
+block of code, `{ … }`, must end where the HTML stood when it began; the branches of an `if` and its `else`s must end
+where each other's do; a statement without braces, `<% if (x) %>…`, must not leave the HTML elsewhere; a component is
+rendered, and a layout's body written, in HTML's text; and a page ends there. A page that breaks one of these, or
+whose HTML browsers read in more than one way, such as a quote in an unquoted attribute's value, is error WL5008, when
+it is compiled:
+
+```text
+page.wasp(6,1): error WL5008: An 'if' without an 'else' and its branches end in different places in the page's HTML, HTML's text and a URL's path.
+```
+
+`<%-` is taken to leave the HTML where it was, as `write` is.
+
+### What WASP cannot tell
+
+Where WASP cannot tell what an attribute holds, such as a library's own attributes (`hx-get`, `x-data`), escape the
+value yourself with the built-in class `Html`, whose text is then escaped again for where it stands, as any string is:
+
+| Member | What it gives |
+|---|---|
+| `Html.escape(x)` | `x`'s text with the five characters as entities, for HTML you build in code and write with `<%-` |
+| `Html.url(x)` | `x` as a URL: a scheme that could run a script refused, the rest percent-encoded as a URL needs |
+| `Html.urlPart(x)` | `x` percent-encoded whole, for a URL's query, a fragment, or a part you join in code |
+| `Html.js(x)` | `x` as JSON a script reads as a value |
+| `Html.jsString(x)` | `x`'s text with JavaScript's escapes, for inside a script's string |
+| `Html.css(x)` | `x`'s text, or `zWebLingoz` if it could change what a style means |
+
+```html
+<div hx-get="<%= Html.url(link) %>"></div>
+```
+
+writes `<div hx-get="#zWebLingoz"></div>`. They are in every WebLingo program, not only in pages (the Standard Library
+Reference, "In WASP's pages").
 
 ---
 
@@ -815,7 +889,6 @@ The repository's `Examples/example1` is such a site, and `Examples/README.md` wa
 WASP is pre-alpha. These are not there yet, and are planned or being designed:
 
 - **Uploaded files**: forms posted as `multipart/form-data` cannot be read.
-- **Escaping for URLs, scripts and styles**: `<%=` escapes for HTML only ([section 4](#4-escaping)).
 - **Sessions and cookies**: a page reads the `Cookie` header and sets `Set-Cookie` itself, with `response.headers.add`.
 - **Hosts other than ASP.NET Core**: FastCGI and a standalone server are planned. WASP has been tried on Windows;
   Linux is built and tested, but no site has been served on it yet.

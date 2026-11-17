@@ -286,7 +286,7 @@ public sealed class PageTests
     /// Templates in memory, each <c>name=text</c>, separated by <c>|</c>: a path starting with <c>/</c> names one from the
     /// root, any other from the including file's folder, <c>.wasp</c> added to one without an extension.
     /// </summary>
-    private sealed class MemoryTemplates(Dictionary<string, string> texts) : IWebLingoSourceResolver
+    internal sealed class MemoryTemplates(Dictionary<string, string> texts) : IWebLingoSourceResolver
     {
         public bool TryResolve(string importer, string path, out string name, out string source, out string? error)
         {
@@ -298,7 +298,7 @@ public sealed class PageTests
         }
     }
 
-    private static MemoryTemplates Templates(string templates)
+    internal static MemoryTemplates Templates(string templates)
     {
         var texts = new Dictionary<string, string>(StringComparer.Ordinal) { ["page.wasp"] = "" };
         foreach (var entry in templates.Split('|', StringSplitOptions.RemoveEmptyEntries))
@@ -313,7 +313,7 @@ public sealed class PageTests
     /// A page compiled and run on both VMs, which must give the same: its diagnostics (each as its code, its file, line
     /// and column, and its message), what it writes, and its runtime error, if any.
     /// </summary>
-    private static (string Diagnostics, string Written, string Error) Render(string page, IWebLingoSourceResolver? templates = null)
+    internal static (string Diagnostics, string Written, string Error) Render(string page, IWebLingoSourceResolver? templates = null)
     {
         var text = new WebLingoSourceText(page, "page.wasp");
 

@@ -74,17 +74,25 @@ public sealed class WebLingoTemplateCompiler
     }
 
     /// <summary>
-    /// The host's built-ins, <c>write</c> and <c>writeLn</c> marked as writing output, and the page's: its writers, the
-    /// wait for its output (section 6.12, "Streaming"), and <c>renderComponent</c>.
+    /// The host's built-ins, <c>write</c> and <c>writeLn</c> marked as writing output, and the page's: its writers, one
+    /// for each escaping of <c>&lt;%= … %&gt;</c> (section 13, "Context-aware escaping"), the wait for its output (section
+    /// 6.12, "Streaming"), and <c>renderComponent</c>.
     /// </summary>
     private static WebLingoCompilerOptions WithBuiltins(WebLingoCompilerOptions options)
     {
-        var builtins = new List<WebLingoBuiltinDeclaration>(options.Builtins.Count + 5);
+        var builtins = new List<WebLingoBuiltinDeclaration>(options.Builtins.Count + 5 + WebLingoTemplateWriters.Escapings.Count);
         foreach (var builtin in options.Builtins) builtins.Add(builtin.Name is "write" or "writeLn" ? builtin with { Writes = true } : builtin);
-        foreach (var declaration in (WebLingoBuiltinDeclaration[])[
-                     new(WebLingoTemplateWriters.Escaped, 1) { Writes = true }, new(WebLingoTemplateWriters.Raw, 1) { Writes = true },
-                     new(WebLingoTemplateWriters.Full, 0), new(WebLingoTemplateWriters.Drained, 0),
-                     new(RenderComponent, 2) { RendersComponent = true }])
+        var declarations = new List<WebLingoBuiltinDeclaration>
+        {
+            new(WebLingoTemplateWriters.Raw, 1) { Writes = true }, new(WebLingoTemplateWriters.Full, 0), new(WebLingoTemplateWriters.Drained, 0),
+            new(RenderComponent, 2) { RendersComponent = true }
+        };
+        // <%= … %>'s writers, one for each escaping the page's HTML asks for (section 13, "Context-aware escaping"), <%=>'s first.
+        foreach (var (escape, quoting) in WebLingoTemplateWriters.Escapings)
+        {
+            declarations.Add(new WebLingoBuiltinDeclaration(WebLingoTemplateWriters.EscapedAs(escape, quoting), 1) { Writes = true });
+        }
+        foreach (var declaration in declarations)
         {
             var declared = false;
             foreach (var builtin in builtins) declared |= builtin.Name == declaration.Name;

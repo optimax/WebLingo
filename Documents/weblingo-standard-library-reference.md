@@ -702,3 +702,38 @@ the WASP User Manual's, section 9; in brief:
 
 A page also has `renderComponent(path, values)`, a task, which renders a component, and a layout `renderBody()`, which
 renders its page's body where it stands (the WASP User Manual, sections 6 and 7).
+
+A page's `<%= value %>` is escaped for where it stands in the page's HTML (the WASP User Manual, section 4). For where
+WASP cannot tell, every program has the built-in class `Html`, whose members give a value's text, as `write` writes
+it but for an instance's `toString()`, escaped; `null` gives `""`:
+
+| Member | What it gives |
+|---|---|
+| `Html.escape(x)` | `&`, `<`, `>`, `"` and `'` as entities |
+| `Html.url(x)` | a URL: `#zWebLingoz` if its scheme is not `http`, `https` or `mailto`, else percent-encoded as a URL needs, as UTF-8 |
+| `Html.urlPart(x)` | percent-encoded whole, but letters, digits and `-._~`, for a URL's query or fragment |
+| `Html.js(x)` | `x`'s JSON, as `Json.stringify` writes it, with `<`, `>`, `&` and line separators as escapes, a number or a keyword between spaces; WL3001 for what JSON cannot write |
+| `Html.jsString(x)` | JavaScript's escapes, for inside a script's string |
+| `Html.css(x)` | `zWebLingoz` if it could change what a style means, else the value, its CSS escapes decoded |
+
+```javascript
+writeLn(Html.escape("<b>Tea & cake</b>"));
+writeLn(Html.url("javascript:alert(1)"));
+writeLn(Html.url("/teas/green tea"));
+writeLn(Html.urlPart("green tea & cake"));
+writeLn(Html.js({ name: "Sencha", cups: 2 }));
+writeLn(Html.jsString("It's </script>"));
+writeLn(Html.css("red; background: url(x)"));
+```
+
+```text
+&lt;b&gt;Tea &amp; cake&lt;/b&gt;
+#zWebLingoz
+/teas/green%20tea
+green%20tea%20%26%20cake
+{"name":"Sencha","cups":2}
+It\u0027s \u003c\/script\u003e
+zWebLingoz
+```
+
+`new Html()` is WL3001: the class has no instances.

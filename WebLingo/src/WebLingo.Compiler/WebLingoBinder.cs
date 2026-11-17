@@ -332,7 +332,7 @@ public sealed class WebLingoBinder
         var span = call.Span;
         var wait = new WebLingoBoundExpressionStatement(new WebLingoBoundAwait(new WebLingoBoundBuiltinCall(UseBuiltin(drained), [], span), span), span);
         // A template's own writer says itself whether the output is full, which saves a call for each of a page's writes.
-        if (written is WebLingoTemplateWriters.Escaped or WebLingoTemplateWriters.Raw) return new WebLingoBoundIf(call.Expression, wait, null, span);
+        if (WebLingoTemplateWriters.IsWriter(written)) return new WebLingoBoundIf(call.Expression, wait, null, span);
         var check = new WebLingoBoundIf(new WebLingoBoundBuiltinCall(UseBuiltin(full), [], span), wait, null, span);
         return new WebLingoBoundBlock([call, check], span);
     }
@@ -1627,6 +1627,13 @@ public sealed class WebLingoBinder
             }
             // A built-in called by its name: checked now, and called directly.
             if (!CheckArity(name.Name, declaration.Arity, arguments.Count, call.Span)) return new WebLingoBoundError(call.Span);
+            if (WebLingoTemplateWriters.TryEscapedAs(name.Name, out var escape, out _) && escape == WebLingoHtmlEscape.Script)
+            {
+                // A page's value in a script, <%= x %>, written as Html.js gives it, its JSON safe there (section 13,
+                // "Context-aware escaping"): the built-in class's own, whatever the page names Html.
+                var html = Reference(UseBuiltinClass("Html"), call.Span);
+                arguments[0] = new WebLingoBoundMethodCall(html, "js", [arguments[0]], call.Span);
+            }
             return new WebLingoBoundBuiltinCall(UseBuiltin(declaration), arguments, call.Span);
         }
         if (calleeSyntax is WebLingoNameSyntax functionName && LookupLocal(functionName.Name) is { FunctionArity: { } arity } function
@@ -1838,9 +1845,10 @@ public sealed class WebLingoBinder
         {
             if (builtin == name) return declaration.Local; // UseError() makes every runtime error's class.
         }
-        // Json's functions are native, so that an error in stringify is reported where it was called (section 3.6).
+        // Json's and Html's functions are native, so that an error in stringify, or in Html.js, is reported where it was
+        // called (sections 3.6 and 13).
         var outer = _nativeCallees;
-        if (name == "Json") _nativeCallees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
+        if (name is "Json" or "Html") _nativeCallees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
         var made = BindBuiltinClass(name, WebLingoPrelude.Source(name), baseLocal, inPrelude: true);
         _nativeCallees = outer;
         return made;

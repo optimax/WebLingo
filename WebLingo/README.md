@@ -19,7 +19,7 @@ Every variable is initialized where it is declared, and a name means nothing bef
 
 ## Pages
 
-WASP pages, Web Application Server Pages, are `.wasp` templates, compiled by the template compiler (`WebLingo.Templates`) into WebLingo, and run by `wasp`, their command line (`src/WebLingo.Wasp.Cli`). A page's text is written as it stands; `<% … %>` holds statements, which may span several blocks, the text between them in their body; `<%= x %>` writes `x`'s text escaped for HTML, `<%- x %>` as it stands, and either nothing for `null`; and `<%# … %>` is a comment. A line holding only `<% … %>` blocks and spaces writes nothing, not even its line break:
+WASP pages, Web Application Server Pages, are `.wasp` templates, compiled by the template compiler (`WebLingo.Templates`) into WebLingo, and run by `wasp`, their command line (`src/WebLingo.Wasp.Cli`). A page's text is written as it stands; `<% … %>` holds statements, which may span several blocks, the text between them in their body; `<%= x %>` writes `x`'s text escaped for where it stands in the page's HTML, its text, an attribute, a URL, a script or a style, as Go's `html/template` escapes it, `<%- x %>` as it stands, and either nothing for `null`; and `<%# … %>` is a comment. A line holding only `<% … %>` blocks and spaces writes nothing, not even its line break:
 
 ```html
 <% param who = "you & me"; %>

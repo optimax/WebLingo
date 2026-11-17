@@ -37,6 +37,8 @@ public enum WebLingoMember : byte
     Iterate,
     /// <summary>An interpolation's format and alignment, a built-in method of every class that no program can name (section 3.5).</summary>
     Format,
+    /// <summary><c>Html</c>'s escapers, besides <c>js</c>, which is written in WebLingo (section 13, "Context-aware escaping").</summary>
+    Escape, Url, UrlPart, JsString, Css,
     /// <summary>The names every value, or every class, has (section 3.7), last, so that one comparison finds them.</summary>
     ClassName, InstanceOf, Parent
 }
@@ -133,6 +135,11 @@ public static partial class WebLingoMembers
         "flags" => WebLingoMember.Flags,
         "iterate" => WebLingoMember.Iterate,
         WebLingoInterpolation.Format => WebLingoMember.Format,
+        "escape" => WebLingoMember.Escape,
+        "url" => WebLingoMember.Url,
+        "urlPart" => WebLingoMember.UrlPart,
+        "jsString" => WebLingoMember.JsString,
+        "css" => WebLingoMember.Css,
         "__className" => WebLingoMember.ClassName,
         "__instanceOf" => WebLingoMember.InstanceOf,
         "__parent" => WebLingoMember.Parent,
@@ -800,7 +807,12 @@ public static partial class WebLingoMembers
                 && bytesClasses[(int)WebLingoValueClass.Bytes] == target)
             || (IsDateTimeClassMethod(member) && heap.ValueClasses is { } dateClasses && dateClasses[(int)WebLingoValueClass.DateTime] == target)
             || (member == WebLingoMember.Parse && IsJson(target, heap))
+            || (member is >= WebLingoMember.Escape and <= WebLingoMember.Css && IsHtml(target, heap))
             || member == WebLingoMember.Format);
+
+    /// <summary>Whether a class is <c>Html</c>, whose escapers the runtime gives (section 13, "Context-aware escaping").</summary>
+    private static bool IsHtml(WebLingoValue target, WebLingoHeap heap) =>
+        heap.ValueClasses is { Length: > (int)WebLingoValueClass.Html } classes && classes[(int)WebLingoValueClass.Html] == target;
 
     /// <summary>Whether a class is <c>Json</c>, whose <c>parse</c> the runtime gives (section 3.6, "JSON").</summary>
     private static bool IsJson(WebLingoValue target, WebLingoHeap heap) =>
@@ -879,6 +891,21 @@ public static partial class WebLingoMembers
             if (IsDateTimeClassMethod(member) && heap.ValueClasses is { } classes && classes[(int)WebLingoValueClass.DateTime] == target)
             {
                 return TryCallDateTimeClass(member, name, values, first, count, heap, out result, out error);
+            }
+            if (member is >= WebLingoMember.Escape and <= WebLingoMember.Css)
+            {
+                // Html.escape(x), Html.url(x) and the like: x's text, as write writes it, escaped (section 13).
+                if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+                var text = values[first].Kind == WebLingoValueKind.Null ? "" : WebLingoValueFormatter.Format(values[first], heap);
+                var escaped = member switch
+                {
+                    WebLingoMember.Escape => WebLingoHtmlEscaping.Html(text),
+                    WebLingoMember.Url => WebLingoHtmlEscaping.NormalizeUrl(WebLingoHtmlEscaping.FilterUrl(text)),
+                    WebLingoMember.UrlPart => WebLingoHtmlEscaping.EscapeUrl(text),
+                    WebLingoMember.JsString => WebLingoHtmlEscaping.ScriptString(text),
+                    _ => WebLingoHtmlEscaping.FilterStyle(text)
+                };
+                return heap.TryAllocateString(escaped, out result, out error);
             }
             if (member == WebLingoMember.Parse && IsJson(target, heap))
             {
