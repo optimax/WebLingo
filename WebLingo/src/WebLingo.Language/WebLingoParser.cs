@@ -908,7 +908,22 @@ public sealed class WebLingoParser : IWebLingoParser
 
     private WebLingoExpressionSyntax ParseAssignment()
     {
-        var left = ParseOr();
+        var left = ParseConditional();
+        if (CompoundOperator(Current.Kind) is { } compound)
+        {
+            // x += v and its kin, an expression giving the value assigned (section 3.5).
+            var token = Advance();
+            var given = ParseExpression();
+            var whole = Between(left.Span, given.Span);
+            if (IsAssignable(left)) return new WebLingoCompoundAssignmentSyntax(left, compound, given, token.Span, whole);
+            if (left is not WebLingoErrorExpressionSyntax)
+            {
+                Report(WebLingoDiagnosticCodes.InvalidAssignmentTarget,
+                    $"Only a variable, an element or entry ('x[i]'), or a field ('x.name') can be assigned with '{token.Text}'.",
+                    left.Span.Length > 0 ? left.Span : token.Span);
+            }
+            return new WebLingoErrorExpressionSyntax(whole);
+        }
         if (Current.Kind != WebLingoTokenKind.Equals) return left;
         var equals = Advance();
         var value = ParseExpression();
@@ -921,6 +936,79 @@ public sealed class WebLingoParser : IWebLingoParser
             Report(WebLingoDiagnosticCodes.InvalidAssignmentTarget,
                 "Only a variable, an element or entry ('x[i]'), or a field ('x.name') can be assigned a value with '='.",
                 left.Span.Length > 0 ? left.Span : equals.Span);
+        }
+        return new WebLingoErrorExpressionSyntax(span);
+    }
+
+    /// <summary>
+    /// <c>condition ? whenTrue : whenFalse</c>, looser than <c>??</c> and <c>||</c>, tighter than assignment, and
+    /// right-associative (section 3.5). A <c>?[</c> written without a space is always an optional index.
+    /// </summary>
+    private WebLingoExpressionSyntax ParseConditional()
+    {
+        var condition = ParseCoalesce();
+        if (Current.Kind != WebLingoTokenKind.Question) return condition;
+        if (!EnterRecursion()) return new WebLingoErrorExpressionSyntax(new WebLingoSourceSpan(Current.Span.Start, 0));
+        try
+        {
+            Advance();
+            var whenTrue = ParseExpression();
+            Expect(WebLingoTokenKind.Colon, "':'");
+            var whenFalse = ParseExpression();
+            return new WebLingoConditionalExpressionSyntax(condition, whenTrue, whenFalse, Between(condition.Span, whenFalse.Span));
+        }
+        finally
+        {
+            _recursionDepth--;
+        }
+    }
+
+    /// <summary><c>a ?? b</c>, looser than <c>||</c>, right-associative (section 3.5).</summary>
+    private WebLingoExpressionSyntax ParseCoalesce()
+    {
+        var left = ParseOr();
+        if (Current.Kind != WebLingoTokenKind.QuestionQuestion) return left;
+        if (!EnterRecursion()) return new WebLingoErrorExpressionSyntax(new WebLingoSourceSpan(Current.Span.Start, 0));
+        try
+        {
+            var op = Advance();
+            var right = ParseCoalesce();
+            return new WebLingoBinaryExpressionSyntax(WebLingoBinaryOperator.Coalesce, left, right, op.Span, Between(left.Span, right.Span));
+        }
+        finally
+        {
+            _recursionDepth--;
+        }
+    }
+
+    private static WebLingoBinaryOperator? CompoundOperator(WebLingoTokenKind kind) => kind switch
+    {
+        WebLingoTokenKind.PlusEquals => WebLingoBinaryOperator.Add,
+        WebLingoTokenKind.MinusEquals => WebLingoBinaryOperator.Subtract,
+        WebLingoTokenKind.StarEquals => WebLingoBinaryOperator.Multiply,
+        WebLingoTokenKind.SlashEquals => WebLingoBinaryOperator.Divide,
+        WebLingoTokenKind.PercentEquals => WebLingoBinaryOperator.Remainder,
+        WebLingoTokenKind.QuestionQuestionEquals => WebLingoBinaryOperator.Coalesce,
+        _ => null
+    };
+
+    /// <summary>What <c>=</c>, its compound forms, <c>++</c> and <c>--</c> may change: a variable, an element or a member.</summary>
+    private static bool IsAssignable(WebLingoExpressionSyntax expression) =>
+        expression is WebLingoNameSyntax or WebLingoIndexExpressionSyntax { IsOptional: false }
+            or WebLingoMemberAccessSyntax { IsOptional: false, Target: not WebLingoSuperSyntax };
+
+    /// <summary><c>++x</c> or <c>x++</c>, its target checked, WL1007 for one that cannot be assigned.</summary>
+    private WebLingoExpressionSyntax Increment(WebLingoExpressionSyntax target, WebLingoToken op, bool isPrefix)
+    {
+        var span = isPrefix ? Between(op.Span, target.Span) : Between(target.Span, op.Span);
+        if (IsAssignable(target))
+        {
+            return new WebLingoIncrementSyntax(target, op.Kind == WebLingoTokenKind.PlusPlus, isPrefix, op.Span, span);
+        }
+        if (target is not WebLingoErrorExpressionSyntax)
+        {
+            Report(WebLingoDiagnosticCodes.InvalidAssignmentTarget,
+                $"Only a variable, an element or entry ('x[i]'), or a field ('x.name') can be changed by '{op.Text}'.", target.Span);
         }
         return new WebLingoErrorExpressionSyntax(span);
     }
@@ -1028,6 +1116,19 @@ public sealed class WebLingoParser : IWebLingoParser
                 _recursionDepth--;
             }
         }
+        if (Current.Kind is WebLingoTokenKind.PlusPlus or WebLingoTokenKind.MinusMinus)
+        {
+            if (!EnterRecursion()) return new WebLingoErrorExpressionSyntax(new WebLingoSourceSpan(Current.Span.Start, 0));
+            try
+            {
+                var op = Advance();
+                return Increment(ParseUnary(), op, isPrefix: true);
+            }
+            finally
+            {
+                _recursionDepth--;
+            }
+        }
         if (Current.Kind is not (WebLingoTokenKind.Minus or WebLingoTokenKind.Plus or WebLingoTokenKind.Bang)) return ParseCall();
         if (!EnterRecursion()) return new WebLingoErrorExpressionSyntax(new WebLingoSourceSpan(Current.Span.Start, 0));
         try
@@ -1100,6 +1201,8 @@ public sealed class WebLingoParser : IWebLingoParser
                     };
                     continue;
                 }
+                case WebLingoTokenKind.PlusPlus or WebLingoTokenKind.MinusMinus:
+                    return Increment(expression, Advance(), isPrefix: false);
                 default:
                     return expression;
             }
@@ -1111,6 +1214,32 @@ public sealed class WebLingoParser : IWebLingoParser
         var token = Current;
         switch (token.Kind)
         {
+            case WebLingoTokenKind.If:
+            {
+                // if (condition) whenTrue else whenFalse, an expression, as Kotlin's (section 3.5): its else required.
+                if (!EnterRecursion()) return new WebLingoErrorExpressionSyntax(new WebLingoSourceSpan(Current.Span.Start, 0));
+                try
+                {
+                    Advance();
+                    Expect(WebLingoTokenKind.OpenParen, "'('");
+                    var condition = ParseExpression();
+                    Expect(WebLingoTokenKind.CloseParen, "')'");
+                    var whenTrue = ParseExpression();
+                    if (Current.Kind != WebLingoTokenKind.Else)
+                    {
+                        Report(WebLingoDiagnosticCodes.UnexpectedToken, "An 'if' that gives a value needs an 'else' and the value it gives.",
+                            new WebLingoSourceSpan(Current.Span.Start, 0));
+                        return new WebLingoErrorExpressionSyntax(SpanFrom(token.Span.Start));
+                    }
+                    Advance();
+                    var whenFalse = ParseExpression();
+                    return new WebLingoConditionalExpressionSyntax(condition, whenTrue, whenFalse, Between(token.Span, whenFalse.Span));
+                }
+                finally
+                {
+                    _recursionDepth--;
+                }
+            }
             case WebLingoTokenKind.IntegerLiteral:
                 Advance();
                 return new WebLingoIntegerLiteralSyntax(token.IntegerValue, token.Span);
@@ -1440,6 +1569,16 @@ public sealed class WebLingoParser : IWebLingoParser
                     case WebLingoIsExpressionSyntax test: pending.Push((test.Value, depth + 1)); break;
                     case WebLingoAwaitExpressionSyntax awaited: pending.Push((awaited.Operand, depth + 1)); break;
                     case WebLingoAssignmentExpressionSyntax assignment: pending.Push((assignment.Value, depth + 1)); break;
+                    case WebLingoConditionalExpressionSyntax choice:
+                        pending.Push((choice.Condition, depth + 1));
+                        pending.Push((choice.WhenTrue, depth + 1));
+                        pending.Push((choice.WhenFalse, depth + 1));
+                        break;
+                    case WebLingoCompoundAssignmentSyntax compound:
+                        pending.Push((compound.Target, depth + 1));
+                        pending.Push((compound.Value, depth + 1));
+                        break;
+                    case WebLingoIncrementSyntax increment: pending.Push((increment.Target, depth + 1)); break;
                     case WebLingoFunctionExpressionSyntax functionExpression:
                         statements.Push(functionExpression.Body);
                         PushDefaults(functionExpression.Parameters, statements);

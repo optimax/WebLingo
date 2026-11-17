@@ -99,7 +99,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("foreach (const x in [1]) writeLn(x);", "WL1001", 1, 10)]
     [InlineData("writeLn(#{1,});", "WL1001", 1, 13)]
     [InlineData("var m = {}; m?[\"a\"] = 2;", "WL1007", 1, 13)]
-    [InlineData("var x = true ? 1 : 2;", "WL1003", 1, 14)]
+    [InlineData("var x = true @ 1;", "WL1003", 1, 14)]
     [InlineData("writeLn(#[1]);", "WL1003", 1, 9)]
     [InlineData("foreach (var x of [1]) writeLn(x);", "WL1001", 1, 16)]
     [InlineData("foreach (var (k, k) in {}) writeLn(k);", "WL2002", 1, 18)]
@@ -149,6 +149,11 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var f = (this = 1) => { };", "WL1001", 1, 15)]
     [InlineData("var f = (a, a) => { return a; };", "WL2002", 1, 13)]
     [InlineData("var f = (a = 1, b) => { };", "WL1001", 1, 17)]
+    [InlineData("const c = 1; c += 1;", "WL2003", 1, 14)]
+    [InlineData("function f() { return 1; } f() += 1;", "WL1007", 1, 28)]
+    [InlineData("var o = null; o?.a += 1;", "WL1007", 1, 15)]
+    [InlineData("5++;", "WL1007", 1, 1)]
+    [InlineData("writeLn(if (true) 1);", "WL1001", 1, 20)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -514,6 +519,20 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn([(-9223372036854775807 - 1) % -1, 7.0 % 0, 1 + 7 % 4 * 2]);", "[0, NaN, 7]")]
     [InlineData("class C { constructor(v) { this.v = v; } static operator %(a, b) { return a.v % b; } } writeLn(new C(7) % 4);", "3")]
     [InlineData("try { writeLn(7 % 0); } catch (DivisionByZeroError e) { writeLn([e.code, e.message, e is Error]); }", "[\"WL3013\", \"7 % 0 divides by zero.\", true]")]
+    // Compound assignment, ++ and --, ??, ??=, ?: and if expressions (the owner's answers, 16 November 2026).
+    [InlineData("var x = 5; x += 3; x -= 1; x *= 2; x /= 7; var n = 10; n %= 4; writeLn([x, n]);", "[2.0, 2]")]
+    [InlineData("var calls = 0; function at() { calls = calls + 1; return 1; } var a = [10, 20, 30]; a[at()] += 5; writeLn([a, calls]);", "[[10, 25, 30], 1]")]
+    [InlineData("var i = 0; writeLn([i++, i, ++i, i, i--, --i]);", "[0, 1, 2, 2, 2, 0]")]
+    [InlineData("var b = [1, 2]; var j = 0; b[j++] += 10; writeLn([b, j]);", "[[11, 2], 1]")]
+    [InlineData("var x = 1; var y = (x += 1) * 10; writeLn([x, y]);", "[2, 20]")]
+    [InlineData("class P { constructor() { this.v = 1; } } var p = new P(); p.v += 41; p.v++; writeLn(p.v);", "43")]
+    [InlineData("var s = \"a\"; s += \"b\"; writeLn(s);", "ab")]
+    [InlineData("var u = null; u ??= \"set\"; u ??= \"not again\"; var e = { a: null }; e[\"a\"] ??= 7; writeLn([u, e, null ?? null ?? 3, 0 ?? 1]);", "[\"set\", {\"a\": 7}, 3, 0]")]
+    [InlineData("var o = null; writeLn(o?.name ?? \"stranger\");", "stranger")]
+    [InlineData("writeLn([true ? \"yes\" : \"no\", false ? 1 : 2 > 1 ? \"nested\" : \"no\", true ? [1] : [2]]);", "[\"yes\", \"nested\", [1]]")]
+    [InlineData("var f = v => if (v % 2 == 0) \"even\" else \"odd\"; writeLn([f(2), f(3), if (true) 1 else 2]);", "[\"even\", \"odd\", 1]")]
+    [InlineData("var calls = 0; function f() { calls = calls + 1; return null; } writeLn([f() ?? \"x\", calls, true ? \"a\" : f(), calls]);", "[\"x\", 1, \"a\", 1]")]
+    [InlineData("var x = 2; writeLn($\"{(x > 1 ? \"big\" : \"small\")}\");", "big")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -554,6 +573,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("f(); var y = 1; function f() { writeLn(y); }", "WL2004")]
     [InlineData("writeLn(7 % 0);", "WL3013")]
     [InlineData("writeLn(\"a\" % 2);", "WL3001")]
+    [InlineData("var i = 9223372036854775807; i++;", "WL3002")]
+    [InlineData("writeLn(1 ? 2 : 3);", "WL3001")]
+    [InlineData("var s = \"a\"; s -= 1;", "WL3001")]
+    [InlineData("writeLn(if (null) 1 else 2);", "WL3001")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

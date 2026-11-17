@@ -286,6 +286,23 @@ public sealed class WebLingoStackCodeGenerator
             case WebLingoIrNullConstant constant:
                 Emit(WebLingoStackOpCode.LoadNull, constant.Span);
                 return;
+            case WebLingoIrConditional conditional:
+            {
+                EmitValue(conditional.Condition);
+                var skipTrue = EmitJump(WebLingoStackOpCode.JumpIfFalse, conditional.Condition.Span);
+                EmitValue(conditional.WhenTrue);
+                var skipFalse = EmitJump(WebLingoStackOpCode.Jump, conditional.Span);
+                _depth--; // The other branch begins as this one did, its value not pushed on its path.
+                PatchJump(skipTrue);
+                EmitValue(conditional.WhenFalse);
+                PatchJump(skipFalse);
+                return;
+            }
+            case WebLingoIrSequence sequence:
+                EmitValue(sequence.First);
+                Emit(WebLingoStackOpCode.Pop, sequence.Span);
+                EmitValue(sequence.Then);
+                return;
             case WebLingoIrLogical logical:
             {
                 // The left operand decides when it is false for &&, true for ||, and is then the result; otherwise it

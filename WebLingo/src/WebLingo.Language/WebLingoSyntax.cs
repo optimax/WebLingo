@@ -220,8 +220,29 @@ public enum WebLingoBinaryOperator
     /// <summary><c>||</c>, which evaluates its right operand only when the left one is false.</summary>
     Or,
     /// <summary><c>%</c>, the remainder, its sign the dividend's (section 3.5).</summary>
-    Remainder
+    Remainder,
+    /// <summary><c>??</c>, its left operand unless it is <c>null</c>, its right one only then (section 3.5).</summary>
+    Coalesce
 }
+
+/// <summary><c>condition ? whenTrue : whenFalse</c>, and <c>if (condition) whenTrue else whenFalse</c> (section 3.5).</summary>
+public sealed record WebLingoConditionalExpressionSyntax(WebLingoExpressionSyntax Condition, WebLingoExpressionSyntax WhenTrue,
+    WebLingoExpressionSyntax WhenFalse, WebLingoSourceSpan Span) : WebLingoExpressionSyntax(Span);
+
+/// <summary>
+/// <c>target op= value</c>, <c>+=</c>, <c>-=</c>, <c>*=</c>, <c>/=</c>, <c>%=</c> and <c>??=</c> (section 3.5): its target a
+/// variable, an element or a member, held once.
+/// </summary>
+public sealed record WebLingoCompoundAssignmentSyntax(WebLingoExpressionSyntax Target, WebLingoBinaryOperator Operator,
+    WebLingoExpressionSyntax Value, WebLingoSourceSpan OperatorSpan, WebLingoSourceSpan Span) : WebLingoExpressionSyntax(Span);
+
+/// <summary><c>++x</c>, <c>x++</c>, <c>--x</c> and <c>x--</c> (section 3.5).</summary>
+public sealed record WebLingoIncrementSyntax(WebLingoExpressionSyntax Target, bool IsIncrement, bool IsPrefix, WebLingoSourceSpan OperatorSpan,
+    WebLingoSourceSpan Span) : WebLingoExpressionSyntax(Span);
+
+/// <summary>Two expressions in order, the second's value the result: what the compiler writes, never a program.</summary>
+public sealed record WebLingoSequenceSyntax(WebLingoExpressionSyntax First, WebLingoExpressionSyntax Then, WebLingoSourceSpan Span)
+    : WebLingoExpressionSyntax(Span);
 
 public sealed record WebLingoBinaryExpressionSyntax(
     WebLingoBinaryOperator Operator, WebLingoExpressionSyntax Left, WebLingoExpressionSyntax Right, WebLingoSourceSpan OperatorSpan,

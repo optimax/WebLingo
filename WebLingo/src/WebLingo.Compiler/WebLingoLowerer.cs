@@ -490,6 +490,11 @@ public sealed class WebLingoLowerer
                 return new WebLingoIrNullConstant(literal.Span);
             case WebLingoBoundStringLiteral literal:
                 return new WebLingoIrStringConstant(literal.Value, literal.Span);
+            case WebLingoBoundConditional conditional:
+                return new WebLingoIrConditional(LowerExpression(conditional.Condition), LowerExpression(conditional.WhenTrue),
+                    LowerExpression(conditional.WhenFalse), conditional.Span);
+            case WebLingoBoundSequence sequence:
+                return new WebLingoIrSequence(LowerExpression(sequence.First), LowerExpression(sequence.Then), sequence.Span);
             case WebLingoBoundBinary { Operator: WebLingoBinaryOperator.And or WebLingoBinaryOperator.Or } logical:
                 return new WebLingoIrLogical(logical.Operator == WebLingoBinaryOperator.And, LowerExpression(logical.Left),
                     LowerExpression(logical.Right), logical.Span);

@@ -239,6 +239,14 @@ public sealed record WebLingoBoundHold(WebLingoBoundExpression Instance, WebLing
 public sealed record WebLingoBoundUnary(WebLingoUnaryOperator Operator, WebLingoBoundExpression Operand, WebLingoSourceSpan Span)
     : WebLingoBoundExpression(Span);
 
+/// <summary>A condition, a Boolean, and only the value it chooses (section 3.5).</summary>
+public sealed record WebLingoBoundConditional(WebLingoBoundExpression Condition, WebLingoBoundExpression WhenTrue,
+    WebLingoBoundExpression WhenFalse, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);
+
+/// <summary>Two expressions in order, the second's value the result.</summary>
+public sealed record WebLingoBoundSequence(WebLingoBoundExpression First, WebLingoBoundExpression Then, WebLingoSourceSpan Span)
+    : WebLingoBoundExpression(Span);
+
 public sealed record WebLingoBoundBinary(
     WebLingoBinaryOperator Operator, WebLingoBoundExpression Left, WebLingoBoundExpression Right, WebLingoSourceSpan OperatorSpan, WebLingoSourceSpan Span)
     : WebLingoBoundExpression(Span);

@@ -1094,6 +1094,108 @@ public sealed class WebLingoBinder
     }
 
     /// <summary>A local of the function that no name refers to: a loop's own state.</summary>
+    /// <summary>How many temporaries the compiler has declared, each a variable of a name no program can write.</summary>
+    private int _temporaries;
+
+    /// <summary>
+    /// A temporary, a variable in the current scope, holding <paramref name="value"/> once <paramref name="store"/> has run:
+    /// what the compiler writes so that an expression it repeats is evaluated once (section 3.5).
+    /// </summary>
+    private WebLingoNameSyntax Temporary(WebLingoExpressionSyntax value, WebLingoSourceSpan span, out WebLingoExpressionSyntax store)
+    {
+        var name = "<temporary " + (_temporaries++).ToString(System.Globalization.CultureInfo.InvariantCulture) + ">";
+        Declare(name, WebLingoDeclarationKind.Var, span, null);
+        var reference = new WebLingoNameSyntax(name, span);
+        store = new WebLingoAssignmentExpressionSyntax(reference, value, span);
+        return reference;
+    }
+
+    private static WebLingoExpressionSyntax IsNull(WebLingoExpressionSyntax value, WebLingoSourceSpan span) =>
+        new WebLingoBinaryExpressionSyntax(WebLingoBinaryOperator.Equal, value, new WebLingoNullLiteralSyntax(span), span, span);
+
+    /// <summary><c>left ?? right</c>: <c>left</c>, evaluated once, unless it is <c>null</c>, and only then <c>right</c> (section 3.5).</summary>
+    private WebLingoExpressionSyntax Coalesce(WebLingoExpressionSyntax left, WebLingoExpressionSyntax right, WebLingoSourceSpan span)
+    {
+        if (left is WebLingoNameSyntax name) return new WebLingoConditionalExpressionSyntax(IsNull(name, span), right, name, span);
+        var held = Temporary(left, span, out var store);
+        return new WebLingoSequenceSyntax(store, new WebLingoConditionalExpressionSyntax(IsNull(held, span), right, held, span), span);
+    }
+
+    /// <summary>
+    /// What a compound assignment, an increment or a decrement changes, held once (section 3.5): a variable as it is; an
+    /// element's target and index, and a member's target, in temporaries, whose stores go to <paramref name="steps"/>.
+    /// </summary>
+    private (WebLingoExpressionSyntax Read, Func<WebLingoExpressionSyntax, WebLingoExpressionSyntax> Write) Place(
+        WebLingoExpressionSyntax target, List<WebLingoExpressionSyntax> steps, WebLingoSourceSpan span)
+    {
+        switch (target)
+        {
+            case WebLingoIndexExpressionSyntax element:
+            {
+                var held = Temporary(element.Target, element.Target.Span, out var storeTarget);
+                var at = Temporary(element.Index, element.Index.Span, out var storeIndex);
+                steps.Add(storeTarget);
+                steps.Add(storeIndex);
+                var read = new WebLingoIndexExpressionSyntax(held, at, element.Span);
+                return (read, value => new WebLingoIndexAssignmentSyntax(read, value, span));
+            }
+            case WebLingoMemberAccessSyntax member:
+            {
+                var held = Temporary(member.Target, member.Target.Span, out var storeTarget);
+                steps.Add(storeTarget);
+                var read = new WebLingoMemberAccessSyntax(held, member.Name, member.NameSpan, member.Span);
+                return (read, value => new WebLingoMemberAssignmentSyntax(read, value, span));
+            }
+            default:
+            {
+                var name = (WebLingoNameSyntax)target;
+                return (name, value => new WebLingoAssignmentExpressionSyntax(name, value, span));
+            }
+        }
+    }
+
+    private static WebLingoExpressionSyntax InOrder(List<WebLingoExpressionSyntax> steps, WebLingoExpressionSyntax last, WebLingoSourceSpan span)
+    {
+        for (var i = steps.Count - 1; i >= 0; i--) last = new WebLingoSequenceSyntax(steps[i], last, span);
+        return last;
+    }
+
+    /// <summary>
+    /// <c>target op= value</c> as <c>target = target op value</c>, its target held once; <c>target ??= value</c> assigning
+    /// only a <c>null</c>, its value the target's otherwise (section 3.5).
+    /// </summary>
+    private WebLingoExpressionSyntax Compound(WebLingoCompoundAssignmentSyntax compound)
+    {
+        var steps = new List<WebLingoExpressionSyntax>();
+        var (read, write) = Place(compound.Target, steps, compound.Span);
+        if (compound.Operator != WebLingoBinaryOperator.Coalesce)
+        {
+            var combined = new WebLingoBinaryExpressionSyntax(compound.Operator, read, compound.Value, compound.OperatorSpan, compound.Span);
+            return InOrder(steps, write(combined), compound.Span);
+        }
+        var current = Temporary(read, compound.Span, out var storeCurrent);
+        steps.Add(storeCurrent);
+        return InOrder(steps, new WebLingoConditionalExpressionSyntax(IsNull(current, compound.Span), write(compound.Value), current,
+            compound.Span), compound.Span);
+    }
+
+    /// <summary><c>++x</c> as <c>x += 1</c>; <c>x++</c> the same, its value the old one (section 3.5).</summary>
+    private WebLingoExpressionSyntax Increment(WebLingoIncrementSyntax increment)
+    {
+        var steps = new List<WebLingoExpressionSyntax>();
+        var (read, write) = Place(increment.Target, steps, increment.Span);
+        var op = increment.IsIncrement ? WebLingoBinaryOperator.Add : WebLingoBinaryOperator.Subtract;
+        var one = new WebLingoIntegerLiteralSyntax(1, increment.OperatorSpan);
+        if (increment.IsPrefix)
+        {
+            return InOrder(steps, write(new WebLingoBinaryExpressionSyntax(op, read, one, increment.OperatorSpan, increment.Span)), increment.Span);
+        }
+        var old = Temporary(read, increment.Span, out var storeOld);
+        steps.Add(storeOld);
+        var changed = write(new WebLingoBinaryExpressionSyntax(op, old, one, increment.OperatorSpan, increment.Span));
+        return InOrder(steps, new WebLingoSequenceSyntax(changed, old, increment.Span), increment.Span);
+    }
+
     private WebLingoLocalSymbol DeclareHidden(string name, WebLingoSourceSpan span)
     {
         var local = new WebLingoLocalSymbol(name, WebLingoDeclarationKind.Var, _function.Locals.Count, span, _function);
@@ -1105,6 +1207,17 @@ public sealed class WebLingoBinder
     {
         switch (expression)
         {
+            case WebLingoConditionalExpressionSyntax conditional:
+                return new WebLingoBoundConditional(BindExpression(conditional.Condition), BindExpression(conditional.WhenTrue),
+                    BindExpression(conditional.WhenFalse), conditional.Span);
+            case WebLingoSequenceSyntax sequence:
+                return new WebLingoBoundSequence(BindExpression(sequence.First), BindExpression(sequence.Then), sequence.Span);
+            case WebLingoBinaryExpressionSyntax { Operator: WebLingoBinaryOperator.Coalesce } coalesce:
+                return BindExpression(Coalesce(coalesce.Left, coalesce.Right, coalesce.Span));
+            case WebLingoCompoundAssignmentSyntax compound:
+                return BindExpression(Compound(compound));
+            case WebLingoIncrementSyntax increment:
+                return BindExpression(Increment(increment));
             case WebLingoIntegerLiteralSyntax literal:
                 return new WebLingoBoundIntegerLiteral(literal.Value, literal.Span);
             case WebLingoBinary64LiteralSyntax literal:

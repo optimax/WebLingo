@@ -299,6 +299,37 @@ public sealed class WebLingoCodeGenerator
                 Emit(new WebLingoInstruction(WebLingoOpCode.LoadNull, destination), constant.Span);
                 return destination;
             }
+            case WebLingoIrConditional conditional:
+            {
+                // As && and ||: the chosen value goes to a temporary of its own, then to the target, which the other
+                // branch, or the condition, may read.
+                var mark = _nextRegister;
+                var result = Allocate();
+                var condition = EmitExpression(conditional.Condition, null);
+                var skipTrue = EmitJump(WebLingoOpCode.JumpIfFalse, condition, conditional.Condition.Span);
+                _nextRegister = mark + 1;
+                EmitExpression(conditional.WhenTrue, result);
+                var skipFalse = EmitJump(WebLingoOpCode.Jump, 0, conditional.Span);
+                PatchJump(skipTrue);
+                _nextRegister = mark + 1;
+                EmitExpression(conditional.WhenFalse, result);
+                PatchJump(skipFalse);
+                if (target is not { } chosen)
+                {
+                    _nextRegister = mark + 1;
+                    return result;
+                }
+                Emit(new WebLingoInstruction(WebLingoOpCode.Move, chosen, result), conditional.Span);
+                _nextRegister = mark;
+                return chosen;
+            }
+            case WebLingoIrSequence sequence:
+            {
+                var mark = _nextRegister;
+                EmitExpression(sequence.First, null);
+                _nextRegister = mark;
+                return EmitExpression(sequence.Then, target);
+            }
             case WebLingoIrLogical logical:
             {
                 // The result goes to a temporary of its own, then to the target: the right operand may read the
@@ -667,6 +698,9 @@ public sealed class WebLingoCodeGenerator
         WebLingoIrIs test => Assigns(test.Value, local) || Assigns(test.Class, local),
         WebLingoIrBinary binary => Assigns(binary.Left, local) || Assigns(binary.Right, local),
         WebLingoIrLogical logical => Assigns(logical.Left, local) || Assigns(logical.Right, local),
+        WebLingoIrConditional conditional => Assigns(conditional.Condition, local) || Assigns(conditional.WhenTrue, local)
+            || Assigns(conditional.WhenFalse, local),
+        WebLingoIrSequence sequence => Assigns(sequence.First, local) || Assigns(sequence.Then, local),
         WebLingoIrCallBuiltin call => AnyAssigns(call.Arguments, local),
         WebLingoIrCall call => Assigns(call.Callee, local) || AnyAssigns(call.Arguments, local),
         WebLingoIrStoreCell store => Assigns(store.Value, local),

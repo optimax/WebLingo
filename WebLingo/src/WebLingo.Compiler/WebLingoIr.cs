@@ -190,6 +190,14 @@ public sealed record WebLingoIrStringConstant(string Value, WebLingoSourceSpan S
 public sealed record WebLingoIrLogical(bool IsAnd, WebLingoIrExpression Left, WebLingoIrExpression Right, WebLingoSourceSpan Span)
     : WebLingoIrExpression(Span);
 
+/// <summary>A condition, which must be a Boolean, and only the value it chooses (section 3.5).</summary>
+public sealed record WebLingoIrConditional(WebLingoIrExpression Condition, WebLingoIrExpression WhenTrue, WebLingoIrExpression WhenFalse,
+    WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
+
+/// <summary>Two expressions in order, the first's value dropped, the second's the result.</summary>
+public sealed record WebLingoIrSequence(WebLingoIrExpression First, WebLingoIrExpression Then, WebLingoSourceSpan Span)
+    : WebLingoIrExpression(Span);
+
 /// <summary>Reads a local.</summary>
 public sealed record WebLingoIrLoadLocal(int Local, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
 

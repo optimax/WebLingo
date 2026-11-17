@@ -98,6 +98,11 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
         if (IsDigit(c)) return ReadNumericLiteral(start);
         if (c is '"' or '\'') return Run(start, c) >= 3 ? ReadRawString(start, 0) : ReadStringLiteral(start);
         if (c == '$' && Run(start, '$') is var dollars && CharAt(start + dollars) is '"' or '\'') return ReadInterpolated(start, dollars);
+        if (c == '?' && CharAt(start + 1) == '?' && CharAt(start + 2) == '=')
+        {
+            _position += 3;
+            return Token(WebLingoTokenKind.QuestionQuestionEquals, start);
+        }
         var pair = (c, start + 1 < source.Length ? source[start + 1] : '\0') switch
         {
             ('=', '=') => WebLingoTokenKind.EqualEqual, ('!', '=') => WebLingoTokenKind.BangEqual,
@@ -105,6 +110,10 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
             ('&', '&') => WebLingoTokenKind.AmpAmp, ('|', '|') => WebLingoTokenKind.PipePipe, ('#', '{') => WebLingoTokenKind.HashBrace,
             ('?', '[') => WebLingoTokenKind.QuestionBracket, ('?', '.') => WebLingoTokenKind.QuestionDot,
             ('=', '>') => WebLingoTokenKind.Arrow,
+            ('+', '=') => WebLingoTokenKind.PlusEquals, ('-', '=') => WebLingoTokenKind.MinusEquals,
+            ('*', '=') => WebLingoTokenKind.StarEquals, ('/', '=') => WebLingoTokenKind.SlashEquals,
+            ('%', '=') => WebLingoTokenKind.PercentEquals, ('+', '+') => WebLingoTokenKind.PlusPlus,
+            ('-', '-') => WebLingoTokenKind.MinusMinus, ('?', '?') => WebLingoTokenKind.QuestionQuestion,
             _ => WebLingoTokenKind.Bad
         };
         if (pair != WebLingoTokenKind.Bad)
@@ -120,7 +129,7 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
             '=' => WebLingoTokenKind.Equals, ';' => WebLingoTokenKind.Semicolon,
             '(' => WebLingoTokenKind.OpenParen, ')' => WebLingoTokenKind.CloseParen,
             ',' => WebLingoTokenKind.Comma, '.' => WebLingoTokenKind.Dot, '[' => WebLingoTokenKind.OpenBracket,
-            ']' => WebLingoTokenKind.CloseBracket, ':' => WebLingoTokenKind.Colon,
+            ']' => WebLingoTokenKind.CloseBracket, ':' => WebLingoTokenKind.Colon, '?' => WebLingoTokenKind.Question,
             _ => WebLingoTokenKind.Bad
         };
         if (kind == WebLingoTokenKind.Bad) return ReadInvalidCharacter(start);

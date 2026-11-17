@@ -324,7 +324,8 @@ true
 | `a \|\| b` | or, short-circuit |
 | `x = value` | assignment, whose value is the value assigned |
 
-Precedence, from the tightest: unary `- + !`; `* / %`; `+ -`; `< <= > >=`; `== !=`; `&&`; `||`; and assignment, which
+Precedence, from the tightest: unary `- + ! ++ --`; `* / %`; `+ -`; `< <= > >=`; `== !=`; `&&`; `||`; `??`; `? :`; and
+assignment, which
 groups to the right (`a = b = 3`). The binary operators group to the left. Parentheses group as usual.
 
 ### Arithmetic
@@ -426,6 +427,62 @@ if (1) writeLn("never");
 ```text
 values-truthy.wl(1,5): error WL3001: A condition needs a Boolean, not the integer 1.
 ```
+
+### Assignment's operators
+
+```javascript
+var total = 10;
+total += 5;
+total *= 2;
+writeLn(total);
+var counts = { tea: 1 };
+counts["tea"] += 1;
+writeLn(counts);
+var i = 0;
+writeLn([i++, i, ++i, i]);
+var name = null;
+name ??= "guest";
+writeLn(name);
+```
+
+```text
+30
+{"tea": 2}
+[0, 1, 2, 2]
+guest
+```
+
+- **`x += v`**, and `-=`, `*=`, `/=` and `%=`, assign `x + v`, and so on; **`x ??= v`** assigns `v` only when `x` is
+  `null`.
+- **`++` and `--`** add or subtract 1: `++i` gives the new value, `i++` the old one.
+- **Each is an expression**, giving the value assigned, so that `y = x += 1` assigns both.
+- **The target is evaluated once**: `a[next()] += 1` calls `next` once. A target is a variable, an element or an entry,
+  `a[i]`, or a member, `x.name`; a constant cannot be one.
+
+### Choosing a value: `? :`, `if` and `??`
+
+```javascript
+var stock = 0;
+writeLn(stock > 0 ? "in stock" : "sold out");
+var size = if (stock > 10) "many" else "few";
+writeLn(size);
+var user = null;
+writeLn(user?.name ?? "stranger");
+writeLn($"{(stock == 1 ? "item" : "items")}");
+```
+
+```text
+sold out
+few
+stranger
+items
+```
+
+- **`c ? a : b`** and **`if (c) a else b`** are the same: `a` when `c` is `true`, `b` when it is `false`, and only that
+  one evaluated. The condition must be a Boolean. An `if` that gives a value needs its `else`.
+- **`a ?? b`** is `a`, unless it is `null`, and then `b`, which is evaluated only then.
+- **`?[` written together is always an optional index**: write `c ? [1] : [2]`, with a space, for a conditional.
+- **In an interpolation**, put a conditional in parentheses, `{(c ? a : b)}`: its `:` would otherwise begin a format.
 
 ---
 
@@ -1640,8 +1697,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Operators**: compound assignment (`+=`, `-=`), `++` and `--`, the conditional `c ? a : b`, `??`,
-  and string comparison with `<`.
+- **Operators**: string comparison with `<`.
 - **Statements**: `switch`.
 - **Values**: decimals (exact decimal arithmetic, `1.5m`), and time zones other than UTC and the server's.
 - **Literals**: hexadecimal and binary numbers, and `_` between digits.
