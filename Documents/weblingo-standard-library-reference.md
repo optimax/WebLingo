@@ -1,7 +1,7 @@
 # WebLingo Standard Library Reference
 
 What every WebLingo program can use without writing it: the built-in functions, the built-in classes and their members,
-the standard modules, and, in WASP's pages, the request and the response. The language itself, its syntax and its
+the standard modules, and, in WASP's pages, the request, the response and their headers. The language itself, its syntax and its
 statements, is the WebLingo Language Reference's (`Documents/weblingo-language-reference.md`); building sites is the
 WASP User Manual's (`Documents/wasp-user-manual.md`).
 
@@ -742,20 +742,60 @@ configuration, `weblingo.config` beside a script and `wasp.config` in a site, `{
 ## 20. In WASP's pages
 
 A page, a layout and a component that declare `param request;` and `param response;` are given the request they
-answer and the response they make; a `.wl` route handler is given them as its function's arguments. Their members are
-the WASP User Manual's, section 9; in brief:
+answer and the response they make, instances of the built-in classes `Request` and `Response`, their headers instances
+of `Headers`; a `.wl` route handler is given them as its function's arguments. How a site uses them is the WASP User
+Manual's, section 9.
+
+The three classes' names are not in scope, `request is Request` being WL2001: a script reaches them as
+`request.__instanceOf` and the like. Only the host makes their instances, which are written `Request {}`, `Response {}`
+and `Headers {}`; one made by `new` holds no request, each of its members WL3001.
+
+### `Request`
 
 | Member | What it is |
 |---|---|
-| `request.method`, `request.path`, `request.scheme`, `request.host` | the request's method, its path, decoded, and where it was sent |
-| `request.query` | the query's names and values, a map |
-| `request.headers` | its headers, read by name without regard to case |
-| `await request.text()`, `await request.form()`, `await request.read()` | its body, as text, as a form's fields, or in pieces, as bytes |
-| `response.status` | the response's status, 200 until set |
-| `response.headers` | its headers, set by name, with `has`, `add` and `remove` |
+| `request.method` | its method, `"GET"`, `"POST"`, as the client sent it |
+| `request.path` | its path, from `/`, decoded, without the query: `/greet` |
+| `request.scheme`, `request.host` | `"http"` or `"https"`, and the host the client asked for, with its port if it gave one |
+| `request.query` | the query's names and values, decoded, a map, a name given twice having its last value |
+| `request.headers` | its headers, a `Headers`, which cannot be changed |
+| `await request.text()` | its body as text, in the charset its `Content-Type` names, UTF-8 if it names none |
+| `await request.form()` | an `application/x-www-form-urlencoded` form's fields, a map, decoded as the query is; a body of another type WL3001 |
+| `await request.read()` | the body's next piece as it arrives, `Bytes`, `null` at its end |
+
+A body is read only when a script asks for it. Read whole, it is kept, `text()` and `form()` giving the same again, and
+`read()` giving it as one piece; read in pieces, it cannot then be read whole, WL3001, and neither can `read()` be called
+again before the piece it gives has come.
+
+### `Response`
+
+| Member | What it is |
+|---|---|
+| `response.status` | its status, an integer, 200 until set; one outside 100 to 999 WL3001 |
+| `response.headers` | its headers, a `Headers`, which can be changed until the response is sent |
+
+A response is sent once its output reaches 64 KB (the WASP User Manual, section 13): setting its status or a header
+after that is WL3001.
+
+### `Headers`
+
+| Member | What it is |
+|---|---|
+| `h[name]` | a header's value, its values joined by `", "`, its name matched without regard to case; a missing one WL3007, `h?[name]` giving `null` |
+| `h[name] = value` | sets it, in place of the values it had |
+| `h.add(name, value)` | gives it one more value, as `Set-Cookie` needs |
+| `h.has(name)` | whether it is there |
+| `h.remove(name)` | removes it, giving whether it was there |
+
+A name or a value that is not a string, a name HTTP does not allow, a value with a character a header's cannot have,
+and any change to a request's headers, are WL3001.
+
+### Components and layouts
 
 A page also has `renderComponent(path, values)`, a task, which renders a component, and a layout `renderBody()`, which
 renders its page's body where it stands (the WASP User Manual, sections 6 and 7).
+
+### `Html`
 
 A page's `<%= value %>` is escaped for where it stands in the page's HTML (the WASP User Manual, section 4). For where
 WASP cannot tell, every program has the built-in class `Html`, whose members give a value's text, as `write` writes
@@ -806,6 +846,7 @@ module installed with the runtime in `windows/`, beside `std/`. Elsewhere, impor
 | `x.Name`, `x.Name = v`, `x.Method(a, b)` | the object's members, through its `IDispatch`, their names' case aside; a property that takes arguments is read as a call, `rs.Fields.Item("Name")` |
 | `x[k]`, `x[k] = v` | its default member with `k`: `rs["Name"]` is the field, as `rs("Name")` was |
 | `foreach (var item in x)` | a collection's items, through its `_NewEnum` |
+| `x.iterate()` | the iterator `foreach` visits them by, a `ComEnumerator` |
 | `x.call(name, arguments)`, `x.get(name)`, `x.set(name, value)` | a member that one of `ComObject`'s own hides, `toString`, `dispose` or `get` |
 | `x.dispose()` | releases the object, as `using` does; the collector or the program's end releases one never disposed |
 
@@ -839,6 +880,34 @@ Sencha
 Assam
 -2146827831
 ```
+
+A `ComEnumerator` is an iterator over a collection's `_NewEnum`, which reads one item ahead (section 5):
+
+| Member | What it is |
+|---|---|
+| `e.hasNext()` | whether the collection has another item |
+| `e.next()` | its next item; WL3005 past the last |
+| `e.dispose()` | releases the collection's enumerator, as `using` does; the collector releases one never disposed |
+
+```javascript
+import com from "windows:com";
+var tea = com.create("Scripting.Dictionary");
+tea.Add("Sencha", 6.5m);
+tea.Add("Assam", 4.25m);
+using (var names = tea.iterate()) {
+    writeLn([names, names is com.ComEnumerator, tea is com.ComObject]);
+    while (names.hasNext()) writeLn(names.next());
+}
+```
+
+```text
+[ComEnumerator {}, true, true]
+Sencha
+Assam
+```
+
+`ComObject` and `ComEnumerator` are the module's exports, `com.ComObject`, or `import { ComObject } from "windows:com";`,
+for `is`. Only the module makes their instances: one made by `new` holds no object, each of its members WL3001.
 
 A call blocks its worker until the object returns, each worker a single-threaded apartment's thread, its objects its
 own. Events, arguments by reference and named arguments are not there yet.
