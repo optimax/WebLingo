@@ -452,6 +452,7 @@ public sealed class WebLingoStackCodeGenerator
         WebLingoBinaryOperator.Subtract => WebLingoStackOpCode.Subtract,
         WebLingoBinaryOperator.Multiply => WebLingoStackOpCode.Multiply,
         WebLingoBinaryOperator.Divide => WebLingoStackOpCode.Divide,
+        WebLingoBinaryOperator.Remainder => WebLingoStackOpCode.Remainder,
         WebLingoBinaryOperator.Equal => WebLingoStackOpCode.Equal,
         WebLingoBinaryOperator.NotEqual => WebLingoStackOpCode.NotEqual,
         WebLingoBinaryOperator.Less => WebLingoStackOpCode.Less,
@@ -717,7 +718,7 @@ public sealed class WebLingoStackCodeGenerator
             WebLingoStackOpCode.StoreLocal or WebLingoStackOpCode.Pop or WebLingoStackOpCode.StoreCell or WebLingoStackOpCode.StoreCapture
                 or WebLingoStackOpCode.JumpIfFalse or WebLingoStackOpCode.JumpIfTrue or WebLingoStackOpCode.ReturnValue => (1, 0),
             WebLingoStackOpCode.Duplicate => (1, 2),
-            WebLingoStackOpCode.Add or WebLingoStackOpCode.Subtract or WebLingoStackOpCode.Multiply or WebLingoStackOpCode.Divide
+            WebLingoStackOpCode.Add or WebLingoStackOpCode.Subtract or WebLingoStackOpCode.Multiply or WebLingoStackOpCode.Divide or WebLingoStackOpCode.Remainder
                 or WebLingoStackOpCode.Equal or WebLingoStackOpCode.NotEqual or WebLingoStackOpCode.Less or WebLingoStackOpCode.LessOrEqual
                 or WebLingoStackOpCode.Greater or WebLingoStackOpCode.GreaterOrEqual => (2, 1),
             WebLingoStackOpCode.Call => (a + 1, 1),

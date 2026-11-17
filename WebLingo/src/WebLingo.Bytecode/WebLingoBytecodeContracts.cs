@@ -202,7 +202,9 @@ public enum WebLingoOpCode : byte
     /// themselves, their loop over, B = the register holding it; else the next, the protocol's step, its iterator's
     /// <c>hasNext()</c> and <c>next()</c> (section 3.6).
     /// </summary>
-    ForEachVisits
+    ForEachVisits,
+    /// <summary>A = destination register, B = left register, C = right register: <c>%</c> (section 3.5).</summary>
+    Remainder
 }
 
 public readonly record struct WebLingoInstruction(WebLingoOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);

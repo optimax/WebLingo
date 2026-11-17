@@ -728,6 +728,7 @@ public sealed class WebLingoCodeGenerator
         WebLingoBinaryOperator.Subtract => WebLingoOpCode.Subtract,
         WebLingoBinaryOperator.Multiply => WebLingoOpCode.Multiply,
         WebLingoBinaryOperator.Divide => WebLingoOpCode.Divide,
+        WebLingoBinaryOperator.Remainder => WebLingoOpCode.Remainder,
         WebLingoBinaryOperator.Equal => WebLingoOpCode.Equal,
         WebLingoBinaryOperator.NotEqual => WebLingoOpCode.NotEqual,
         WebLingoBinaryOperator.Less => WebLingoOpCode.Less,

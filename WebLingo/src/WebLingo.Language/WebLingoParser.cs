@@ -497,7 +497,7 @@ public sealed class WebLingoParser : IWebLingoParser
 
     /// <summary>The operators a class may declare: arithmetic's and the orderings, not <c>==</c> (section 3.7).</summary>
     private static bool IsOperator(WebLingoTokenKind kind) => kind is WebLingoTokenKind.Plus or WebLingoTokenKind.Minus or WebLingoTokenKind.Star
-        or WebLingoTokenKind.Slash or WebLingoTokenKind.Less or WebLingoTokenKind.LessEqual or WebLingoTokenKind.Greater or WebLingoTokenKind.GreaterEqual;
+        or WebLingoTokenKind.Slash or WebLingoTokenKind.Percent or WebLingoTokenKind.Less or WebLingoTokenKind.LessEqual or WebLingoTokenKind.Greater or WebLingoTokenKind.GreaterEqual;
 
     /// <summary>
     /// <c>static var name = value;</c>, after its <c>static</c>: a field of a class itself, or with <c>const</c> a constant
@@ -996,11 +996,16 @@ public sealed class WebLingoParser : IWebLingoParser
     private WebLingoExpressionSyntax ParseMultiplicative()
     {
         var left = ParseUnary();
-        while (Current.Kind is WebLingoTokenKind.Star or WebLingoTokenKind.Slash)
+        while (Current.Kind is WebLingoTokenKind.Star or WebLingoTokenKind.Slash or WebLingoTokenKind.Percent)
         {
             var op = Advance();
             var right = ParseUnary();
-            var kind = op.Kind == WebLingoTokenKind.Star ? WebLingoBinaryOperator.Multiply : WebLingoBinaryOperator.Divide;
+            var kind = op.Kind switch
+            {
+                WebLingoTokenKind.Star => WebLingoBinaryOperator.Multiply,
+                WebLingoTokenKind.Slash => WebLingoBinaryOperator.Divide,
+                _ => WebLingoBinaryOperator.Remainder
+            };
             left = new WebLingoBinaryExpressionSyntax(kind, left, right, op.Span, Between(left.Span, right.Span));
         }
         return left;

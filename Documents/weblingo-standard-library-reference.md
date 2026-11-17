@@ -262,6 +262,7 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `KeyError` | WL3007 | a key a map does not have |
 | `TimeoutError` | WL3010 | a task that did not complete within `Task.timeout`'s time |
 | `IOError` | WL3011 | a file or a folder that cannot be read, written or removed |
+| `DivisionByZeroError` | WL3013 | an integer's remainder by 0, `7 % 0` |
 
 ```javascript
 try {

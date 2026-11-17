@@ -65,7 +65,7 @@ public static class WebLingoDisassembler
             WebLingoOpCode.MakeClosure => $"MakeClosure {Register(function, a)}, function{b}",
             WebLingoOpCode.LoadBuiltin => $"LoadBuiltin {Register(function, a)}, {Import(module, b)}",
             WebLingoOpCode.Call => $"Call {Register(function, a)}, {Register(function, b)}({Arguments(function, c, d)})",
-            WebLingoOpCode.Add or WebLingoOpCode.Subtract or WebLingoOpCode.Multiply or WebLingoOpCode.Divide =>
+            WebLingoOpCode.Add or WebLingoOpCode.Subtract or WebLingoOpCode.Multiply or WebLingoOpCode.Divide or WebLingoOpCode.Remainder =>
                 $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
             WebLingoOpCode.CallBuiltin => $"CallBuiltin {Register(function, a)}, {Import(module, b)}({Arguments(function, c, d)})",
             WebLingoOpCode.Jump => $"Jump {a}",

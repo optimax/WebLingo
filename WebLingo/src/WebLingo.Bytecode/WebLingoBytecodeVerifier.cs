@@ -152,6 +152,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             case WebLingoOpCode.Subtract:
             case WebLingoOpCode.Multiply:
             case WebLingoOpCode.Divide:
+            case WebLingoOpCode.Remainder:
                 return Register(function, a, "destination") ?? Register(function, b, "left")
                     ?? Register(function, c, "right") ?? Unused(d);
             case WebLingoOpCode.CallBuiltin:
@@ -588,6 +589,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             case WebLingoOpCode.Subtract:
             case WebLingoOpCode.Multiply:
             case WebLingoOpCode.Divide:
+            case WebLingoOpCode.Remainder:
             case WebLingoOpCode.Equal:
             case WebLingoOpCode.NotEqual:
             case WebLingoOpCode.Less:
@@ -713,7 +715,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
     {
         WebLingoOpCode.LoadConstant or WebLingoOpCode.Move or WebLingoOpCode.Negate or WebLingoOpCode.Plus or WebLingoOpCode.ToText or WebLingoOpCode.IsInstance or WebLingoOpCode.Hold or WebLingoOpCode.Await or WebLingoOpCode.Import or WebLingoOpCode.ImportDynamic
             or WebLingoOpCode.MakeModule or WebLingoOpCode.Add or WebLingoOpCode.Subtract
-            or WebLingoOpCode.Multiply or WebLingoOpCode.Divide or WebLingoOpCode.CallBuiltin or WebLingoOpCode.LoadNull or WebLingoOpCode.LoadBoolean
+            or WebLingoOpCode.Multiply or WebLingoOpCode.Divide or WebLingoOpCode.Remainder or WebLingoOpCode.CallBuiltin or WebLingoOpCode.LoadNull or WebLingoOpCode.LoadBoolean
             or WebLingoOpCode.Not or WebLingoOpCode.Equal or WebLingoOpCode.NotEqual or WebLingoOpCode.Less or WebLingoOpCode.LessOrEqual
             or WebLingoOpCode.Greater or WebLingoOpCode.GreaterOrEqual or WebLingoOpCode.NewCell or WebLingoOpCode.BoxRegister or WebLingoOpCode.CopyCell
             or WebLingoOpCode.LoadCell or WebLingoOpCode.LoadCapture or WebLingoOpCode.MakeClosure or WebLingoOpCode.LoadBuiltin

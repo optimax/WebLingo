@@ -40,6 +40,7 @@ public sealed class OperatorTests
     [InlineData("-", WebLingoArithmeticOperator.Subtract)]
     [InlineData("*", WebLingoArithmeticOperator.Multiply)]
     [InlineData("/", WebLingoArithmeticOperator.Divide)]
+    [InlineData("%", WebLingoArithmeticOperator.Remainder)]
     public void ArithmeticIsTheRuntimes(string symbol, WebLingoArithmeticOperator op)
     {
         foreach (var (left, a) in Operands)

@@ -1,7 +1,7 @@
 using WebLingo.Core;
 namespace WebLingo.Runtime;
 
-public enum WebLingoArithmeticOperator { Add, Subtract, Multiply, Divide }
+public enum WebLingoArithmeticOperator { Add, Subtract, Multiply, Divide, Remainder }
 
 public enum WebLingoComparisonOperator { Equal, NotEqual, Less, LessOrEqual, Greater, GreaterOrEqual }
 
@@ -50,6 +50,19 @@ public static class WebLingoOperators
         error = CheckOperand(left, op) ?? CheckOperand(right, op);
         if (error is not null) return false;
 
+        if (op == WebLingoArithmeticOperator.Remainder && left.Kind == WebLingoValueKind.Int64 && right.Kind == WebLingoValueKind.Int64)
+        {
+            // An integer's remainder, its sign the dividend's; by 0 an error of its own, and by -1 always 0, which C#'s % would
+            // overflow for the smallest int64 (the owner's answers, 16 November 2026, section 3.5).
+            var (dividend, divisor) = (left.AsInt64, right.AsInt64);
+            if (divisor == 0)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.DivisionByZero, $"{Invariant(dividend)} % 0 divides by zero.");
+                return false;
+            }
+            result = WebLingoValue.FromInt64(divisor == -1 ? 0 : dividend % divisor);
+            return true;
+        }
         if (left.Kind == WebLingoValueKind.Int64 && right.Kind == WebLingoValueKind.Int64 && op != WebLingoArithmeticOperator.Divide)
         {
             var (a, b) = (left.AsInt64, right.AsInt64);
@@ -71,6 +84,7 @@ public static class WebLingoOperators
             WebLingoArithmeticOperator.Add => x + y,
             WebLingoArithmeticOperator.Subtract => x - y,
             WebLingoArithmeticOperator.Multiply => x * y,
+            WebLingoArithmeticOperator.Remainder => x % y,
             _ => x / y
         });
         return true;
@@ -323,6 +337,7 @@ public static class WebLingoOperators
         WebLingoArithmeticOperator.Add => "+",
         WebLingoArithmeticOperator.Subtract => "-",
         WebLingoArithmeticOperator.Multiply => "*",
+        WebLingoArithmeticOperator.Remainder => "%",
         _ => "/"
     };
 

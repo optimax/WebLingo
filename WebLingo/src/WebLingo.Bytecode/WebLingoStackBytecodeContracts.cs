@@ -180,7 +180,9 @@ public enum WebLingoStackOpCode : byte
     /// <c>foreach</c> of one item, after its loop's body: A = the instruction to go to when the VMs visit the collection in
     /// local B themselves, their loop over; else the next, the protocol's step (section 3.6). The stack is unchanged.
     /// </summary>
-    ForEachVisits
+    ForEachVisits,
+    /// <summary><c>%</c>: pops the right operand, then the left, and pushes their remainder (section 3.5).</summary>
+    Remainder
 }
 
 public readonly record struct WebLingoStackInstruction(WebLingoStackOpCode OpCode, int A = 0, int B = 0);

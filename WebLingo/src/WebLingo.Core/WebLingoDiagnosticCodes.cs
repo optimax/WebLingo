@@ -87,6 +87,8 @@ public static class WebLingoDiagnosticCodes
     public const string Timeout = "WL3010";
     /// <summary>An I/O failure: a file that is not there, or cannot be read or written (section 3.9, <c>std:fs</c>).</summary>
     public const string IOFailure = "WL3011";
+    /// <summary>An integer's remainder by 0, <c>7 % 0</c> (the owner's answer, 16 November 2026, section 3.5).</summary>
+    public const string DivisionByZero = "WL3013";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";

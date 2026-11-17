@@ -218,7 +218,9 @@ public enum WebLingoBinaryOperator
     /// <summary><c>&amp;&amp;</c>, which evaluates its right operand only when the left one is true.</summary>
     And,
     /// <summary><c>||</c>, which evaluates its right operand only when the left one is false.</summary>
-    Or
+    Or,
+    /// <summary><c>%</c>, the remainder, its sign the dividend's (section 3.5).</summary>
+    Remainder
 }
 
 public sealed record WebLingoBinaryExpressionSyntax(

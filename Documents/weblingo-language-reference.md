@@ -324,7 +324,7 @@ true
 | `a \|\| b` | or, short-circuit |
 | `x = value` | assignment, whose value is the value assigned |
 
-Precedence, from the tightest: unary `- + !`; `* /`; `+ -`; `< <= > >=`; `== !=`; `&&`; `||`; and assignment, which
+Precedence, from the tightest: unary `- + !`; `* / %`; `+ -`; `< <= > >=`; `== !=`; `&&`; `||`; and assignment, which
 groups to the right (`a = b = 3`). The binary operators group to the left. Parentheses group as usual.
 
 ### Arithmetic
@@ -354,6 +354,8 @@ NaN
 ```
 
 - **`/` always gives a number**: `7 / 2` is `3.5` and `8 / 2` is `4.0`; there is no integer division.
+- **`%` is the remainder**, as tight as `*` and `/`, its sign the dividend's: `7 % 3` is `1`, `-7 % 3` is `-1`, and
+  `5.5 % 2` is `1.5`. An integer's remainder by 0 is an error, WL3013 (`DivisionByZeroError`); a number's is `NaN`.
 - **An integer meeting a number** becomes a number: `1 + 0.5` is `1.5`.
 - **Integers do not overflow silently**:
 
@@ -1255,6 +1257,7 @@ An error the runtime raises becomes an instance of a class extending `Error`, wi
 | `ArgumentError` | WL2006 | a call with the wrong number of arguments |
 | `TimeoutError` | WL3010 | a task that took longer than `Task.timeout` gave it |
 | `IOError` | WL3011 | a file that cannot be read or written |
+| `DivisionByZeroError` | WL3013 | an integer's remainder by 0 |
 
 Two errors cannot be caught, and always end the program: running past the execution's limits (WL3003) and being
 cancelled (WL3004).
@@ -1618,6 +1621,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL3009 | waiting for a task nothing will complete |
 | WL3010 | a task that took longer than `Task.timeout` gave it |
 | WL3011 | a file that cannot be read or written |
+| WL3013 | an integer's remainder by 0 |
 | **WL4xxx** | **bytecode** |
 | WL4001 | bytecode that fails verification, such as a damaged `.wlbc` |
 | WL4002 | a program too large for the bytecode |
@@ -1636,7 +1640,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Operators**: `%` (remainder), compound assignment (`+=`, `-=`), `++` and `--`, the conditional `c ? a : b`, `??`,
+- **Operators**: compound assignment (`+=`, `-=`), `++` and `--`, the conditional `c ? a : b`, `??`,
   and string comparison with `<`.
 - **Statements**: `switch`.
 - **Values**: decimals (exact decimal arithmetic, `1.5m`), and time zones other than UTC and the server's.

@@ -116,7 +116,7 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
         {
             '<' => WebLingoTokenKind.Less, '>' => WebLingoTokenKind.Greater, '!' => WebLingoTokenKind.Bang,
             '{' => WebLingoTokenKind.OpenBrace, '}' => WebLingoTokenKind.CloseBrace, '+' => WebLingoTokenKind.Plus, '-' => WebLingoTokenKind.Minus,
-            '*' => WebLingoTokenKind.Star, '/' => WebLingoTokenKind.Slash,
+            '*' => WebLingoTokenKind.Star, '/' => WebLingoTokenKind.Slash, '%' => WebLingoTokenKind.Percent,
             '=' => WebLingoTokenKind.Equals, ';' => WebLingoTokenKind.Semicolon,
             '(' => WebLingoTokenKind.OpenParen, ')' => WebLingoTokenKind.CloseParen,
             ',' => WebLingoTokenKind.Comma, '.' => WebLingoTokenKind.Dot, '[' => WebLingoTokenKind.OpenBracket,

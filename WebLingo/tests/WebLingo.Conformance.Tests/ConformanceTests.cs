@@ -509,6 +509,11 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class C extends Number {} class I extends Integer {} writeLn($\"{new C(2.5):F3} {new I(5):D2}\");", "2.500 05")]
     [InlineData("var p = 1234.5; writeLn($$\"\"\"{\"p\": {{p,8:F1}}, \"q\": \"{{\"x\",-3}}\"}\"\"\");", "{\"p\":   1234.5, \"q\": \"x  \"}")]
     [InlineData("class P { toString() { return \"a P\"; } } writeLn($\"[{new P(),5}]\");", "[  a P]")]
+    // % (the owner's answers, 16 November 2026): the dividend's sign; by -1 always 0; a number's as IEEE 754's.
+    [InlineData("writeLn([7 % 3, -7 % 3, 7 % -3, -7 % -3, 5.5 % 2, -5.5 % 2, 7 % 2.5, 6 % 3]);", "[1, -1, 1, -1, 1.5, -1.5, 2.0, 0]")]
+    [InlineData("writeLn([(-9223372036854775807 - 1) % -1, 7.0 % 0, 1 + 7 % 4 * 2]);", "[0, NaN, 7]")]
+    [InlineData("class C { constructor(v) { this.v = v; } static operator %(a, b) { return a.v % b; } } writeLn(new C(7) % 4);", "3")]
+    [InlineData("try { writeLn(7 % 0); } catch (DivisionByZeroError e) { writeLn([e.code, e.message, e is Error]); }", "[\"WL3013\", \"7 % 0 divides by zero.\", true]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -547,6 +552,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var w = writeLn; w(1, 2);", "WL2006")]
     [InlineData("function f() { return f(); } f();", "WL3003")]
     [InlineData("f(); var y = 1; function f() { writeLn(y); }", "WL2004")]
+    [InlineData("writeLn(7 % 0);", "WL3013")]
+    [InlineData("writeLn(\"a\" % 2);", "WL3001")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

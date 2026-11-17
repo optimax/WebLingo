@@ -342,6 +342,10 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             if (!Arithmetic(WebLingoOpCode.Divide, registers, ins, out error)) break;
                             pc++;
                             continue;
+                        case WebLingoOpCode.Remainder:
+                            if (!Arithmetic(WebLingoOpCode.Remainder, registers, ins, out error)) break;
+                            pc++;
+                            continue;
                         case WebLingoOpCode.Equal:
                             if (!Compare(WebLingoOpCode.Equal, registers, ins, out error)) break;
                             pc++;
@@ -1298,6 +1302,9 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         if (high == low >> 63) return Done(WebLingoValue.FromInt64(low), registers, ins);
                         break;
                     }
+                    case WebLingoOpCode.Remainder:
+                        if (b is 0 or -1) break;
+                        return Done(WebLingoValue.FromInt64(a % b), registers, ins);
                     default:
                         return Done(WebLingoValue.FromBinary64((double)a / b), registers, ins);
                 }
@@ -1310,6 +1317,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     WebLingoOpCode.Add => x + y,
                     WebLingoOpCode.Subtract => x - y,
                     WebLingoOpCode.Multiply => x * y,
+                    WebLingoOpCode.Remainder => x % y,
                     _ => x / y
                 }), registers, ins);
             }
@@ -1558,6 +1566,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             WebLingoOpCode.Subtract => "operator-",
             WebLingoOpCode.Multiply => "operator*",
             WebLingoOpCode.Divide => "operator/",
+            WebLingoOpCode.Remainder => "operator%",
             WebLingoOpCode.Less => "operator<",
             WebLingoOpCode.LessOrEqual => "operator<=",
             WebLingoOpCode.Greater => "operator>",
@@ -2533,6 +2542,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         WebLingoOpCode.Add => WebLingoArithmeticOperator.Add,
         WebLingoOpCode.Subtract => WebLingoArithmeticOperator.Subtract,
         WebLingoOpCode.Multiply => WebLingoArithmeticOperator.Multiply,
+        WebLingoOpCode.Remainder => WebLingoArithmeticOperator.Remainder,
         _ => WebLingoArithmeticOperator.Divide
     };
 
