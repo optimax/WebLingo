@@ -3346,3 +3346,29 @@ Benchmark, three rounds of every workload but `io` and `async`, alternately agai
 Tests: `ComTests` (`WebLingo.Conformance.Tests`, Windows only, skipped elsewhere), through `weblingo`, each program on the register VM and from a stack `.wlbc`, on a single-threaded apartment's thread: `Scripting.Dictionary`, an ADO recordset in memory, the errors, the permission and the configuration's error. Docs: the specification, the Standard Library Reference (section 20, `windows:com`), the WASP User Manual's configuration, the Language Reference, `Documents/implementation.md`, the portability inventory and the editors' colouring.
 
 Done (Claude, 2026-11-17, `90b7e5e`): COM objects on Windows, M0.17. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail; `weblingo` on a script and `wasp` on a page that use COM; Windows only, where COM is; not tried under IIS.
+
+## [DONE] Cryptography: `std:crypto`
+
+The owner's fourth milestone, M0.18 (A1 of "What Comes After M0.14", 2026-11-17; specification, section 9): a standard module of the specification's section 7.10, secure random bytes, SHA-256 and SHA-512, HMAC, a comparison of bytes in constant time (approved for `Bytes`, section 3.2, not built yet), and password hashing, through the platform layer (`IWebLingoCryptoService`, section 7.3), so that the portable core reaches no .NET cryptography. Added by Claude, 2026-11-17.
+
+2026-11-17 (Claude): its questions, asked now, with the tasks above, so that they can be answered together. One decision each:
+
+Q1, password hashing: (a) PBKDF2 with HMAC-SHA-256, built into .NET (`Rfc2898DeriveBytes.Pbkdf2`), 600,000 iterations and a 16-byte random salt, as OWASP advises, its result one string that names them, `pbkdf2-sha256$600000$salt$hash`, so that a later default still verifies an older hash; no new package, and simple for Native C# to implement again; (b) Argon2id, stronger against graphics cards, through a package (MIT), a new dependency; (c) bcrypt, through a package (MIT).
+
+A1: (a)
+
+Q2, the module's names: (a) functions, `crypto.randomBytes(n)`, `crypto.sha256(data)`, `crypto.sha512(data)`, `crypto.hmac("sha256", key, data)`, `crypto.equal(a, b)` in constant time, `crypto.hashPassword(password)` and `crypto.verifyPassword(password, hash)`, data a string, as UTF-8, or `Bytes`, a hash given as `Bytes`; (b) Node.js's, `crypto.createHash("sha256").update(data).digest()`, a hash built in pieces.
+
+A2: (a)
+
+Q3, waiting: (a) `hashPassword` and `verifyPassword` asynchronous, run off the worker, since each takes a large part of a second by design, the rest synchronous; (b) all synchronous, as they are quick, a password's hash blocking its worker.
+
+A3: (a) designates the sync methods; `hashPasswordAsync` and `verifyPasswordAsync` for the async versions.
+
+2026-11-17 (Claude): built with A1's (a), A2's (a) and A3's answer, `hashPassword` and `verifyPassword` synchronous and `hashPasswordAsync` and `verifyPasswordAsync` run off the worker, and landed: `std:crypto`, `WebLingo.StdLib.Crypto`, installed as `std/crypto.dll`, in the portable core, through the platform's `IWebLingoCrypto`, `DotNetCrypto` on .NET, the heap's `Crypto`, which the command lines and the web host give; `PortabilityTests` keeps `System.Security.Cryptography` out of the portable core. The answers are recorded in the specification (section 1.1's "Cryptography (M0.18)" and section 7.10), the details as built in section 15.2, "Cryptography", Proposed.
+
+Guessed, each recorded as Proposed in section 15.2: the platform's contract is `IWebLingoCrypto`, section 7.3's conceptual `IWebLingoCryptoService`, as `IWebLingoNetwork` and `IWebLingoDatabases` are named; `randomBytes` gives at most 1,048,576 bytes; `hmac` takes `"sha256"` or `"sha512"`; `equal` of two values of different lengths is `false`, their lengths not secret; a password's hash's salt and hash are in RFC 4648's Base64, with its padding, the hash 32 bytes; `verifyPassword` reads 1 to 10,000,000 iterations, so that a hash from outside cannot hold a worker for ever, and a hash it does not read is WL3001, its text kept out of the message. A script that wants a hash as text formats its bytes itself, `$"{b[i]:x2}"`; a question of its own asks about hexadecimal and Base64 text for `Bytes`.
+
+Tests: `CryptoTests` (`WebLingo.Conformance.Tests`), each program on the register VM and from a stack `.wlbc`: SHA-256's and SHA-512's, RFC 4231's HMAC and PBKDF2's published vectors, the last read by `verifyPassword`; random bytes; `equal`; hashes made and verified, synchronously and as tasks; nine errors. Docs: the specification, the Standard Library Reference (section 18, its later sections one further on), the Language Reference, `Documents/implementation.md` and the portability inventory.
+
+Done (Claude, 2026-11-17, `2192b88`): cryptography, `std:crypto`, M0.18. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail; `weblingo` on the reference's example; both VMs; Windows only, Linux not tried.
