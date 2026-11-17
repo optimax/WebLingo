@@ -3032,3 +3032,21 @@ A: (a)
 2026-11-16 (Claude): the answer recorded as approved in the specification, sections 1.1 and 3.5, and built through the lexer, the parser, the binder, the IR, both code generators, WLBC, both verifiers and both VMs. Guessed, and recorded as Proposed (section 15.2, "Rest parameters"): a rest parameter after any with defaults, without a default of its own, the last; a new array each call; WL2006 "takes at least N arguments", at compile time for a function called by its name; in the bytecode, a function counting only the parameters before it, `HasRest` (WLBC's function flag 16), and a new instruction of both VMs, `TakeRest`, its first, which takes the array a call with more arguments than its parameters gathered on the VMs' existing slow path, so that the fast call path is as it was: a first build that looked for a rest parameter on every call made the stack VM's `objects` 2.5% slower, and the landed one measured within the machine's noise against `main` (`objects` and `calls`, both VMs, five rounds alternately, and the stack VM's `calls` seven more). Described in the Language Reference, its example run with `weblingo`; the working copy's other, uncommitted edit to that file, in the `if` example's output, is not in the commit.
 
 Done (Claude, 2026-11-16, `b74d9d5`): rest parameters. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
+
+## [DONE] Spreading into a Call
+
+`f(...args)`, an array's elements as a call's arguments. Built as every feature is: in the lexer and the parser where it is syntax, the binder and the lowered IR, both VMs or the runtime they share, with its conformance tests on both VMs, and the Language Reference. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, where: (a) into calls only; (b) into calls and array literals, `[...a, ...b]`; (c) into map and set literals too, `{ ...defaults, ...given }`.
+
+A1: (c)
+
+Q2, what may be spread: (a) arrays only; (b) anything `foreach` visits.
+
+A2: (b)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.5, and built through the parser, the binder, the IR, both code generators and both VMs. Guessed, and recorded as Proposed (section 15.2, "Spreading"): spread elsewhere, and into `Module.import` and a component's render, WL1001; into a map, maps only, a later key replacing an earlier one; a value that cannot be spread WL3001; a spread call's arity checked when it runs, at most 65,535 arguments (WL3001). As built: literals through a hidden class written in WebLingo, whose functions are native so that an error is reported at the spread; calls through three new instructions of each VM, CallSpread, CallMethodSpread and NewSpread, which put the array's elements where the call takes its arguments, growing the frame where needed, as the stack VM already grows its slots for an operator's call, then run the call's own case by `goto case` on a rewritten instruction; values put beyond a function's own registers or slots stay in its frame's array until overwritten, keeping them alive meanwhile, as an operator's operands already are. The benchmark's workloads but `io`, both VMs, against `main`, alternately, were within the machine's noise. Described in the Language Reference, its example run with `weblingo`; implementation.md's trap about the dispatch method records what rest parameters and spreading measured.
+
+Done (Claude, 2026-11-16, `ce836fe`): spreading. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried. Seen meanwhile: `WebLingo.Language.Tests` reports a varying number of tests from run to run of the same build (233 to 241), random ones missing; not caused by this task, and not yet looked into.
