@@ -105,8 +105,8 @@ public sealed class WebLingoCryptoModule : IWebLingoNativeModule
         if (!TryCrypto(heap, out var crypto, out error) || !TryData(a[0], name, "password", heap, out var password, out error)) return false;
         var salt = new byte[SaltLength];
         crypto.FillRandom(salt);
-        return Run(sync, heap, () => Scheme + "$" + Iterations.ToString(System.Globalization.CultureInfo.InvariantCulture) + "$" + Base64(salt) + "$"
-                + Base64(crypto.Pbkdf2Sha256(password, salt, Iterations, HashLength)),
+        return Run(sync, heap, () => Scheme + "$" + Iterations.ToString(System.Globalization.CultureInfo.InvariantCulture) + "$" + WebLingoBinaryText.ToBase64(salt) + "$"
+                + WebLingoBinaryText.ToBase64(crypto.Pbkdf2Sha256(password, salt, Iterations, HashLength)),
             (string text, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? wrong) => h.TryAllocateString(text, out made, out wrong),
             out result, out error);
     }
@@ -143,7 +143,8 @@ public sealed class WebLingoCryptoModule : IWebLingoNativeModule
         return parts.Length == 4 && parts[0] == Scheme
             && int.TryParse(parts[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out iterations)
             && iterations is >= 1 and <= MostIterations
-            && TryFromBase64(parts[2], out salt) && TryFromBase64(parts[3], out hash) && hash.Length > 0;
+            && parts[2].Length > 0 && WebLingoBinaryText.TryFromBase64(parts[2], urlSafe: false, out salt)
+            && WebLingoBinaryText.TryFromBase64(parts[3], urlSafe: false, out hash) && hash.Length > 0;
     }
 
     /// <summary>
@@ -190,42 +191,4 @@ public sealed class WebLingoCryptoModule : IWebLingoNativeModule
     }
 
     private static WebLingoRuntimeError Invalid(string message) => new(WebLingoDiagnosticCodes.InvalidOperation, message);
-
-    private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    /// <summary>Bytes in Base64, RFC 4648's, with its padding, which a password's hash writes its salt and its hash in.</summary>
-    private static string Base64(byte[] bytes)
-    {
-        var text = new System.Text.StringBuilder((bytes.Length + 2) / 3 * 4);
-        for (var i = 0; i < bytes.Length; i += 3)
-        {
-            var count = Math.Min(3, bytes.Length - i);
-            var chunk = bytes[i] << 16 | (count > 1 ? bytes[i + 1] << 8 : 0) | (count > 2 ? bytes[i + 2] : 0);
-            for (var j = 0; j < 4; j++) text.Append(j <= count ? Alphabet[(chunk >> (18 - 6 * j)) & 63] : '=');
-        }
-        return text.ToString();
-    }
-
-    private static bool TryFromBase64(string text, out byte[] bytes)
-    {
-        bytes = [];
-        if (text.Length == 0 || text.Length % 4 != 0) return false;
-        var padding = text.EndsWith("==", StringComparison.Ordinal) ? 2 : text.EndsWith('=') ? 1 : 0;
-        var made = new byte[text.Length / 4 * 3 - padding];
-        var at = 0;
-        for (var i = 0; i < text.Length; i += 4)
-        {
-            var chunk = 0;
-            for (var j = 0; j < 4; j++)
-            {
-                var c = text[i + j];
-                var value = c == '=' && i + 4 == text.Length && j >= 4 - padding ? 0 : Alphabet.IndexOf(c);
-                if (value < 0) return false;
-                chunk = chunk << 6 | value;
-            }
-            for (var j = 0; j < 3 && at < made.Length; j++) made[at++] = (byte)(chunk >> (16 - 8 * j));
-        }
-        bytes = made;
-        return true;
-    }
 }

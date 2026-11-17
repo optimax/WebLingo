@@ -12,8 +12,11 @@ public enum WebLingoMember : byte
     Unknown, Length, Push, Pop, Has, Remove, Add, Dispose, ToString, Equal, Forget, SetMethod, SetProperty, SetStaticProperty, SetConstant,
     RemoveMethod,
     All, Any, Timeout, Parse,
-    /// <summary>Bytes' <c>slice</c> and <c>text</c>, and the class's <c>from</c>, <c>concat</c> and <c>fixedTimeEqual</c> (section 3.2, "Bytes").</summary>
-    Slice, Text, From, Concat, FixedTimeEqual,
+    /// <summary>
+    /// Bytes' <c>slice</c>, <c>text</c>, <c>toHex</c> and <c>toBase64</c>, and the class's <c>from</c>, <c>concat</c>,
+    /// <c>fixedTimeEqual</c>, <c>fromHex</c> and <c>fromBase64</c> (section 3.2, "Bytes").
+    /// </summary>
+    Slice, Text, From, Concat, FixedTimeEqual, ToHex, ToBase64, FromHex, FromBase64,
     /// <summary>
     /// A date's properties, its methods, and the class's <c>now</c>, <c>utcNow</c>, <c>local</c>, <c>utc</c>,
     /// <c>fromUnixMilliseconds</c> and <c>inZone</c>, besides <c>parse</c> (section 3.2, "Dates and times" and "Time zones").
@@ -80,6 +83,10 @@ public static partial class WebLingoMembers
         "from" => WebLingoMember.From,
         "concat" => WebLingoMember.Concat,
         "fixedTimeEqual" => WebLingoMember.FixedTimeEqual,
+        "toHex" => WebLingoMember.ToHex,
+        "toBase64" => WebLingoMember.ToBase64,
+        "fromHex" => WebLingoMember.FromHex,
+        "fromBase64" => WebLingoMember.FromBase64,
         "year" => WebLingoMember.Year,
         "month" => WebLingoMember.Month,
         "day" => WebLingoMember.Day,
@@ -821,7 +828,7 @@ public static partial class WebLingoMembers
         || (target.Kind == WebLingoValueKind.Map && member is WebLingoMember.Has or WebLingoMember.Remove)
         || (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
         || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
-        || (target.Kind == WebLingoValueKind.Bytes && member is WebLingoMember.Slice or WebLingoMember.Text)
+        || (target.Kind == WebLingoValueKind.Bytes && IsBytesMethod(member))
         || (target.Kind == WebLingoValueKind.DateTime && IsDateTimeMethod(member))
         || (target.Kind == WebLingoValueKind.String && IsStringMethod(member))
         || (target.Kind == WebLingoValueKind.Regex && IsRegexMethod(member));
@@ -842,8 +849,7 @@ public static partial class WebLingoMembers
             || (member is WebLingoMember.All or WebLingoMember.Any or WebLingoMember.Timeout && heap.ValueClasses is { } classes
                 && classes[(int)WebLingoValueClass.Task] == target)
             || (member == WebLingoMember.Parse && ParsedKind(target, heap) != WebLingoValueKind.Null)
-            || (member is WebLingoMember.From or WebLingoMember.Concat or WebLingoMember.FixedTimeEqual && heap.ValueClasses is { } bytesClasses
-                && bytesClasses[(int)WebLingoValueClass.Bytes] == target)
+            || (IsBytesClassMethod(member) && heap.ValueClasses is { } bytesClasses && bytesClasses[(int)WebLingoValueClass.Bytes] == target)
             || (IsDateTimeClassMethod(member) && heap.ValueClasses is { } dateClasses && dateClasses[(int)WebLingoValueClass.DateTime] == target)
             || (member == WebLingoMember.Parse && IsJson(target, heap))
             || (member is >= WebLingoMember.Escape and <= WebLingoMember.Css && IsHtml(target, heap))
@@ -928,7 +934,7 @@ public static partial class WebLingoMembers
             {
                 return TryCombine(member, name, values, first, count, heap, out result, out error);
             }
-            if (member is WebLingoMember.From or WebLingoMember.Concat or WebLingoMember.FixedTimeEqual)
+            if (IsBytesClassMethod(member))
             {
                 return TryCallBytesClass(member, name, values, first, count, heap, out result, out error);
             }
@@ -1000,7 +1006,7 @@ public static partial class WebLingoMembers
             error = null;
             return true;
         }
-        if (target.Kind == WebLingoValueKind.Bytes && member is WebLingoMember.Slice or WebLingoMember.Text)
+        if (target.Kind == WebLingoValueKind.Bytes && IsBytesMethod(member))
         {
             return TryCallBytes(target, member, name, values, first, count, heap, out result, out error);
         }

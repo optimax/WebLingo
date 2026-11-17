@@ -1170,6 +1170,22 @@ abcd
 - **`b.length`** is how many bytes there are, and **`b[i]`** the byte at `i`, from 0, an integer from 0 to 255. `b[i] = v` is an error.
 - **`b.slice(start, end)`** gives the bytes from `start` to `end`, `end` left out meaning the end.
 - **`b.text(charset)`** reads the bytes as text, UTF-8 unless a charset is named. What is not a character becomes U+FFFD.
+- **`b.toHex()`** and **`b.toBase64()`** write the bytes as text that holds any byte: hexadecimal, two lower-case digits for each,
+  or Base64, RFC 4648's, padded with `=`; `b.toBase64(true)` uses Base64's URL-safe alphabet, `-` and `_` for `+` and `/`, without
+  the padding, for a token in a URL. **`Bytes.fromHex(text)`** and **`Bytes.fromBase64(text)`**, or `Bytes.fromBase64(text, true)`
+  for the URL-safe alphabet, padded or not, read them back; any other text is an error:
+
+  ```javascript
+  var key = Bytes.from([251, 255, 0]);
+  writeLn([key.toHex(), key.toBase64(), key.toBase64(true)]);
+  writeLn(Bytes.fromBase64("-_8A", true) == key);
+  ```
+
+  ```text
+  ["fbff00", "+/8A", "-_8A"]
+  true
+  ```
+
 - **The charsets**: `utf-8`, `utf-16` (or `utf-16le`), `utf-16be`, `us-ascii` and `iso-8859-1` (or `latin1`), named without regard to
   case.
 - **`==` compares their contents.** Bytes are not keys of a map, nor values of a set, and `+` does not join them.

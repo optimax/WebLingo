@@ -3,11 +3,19 @@ using WebLingo.Core;
 namespace WebLingo.Runtime;
 
 // Bytes' members (specification, section 3.2, "Bytes"): b.length, b[i], an integer from 0 to 255, b.slice(start, end),
-// b.text(charset), and the class's Bytes.from(value, charset), Bytes.concat(parts) and Bytes.fixedTimeEqual(a, b). Bytes
-// are immutable, as strings are: b[i] = v is WL3001. Text is encoded and decoded by the core's own codec,
-// WebLingoTextCodec, UTF-8 unless a charset is named.
+// b.text(charset), b.toHex() and b.toBase64(urlSafe), and the class's Bytes.from(value, charset), Bytes.concat(parts),
+// Bytes.fixedTimeEqual(a, b), Bytes.fromHex(text) and Bytes.fromBase64(text, urlSafe). Bytes are immutable, as strings
+// are: b[i] = v is WL3001. Text is encoded and decoded by the core's own codec, WebLingoTextCodec, UTF-8 unless a charset
+// is named; hexadecimal and Base64 by WebLingoBinaryText.
 public static partial class WebLingoMembers
 {
+    private static bool IsBytesMethod(WebLingoMember member) =>
+        member is WebLingoMember.Slice or WebLingoMember.Text or WebLingoMember.ToHex or WebLingoMember.ToBase64;
+
+    private static bool IsBytesClassMethod(WebLingoMember member) =>
+        member is WebLingoMember.From or WebLingoMember.Concat or WebLingoMember.FixedTimeEqual or WebLingoMember.FromHex
+            or WebLingoMember.FromBase64;
+
     /// <summary><c>b[i]</c>: the byte at <c>i</c>, from 0, as an integer from 0 to 255; WL3005 outside the bytes.</summary>
     private static bool TryGetByte(WebLingoValue target, WebLingoValue index, WebLingoHeap heap, bool optional, out WebLingoValue result,
         out WebLingoRuntimeError? error)
@@ -19,7 +27,7 @@ public static partial class WebLingoMembers
         return true;
     }
 
-    /// <summary><c>b.slice(start, end)</c> and <c>b.text(charset)</c>.</summary>
+    /// <summary><c>b.slice(start, end)</c>, <c>b.text(charset)</c>, <c>b.toHex()</c> and <c>b.toBase64(urlSafe)</c>.</summary>
     private static bool TryCallBytes(WebLingoValue target, WebLingoMember member, string name, WebLingoValue[] values, int first, int count,
         WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
@@ -30,6 +38,18 @@ public static partial class WebLingoMembers
             if (count > 1) return WrongArgumentCount(name, 0, 1, count, out error);
             if (!TryCharset(count == 1 ? values[first] : WebLingoValue.Null, heap, out var charset, out error)) return false;
             return heap.TryAllocateString(WebLingoTextCodec.Decode(data, charset), out result, out error);
+        }
+        if (member == WebLingoMember.ToHex)
+        {
+            if (count != 0) return WrongArgumentCount(name, 0, count, out error);
+            return heap.TryAllocateString(WebLingoBinaryText.ToHex(data), out result, out error);
+        }
+        if (member == WebLingoMember.ToBase64)
+        {
+            // toBase64(urlSafe): RFC 4648's standard alphabet, padded, or, given true, its URL-safe one, unpadded.
+            if (count > 1) return WrongArgumentCount(name, 0, 1, count, out error);
+            if (!TryUrlSafe(values, first, count == 1, name, heap, out var urlSafe, out error)) return false;
+            return heap.TryAllocateString(WebLingoBinaryText.ToBase64(data, urlSafe), out result, out error);
         }
         // slice(start, end): from start to end, end left out the bytes' end; WL3005 for a range outside them.
         if (count is < 1 or > 2) return WrongArgumentCount(name, 1, 2, count, out error);
@@ -53,8 +73,8 @@ public static partial class WebLingoMembers
     }
 
     /// <summary>
-    /// <c>Bytes.from(value, charset)</c>, <c>Bytes.concat(parts)</c> and <c>Bytes.fixedTimeEqual(a, b)</c>, the methods of
-    /// the class <c>Bytes</c>.
+    /// <c>Bytes.from(value, charset)</c>, <c>Bytes.concat(parts)</c>, <c>Bytes.fixedTimeEqual(a, b)</c>,
+    /// <c>Bytes.fromHex(text)</c> and <c>Bytes.fromBase64(text, urlSafe)</c>, the methods of the class <c>Bytes</c>.
     /// </summary>
     private static bool TryCallBytesClass(WebLingoMember member, string name, WebLingoValue[] values, int first, int count, WebLingoHeap heap,
         out WebLingoValue result, out WebLingoRuntimeError? error)
@@ -137,6 +157,35 @@ public static partial class WebLingoMembers
                 }
                 return heap.TryAllocateBytes(whole, out result, out error);
             }
+            case WebLingoMember.FromHex:
+            case WebLingoMember.FromBase64:
+            {
+                // fromHex(text) and fromBase64(text, urlSafe): the bytes the text writes, WL3001 for text that writes none.
+                var hex = member == WebLingoMember.FromHex;
+                if (hex ? count != 1 : count is < 1 or > 2)
+                {
+                    return hex ? WrongArgumentCount(name, 1, count, out error) : WrongArgumentCount(name, 1, 2, count, out error);
+                }
+                if (values[first].Kind != WebLingoValueKind.String)
+                {
+                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                        $"'{name}' reads a string, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                    return false;
+                }
+                var text = heap.GetString(values[first]);
+                var urlSafe = false;
+                if (!hex && !TryUrlSafe(values, first + 1, count == 2, name, heap, out urlSafe, out error)) return false;
+                if (hex ? WebLingoBinaryText.TryFromHex(text, out var read) : WebLingoBinaryText.TryFromBase64(text, urlSafe, out read))
+                {
+                    return heap.TryAllocateBytes(read, out result, out error);
+                }
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, hex
+                    ? $"\"{text}\" is not hexadecimal: two digits, 0 to 9 and a to f, for each byte."
+                    : urlSafe
+                        ? $"\"{text}\" is not URL-safe Base64: A to Z, a to z, 0 to 9, - and _, padded with = or not."
+                        : $"\"{text}\" is not Base64: A to Z, a to z, 0 to 9, + and /, padded with = to a multiple of four.");
+                return false;
+            }
             default:
             {
                 // fixedTimeEqual(a, b): whether two bytes are equal, taking as long whatever their contents, for secrets.
@@ -167,6 +216,22 @@ public static partial class WebLingoMembers
         var difference = 0;
         for (var i = 0; i < a.Length; i++) difference |= a[i] ^ b[i];
         return difference == 0;
+    }
+
+    /// <summary>Base64's <c>urlSafe</c>, a Boolean, at <paramref name="at"/> if <paramref name="given"/>, else <c>false</c>.</summary>
+    private static bool TryUrlSafe(WebLingoValue[] values, int at, bool given, string name, WebLingoHeap heap, out bool urlSafe,
+        out WebLingoRuntimeError? error)
+    {
+        (urlSafe, error) = (false, null);
+        if (!given) return true;
+        if (values[at].Kind == WebLingoValueKind.Boolean)
+        {
+            urlSafe = values[at].AsBoolean;
+            return true;
+        }
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+            $"'{name}' takes whether the URL-safe alphabet is meant, a Boolean, not {WebLingoValueFormatter.Describe(values[at], heap)}.");
+        return false;
     }
 
     /// <summary>A byte, an integer from 0 to 255; WL3001 for anything else, its message <paramref name="what"/> and the value.</summary>

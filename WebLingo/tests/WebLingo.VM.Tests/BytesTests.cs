@@ -8,7 +8,8 @@ namespace WebLingo.VM.Tests;
 
 /// <summary>
 /// Bytes (specification, section 3.2, "Bytes"), on both VMs: a kind of value of its own, immutable, made by
-/// <c>Bytes.from</c> and <c>Bytes.concat</c>, read by <c>length</c>, indexing, <c>slice</c> and <c>text</c>, equal by
+/// <c>Bytes.from</c> and <c>Bytes.concat</c>, read by <c>length</c>, indexing, <c>slice</c> and <c>text</c>, written as
+/// hexadecimal and Base64 and read from them, equal by
 /// their contents, compared for secrets by <c>Bytes.fixedTimeEqual</c>, and built from pieces by a <c>BytesBuilder</c>.
 /// </summary>
 public sealed class BytesTests
@@ -37,6 +38,18 @@ public sealed class BytesTests
                 + "writeLn(builder.toBytes().text()); builder.add(\"!\"); writeLn(builder.toBytes().text());", "8\ntea time\ntea time!\n")]
     [InlineData("extend Bytes { hex() { var s = \"\"; var i = 0; while (i < this.length) { s = s + $\"{this[i]:X2}\"; i = i + 1; } return s; } } "
                 + "writeLn(Bytes.from(\"hi\").hex());", "6869\n")]
+    [InlineData("writeLn([Bytes.from([0, 15, 16, 171, 255]).toHex(), Bytes.from([]).toHex()]);", "[\"000f10abff\", \"\"]\n")]
+    [InlineData("writeLn([Bytes.fromHex(\"000F10abFF\"), Bytes.fromHex(\"\")]);", "[Bytes:[0, 15, 16, 171, 255], Bytes:[]]\n")]
+    [InlineData("foreach (var t in [\"\", \"f\", \"fo\", \"foo\", \"foob\", \"fooba\", \"foobar\"]) { writeLn(Bytes.from(t).toBase64()); }",
+        "\nZg==\nZm8=\nZm9v\nZm9vYg==\nZm9vYmE=\nZm9vYmFy\n")]
+    [InlineData("foreach (var t in [\"\", \"Zg==\", \"Zm8=\", \"Zm9v\", \"Zm9vYg==\", \"Zm9vYmE=\", \"Zm9vYmFy\"]) { write(Bytes.fromBase64(t).text() + \"|\"); }",
+        "|f|fo|foo|foob|fooba|foobar|")]
+    [InlineData("var b = Bytes.from([251, 255, 191]); writeLn([b.toBase64(), b.toBase64(false), b.toBase64(true), Bytes.from([251, 255]).toBase64(true)]);",
+        "[\"+/+/\", \"+/+/\", \"-_-_\", \"-_8\"]\n")]
+    [InlineData("writeLn([Bytes.fromBase64(\"-_8\", true), Bytes.fromBase64(\"-_8=\", true), Bytes.fromBase64(\"+/8=\"), Bytes.fromBase64(\"+/8=\", false)]);",
+        "[Bytes:[251, 255], Bytes:[251, 255], Bytes:[251, 255], Bytes:[251, 255]]\n")]
+    [InlineData("var b = Bytes.from(\"tea time\"); writeLn([Bytes.fromHex(b.toHex()) == b, Bytes.fromBase64(b.toBase64()) == b, Bytes.fromBase64(b.toBase64(true), true) == b]);",
+        "[true, true, true]\n")]
     public void BytesBehaveAlikeOnBothVms(string program, string output)
     {
         foreach (var stack in new[] { false, true })
@@ -61,6 +74,17 @@ public sealed class BytesTests
     [InlineData("writeLn(Bytes.from(\"a\") + Bytes.from(\"b\"));", "WL3001", "'+' needs two numbers or two strings, not bytes.")]
     [InlineData("writeLn(new Bytes());", "WL3001", "'new' cannot make a value of the class Bytes.")]
     [InlineData("new BytesBuilder().add(1.5);", "WL3001", "'concat' takes bytes and integers from 0 to 255, not the number 1.5.")]
+    [InlineData("Bytes.fromHex(\"abc\");", "WL3001", "\"abc\" is not hexadecimal: two digits, 0 to 9 and a to f, for each byte.")]
+    [InlineData("Bytes.fromHex(\"0g\");", "WL3001", "\"0g\" is not hexadecimal: two digits, 0 to 9 and a to f, for each byte.")]
+    [InlineData("Bytes.fromHex(5);", "WL3001", "'fromHex' reads a string, not the integer 5.")]
+    [InlineData("Bytes.fromBase64(\"Zg\");", "WL3001", "\"Zg\" is not Base64: A to Z, a to z, 0 to 9, + and /, padded with = to a multiple of four.")]
+    [InlineData("Bytes.fromBase64(\"Zg=\");", "WL3001", "\"Zg=\" is not Base64: A to Z, a to z, 0 to 9, + and /, padded with = to a multiple of four.")]
+    [InlineData("Bytes.fromBase64(\"Zm9v Yg==\");", "WL3001", "\"Zm9v Yg==\" is not Base64: A to Z, a to z, 0 to 9, + and /, padded with = to a multiple of four.")]
+    [InlineData("Bytes.fromBase64(\"-_8=\");", "WL3001", "\"-_8=\" is not Base64: A to Z, a to z, 0 to 9, + and /, padded with = to a multiple of four.")]
+    [InlineData("Bytes.fromBase64(\"+/8\", true);", "WL3001", "\"+/8\" is not URL-safe Base64: A to Z, a to z, 0 to 9, - and _, padded with = or not.")]
+    [InlineData("Bytes.fromBase64(\"Z\", true);", "WL3001", "\"Z\" is not URL-safe Base64: A to Z, a to z, 0 to 9, - and _, padded with = or not.")]
+    [InlineData("Bytes.from(\"x\").toBase64(1);", "WL3001", "'toBase64' takes whether the URL-safe alphabet is meant, a Boolean, not the integer 1.")]
+    [InlineData("Bytes.from(\"x\").toHex(1);", "WL2006", "'toHex' takes 0 arguments, not 1.")]
     public void WrongUsesAreErrorsAlikeOnBothVms(string program, string code, string message)
     {
         foreach (var stack in new[] { false, true })

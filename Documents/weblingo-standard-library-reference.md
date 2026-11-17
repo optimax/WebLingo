@@ -395,13 +395,17 @@ Bytes are binary data, immutable, as a string is.
 | `Bytes.from(value, charset)` | bytes of a string, encoded, UTF-8 unless a charset is named; of an array of integers from 0 to 255; or bytes |
 | `Bytes.concat(parts)` | bytes and integers from 0 to 255, joined |
 | `Bytes.fixedTimeEqual(a, b)` | whether two bytes are equal, in a time that does not depend on where they differ |
+| `Bytes.fromHex(text)` | the bytes hexadecimal writes, two digits for each, in either case |
+| `Bytes.fromBase64(text, urlSafe)` | the bytes Base64 writes, padded with `=`; given `true`, in its URL-safe alphabet, padded or not |
 | `b.length`, `b[i]` | how many bytes, and the byte at `i`, from 0 to 255 |
 | `b.slice(start, end)` | the bytes from `start` to `end`, the end when it is left out |
 | `b.text(charset)` | the bytes read as text, UTF-8 unless a charset is named |
+| `b.toHex()` | the bytes as hexadecimal, two lower-case digits for each, `"746561"` |
+| `b.toBase64(urlSafe)` | the bytes as Base64, RFC 4648's, padded with `=`; given `true`, its URL-safe alphabet, `-` and `_` for `+` and `/`, unpadded |
 | `new BytesBuilder()` | a builder, its `add(value)` taking bytes, an integer from 0 to 255 or a string, its `length`, and `toBytes()` |
 
 The charsets are `utf-8`, `utf-16` (or `utf-16le`), `utf-16be`, `us-ascii` and `iso-8859-1` (or `latin1`), named
-without regard to case.
+without regard to case. Text that is not hexadecimal, or not Base64, is WL3001.
 
 ```javascript
 var b = Bytes.from("tea");
@@ -410,12 +414,14 @@ var builder = new BytesBuilder();
 builder.add("green ").add(Bytes.from("tea")).add(33);
 writeLn(builder.toBytes().text());
 writeLn(Bytes.fixedTimeEqual(Bytes.from("secret"), Bytes.from("secret")));
+writeLn([b.toHex(), b.toBase64(), Bytes.fromHex("746561").text()]);
 ```
 
 ```text
 [Bytes:[116, 101, 97], 3, 116, "ea"]
 green tea!
 true
+["746561", "dGVh", "tea"]
 ```
 
 ---
@@ -704,9 +710,8 @@ and its salt, so that one made with today's defaults still verifies after they c
 
 ```javascript
 import crypto from "std:crypto";
-function hex(bytes) { var text = ""; for (var i = 0; i < bytes.length; i++) text += $"{bytes[i]:x2}"; return text; }
-writeLn(hex(crypto.sha256("abc")));
-writeLn(hex(crypto.hmac("sha256", "Jefe", "what do ya want for nothing?")));
+writeLn(crypto.sha256("abc").toHex());
+writeLn(crypto.hmac("sha256", "Jefe", "what do ya want for nothing?").toHex());
 writeLn(crypto.randomBytes(16).length);
 var stored = await crypto.hashPasswordAsync("correct horse");
 writeLn([stored.startsWith("pbkdf2-sha256$600000$"), await crypto.verifyPasswordAsync("correct horse", stored),
@@ -720,7 +725,7 @@ ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
 [true, true, false]
 ```
 
-An algorithm it does not have, a value that is not data, and a hash it did not make are each WL3001.
+A hash, an HMAC and random bytes are `Bytes`, which `toHex()` and `toBase64()` write as text (section 10). An algorithm it does not have, a value that is not data, and a hash it did not make are each WL3001.
 
 ---
 
