@@ -274,6 +274,9 @@ public sealed class WebLingoStackCodeGenerator
             case WebLingoIrInt64Constant constant:
                 Emit(WebLingoStackOpCode.LoadConstant, constant.Span, Int64Constant(constant.Value));
                 return;
+            case WebLingoIrDecimalConstant constant:
+                Emit(WebLingoStackOpCode.LoadConstant, constant.Span, DecimalConstant(constant.Digits));
+                return;
             case WebLingoIrBinary64Constant constant:
                 Emit(WebLingoStackOpCode.LoadConstant, constant.Span, Binary64Constant(constant.Value));
                 return;
@@ -703,6 +706,16 @@ public sealed class WebLingoStackCodeGenerator
         _module.Constants.Add(WebLingoConstant.Int64(value));
         _module.Int64Constants.Add(value, index);
         return index;
+    }
+
+    private int DecimalConstant(string digits)
+    {
+        for (var i = 0; i < _module.Constants.Count; i++)
+        {
+            if (_module.Constants[i].Kind == WebLingoConstantKind.Decimal && _module.Constants[i].Text == digits) return i;
+        }
+        _module.Constants.Add(WebLingoConstant.Decimal(digits));
+        return _module.Constants.Count - 1;
     }
 
     private int Binary64Constant(double value)

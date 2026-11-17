@@ -10,6 +10,20 @@ namespace WebLingo.Runtime;
 public static class WebLingoConversions
 {
     /// <summary>A string as a value of <paramref name="kind"/>, an integer, a number or a Boolean; WL3001 for one that is not its literal.</summary>
+    /// <summary>As the other, and a decimal's digits too, <c>Decimal.parse("1.50")</c>, made in <paramref name="heap"/>.</summary>
+    public static bool TryParse(WebLingoValueKind kind, string text, WebLingoHeap heap, out WebLingoValue value, out WebLingoRuntimeError? error)
+    {
+        if (kind != WebLingoValueKind.Decimal) return TryParse(kind, text, out value, out error);
+        var digits = text.Length > 0 && text[0] is '-' or '+' ? text[1..] : text;
+        if (digits.Length > 0 && char.IsAsciiDigit(digits[0]) && WebLingoValue.TryParseDecimal(text, out var parsed))
+        {
+            return heap.TryAllocateDecimal(parsed, out value, out error);
+        }
+        value = WebLingoValue.Null;
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"\"{text}\" is not a decimal.");
+        return false;
+    }
+
     public static bool TryParse(WebLingoValueKind kind, string text, out WebLingoValue value, out WebLingoRuntimeError? error)
     {
         error = null;

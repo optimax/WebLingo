@@ -15,7 +15,8 @@ internal static class WebLingoPrelude
         ("String", WebLingoValueClass.String), ("Array", WebLingoValueClass.Array), ("Map", WebLingoValueClass.Map), ("Set", WebLingoValueClass.Set),
         ("Function", WebLingoValueClass.Function), ("Class", WebLingoValueClass.Class), ("Task", WebLingoValueClass.Task),
         ("Module", WebLingoValueClass.Module), ("Iterator", WebLingoValueClass.Iterator), ("Bytes", WebLingoValueClass.Bytes),
-        ("BytesBuilder", WebLingoValueClass.BytesBuilder), ("DateTime", WebLingoValueClass.DateTime)
+        ("BytesBuilder", WebLingoValueClass.BytesBuilder), ("DateTime", WebLingoValueClass.DateTime),
+        ("Decimal", WebLingoValueClass.Decimal)
     ];
 
     public static readonly (string Name, string Code)[] ErrorClasses =
@@ -56,6 +57,7 @@ internal static class WebLingoPrelude
         "Boolean" => "class Boolean { constructor(value = false) { hold(this, value); } }",
         "Integer" => "class Integer { constructor(value = 0) { hold(this, value); } }",
         "Number" => "class Number { constructor(value = 0.0) { hold(this, value); } }",
+        "Decimal" => "class Decimal { constructor(value = 0) { hold(this, value); } }",
         "String" => "class String { constructor(value = \"\") { hold(this, value); } }",
         "Function" => "class Function { constructor(f = function () {}) { hold(this, f); } }",
         // A metaclass's super(name, base) names and bases the class it makes (section 3.7).

@@ -156,6 +156,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(if (true) 1);", "WL1001", 1, 20)]
     [InlineData("var x = 1 switch { 1 => 2 };", "WL1001", 1, 9)]
     [InlineData("switch (1) { case Point p, 2 { } }", "WL1001", 1, 19)]
+    [InlineData("var d = 79228162514264337593543950336m;", "WL1004", 1, 9)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -544,6 +545,13 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("switch (\"x\") { case \"y\" { writeLn(\"no\"); } } writeLn(\"after\");", "after")]
     [InlineData("var calls = 0; function next() { calls++; return 2; } writeLn([next() switch { 1 => \"one\", 2 => \"two\", _ => \"many\" }, calls]);", "[\"two\", 1]")]
     [InlineData("class C { constructor(r) { this.r = r; } } writeLn([new C(2) switch { C c => c.r * 3, _ => 0 }, 7 switch { 1, 2 => \"a\", _ => \"b\" } + \"!\"]);", "[6, \"b!\"]")]
+    // Decimals (the owner's answers, 16 November 2026): .NET's decimal; integers converted exactly; written 1.5m.
+    [InlineData("writeLn([1.50m, 0.1m + 0.2m, 1.5m * 2, 7m / 2, 10m % 3, -1.5m, 2.000m, 100m]);", "[1.5m, 0.3m, 3m, 3.5m, 1m, -1.5m, 2m, 100m]")]
+    [InlineData("writeLn([1.5m == 1.50m, 1m == 1, 1.5m == 1.5, 2.5m > 2, 1.1m < 1.2m]);", "[true, true, false, true, true]")]
+    [InlineData("writeLn([1.5m is Decimal, Decimal.parse(\"3.25\"), new Decimal(4), new Decimal(\"2.50\"), new Decimal(0.1), new Number(2.5m), new Integer(3m), new Decimal()]);", "[true, 3.25m, 4m, 2.5m, 0.1m, 2.5, 3, 0m]")]
+    [InlineData("var p = 1.5m; writeLn($\"{p:0.00} {1234.5m:N1} {p}\");", "1.50 1,234.5 1.5m")]
+    [InlineData("var total = 0m; foreach (var x in [1.10m, 2.20m, 3.30m]) total += x; writeLn(total);", "6.6m")]
+    [InlineData("class Money extends Decimal {} var m = new Money(1.25m); writeLn([m, m + 1, m is Decimal]);", "[Money:1.25m, Money:2.25m, true]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -589,6 +597,13 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var s = \"a\"; s -= 1;", "WL3001")]
     [InlineData("writeLn(if (null) 1 else 2);", "WL3001")]
     [InlineData("writeLn(\"a\".compare(1));", "WL3001")]
+    [InlineData("writeLn(1.5m + 1.5);", "WL3001")]
+    [InlineData("writeLn(1.5m < 2.0);", "WL3001")]
+    [InlineData("writeLn(1m / 0);", "WL3013")]
+    [InlineData("writeLn(1m % 0m);", "WL3013")]
+    [InlineData("writeLn(79228162514264337593543950335m + 1);", "WL3002")]
+    [InlineData("writeLn(new Integer(2.5m));", "WL3001")]
+    [InlineData("writeLn(Decimal.parse(\"1.5m\"));", "WL3001")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

@@ -91,6 +91,14 @@ public sealed class WebLingoStackVirtualMachine
                 }
                 continue;
             }
+            if (constant.Kind == WebLingoConstantKind.Decimal)
+            {
+                if (!heap.TryAllocateDecimal(WebLingoValue.ParseDecimal(constant.Text!), out constants[i], out var decimalError))
+                {
+                    return Failure(decimalError!.Code, decimalError.Message, new WebLingoSourceSpan(0, 0));
+                }
+                continue;
+            }
             constants[i] = constant.Kind == WebLingoConstantKind.Int64
                 ? WebLingoValue.FromInt64(constant.Bits)
                 : WebLingoValue.FromBinary64Bits(constant.Bits);
@@ -1890,6 +1898,12 @@ public sealed class WebLingoStackVirtualMachine
                     _linked.Add(addedConstants[i]);
                     continue;
                 }
+                if (constant.Kind == WebLingoConstantKind.Decimal)
+                {
+                    if (!heap.TryAllocateDecimal(WebLingoValue.ParseDecimal(constant.Text!), out addedConstants[i], out error)) return false;
+                    _linked.Add(addedConstants[i]);
+                    continue;
+                }
                 addedConstants[i] = constant.Kind == WebLingoConstantKind.Int64
                     ? WebLingoValue.FromInt64(constant.Bits)
                     : WebLingoValue.FromBinary64Bits(constant.Bits);
@@ -2278,7 +2292,7 @@ public sealed class WebLingoStackVirtualMachine
             value.Kind is WebLingoValueKind.Instance or WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set;
 
         /// <summary>The kinds of values' classes, by <c>WebLingoValueClass</c>, once the module has made them (section 3.7); a root.</summary>
-        private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.DateTime + 1];
+        private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.Decimal + 1];
 
         /// <summary>The kinds of runtime errors' classes, as <c>module.ErrorClasses</c> lists them, once made; a root.</summary>
         private readonly WebLingoValue[] _errorClasses = new WebLingoValue[Math.Max(module.ErrorClasses.Count, MaxErrorClasses)];
@@ -2325,6 +2339,7 @@ public sealed class WebLingoStackVirtualMachine
                 else if (i == (int)WebLingoValueClass.Boolean) heap.MarkValueClass(made, WebLingoValueKind.Boolean);
                 else if (i == (int)WebLingoValueClass.Integer) heap.MarkValueClass(made, WebLingoValueKind.Int64);
                 else if (i == (int)WebLingoValueClass.Number) heap.MarkValueClass(made, WebLingoValueKind.Binary64);
+                else if (i == (int)WebLingoValueClass.Decimal) heap.MarkValueClass(made, WebLingoValueKind.Decimal);
                 else if (i == (int)WebLingoValueClass.String) heap.MarkValueClass(made, WebLingoValueKind.String);
                 else if (i == (int)WebLingoValueClass.Function) heap.MarkValueClass(made, WebLingoValueKind.Function);
                 else if (i == (int)WebLingoValueClass.Class) heap.MarkClassClass(made);

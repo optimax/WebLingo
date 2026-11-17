@@ -325,6 +325,8 @@ public sealed class WebLingoHeap
             case WebLingoValueKind.Binary64:
                 result = WebLingoValue.FromBinary64(0.0);
                 return true;
+            case WebLingoValueKind.Decimal:
+                return TryAllocateDecimal(0m, out result, out error);
             default:
                 return TryAllocateString("", out result, out error);
         }
@@ -336,6 +338,36 @@ public sealed class WebLingoHeap
         error = null;
         result = kind == WebLingoValueKind.Binary64 && value.Kind == WebLingoValueKind.Int64 ? WebLingoValue.FromBinary64(value.AsInt64) : value;
         if (result.Kind == kind) return true;
+        if (kind == WebLingoValueKind.Decimal && value.Kind is WebLingoValueKind.Int64 or WebLingoValueKind.Binary64 or WebLingoValueKind.String)
+        {
+            // new Decimal(x): an integer exactly, a number explicitly converted, or a string read as a decimal's digits.
+            if (value.Kind == WebLingoValueKind.String) return WebLingoConversions.TryParse(kind, GetString(value), this, out result, out error);
+            if (value.Kind == WebLingoValueKind.Int64) return TryAllocateDecimal(value.AsInt64, out result, out error);
+            var number = value.AsBinary64;
+            if (double.IsFinite(number) && Math.Abs(number) < 7.9e28) return TryAllocateDecimal((decimal)number, out result, out error);
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"The number {WebLingoValueFormatter.Format(value)} is beyond a decimal's range.");
+            result = WebLingoValue.Null;
+            return false;
+        }
+        if (value.Kind == WebLingoValueKind.Decimal && kind is WebLingoValueKind.Binary64 or WebLingoValueKind.Int64)
+        {
+            // new Number(d), explicitly converted; new Integer(d), only a whole one, exactly.
+            var held = GetDecimal(value);
+            if (kind == WebLingoValueKind.Binary64)
+            {
+                result = WebLingoValue.FromBinary64((double)held);
+                return true;
+            }
+            if (held == decimal.Truncate(held) && held >= long.MinValue && held <= long.MaxValue)
+            {
+                result = WebLingoValue.FromInt64((long)held);
+                return true;
+            }
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"The decimal {WebLingoValueFormatter.Format(value, this)} is not a whole number within 64 bits.");
+            result = WebLingoValue.Null;
+            return false;
+        }
         if (value.Kind == WebLingoValueKind.String && kind is WebLingoValueKind.Int64 or WebLingoValueKind.Binary64 or WebLingoValueKind.Boolean)
         {
             // A string read as a literal of the class's kind, as its parse reads it (section 3.7).
@@ -353,6 +385,7 @@ public sealed class WebLingoHeap
         WebLingoValueKind.Boolean => "a Boolean",
         WebLingoValueKind.Int64 => "an integer",
         WebLingoValueKind.Binary64 => "a number",
+        WebLingoValueKind.Decimal => "a decimal",
         WebLingoValueKind.Function => "a function",
         _ => "a string"
     };
@@ -488,6 +521,19 @@ public sealed class WebLingoHeap
     /// </summary>
     public bool TryAllocateBytes(byte[] data, out WebLingoValue value, out WebLingoRuntimeError? error) =>
         TryAllocate(data, WebLingoValueKind.Bytes, (data.Length + 7) / 8, out value, out error);
+
+    /// <summary>A new decimal (section 3.2), immutable, as a number is, in the heap since it is 128 bits.</summary>
+    public bool TryAllocateDecimal(decimal value, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        TryAllocate(new DecimalObject(value), WebLingoValueKind.Decimal, 2, out result, out error);
+
+    /// <summary>The value a decimal of this heap holds.</summary>
+    public decimal GetDecimal(WebLingoValue value) => Get<DecimalObject>(value, WebLingoValueKind.Decimal).Value;
+
+    /// <summary>A decimal, which the heap holds as an object of its own.</summary>
+    private sealed class DecimalObject(decimal value)
+    {
+        public decimal Value { get; } = value;
+    }
 
     /// <summary>The bytes a bytes value of this heap holds, which nothing may change.</summary>
     public byte[] GetBytes(WebLingoValue value) => Get<byte[]>(value, WebLingoValueKind.Bytes);
@@ -1360,7 +1406,7 @@ public sealed class WebLingoHeap
 
     private static void Mark(WebLingoValue value, bool[] marked, Stack<int> pending)
     {
-        if (value.Kind is not (WebLingoValueKind.String or WebLingoValueKind.Bytes or WebLingoValueKind.Function or WebLingoValueKind.Cell or WebLingoValueKind.Array
+        if (value.Kind is not (WebLingoValueKind.String or WebLingoValueKind.Bytes or WebLingoValueKind.Decimal or WebLingoValueKind.Function or WebLingoValueKind.Cell or WebLingoValueKind.Array
             or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Class or WebLingoValueKind.Instance or WebLingoValueKind.BoundMethod
             or WebLingoValueKind.Task or WebLingoValueKind.Module))
         {

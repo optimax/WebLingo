@@ -275,6 +275,12 @@ public sealed class WebLingoCodeGenerator
                 Emit(new WebLingoInstruction(WebLingoOpCode.LoadConstant, destination, Int64Constant(constant.Value)), constant.Span);
                 return destination;
             }
+            case WebLingoIrDecimalConstant constant:
+            {
+                var destination = target ?? Allocate();
+                Emit(new WebLingoInstruction(WebLingoOpCode.LoadConstant, destination, DecimalConstant(constant.Digits)), constant.Span);
+                return destination;
+            }
             case WebLingoIrBinary64Constant constant:
             {
                 var destination = target ?? Allocate();
@@ -1018,6 +1024,16 @@ public sealed class WebLingoCodeGenerator
         _constants.Add(WebLingoConstant.String(value));
         _stringConstants.Add(value, index);
         return index;
+    }
+
+    private int DecimalConstant(string digits)
+    {
+        for (var i = 0; i < _constants.Count; i++)
+        {
+            if (_constants[i].Kind == WebLingoConstantKind.Decimal && _constants[i].Text == digits) return i;
+        }
+        _constants.Add(WebLingoConstant.Decimal(digits));
+        return _constants.Count - 1;
     }
 
     private int Binary64Constant(double value)

@@ -1388,6 +1388,9 @@ public sealed class WebLingoParser : IWebLingoParser
             case WebLingoTokenKind.IntegerLiteral:
                 Advance();
                 return new WebLingoIntegerLiteralSyntax(token.IntegerValue, token.Span);
+            case WebLingoTokenKind.DecimalLiteral:
+                Advance();
+                return new WebLingoDecimalLiteralSyntax(token.StringValue!, token.Span);
             case WebLingoTokenKind.Binary64Literal:
                 Advance();
                 return new WebLingoBinary64LiteralSyntax(token.Binary64Value, token.Span);

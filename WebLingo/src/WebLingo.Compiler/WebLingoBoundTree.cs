@@ -211,6 +211,8 @@ public sealed record WebLingoBoundStaticConstant(WebLingoBoundExpression Value, 
 
 public sealed record WebLingoBoundIntegerLiteral(long Value, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);
 
+public sealed record WebLingoBoundDecimalLiteral(string Digits, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);
+
 public sealed record WebLingoBoundBinary64Literal(double Value, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);
 
 public sealed record WebLingoBoundBooleanLiteral(bool Value, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);

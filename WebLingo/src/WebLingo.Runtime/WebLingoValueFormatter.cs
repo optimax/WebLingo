@@ -21,6 +21,7 @@ public static class WebLingoValueFormatter
         {
             WebLingoValueKind.String => heap.GetString(value),
             WebLingoValueKind.Bytes => FormatBytes(heap.GetBytes(value)),
+            WebLingoValueKind.Decimal => FormatDecimal(heap.GetDecimal(value)),
             WebLingoValueKind.Instance when heap.IsHolding(value) => Held(value, heap),
             WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Instance => FormatCollection(value, heap),
             WebLingoValueKind.Class => heap.IsNamed(value) ? "class " + heap.ClassName(value) : "class",
@@ -45,6 +46,7 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Task => "task",
         WebLingoValueKind.Module => $"module#{value.Handle}",
         WebLingoValueKind.Bytes => $"bytes#{value.Handle}",
+        WebLingoValueKind.Decimal => $"decimal#{value.Handle}",
         // A date and time's text (section 3.2, "Dates and times"): its class's name, a colon, and ISO 8601's.
         WebLingoValueKind.DateTime => "DateTime:" + WebLingoMembers.IsoText(value),
         WebLingoValueKind.Boolean => value.AsBoolean ? "true" : "false",
@@ -68,9 +70,21 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Task => "a task",
         WebLingoValueKind.Module => "a module",
         WebLingoValueKind.Bytes => "bytes",
+        WebLingoValueKind.Decimal => "a decimal",
         WebLingoValueKind.DateTime => $"the date and time {WebLingoMembers.IsoText(value)}",
         _ => $"the number {Format(value)}"
     };
+
+    /// <summary>
+    /// A decimal's text (the owner's answer, 16 November 2026): its fewest digits, its trailing zeros dropped, and <c>m</c>,
+    /// as its literal writes it, <c>1.5m</c> for <c>1.50m</c>, never in an exponent's form.
+    /// </summary>
+    public static string FormatDecimal(decimal value)
+    {
+        var text = value.ToString(CultureInfo.InvariantCulture);
+        if (text.Contains('.')) text = text.TrimEnd('0').TrimEnd('.');
+        return (text == "-0" ? "0" : text) + "m";
+    }
 
     /// <summary>Bytes' text (section 3.2, "Bytes"): their class's name, a colon, and their values, <c>Bytes:[104, 105]</c>.</summary>
     private static string FormatBytes(byte[] data)
@@ -90,6 +104,7 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Instance => $"an instance of {heap.ClassName(heap.ClassOf(value))}",
         WebLingoValueKind.Class => heap.IsNamed(value) ? $"the class {heap.ClassName(value)}" : "an unnamed class",
         WebLingoValueKind.Module => $"the module {heap.ModuleName(value)}",
+        WebLingoValueKind.Decimal => $"the decimal {FormatDecimal(heap.GetDecimal(value))}",
         _ => Describe(value)
     };
 

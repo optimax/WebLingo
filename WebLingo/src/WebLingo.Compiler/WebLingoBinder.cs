@@ -1308,6 +1308,8 @@ public sealed class WebLingoBinder
                 return new WebLingoBoundIntegerLiteral(literal.Value, literal.Span);
             case WebLingoBinary64LiteralSyntax literal:
                 return new WebLingoBoundBinary64Literal(literal.Value, literal.Span);
+            case WebLingoDecimalLiteralSyntax literal:
+                return new WebLingoBoundDecimalLiteral(literal.Digits, literal.Span);
             case WebLingoBooleanLiteralSyntax literal:
                 return new WebLingoBoundBooleanLiteral(literal.Value, literal.Span);
             case WebLingoNullLiteralSyntax literal:
@@ -1560,7 +1562,7 @@ public sealed class WebLingoBinder
             if (member.Name == "iterate") UseBuiltinClass("Iterator");
             return new WebLingoBoundMethodCall(BindExpression(member.Target), member.Name, arguments, call.Span);
         }
-        if (calleeSyntax is WebLingoIntegerLiteralSyntax or WebLingoBinary64LiteralSyntax or WebLingoBooleanLiteralSyntax
+        if (calleeSyntax is WebLingoIntegerLiteralSyntax or WebLingoBinary64LiteralSyntax or WebLingoDecimalLiteralSyntax or WebLingoBooleanLiteralSyntax
             or WebLingoNullLiteralSyntax or WebLingoStringLiteralSyntax)
         {
             Report(WebLingoDiagnosticCodes.NotAFunction, "A literal is not a function, and cannot be called.", calleeSyntax.Span);

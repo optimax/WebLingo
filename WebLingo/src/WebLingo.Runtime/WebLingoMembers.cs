@@ -593,6 +593,7 @@ public static partial class WebLingoMembers
         WebLingoValueKind.Module => (int)WebLingoValueClass.Module,
         WebLingoValueKind.Bytes => (int)WebLingoValueClass.Bytes,
         WebLingoValueKind.DateTime => (int)WebLingoValueClass.DateTime,
+        WebLingoValueKind.Decimal => (int)WebLingoValueClass.Decimal,
         _ => -1
     };
 
@@ -767,6 +768,7 @@ public static partial class WebLingoMembers
         if (heap.ValueClasses is not { } classes) return WebLingoValueKind.Null;
         if (classes[(int)WebLingoValueClass.Integer] == target) return WebLingoValueKind.Int64;
         if (classes[(int)WebLingoValueClass.Number] == target) return WebLingoValueKind.Binary64;
+        if (classes.Length > (int)WebLingoValueClass.Decimal && classes[(int)WebLingoValueClass.Decimal] == target) return WebLingoValueKind.Decimal;
         return classes[(int)WebLingoValueClass.Boolean] == target ? WebLingoValueKind.Boolean : WebLingoValueKind.Null;
     }
 
@@ -836,7 +838,7 @@ public static partial class WebLingoMembers
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
                 if (values[first].Kind == WebLingoValueKind.String)
                 {
-                    return WebLingoConversions.TryParse(ParsedKind(target, heap), heap.GetString(values[first]), out result, out error);
+                    return WebLingoConversions.TryParse(ParsedKind(target, heap), heap.GetString(values[first]), heap, out result, out error);
                 }
                 error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
                     $"'parse' reads a string, not {WebLingoValueFormatter.Describe(values[first], heap)}.");

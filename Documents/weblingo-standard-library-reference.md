@@ -104,6 +104,8 @@ binary64, and `"tea"` a `String`.
 | `s.length` | a string's length, in Unicode scalar values |
 | `s[i]` | the string's `i`-th Unicode scalar value, as a string of one; `s?[i]` gives `null` outside it |
 | `s.iterate()` | an `Iterator` of its characters, each a string of one |
+| `Decimal.parse(text)`, `new Decimal(value)` | a decimal, `1.5m`, read from its digits, or made from an integer, exactly, or a number, converted |
+| `new Number(d)`, `new Integer(d)` | a decimal converted to a number, or to an integer when it is whole |
 | `s.compare(other)` | -1, 0 or 1, as `s` comes before `other`, equals it or comes after it, by their Unicode values, as `<` orders them |
 
 ```javascript

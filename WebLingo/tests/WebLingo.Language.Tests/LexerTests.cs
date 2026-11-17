@@ -357,9 +357,9 @@ public sealed class LexerTests
 
     [Theory]
     [InlineData("10abc")]
-    [InlineData("10m")]
+    [InlineData("10mx")]
     [InlineData("1_000")]
-    [InlineData("1.5m")]
+    [InlineData("1.5mm")]
     [InlineData("1e")]
     [InlineData("2.5e3x")]
     public void DigitsRunningIntoLettersAreOneInvalidLiteral(string text)

@@ -482,6 +482,8 @@ public sealed class WebLingoLowerer
         {
             case WebLingoBoundIntegerLiteral literal:
                 return new WebLingoIrInt64Constant(literal.Value, literal.Span);
+            case WebLingoBoundDecimalLiteral literal:
+                return new WebLingoIrDecimalConstant(literal.Digits, literal.Span);
             case WebLingoBoundBinary64Literal literal:
                 return new WebLingoIrBinary64Constant(literal.Value, literal.Span);
             case WebLingoBoundBooleanLiteral literal:

@@ -209,7 +209,7 @@ public enum WebLingoOpCode : byte
 
 public readonly record struct WebLingoInstruction(WebLingoOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
 
-public enum WebLingoConstantKind : byte { Int64, Binary64, String }
+public enum WebLingoConstantKind : byte { Int64, Binary64, String, Decimal }
 
 /// <summary>
 /// A constant; a binary64 is kept as its IEEE 754 bits, so that constants compare and copy exactly, and a string as
@@ -218,6 +218,13 @@ public enum WebLingoConstantKind : byte { Int64, Binary64, String }
 public readonly record struct WebLingoConstant(WebLingoConstantKind Kind, long Bits, string? Text = null)
 {
     public static WebLingoConstant String(string text) => new(WebLingoConstantKind.String, 0, text);
+    /// <summary>A decimal, its digits as its literal writes them (section 3.2), which a VM reads as .NET's decimal.</summary>
+    public static WebLingoConstant Decimal(string digits) => new(WebLingoConstantKind.Decimal, 0, digits);
+
+    /// <summary>Whether text is a decimal's digits, as a decimal constant holds them, within a decimal's range.</summary>
+    public static bool IsDecimal(string digits) =>
+        decimal.TryParse(digits, System.Globalization.NumberStyles.AllowDecimalPoint | System.Globalization.NumberStyles.AllowExponent,
+            System.Globalization.CultureInfo.InvariantCulture, out _);
     public static WebLingoConstant Int64(long value) => new(WebLingoConstantKind.Int64, value);
     public static WebLingoConstant Binary64(double value) => new(WebLingoConstantKind.Binary64, BitConverter.DoubleToInt64Bits(value));
 }

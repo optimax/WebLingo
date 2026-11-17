@@ -118,6 +118,7 @@ public static class WebLingoDisassembler
         {
             WebLingoConstantKind.Int64 => constant.Bits.ToString(System.Globalization.CultureInfo.InvariantCulture),
             WebLingoConstantKind.String => "\"" + constant.Text + "\"",
+            WebLingoConstantKind.Decimal => constant.Text + "m",
             _ => BitConverter.Int64BitsToDouble(constant.Bits).ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "d"
         };
     }

@@ -40,6 +40,10 @@ public static class WebLingoOperators
                 $"'+' joins two strings or adds two numbers, not {WebLingoValueFormatter.Describe(left)} and {WebLingoValueFormatter.Describe(right)}.");
             return false;
         }
+        if ((left.Kind == WebLingoValueKind.Decimal || right.Kind == WebLingoValueKind.Decimal) && heap is not null)
+        {
+            return TryDecimal(op, left, right, heap, out result, out error);
+        }
         if (op == WebLingoArithmeticOperator.Subtract && left.Kind == WebLingoValueKind.DateTime && right.Kind == WebLingoValueKind.DateTime)
         {
             // How long from one date to another, in milliseconds (section 3.2, "Dates and times").
@@ -91,6 +95,61 @@ public static class WebLingoOperators
     }
 
     /// <summary>
+    /// Arithmetic with a decimal (section 3.2, the owner's answers, 16 November 2026): of two decimals, or of a decimal and
+    /// an integer, which converts exactly; with a binary64 WL3001, the two mixed only by an explicit conversion. A result
+    /// beyond a decimal's range is WL3002, and a division or a remainder by 0 WL3013.
+    /// </summary>
+    private static bool TryDecimal(WebLingoArithmeticOperator op, WebLingoValue left, WebLingoValue right, WebLingoHeap heap,
+        out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!TryDecimalOperand(left, heap, out var a) || !TryDecimalOperand(right, heap, out var b))
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"'{Symbol(op)}' takes a decimal with a decimal or an integer, not {WebLingoValueFormatter.Describe(left, heap)} and "
+                + $"{WebLingoValueFormatter.Describe(right, heap)}: convert a number first, new Decimal(x).");
+            return false;
+        }
+        if (b == 0 && op is WebLingoArithmeticOperator.Divide or WebLingoArithmeticOperator.Remainder)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.DivisionByZero,
+                $"{WebLingoValueFormatter.FormatDecimal(a)} {Symbol(op)} 0 divides by zero.");
+            return false;
+        }
+        decimal value;
+        try
+        {
+            value = op switch
+            {
+                WebLingoArithmeticOperator.Add => a + b,
+                WebLingoArithmeticOperator.Subtract => a - b,
+                WebLingoArithmeticOperator.Multiply => a * b,
+                WebLingoArithmeticOperator.Divide => a / b,
+                _ => a % b
+            };
+        }
+        catch (OverflowException)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.IntegerOverflow,
+                $"{WebLingoValueFormatter.FormatDecimal(a)} {Symbol(op)} {WebLingoValueFormatter.FormatDecimal(b)} is beyond a decimal's range.");
+            return false;
+        }
+        return heap.TryAllocateDecimal(value, out result, out error);
+    }
+
+    /// <summary>A decimal, or an integer converted exactly; false for anything else.</summary>
+    private static bool TryDecimalOperand(WebLingoValue value, WebLingoHeap heap, out decimal operand)
+    {
+        operand = value.Kind switch
+        {
+            WebLingoValueKind.Decimal => heap.GetDecimal(value),
+            WebLingoValueKind.Int64 => value.AsInt64,
+            _ => 0m
+        };
+        return value.Kind is WebLingoValueKind.Decimal or WebLingoValueKind.Int64;
+    }
+
+    /// <summary>
     /// <c>==</c> and <c>!=</c> never fail and never convert, except that an int64 and a binary64 compare as numbers,
     /// exactly; <c>&lt; &lt;= &gt; &gt;=</c> take numbers only (specification, section 3.5). NaN is unordered, and
     /// unequal even to itself.
@@ -129,6 +188,19 @@ public static class WebLingoOperators
             });
             return true;
         }
+        if ((left.Kind == WebLingoValueKind.Decimal || right.Kind == WebLingoValueKind.Decimal) && heap is not null
+            && TryDecimalOperand(left, heap, out var leftDecimal) && TryDecimalOperand(right, heap, out var rightDecimal))
+        {
+            var amounts = leftDecimal.CompareTo(rightDecimal);
+            result = WebLingoValue.FromBoolean(op switch
+            {
+                WebLingoComparisonOperator.Less => amounts < 0,
+                WebLingoComparisonOperator.LessOrEqual => amounts <= 0,
+                WebLingoComparisonOperator.Greater => amounts > 0,
+                _ => amounts >= 0
+            });
+            return true;
+        }
         if (left.Kind == WebLingoValueKind.String && right.Kind == WebLingoValueKind.String && heap is not null)
         {
             // Two strings, by their Unicode scalar values, never by culture (the owner's answer, 16 November 2026).
@@ -145,8 +217,9 @@ public static class WebLingoOperators
         if (!IsNumber(left) || !IsNumber(right))
         {
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'{Symbol(op)}' compares two numbers, two strings or two dates, not {WebLingoValueFormatter.Describe(left)} "
-                + $"and {WebLingoValueFormatter.Describe(right)}.");
+                $"'{Symbol(op)}' compares two numbers, two decimals, two strings or two dates, not "
+                + $"{(heap is null ? WebLingoValueFormatter.Describe(left) : WebLingoValueFormatter.Describe(left, heap))} "
+                + $"and {(heap is null ? WebLingoValueFormatter.Describe(right) : WebLingoValueFormatter.Describe(right, heap))}.");
             return false;
         }
         var order = Compare(left, right);
@@ -185,6 +258,7 @@ public static class WebLingoOperators
     /// <summary>Unary <c>-</c> on any value, an instance holding a number giving one of its class (section 3.7).</summary>
     public static bool TryNegate(WebLingoValue operand, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
+        if (operand.Kind == WebLingoValueKind.Decimal) return heap.TryAllocateDecimal(-heap.GetDecimal(operand), out result, out error);
         if (!heap.IsHolding(operand)) return TryNegate(operand, out result, out error);
         if (!TryNegate(heap.Held(operand), out var value, out error))
         {
@@ -197,6 +271,11 @@ public static class WebLingoOperators
     /// <summary>Unary <c>+</c> on any value, an instance holding a number giving one of its class (section 3.7).</summary>
     public static bool TryPlus(WebLingoValue operand, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
+        if (operand.Kind == WebLingoValueKind.Decimal)
+        {
+            (result, error) = (operand, null);
+            return true;
+        }
         if (!heap.IsHolding(operand)) return TryPlus(operand, out result, out error);
         if (!TryPlus(heap.Held(operand), out var value, out error))
         {
@@ -229,6 +308,10 @@ public static class WebLingoOperators
             return heap is null
                 ? left.Handle == right.Handle
                 : string.Equals(heap.GetString(left), heap.GetString(right), StringComparison.Ordinal);
+        }
+        if ((left.Kind == WebLingoValueKind.Decimal || right.Kind == WebLingoValueKind.Decimal) && heap is not null)
+        {
+            return TryDecimalOperand(left, heap, out var a) && TryDecimalOperand(right, heap, out var b) && a == b;
         }
         if (left.Kind == WebLingoValueKind.Bytes && right.Kind == WebLingoValueKind.Bytes)
         {

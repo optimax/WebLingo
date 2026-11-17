@@ -241,9 +241,26 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
             SkipDigits();
             isBinary64 = true;
         }
+        if (At(0) is 'm' or 'M' && (_position + 1 >= source.Length || !IsIdentifierPart(source[_position + 1])))
+        {
+            // A decimal, 1.5m (section 3.2): .NET's decimal for now, its digits as written, which must fit it.
+            var digits = source[start.._position];
+            _position++;
+            if (!decimal.TryParse(digits, System.Globalization.NumberStyles.AllowDecimalPoint | System.Globalization.NumberStyles.AllowExponent,
+                    System.Globalization.CultureInfo.InvariantCulture, out _))
+            {
+                Report(WebLingoDiagnosticCodes.InvalidNumericLiteral, $"The decimal {digits}m is beyond a decimal's range.",
+                    new WebLingoSourceSpan(start, _position - start));
+                return Token(WebLingoTokenKind.Bad, start);
+            }
+            return new WebLingoToken(WebLingoTokenKind.DecimalLiteral, source[start.._position], new WebLingoSourceSpan(start, _position - start))
+            {
+                StringValue = digits
+            };
+        }
         if (_position < source.Length && IsIdentifierPart(source[_position]))
         {
-            // Digits run into letters (10abc, or the decimal suffix of 10m, which M0.6 does not read yet).
+            // Digits run into letters (10abc).
             while (_position < source.Length && IsIdentifierPart(source[_position])) _position++;
             var text = source[start.._position];
             Report(WebLingoDiagnosticCodes.InvalidNumericLiteral, $"'{text}' is not a valid number.",

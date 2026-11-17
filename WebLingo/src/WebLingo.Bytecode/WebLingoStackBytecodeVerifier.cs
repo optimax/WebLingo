@@ -25,11 +25,16 @@ public sealed class WebLingoStackBytecodeVerifier
         for (var i = 0; i < module.Constants.Count; i++)
         {
             var constant = module.Constants[i];
-            if (constant.Kind is not (WebLingoConstantKind.Int64 or WebLingoConstantKind.Binary64 or WebLingoConstantKind.String))
+            if (constant.Kind is not (WebLingoConstantKind.Int64 or WebLingoConstantKind.Binary64 or WebLingoConstantKind.String
+                or WebLingoConstantKind.Decimal))
             {
                 return Fail($"Constant {i} has the unknown kind {(int)constant.Kind}.");
             }
-            if ((constant.Kind == WebLingoConstantKind.String) != (constant.Text is not null))
+            if (constant.Kind == WebLingoConstantKind.Decimal && (constant.Text is null || !WebLingoConstant.IsDecimal(constant.Text)))
+            {
+                return Fail($"Constant {i} is a decimal whose digits are not one.");
+            }
+            if ((constant.Kind is WebLingoConstantKind.String or WebLingoConstantKind.Decimal) != (constant.Text is not null))
             {
                 return Fail($"Constant {i} has text if and only if it is not a string.");
             }

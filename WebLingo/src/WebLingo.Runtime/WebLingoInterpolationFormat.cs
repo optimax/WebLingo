@@ -66,6 +66,9 @@ public static class WebLingoInterpolationFormat
                 case WebLingoValueKind.Binary64:
                     text = held.AsBinary64.ToString(format, CultureInfo.InvariantCulture);
                     return true;
+                case WebLingoValueKind.Decimal:
+                    text = heap.GetDecimal(held).ToString(format, CultureInfo.InvariantCulture);
+                    return true;
                 case WebLingoValueKind.DateTime:
                     // A date by .NET's date and time formats (section 3.2, "Dates and times").
                     return WebLingoMembers.TryFormatDateTime(held, format, out text, out error);

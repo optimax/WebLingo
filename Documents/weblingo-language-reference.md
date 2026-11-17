@@ -195,6 +195,7 @@ writeLn(limit);
 | Map | `{ name: "Ann", age: 30 }` | `Map` |
 | Set | `#{1, 2, 3}` | `Set` |
 | Bytes | `Bytes.from("hi")`, `Bytes.from([104, 105])` | `Bytes` |
+| Decimal | `1.5m`, `0.1m` | `Decimal` |
 | Date and time | `DateTime.now()`, `DateTime.utc(2026, 11, 16)` | `DateTime` |
 | Function | `function (x) { … }`, `x => x * 2` | `Function` |
 | Class | `class Point { … }` | `Class` |
@@ -254,6 +255,34 @@ text
 
 - **Every value but `null` has a class** ([section 10](#classes-of-values)), so `5 is Integer` and `"a" is String`
   are true.
+
+### Decimals
+
+A decimal is a number written with an `m`, `2.50m`, whose arithmetic is exact in decimal digits, as money needs:
+
+```javascript
+var price = 2.50m;
+var total = price * 3 + 0.10m;
+writeLn(total);
+writeLn(0.1m + 0.2m);
+writeLn(0.1 + 0.2);
+writeLn($"{total:0.00}");
+writeLn([7m / 2, 1m == 1, new Decimal(0.1), new Number(total)]);
+```
+
+```text
+7.6m
+0.3m
+0.30000000000000004
+7.60
+[3.5m, true, 0.1m, 7.6]
+```
+
+- **A decimal and an integer** mix: the integer converts exactly, `1.5m + 1` is `2.5m`.
+- **A decimal and a number do not**: `1.5m + 1.5` is an error. Convert one, `new Decimal(x)` or `new Number(d)`.
+- **Its text** has its fewest digits and its `m`: `2.50m` is written `2.5m`. A format writes it as you choose, `{d:0.00}`.
+- **`Decimal.parse("2.50")`** reads one; `new Integer(d)` takes only a whole one.
+- **Its range** is .NET's `decimal`'s, 28 or 29 digits; beyond it is an error, as is dividing a decimal by 0.
 
 ### Dates and times
 
@@ -1732,7 +1761,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Values**: decimals (exact decimal arithmetic, `1.5m`), and time zones other than UTC and the server's.
+- **Values**: time zones other than UTC and the server's.
 - **Literals**: hexadecimal and binary numbers, and `_` between digits.
 - **Functions**: a variable number of arguments (rest parameters), and spreading an array into a call.
 - **Library**: string methods (searching, splitting, case), array methods beyond `push` and `pop`, regular expressions,

@@ -645,6 +645,7 @@ public static class WebLingoBytecodeFile
                 (int)WebLingoConstantKind.Int64 => WebLingoConstant.Int64(r.Signed()),
                 (int)WebLingoConstantKind.Binary64 => new WebLingoConstant(WebLingoConstantKind.Binary64, r.Fixed64()),
                 (int)WebLingoConstantKind.String => WebLingoConstant.String(r.Text()),
+                (int)WebLingoConstantKind.Decimal => WebLingoConstant.Decimal(r.Text()),
                 _ => Unknown(r, "has a constant of an unknown kind")
             };
         }

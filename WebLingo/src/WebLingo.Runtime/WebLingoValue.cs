@@ -5,7 +5,7 @@ namespace WebLingo.Runtime;
 /// a BoundMethod (a method and the instance it runs on) refer to an object of a heap by
 /// handle; a Builtin is a host built-in, by its import index; a Cell is never a script's value, only a frame's.
 /// </summary>
-public enum WebLingoValueKind : byte { Null, Boolean, Int64, Binary64, String, Function, Builtin, Cell, Array, Map, Set, Class, Instance, BoundMethod, Missing, Task, Module, Bytes, DateTime }
+public enum WebLingoValueKind : byte { Null, Boolean, Int64, Binary64, String, Function, Builtin, Cell, Array, Map, Set, Class, Instance, BoundMethod, Missing, Task, Module, Bytes, DateTime, Decimal }
 
 /// <summary>
 /// A runtime value (specification, section 4.1): a kind and a 64-bit payload, 16 bytes in all. M0.6 has null,
@@ -53,6 +53,16 @@ public readonly struct WebLingoValue : IEquatable<WebLingoValue>
     /// </summary>
     public static WebLingoValue FromDateTime(long unixMilliseconds, int offsetMinutes) =>
         new(WebLingoValueKind.DateTime, (unixMilliseconds << 12) | (uint)(offsetMinutes & 0xFFF));
+
+    /// <summary>Text as a decimal, a sign, digits, a point and more digits, with the invariant culture.</summary>
+    public static bool TryParseDecimal(string text, out decimal value) =>
+        decimal.TryParse(text, System.Globalization.NumberStyles.AllowLeadingSign | System.Globalization.NumberStyles.AllowDecimalPoint,
+            System.Globalization.CultureInfo.InvariantCulture, out value);
+
+    /// <summary>A decimal constant's digits as .NET's decimal, which the verifier has checked they are.</summary>
+    public static decimal ParseDecimal(string digits) =>
+        decimal.Parse(digits, System.Globalization.NumberStyles.AllowDecimalPoint | System.Globalization.NumberStyles.AllowExponent,
+            System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>A date and time's instant, in milliseconds since 1970-01-01T00:00:00Z.</summary>
     public long UnixMilliseconds => _bits >> 12;

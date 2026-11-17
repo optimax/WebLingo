@@ -219,6 +219,9 @@ public sealed record WebLingoAwaitExpressionSyntax(WebLingoExpressionSyntax Oper
 public sealed record WebLingoIntegerLiteralSyntax(long Value, WebLingoSourceSpan Span) : WebLingoExpressionSyntax(Span);
 
 /// <summary>A binary64 literal: <c>1.5</c>, <c>1e21</c>, or the keyword <c>Infinity</c> or <c>NaN</c>.</summary>
+/// <summary>A decimal's literal, <c>1.5m</c>, its digits as written (section 3.2).</summary>
+public sealed record WebLingoDecimalLiteralSyntax(string Digits, WebLingoSourceSpan Span) : WebLingoExpressionSyntax(Span);
+
 public sealed record WebLingoBinary64LiteralSyntax(double Value, WebLingoSourceSpan Span) : WebLingoExpressionSyntax(Span);
 
 /// <summary><c>true</c> or <c>false</c>.</summary>

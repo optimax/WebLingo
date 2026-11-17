@@ -25,5 +25,6 @@ public enum WebLingoValueClass
     Iterator,
     Bytes,
     BytesBuilder,
-    DateTime
+    DateTime,
+    Decimal
 }

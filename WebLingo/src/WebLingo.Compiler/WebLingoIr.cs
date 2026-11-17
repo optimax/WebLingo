@@ -175,6 +175,9 @@ public abstract record WebLingoIrExpression(WebLingoSourceSpan Span);
 
 public sealed record WebLingoIrInt64Constant(long Value, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
 
+/// <summary>A decimal, its digits as written (section 3.2).</summary>
+public sealed record WebLingoIrDecimalConstant(string Digits, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
+
 public sealed record WebLingoIrBinary64Constant(double Value, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
 
 public sealed record WebLingoIrBooleanConstant(bool Value, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
