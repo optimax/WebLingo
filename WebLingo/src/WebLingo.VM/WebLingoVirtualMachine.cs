@@ -507,6 +507,23 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             if (error is not null) break;
                             pc++;
                             continue;
+                        case WebLingoOpCode.CallSpread:
+                            // f(...values), new C(...values) and x.m(...values) (section 3.5): the array's elements where
+                            // the call takes its arguments, then the call itself, as its own instruction would run it.
+                            if (!TrySpread(frame, in ins, out error)) break;
+                            registers = frame.Registers;
+                            ins = ref _spread[0];
+                            goto case WebLingoOpCode.Call;
+                        case WebLingoOpCode.NewSpread:
+                            if (!TrySpread(frame, in ins, out error)) break;
+                            registers = frame.Registers;
+                            ins = ref _spread[0];
+                            goto case WebLingoOpCode.New;
+                        case WebLingoOpCode.CallMethodSpread:
+                            if (!TrySpread(frame, in ins, out error)) break;
+                            registers = frame.Registers;
+                            ins = ref _spread[0];
+                            goto case WebLingoOpCode.CallMethod;
                         case WebLingoOpCode.Call:
                             // Register B must hold a function taking D arguments; the compiler checks what it can, and
                             // the call, after this switch, the rest (WL2005, WL2006).
@@ -1527,6 +1544,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         private readonly WebLingoValue[] _main = new WebLingoValue[1];
         /// <summary>A call's rest parameter, gathered before its frame is made, a root until its function takes it (section 3.5).</summary>
         private readonly WebLingoValue[] _rest = [WebLingoValue.Null];
+        /// <summary>The call a spread instruction is, once its array's elements are in place (section 3.5).</summary>
+        private readonly WebLingoInstruction[] _spread = new WebLingoInstruction[1];
 
         /// <summary>
         /// A class's operator that an arithmetic or a comparison found (section 3.7), with its operands, and, on the
@@ -2414,6 +2433,56 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 return true;
             }
             return heap.TryAllocateArray(_rest, 0, 0, out rest, out error);
+        }
+
+        /// <summary>
+        /// A spread call's arguments (section 3.5): the elements of its array in the registers its call takes them from, from
+        /// the array's own on, or after the target's for a method, the frame's registers grown where they are too few; and
+        /// the call it is, in <see cref="_spread"/>. Elements beyond the function's own registers stay in its frame's
+        /// array, as values above a stack VM's operands do, until something else is put there.
+        /// </summary>
+        private bool TrySpread(Frame frame, in WebLingoInstruction ins, out WebLingoRuntimeError? error)
+        {
+            var method = ins.OpCode == WebLingoOpCode.CallMethodSpread;
+            var registers = frame.Registers;
+            var values = registers[method ? ins.D : ins.C];
+            if (values.Kind != WebLingoValueKind.Array)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"'...' spreads an array into a call, not {WebLingoValueFormatter.Describe(values, heap)}.");
+                return false;
+            }
+            var elements = heap.GetArray(values);
+            if (elements.Count > WebLingoFunction.MaxRegisters)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"'...' spreads at most {WebLingoFunction.MaxRegisters} arguments into a call, not {elements.Count}.");
+                return false;
+            }
+            var first = method ? ins.C + 1 : ins.C;
+            if (first + elements.Count > registers.Length) registers = Grown(frame, registers, first + elements.Count);
+            for (var i = 0; i < elements.Count; i++) registers[first + i] = elements[i];
+            _spread[0] = ins.OpCode switch
+            {
+                WebLingoOpCode.CallSpread => new WebLingoInstruction(WebLingoOpCode.Call, ins.A, ins.B, first, elements.Count),
+                WebLingoOpCode.NewSpread => new WebLingoInstruction(WebLingoOpCode.New, ins.A, ins.B, first, elements.Count),
+                _ => new WebLingoInstruction(WebLingoOpCode.CallMethod, ins.A, ins.B, ins.C, elements.Count)
+            };
+            error = null;
+            return true;
+        }
+
+        /// <summary>The running frame's registers made <paramref name="length"/> long, its roots, the last added, replaced.</summary>
+        private WebLingoValue[] Grown(Frame frame, WebLingoValue[] registers, int length)
+        {
+            heap.RemoveLastRoots(frame.Closure);
+            heap.RemoveLastRoots(registers);
+            var grown = new WebLingoValue[length];
+            Array.Copy(registers, grown, registers.Length);
+            frame.Registers = grown;
+            heap.AddRoots(grown);
+            heap.AddRoots(frame.Closure);
+            return grown;
         }
 
         private static WebLingoRuntimeError WrongArgumentCount(string name, int arity, int count, int optional = 0) =>

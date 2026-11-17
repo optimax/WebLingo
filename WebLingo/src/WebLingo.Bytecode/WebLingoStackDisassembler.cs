@@ -58,6 +58,7 @@ public static class WebLingoStackDisassembler
             WebLingoStackOpCode.CallBuiltin => $"{name} {Import(module, a)} ({b} arguments)",
             WebLingoStackOpCode.GetMember => $"{name} {(b == 0 ? "." : "?.")}{Constant(module, a)}",
             WebLingoStackOpCode.CallMethod => $"{name} .{Constant(module, a)} ({b} arguments)",
+            WebLingoStackOpCode.CallMethodSpread => $"{name} .{Constant(module, a)}",
             WebLingoStackOpCode.GetIndex => a == 0 ? $"{name} []" : $"{name} ?[]",
             WebLingoStackOpCode.StoreIndex => a == 0 ? name : $"{name}, kept",
             WebLingoStackOpCode.SetMember => $"{name} .{Constant(module, a)}" + (b == 0 ? "" : ", kept"),

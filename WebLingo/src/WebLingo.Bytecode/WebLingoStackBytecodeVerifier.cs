@@ -224,6 +224,11 @@ public sealed class WebLingoStackBytecodeVerifier
                 }
                 return null;
             }
+            case WebLingoStackOpCode.CallSpread:
+            case WebLingoStackOpCode.NewSpread:
+                return Unused(a, b);
+            case WebLingoStackOpCode.CallMethodSpread:
+                return Name(module, a) ?? Unused(b);
             case WebLingoStackOpCode.New:
                 return a is < 0 or > WebLingoFunction.MaxRegisters
                     ? $"its argument count, {a}, is not 0 to {WebLingoFunction.MaxRegisters}."
@@ -480,6 +485,7 @@ public sealed class WebLingoStackBytecodeVerifier
         WebLingoStackOpCode.NewArray or WebLingoStackOpCode.NewSet => (instruction.A, 1),
         WebLingoStackOpCode.NewMap => (2 * instruction.A, 1),
         WebLingoStackOpCode.CallMethod => (instruction.B + 1, 1),
+        WebLingoStackOpCode.CallSpread or WebLingoStackOpCode.CallMethodSpread or WebLingoStackOpCode.NewSpread => (2, 1),
         WebLingoStackOpCode.GetIndex => (2, 1),
         WebLingoStackOpCode.StoreIndex => (3, instruction.A),
         _ => (0, 0) // Jump, NewCell, BoxLocal, CopyCell and Return.

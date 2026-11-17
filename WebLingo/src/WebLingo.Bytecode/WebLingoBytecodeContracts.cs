@@ -209,7 +209,22 @@ public enum WebLingoOpCode : byte
     /// A = the rest parameter's register, the one after the parameters: the arguments after them, which the call gathered,
     /// else a new empty array; a function with a rest parameter's first instruction, and only there (section 3.5).
     /// </summary>
-    TakeRest
+    TakeRest,
+    /// <summary>
+    /// A = destination, B = callee, C = an array: <c>f(...values)</c> (section 3.5), the array's elements put in the
+    /// registers from C on, the frame's registers grown where they are too few, then called as <see cref="Call"/> is.
+    /// </summary>
+    CallSpread,
+    /// <summary>
+    /// A = destination, B = the method's name, a constant, C = target, D = an array: <c>x.m(...values)</c>, the array's
+    /// elements put in the registers from C + 1 on, then called as <see cref="CallMethod"/> is (section 3.5).
+    /// </summary>
+    CallMethodSpread,
+    /// <summary>
+    /// A = destination, B = class, C = an array: <c>new Class(...values)</c>, the array's elements put in the registers
+    /// from C on, then made as <see cref="New"/> makes one (section 3.5).
+    /// </summary>
+    NewSpread
 }
 
 public readonly record struct WebLingoInstruction(WebLingoOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);

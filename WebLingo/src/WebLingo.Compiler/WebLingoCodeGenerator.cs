@@ -412,8 +412,11 @@ public sealed class WebLingoCodeGenerator
                 for (var i = 0; i < call.Arguments.Count; i++) EmitExpression(call.Arguments[i], first + i);
                 _nextRegister = mark;
                 var destination = target ?? Allocate();
-                Emit(new WebLingoInstruction(WebLingoOpCode.Call, destination, callee, call.Arguments.Count == 0 ? 0 : first,
-                    call.Arguments.Count), call.Span);
+                // A spread call's one argument is an array, whose elements the VM puts in the registers from its own on.
+                Emit(call.IsSpread
+                    ? new WebLingoInstruction(WebLingoOpCode.CallSpread, destination, callee, first)
+                    : new WebLingoInstruction(WebLingoOpCode.Call, destination, callee, call.Arguments.Count == 0 ? 0 : first,
+                        call.Arguments.Count), call.Span);
                 return destination;
             }
             case WebLingoIrLoadLocal load:
@@ -662,8 +665,10 @@ public sealed class WebLingoCodeGenerator
                 for (var i = 0; i < created.Arguments.Count; i++) EmitExpression(created.Arguments[i], first + i);
                 _nextRegister = mark;
                 var destination = target ?? Allocate();
-                Emit(new WebLingoInstruction(WebLingoOpCode.New, destination, subject, created.Arguments.Count == 0 ? 0 : first,
-                    created.Arguments.Count), created.Span);
+                Emit(created.IsSpread
+                    ? new WebLingoInstruction(WebLingoOpCode.NewSpread, destination, subject, first)
+                    : new WebLingoInstruction(WebLingoOpCode.New, destination, subject, created.Arguments.Count == 0 ? 0 : first,
+                        created.Arguments.Count), created.Span);
                 return destination;
             }
             case WebLingoIrCallMethod call:
@@ -676,7 +681,9 @@ public sealed class WebLingoCodeGenerator
                 for (var i = 0; i < call.Arguments.Count; i++) EmitExpression(call.Arguments[i], first + 1 + i);
                 _nextRegister = mark;
                 var destination = target ?? Allocate();
-                Emit(new WebLingoInstruction(WebLingoOpCode.CallMethod, destination, StringConstant(call.Name), first, call.Arguments.Count),
+                Emit(call.IsSpread
+                    ? new WebLingoInstruction(WebLingoOpCode.CallMethodSpread, destination, StringConstant(call.Name), first, first + 1)
+                    : new WebLingoInstruction(WebLingoOpCode.CallMethod, destination, StringConstant(call.Name), first, call.Arguments.Count),
                     call.Span);
                 return destination;
             }

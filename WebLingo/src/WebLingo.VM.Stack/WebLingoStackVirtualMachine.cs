@@ -534,6 +534,26 @@ public sealed class WebLingoStackVirtualMachine
                             pc++;
                             continue;
                         }
+                        case WebLingoStackOpCode.CallSpread:
+                            // f(...values), new C(...values) and x.m(...values) (section 3.5): the array's elements on the
+                            // stack in its place, then the call itself, as its own instruction would run it.
+                            if (!TrySpread(frame, sp, in ins, out error)) break;
+                            slots = frame.Slots;
+                            sp = _spreadTop;
+                            ins = ref _spread[0];
+                            goto case WebLingoStackOpCode.Call;
+                        case WebLingoStackOpCode.NewSpread:
+                            if (!TrySpread(frame, sp, in ins, out error)) break;
+                            slots = frame.Slots;
+                            sp = _spreadTop;
+                            ins = ref _spread[0];
+                            goto case WebLingoStackOpCode.New;
+                        case WebLingoStackOpCode.CallMethodSpread:
+                            if (!TrySpread(frame, sp, in ins, out error)) break;
+                            slots = frame.Slots;
+                            sp = _spreadTop;
+                            ins = ref _spread[0];
+                            goto case WebLingoStackOpCode.CallMethod;
                         case WebLingoStackOpCode.Call:
                             // Below the arguments, the callee must be a function taking A of them; the compiler checks
                             // what it can, and the call, after this switch, the rest (WL2005, WL2006).
@@ -1576,6 +1596,9 @@ public sealed class WebLingoStackVirtualMachine
         private readonly WebLingoValue[] _main = new WebLingoValue[1];
         /// <summary>A call's rest parameter, gathered before its frame is made, a root until its function takes it (section 3.5).</summary>
         private readonly WebLingoValue[] _rest = [WebLingoValue.Null];
+        /// <summary>The call a spread instruction is, once its array's elements are on the stack, and the stack's top then (section 3.5).</summary>
+        private readonly WebLingoStackInstruction[] _spread = new WebLingoStackInstruction[1];
+        private int _spreadTop;
 
         /// <summary>
         /// A class's operator that an arithmetic or a comparison found (section 3.7), with its operands: called as a
@@ -1703,11 +1726,14 @@ public sealed class WebLingoStackVirtualMachine
         }
 
         /// <summary>The running frame's slots, one more, its roots registered anew, for an operator's call.</summary>
-        private WebLingoValue[] Grown(Frame frame, WebLingoValue[] slots)
+        private WebLingoValue[] Grown(Frame frame, WebLingoValue[] slots) => GrownTo(frame, slots, slots.Length + 1);
+
+        /// <summary>The running frame's slots made <paramref name="length"/> long, its roots, the last added, replaced.</summary>
+        private WebLingoValue[] GrownTo(Frame frame, WebLingoValue[] slots, int length)
         {
             heap.RemoveLastRoots(frame.Closure);
             heap.RemoveLastRoots(slots);
-            var grown = new WebLingoValue[slots.Length + 1];
+            var grown = new WebLingoValue[length];
             Array.Copy(slots, grown, slots.Length);
             frame.Slots = grown;
             heap.AddRoots(grown);
@@ -2535,6 +2561,43 @@ public sealed class WebLingoStackVirtualMachine
                 return true;
             }
             return heap.TryAllocateArray(_rest, 0, 0, out rest, out error);
+        }
+
+        /// <summary>
+        /// A spread call's arguments (section 3.5): the array on the stack's top replaced by its elements, the frame's slots
+        /// grown where they are too few, the stack's new top in <see cref="_spreadTop"/>, and the call it is, in
+        /// <see cref="_spread"/>. Elements beyond the function's own slots stay in its frame's array, as an operator's
+        /// operands do (<see cref="Grown"/>), until something else is put there.
+        /// </summary>
+        private bool TrySpread(Frame frame, int sp, in WebLingoStackInstruction ins, out WebLingoRuntimeError? error)
+        {
+            var slots = frame.Slots;
+            var values = slots[sp - 1];
+            if (values.Kind != WebLingoValueKind.Array)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"'...' spreads an array into a call, not {WebLingoValueFormatter.Describe(values, heap)}.");
+                return false;
+            }
+            var elements = heap.GetArray(values);
+            if (elements.Count > WebLingoFunction.MaxRegisters)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"'...' spreads at most {WebLingoFunction.MaxRegisters} arguments into a call, not {elements.Count}.");
+                return false;
+            }
+            var top = sp - 1 + elements.Count;
+            if (top > slots.Length) slots = GrownTo(frame, slots, top);
+            for (var i = 0; i < elements.Count; i++) slots[sp - 1 + i] = elements[i];
+            _spreadTop = top;
+            _spread[0] = ins.OpCode switch
+            {
+                WebLingoStackOpCode.CallSpread => new WebLingoStackInstruction(WebLingoStackOpCode.Call, elements.Count),
+                WebLingoStackOpCode.NewSpread => new WebLingoStackInstruction(WebLingoStackOpCode.New, elements.Count),
+                _ => new WebLingoStackInstruction(WebLingoStackOpCode.CallMethod, ins.A, elements.Count)
+            };
+            error = null;
+            return true;
         }
 
         private static WebLingoRuntimeError WrongArgumentCount(string name, int arity, int count, int optional = 0) =>

@@ -1324,11 +1324,11 @@ public sealed class WebLingoParser : IWebLingoParser
                     var arguments = new List<WebLingoExpressionSyntax>();
                     if (Current.Kind != WebLingoTokenKind.CloseParen)
                     {
-                        arguments.Add(ParseExpression());
+                        arguments.Add(ParseElement());
                         while (Current.Kind == WebLingoTokenKind.Comma)
                         {
                             Advance();
-                            arguments.Add(ParseExpression());
+                            arguments.Add(ParseElement());
                         }
                     }
                     Expect(WebLingoTokenKind.CloseParen, "')'");
@@ -1479,6 +1479,15 @@ public sealed class WebLingoParser : IWebLingoParser
                 {
                     while (true)
                     {
+                        if (Current.Kind == WebLingoTokenKind.Ellipsis)
+                        {
+                            // ...defaults: a map's entries spread into the literal (section 3.5).
+                            var spread = Advance();
+                            entries.Add(new WebLingoMapEntrySyntax("", spread.Span, ParseExpression()) { IsSpread = true });
+                            if (Current.Kind != WebLingoTokenKind.Comma) break;
+                            Advance();
+                            continue;
+                        }
                         var key = Current;
                         if (key.Kind is not (WebLingoTokenKind.Identifier or WebLingoTokenKind.StringLiteral))
                         {
@@ -1555,15 +1564,24 @@ public sealed class WebLingoParser : IWebLingoParser
         var elements = new List<WebLingoExpressionSyntax>();
         if (Current.Kind != close)
         {
-            elements.Add(ParseExpression());
+            elements.Add(ParseElement());
             while (Current.Kind == WebLingoTokenKind.Comma)
             {
                 Advance();
-                elements.Add(ParseExpression());
+                elements.Add(ParseElement());
             }
         }
         Expect(close, shown);
         return elements;
+    }
+
+    /// <summary>An argument of a call, or an element of an array's or a set's literal: an expression, or one spread, <c>...values</c> (section 3.5).</summary>
+    private WebLingoExpressionSyntax ParseElement()
+    {
+        if (Current.Kind != WebLingoTokenKind.Ellipsis) return ParseExpression();
+        var start = Advance().Span.Start;
+        var value = ParseExpression();
+        return new WebLingoSpreadSyntax(value, SpanFrom(start));
     }
 
     /// <summary>
@@ -1769,6 +1787,7 @@ public sealed class WebLingoParser : IWebLingoParser
                     case WebLingoArrayLiteralSyntax array:
                         foreach (var element in array.Elements) pending.Push((element, depth + 1));
                         break;
+                    case WebLingoSpreadSyntax spread: pending.Push((spread.Value, depth + 1)); break;
                     case WebLingoSetLiteralSyntax set:
                         foreach (var element in set.Elements) pending.Push((element, depth + 1));
                         break;

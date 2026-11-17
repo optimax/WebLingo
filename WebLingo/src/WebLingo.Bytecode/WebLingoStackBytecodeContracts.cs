@@ -187,7 +187,16 @@ public enum WebLingoStackOpCode : byte
     /// A = the rest parameter's local, the one after the parameters, as the register bytecode's (section 3.5). The stack is
     /// unchanged.
     /// </summary>
-    TakeRest
+    TakeRest,
+    /// <summary>
+    /// <c>f(...values)</c> (section 3.5): pops an array, pushes its elements, the frame's slots grown where they are too
+    /// few, and calls as <see cref="Call"/> does with that many.
+    /// </summary>
+    CallSpread,
+    /// <summary><c>x.m(...values)</c>, A = the method's name, a constant: as <see cref="CallMethod"/>, with the array's elements.</summary>
+    CallMethodSpread,
+    /// <summary><c>new Class(...values)</c>: as <see cref="New"/>, with the array's elements.</summary>
+    NewSpread
 }
 
 public readonly record struct WebLingoStackInstruction(WebLingoStackOpCode OpCode, int A = 0, int B = 0);

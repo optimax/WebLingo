@@ -817,6 +817,38 @@ three: 6
 - **It comes last**, after any parameter with a default, and has no default itself. Methods, constructors and arrow
   functions, in parentheses, may have one too.
 
+### Spreading
+
+`...values` spreads what `foreach` visits in `values` into a call's arguments, or into a literal's elements:
+
+```javascript
+function sum(...numbers) {
+  var total = 0;
+  foreach (var n in numbers) total += n;
+  return total;
+}
+var some = [1, 2, 3];
+writeLn(sum(...some, 4));
+writeLn([0, ...some, ...#{9}]);
+writeLn([..."tea"]);
+var defaults = { size: "M", color: "green" };
+writeLn({ ...defaults, size: "L" });
+```
+
+```text
+10
+[0, 1, 2, 3, 9]
+["t", "e", "a"]
+{"size": "L", "color": "green"}
+```
+
+- **Into a call**, each item is an argument, with others before or after it; a method's call, `new` and
+  `super(…)` take them too. A function's number of arguments is then checked when it runs.
+- **Into an array or a set**, each item is an element; **into a map**, a map's entries, a later key replacing an
+  earlier one, as in `{ ...defaults, size: "L" }`.
+- **What spreads** is what `foreach` visits: arrays, sets, strings, and instances whose class has `iterate()`; into a
+  map, only maps. Spreading anything else is an error when it runs.
+
 ### Functions as values
 
 A function is a value, which a variable may hold and a call may take. `function (…) { … }` is a function expression,
@@ -1815,6 +1847,5 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Functions**: spreading an array into a call.
 - **Library**: string methods (searching, splitting, case), array methods beyond `push` and `pop`, regular expressions,
   JSON, and network access.

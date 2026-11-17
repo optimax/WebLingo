@@ -537,7 +537,7 @@ public sealed class WebLingoLowerer
             case WebLingoBoundBuiltinCall call:
                 return new WebLingoIrCallBuiltin(call.Builtin.Index, LowerArguments(call.Arguments), call.Span);
             case WebLingoBoundCall call:
-                return new WebLingoIrCall(LowerExpression(call.Callee), LowerArguments(call.Arguments), call.Span);
+                return new WebLingoIrCall(LowerExpression(call.Callee), LowerArguments(call.Arguments), call.Span) { IsSpread = call.IsSpread };
             case WebLingoBoundArrayLiteral array:
                 return new WebLingoIrNewArray(LowerArguments(array.Elements), array.Span);
             case WebLingoBoundSetLiteral set:
@@ -566,9 +566,15 @@ public sealed class WebLingoLowerer
             case WebLingoBoundSuper super:
                 return new WebLingoIrGetSuper(LowerExpression(super.Class), LowerExpression(super.This), super.Name, super.Span);
             case WebLingoBoundNew created:
-                return new WebLingoIrNew(LowerExpression(created.Class), LowerArguments(created.Arguments), created.Span);
+                return new WebLingoIrNew(LowerExpression(created.Class), LowerArguments(created.Arguments), created.Span)
+                {
+                    IsSpread = created.IsSpread
+                };
             case WebLingoBoundMethodCall call:
-                return new WebLingoIrCallMethod(LowerExpression(call.Target), call.Name, LowerArguments(call.Arguments), call.Span);
+                return new WebLingoIrCallMethod(LowerExpression(call.Target), call.Name, LowerArguments(call.Arguments), call.Span)
+                {
+                    IsSpread = call.IsSpread
+                };
             default:
                 throw new InvalidOperationException($"Cannot lower {expression.GetType().Name}: binding had errors.");
         }

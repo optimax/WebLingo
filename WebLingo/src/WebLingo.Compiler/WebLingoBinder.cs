@@ -26,6 +26,8 @@ public sealed class WebLingoBinder
 
     /// <summary>The built-in class <c>Object</c>, bound once a program needs it (section 3.7).</summary>
     private WebLingoBoundClassDeclaration? _object;
+    /// <summary>The class that spreads values into a collection's literal or a call's arguments, once a program spreads one.</summary>
+    private WebLingoLocalSymbol? _spread;
 
     /// <summary>
     /// <c>Object</c>, which every class without <c>extends</c> extends: <c>equal(other)</c> gives <c>this == other</c>,
@@ -1331,6 +1333,16 @@ public sealed class WebLingoBinder
                 return BindAssignment(assignment);
             case WebLingoCallExpressionSyntax call:
                 return BindCall(call);
+            case WebLingoArrayLiteralSyntax array when HasSpread(array.Elements):
+                return BindSpread("array", array.Elements, array.Span);
+            case WebLingoSetLiteralSyntax set when HasSpread(set.Elements):
+                return BindSpread("set", set.Elements, set.Span);
+            case WebLingoMapLiteralSyntax map when HasSpreadEntry(map.Entries):
+                return BindSpreadMap(map);
+            case WebLingoSpreadSyntax spread:
+                Report(WebLingoDiagnosticCodes.UnexpectedToken,
+                    "'...' spreads values only into a call's arguments, or an array's, a set's or a map's literal.", spread.Span);
+                return new WebLingoBoundError(spread.Span);
             case WebLingoArrayLiteralSyntax array:
             {
                 var elements = new List<WebLingoBoundExpression>();
@@ -1373,6 +1385,11 @@ public sealed class WebLingoBinder
             case WebLingoNewExpressionSyntax created:
             {
                 var target = BindExpression(created.Class);
+                if (HasSpread(created.Arguments))
+                {
+                    // new Class(...values): one array, whose elements the VMs give the constructor (section 3.5).
+                    return new WebLingoBoundNew(target, [BindSpread("array", created.Arguments, created.Span)], created.Span) { IsSpread = true };
+                }
                 var arguments = new List<WebLingoBoundExpression>();
                 foreach (var argument in created.Arguments) arguments.Add(BindExpression(argument));
                 return new WebLingoBoundNew(target, arguments, created.Span);
@@ -1517,6 +1534,7 @@ public sealed class WebLingoBinder
 
     private WebLingoBoundExpression BindCall(WebLingoCallExpressionSyntax call)
     {
+        if (HasSpread(call.Arguments)) return BindSpreadCall(call);
         var arguments = new List<WebLingoBoundExpression>();
         foreach (var argument in call.Arguments) arguments.Add(BindExpression(argument));
 
@@ -1600,6 +1618,136 @@ public sealed class WebLingoBinder
 
     /// <summary>The arity of a function with a rest parameter, which takes any number of arguments after the others.</summary>
     private const int AnyNumber = int.MaxValue;
+
+    /// <summary>
+    /// A call with spread arguments, <c>f(a, ...values)</c> (section 3.5): its arguments one array, made as an array's
+    /// literal with spread elements is, whose elements the VMs pass as the call's arguments, a function's arity checked
+    /// when it runs. A built-in called by its name is called as a value; <c>Module.import</c> and a component's render,
+    /// whose arguments the compiler reads, take no spread (WL1001).
+    /// </summary>
+    private WebLingoBoundExpression BindSpreadCall(WebLingoCallExpressionSyntax call)
+    {
+        var calleeSyntax = call.Callee;
+        while (calleeSyntax is WebLingoParenthesizedExpressionSyntax parenthesized) calleeSyntax = parenthesized.Expression;
+        if (calleeSyntax is WebLingoErrorExpressionSyntax) return new WebLingoBoundError(call.Span);
+        var fixedArguments = calleeSyntax switch
+        {
+            WebLingoMemberAccessSyntax { Name: "import", Target: WebLingoNameSyntax { Name: "Module" } }
+                when IsBuiltinClass(LookupLocal("Module"), "Module") => "Module.import",
+            WebLingoNameSyntax name when LookupLocal(name.Name) is null && _hostBuiltins.TryGetValue(name.Name, out var builtin)
+                && builtin.RendersComponent => name.Name,
+            _ => null
+        };
+        if (fixedArguments is not null)
+        {
+            var spreadAt = call.Span;
+            for (var i = call.Arguments.Count - 1; i >= 0; i--)
+            {
+                if (call.Arguments[i] is WebLingoSpreadSyntax spread) spreadAt = spread.Span;
+            }
+            Report(WebLingoDiagnosticCodes.UnexpectedToken, $"'...' cannot spread into '{fixedArguments}', whose arguments are read as written.",
+                spreadAt);
+            return new WebLingoBoundError(call.Span);
+        }
+        if (calleeSyntax is WebLingoIntegerLiteralSyntax or WebLingoBinary64LiteralSyntax or WebLingoDecimalLiteralSyntax or WebLingoBooleanLiteralSyntax
+            or WebLingoNullLiteralSyntax or WebLingoStringLiteralSyntax)
+        {
+            Report(WebLingoDiagnosticCodes.NotAFunction, "A literal is not a function, and cannot be called.", calleeSyntax.Span);
+            return new WebLingoBoundError(call.Span);
+        }
+        if (calleeSyntax is WebLingoNameSyntax className && LookupLocal(className.Name) is { Kind: WebLingoDeclarationKind.Class })
+        {
+            Report(WebLingoDiagnosticCodes.NotAFunction, $"'{className.Name}' is a class: make an instance with 'new {className.Name}(…)'.",
+                calleeSyntax.Span);
+            return new WebLingoBoundError(call.Span);
+        }
+        if (calleeSyntax is WebLingoSuperSyntax && _class is { InConstructor: false, InExtension: false })
+        {
+            Report(WebLingoDiagnosticCodes.ThisOutsideMethod, "'super(…)' is only allowed in a constructor.", calleeSyntax.Span);
+            return new WebLingoBoundError(call.Span);
+        }
+        var values = BindSpread("array", call.Arguments, call.Span);
+        WebLingoBoundExpression callee;
+        switch (calleeSyntax)
+        {
+            case WebLingoSuperSyntax:
+                callee = BindSuper("constructor", calleeSyntax.Span);
+                break;
+            case WebLingoMemberAccessSyntax { Target: WebLingoSuperSyntax } superMember:
+                callee = BindSuper(superMember.Name, superMember.Span);
+                break;
+            case WebLingoMemberAccessSyntax member:
+                if (member.Name is "toString" or "equal") UseObject();
+                if (member.Name == "iterate") UseBuiltinClass("Iterator");
+                return new WebLingoBoundMethodCall(BindExpression(member.Target), member.Name, [values], call.Span) { IsSpread = true };
+            default:
+                callee = BindExpression(calleeSyntax);
+                break;
+        }
+        return new WebLingoBoundCall(callee, [values], call.Span) { IsSpread = true };
+    }
+
+    private static bool HasSpread(IReadOnlyList<WebLingoExpressionSyntax> elements)
+    {
+        foreach (var element in elements)
+        {
+            if (element is WebLingoSpreadSyntax) return true;
+        }
+        return false;
+    }
+
+    private static bool HasSpreadEntry(IReadOnlyList<WebLingoMapEntrySyntax> entries)
+    {
+        foreach (var entry in entries)
+        {
+            if (entry.IsSpread) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Elements some of which are spread, <c>[1, ...values, 2]</c> (section 3.5): a call of the spreading class's method,
+    /// <c>array</c> or <c>set</c>, its parts in order, the plain elements grouped in arrays of their own, and the values
+    /// spread, each of which it visits as <c>foreach</c> does.
+    /// </summary>
+    private WebLingoBoundExpression BindSpread(string method, IReadOnlyList<WebLingoExpressionSyntax> elements, WebLingoSourceSpan span)
+    {
+        var parts = new List<WebLingoBoundExpression>();
+        List<WebLingoBoundExpression>? group = null;
+        foreach (var element in elements)
+        {
+            if (element is not WebLingoSpreadSyntax spread)
+            {
+                (group ??= []).Add(BindExpression(element));
+                continue;
+            }
+            if (group is not null) parts.Add(new WebLingoBoundArrayLiteral(group, span));
+            group = null;
+            parts.Add(BindExpression(spread.Value));
+        }
+        if (group is not null) parts.Add(new WebLingoBoundArrayLiteral(group, span));
+        return new WebLingoBoundMethodCall(Reference(UseSpread(), span), method, parts, span);
+    }
+
+    /// <summary>A map's literal with spread entries, <c>{ ...defaults, size: 10 }</c> (section 3.5): the plain entries grouped in maps of their own.</summary>
+    private WebLingoBoundExpression BindSpreadMap(WebLingoMapLiteralSyntax map)
+    {
+        var parts = new List<WebLingoBoundExpression>();
+        List<(string, WebLingoBoundExpression)>? group = null;
+        foreach (var entry in map.Entries)
+        {
+            if (!entry.IsSpread)
+            {
+                (group ??= []).Add((entry.Key, BindExpression(entry.Value)));
+                continue;
+            }
+            if (group is not null) parts.Add(new WebLingoBoundMapLiteral(group, map.Span));
+            group = null;
+            parts.Add(BindExpression(entry.Value));
+        }
+        if (group is not null) parts.Add(new WebLingoBoundMapLiteral(group, map.Span));
+        return new WebLingoBoundMethodCall(Reference(UseSpread(), map.Span), "map", parts, map.Span);
+    }
 
     private bool CheckArity(string name, int arity, int count, WebLingoSourceSpan span, int? minimum = null)
     {
@@ -1815,6 +1963,24 @@ public sealed class WebLingoBinder
         _object = _builtinClasses[^1].Declaration;
         return local;
     }
+
+    /// <summary>
+    /// The class that spreads values (section 3.5), written in WebLingo, under a name no program can write: its static
+    /// <c>array</c>, <c>set</c> and <c>map</c> visit each of their parts as <c>foreach</c> does, a map's as its entries,
+    /// into a new collection. Its functions are native, so that an error in one is reported where the spread is.
+    /// </summary>
+    private WebLingoLocalSymbol UseSpread()
+    {
+        if (_spread is not null) return _spread;
+        var outer = _nativeCallees;
+        _nativeCallees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
+        _spread = BindBuiltinClass("spread:Spread", SpreadSource, UseObject());
+        _nativeCallees = outer;
+        return _spread;
+    }
+
+    private const string SpreadSource =
+        "class Spread { static array(...parts) { var result = []; foreach (var part in parts) { foreach (var item in part) result.push(item); } return result; } static set(...parts) { var result = #{}; foreach (var part in parts) { foreach (var item in part) result.add(item); } return result; } static map(...parts) { var result = {}; foreach (var part in parts) { foreach (var (key, value) in part) result[key] = value; } return result; } }";
 
     private void Report(string code, string message, WebLingoSourceSpan span) =>
         _diagnostics.Add(new WebLingoDiagnostic(code, WebLingoDiagnosticSeverity.Error, message, span) { Source = _source });

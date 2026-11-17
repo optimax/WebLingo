@@ -166,6 +166,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("function f(...rest = []) { }", "WL1001", 1, 20)]
     [InlineData("function f(...) { }", "WL1001", 1, 15)]
     [InlineData("function f(a, ...b) { } f();", "WL2006", 1, 25)]
+    [InlineData("var a = [1]; var m = Module.import(...a);", "WL1001", 1, 36)]
+    [InlineData("var a = [1]; var b = ...a;", "WL1001", 1, 22)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -577,6 +579,16 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var count = (...xs) => xs.length; class Box { constructor(...items) { this.items = items; } add(...more) { return this.items.length + more.length; } } var b = new Box(1, 2); writeLn([count(), count(1, 2), b.items, b.add(3, 4, 5)]);", "[0, 2, [1, 2], 5]")]
     [InlineData("async function later(first, ...others) { await null; return others; } function own(this, ...xs) { return xs; } writeLn([await later(1, 2, 3), own(null, 4, 5)]);", "[[2, 3], [4, 5]]")]
     [InlineData("function f(...xs) { return () => xs; } var g = f(1, \"two\"); writeLn([g(), g() == g()]);", "[[1, \"two\"], true]")]
+    // Spreading (the owner's answers, 16 November 2026): into calls and array, map and set literals; anything foreach visits.
+    [InlineData("function sum(...xs) { var t = 0; foreach (var x in xs) t += x; return t; } var a = [1, 2, 3]; writeLn([sum(...a), sum(0, ...a, 10), sum(...#{5}), sum(...[])]);", "[6, 16, 5, 0]")]
+    [InlineData("var a = [1, 2]; writeLn([[...a, 3, ...a], [0, ...\"hé\"], #{...a, 2, 3}]);", "[[1, 2, 3, 1, 2], [0, \"h\", \"é\"], #{1, 2, 3}]")]
+    [InlineData("var d = { size: 1, color: \"red\" }; var m = { ...d, size: 2, ...{ shape: \"round\" } }; writeLn([m[\"size\"], m[\"color\"], m[\"shape\"], m.length, d[\"size\"]]);", "[2, \"red\", \"round\", 3, 1]")]
+    [InlineData("class R { constructor(n) { this.n = n; } iterate() { return new I(this.n); } } class I { constructor(n) { this.i = 0; this.n = n; } hasNext() { return this.i < this.n; } next() { this.i += 1; return this.i; } } writeLn([...new R(3)]);", "[1, 2, 3]")]
+    [InlineData("class P { constructor(x, y) { this.x = x; this.y = y; } sum(...more) { return this.x + this.y + more.length; } } class Q extends P { constructor(...xs) { super(...xs); } } var q = new Q(...[1, 2]); writeLn([q.x, q.sum(...[7, 8])]);", "[1, 5]")]
+    [InlineData("writeLn(...[\"done\"]);", "done")]
+    [InlineData("var big = []; for (var i = 0; i < 1000; i++) big.push(i); function count(...xs) { return xs.length; } writeLn([count(...big), count(...big, ...big)]);", "[1000, 2000]")]
+    [InlineData("var log = []; function f(...xs) { return xs; } function t(x) { log.push(x); return [x]; } var r = f(...t(1), t(2), ...t(3)); writeLn([log, r]);", "[[1, 2, 3], [1, [2], 3]]")]
+    [InlineData("async function later(...xs) { await null; return xs.length; } writeLn(await later(...[1, 2, 3]));", "3")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -631,6 +643,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(Decimal.parse(\"1.5m\"));", "WL3001")]
     [InlineData("writeLn(DateTime.utc(2026, 1, 1).toZone(\"Nowhere/Atlantis\"));", "WL3001")]
     [InlineData("function g(a, ...rest) { return rest; } var h = g; h();", "WL2006")]
+    [InlineData("writeLn([...5]);", "WL3001")]
+    [InlineData("var m = { ...[1] };", "WL3001")]
+    [InlineData("function f(a) { return a; } var g = f; g(...[1, 2]);", "WL2006")]
+    [InlineData("writeLn(...[1, 2]);", "WL2006")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

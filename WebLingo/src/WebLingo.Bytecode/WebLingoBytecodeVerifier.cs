@@ -294,6 +294,12 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                     return $"its arguments, registers {c} to {(long)c + d - 1}, are not all in the function's {function.RegisterCount}.";
                 }
                 return null;
+            case WebLingoOpCode.CallSpread:
+            case WebLingoOpCode.NewSpread:
+                return Register(function, a, "destination") ?? Register(function, b, instruction.OpCode == WebLingoOpCode.NewSpread ? "class" : "callee")
+                    ?? Register(function, c, "array") ?? Unused(d);
+            case WebLingoOpCode.CallMethodSpread:
+                return Register(function, a, "destination") ?? Name(module, b) ?? Register(function, c, "target") ?? Register(function, d, "array");
             case WebLingoOpCode.Return:
                 return Unused(a, b, c, d);
             case WebLingoOpCode.GetMember:
@@ -594,6 +600,17 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                 var path = Unwritten(instruction.B, state, locals);
                 return path >= 0 || (instruction.D & 1) == 0 ? path : Unwritten(instruction.C, state, locals);
             }
+            case WebLingoOpCode.CallSpread:
+            case WebLingoOpCode.NewSpread:
+            {
+                var spreadCallee = Unwritten(instruction.B, state, locals);
+                return spreadCallee >= 0 ? spreadCallee : Unwritten(instruction.C, state, locals);
+            }
+            case WebLingoOpCode.CallMethodSpread:
+            {
+                var spreadTarget = Unwritten(instruction.C, state, locals);
+                return spreadTarget >= 0 ? spreadTarget : Unwritten(instruction.D, state, locals);
+            }
             case WebLingoOpCode.Rethrow:
             {
                 var exception = Unwritten(instruction.A, state, locals);
@@ -741,7 +758,8 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             or WebLingoOpCode.LoadCell or WebLingoOpCode.LoadCapture or WebLingoOpCode.MakeClosure or WebLingoOpCode.LoadBuiltin
             or WebLingoOpCode.Call or WebLingoOpCode.GetMember or WebLingoOpCode.CallMethod or WebLingoOpCode.GetIndex
             or WebLingoOpCode.NewArray or WebLingoOpCode.NewMap or WebLingoOpCode.NewSet or WebLingoOpCode.MakeClass or WebLingoOpCode.New
-            or WebLingoOpCode.GetSuper or WebLingoOpCode.TakeRest => instruction.A,
+            or WebLingoOpCode.GetSuper or WebLingoOpCode.TakeRest or WebLingoOpCode.CallSpread or WebLingoOpCode.CallMethodSpread
+            or WebLingoOpCode.NewSpread => instruction.A,
         _ => null
     };
 

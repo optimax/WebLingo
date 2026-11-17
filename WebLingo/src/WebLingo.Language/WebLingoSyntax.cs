@@ -292,7 +292,17 @@ public sealed record WebLingoArrayLiteralSyntax(IReadOnlyList<WebLingoExpression
 public sealed record WebLingoSetLiteralSyntax(IReadOnlyList<WebLingoExpressionSyntax> Elements, WebLingoSourceSpan Span) : WebLingoExpressionSyntax(Span);
 
 /// <summary>One entry of a map literal: its key, a string, written as a name or as a string literal, and its value.</summary>
-public sealed record WebLingoMapEntrySyntax(string Key, WebLingoSourceSpan KeySpan, WebLingoExpressionSyntax Value);
+public sealed record WebLingoMapEntrySyntax(string Key, WebLingoSourceSpan KeySpan, WebLingoExpressionSyntax Value)
+{
+    /// <summary>Whether it spreads a map's entries into the literal, <c>...defaults</c>, its key empty (section 3.5).</summary>
+    public bool IsSpread { get; init; }
+}
+
+/// <summary>
+/// <c>...values</c>, an element of a call's arguments or of an array's or a set's literal: what <c>foreach</c> visits in
+/// <paramref name="Value"/>, each item an argument or an element (section 3.5).
+/// </summary>
+public sealed record WebLingoSpreadSyntax(WebLingoExpressionSyntax Value, WebLingoSourceSpan Span) : WebLingoExpressionSyntax(Span);
 
 /// <summary><c>{ key: value, … }</c>, a new map (section 3.6); at the start of a statement, <c>{</c> opens a block.</summary>
 public sealed record WebLingoMapLiteralSyntax(IReadOnlyList<WebLingoMapEntrySyntax> Entries, WebLingoSourceSpan Span) : WebLingoExpressionSyntax(Span);

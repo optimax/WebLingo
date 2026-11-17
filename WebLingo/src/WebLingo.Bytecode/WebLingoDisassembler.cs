@@ -91,6 +91,10 @@ public static class WebLingoDisassembler
             WebLingoOpCode.MakeClass => $"MakeClass {Register(function, a)}, class{b}" + (d == 1 ? $" extends {Register(function, c)}" : ""),
             WebLingoOpCode.GetSuper => $"GetSuper {Register(function, a)}, {Register(function, b)}, {Register(function, c)}, {Constant(module, d)}",
             WebLingoOpCode.New => $"New {Register(function, a)}, {Register(function, b)}({Arguments(function, c, d)})",
+            WebLingoOpCode.CallSpread or WebLingoOpCode.NewSpread =>
+                $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}(...{Register(function, c)})",
+            WebLingoOpCode.CallMethodSpread =>
+                $"CallMethodSpread {Register(function, a)}, {Register(function, c)}.{Constant(module, b)}(...{Register(function, d)})",
             WebLingoOpCode.CallMethod => $"CallMethod {Register(function, a)}, {Register(function, c)}.{Constant(module, b)}" +
                                    $"({Arguments(function, c + 1, d)})",
             WebLingoOpCode.NewArray => $"NewArray {Register(function, a)}, [{Arguments(function, b, c)}]",

@@ -317,13 +317,25 @@ public sealed record WebLingoBoundSuper(WebLingoBoundExpression Class, WebLingoB
 
 /// <summary><c>new Class(arguments)</c>, checked when it runs.</summary>
 public sealed record WebLingoBoundNew(WebLingoBoundExpression Class, IReadOnlyList<WebLingoBoundExpression> Arguments, WebLingoSourceSpan Span)
-    : WebLingoBoundExpression(Span);
+    : WebLingoBoundExpression(Span)
+{
+    /// <summary>Whether its one argument is an array, whose elements are its arguments, <c>...values</c> (section 3.5).</summary>
+    public bool IsSpread { get; init; }
+}
 
 /// <summary><c>target.name(arguments)</c>, a method called, checked when it runs.</summary>
 public sealed record WebLingoBoundMethodCall(
     WebLingoBoundExpression Target, string Name, IReadOnlyList<WebLingoBoundExpression> Arguments, WebLingoSourceSpan Span)
-    : WebLingoBoundExpression(Span);
+    : WebLingoBoundExpression(Span)
+{
+    /// <summary>Whether its one argument is an array, whose elements are its arguments, <c>...values</c> (section 3.5).</summary>
+    public bool IsSpread { get; init; }
+}
 
 /// <summary>A call of any value, checked to be a function, with the right number of arguments, at run time.</summary>
 public sealed record WebLingoBoundCall(WebLingoBoundExpression Callee, IReadOnlyList<WebLingoBoundExpression> Arguments, WebLingoSourceSpan Span)
-    : WebLingoBoundExpression(Span);
+    : WebLingoBoundExpression(Span)
+{
+    /// <summary>Whether its one argument is an array, whose elements are its arguments, <c>...values</c> (section 3.5).</summary>
+    public bool IsSpread { get; init; }
+}

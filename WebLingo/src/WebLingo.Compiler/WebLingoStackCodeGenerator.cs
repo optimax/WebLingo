@@ -404,7 +404,8 @@ public sealed class WebLingoStackCodeGenerator
             case WebLingoIrCall call:
                 EmitValue(call.Callee);
                 foreach (var argument in call.Arguments) EmitValue(argument);
-                Emit(WebLingoStackOpCode.Call, call.Span, call.Arguments.Count);
+                if (call.IsSpread) Emit(WebLingoStackOpCode.CallSpread, call.Span);
+                else Emit(WebLingoStackOpCode.Call, call.Span, call.Arguments.Count);
                 return;
             case WebLingoIrNewArray array:
                 foreach (var element in array.Elements) EmitValue(element);
@@ -454,12 +455,14 @@ public sealed class WebLingoStackCodeGenerator
             case WebLingoIrNew created:
                 EmitValue(created.Class);
                 foreach (var argument in created.Arguments) EmitValue(argument);
-                Emit(WebLingoStackOpCode.New, created.Span, created.Arguments.Count);
+                if (created.IsSpread) Emit(WebLingoStackOpCode.NewSpread, created.Span);
+                else Emit(WebLingoStackOpCode.New, created.Span, created.Arguments.Count);
                 return;
             case WebLingoIrCallMethod call:
                 EmitValue(call.Target);
                 foreach (var argument in call.Arguments) EmitValue(argument);
-                Emit(WebLingoStackOpCode.CallMethod, call.Span, StringConstant(call.Name), call.Arguments.Count);
+                if (call.IsSpread) Emit(WebLingoStackOpCode.CallMethodSpread, call.Span, StringConstant(call.Name));
+                else Emit(WebLingoStackOpCode.CallMethod, call.Span, StringConstant(call.Name), call.Arguments.Count);
                 return;
             case WebLingoIrCallBuiltin call:
                 foreach (var argument in call.Arguments) EmitValue(argument);
@@ -779,6 +782,7 @@ public sealed class WebLingoStackCodeGenerator
             WebLingoStackOpCode.NewMap => (2 * a, 1),
             WebLingoStackOpCode.NewSet => (a, 1),
             WebLingoStackOpCode.CallMethod => (b + 1, 1),
+            WebLingoStackOpCode.CallSpread or WebLingoStackOpCode.CallMethodSpread or WebLingoStackOpCode.NewSpread => (2, 1),
             WebLingoStackOpCode.GetIndex => (2, 1),
             WebLingoStackOpCode.StoreIndex => (3, a),
             WebLingoStackOpCode.Negate or WebLingoStackOpCode.Plus or WebLingoStackOpCode.Not or WebLingoStackOpCode.CheckBoolean => (1, 1),

@@ -335,15 +335,27 @@ public sealed record WebLingoIrGetSuper(WebLingoIrExpression Class, WebLingoIrEx
 
 /// <summary><c>new Class(arguments)</c>: the class, then the arguments, evaluated; an instance, its constructor run.</summary>
 public sealed record WebLingoIrNew(WebLingoIrExpression Class, IReadOnlyList<WebLingoIrExpression> Arguments, WebLingoSourceSpan Span)
-    : WebLingoIrExpression(Span);
+    : WebLingoIrExpression(Span)
+{
+    /// <summary>Whether its one argument is an array, whose elements are its arguments, <c>...values</c> (section 3.5).</summary>
+    public bool IsSpread { get; init; }
+}
 
 /// <summary><c>target.name(arguments)</c>: the target, then the arguments, evaluated, and the method called.</summary>
 public sealed record WebLingoIrCallMethod(WebLingoIrExpression Target, string Name, IReadOnlyList<WebLingoIrExpression> Arguments, WebLingoSourceSpan Span)
-    : WebLingoIrExpression(Span);
+    : WebLingoIrExpression(Span)
+{
+    /// <summary>Whether its one argument is an array, whose elements are its arguments, <c>...values</c> (section 3.5).</summary>
+    public bool IsSpread { get; init; }
+}
 
 /// <summary>Calls the callee's value, which must be a function taking as many arguments as are given.</summary>
 public sealed record WebLingoIrCall(WebLingoIrExpression Callee, IReadOnlyList<WebLingoIrExpression> Arguments, WebLingoSourceSpan Span)
-    : WebLingoIrExpression(Span);
+    : WebLingoIrExpression(Span)
+{
+    /// <summary>Whether its one argument is an array, whose elements are its arguments, <c>...values</c> (section 3.5).</summary>
+    public bool IsSpread { get; init; }
+}
 
 public sealed record WebLingoIrCallBuiltin(int Builtin, IReadOnlyList<WebLingoIrExpression> Arguments, WebLingoSourceSpan Span)
     : WebLingoIrExpression(Span);
