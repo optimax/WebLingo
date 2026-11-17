@@ -2814,3 +2814,11 @@ A1: (c)
 2026-11-16 (Claude): A1 recorded as approved in the specification, sections 1.1 and 6.12, and built: a layout's and a component's `param request;` and `param response;` are module parameters whose default is the host's instance, neither the template parser's check of a layout's values nor the binder's of an import's asking for them; so a layout, and what it includes, read the request; described in the WASP User Manual, section 9. Tested with a layout having the host's request, its include reading it, and a component having the host's, and its caller's.
 
 Done (Claude, 2026-11-16, `5a06d7a`): layouts and components have the request and the response. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; the committed site, served by `wasp` from a copy, gives every page; `wasp serve` tried on a site of each arrangement, on Windows only; Linux and IIS not tried.
+
+## [DONE] Add Missing Features
+
+Add from `weblingo-language-reference.md` the items listed in "What is not in the language yet" each as a separate to-do task here. Enhance the descriptions of these tasks.
+
+2026-11-16 (Claude): each item of the Language Reference's "What is not in the language yet" is a task of its own in `TO-DO.md`, eighteen of them, from `%` to network access, each saying what the specification already decides, what it touches, and its open decisions as questions, so each is marked [QUESTION].
+
+Done (Claude, 2026-11-16): the tasks added to `TO-DO.md`, which is left uncommitted while their questions are open. Main's checks: none needed, nothing of the solution changed.
