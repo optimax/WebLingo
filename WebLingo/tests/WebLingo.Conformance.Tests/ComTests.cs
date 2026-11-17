@@ -125,7 +125,7 @@ public sealed class ComTests : IDisposable
             The COM object has no member 'Nonsense'.
             ["ADODB.Connection", true]
             A function cannot be given to a COM object.
-            WL3001
+            WL3018
 
             """.ReplaceLineEndings("\n"), ""), Run(program));
     }
@@ -135,18 +135,18 @@ public sealed class ComTests : IDisposable
     {
         const string program = """
             import com from "windows:com";
-            try { com.create("WScript.Shell"); } catch (TypeError e) { writeLn(e.message); }
-            try { com.get("winmgmts:"); } catch (TypeError e) { writeLn(e.message); }
+            try { com.create("WScript.Shell"); } catch (ComPermissionError e) { writeLn(e.code + " " + e.message); }
+            try { com.get("winmgmts:"); } catch (ComPermissionError e) { writeLn(e.code + " " + e.message); }
             """;
         Assert.Equal(("""
-            'WScript.Shell' is not a COM object this application may make: its configuration's "com" does not allow it.
-            'winmgmts:' is not a COM object this application may make: its configuration's "com" does not allow it.
+            WL3018 'WScript.Shell' is not a COM object this application may make: its configuration's "com" does not allow it.
+            WL3018 'winmgmts:' is not a COM object this application may make: its configuration's "com" does not allow it.
 
             """.ReplaceLineEndings("\n"), ""), Run(program));
         File.Delete(Path.Combine(_folder, "weblingo.config"));
         Assert.Equal(("""
-            'WScript.Shell' is not a COM object this application may make: its configuration's "com" does not allow it.
-            'winmgmts:' is not a COM object this application may make: its configuration's "com" does not allow it.
+            WL3018 'WScript.Shell' is not a COM object this application may make: its configuration's "com" does not allow it.
+            WL3018 'winmgmts:' is not a COM object this application may make: its configuration's "com" does not allow it.
 
             """.ReplaceLineEndings("\n"), ""), Run(program));
     }

@@ -1605,6 +1605,8 @@ An error the runtime raises becomes an instance of a class extending `Error`, wi
 | `DatabaseError` | WL3015 | a statement a database refuses, or a database that cannot be opened |
 | `PermissionError` | WL3016 | a file a site's scripts may not reach, outside the folders its `wasp.config` allows |
 | `ComError` | WL3012 | a COM object's failure, on Windows (`windows:com`) |
+| `NetworkPermissionError` | WL3017 | a host a script's configuration does not let it reach |
+| `ComPermissionError` | WL3018 | a COM object a script's configuration does not let it make |
 
 Two errors cannot be caught, and always end the program: running past the execution's limits (WL3003) and being
 cancelled (WL3004).
@@ -2021,6 +2023,8 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL3014 | a host that cannot be reached, or a connection that fails |
 | WL3015 | a statement a database refuses, or a database that cannot be opened |
 | WL3016 | a file a site's scripts may not reach |
+| WL3017 | a host a script's configuration does not let it reach |
+| WL3018 | a COM object a script's configuration does not let it make |
 | **WL4xxx** | **bytecode** |
 | WL4001 | bytecode that fails verification, such as a damaged `.wlbc` |
 | WL4002 | a program too large for the bytecode |

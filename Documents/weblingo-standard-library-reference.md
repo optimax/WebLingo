@@ -295,6 +295,8 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `DatabaseError` | WL3015 | a statement a database refuses, a database that cannot be opened |
 | `PermissionError` | WL3016 | a file or a folder a site's scripts may not reach, outside the folders its `wasp.config` allows |
 | `ComError` | WL3012 | a COM object's failure, with its `number`, `source` and `description` (section 21) |
+| `NetworkPermissionError` | WL3017 | a host the configuration's `"network"` does not let a script reach |
+| `ComPermissionError` | WL3018 | a COM object the configuration's `"com"` does not let a script make (section 21) |
 
 ```javascript
 try {
@@ -574,7 +576,7 @@ HTTP requests to other servers. Each function is asynchronous, a task of the res
 | `"body"` | its body as text, in the charset its `Content-Type` names, UTF-8 unless it names another |
 | `"bytes"` | its body as bytes |
 
-A status that is not a success, `404`, is a response as any other. A redirect is given as it is, its status `301` or `302` and its `"location"`, not followed, so that a script reaches only the hosts it names. A request waits at most 30 seconds to connect and 100 seconds in all, and a body is at most 64 MB. An address that is not an `http` or `https` one, and a host the script may not reach, are WL3001; a host that cannot be reached, a connection that fails and a request that takes too long are a `NetworkError`, WL3014. A script `weblingo` runs may reach any host, and a site's only those its `wasp.config` allows, `{ "network": { "allow": ["api.example.com"] } }`.
+A status that is not a success, `404`, is a response as any other. A redirect is given as it is, its status `301` or `302` and its `"location"`, not followed, so that a script reaches only the hosts it names. A request waits at most 30 seconds to connect and 100 seconds in all, and a body is at most 64 MB. An address that is not an `http` or `https` one is WL3001, and a host the script may not reach a `NetworkPermissionError`, WL3017; a host that cannot be reached, a connection that fails and a request that takes too long are a `NetworkError`, WL3014. A script `weblingo` runs may reach any host, and a site's only those its `wasp.config` allows, `{ "network": { "allow": ["api.example.com"] } }`.
 
 Given a server on this machine, at port 8080, that has `teas.json`, `[{"name": "Sencha", "price": 4.5}, {"name": "Genmaicha", "price": 3.75}]`, and `menu.txt`, but no `green.json`:
 
@@ -616,7 +618,7 @@ TCP connections to other servers, through the native class `Socket`. Each operat
 | `socket.write(data)` | sends `data`, a string, as UTF-8, or bytes |
 | `socket.dispose()` | closes it, as `using` does |
 
-A host the script may not reach is WL3001, as for `std:http`; a host that cannot be reached, and a connection that fails, are a `NetworkError`, WL3014. Given the server above:
+A host the script may not reach is a `NetworkPermissionError`, WL3017, as for `std:http`; a host that cannot be reached, and a connection that fails, are a `NetworkError`, WL3014. Given the server above:
 
 ```javascript
 import { Socket } from "std:net";
@@ -809,7 +811,7 @@ ProgID, CLSID or moniker, `"*"` allowing any:
 { "com": { "allow": ["ADODB.Connection", "ADODB.Recordset"] } }
 ```
 
-Any other is WL3001. Values go to COM and come back as their kinds: `null` as `VT_NULL` and back; Booleans; integers,
+Any other is a `ComPermissionError`, WL3018. Values go to COM and come back as their kinds: `null` as `VT_NULL` and back; Booleans; integers,
 as `VT_I4` or `VT_I8`; numbers; decimals, ADO's `MONEY` and `DECIMAL` among them; strings; `Bytes`, ADO's binary fields;
 dates, at their time on the server's clocks; arrays, a `SAFEARRAY` of several dimensions coming back as arrays of
 arrays; and objects, as `ComObject`s. A member the object does not have is a `MemberError`, WL3006, and a failure a

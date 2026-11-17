@@ -29,7 +29,9 @@ internal static class WebLingoPrelude
         ("TimeoutError", WebLingoDiagnosticCodes.Timeout), ("IOError", WebLingoDiagnosticCodes.IOFailure),
         ("DivisionByZeroError", WebLingoDiagnosticCodes.DivisionByZero), ("NetworkError", WebLingoDiagnosticCodes.NetworkFailure),
         ("DatabaseError", WebLingoDiagnosticCodes.DatabaseFailure), ("PermissionError", WebLingoDiagnosticCodes.PermissionDenied),
-        ("ComError", WebLingoDiagnosticCodes.ComFailure)
+        ("ComError", WebLingoDiagnosticCodes.ComFailure),
+        ("NetworkPermissionError", WebLingoDiagnosticCodes.NetworkPermissionDenied),
+        ("ComPermissionError", WebLingoDiagnosticCodes.ComPermissionDenied)
     ];
 
     public static bool IsValueClass(string name)

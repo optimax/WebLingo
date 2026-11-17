@@ -9,8 +9,8 @@ namespace WebLingo.StdLib.Net;
 /// (<see cref="WebLingoHeap.Network"/>), the class <c>Socket</c>, made by <c>Socket.connect(host, port)</c>, a task of a
 /// connection; its <c>read()</c>, a task of the bytes that have come, waiting for at least one, <c>null</c> at the end;
 /// its <c>write(data)</c>, a task, the data a string, sent as UTF-8, or bytes; and its <c>dispose()</c>, which closes it,
-/// once. Each operation runs off the worker. A host the application may not reach is WL3001; a connection that fails a
-/// <c>NetworkError</c> (WL3014).
+/// once. Each operation runs off the worker. A host the application may not reach is a <c>NetworkPermissionError</c>
+/// (WL3017); a connection that fails a <c>NetworkError</c> (WL3014).
 /// </summary>
 public sealed class WebLingoNetModule : IWebLingoNativeModule
 {
@@ -108,7 +108,12 @@ public sealed class WebLingoNetModule : IWebLingoNativeModule
     }
 
     private static WebLingoRuntimeError? Failed(Exception exception) => exception is WebLingoNetworkException failure
-        ? new WebLingoRuntimeError(failure.Kind == WebLingoNetworkErrorKind.Failed ? WebLingoDiagnosticCodes.NetworkFailure : WebLingoDiagnosticCodes.InvalidOperation,
+        ? new WebLingoRuntimeError(failure.Kind switch
+            {
+                WebLingoNetworkErrorKind.Failed => WebLingoDiagnosticCodes.NetworkFailure,
+                WebLingoNetworkErrorKind.NotAllowed => WebLingoDiagnosticCodes.NetworkPermissionDenied,
+                _ => WebLingoDiagnosticCodes.InvalidOperation
+            },
             Capitalized(failure.Message) + ".")
         : null;
 

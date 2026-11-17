@@ -744,7 +744,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"network"` | the hosts the site's pages and handlers may reach, through `std:http` and `std:net`: `{ "allow": ["api.example.com"] }` | none |
 | `"databases"` | the site's databases, each a name its scripts open it by and its connection string: `{ "fish": "sqlite:../database/fish.db" }` | none |
 | `"files"` | the folders the site's pages and handlers may read, and read and write, through `std:fs`: `{ "read": ["../data"], "write": ["../uploads"] }` | none |
-| `"com"` | the COM objects the site's pages and handlers may make, on Windows, through `windows:com`: `{ "allow": ["ADODB.Connection"] }`, `"*"` any | none |
+| `"com"` | the COM objects the site's pages and handlers may make, on Windows, through `windows:com`: `{ "allow": ["ADODB.Connection"] }`, `"*"` any; any other a `ComPermissionError`, WL3018 | none |
 
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
 which. `wasp serve` reads the file when it starts; after changing it, start `wasp serve`, or the IIS site, again.
@@ -756,7 +756,7 @@ address, `api.example.com` or `127.0.0.1`, at any of its ports, its letters' cas
 { "network": { "allow": ["api.example.com", "localhost"] } }
 ```
 
-A request to any other host is an error where the script makes it, WL3001,
+A request to any other host is a `NetworkPermissionError`, WL3017, where the script makes it,
 `'example.com' is not a host this application may reach.`, which a `catch` may catch; without the setting, a site
 reaches no host. A script that `weblingo` runs reaches any.
 

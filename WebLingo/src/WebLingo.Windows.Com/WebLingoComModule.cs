@@ -7,7 +7,7 @@ namespace WebLingo.Windows.Com;
 /// <c>windows:com</c>, COM's objects on Windows (specification, section 3.10), a native module installed with the runtime
 /// as <c>windows/com.dll</c> on Windows: <c>com.create(progId)</c>, by a ProgID or a CLSID, and <c>com.get(moniker)</c>,
 /// each giving a <c>ComObject</c>, only for what the configuration's <c>"com"</c> allows, by name, ignoring case, or
-/// <c>"*"</c> any; a <c>ComObject</c>'s members through its <c>IDispatch</c>, written as any member is, its fallback
+/// <c>"*"</c> any, anything else a <c>ComPermissionError</c> (WL3018); a <c>ComObject</c>'s members through its <c>IDispatch</c>, written as any member is, its fallback
 /// reading, assigning and calling those it does not declare (<see cref="WebLingoNativeFallback"/>), a property that takes
 /// arguments read as a call, its default member its indexer, <c>x[k]</c>, a member hidden by one of its own reached by its
 /// <c>call(name, arguments)</c>, <c>get(name)</c> and <c>set(name, value)</c>; <c>foreach</c> through its <c>iterate()</c>,
@@ -77,7 +77,7 @@ internal sealed unsafe class WebLingoComObjects(WebLingoNativeClass objects, Web
                 if (each == "*" || string.Equals(each, name, StringComparison.OrdinalIgnoreCase)) return true;
             }
         }
-        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.ComPermissionDenied,
             $"'{name}' is not a COM object this application may make: its configuration's \"com\" does not allow it.");
         return false;
     }

@@ -11,8 +11,9 @@ namespace WebLingo.StdLib.Http;
 /// a map: its <c>"status"</c>, an integer; its <c>"headers"</c>, a map of each header's name, in lower case, to its
 /// value; its <c>"body"</c>, its text, in the charset its <c>Content-Type</c> names, UTF-8 unless it names another the
 /// core knows; and its <c>"bytes"</c>. A body to send is a string, sent as UTF-8, or bytes; headers, a map of strings. A
-/// redirect is given as it is, not followed. A host the application may not reach, and an address that is not an
-/// <c>http</c> or <c>https</c> one, are WL3001; a request that fails a <c>NetworkError</c> (WL3014).
+/// redirect is given as it is, not followed. A host the application may not reach is a <c>NetworkPermissionError</c>
+/// (WL3017), an address that is not an <c>http</c> or <c>https</c> one WL3001, and a request that fails a
+/// <c>NetworkError</c> (WL3014).
 /// </summary>
 public sealed class WebLingoHttpModule : IWebLingoNativeModule
 {
@@ -135,7 +136,12 @@ public sealed class WebLingoHttpModule : IWebLingoNativeModule
     }
 
     private static WebLingoRuntimeError? Failed(Exception exception) => exception is WebLingoNetworkException failure
-        ? new WebLingoRuntimeError(failure.Kind == WebLingoNetworkErrorKind.Failed ? WebLingoDiagnosticCodes.NetworkFailure : WebLingoDiagnosticCodes.InvalidOperation,
+        ? new WebLingoRuntimeError(failure.Kind switch
+            {
+                WebLingoNetworkErrorKind.Failed => WebLingoDiagnosticCodes.NetworkFailure,
+                WebLingoNetworkErrorKind.NotAllowed => WebLingoDiagnosticCodes.NetworkPermissionDenied,
+                _ => WebLingoDiagnosticCodes.InvalidOperation
+            },
             Capitalized(failure.Message) + ".")
         : null;
 

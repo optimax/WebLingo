@@ -105,6 +105,16 @@ public static class WebLingoDiagnosticCodes
     /// device's (proposed, the owner's answer, 17 November 2026; section 7.13, "File capabilities"; <c>PermissionError</c>).
     /// </summary>
     public const string PermissionDenied = "WL3016";
+    /// <summary>
+    /// A host a site's or a script's configuration does not let it reach, by <c>std:http</c> or <c>std:net</c> (proposed,
+    /// the owner's answer, 17 November 2026, a code of its own; section 7.9; <c>NetworkPermissionError</c>).
+    /// </summary>
+    public const string NetworkPermissionDenied = "WL3017";
+    /// <summary>
+    /// A COM object an application's configuration does not let it make or bind to (proposed, the owner's answer, 17
+    /// November 2026, a code of its own; section 3.10; <c>ComPermissionError</c>).
+    /// </summary>
+    public const string ComPermissionDenied = "WL3018";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";
