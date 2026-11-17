@@ -250,6 +250,34 @@ public sealed class WaspServeTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Under <c>wasp serve</c>, as under <c>wasp run</c>, a site's scripts reach only the folders its <c>wasp.config</c>
+    /// allows, a relative path from its root (specification, section 7.13, "File capabilities"), while the site's own pages
+    /// are read as before.
+    /// </summary>
+    [Fact]
+    public async Task ASitesScriptsReachOnlyTheFoldersItsConfigurationAllows()
+    {
+        Write("wasp.config", "{ \"files\": { \"read\": [\"data\"] } }");
+        Write("data/teas.txt", "Sencha");
+        Write("reads.wasp", "<% import fs from \"std:fs\"; %><%= await fs.readText(\"data/teas.txt\") %>|" +
+                            "<% try { await fs.readText(\"index.wasp\"); } catch (PermissionError e) { %><%= e.code %><% } %>");
+        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        Assert.True(server is not null, error);
+        await server.StartAsync();
+        try
+        {
+            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            using var client = new HttpClient { BaseAddress = new Uri(address) };
+            Assert.Equal("Sencha|WL3016", await client.GetStringAsync("/reads"));
+            Assert.Contains("<h1>Hello</h1>", await client.GetStringAsync("/"));
+        }
+        finally
+        {
+            await server.StopAsync();
+        }
+    }
+
     [Fact]
     public void TheConfigurationNamesTheEnvironment()
     {

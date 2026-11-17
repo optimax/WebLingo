@@ -42,6 +42,12 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// <summary>The server's own time zone, a date's local time's; without one, UTC.</summary>
     public WebLingo.Platform.Abstractions.IWebLingoTimeZone? TimeZone { get; init; }
 
+    /// <summary>
+    /// The files its scripts reach, through <c>std:fs</c>: those in the folders its configuration allows (section 7.13, "File
+    /// capabilities"); <see cref="FileSystem"/>, through which the application's own are read, without one.
+    /// </summary>
+    public IWebLingoFileSystem? ScriptFileSystem { get; init; }
+
     /// <summary>The network its scripts may reach, the hosts its configuration allows; none without one (section 7.9).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoNetwork? Network { get; init; }
 

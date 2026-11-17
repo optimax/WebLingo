@@ -369,7 +369,7 @@ public static class WebLingoCommandLine
 
     /// <summary>What a command line gives the programs it compiles and runs: its built-ins, its native modules and its files.</summary>
     private sealed record Host(WebLingoBuiltinRegistry Services, WebLingoNativeModuleLoader Native, WebLingoCompilerOptions Options,
-        FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoNetwork Network, IWebLingoDatabases Databases);
+        FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoNetwork Network, IWebLingoDatabases Databases, IWebLingoFileSystem Files);
 
     /// <summary>
     /// The host for the file <paramref name="path"/>, whose program's own file is named <paramref name="mainName"/>: its
@@ -380,7 +380,7 @@ public static class WebLingoCommandLine
         TextWriter output, TextWriter error)
     {
         if (!WebLingoSchemes.TryLoad(path, program.Configuration, givenSchemes, out var schemes, out var allowedHosts, out var databases,
-            out var wrongConfiguration))
+            out var folders, out var wrongConfiguration))
         {
             error.WriteLine(wrongConfiguration);
             return null;
@@ -404,11 +404,13 @@ public static class WebLingoCommandLine
             declarations.Add(new WebLingoBuiltinDeclaration(builtin.Name, builtin.Arity));
         }
         var resolver = new FileResolver(mainName);
-        // Any host for a script's, only those its configuration allows for a page's (section 7.9); the databases it names,
-        // their files from its folder (section 7.11).
+        // Any host and any file for a script's, only those its configuration allows for a page's (sections 7.9 and 7.13); the
+        // databases it names, their files from its folder (section 7.11), a script's own checked as its files are.
+        var folder = Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".";
+        var files = program.ReachesAnyFile ? null : new DotNetFileCapabilities(program.Root ?? folder, folders.Read, folders.Write);
         return new Host(services, native, new WebLingoCompilerOptions(declarations) { Resolver = resolver, Native = native }, resolver,
-            textOutput, new DotNetNetwork(program.ReachesAnyHost ? null : allowedHosts),
-            new DotNetDatabases(databases, Path.GetDirectoryName(Path.GetFullPath(path)) ?? "."));
+            textOutput, new DotNetNetwork(program.ReachesAnyHost ? null : allowedHosts), new DotNetDatabases(databases, folder) { Files = files },
+            new DotNetFileSystem(files));
     }
 
     private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters) =>
@@ -420,7 +422,7 @@ public static class WebLingoCommandLine
             TimeZone = new DotNetTimeZone(),
             Output = host.Output,
             Parameters = parameters,
-            FileSystem = new DotNetFileSystem(),
+            FileSystem = host.Files,
             Network = host.Network,
             Databases = host.Databases,
             SchedulerHost = new DotNetSchedulerHost()

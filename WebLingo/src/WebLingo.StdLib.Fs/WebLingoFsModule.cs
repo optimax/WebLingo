@@ -208,10 +208,16 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
             }, out result, out error);
     }
 
-    private static WebLingoRuntimeError Failed(string doing, string path, WebLingoFileSystemException failure) =>
-        failure.Kind == WebLingoFileErrorKind.UnknownEncoding
-            ? new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'{path}' cannot be {doing}: {failure.Message}.")
-            : new WebLingoRuntimeError(WebLingoDiagnosticCodes.IOFailure, $"'{path}' cannot be {doing}: {failure.Message}.");
+    /// <summary>
+    /// A file system's failure as a runtime error: an encoding that is not there a <c>TypeError</c>; a path the site may not
+    /// reach a <c>PermissionError</c> (WL3016, section 7.13, "File capabilities"); any other an <c>IOError</c>.
+    /// </summary>
+    private static WebLingoRuntimeError Failed(string doing, string path, WebLingoFileSystemException failure) => new(failure.Kind switch
+    {
+        WebLingoFileErrorKind.UnknownEncoding => WebLingoDiagnosticCodes.InvalidOperation,
+        WebLingoFileErrorKind.NotAllowed => WebLingoDiagnosticCodes.PermissionDenied,
+        _ => WebLingoDiagnosticCodes.IOFailure
+    }, $"'{path}' cannot be {doing}: {failure.Message}.");
 
     private static bool TryFileSystem(WebLingoHeap heap, out IWebLingoFileSystem fs, out WebLingoRuntimeError? error)
     {

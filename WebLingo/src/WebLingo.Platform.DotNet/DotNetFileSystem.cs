@@ -4,14 +4,19 @@ namespace WebLingo.Platform.DotNet;
 
 /// <summary>
 /// The file system on .NET (section 7.4): <see cref="File"/>, <see cref="Directory"/> and streams, adapter-only (section
-/// 7.14); each failure translated into a portable category, its reason naming no path (WL-P015). Stateless, and so safe
-/// on several threads at once.
+/// 7.14); each failure translated into a portable category, its reason naming no path (WL-P015). Given a site's
+/// capabilities (section 7.13, "File capabilities"), each path is the real path they resolve it to, if the site may reach
+/// it, for writing too where the operation writes; without them, any path the process may reach, a relative one from its
+/// current folder. Stateless, and so safe on several threads at once.
 /// </summary>
-public sealed class DotNetFileSystem : IWebLingoFileSystem
+public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = null) : IWebLingoFileSystem
 {
+    /// <summary>The path to reach for <paramref name="path"/>: the real path the capabilities allow, or the path itself without them.</summary>
+    private string Reach(string path, bool write) => capabilities is null ? path : capabilities.Resolve(path, write);
+
     public string ReadText(string path, string encoding) => Translated(() =>
     {
-        using var reader = Reader(path, encoding);
+        using var reader = Reader(Reach(path, false), encoding);
         return reader.ReadToEnd();
     });
 
@@ -27,43 +32,49 @@ public sealed class DotNetFileSystem : IWebLingoFileSystem
 
     public void WriteText(string path, string text, string encoding, bool append) => Translated(() =>
     {
-        using var writer = new StreamWriter(path, append, EncodingOf(encoding));
+        using var writer = new StreamWriter(Reach(path, true), append, EncodingOf(encoding));
         writer.Write(text);
         return true;
     });
 
-    public bool Exists(string path) => Translated(() => File.Exists(path) || Directory.Exists(path));
+    public bool Exists(string path) => Translated(() =>
+    {
+        var reached = Reach(path, false);
+        return File.Exists(reached) || Directory.Exists(reached);
+    });
 
-    public bool IsFolder(string path) => Translated(() => Directory.Exists(path));
+    public bool IsFolder(string path) => Translated(() => Directory.Exists(Reach(path, false)));
 
     public void Remove(string path) => Translated(() =>
     {
+        var reached = Reach(path, true);
         // File.Delete does nothing for a file that is not there, which is an error here.
-        if (!File.Exists(path)) throw new FileNotFoundException();
-        File.Delete(path);
+        if (!File.Exists(reached)) throw new FileNotFoundException();
+        File.Delete(reached);
         return true;
     });
 
     public IReadOnlyList<string> List(string path) => Translated(() =>
     {
         var names = new List<string>();
-        foreach (var entry in Directory.EnumerateFileSystemEntries(path)) names.Add(Path.GetFileName(entry));
+        foreach (var entry in Directory.EnumerateFileSystemEntries(Reach(path, false))) names.Add(Path.GetFileName(entry));
         names.Sort(StringComparer.Ordinal);
         return (IReadOnlyList<string>)names;
     });
 
-    public void MakeFolder(string path) => Translated(() => Directory.CreateDirectory(path));
+    public void MakeFolder(string path) => Translated(() => Directory.CreateDirectory(Reach(path, true)));
 
     public void RemoveFolder(string path) => Translated(() =>
     {
-        if (Directory.EnumerateFileSystemEntries(path).Any()) throw new WebLingoFileSystemException(WebLingoFileErrorKind.NotEmpty, "it is not empty");
-        Directory.Delete(path);
+        var reached = Reach(path, true);
+        if (Directory.EnumerateFileSystemEntries(reached).Any()) throw new WebLingoFileSystemException(WebLingoFileErrorKind.NotEmpty, "it is not empty");
+        Directory.Delete(reached);
         return true;
     });
 
     public IWebLingoFile Open(string path, WebLingoFileMode mode, string encoding) => Translated<IWebLingoFile>(() => mode == WebLingoFileMode.Read
-        ? new DotNetFile(Reader(path, encoding), null)
-        : new DotNetFile(null, new StreamWriter(path, mode == WebLingoFileMode.Append, EncodingOf(encoding))));
+        ? new DotNetFile(Reader(Reach(path, false), encoding), null)
+        : new DotNetFile(null, new StreamWriter(Reach(path, true), mode == WebLingoFileMode.Append, EncodingOf(encoding))));
 
     /// <summary>
     /// An encoding by its name, as .NET names them (<c>utf-8</c>, <c>utf-16</c>, <c>utf-16BE</c>, <c>utf-32</c>,

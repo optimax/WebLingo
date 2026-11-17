@@ -742,6 +742,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"schemes"` | folders of native modules, each a name and a folder: `{ "native": "C:/WebLingo/native" }` | `std`, WebLingo's own |
 | `"network"` | the hosts the site's pages and handlers may reach, through `std:http` and `std:net`: `{ "allow": ["api.example.com"] }` | none |
 | `"databases"` | the site's databases, each a name its scripts open it by and its connection string: `{ "fish": "sqlite:../database/fish.db" }` | none |
+| `"files"` | the folders the site's pages and handlers may read, and read and write, through `std:fs`: `{ "read": ["../data"], "write": ["../uploads"] }` | none |
 
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
 which. `wasp serve` reads the file when it starts; after changing it, start `wasp serve`, or the IIS site, again.
@@ -756,6 +757,29 @@ address, `api.example.com` or `127.0.0.1`, at any of its ports, its letters' cas
 A request to any other host is an error where the script makes it, WL3001,
 `'example.com' is not a host this application may reach.`, which a `catch` may catch; without the setting, a site
 reaches no host. A script that `weblingo` runs reaches any.
+
+A site reaches files only in the folders its `"files"` lists: those in `"read"` to read, list and look for, those in
+`"write"` to read and write as well. A folder in the list is from the configuration's folder when it is relative, and
+a path in a script from the site's root, its folder, under `wasp serve` and IIS alike:
+
+```json
+{ "files": { "read": ["../data"], "write": ["../uploads"] } }
+```
+
+```javascript
+var teas = await fs.readText("../data/teas.json");        // read, as ../data is listed
+await fs.writeText("../uploads/order.txt", order);         // written, as ../uploads is listed to be written
+await fs.writeText("../data/teas.json", "[]");             // a PermissionError: ../data is listed to be read only
+```
+
+A path is checked by where it really leads: `..`, a link and a junction followed, its letters' case aside on Windows;
+and a Windows device's name, `NUL` or `COM1`, is never reached. A path the site may not reach is a `PermissionError`,
+WL3016, where the script tries it, which a `catch` may catch: `'../data/teas.json' cannot be written: it is not in a
+folder this site may write.`; without the setting, a site reaches no file. A SQLite database a script names by its
+own connection string, `Database.open("sqlite:../uploads/orders.db")`, is checked as a file is, to be written unless
+it is opened read-only, `Mode=ReadOnly`; one `"databases"` names is the site's own, and is not. Keep the folders outside
+the site's folder, as a database is, since `wasp` serves a file in it to whoever asks for it. A script that `weblingo`
+runs reaches any file, a relative path from the current folder.
 
 A database's connection string is its provider's name, a colon, and what the provider reads: SQLite's, a file's
 path, from the configuration's folder when it is relative. Keep the database outside the site's folder,

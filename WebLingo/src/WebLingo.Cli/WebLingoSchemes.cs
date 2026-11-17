@@ -14,7 +14,10 @@ namespace WebLingo.Cli;
 /// more than 0 (specification, section 6.12, "Streaming"), which only <c>wasp serve</c> reads; and the hosts its scripts may
 /// reach, <c>"network": { "allow": ["api.example.com"] }</c>, which <c>wasp</c> reads, <c>weblingo</c>'s scripts reaching
 /// any (section 7.9); and its databases, each a name and a connection string, a provider's name, a colon, and what the
-/// provider reads, <c>"databases": { "shop": "sqlite:../data/shop.db" }</c>, which both read (section 7.11).
+/// provider reads, <c>"databases": { "shop": "sqlite:../data/shop.db" }</c>, which both read (section 7.11); and the
+/// folders its scripts may read and write, <c>"files": { "read": ["../data"], "write": ["../uploads"] }</c>, a relative
+/// folder from the file's folder, which <c>wasp</c> reads, <c>weblingo</c>'s scripts reaching any file (section 7.13,
+/// "File capabilities").
 /// </summary>
 public static class WebLingoSchemes
 {
@@ -27,17 +30,17 @@ public static class WebLingoSchemes
     /// </summary>
     public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? error) =>
-        TryLoad(program, configuration, given, out schemes, out _, out _, out error);
+        TryLoad(program, configuration, given, out schemes, out _, out _, out _, out error);
 
     /// <summary>
-    /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, and its databases,
-    /// each name's connection string.
+    /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, its databases,
+    /// each name's connection string, and the folders its scripts may read and write, none when it names none.
     /// </summary>
     public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out IReadOnlyDictionary<string, string> databases,
-        out string? error) =>
+        out WebLingoFileFolders files, out string? error) =>
         TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
-            out databases, out error);
+            out databases, out files, out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
@@ -46,21 +49,23 @@ public static class WebLingoSchemes
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out string? error) =>
-        TryLoadFolder(folder, configuration, given, out schemes, out environment, out sendTimeout, out _, out _, out error);
+        TryLoadFolder(folder, configuration, given, out schemes, out environment, out sendTimeout, out _, out _, out _, out error);
 
     /// <summary>
-    /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, and its databases,
-    /// each name's connection string.
+    /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, its databases,
+    /// each name's connection string, and the folders its scripts may read and write, none when it names none.
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
-        out IReadOnlyDictionary<string, string> databases, out string? error)
+        out IReadOnlyDictionary<string, string> databases, out WebLingoFileFolders files, out string? error)
     {
         sendTimeout = null;
         var hosts = new List<string>();
         allowedHosts = hosts;
         var named = new Dictionary<string, string>(StringComparer.Ordinal);
         databases = named;
+        var (read, write) = (new List<string>(), new List<string>());
+        files = new WebLingoFileFolders(read, write);
         schemes = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["std"] = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "std"))
@@ -68,8 +73,29 @@ public static class WebLingoSchemes
         (environment, error) = (null, null);
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
-        if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, ref sendTimeout, hosts, named, out error)) return false;
+        if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, ref sendTimeout, hosts, named, read, write, out error)) return false;
         foreach (var (name, path) in given) schemes[name] = Path.GetFullPath(path);
+        return true;
+    }
+
+    /// <summary>
+    /// <c>"files": { "read": [folder, …], "write": [folder, …] }</c>, either list optional, each folder's full path, a
+    /// relative one from the configuration's folder.
+    /// </summary>
+    private static bool TryReadFolders(string file, string folder, JsonElement files, List<string> read, List<string> write, out string? error)
+    {
+        error = $"{file}: \"files\" is an object, {{ \"read\": [\"../data\"], \"write\": [\"../uploads\"] }}, each a list of folders.";
+        if (files.ValueKind != JsonValueKind.Object) return false;
+        foreach (var list in files.EnumerateObject())
+        {
+            if (list.Name is not ("read" or "write") || list.Value.ValueKind != JsonValueKind.Array) return false;
+            foreach (var entry in list.Value.EnumerateArray())
+            {
+                if (entry.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(entry.GetString())) return false;
+                (list.Name == "read" ? read : write).Add(Path.GetFullPath(Path.Combine(folder, entry.GetString()!)));
+            }
+        }
+        error = null;
         return true;
     }
 
@@ -85,7 +111,7 @@ public static class WebLingoSchemes
     }
 
     private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? environment, ref double? sendTimeout,
-        List<string> hosts, Dictionary<string, string> databases, out string? error)
+        List<string> hosts, Dictionary<string, string> databases, List<string> read, List<string> write, out string? error)
     {
         error = null;
         try
@@ -160,9 +186,16 @@ public static class WebLingoSchemes
                     }
                     continue;
                 }
+                if (setting.Name == "files")
+                {
+                    // The folders its scripts may read, and read and write (section 7.13, "File capabilities").
+                    if (!TryReadFolders(file, folder, setting.Value, read, write, out error)) return false;
+                    continue;
+                }
                 if (setting.Name != "schemes")
                 {
-                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"environment\", \"sendTimeout\", \"network\" and \"databases\".";
+                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"environment\", \"sendTimeout\", \"network\", "
+                            + "\"databases\" and \"files\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)
@@ -191,3 +224,9 @@ public static class WebLingoSchemes
         }
     }
 }
+
+/// <summary>
+/// The folders a configuration lets its scripts read, and read and write, each a full path (specification, section 7.13,
+/// "File capabilities").
+/// </summary>
+public sealed record WebLingoFileFolders(IReadOnlyList<string> Read, IReadOnlyList<string> Write);

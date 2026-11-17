@@ -39,7 +39,7 @@ public static class WebLingoWaspServer
         var site = Environment.GetEnvironmentVariable("ASPNETCORE_IIS_PHYSICAL_PATH") ?? Directory.GetCurrentDirectory();
         var full = Path.GetFullPath(Path.Combine(site, root ?? "."));
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
-            out var sendTimeout, out var allowedHosts, out var databases, out error)) return null;
+            out var sendTimeout, out var allowedHosts, out var databases, out var folders, out error)) return null;
         if (configured is not null) environment = configured == "production" ? WebLingoEnvironment.Production : WebLingoEnvironment.Development;
 
         // std:system, loaded once here to fail early, then by each worker on its own.
@@ -50,8 +50,11 @@ public static class WebLingoWaspServer
             return null;
         }
         var workers = Math.Max(1, Environment.ProcessorCount);
+        // Its scripts reach only the folders wasp.config allows, a relative path from the root (section 7.13).
+        var files = new DotNetFileCapabilities(full, folders.Read, folders.Write);
         var application = WebLingoApplication.Load(new WebLingoApplicationOptions(full, new DotNetFileSystem())
         {
+            ScriptFileSystem = new DotNetFileSystem(files),
             Workers = workers,
             WorkerServices = _ => Services(schemes, importer),
             Environment = environment,
@@ -59,7 +62,8 @@ public static class WebLingoWaspServer
             WallClock = new DotNetClock(),
             TimeZone = new DotNetTimeZone(),
             Network = new DotNetNetwork(allowedHosts), // Only the hosts wasp.config allows (section 7.9).
-            Databases = new DotNetDatabases(databases, full), // Those wasp.config names, their files from its folder (section 7.11).
+            // Those wasp.config names, their files from its folder (section 7.11); a script's own checked as its files are.
+            Databases = new DotNetDatabases(databases, full) { Files = files },
             Scheduler = () => new DotNetSchedulerHost(),
             Log = log is null ? null : log.WriteLine,
             SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30)

@@ -40,6 +40,16 @@ public sealed record WebLingoCommandLineProgram(
     /// those its configuration allows, as <c>wasp</c>'s pages may.
     /// </summary>
     public bool ReachesAnyHost { get; init; } = true;
+
+    /// <summary>
+    /// Whether its scripts may reach any file (specification, section 7.13, "File capabilities"): <c>weblingo</c>'s, a
+    /// relative path from the current folder; else only those in the folders its configuration allows, a relative path from
+    /// <see cref="Root"/>, as <c>wasp</c>'s pages may.
+    /// </summary>
+    public bool ReachesAnyFile { get; init; } = true;
+
+    /// <summary>The application's root, from which a script's relative path is where it reaches only some files; the file's folder if null.</summary>
+    public string? Root { get; init; }
 }
 
 /// <summary>

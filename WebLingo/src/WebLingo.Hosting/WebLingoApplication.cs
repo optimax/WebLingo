@@ -201,7 +201,7 @@ public sealed class WebLingoApplication
             Services = new RequestServices([.. WebLingoTemplateBuiltins.Common(output), .. _http.For(request, response)], _http.Members,
                 _services[worker.Value].Builtins, output),
             Output = output,
-            FileSystem = _options.FileSystem,
+            FileSystem = _options.ScriptFileSystem ?? _options.FileSystem,
             Network = _options.Network,
             Databases = _options.Databases,
             Clock = _options.Clock,

@@ -291,6 +291,7 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `DivisionByZeroError` | WL3013 | an integer's remainder by 0, `7 % 0` |
 | `NetworkError` | WL3014 | a host that cannot be reached, a connection that fails, a request that takes too long |
 | `DatabaseError` | WL3015 | a statement a database refuses, a database that cannot be opened |
+| `PermissionError` | WL3016 | a file or a folder a site's scripts may not reach, outside the folders its `wasp.config` allows |
 
 ```javascript
 try {
@@ -518,7 +519,9 @@ synchronous form whose name ends in `Sync`: `readText` and `readTextSync`.
 
 Text is UTF-8 unless an encoding is named, as .NET names them: `utf-16`, `utf-16be`, `utf-32`, `us-ascii`,
 `iso-8859-1`. A relative path is from the program's current folder. A file or a folder that cannot be read, written
-or removed is an `IOError`, WL3011, its message naming the path as the script gave it.
+or removed is an `IOError`, WL3011, its message naming the path as the script gave it. A site's pages and handlers,
+under `wasp`, reach only the folders its `wasp.config`'s `"files"` lets them read, or read and write, a relative path
+from the site's root, and a path outside them is a `PermissionError`, WL3016 (the WASP User Manual, "Configuration").
 
 ```javascript
 import fs from "std:fs";

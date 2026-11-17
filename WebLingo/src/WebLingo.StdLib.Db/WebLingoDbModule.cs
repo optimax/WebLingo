@@ -326,8 +326,12 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
     }
 
     private static WebLingoRuntimeError? Failed(Exception exception) => exception is WebLingoDatabaseException failure
-        ? new WebLingoRuntimeError(failure.Kind == WebLingoDatabaseErrorKind.Failed ? WebLingoDiagnosticCodes.DatabaseFailure : WebLingoDiagnosticCodes.InvalidOperation,
-            Sentence(failure.Message))
+        ? new WebLingoRuntimeError(failure.Kind switch
+        {
+            WebLingoDatabaseErrorKind.Failed => WebLingoDiagnosticCodes.DatabaseFailure,
+            WebLingoDatabaseErrorKind.NotAllowed => WebLingoDiagnosticCodes.PermissionDenied,
+            _ => WebLingoDiagnosticCodes.InvalidOperation
+        }, Sentence(failure.Message))
         : null;
 
     /// <summary>A message as a sentence: its first letter a capital, a full stop at its end, unless it has one.</summary>

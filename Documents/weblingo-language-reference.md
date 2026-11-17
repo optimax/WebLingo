@@ -1603,6 +1603,7 @@ An error the runtime raises becomes an instance of a class extending `Error`, wi
 | `DivisionByZeroError` | WL3013 | an integer's remainder by 0 |
 | `NetworkError` | WL3014 | a host that cannot be reached, or a connection that fails |
 | `DatabaseError` | WL3015 | a statement a database refuses, or a database that cannot be opened |
+| `PermissionError` | WL3016 | a file a site's scripts may not reach, outside the folders its `wasp.config` allows |
 
 Two errors cannot be caught, and always end the program: running past the execution's limits (WL3003) and being
 cancelled (WL3004).
@@ -1905,7 +1906,8 @@ false
 
 Each is asynchronous, giving a task, and each has a synchronous form whose name ends in `Sync`: `readTextSync(path)`.
 A relative path is from the program's current folder. A file that cannot be read or written is an `IOError`, WL3011,
-naming the path as the script gave it.
+naming the path as the script gave it. A site's pages, under `wasp`, reach only the folders its `wasp.config` allows, a
+relative path from the site's root, and a path outside them is a `PermissionError`, WL3016.
 
 ### `std:http` and `std:net`
 
@@ -2008,6 +2010,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL3013 | an integer's remainder by 0 |
 | WL3014 | a host that cannot be reached, or a connection that fails |
 | WL3015 | a statement a database refuses, or a database that cannot be opened |
+| WL3016 | a file a site's scripts may not reach |
 | **WL4xxx** | **bytecode** |
 | WL4001 | bytecode that fails verification, such as a damaged `.wlbc` |
 | WL4002 | a program too large for the bytecode |

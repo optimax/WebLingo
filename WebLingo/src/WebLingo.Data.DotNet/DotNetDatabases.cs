@@ -14,7 +14,10 @@ namespace WebLingo.Data.DotNet;
 /// holds an <c>=</c>, <c>"sqlite:Data Source=shop.db;Mode=ReadOnly"</c>, <c>:memory:</c> being a database in memory; for
 /// SQL Server, SqlClient's own, <c>"sqlserver:Server=localhost;Database=Todo;Integrated Security=true"</c>. A name the
 /// configuration gives stands for its connection string, a relative path in which is from the configuration's folder,
-/// <paramref name="folder"/>; one in a script's, from the program's current folder. SQLite makes a file that is not
+/// <paramref name="folder"/>; one in a script's, from the program's current folder, or, given a site's file capabilities
+/// (<see cref="Files"/>, section 7.13, "File capabilities"), checked as <c>std:fs</c>'s paths are, from the site's root, a
+/// database opened to be written in a folder the site may write, one opened read-only (<c>Mode=ReadOnly</c>) in one it may
+/// read, a <c>file:</c> URI refused, those the configuration names being trusted. SQLite makes a file that is not
 /// there; both providers pool connections. SqlClient uses its managed network layer on Windows too, as it does elsewhere,
 /// its native one, under Microsoft's own terms, not shipped: it reaches a server by TCP/IP, never by its shared memory.
 /// </summary>
@@ -29,6 +32,9 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
         AppContext.SetSwitch("Switch.Microsoft.Data.SqlClient.UseManagedNetworkingOnWindows", true);
     }
 
+    /// <summary>The site's file capabilities, which a SQLite database a script names by its own connection string is checked by; none for any file.</summary>
+    public IWebLingoFileCapabilities? Files { get; init; }
+
     public IWebLingoDatabaseConnection Open(string nameOrConnection)
     {
         string connection;
@@ -40,7 +46,7 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
         var (provider, rest) = (connection[..colon], connection[(colon + 1)..]);
         DbConnection opened = provider switch
         {
-            "sqlite" => Sqlite(rest, relativeTo),
+            "sqlite" => Sqlite(rest, relativeTo, relativeTo is null ? Files : null),
             "sqlserver" => SqlServer(rest),
             _ => throw Invalid($"'{provider}' is not a database's provider WebLingo has, which are \"{string.Join("\", \"", Providers)}\"")
         };
@@ -56,8 +62,11 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
         }
     }
 
-    /// <summary>A SQLite connection, not yet open, to a file's path or by SQLite's own connection string.</summary>
-    private static SqliteConnection Sqlite(string rest, string? relativeTo)
+    /// <summary>
+    /// A SQLite connection, not yet open, to a file's path or by SQLite's own connection string, its file checked by
+    /// <paramref name="files"/>, if given.
+    /// </summary>
+    private static SqliteConnection Sqlite(string rest, string? relativeTo, IWebLingoFileCapabilities? files)
     {
         SqliteConnectionStringBuilder builder;
         try
@@ -69,7 +78,26 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
             throw Invalid($"'{rest}' is not a SQLite connection string: {exception.Message}");
         }
         if (builder.DataSource.Length == 0) throw Invalid("a SQLite database is a file's path, or :memory:");
-        if (builder.DataSource != ":memory:" && !builder.DataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+        var inMemory = builder.DataSource == ":memory:" || builder.Mode == SqliteOpenMode.Memory;
+        var uri = builder.DataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase);
+        if (files is not null && uri)
+        {
+            throw new WebLingoDatabaseException(WebLingoDatabaseErrorKind.NotAllowed,
+                $"'{builder.DataSource}' cannot be opened: a site's script names a SQLite database by its path, not by a file: URI");
+        }
+        if (files is not null && !inMemory)
+        {
+            try
+            {
+                builder.DataSource = files.Resolve(builder.DataSource, write: builder.Mode != SqliteOpenMode.ReadOnly);
+            }
+            catch (WebLingoFileSystemException failure)
+            {
+                throw new WebLingoDatabaseException(failure.Kind == WebLingoFileErrorKind.NotAllowed ? WebLingoDatabaseErrorKind.NotAllowed
+                    : WebLingoDatabaseErrorKind.Invalid, $"the database '{builder.DataSource}' cannot be opened: {failure.Message}");
+            }
+        }
+        else if (builder.DataSource != ":memory:" && !uri)
         {
             builder.DataSource = relativeTo is null ? Path.GetFullPath(builder.DataSource) : Path.GetFullPath(builder.DataSource, relativeTo);
         }

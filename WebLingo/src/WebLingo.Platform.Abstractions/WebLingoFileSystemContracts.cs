@@ -49,8 +49,26 @@ public interface IWebLingoFile : IDisposable
 /// <summary>How a file is opened: to read it; to write it anew, made if it is not there; or to write after its text.</summary>
 public enum WebLingoFileMode { Read, Write, Append }
 
-/// <summary>What failed, a portable category, not the host's exception (section 7.13, WL-P015).</summary>
-public enum WebLingoFileErrorKind { NotFound, AccessDenied, AlreadyExists, NotEmpty, InvalidPath, InvalidText, UnknownEncoding, Other }
+/// <summary>
+/// What failed, a portable category, not the host's exception (section 7.13, WL-P015); <see cref="NotAllowed"/>, a path a
+/// site's scripts may not reach (<see cref="IWebLingoFileCapabilities"/>).
+/// </summary>
+public enum WebLingoFileErrorKind { NotFound, AccessDenied, AlreadyExists, NotEmpty, InvalidPath, InvalidText, UnknownEncoding, Other, NotAllowed }
+
+/// <summary>
+/// The folders a site's scripts may reach (specification, section 7.13, "File capabilities"): a script's path, relative to
+/// the site's root or absolute, resolved to the file it names, its links and junctions followed, and checked against the
+/// folders its configuration lets it read, or write, a folder it may write being one it may read too.
+/// </summary>
+public interface IWebLingoFileCapabilities
+{
+    /// <summary>
+    /// The real path <paramref name="path"/> names, if the site may reach it, to write it too if <paramref name="write"/>;
+    /// a <see cref="WebLingoFileSystemException"/> of <see cref="WebLingoFileErrorKind.NotAllowed"/>, whose reason names no
+    /// path, otherwise.
+    /// </summary>
+    string Resolve(string path, bool write);
+}
 
 /// <summary>
 /// A file system's failure: its category, and why, in words that name no path, so that the script's own path is the
