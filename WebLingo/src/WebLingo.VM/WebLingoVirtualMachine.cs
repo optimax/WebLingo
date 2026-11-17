@@ -2205,7 +2205,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             value.Kind is WebLingoValueKind.Instance or WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set;
 
         /// <summary>The kinds of values' classes, by <c>WebLingoValueClass</c>, once the module has made them (section 3.7); a root.</summary>
-        private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.Decimal + 1];
+        private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.Regex + 1];
 
         /// <summary>The kinds of runtime errors' classes, as <c>module.ErrorClasses</c> lists them, once made; a root.</summary>
         private readonly WebLingoValue[] _errorClasses = new WebLingoValue[Math.Max(module.ErrorClasses.Count, MaxErrorClasses)];
@@ -2253,6 +2253,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 else if (i == (int)WebLingoValueClass.Integer) heap.MarkValueClass(made, WebLingoValueKind.Int64);
                 else if (i == (int)WebLingoValueClass.Number) heap.MarkValueClass(made, WebLingoValueKind.Binary64);
                 else if (i == (int)WebLingoValueClass.Decimal) heap.MarkValueClass(made, WebLingoValueKind.Decimal);
+                else if (i == (int)WebLingoValueClass.Regex) heap.MarkValueClass(made, WebLingoValueKind.Regex);
                 else if (i == (int)WebLingoValueClass.String) heap.MarkValueClass(made, WebLingoValueKind.String);
                 else if (i == (int)WebLingoValueClass.Function) heap.MarkValueClass(made, WebLingoValueKind.Function);
                 else if (i == (int)WebLingoValueClass.Class) heap.MarkClassClass(made);

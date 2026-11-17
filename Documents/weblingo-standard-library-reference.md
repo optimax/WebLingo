@@ -21,9 +21,10 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 9. [`Module`](#9-module)
 10. [`Bytes` and `BytesBuilder`](#10-bytes-and-bytesbuilder)
 11. [`DateTime`](#11-datetime)
-12. [`std:fs`](#12-stdfs)
-13. [Native modules](#13-native-modules)
-14. [In WASP's pages](#14-in-wasps-pages)
+12. [`Regex`](#12-regex)
+13. [`std:fs`](#13-stdfs)
+14. [Native modules](#14-native-modules)
+15. [In WASP's pages](#15-in-wasps-pages)
 
 ---
 
@@ -449,7 +450,27 @@ which may differ from one server to another, a name it does not know an error.
 
 ---
 
-## 12. `std:fs`
+## 12. `Regex`
+
+A regular expression: a pattern in .NET's syntax, and flags, immutable.
+
+| Member | What it is |
+|---|---|
+| `new Regex(pattern, flags)` | a regular expression; the flags, a string, `i`, `m`, `s`, `x` and `n`, none unless given |
+| `r.test(s)` or `r.isMatch(s)` | whether `s` has a match |
+| `r.match(s)` or `r.exec(s)` | the first match, an array of its groups' text, the whole match first, `null` for a group that matched nothing; `null` for none |
+| `r.matchAll(s)` or `r.matches(s)` | an array of every match, each as `match` gives it |
+| `r.replace(s, replacement)`, `s.replace(r, replacement)` | `s` with every match replaced, `$1` the first group, `${name}` a named one, `$0` the whole match, `$$` a `$` |
+| `r.split(s)`, `s.split(r)` | the parts of `s` between matches, the groups a match captured among them |
+| `s.match(r)`, `s.matchAll(r)` | as `r.match(s)` and `r.matchAll(s)` |
+| `r.pattern`, `r.flags` | the pattern and the flags it was made of |
+
+Each operation may take a second; a pattern that backtracks longer stops with a `TimeoutError` (WL3010). `write`
+writes a regular expression as `Regex:/pattern/flags`.
+
+---
+
+## 13. `std:fs`
 
 Files and folders, through the platform's file system. Each function is asynchronous, giving a task, and has a
 synchronous form whose name ends in `Sync`: `readText` and `readTextSync`.
@@ -502,7 +523,7 @@ false
 
 ---
 
-## 13. Native modules
+## 14. Native modules
 
 A native module is code compiled for .NET that extends what scripts can use: functions and classes, imported as any
 module's are, by a scheme naming a folder of them, `import db from "native:sqlite";`. The folders are named by the
@@ -512,7 +533,7 @@ configuration, `weblingo.config` beside a script and `wasp.config` in a site, `{
 
 ---
 
-## 14. In WASP's pages
+## 15. In WASP's pages
 
 A page, a layout and a component that declare `param request;` and `param response;` are given the request they
 answer and the response they make; a `.wl` route handler is given them as its function's arguments. Their members are

@@ -199,6 +199,7 @@ writeLn(limit);
 | Set | `#{1, 2, 3}` | `Set` |
 | Bytes | `Bytes.from("hi")`, `Bytes.from([104, 105])` | `Bytes` |
 | Decimal | `1.5m`, `0.1m` | `Decimal` |
+| Regular expression | `new Regex("a+b", "i")` | `Regex` |
 | Date and time | `DateTime.now()`, `DateTime.utc(2026, 11, 16)` | `DateTime` |
 | Function | `function (x) { … }`, `x => x * 2` | `Function` |
 | Class | `class Point { … }` | `Class` |
@@ -607,6 +608,40 @@ tea
 - **`padStart(width, pad)` and `padEnd`** pad to a width in characters, with a space unless a pad is given.
 - **`separator.join(array)`** joins strings, numbers, Booleans, decimals and dates, `null` as nothing; give anything
   else's text first, `x.toString()`.
+
+### Regular expressions
+
+A regular expression is made by the class `Regex`, from a pattern in .NET's syntax and flags:
+
+```javascript
+var email = new Regex("(\\w+)@(\\w+)\\.com");
+var text = "ann@tea.com, bob@cake.com";
+writeLn(email.test(text));
+writeLn(email.match(text));
+writeLn(email.matchAll(text).length);
+writeLn(text.replace(email, "$2:$1"));
+writeLn(text.split(new Regex(",\\s*")));
+writeLn(new Regex("^tea$", "im").test("Green\nTEA"));
+```
+
+```text
+true
+["ann@tea.com", "ann", "tea"]
+2
+tea:ann, cake:bob
+["ann@tea.com", "bob@cake.com"]
+true
+```
+
+- **The flags**, a string, are `i`, ignoring case, `m`, `^` and `$` at every line, `s`, `.` matching a line break too,
+  `x`, white space in the pattern ignored, and `n`, only named groups captured.
+- **`r.match(s)`** gives the first match, an array of its groups' text, the whole match first, a group that matched
+  nothing `null`; or `null`, for no match. `r.matchAll(s)` gives every match so, in an array; `r.test(s)` whether there
+  is one. Other names work too: `isMatch` for `test`, `exec` for `match`, `matches` for `matchAll`.
+- **Replacing and splitting**: `s.replace(r, replacement)` or `r.replace(s, replacement)` replaces every match, `$1` in
+  the replacement standing for the first group, `$0` for the whole match; `s.split(r)` or `r.split(s)` splits at each.
+- **A pattern is written in a string**, so its backslashes are doubled: `"\\d+"` is the pattern `\d+`.
+- **A pattern that takes more than a second** to match, as some do on some text, stops with a `TimeoutError`.
 
 ### Multi-line strings
 
@@ -1913,4 +1948,4 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Library**: regular expressions, JSON, and network access.
+- **Library**: JSON, and network access.

@@ -31,6 +31,8 @@ public enum WebLingoMember : byte
     PadStart, PadEnd, Join,
     /// <summary>Arrays' methods that take no function, besides those strings have too (section 3.6, "Array methods").</summary>
     Insert, RemoveAt, Reverse,
+    /// <summary>Regular expressions' methods and properties, besides <c>replace</c> and <c>split</c> (section 3.6, "Regular expressions").</summary>
+    Test, Match, MatchAll, Pattern, Flags,
     /// <summary>A collection's or a string's <c>iterate()</c>, which gives an <c>Iterator</c> (section 3.6).</summary>
     Iterate,
     /// <summary>An interpolation's format and alignment, a built-in method of every class that no program can name (section 3.5).</summary>
@@ -124,6 +126,11 @@ public static partial class WebLingoMembers
         "insert" => WebLingoMember.Insert,
         "removeAt" => WebLingoMember.RemoveAt,
         "reverse" => WebLingoMember.Reverse,
+        "test" or "isMatch" => WebLingoMember.Test,
+        "match" or "exec" => WebLingoMember.Match,
+        "matchAll" or "matches" => WebLingoMember.MatchAll,
+        "pattern" => WebLingoMember.Pattern,
+        "flags" => WebLingoMember.Flags,
         "iterate" => WebLingoMember.Iterate,
         WebLingoInterpolation.Format => WebLingoMember.Format,
         "__className" => WebLingoMember.ClassName,
@@ -302,6 +309,7 @@ public static partial class WebLingoMembers
             error = null;
             return true;
         }
+        if (target.Kind == WebLingoValueKind.Regex && IsRegexProperty(member)) return TryGetRegexProperty(target, member, heap, out result, out error);
         result = WebLingoValue.Null;
         if (IsMethod(target, member))
         {
@@ -623,6 +631,7 @@ public static partial class WebLingoMembers
         WebLingoValueKind.Bytes => (int)WebLingoValueClass.Bytes,
         WebLingoValueKind.DateTime => (int)WebLingoValueClass.DateTime,
         WebLingoValueKind.Decimal => (int)WebLingoValueClass.Decimal,
+        WebLingoValueKind.Regex => (int)WebLingoValueClass.Regex,
         _ => -1
     };
 
@@ -768,7 +777,8 @@ public static partial class WebLingoMembers
         || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
         || (target.Kind == WebLingoValueKind.Bytes && member is WebLingoMember.Slice or WebLingoMember.Text)
         || (target.Kind == WebLingoValueKind.DateTime && IsDateTimeMethod(member))
-        || (target.Kind == WebLingoValueKind.String && IsStringMethod(member));
+        || (target.Kind == WebLingoValueKind.String && IsStringMethod(member))
+        || (target.Kind == WebLingoValueKind.Regex && IsRegexMethod(member));
 
     /// <summary>
     /// Whether <c>x.name(…)</c> calls a class's built-in method, <c>setMethod</c>, <c>setProperty</c>,
@@ -919,6 +929,10 @@ public static partial class WebLingoMembers
         {
             return TryCallString(target, member, name, values, first, count, heap, out result, out error);
         }
+        if (target.Kind == WebLingoValueKind.Regex && IsRegexMethod(member))
+        {
+            return TryCallRegex(target, member, name, values, first, count, heap, out result, out error);
+        }
         if (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
         {
             if (count != 1) return WrongArgumentCount(name, 1, count, out error);
@@ -936,6 +950,7 @@ public static partial class WebLingoMembers
                     or WebLingoValueKind.Bytes
                 && member == WebLingoMember.Length)
             || (target.Kind == WebLingoValueKind.DateTime && IsDateTimeProperty(member))
+            || (target.Kind == WebLingoValueKind.Regex && IsRegexProperty(member))
             ? new WebLingoRuntimeError(WebLingoDiagnosticCodes.NotAFunction,
                 $"'{name}' of {WebLingoValueFormatter.Describe(target)} is not a method, and cannot be called.")
             : NoSuchMember(target, name, heap);

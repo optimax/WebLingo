@@ -96,7 +96,7 @@ internal static class WebLingoClassTables
     {
         if (valueClasses is null || errorClasses is null) return "The module has no tables of built-in classes.";
         // One for each kind; a module compiled before bytes, or dates (section 3.2), which ends with Iterator, still loads.
-        if (valueClasses.Count != 0 && valueClasses.Count is < (int)WebLingoValueClass.Iterator + 1 or > (int)WebLingoValueClass.Decimal + 1)
+        if (valueClasses.Count != 0 && valueClasses.Count is < (int)WebLingoValueClass.Iterator + 1 or > (int)WebLingoValueClass.Regex + 1)
         {
             return $"The module has {valueClasses.Count} classes of values, not one for each kind.";
         }

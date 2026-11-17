@@ -14,7 +14,8 @@ public static partial class WebLingoMembers
         member is WebLingoMember.Compare or WebLingoMember.IndexOf or WebLingoMember.LastIndexOf or WebLingoMember.Contains
             or WebLingoMember.StartsWith or WebLingoMember.EndsWith or WebLingoMember.Slice or WebLingoMember.Split or WebLingoMember.Trim
             or WebLingoMember.TrimStart or WebLingoMember.TrimEnd or WebLingoMember.ToUpper or WebLingoMember.ToLower
-            or WebLingoMember.Replace or WebLingoMember.Repeat or WebLingoMember.PadStart or WebLingoMember.PadEnd or WebLingoMember.Join;
+            or WebLingoMember.Replace or WebLingoMember.Repeat or WebLingoMember.PadStart or WebLingoMember.PadEnd or WebLingoMember.Join
+            or WebLingoMember.Match or WebLingoMember.MatchAll;
 
     private static bool TryCallString(WebLingoValue target, WebLingoMember member, string name, WebLingoValue[] values, int first, int count,
         WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
@@ -92,6 +93,7 @@ public static partial class WebLingoMembers
             {
                 // The parts between the separators, empty ones included; an empty separator, each Unicode scalar value.
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+                if (values[first].Kind == WebLingoValueKind.Regex) return TryRegex(values[first], member, text, "", heap, out result, out error);
                 if (!TryText(name, values[first], heap, out var separator, out error)) return false;
                 if (separator.Length == 0) return TrySnapshot(target, heap, out result, out error);
                 return TryStrings(text.Split(separator), heap, out result, out error);
@@ -113,6 +115,12 @@ public static partial class WebLingoMembers
             {
                 // Every one replaced, left to right, as found, none overlapping.
                 if (count != 2) return WrongArgumentCount(name, 2, count, out error);
+                if (values[first].Kind == WebLingoValueKind.Regex)
+                {
+                    // A regular expression's matches, each replaced, by .NET's substitutions (section 3.6).
+                    if (!TryText(name, values[first + 1], heap, out var substitution, out error)) return false;
+                    return TryRegex(values[first], member, text, substitution, heap, out result, out error);
+                }
                 if (!TryText(name, values[first], heap, out var old, out error) || !TryText(name, values[first + 1], heap, out var replacement, out error))
                 {
                     return false;
@@ -169,6 +177,18 @@ public static partial class WebLingoMembers
                     i = (i + length) % pad.Length;
                 }
                 return heap.TryAllocateString(member == WebLingoMember.PadStart ? padding + text : text + padding, out result, out error);
+            }
+            case WebLingoMember.Match or WebLingoMember.MatchAll:
+            {
+                // s.match(r) and s.matchAll(r): as r.match(s) and r.matchAll(s) (section 3.6).
+                if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+                if (values[first].Kind != WebLingoValueKind.Regex)
+                {
+                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                        $"'{name}' takes a regular expression, new Regex(…), not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                    return false;
+                }
+                return TryRegex(values[first], member, text, "", heap, out result, out error);
             }
             default:
                 return TryJoin(text, name, values, first, count, heap, out result, out error);

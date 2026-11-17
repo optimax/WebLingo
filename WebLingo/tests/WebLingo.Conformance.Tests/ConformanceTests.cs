@@ -627,6 +627,15 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var people = [{ name: \"Ann\", age: 30 }, { name: \"Bob\", age: 25 }, { name: \"Cy\", age: 30 }]; writeLn(people.sort((x, y) => x[\"age\"] - y[\"age\"]).map(p => p[\"name\"]));", "[\"Bob\", \"Ann\", \"Cy\"]")]
     [InlineData("var a = [3, 1, 2]; async function twice(x) { await null; return x * 2; } writeLn([await a.map(twice), await a.filter(async x => { await null; return x != 1; }), await a.reduce(async (s, x) => { await null; return s + x; }, 10), await a.find(async x => x == 2), await a.any(async x => x == 7), await a.all(async x => x < 4)]);", "[[6, 2, 4], [3, 2], 16, 2, false, true]")]
     [InlineData("class Stack extends Array {} var s = new Stack(); s.push(5); s.push(4); writeLn([s.sort(), s.map(x => x + 1), s.contains(4)]);", "[[4, 5], [6, 5], true]")]
+    // Regular expressions (the owner's answers, 16 November 2026): .NET's syntax; a class only, new Regex(pattern, flags).
+    [InlineData("var r = new Regex(\"(\\\\w+)@(\\\\w+)\\\\.com\"); var text = \"ann@tea.com, bob@cake.com\"; writeLn([r, r is Regex, r.pattern, r.flags, r.test(text), r.isMatch(\"nobody\")]);", "[Regex:/(\\w+)@(\\w+)\\.com/, true, \"(\\\\w+)@(\\\\w+)\\\\.com\", \"\", true, false]")]
+    [InlineData("var r = new Regex(\"(\\\\w+)@(\\\\w+)\\\\.com\"); var text = \"ann@tea.com, bob@cake.com\"; writeLn([r.match(text), r.exec(\"none\"), r.matchAll(text), r.matches(text).length]);", "[[\"ann@tea.com\", \"ann\", \"tea\"], null, [[\"ann@tea.com\", \"ann\", \"tea\"], [\"bob@cake.com\", \"bob\", \"cake\"]], 2]")]
+    [InlineData("var r = new Regex(\"(\\\\w+)@(\\\\w+)\\\\.com\"); var text = \"ann@tea.com, bob@cake.com\"; writeLn([r.replace(text, \"$2:$1\"), text.replace(r, \"<$0>\"), new Regex(\",\\\\s*\").split(text), text.split(new Regex(\", \"))]);", "[\"tea:ann, cake:bob\", \"<ann@tea.com>, <bob@cake.com>\", [\"ann@tea.com\", \"bob@cake.com\"], [\"ann@tea.com\", \"bob@cake.com\"]]")]
+    [InlineData("var r = new Regex(\"(\\\\w+)@(\\\\w+)\\\\.com\"); var text = \"ann@tea.com, bob@cake.com\"; writeLn([text.match(r), text.matchAll(r).length]);", "[[\"ann@tea.com\", \"ann\", \"tea\"], 2]")]
+    [InlineData("var i = new Regex(\"^TEA$\", \"im\"); writeLn([i.test(\"green\\ntea\"), i, $\"{i}\"]);", "[true, Regex:/^TEA$/im, \"Regex:/^TEA$/im\"]")]
+    [InlineData("writeLn(new Regex(\"(a)|(b)\").match(\"b\"));", "[\"b\", null, \"b\"]")]
+    [InlineData("class Strict extends Regex {} var s = new Strict(\"x+\"); writeLn([s is Regex, s is Strict]);", "[true, true]")]
+    [InlineData("var r = new Regex(\"a\"); writeLn([r == r, r == new Regex(r.pattern)]);", "[true, false]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -704,6 +713,14 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var b = [1].concat(2);", "WL3001")]
     [InlineData("var b = [1].map();", "WL2006")]
     [InlineData("var b = [[1]].join();", "WL3001")]
+    [InlineData("var r = new Regex(\"a(\");", "WL3001")]
+    [InlineData("var r = new Regex(\"a\", \"q\");", "WL3001")]
+    [InlineData("var r = new Regex(\"a\", \"ii\");", "WL3001")]
+    [InlineData("var r = new Regex(1);", "WL3001")]
+    [InlineData("var r = new Regex();", "WL2006")]
+    [InlineData("var m = \"x\".match(\"x\");", "WL3001")]
+    [InlineData("var m = {}; m[new Regex(\"a\")] = 1;", "WL3001")]
+    [InlineData("var t = new Regex(\"(a+)+$\").test(\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!\");", "WL3010")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

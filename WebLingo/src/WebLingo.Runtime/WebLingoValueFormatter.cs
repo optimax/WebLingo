@@ -22,6 +22,7 @@ public static class WebLingoValueFormatter
             WebLingoValueKind.String => heap.GetString(value),
             WebLingoValueKind.Bytes => FormatBytes(heap.GetBytes(value)),
             WebLingoValueKind.Decimal => FormatDecimal(heap.GetDecimal(value)),
+            WebLingoValueKind.Regex => "Regex:" + RegexText(value, heap),
             WebLingoValueKind.Instance when heap.IsHolding(value) => Held(value, heap),
             WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Instance => FormatCollection(value, heap),
             WebLingoValueKind.Class => heap.IsNamed(value) ? "class " + heap.ClassName(value) : "class",
@@ -47,6 +48,7 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Module => $"module#{value.Handle}",
         WebLingoValueKind.Bytes => $"bytes#{value.Handle}",
         WebLingoValueKind.Decimal => $"decimal#{value.Handle}",
+        WebLingoValueKind.Regex => $"regex#{value.Handle}",
         // A date and time's text (section 3.2, "Dates and times"): its class's name, a colon, and ISO 8601's.
         WebLingoValueKind.DateTime => "DateTime:" + WebLingoMembers.IsoText(value),
         WebLingoValueKind.Boolean => value.AsBoolean ? "true" : "false",
@@ -71,6 +73,7 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Module => "a module",
         WebLingoValueKind.Bytes => "bytes",
         WebLingoValueKind.Decimal => "a decimal",
+        WebLingoValueKind.Regex => "a regular expression",
         WebLingoValueKind.DateTime => $"the date and time {WebLingoMembers.IsoText(value)}",
         _ => $"the number {Format(value)}"
     };
@@ -79,6 +82,13 @@ public static class WebLingoValueFormatter
     /// A decimal's text (the owner's answer, 16 November 2026): its fewest digits, its trailing zeros dropped, and <c>m</c>,
     /// as its literal writes it, <c>1.5m</c> for <c>1.50m</c>, never in an exponent's form.
     /// </summary>
+    /// <summary>A regular expression's text, <c>/a+b/i</c>, its pattern between slashes, then its flags (section 3.6).</summary>
+    private static string RegexText(WebLingoValue value, WebLingoHeap heap)
+    {
+        var (_, pattern, flags) = heap.GetRegex(value);
+        return "/" + pattern + "/" + flags;
+    }
+
     public static string FormatDecimal(decimal value)
     {
         var text = value.ToString(CultureInfo.InvariantCulture);
@@ -105,6 +115,7 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Class => heap.IsNamed(value) ? $"the class {heap.ClassName(value)}" : "an unnamed class",
         WebLingoValueKind.Module => $"the module {heap.ModuleName(value)}",
         WebLingoValueKind.Decimal => $"the decimal {FormatDecimal(heap.GetDecimal(value))}",
+        WebLingoValueKind.Regex => $"the regular expression {RegexText(value, heap)}",
         _ => Describe(value)
     };
 

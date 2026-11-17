@@ -305,6 +305,7 @@ public sealed class WebLingoHeap
         // The result may go where the argument is, so the argument is read before the result is written.
         var classObject = Get<ClassObject>(classValue, WebLingoValueKind.Class);
         if (classObject.MakesClasses) return TryNewClass(values, first, count, out result, out error);
+        if (classObject.Holds == WebLingoValueKind.Regex) return TryMakeRegex(values, first, count, out result, out error);
         if (count == 1) return TryOfKind(classObject.Holds, classObject.Name, Held(values[first]), out result, out error);
         result = WebLingoValue.Null;
         if (count > 1)
@@ -386,6 +387,7 @@ public sealed class WebLingoHeap
         WebLingoValueKind.Int64 => "an integer",
         WebLingoValueKind.Binary64 => "a number",
         WebLingoValueKind.Decimal => "a decimal",
+        WebLingoValueKind.Regex => "a regular expression",
         WebLingoValueKind.Function => "a function",
         _ => "a string"
     };
@@ -528,6 +530,89 @@ public sealed class WebLingoHeap
 
     /// <summary>The value a decimal of this heap holds.</summary>
     public decimal GetDecimal(WebLingoValue value) => Get<DecimalObject>(value, WebLingoValueKind.Decimal).Value;
+
+    /// <summary>How long a regular expression's operation may take, a pattern that backtracks without end then a TimeoutError (section 3.6).</summary>
+    public static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
+
+    /// <summary>The units of memory the execution may still use, without collecting.</summary>
+    public long RoomLeft => _maxUnits - Units;
+
+    /// <summary>
+    /// A regular expression (section 3.6): a pattern of .NET's syntax, its flags letters, <c>i</c>, <c>m</c>, <c>s</c>,
+    /// <c>x</c> and <c>n</c>, each once, its culture the invariant one, never compiled to CLR code; WL3001 for a pattern
+    /// or a flag that is not one.
+    /// </summary>
+    public bool TryAllocateRegex(string pattern, string flags, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        var options = System.Text.RegularExpressions.RegexOptions.CultureInvariant;
+        foreach (var flag in flags)
+        {
+            var option = flag switch
+            {
+                'i' => System.Text.RegularExpressions.RegexOptions.IgnoreCase,
+                'm' => System.Text.RegularExpressions.RegexOptions.Multiline,
+                's' => System.Text.RegularExpressions.RegexOptions.Singleline,
+                'x' => System.Text.RegularExpressions.RegexOptions.IgnorePatternWhitespace,
+                'n' => System.Text.RegularExpressions.RegexOptions.ExplicitCapture,
+                _ => System.Text.RegularExpressions.RegexOptions.None
+            };
+            if (option == System.Text.RegularExpressions.RegexOptions.None || (options & option) != 0)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"\"{flags}\" are not a regular expression's flags: i, m, s, x and n, each once.");
+                return false;
+            }
+            options |= option;
+        }
+        System.Text.RegularExpressions.Regex regex;
+        try
+        {
+            regex = new System.Text.RegularExpressions.Regex(pattern, options, RegexTimeout);
+        }
+        catch (ArgumentException exception)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"/{pattern}/ is not a regular expression: {exception.Message}");
+            return false;
+        }
+        return TryAllocate(new RegexObject(regex, pattern, flags), WebLingoValueKind.Regex, pattern.Length + flags.Length, out result, out error);
+    }
+
+    /// <summary>A regular expression's engine, and the pattern and the flags it was made of.</summary>
+    public (System.Text.RegularExpressions.Regex Regex, string Pattern, string Flags) GetRegex(WebLingoValue value)
+    {
+        var held = Get<RegexObject>(value, WebLingoValueKind.Regex);
+        return (held.Regex, held.Pattern, held.Flags);
+    }
+
+    /// <summary><c>new Regex(pattern, flags)</c>: a pattern, and flags, none unless given (section 3.6).</summary>
+    private bool TryMakeRegex(WebLingoValue[] values, int first, int count, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (count is < 1 or > 2)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.WrongArgumentCount, $"'Regex' takes 1 to 2 arguments, not {count}.");
+            return false;
+        }
+        var pattern = Held(values[first]);
+        var flags = count == 2 ? Held(values[first + 1]) : WebLingoValue.Null;
+        if (pattern.Kind != WebLingoValueKind.String || (count == 2 && flags.Kind != WebLingoValueKind.String))
+        {
+            var bad = pattern.Kind != WebLingoValueKind.String ? pattern : flags;
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"A regular expression is made of a pattern and flags, strings, not {WebLingoValueFormatter.Describe(bad, this)}.");
+            return false;
+        }
+        return TryAllocateRegex(GetString(pattern), count == 2 ? GetString(flags) : "", out result, out error);
+    }
+
+    private sealed class RegexObject(System.Text.RegularExpressions.Regex regex, string pattern, string flags)
+    {
+        public System.Text.RegularExpressions.Regex Regex { get; } = regex;
+        public string Pattern { get; } = pattern;
+        public string Flags { get; } = flags;
+    }
 
     /// <summary>A decimal, which the heap holds as an object of its own.</summary>
     private sealed class DecimalObject(decimal value)
@@ -1426,7 +1511,8 @@ public sealed class WebLingoHeap
 
     private static void Mark(WebLingoValue value, bool[] marked, Stack<int> pending)
     {
-        if (value.Kind is not (WebLingoValueKind.String or WebLingoValueKind.Bytes or WebLingoValueKind.Decimal or WebLingoValueKind.Function or WebLingoValueKind.Cell or WebLingoValueKind.Array
+        if (value.Kind is not (WebLingoValueKind.String or WebLingoValueKind.Bytes or WebLingoValueKind.Decimal or WebLingoValueKind.Regex
+            or WebLingoValueKind.Function or WebLingoValueKind.Cell or WebLingoValueKind.Array
             or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Class or WebLingoValueKind.Instance or WebLingoValueKind.BoundMethod
             or WebLingoValueKind.Task or WebLingoValueKind.Module))
         {
