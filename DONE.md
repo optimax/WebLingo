@@ -2744,3 +2744,43 @@ TODO: For Linux's sake, change it to `wasp.config`.
 2026-11-16 (Claude): A1 recorded as approved in the specification, sections 1.1 and 6.12, and built, first as `WASP.config` (`94993ee`), then, as the TODO above asks, in lower case: a site's configuration, in its root, and a page's folder's under `wasp run` and `wasp check`, is `wasp.config` (`WebLingoRouteTable.ConfigurationFile`, `WebLingoCommandLineProgram.Configuration`), a script's folder's under `weblingo` `weblingo.config`, `wasp` reading no `weblingo.config`. The specification (sections 3.9, 3.10, 6.9, 9 and 15.2), the WASP User Manual, the READMEs and `Documents/implementation.md` say so. Guessed, and recorded as Proposed (section 15.2, "The host's core"): neither name served from a site's root, nor `web.config`, whatever their names' case, since Windows reads `WASP.config` as `wasp.config`.
 
 Done (Claude, 2026-11-16, `94993ee` and `e838ba0`): a site's configuration named `wasp.config`. Main's checks passed: the Release build, without warnings, 3,030 tests, `wasp serve` with `weblingo.config`, then `wasp.config`, and `weblingo` and `wasp` on the samples, on Windows only; Linux and IIS not tried.
+
+## [DONE] Dates and Times
+
+A page cannot show the date or the time: `<%= DateTime.Now %>` is WL2001, `'DateTime' is not defined`, since WebLingo has no dates or times yet (the Language Reference, "What is not in the language yet"), and nothing in the standard library gives the time. Add them: the current date and time, the server's, and dates and times as values a script can hold, compare, format, parse and do arithmetic with. Asked by the owner in the chat, 2026-11-16; added by Claude the same day.
+
+What bears on it: the platform layer's clocks (specification, section 7.6, WL-P006): a wall clock for timestamps, apart from the monotonic one the scheduler has (`IWebLingoExecutionClock`), time zones and calendars as services of their own, and a clock a test can set; the portable core uses only what `Documents/NativeCompatibility.md` allows, so the time and the zones come through the platform layer; COM's `VT_DATE` comes back as an ISO 8601 string until WebLingo has dates (section 3.10); and the WASP User Manual's "What is not there yet" should say that dates and times are not there, until they are.
+
+One decision each, answerable with a letter:
+
+Q1, what a date and time is in a script: (a) a kind of value of its own, immutable, built into both VMs, as strings and bytes are, its class `DateTime`; (b) a native class of a standard module, `std:time`, as `std:fs`'s `File` is; (c) a class written in WebLingo, holding a count of time since an epoch, as `BytesBuilder` is written in WebLingo.
+
+A1: (a)
+
+Q2, what it holds: (a) an instant only, as JavaScript's `Date` does, shown in UTC or in a zone only when it is formatted or read; (b) an instant with its offset from UTC, as .NET's `DateTimeOffset` does, so that the server's time keeps the server's offset; (c) kinds of their own, an instant, a date, a time of day, and a date and time without a zone, as Java's `java.time` has them.
+
+A2: (b)
+
+Q3, its precision: (a) milliseconds, as JavaScript's; (b) 100 nanoseconds, as .NET's ticks; (c) microseconds.
+
+A3: (a)
+
+Q4, time zones: (a) UTC and the server's own zone only, for now; (b) any zone by its IANA name, `"Europe/Warsaw"`, from the platform's database, through the platform layer.
+
+A4: (a)
+
+Q5, how it is formatted and parsed: (a) with .NET's date and time format strings, standard and custom, with the invariant culture, in an interpolation too, `{d:yyyy-MM-dd HH:mm}`, as numbers' formats are (section 3.5), the subset in use written into the specification; (b) ISO 8601 only, other text built from its members, `d.year`, `d.month` and so on.
+
+A5: (a)
+
+Q6, what `write` and `<%= %>` write: (a) ISO 8601, `2026-11-16T14:30:00Z`; (b) its class's name and that, `DateTime:2026-11-16T14:30:00Z`, as a classed value is written (section 3.7).
+
+A6: (b)
+
+Q7, how time is added and measured: (a) a duration of its own, `Duration`, `d + Duration.hours(2)`, and `b - a` a `Duration`; (b) methods and numbers, `d.addHours(2)`, and `b - a` a number of milliseconds.
+
+A7: (b)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.2, and built, on both VMs: `DateTime`, a kind of value held in the value itself, its instant and its offset sharing its 64 bits; `DateTime.now()`, `utcNow()`, `local(…)`, `utc(…)`, `parse(text, format)` and `fromUnixMilliseconds(ms)`; a date's properties and its `add…`, `toUtc()`, `toLocal()` and `format(format)`; `==` and the orderings by instant, `b - a` in milliseconds; its text `DateTime:` and ISO 8601's. The time is the platform's wall clock, and the server's zone a new platform service, `IWebLingoTimeZone` (`DotNetTimeZone`), which `weblingo`, `wasp` and the web host give; `PortabilityTests` keeps .NET's clock and `TimeZoneInfo` out of the portable core. Guessed, and recorded as Proposed (section 15.2, "Dates and times"): the members' names; the years 1 to 9999 and a WL3001 beyond them; `==` by instant, as .NET's `DateTimeOffset`; `add…` keeping the offset, as .NET does; ISO 8601's forms `parse` reads, and a time without a zone the server's; dates not map keys; `new DateTime()` WL3001; and, without a host's clock, `now()` WL3001 and the zone UTC. Described in the Language Reference (section 4, "Dates and times") and the WASP User Manual (section 3).
+
+Done (Claude, 2026-11-16, `c5d970c`): dates and times. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted change to `Examples/example1/includes/footer.wasp` (`<%=DateTime.Now%>`, a member `DateTime` does not have) fails; with the committed footer, served by `wasp` from a copy, every page of the site is a 200; `weblingo` and `wasp` tried with dates, on Windows only; Linux and IIS not tried.
