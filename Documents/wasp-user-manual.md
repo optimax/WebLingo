@@ -395,7 +395,9 @@ catalog from "/lib/catalog.wl";`, then `catalog.teas`. Here is `shop.wasp`, whic
 ## 9. The request and the response
 
 A page that declares `param request;` and `param response;` is given the request it answers and the response it
-makes, each an object whose members you read and set. A page declares only those it uses.
+makes, each an object whose members you read and set. A page declares only those it uses. A layout and a component
+may declare them too, and get the same request and response without the page giving them; an include sees the
+page's, or its layout's, as it sees any of their variables.
 
 ### The request
 

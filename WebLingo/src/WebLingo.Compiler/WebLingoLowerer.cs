@@ -140,8 +140,13 @@ public sealed class WebLingoLowerer
         }
         foreach (var statement in block)
         {
-            // A module's parameters, before its imports, which may give them on (section 3.9).
+            // A module's parameters, before its imports, which may give them on (section 3.9); and a program's that its host
+            // gives, made of the built-in classes, which are made first when it imports (section 6.12).
             if (statement is WebLingoBoundModuleParameter parameter) lowered.Add(LowerModuleParameter(parameter));
+            if (prologue is not null && statement is WebLingoBoundVariableDeclaration { IsHostParameter: true } hosted)
+            {
+                lowered.Add(LowerStatement(hosted));
+            }
         }
         foreach (var statement in block)
         {
@@ -186,7 +191,8 @@ public sealed class WebLingoLowerer
         foreach (var statement in block)
         {
             if (statement is not (WebLingoBoundFunctionDeclaration or WebLingoBoundClassDeclaration or WebLingoBoundExtension
-                or WebLingoBoundImport or WebLingoBoundModuleParameter))
+                or WebLingoBoundImport or WebLingoBoundModuleParameter)
+                && !(prologue is not null && statement is WebLingoBoundVariableDeclaration { IsHostParameter: true }))
             {
                 lowered.Add(LowerStatement(statement));
             }

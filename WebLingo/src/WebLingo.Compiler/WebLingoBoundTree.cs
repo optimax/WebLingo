@@ -85,7 +85,14 @@ public sealed record WebLingoBoundFunction(
 public abstract record WebLingoBoundStatement(WebLingoSourceSpan Span);
 
 public sealed record WebLingoBoundVariableDeclaration(WebLingoLocalSymbol Local, WebLingoBoundExpression Initializer, WebLingoSourceSpan Span)
-    : WebLingoBoundStatement(Span);
+    : WebLingoBoundStatement(Span)
+{
+    /// <summary>
+    /// A program's parameter that its host gives, <c>param request;</c> (section 6.12), made before the program's imports,
+    /// which may give it on, as its other parameters are.
+    /// </summary>
+    public bool IsHostParameter { get; init; }
+}
 
 public sealed record WebLingoBoundExpressionStatement(WebLingoBoundExpression Expression, WebLingoSourceSpan Span) : WebLingoBoundStatement(Span);
 

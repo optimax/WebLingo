@@ -74,6 +74,18 @@ public sealed class WebLingoTemplateParser
     private readonly Dictionary<string, List<Piece>> _read = new(StringComparer.Ordinal);
     private readonly List<string> _including = [];
     private readonly WebLingoTemplateKind _kind;
+
+    /// <summary>The host's parameters, <c>request</c> and <c>response</c>, which a layout has without its page giving them (section 6.12).</summary>
+    private IReadOnlyCollection<string> _hostParameters = [];
+
+    private bool IsHostParameter(string name)
+    {
+        foreach (var parameter in _hostParameters)
+        {
+            if (parameter == name) return true;
+        }
+        return false;
+    }
     private long _includedLength;
 
     /// <summary>The page's layout statement, once read: its keyword's span, its path, and its values' entries.</summary>
@@ -97,9 +109,9 @@ public sealed class WebLingoTemplateParser
     /// The tree's positions are the program's: <paramref name="files"/> says which file each is in.
     /// </summary>
     public static WebLingoSyntaxTree Parse(WebLingoSourceText page, IWebLingoSourceResolver? resolver, out WebLingoTemplateFiles files,
-        WebLingoTemplateKind kind = WebLingoTemplateKind.Page)
+        WebLingoTemplateKind kind = WebLingoTemplateKind.Page, IReadOnlyCollection<string>? hostParameters = null)
     {
-        var parser = new WebLingoTemplateParser(page, resolver, kind);
+        var parser = new WebLingoTemplateParser(page, resolver, kind) { _hostParameters = hostParameters ?? [] };
         parser._including.Add(page.Name);
         if (kind == WebLingoTemplateKind.Layout)
         {
@@ -596,7 +608,7 @@ public sealed class WebLingoTemplateParser
         }
         foreach (var (name, hasDefault) in parameters)
         {
-            if (!hasDefault && !given.Contains(name))
+            if (!hasDefault && !given.Contains(name) && !IsHostParameter(name))
             {
                 Report(WebLingoDiagnosticCodes.ComponentParameter, $"'{layout}''s parameter '{name}' is not given.", at);
             }

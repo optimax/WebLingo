@@ -53,7 +53,9 @@ public sealed class WebLingoTemplateCompiler
 
     private WebLingoSyntaxTree Parse(WebLingoSourceText page, WebLingoTemplateKind kind)
     {
-        var tree = WebLingoTemplateParser.Parse(page, _templates, out var files, kind);
+        var hosted = new List<string>();
+        foreach (var parameter in _options.HostParameters) hosted.Add(parameter.Name);
+        var tree = WebLingoTemplateParser.Parse(page, _templates, out var files, kind, hosted);
         Sources.Add(files);
         return tree;
     }

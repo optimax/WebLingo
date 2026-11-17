@@ -202,12 +202,15 @@ public sealed class WebLingoBinder
             var declared = new List<WebLingoModuleParameter>();
             foreach (var parameter in parameters)
             {
-                // A default is bound before its parameter is declared, as a variable's initializer is (section 3.1).
-                var value = parameter.Default is { } given ? BindExpression(given) : null;
+                // A default is bound before its parameter is declared, as a variable's initializer is (section 3.1); a host's
+                // parameter, a layout's or a component's request, is the host's unless its importer gives another (section 6.12).
+                var hosted = parameter.Default is null ? HostParameter(parameter.Name) : null;
+                var value = parameter.Default is { } given ? BindExpression(given)
+                    : hosted is not null ? MakeHostParameter(hosted, parameter.Span) : null;
                 if (Declare(parameter.Name, WebLingoDeclarationKind.Const, parameter.NameSpan, null) is { } local)
                 {
                     body.Add(new WebLingoBoundModuleParameter(local, values!, parameter.Name, value, parameter.Span));
-                    declared.Add(new WebLingoModuleParameter(parameter.Name, parameter.Default is not null));
+                    declared.Add(new WebLingoModuleParameter(parameter.Name, value is not null));
                 }
             }
             body.AddRange(BindStatements(AfterParameters(module.Root, parameters.Count)));
@@ -286,14 +289,12 @@ public sealed class WebLingoBinder
         {
             if (HostParameter(parameter.Name) is { } hosted)
             {
-                // The host's (section 6.12): an instance its built-in makes, given its classes, when the statement runs.
-                var arguments = new List<WebLingoBoundExpression>();
-                foreach (var info in hosted.Classes) arguments.Add(Reference(HostClass(info), parameter.Span));
-                var made = new WebLingoBoundBuiltinCall(UseBuiltin(new WebLingoBuiltinDeclaration(hosted.Builtin, arguments.Count)), arguments,
-                    parameter.Span);
+                // The host's (section 6.12): an instance its built-in makes, given its classes, when the statement runs,
+                // before the program's imports, which may give it on.
+                var made = MakeHostParameter(hosted, parameter.Span);
                 if (Declare(parameter.Name, WebLingoDeclarationKind.Const, parameter.NameSpan, null) is { } hostLocal)
                 {
-                    statements.Add(new WebLingoBoundVariableDeclaration(hostLocal, made, parameter.Span));
+                    statements.Add(new WebLingoBoundVariableDeclaration(hostLocal, made, parameter.Span) { IsHostParameter = true });
                 }
                 continue;
             }
@@ -327,6 +328,14 @@ public sealed class WebLingoBinder
         if (written is WebLingoTemplateWriters.Escaped or WebLingoTemplateWriters.Raw) return new WebLingoBoundIf(call.Expression, wait, null, span);
         var check = new WebLingoBoundIf(new WebLingoBoundBuiltinCall(UseBuiltin(full), [], span), wait, null, span);
         return new WebLingoBoundBlock([call, check], span);
+    }
+
+    /// <summary>The host's instance for its parameter: its built-in's, given its classes (section 6.12).</summary>
+    private WebLingoBoundBuiltinCall MakeHostParameter(WebLingoHostParameter hosted, WebLingoSourceSpan span)
+    {
+        var arguments = new List<WebLingoBoundExpression>();
+        foreach (var info in hosted.Classes) arguments.Add(Reference(HostClass(info), span));
+        return new WebLingoBoundBuiltinCall(UseBuiltin(new WebLingoBuiltinDeclaration(hosted.Builtin, arguments.Count)), arguments, span);
     }
 
     /// <summary>The host's parameter of that name, or null (section 6.12).</summary>
@@ -380,7 +389,7 @@ public sealed class WebLingoBinder
         }
         foreach (var parameter in parameters)
         {
-            if (parameter.Default is null && !given.Contains(parameter.Name))
+            if (parameter.Default is null && !given.Contains(parameter.Name) && HostParameter(parameter.Name) is null)
             {
                 Report(WebLingoDiagnosticCodes.ModuleParameter,
                     $"\"{import.Path}\"'s parameter '{parameter.Name}' is not given: '{{ {parameter.Name}: … }}' after its path.", import.PathSpan);

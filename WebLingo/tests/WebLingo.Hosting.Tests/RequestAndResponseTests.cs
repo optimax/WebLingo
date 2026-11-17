@@ -84,17 +84,39 @@ public sealed class RequestAndResponseTests
     }
 
     [Fact]
-    public void OnlyThePagesOwnParametersAreTheHosts()
+    public void AComponentsParametersAreTheHostsUnlessItsCallerGivesThem()
     {
-        // A component's parameter of that name is its caller's to give, and a page without them has neither.
+        // A component's parameter of that name is the host's, unless its caller gives another (the owner's answer, 16
+        // November 2026); a page that declares none has neither.
         var app = Load(new MemoryFileSystem()
             .Add("/site/index.wasp", "<% param request; %><% await renderComponent(\"/card.wasp\", { request: \"given\" }); %> <%= request.path %>")
             .Add("/site/card.wasp", "<% param request; %><b><%= request %></b>")
+            .Add("/site/path.wasp", "<% await renderComponent(\"/path-card.wasp\", {}); %>")
+            .Add("/site/path-card.wasp", "<% param request; param response; %><% response.status = 202; %><b><%= request.path %></b>")
             .Add("/site/plain.wasp", "<% var request = 1; %><%= request %>"));
         var given = Get(app, "GET", "/");
         Assert.True(given.Status == 200, given.Body);
         Assert.Equal((200, "<b>given</b> /"), given);
+        Assert.Equal((202, "<b>/path</b>"), Get(app, "GET", "/path"));
         Assert.Equal((200, "1"), Get(app, "GET", "/plain"));
+    }
+
+    [Fact]
+    public void ALayoutHasTheHostsRequest_OrThePagesGiven_AndWhatItIncludesSeesIt()
+    {
+        // A layout's request and response are the host's, unless its page gives them; a page that gives its own request to
+        // its layout made bytecode that failed verification (WL4001), or read its request before it was made (WL2004).
+        var app = Load(new MemoryFileSystem()
+            .Add("/site/layouts/main.wasp", "<% param title; param request; %><h1><%= title %></h1><% renderBody(); %>"
+                + "<% include \"/footer.wasp\"; %>")
+            .Add("/site/footer.wasp", "<footer><%= request.path %></footer>")
+            .Add("/site/hosted.wasp", "<% layout \"/layouts/main.wasp\", { title: \"Hosted\" }; %><p>body</p>")
+            .Add("/site/passed.wasp", "<% param request; %><% layout \"/layouts/main.wasp\", { title: \"Passed\", request: request }; %><p>body</p>")
+            .Add("/site/both.wasp", "<% param request; param response; %><% layout \"/layouts/main.wasp\", { title: \"Both\", request: request }; %>"
+                + "<% response.status = 201; %><p><%= request.method %></p>"));
+        Assert.Equal((200, "<h1>Hosted</h1><p>body</p><footer>/hosted</footer>"), Get(app, "GET", "/hosted"));
+        Assert.Equal((200, "<h1>Passed</h1><p>body</p><footer>/passed</footer>"), Get(app, "GET", "/passed"));
+        Assert.Equal((201, "<h1>Both</h1><p>GET</p><footer>/both</footer>"), Get(app, "GET", "/both"));
     }
 
     [Fact]
