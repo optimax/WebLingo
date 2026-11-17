@@ -3314,3 +3314,35 @@ Guessed, each recorded as Proposed in section 15.2: `..` is resolved as written 
 Tests: `WaspTests`, through `wasp run`, no folders, read and write folders, `..`, the root and `--root`, a junction leading out of a folder (a symbolic link elsewhere), on Windows another case and device names, a page's own databases, and the configuration's errors; `WaspServeTests`, through `wasp serve`. Docs: the specification, the WASP User Manual (section 14), the Standard Library Reference, the Language Reference, `Documents/implementation.md`, the portability inventory and the editors' colouring.
 
 Done (Claude, 2026-11-17, `4b520e8`): file capabilities, M0.16. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail; `weblingo` on the samples and `wasp` on `samples/SimpleWebsite`; Windows only, Linux not tried, where links are symbolic links and names' case counts.
+
+## [DONE] COM Objects on Windows: `windows:com`
+
+The owner's third milestone, M0.17 (A1 of "What Comes After M0.14", 2026-11-17; specification, section 9): the native module designed in the specification's section 3.10, its name, members, threads, permission and interop approved on 15 November 2026, built: `com.create(progId)`, `com.get(moniker)`, `ComObject`'s members through `IDispatch`, `VARIANT`s mapped to values, `ComError` (WL3012), each worker a single-threaded apartment, and COM allowed only by `wasp.config`'s or `weblingo.config`'s `"com"`. Windows only; skipped, as the SQL Server tests are, elsewhere. Added by Claude, 2026-11-17.
+
+2026-11-17 (Claude): its questions, asked before it is built, since it is large and its Proposed points shape what scripts write; the two tasks above wait for theirs. Section 3.10 was written before WebLingo had decimals, bytes and dates (section 3.2), which Q2 to Q4 bring in. One decision each:
+
+Q1, the rest of section 3.10, which is Proposed: `com.create(progId)` by a ProgID or a CLSID and `com.get(moniker)`; values going out and coming back as its "Values" maps them; `ComError`'s fields, `number`, `source` and `description`; `foreach` through `_NewEnum`; the `windows` scheme's folder, `windows/`, beside the runtime's program, as `std/` is; a COM member named as one every value has (`toString`, `equal`, `dispose`) reached by `ComObject`'s `call(name, arguments)`, `get(name)` and `set(name, value)`; and `"com": { "allow": ["ADODB.Connection"] }`, `"*"` allowing any: (a) approved as written, but for Q2 to Q4; (b) not yet, you naming what changes.
+
+A1: (a)
+
+Q2, COM's currency and decimals, `VT_CY` and `VT_DECIMAL`, which section 3.10 reads as numbers "until WebLingo has decimal128 values": (a) as decimals, which WebLingo has had since 16 November 2026, a decimal going out as `VT_DECIMAL`, so that ADO's `MONEY` and `DECIMAL` fields keep their digits; (b) as numbers, as written.
+
+A2: (a)
+
+Q3, COM's arrays of bytes, `VT_ARRAY | VT_UI1`, as ADO gives a binary field: (a) as `Bytes`, and `Bytes` going out as one; (b) as an array of integers, as any other `SAFEARRAY` is.
+
+A3: (a)
+
+Q4, a date going out to COM, which section 3.10 does not list: (a) as `VT_DATE`, its time on the server's clocks, as `VT_DATE` comes back; (b) WL3001, as a value COM does not take is.
+
+A4: (a)
+
+2026-11-17 (Claude): built with A1's (a), A2's (a), A3's (a) and A4's (a), and landed: `windows:com`, `WebLingo.Windows.Com`, installed as `windows/com.dll`, the `windows` scheme's folder by default on Windows only: `com.create(progId)` and `com.get(moniker)`, only for what the configuration's `"com"` allows; `ComObject`'s members through `IDispatch`, called through function pointers, never .NET's COM interop; values to `VARIANT`s and back, decimals, bytes and dates as your answers have them; `x[k]` the default member; `foreach` through `_NewEnum`; `call`, `get` and `set`; `ComError`, WL3012. For it, native modules gained a class's fallback for the members it does not declare (`DeclareFallback`), which the runtime runs, each VM's method call reaching it in its failure's path, its one change to either VM; a class its module's own functions make (`DeclareMadeByModule`); a runtime error's fields; and the configuration's allow-lists through the heap. `weblingo`'s and `wasp`'s `Main` are `[STAThread]`, and the web host's workers single-threaded apartments. The answers are recorded in the specification (section 1.1's "COM objects (Windows)", section 3.10, now built), the details as built in section 15.2, "COM objects", Proposed.
+
+Guessed, each recorded as Proposed in section 15.2: `com.get(moniker)` needs the moniker itself, or `"*"`, in `"com"`'s list, as `create` needs its ProgID; a CLSID is compared as written; `x[k]` goes on to the default member's own default member when the first takes no argument, as VBScript's `rs("Name")` does; an assignment of an object is tried by reference first, then by value; every call is made with the invariant locale; a failure without an `EXCEPINFO` takes the thread's error information, its `description` "" where COM gave none, the message then in my words; `VT_ERROR` comes back as its code, `DISP_E_PARAMNOTFOUND` as `null`; the enumerator's class is `ComEnumerator`. ADO gives a big integer back as a decimal, which the tests show. A host `"com"` does not list is WL3001, as approved; the question "Permissions: Hosts and COM Objects as `PermissionError`" asks whether it should be a `PermissionError`.
+
+Benchmark, three rounds of every workload but `io` and `async`, alternately against `main`: within the machine's noise on both VMs (`objects` 100 ms against 119 on the register VM, 107 against 101 on the stack VM, `main`'s own rounds ranging 100 to 110).
+
+Tests: `ComTests` (`WebLingo.Conformance.Tests`, Windows only, skipped elsewhere), through `weblingo`, each program on the register VM and from a stack `.wlbc`, on a single-threaded apartment's thread: `Scripting.Dictionary`, an ADO recordset in memory, the errors, the permission and the configuration's error. Docs: the specification, the Standard Library Reference (section 20, `windows:com`), the WASP User Manual's configuration, the Language Reference, `Documents/implementation.md`, the portability inventory and the editors' colouring.
+
+Done (Claude, 2026-11-17, `90b7e5e`): COM objects on Windows, M0.17. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail; `weblingo` on a script and `wasp` on a page that use COM; Windows only, where COM is; not tried under IIS.
