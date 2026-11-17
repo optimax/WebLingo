@@ -55,6 +55,8 @@ public static class WebLingoWaspServer
             WorkerServices = _ => Services(schemes, importer),
             Environment = environment,
             Clock = new WebLingoExecutionClock(new DotNetClock()),
+            WallClock = new DotNetClock(),
+            TimeZone = new DotNetTimeZone(),
             Scheduler = () => new DotNetSchedulerHost(),
             Log = log is null ? null : log.WriteLine,
             SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30)

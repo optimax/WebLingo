@@ -48,6 +48,16 @@ public sealed class PortabilityTests
         ("System.Text.UnicodeEncoding", "encodings are adapter-only; the core has its own codec, WebLingoTextCodec"),
         ("System.Text.Latin1Encoding", "encodings are adapter-only; the core has its own codec, WebLingoTextCodec"),
         ("System.Uri", "the core decodes what it needs of a URL itself"),
+        ("System.TimeZoneInfo", "the server's zone is the platform's, IWebLingoTimeZone"),
+    ];
+
+    private static readonly (string Type, string Member, string Reason)[] ForbiddenMembers =
+    [
+        ("System.DateTime", "get_Now", "the time is the platform's wall clock, IWebLingoClock"),
+        ("System.DateTime", "get_UtcNow", "the time is the platform's wall clock, IWebLingoClock"),
+        ("System.DateTime", "get_Today", "the time is the platform's wall clock, IWebLingoClock"),
+        ("System.DateTimeOffset", "get_Now", "the time is the platform's wall clock, IWebLingoClock"),
+        ("System.DateTimeOffset", "get_UtcNow", "the time is the platform's wall clock, IWebLingoClock"),
     ];
 
     public static TheoryData<string> PortableCore => new()
@@ -67,10 +77,12 @@ public sealed class PortabilityTests
     [Fact]
     public void TheCheckFindsWhatItLooksFor()
     {
-        // This test assembly reads files and uses LINQ, so the check must object to it.
+        // This test assembly reads files, uses LINQ and reads .NET's clock, so the check must object to it.
+        Assert.True(DateTimeOffset.UtcNow.Year > 2000);
         var violations = Violations(typeof(PortabilityTests).Assembly);
         Assert.Contains(violations, v => v.StartsWith("System.IO.File:", StringComparison.Ordinal));
         Assert.Contains(violations, v => v.StartsWith("System.Linq.", StringComparison.Ordinal));
+        Assert.Contains(violations, v => v.StartsWith("System.DateTimeOffset.get_UtcNow:", StringComparison.Ordinal));
     }
 
     private static List<string> Violations(Assembly assembly)
@@ -90,6 +102,16 @@ public sealed class PortabilityTests
             foreach (var (type, reason) in ForbiddenTypes)
             {
                 if (name == type || name.StartsWith(type + "+", StringComparison.Ordinal)) violations.Add($"{name}: {reason}");
+            }
+        }
+        foreach (var handle in metadata.MemberReferences)
+        {
+            var member = metadata.GetMemberReference(handle);
+            if (member.Parent.Kind != HandleKind.TypeReference) continue;
+            var (type, name) = (FullName(metadata, metadata.GetTypeReference((TypeReferenceHandle)member.Parent)), metadata.GetString(member.Name));
+            foreach (var (forbiddenType, forbiddenMember, reason) in ForbiddenMembers)
+            {
+                if (type == forbiddenType && name == forbiddenMember) violations.Add($"{type}.{name}: {reason}");
             }
         }
         foreach (var handle in metadata.MethodDefinitions)

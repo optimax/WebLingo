@@ -411,6 +411,8 @@ public static class WebLingoCommandLine
         {
             Services = host.Services,
             Clock = new SystemClock(new DotNetClock()),
+            WallClock = new DotNetClock(),
+            TimeZone = new DotNetTimeZone(),
             Output = host.Output,
             Parameters = parameters,
             FileSystem = new DotNetFileSystem(),

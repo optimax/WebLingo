@@ -15,7 +15,7 @@ internal static class WebLingoPrelude
         ("String", WebLingoValueClass.String), ("Array", WebLingoValueClass.Array), ("Map", WebLingoValueClass.Map), ("Set", WebLingoValueClass.Set),
         ("Function", WebLingoValueClass.Function), ("Class", WebLingoValueClass.Class), ("Task", WebLingoValueClass.Task),
         ("Module", WebLingoValueClass.Module), ("Iterator", WebLingoValueClass.Iterator), ("Bytes", WebLingoValueClass.Bytes),
-        ("BytesBuilder", WebLingoValueClass.BytesBuilder)
+        ("BytesBuilder", WebLingoValueClass.BytesBuilder), ("DateTime", WebLingoValueClass.DateTime)
     ];
 
     public static readonly (string Name, string Code)[] ErrorClasses =

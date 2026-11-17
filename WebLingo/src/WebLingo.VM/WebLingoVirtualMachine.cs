@@ -78,6 +78,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         // The execution's own heap (worker-local, section 4.3), whose roots are the constants and the frames.
         var heap = new WebLingoHeap(context.Resources.MaxHeapUnits);
         heap.FileSystem = context.FileSystem;
+        heap.WallClock = context.WallClock;
+        heap.TimeZone = context.TimeZone;
         heap.SchedulerHost = context.SchedulerHost;
         var constants = new WebLingoValue[module.Constants.Count];
         var names = new WebLingoMemberName[module.Constants.Count]; // Each string constant as a member's name.
@@ -2147,7 +2149,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             value.Kind is WebLingoValueKind.Instance or WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set;
 
         /// <summary>The kinds of values' classes, by <c>WebLingoValueClass</c>, once the module has made them (section 3.7); a root.</summary>
-        private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.BytesBuilder + 1];
+        private readonly WebLingoValue[] _valueClasses = new WebLingoValue[(int)WebLingoValueClass.DateTime + 1];
 
         /// <summary>The kinds of runtime errors' classes, as <c>module.ErrorClasses</c> lists them, once made; a root.</summary>
         private readonly WebLingoValue[] _errorClasses = new WebLingoValue[Math.Max(module.ErrorClasses.Count, MaxErrorClasses)];

@@ -6,7 +6,8 @@ namespace WebLingo.Runtime;
 /// An interpolation's format and alignment (specification, section 3.5), <c>{price,10:N2}</c>, which the parser writes as
 /// a call of the hidden class's built-in method, <c>&lt;text&gt;.&lt;format&gt;(value, width, format)</c>. A format is one
 /// of .NET's numeric format strings, standard or custom, applied with the invariant culture to an integer or a number, a
-/// class's instance holding one included, and gives <c>null</c> nothing; any other value is WL3001. An alignment pads
+/// class's instance holding one included, or of its date and time format strings, to a date (section 3.2), and gives
+/// <c>null</c> nothing; any other value is WL3001. An alignment pads
 /// the text with spaces to its width, counted in Unicode scalar values, on the left when it is positive and on the
 /// right when it is negative.
 /// </summary>
@@ -65,6 +66,9 @@ public static class WebLingoInterpolationFormat
                 case WebLingoValueKind.Binary64:
                     text = held.AsBinary64.ToString(format, CultureInfo.InvariantCulture);
                     return true;
+                case WebLingoValueKind.DateTime:
+                    // A date by .NET's date and time formats (section 3.2, "Dates and times").
+                    return WebLingoMembers.TryFormatDateTime(held, format, out text, out error);
             }
         }
         catch (FormatException)
@@ -74,7 +78,7 @@ public static class WebLingoInterpolationFormat
             return false;
         }
         error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-            $"A format applies to an integer or a number, not {WebLingoValueFormatter.Describe(value, heap)}.");
+            $"A format applies to an integer, a number or a date and time, not {WebLingoValueFormatter.Describe(value, heap)}.");
         return false;
     }
 }

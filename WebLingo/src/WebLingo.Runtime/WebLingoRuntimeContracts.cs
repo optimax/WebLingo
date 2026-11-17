@@ -24,6 +24,15 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     public IWebLingoExecutionClock? Clock { get; init; }
 
     /// <summary>
+    /// The platform's wall clock, which <c>DateTime.now()</c> and <c>DateTime.utcNow()</c> read (section 3.2, "Dates and
+    /// times"); without one, they are WL3001.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoClock? WallClock { get; init; }
+
+    /// <summary>The server's own time zone, a date's local time's; without one, the server's zone is UTC.</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoTimeZone? TimeZone { get; init; }
+
+    /// <summary>
     /// Where the execution's text goes, which a native module's functions reach through the heap
     /// (<see cref="WebLingoHeap.Output"/>), as <c>std:system</c>'s <c>write</c> does (section 3.9); none by default.
     /// </summary>

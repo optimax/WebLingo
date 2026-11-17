@@ -203,6 +203,8 @@ public sealed class WebLingoApplication
             Output = output,
             FileSystem = _options.FileSystem,
             Clock = _options.Clock,
+            WallClock = _options.WallClock,
+            TimeZone = _options.TimeZone,
             SchedulerHost = scheduler ?? _options.Scheduler?.Invoke(),
             Suspends = scheduler is not null,
             InstructionBudget = _options.InstructionBudget,

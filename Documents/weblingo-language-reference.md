@@ -194,6 +194,7 @@ writeLn(limit);
 | Map | `{ name: "Ann", age: 30 }` | `Map` |
 | Set | `#{1, 2, 3}` | `Set` |
 | Bytes | `Bytes.from("hi")`, `Bytes.from([104, 105])` | `Bytes` |
+| Date and time | `DateTime.now()`, `DateTime.utc(2026, 11, 16)` | `DateTime` |
 | Function | `function (x) { … }`, `x => x * 2` | `Function` |
 | Class | `class Point { … }` | `Class` |
 | Instance | `new Point(1, 2)` | its class |
@@ -252,6 +253,59 @@ text
 
 - **Every value but `null` has a class** ([section 10](#classes-of-values)), so `5 is Integer` and `"a" is String`
   are true.
+
+### Dates and times
+
+A date and time is a value of the class `DateTime`: an instant, to the millisecond, with its offset from UTC, the time on
+the clocks where it was read. Like a string, it is immutable; its years are 1 to 9999.
+
+```javascript
+var d = DateTime.utc(2026, 11, 16, 14, 30);
+writeLn(d);
+writeLn([d.year, d.month, d.day, d.hour, d.minute, d.dayOfWeek]);
+writeLn(d.addDays(1).addHours(-2.5));
+writeLn(DateTime.utc(2026, 1, 31).addMonths(1));
+var meeting = DateTime.parse("2026-11-16T15:30:00+01:00");
+writeLn(meeting);
+writeLn([meeting == d, meeting - d, meeting.toUtc()]);
+writeLn(d.format("dddd, d MMMM yyyy 'at' HH:mm"));
+writeLn($"{d:yyyy-MM-dd} {d:HH:mm}");
+writeLn(DateTime.parse("16/11/2026 14:30 +00:00", "dd/MM/yyyy HH:mm zzz") == d);
+```
+
+```text
+DateTime:2026-11-16T14:30:00Z
+[2026, 11, 16, 14, 30, 1]
+DateTime:2026-11-17T12:00:00Z
+DateTime:2026-02-28T00:00:00Z
+DateTime:2026-11-16T15:30:00+01:00
+[true, 0, DateTime:2026-11-16T14:30:00Z]
+Monday, 16 November 2026 at 14:30
+2026-11-16 14:30
+true
+```
+
+- **Making one.** `DateTime.now()` is the server's time, with the server's offset, and `DateTime.utcNow()` the same
+  instant in UTC. `DateTime.utc(year, month, day, hour, minute, second, millisecond)`, and `DateTime.local(…)`, in the
+  server's time zone, make one from its parts, those after the day optional, 0 when left out; months and days count
+  from 1. `DateTime.fromUnixMilliseconds(ms)` makes one from milliseconds since 1970-01-01T00:00:00Z, in UTC.
+  `new DateTime()` is an error.
+- **Reading one.** `d.year`, `d.month`, `d.day`, `d.hour`, `d.minute`, `d.second` and `d.millisecond` are its time on
+  its own clocks; `d.dayOfWeek` is 0 for Sunday to 6 for Saturday; `d.dayOfYear` counts from 1; `d.offset` is how many
+  minutes ahead of UTC it is; and `d.unixMilliseconds` its milliseconds since 1970-01-01T00:00:00Z.
+- **Moving one.** `d.addYears(n)` and `d.addMonths(n)` take an integer, and keep the day, or the month's last when it
+  has fewer; `d.addDays(n)`, `d.addHours(n)`, `d.addMinutes(n)`, `d.addSeconds(n)` and `d.addMilliseconds(n)` take a
+  number, rounded to the millisecond. Each gives a new date with the same offset. `d.toUtc()` is the same instant in
+  UTC, and `d.toLocal()` in the server's time zone.
+- **Comparing them.** `==`, `!=`, `<`, `<=`, `>` and `>=` compare instants, whatever their offsets, and `b - a` is the
+  milliseconds from `a` to `b`. `+` does not add to a date: its `add` methods do. Dates are not keys of a map.
+- **As text.** `write` writes `DateTime:` and the date as ISO 8601 writes it, its milliseconds only when it has any.
+  `d.format(format)`, and an interpolation's format, `{d:yyyy-MM-dd}`, take .NET's date and time formats, standard
+  (`"o"`, `"d"`) or custom (`"dddd, d MMMM yyyy"`), in English, whatever the server's language.
+- **From text.** `DateTime.parse(text)` reads ISO 8601: `2026-11-16T14:30:00Z`, `2026-11-16T15:30:00+01:00`, and,
+  in the server's time zone, `2026-11-16T14:30` and `2026-11-16`. `DateTime.parse(text, format)` reads by a format of
+  .NET's, a time without a zone being the server's.
+- **Time zones.** UTC and the server's own, for now.
 
 ---
 
@@ -1583,7 +1637,7 @@ WebLingo is pre-alpha, and some of what other languages have is still to come. T
 - **Operators**: `%` (remainder), compound assignment (`+=`, `-=`), `++` and `--`, the conditional `c ? a : b`, `??`,
   and string comparison with `<`.
 - **Statements**: `switch`.
-- **Values**: decimals (exact decimal arithmetic, `1.5m`), and dates and times.
+- **Values**: decimals (exact decimal arithmetic, `1.5m`), and time zones other than UTC and the server's.
 - **Literals**: hexadecimal and binary numbers, and `_` between digits.
 - **Functions**: a variable number of arguments (rest parameters), and spreading an array into a call.
 - **Library**: string methods (searching, splitting, case), array methods beyond `push` and `pop`, regular expressions,

@@ -5,7 +5,7 @@ namespace WebLingo.Runtime;
 /// a BoundMethod (a method and the instance it runs on) refer to an object of a heap by
 /// handle; a Builtin is a host built-in, by its import index; a Cell is never a script's value, only a frame's.
 /// </summary>
-public enum WebLingoValueKind : byte { Null, Boolean, Int64, Binary64, String, Function, Builtin, Cell, Array, Map, Set, Class, Instance, BoundMethod, Missing, Task, Module, Bytes }
+public enum WebLingoValueKind : byte { Null, Boolean, Int64, Binary64, String, Function, Builtin, Cell, Array, Map, Set, Class, Instance, BoundMethod, Missing, Task, Module, Bytes, DateTime }
 
 /// <summary>
 /// A runtime value (specification, section 4.1): a kind and a 64-bit payload, 16 bytes in all. M0.6 has null,
@@ -46,6 +46,19 @@ public readonly struct WebLingoValue : IEquatable<WebLingoValue>
     /// </summary>
     public static WebLingoValue FromHandle(WebLingoValueKind kind, int handle, bool hasClass) =>
         new(kind, hasClass ? (uint)handle | (1L << 32) : handle);
+
+    /// <summary>
+    /// A date and time (section 3.2, "Dates and times"), held in the value itself: its instant, in milliseconds since
+    /// 1970-01-01T00:00:00Z, and its offset from UTC, in minutes, which the instant's 49 bits and the offset's 12 share.
+    /// </summary>
+    public static WebLingoValue FromDateTime(long unixMilliseconds, int offsetMinutes) =>
+        new(WebLingoValueKind.DateTime, (unixMilliseconds << 12) | (uint)(offsetMinutes & 0xFFF));
+
+    /// <summary>A date and time's instant, in milliseconds since 1970-01-01T00:00:00Z.</summary>
+    public long UnixMilliseconds => _bits >> 12;
+
+    /// <summary>A date and time's offset from UTC, in minutes.</summary>
+    public int OffsetMinutes => (int)(_bits << 52 >> 52);
 
     /// <summary>For an array, a map or a set: whether a class extending Array, Map or Set made it.</summary>
     public bool HasClass => (_bits >> 32) == 1;

@@ -33,6 +33,15 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// <summary>The clock an execution's timers wait on, or none, for virtual time.</summary>
     public IWebLingoExecutionClock? Clock { get; init; }
 
+    /// <summary>
+    /// The platform's wall clock, which a page's dates read (section 3.2, "Dates and times"); without one,
+    /// <c>DateTime.now()</c> is WL3001.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoClock? WallClock { get; init; }
+
+    /// <summary>The server's own time zone, a date's local time's; without one, UTC.</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoTimeZone? TimeZone { get; init; }
+
     /// <summary>The host's side of an execution's scheduler, a new one for each request, or none.</summary>
     public Func<IWebLingoSchedulerHost>? Scheduler { get; init; }
 

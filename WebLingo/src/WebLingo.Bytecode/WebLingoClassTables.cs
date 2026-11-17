@@ -95,8 +95,8 @@ internal static class WebLingoClassTables
     public static string? CheckRoles(int classCount, IReadOnlyList<int>? valueClasses, IReadOnlyList<WebLingoErrorClass>? errorClasses)
     {
         if (valueClasses is null || errorClasses is null) return "The module has no tables of built-in classes.";
-        // One for each kind; a module compiled before bytes (section 3.2), which ends with Iterator, still loads.
-        if (valueClasses.Count != 0 && valueClasses.Count is < (int)WebLingoValueClass.Iterator + 1 or > (int)WebLingoValueClass.BytesBuilder + 1)
+        // One for each kind; a module compiled before bytes, or dates (section 3.2), which ends with Iterator, still loads.
+        if (valueClasses.Count != 0 && valueClasses.Count is < (int)WebLingoValueClass.Iterator + 1 or > (int)WebLingoValueClass.DateTime + 1)
         {
             return $"The module has {valueClasses.Count} classes of values, not one for each kind.";
         }

@@ -45,6 +45,8 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Task => "task",
         WebLingoValueKind.Module => $"module#{value.Handle}",
         WebLingoValueKind.Bytes => $"bytes#{value.Handle}",
+        // A date and time's text (section 3.2, "Dates and times"): its class's name, a colon, and ISO 8601's.
+        WebLingoValueKind.DateTime => "DateTime:" + WebLingoMembers.IsoText(value),
         WebLingoValueKind.Boolean => value.AsBoolean ? "true" : "false",
         WebLingoValueKind.Int64 => value.AsInt64.ToString(CultureInfo.InvariantCulture),
         _ => FormatBinary64(value.AsBinary64)
@@ -66,6 +68,7 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Task => "a task",
         WebLingoValueKind.Module => "a module",
         WebLingoValueKind.Bytes => "bytes",
+        WebLingoValueKind.DateTime => $"the date and time {WebLingoMembers.IsoText(value)}",
         _ => $"the number {Format(value)}"
     };
 

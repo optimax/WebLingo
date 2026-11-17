@@ -40,6 +40,13 @@ public static class WebLingoOperators
                 $"'+' joins two strings or adds two numbers, not {WebLingoValueFormatter.Describe(left)} and {WebLingoValueFormatter.Describe(right)}.");
             return false;
         }
+        if (op == WebLingoArithmeticOperator.Subtract && left.Kind == WebLingoValueKind.DateTime && right.Kind == WebLingoValueKind.DateTime)
+        {
+            // How long from one date to another, in milliseconds (section 3.2, "Dates and times").
+            result = WebLingoValue.FromInt64(left.UnixMilliseconds - right.UnixMilliseconds);
+            error = null;
+            return true;
+        }
         error = CheckOperand(left, op) ?? CheckOperand(right, op);
         if (error is not null) return false;
 
@@ -95,6 +102,19 @@ public static class WebLingoOperators
             return true;
         }
         result = WebLingoValue.Null;
+        if (left.Kind == WebLingoValueKind.DateTime && right.Kind == WebLingoValueKind.DateTime)
+        {
+            // Dates are ordered by their instants, whatever their offsets (section 3.2, "Dates and times").
+            var instants = left.UnixMilliseconds.CompareTo(right.UnixMilliseconds);
+            result = WebLingoValue.FromBoolean(op switch
+            {
+                WebLingoComparisonOperator.Less => instants < 0,
+                WebLingoComparisonOperator.LessOrEqual => instants <= 0,
+                WebLingoComparisonOperator.Greater => instants > 0,
+                _ => instants >= 0
+            });
+            return true;
+        }
         if (!IsNumber(left) || !IsNumber(right))
         {
             var bad = IsNumber(left) ? right : left;
@@ -187,6 +207,10 @@ public static class WebLingoOperators
         {
             // Bytes are equal when their contents are (section 3.2, "Bytes"); Bytes.fixedTimeEqual compares secrets.
             return heap is null ? left.Handle == right.Handle : heap.GetBytes(left).AsSpan().SequenceEqual(heap.GetBytes(right));
+        }
+        if (left.Kind == WebLingoValueKind.DateTime && right.Kind == WebLingoValueKind.DateTime)
+        {
+            return left.UnixMilliseconds == right.UnixMilliseconds; // The same instant, whatever its offset, as .NET's DateTimeOffset.
         }
         return left == right; // The same kind and payload: null, a Boolean, or a function by identity.
     }

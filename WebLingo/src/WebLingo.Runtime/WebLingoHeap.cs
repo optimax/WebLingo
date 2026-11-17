@@ -78,6 +78,12 @@ public sealed class WebLingoHeap
     /// <summary>The platform's files (<see cref="WebLingoExecutionContext.FileSystem"/>), for native functions, <c>std:fs</c>'s (section 7.4).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoFileSystem? FileSystem { get; set; }
 
+    /// <summary>The platform's wall clock (<see cref="WebLingoExecutionContext.WallClock"/>), which dates read (section 3.2).</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoClock? WallClock { get; set; }
+
+    /// <summary>The server's own time zone (<see cref="WebLingoExecutionContext.TimeZone"/>); UTC without one.</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoTimeZone? TimeZone { get; set; }
+
     /// <summary>The host's side of the scheduler (<see cref="WebLingoExecutionContext.SchedulerHost"/>), which its operations run on (section 7.8).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoSchedulerHost? SchedulerHost { get; set; }
 

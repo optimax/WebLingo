@@ -14,6 +14,13 @@ public enum WebLingoMember : byte
     All, Any, Timeout, Parse,
     /// <summary>Bytes' <c>slice</c> and <c>text</c>, and the class's <c>from</c>, <c>concat</c> and <c>fixedTimeEqual</c> (section 3.2, "Bytes").</summary>
     Slice, Text, From, Concat, FixedTimeEqual,
+    /// <summary>
+    /// A date's properties, its methods, and the class's <c>now</c>, <c>utcNow</c>, <c>local</c>, <c>utc</c> and
+    /// <c>fromUnixMilliseconds</c>, besides <c>parse</c> (section 3.2, "Dates and times").
+    /// </summary>
+    Year, Month, Day, Hour, Minute, Second, Millisecond, DayOfWeek, DayOfYear, Offset, UnixMilliseconds,
+    AddYears, AddMonths, AddDays, AddHours, AddMinutes, AddSeconds, AddMilliseconds, ToUtc, ToLocal, FormatWith,
+    Now, UtcNow, Local, Utc, FromUnixMilliseconds,
     /// <summary>A collection's or a string's <c>iterate()</c>, which gives an <c>Iterator</c> (section 3.6).</summary>
     Iterate,
     /// <summary>An interpolation's format and alignment, a built-in method of every class that no program can name (section 3.5).</summary>
@@ -59,6 +66,32 @@ public static partial class WebLingoMembers
         "from" => WebLingoMember.From,
         "concat" => WebLingoMember.Concat,
         "fixedTimeEqual" => WebLingoMember.FixedTimeEqual,
+        "year" => WebLingoMember.Year,
+        "month" => WebLingoMember.Month,
+        "day" => WebLingoMember.Day,
+        "hour" => WebLingoMember.Hour,
+        "minute" => WebLingoMember.Minute,
+        "second" => WebLingoMember.Second,
+        "millisecond" => WebLingoMember.Millisecond,
+        "dayOfWeek" => WebLingoMember.DayOfWeek,
+        "dayOfYear" => WebLingoMember.DayOfYear,
+        "offset" => WebLingoMember.Offset,
+        "unixMilliseconds" => WebLingoMember.UnixMilliseconds,
+        "addYears" => WebLingoMember.AddYears,
+        "addMonths" => WebLingoMember.AddMonths,
+        "addDays" => WebLingoMember.AddDays,
+        "addHours" => WebLingoMember.AddHours,
+        "addMinutes" => WebLingoMember.AddMinutes,
+        "addSeconds" => WebLingoMember.AddSeconds,
+        "addMilliseconds" => WebLingoMember.AddMilliseconds,
+        "toUtc" => WebLingoMember.ToUtc,
+        "toLocal" => WebLingoMember.ToLocal,
+        "format" => WebLingoMember.FormatWith,
+        "now" => WebLingoMember.Now,
+        "utcNow" => WebLingoMember.UtcNow,
+        "local" => WebLingoMember.Local,
+        "utc" => WebLingoMember.Utc,
+        "fromUnixMilliseconds" => WebLingoMember.FromUnixMilliseconds,
         "iterate" => WebLingoMember.Iterate,
         WebLingoInterpolation.Format => WebLingoMember.Format,
         "__className" => WebLingoMember.ClassName,
@@ -228,6 +261,12 @@ public static partial class WebLingoMembers
         if (target.Kind == WebLingoValueKind.Bytes && member == WebLingoMember.Length)
         {
             result = WebLingoValue.FromInt64(heap.GetBytes(target).Length);
+            error = null;
+            return true;
+        }
+        if (target.Kind == WebLingoValueKind.DateTime && IsDateTimeProperty(member))
+        {
+            result = GetDateTimeProperty(target, member);
             error = null;
             return true;
         }
@@ -550,6 +589,7 @@ public static partial class WebLingoMembers
         WebLingoValueKind.Task => (int)WebLingoValueClass.Task,
         WebLingoValueKind.Module => (int)WebLingoValueClass.Module,
         WebLingoValueKind.Bytes => (int)WebLingoValueClass.Bytes,
+        WebLingoValueKind.DateTime => (int)WebLingoValueClass.DateTime,
         _ => -1
     };
 
@@ -693,7 +733,8 @@ public static partial class WebLingoMembers
         || (target.Kind == WebLingoValueKind.Map && member is WebLingoMember.Has or WebLingoMember.Remove)
         || (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
         || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
-        || (target.Kind == WebLingoValueKind.Bytes && member is WebLingoMember.Slice or WebLingoMember.Text);
+        || (target.Kind == WebLingoValueKind.Bytes && member is WebLingoMember.Slice or WebLingoMember.Text)
+        || (target.Kind == WebLingoValueKind.DateTime && IsDateTimeMethod(member));
 
     /// <summary>
     /// Whether <c>x.name(…)</c> calls a class's built-in method, <c>setMethod</c>, <c>setProperty</c>,
@@ -713,6 +754,7 @@ public static partial class WebLingoMembers
             || (member == WebLingoMember.Parse && ParsedKind(target, heap) != WebLingoValueKind.Null)
             || (member is WebLingoMember.From or WebLingoMember.Concat or WebLingoMember.FixedTimeEqual && heap.ValueClasses is { } bytesClasses
                 && bytesClasses[(int)WebLingoValueClass.Bytes] == target)
+            || (IsDateTimeClassMethod(member) && heap.ValueClasses is { } dateClasses && dateClasses[(int)WebLingoValueClass.DateTime] == target)
             || member == WebLingoMember.Format);
 
     /// <summary>The kind <c>parse</c> reads a string as, for <c>Integer</c>, <c>Number</c> and <c>Boolean</c>; null's for any other class.</summary>
@@ -780,6 +822,10 @@ public static partial class WebLingoMembers
             {
                 return TryCallBytesClass(member, name, values, first, count, heap, out result, out error);
             }
+            if (IsDateTimeClassMethod(member) && heap.ValueClasses is { } classes && classes[(int)WebLingoValueClass.DateTime] == target)
+            {
+                return TryCallDateTimeClass(member, name, values, first, count, heap, out result, out error);
+            }
             if (member == WebLingoMember.Parse)
             {
                 // Integer.parse("10"), Number.parse("1.5") and Boolean.parse("true") (section 3.7).
@@ -826,6 +872,10 @@ public static partial class WebLingoMembers
         {
             return TryCallBytes(target, member, name, values, first, count, heap, out result, out error);
         }
+        if (target.Kind == WebLingoValueKind.DateTime && IsDateTimeMethod(member))
+        {
+            return TryCallDateTime(target, member, name, values, first, count, heap, out result, out error);
+        }
         if (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
         {
             if (count != 1) return WrongArgumentCount(name, 1, count, out error);
@@ -839,9 +889,10 @@ public static partial class WebLingoMembers
             if (succeeded) result = WebLingoValue.FromBoolean(answer);
             return succeeded;
         }
-        error = target.Kind is WebLingoValueKind.String or WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set
+        error = (target.Kind is WebLingoValueKind.String or WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set
                     or WebLingoValueKind.Bytes
-                && member == WebLingoMember.Length
+                && member == WebLingoMember.Length)
+            || (target.Kind == WebLingoValueKind.DateTime && IsDateTimeProperty(member))
             ? new WebLingoRuntimeError(WebLingoDiagnosticCodes.NotAFunction,
                 $"'{name}' of {WebLingoValueFormatter.Describe(target)} is not a method, and cannot be called.")
             : NoSuchMember(target, name, heap);

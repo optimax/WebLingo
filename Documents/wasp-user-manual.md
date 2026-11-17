@@ -206,6 +206,15 @@ Everything else inside the blocks is the WebLingo language: variables (`var`, `c
 (`[1, 2]`), maps (`{ name: "Ann" }`), `if`, `while`, `for`, `foreach`, `try`, and the rest. An interpolated string,
 `$"…"`, puts values in text, with a format for numbers when you want one: `$"€{price:N2}"` writes `€6.50` for 6.5.
 
+`DateTime.now()` is the server's date and time. `<%= %>` writes a date as WebLingo shows any date,
+`DateTime:2026-11-16T14:30:00-06:00`, so give it a format for people to read:
+
+```html
+<p>Served on <%= DateTime.now().format("d MMMM yyyy 'at' HH:mm") %>.</p>
+```
+
+The WebLingo Language Reference has dates' members, their formats, and how to read one from text.
+
 ---
 
 ## 4. Escaping
