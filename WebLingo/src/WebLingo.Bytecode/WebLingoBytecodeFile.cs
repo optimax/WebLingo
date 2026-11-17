@@ -134,6 +134,7 @@ public static class WebLingoBytecodeFile
                 OptionalCount = h.OptionalCount,
                 HasThis = h.HasThis,
                 IsAsync = h.IsAsync,
+                HasRest = h.HasRest,
                 IsNative = h.IsNative,
                 Source = h.Source,
                 NativeBuiltin = h.NativeBuiltin,
@@ -198,6 +199,7 @@ public static class WebLingoBytecodeFile
                 OptionalCount = h.OptionalCount,
                 HasThis = h.HasThis,
                 IsAsync = h.IsAsync,
+                HasRest = h.HasRest,
                 IsNative = h.IsNative,
                 Source = h.Source,
                 NativeBuiltin = h.NativeBuiltin,
@@ -249,9 +251,10 @@ public static class WebLingoBytecodeFile
     {
         public IReadOnlyList<WebLingoSourceSpan>? Spans { get; set; }
         public IReadOnlyList<string>? LocalNames { get; set; }
+        public bool HasRest { get; init; }
     }
 
-    private const int HasThisFlag = 1, IsAsyncFlag = 2, IsNativeFlag = 4, HasSourceFlag = 8;
+    private const int HasThisFlag = 1, IsAsyncFlag = 2, IsNativeFlag = 4, HasSourceFlag = 8, HasRestFlag = 16;
     private const int HasSpansFlag = 1, HasLocalNamesFlag = 2;
 
     private static ModuleHead HeadOf(WebLingoCompiledModule m) => new(m.Name, m.IsImport, m.ErrorClass, m.ObjectClass,
@@ -264,14 +267,16 @@ public static class WebLingoBytecodeFile
         f.OptionalCount, f.HasThis, f.IsAsync, f.IsNative, f.Source, f.NativeBuiltin, f.NativeResult, f.Captures, f.Code.Count)
     {
         Spans = f.Spans,
-        LocalNames = f.LocalNames
+        LocalNames = f.LocalNames,
+        HasRest = f.HasRest
     };
 
     private static FunctionHead HeadOf(WebLingoStackFunction f) => new(f.Name, f.LocalCount, f.MaxStack, f.ParameterCount,
         f.OptionalCount, f.HasThis, f.IsAsync, f.IsNative, f.Source, f.NativeBuiltin, f.NativeResult, f.Captures, f.Code.Count)
     {
         Spans = f.Spans,
-        LocalNames = f.LocalNames
+        LocalNames = f.LocalNames,
+        HasRest = f.HasRest
     };
 
     private static byte[] Assemble(WebLingoBytecodeKind kind, ModuleHead module, List<FunctionHead> functions,
@@ -385,7 +390,7 @@ public static class WebLingoBytecodeFile
             w.Signed(f.ParameterCount);
             w.Signed(f.OptionalCount);
             w.Byte((f.HasThis ? HasThisFlag : 0) | (f.IsAsync ? IsAsyncFlag : 0) | (f.IsNative ? IsNativeFlag : 0)
-                   | (f.Source is not null ? HasSourceFlag : 0));
+                   | (f.Source is not null ? HasSourceFlag : 0) | (f.HasRest ? HasRestFlag : 0));
             if (f.Source is not null) w.Text(f.Source);
             w.Signed(f.NativeBuiltin);
             w.Byte((int)f.NativeResult);
@@ -665,7 +670,7 @@ public static class WebLingoBytecodeFile
         {
             var name = r.Text();
             var (first, second, parameters, optional) = (r.Int(), r.Int(), r.Int(), r.Int());
-            var flags = r.Flags(HasThisFlag | IsAsyncFlag | IsNativeFlag | HasSourceFlag);
+            var flags = r.Flags(HasThisFlag | IsAsyncFlag | IsNativeFlag | HasSourceFlag | HasRestFlag);
             var source = (flags & HasSourceFlag) != 0 ? r.Text() : null;
             var native = r.Int();
             var result = r.Byte();
@@ -673,7 +678,10 @@ public static class WebLingoBytecodeFile
             var captures = new WebLingoCapture[r.Count()];
             for (var i = 0; i < captures.Length; i++) captures[i] = new WebLingoCapture(r.Boolean(), r.Int());
             functions.Add(new FunctionHead(name, first, second, parameters, optional, (flags & HasThisFlag) != 0, (flags & IsAsyncFlag) != 0,
-                (flags & IsNativeFlag) != 0, source, native, (WebLingoNativeResult)result, captures, r.Number()));
+                (flags & IsNativeFlag) != 0, source, native, (WebLingoNativeResult)result, captures, r.Number())
+            {
+                HasRest = (flags & HasRestFlag) != 0
+            });
         }
         return functions;
     }

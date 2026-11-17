@@ -245,6 +245,7 @@ public sealed class WebLingoStackVirtualMachine
                 heap.AddRoots(_valueClasses);
                 heap.AddRoots(_errorClasses);
                 heap.AddRoots(_main);
+                heap.AddRoots(_rest);
                 _modules = new WebLingoModuleTable(module.Units.Count, heap);
                 for (var i = 0; i < module.Units.Count; i++) _unitClosures.Add(WebLingoValue.Null);
                 heap.AddRoots(_unitClosures);
@@ -466,6 +467,10 @@ public sealed class WebLingoStackVirtualMachine
                             continue;
                         case WebLingoStackOpCode.NewCell:
                             if (!heap.TryAllocateCell(WebLingoValue.Null, false, out slots[ins.A], out error)) break;
+                            pc++;
+                            continue;
+                        case WebLingoStackOpCode.TakeRest:
+                            if (!TryTakeRest(out slots[ins.A], out error)) break;
                             pc++;
                             continue;
                         case WebLingoStackOpCode.BoxLocal:
@@ -974,9 +979,16 @@ public sealed class WebLingoStackVirtualMachine
                             && (argumentCount + withThis > function.ParameterCount
                                 || argumentCount + withThis < function.ParameterCount - function.OptionalCount))
                         {
-                            error = WrongArgumentCount(function.Name, function.ParameterCount - withThis, argumentCount,
-                                function.OptionalCount);
-                            goto failed;
+                            // Too many arguments for any function but one with a rest parameter, which gathers those after
+                            // its parameters into an array before the frame is made (section 3.5).
+                            if (!function.HasRest || argumentCount + withThis < function.ParameterCount)
+                            {
+                                error = WrongArgumentCountOf(function.Name, function.ParameterCount - withThis, function.OptionalCount,
+                                    function.HasRest, argumentCount);
+                                goto failed;
+                            }
+                            if (!TryGatherRest(function, withThis, slots, firstArgument, argumentCount, out error)) goto failed;
+                            argumentCount = function.ParameterCount - withThis;
                         }
                         if (function.NativeBuiltin >= 0 && NativeApplies(frames, depth)) goto native;
                         if (depth + 1 >= maxCallDepth)
@@ -1562,6 +1574,8 @@ public sealed class WebLingoStackVirtualMachine
         /// <summary>The execution's tasks (section 3.8), made when it starts; the program's own task, if its top level awaits, a root.</summary>
         private WebLingoScheduler _scheduler = null!;
         private readonly WebLingoValue[] _main = new WebLingoValue[1];
+        /// <summary>A call's rest parameter, gathered before its frame is made, a root until its function takes it (section 3.5).</summary>
+        private readonly WebLingoValue[] _rest = [WebLingoValue.Null];
 
         /// <summary>
         /// A class's operator that an arithmetic or a comparison found (section 3.7), with its operands: called as a
@@ -2485,6 +2499,42 @@ public sealed class WebLingoStackVirtualMachine
             frame.HeldError = null;
             frame.Text = null;
             frame.DiscardResult = false;
+        }
+
+        /// <summary>
+        /// A call of a function with a rest parameter that gives more arguments than its parameters (section 3.5): those
+        /// after them an array, held in <see cref="_rest"/>, a root, until the function's first instruction takes it.
+        /// </summary>
+        private bool TryGatherRest(WebLingoStackFunction function, int withThis, WebLingoValue[] arguments, int firstArgument,
+            int argumentCount, out WebLingoRuntimeError? error)
+        {
+            var others = function.ParameterCount - withThis;
+            if (!heap.TryAllocateArray(arguments, firstArgument + others, argumentCount - others, out var rest, out error)) return false;
+            _rest[0] = rest;
+            return true;
+        }
+
+        /// <summary>WL2006 for a call of a function, which may have a rest parameter (section 3.5).</summary>
+        private static WebLingoRuntimeError WrongArgumentCountOf(string name, int arity, int optional, bool hasRest, int count)
+        {
+            if (!hasRest) return WrongArgumentCount(name, arity, count, optional);
+            var least = arity - optional;
+            return new(WebLingoDiagnosticCodes.WrongArgumentCount,
+                $"'{name}' takes at least {least} {(least == 1 ? "argument" : "arguments")}, not {count}.");
+        }
+
+        /// <summary>
+        /// A rest parameter's value (section 3.5): the arguments its call gathered, held in <see cref="_rest"/>, else a new
+        /// empty array, the call having given none after the parameters.
+        /// </summary>
+        private bool TryTakeRest(out WebLingoValue rest, out WebLingoRuntimeError? error)
+        {
+            if (_rest[0].Kind == WebLingoValueKind.Array)
+            {
+                (rest, _rest[0], error) = (_rest[0], WebLingoValue.Null, null);
+                return true;
+            }
+            return heap.TryAllocateArray(_rest, 0, 0, out rest, out error);
         }
 
         private static WebLingoRuntimeError WrongArgumentCount(string name, int arity, int count, int optional = 0) =>

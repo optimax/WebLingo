@@ -97,6 +97,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
         }
         if (function.NativeBuiltin != -1 && (!function.IsNative || function.NativeBuiltin < 0 || function.NativeBuiltin >= module.Imports.Count
                 || module.Imports[function.NativeBuiltin].Arity != function.ParameterCount || function.IsAsync || function.OptionalCount != 0
+                || function.HasRest
                 || !Enum.IsDefined(function.NativeResult)))
         {
             return Fail($"The function's native built-in, {function.NativeBuiltin}, is not an import of a native member's arity.");
@@ -114,6 +115,19 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
         if (function.OptionalCount < 0 || function.OptionalCount > function.ParameterCount - (function.HasThis ? 1 : 0))
         {
             return Fail($"The function has {function.OptionalCount} optional parameters of {function.ParameterCount}.");
+        }
+        // A rest parameter's local is the one after the parameters, which the function's first instruction, and no other,
+        // takes; a function with one is never a native member's (section 3.5).
+        var takesRest = function.Code.Count > 0 && function.Code[0].OpCode == WebLingoOpCode.TakeRest;
+        if (function.HasRest != takesRest || (takesRest && function.Code[0].A != function.ParameterCount))
+        {
+            return Fail(function.HasRest
+                ? $"The function has a rest parameter, which its first instruction does not take into local {function.ParameterCount}."
+                : "The function takes a rest parameter it does not have.");
+        }
+        for (var i = 1; i < function.Code.Count; i++)
+        {
+            if (function.Code[i].OpCode == WebLingoOpCode.TakeRest) return Fail("A rest parameter is taken by a function's first instruction only.");
         }
         for (var i = 0; i < function.Handlers.Count; i++)
         {
@@ -174,6 +188,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             case WebLingoOpCode.Jump:
                 return Index(a, function.Code.Count, "target instruction") ?? Unused(b, c, d);
             case WebLingoOpCode.LoadNull:
+            case WebLingoOpCode.TakeRest:
                 return Register(function, a, "destination") ?? Unused(b, c, d);
             case WebLingoOpCode.LoadBoolean:
                 return Register(function, a, "destination") ?? (b is 0 or 1 ? null : $"its value is {b}, not 0 or 1.")
@@ -726,7 +741,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             or WebLingoOpCode.LoadCell or WebLingoOpCode.LoadCapture or WebLingoOpCode.MakeClosure or WebLingoOpCode.LoadBuiltin
             or WebLingoOpCode.Call or WebLingoOpCode.GetMember or WebLingoOpCode.CallMethod or WebLingoOpCode.GetIndex
             or WebLingoOpCode.NewArray or WebLingoOpCode.NewMap or WebLingoOpCode.NewSet or WebLingoOpCode.MakeClass or WebLingoOpCode.New
-            or WebLingoOpCode.GetSuper => instruction.A,
+            or WebLingoOpCode.GetSuper or WebLingoOpCode.TakeRest => instruction.A,
         _ => null
     };
 

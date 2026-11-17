@@ -162,6 +162,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var x = 1__000;", "WL1004", 1, 9)]
     [InlineData("var x = 1_000_;", "WL1004", 1, 9)]
     [InlineData("var x = 1_.5;", "WL1004", 1, 9)]
+    [InlineData("function f(...rest, a) { }", "WL1001", 1, 15)]
+    [InlineData("function f(...rest = []) { }", "WL1001", 1, 20)]
+    [InlineData("function f(...) { }", "WL1001", 1, 15)]
+    [InlineData("function f(a, ...b) { } f();", "WL2006", 1, 25)]
     public void CompileErrorsAreReportedAndNothingRuns(string source, string code, int line, int column)
     {
         foreach (var command in new[] { "check", "run" })
@@ -567,6 +571,12 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var flags = 0b0101; writeLn([flags == 5, 0x10 * 0b10, $\"{0xFF:X4}\"]);", "[true, 32, \"00FF\"]")]
     // Digit separators (the owner's answer, 16 November 2026): `_` between two digits, one at a time.
     [InlineData("writeLn([1_000_000, 0.000_1, 1e1_0, 0xFF_FF, 0b1010_0101, 1_000.50m, 9_223_372_036_854_775_807]);", "[1000000, 0.0001, 10000000000.0, 65535, 165, 1000.5m, 9223372036854775807]")]
+    // Rest parameters (the owner's answer, 16 November 2026): JavaScript's, ...rest, an array of the arguments after the others.
+    [InlineData("function sum(...numbers) { var total = 0; foreach (var n in numbers) total += n; return total; } writeLn([sum(), sum(1), sum(1, 2, 3)]);", "[0, 1, 6]")]
+    [InlineData("function tag(name, size = 1, ...rest) { return [name, size, rest]; } writeLn([tag(\"a\"), tag(\"a\", 2), tag(\"a\", 2, 3, 4)]);", "[[\"a\", 1, []], [\"a\", 2, []], [\"a\", 2, [3, 4]]]")]
+    [InlineData("var count = (...xs) => xs.length; class Box { constructor(...items) { this.items = items; } add(...more) { return this.items.length + more.length; } } var b = new Box(1, 2); writeLn([count(), count(1, 2), b.items, b.add(3, 4, 5)]);", "[0, 2, [1, 2], 5]")]
+    [InlineData("async function later(first, ...others) { await null; return others; } function own(this, ...xs) { return xs; } writeLn([await later(1, 2, 3), own(null, 4, 5)]);", "[[2, 3], [4, 5]]")]
+    [InlineData("function f(...xs) { return () => xs; } var g = f(1, \"two\"); writeLn([g(), g() == g()]);", "[[1, \"two\"], true]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -620,6 +630,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(new Integer(2.5m));", "WL3001")]
     [InlineData("writeLn(Decimal.parse(\"1.5m\"));", "WL3001")]
     [InlineData("writeLn(DateTime.utc(2026, 1, 1).toZone(\"Nowhere/Atlantis\"));", "WL3001")]
+    [InlineData("function g(a, ...rest) { return rest; } var h = g; h();", "WL2006")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

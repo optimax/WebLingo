@@ -204,7 +204,12 @@ public enum WebLingoOpCode : byte
     /// </summary>
     ForEachVisits,
     /// <summary>A = destination register, B = left register, C = right register: <c>%</c> (section 3.5).</summary>
-    Remainder
+    Remainder,
+    /// <summary>
+    /// A = the rest parameter's register, the one after the parameters: the arguments after them, which the call gathered,
+    /// else a new empty array; a function with a rest parameter's first instruction, and only there (section 3.5).
+    /// </summary>
+    TakeRest
 }
 
 public readonly record struct WebLingoInstruction(WebLingoOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
@@ -267,6 +272,12 @@ public sealed record WebLingoFunction(
     public int OptionalCount { get; init; }
     /// <summary>Whether it is <c>async</c>: its call gives a task, and it may <c>Await</c> (section 3.8).</summary>
     public bool IsAsync { get; init; }
+    /// <summary>
+    /// Whether it has a rest parameter after its parameters, which it does not count (section 3.5): the arguments after
+    /// them, an array, empty when there are none, which its first instruction, <see cref="WebLingoOpCode.TakeRest"/>,
+    /// takes; a call then gives at least its parameters but the optional ones, and any number more.
+    /// </summary>
+    public bool HasRest { get; init; }
     /// <summary>
     /// Its protected regions, innermost first, which an exception raised in it, or in a call it makes, looks through for
     /// the first that holds the instruction it was raised at (section 3.7; section 5.4's table-driven regions).

@@ -22,6 +22,7 @@ public static class WebLingoStackDisassembler
     {
         text.Append("function ").Append(label).Append(function.Name).Append(" (");
         if (function.ParameterCount > 0) text.Append(function.ParameterCount).Append(" parameters, ");
+        if (function.HasRest) text.Append("a rest parameter, ");
         if (function.Captures.Count > 0) text.Append(function.Captures.Count).Append(" captures, ");
         text.Append(function.LocalCount).Append(" locals, ").Append(function.MaxStack).Append(" stack)\n");
         for (var i = 0; i < function.Code.Count; i++)
@@ -46,7 +47,8 @@ public static class WebLingoStackDisassembler
             WebLingoStackOpCode.LoadConstant => $"{name} {Constant(module, a)}",
             WebLingoStackOpCode.LoadBoolean => $"{name} {(a == 0 ? "false" : "true")}",
             WebLingoStackOpCode.LoadLocal or WebLingoStackOpCode.StoreLocal or WebLingoStackOpCode.NewCell or WebLingoStackOpCode.BoxLocal
-                or WebLingoStackOpCode.CopyCell or WebLingoStackOpCode.LoadCell or WebLingoStackOpCode.StoreCell => $"{name} {Local(function, a)}",
+                or WebLingoStackOpCode.CopyCell or WebLingoStackOpCode.LoadCell or WebLingoStackOpCode.StoreCell
+                or WebLingoStackOpCode.TakeRest => $"{name} {Local(function, a)}",
             WebLingoStackOpCode.Jump or WebLingoStackOpCode.JumpIfFalse or WebLingoStackOpCode.JumpIfTrue => $"{name} {Target(a)}",
             WebLingoStackOpCode.JumpIfGiven => $"{name} {Local(function, b)}, {Target(a)}",
             WebLingoStackOpCode.LoadCapture or WebLingoStackOpCode.StoreCapture => $"{name} capture{a}",

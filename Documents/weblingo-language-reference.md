@@ -789,6 +789,34 @@ null
   2432902008176640000
   ```
 
+### Rest parameters
+
+A function's last parameter may be written `...name`: an array of the arguments after the others, so that the
+function takes any number of them.
+
+```javascript
+function sum(label, ...numbers) {
+  var total = 0;
+  foreach (var n in numbers) total += n;
+  return $"{label}: {total}";
+}
+writeLn(sum("none"));
+writeLn(sum("three", 1, 2, 3));
+var pair = (first, ...others) => [first, others];
+writeLn(pair("a", "b", "c"));
+```
+
+```text
+none: 0
+three: 6
+["a", ["b", "c"]]
+```
+
+- **It is always an array**, `[]` when no argument is left for it, and a new one each call.
+- **A call gives at least the parameters before it**, but those with defaults: `sum()` is an error.
+- **It comes last**, after any parameter with a default, and has no default itself. Methods, constructors and arrow
+  functions, in parentheses, may have one too.
+
 ### Functions as values
 
 A function is a value, which a variable may hold and a call may take. `function (…) { … }` is a function expression,
@@ -1787,6 +1815,6 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Functions**: a variable number of arguments (rest parameters), and spreading an array into a call.
+- **Functions**: spreading an array into a call.
 - **Library**: string methods (searching, splitting, case), array methods beyond `push` and `pop`, regular expressions,
   JSON, and network access.

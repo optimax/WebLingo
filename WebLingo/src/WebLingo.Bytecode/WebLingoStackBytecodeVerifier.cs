@@ -106,6 +106,7 @@ public sealed class WebLingoStackBytecodeVerifier
         }
         if (function.NativeBuiltin != -1 && (!function.IsNative || function.NativeBuiltin < 0 || function.NativeBuiltin >= module.Imports.Count
                 || module.Imports[function.NativeBuiltin].Arity != function.ParameterCount || function.IsAsync || function.OptionalCount != 0
+                || function.HasRest
                 || !Enum.IsDefined(function.NativeResult)))
         {
             return Fail($"The function's native built-in, {function.NativeBuiltin}, is not an import of a native member's arity.");
@@ -119,6 +120,19 @@ public sealed class WebLingoStackBytecodeVerifier
         if (function.OptionalCount < 0 || function.OptionalCount > function.ParameterCount - (function.HasThis ? 1 : 0))
         {
             return Fail($"The function has {function.OptionalCount} optional parameters of {function.ParameterCount}.");
+        }
+        // A rest parameter's local is the one after the parameters, which the function's first instruction, and no other,
+        // takes; a function with one is never a native member's (section 3.5).
+        var takesRest = function.Code.Count > 0 && function.Code[0].OpCode == WebLingoStackOpCode.TakeRest;
+        if (function.HasRest != takesRest || (takesRest && function.Code[0].A != function.ParameterCount))
+        {
+            return Fail(function.HasRest
+                ? $"The function has a rest parameter, which its first instruction does not take into local {function.ParameterCount}."
+                : "The function takes a rest parameter it does not have.");
+        }
+        for (var i = 1; i < function.Code.Count; i++)
+        {
+            if (function.Code[i].OpCode == WebLingoStackOpCode.TakeRest) return Fail("A rest parameter is taken by a function's first instruction only.");
         }
         for (var i = 0; i < function.Handlers.Count; i++)
         {
@@ -166,6 +180,7 @@ public sealed class WebLingoStackBytecodeVerifier
             case WebLingoStackOpCode.CopyCell:
             case WebLingoStackOpCode.LoadCell:
             case WebLingoStackOpCode.StoreCell:
+            case WebLingoStackOpCode.TakeRest:
                 return Index(a, function.LocalCount, "local") ?? Unused(b);
             case WebLingoStackOpCode.LoadCapture:
             case WebLingoStackOpCode.StoreCapture:
@@ -542,7 +557,7 @@ public sealed class WebLingoStackBytecodeVerifier
     private static int? Writes(WebLingoStackInstruction instruction) => instruction.OpCode switch
     {
         WebLingoStackOpCode.StoreLocal or WebLingoStackOpCode.NewCell or WebLingoStackOpCode.BoxLocal
-            or WebLingoStackOpCode.CopyCell => instruction.A,
+            or WebLingoStackOpCode.CopyCell or WebLingoStackOpCode.TakeRest => instruction.A,
         _ => null
     };
 

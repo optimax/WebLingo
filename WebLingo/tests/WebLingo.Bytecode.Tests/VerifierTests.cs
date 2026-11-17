@@ -241,6 +241,23 @@ public sealed class VerifierTests
         Assert.False(Verify(module with { Functions = [reading] }).IsValid);
     }
 
+    [Fact]
+    public void ARestParameterIsTakenByItsFunctionsFirstInstructionOnly()
+    {
+        // function f(a = 1, ...rest): one parameter, optional, and the rest, the local after it, taken first.
+        var function = new WebLingoFunction("f", 2, 2, [I(WebLingoOpCode.TakeRest, 1), I(WebLingoOpCode.Return)])
+        {
+            ParameterCount = 1, OptionalCount = 1, HasRest = true
+        };
+        var module = Module(registers: 1, locals: 0, I(WebLingoOpCode.MakeClosure, 0, 0), I(WebLingoOpCode.Return)) with { Functions = [function] };
+        Assert.Equal(Valid, Verify(module));
+        Assert.Contains("does not have", Verify(module with { Functions = [function with { HasRest = false }] }).Error);
+        Assert.Contains("into local 1", Verify(module with { Functions = [function with { Code = [I(WebLingoOpCode.TakeRest, 0), I(WebLingoOpCode.Return)] }] }).Error);
+        Assert.Contains("into local 1", Verify(module with { Functions = [function with { Code = [I(WebLingoOpCode.Return)] }] }).Error);
+        var twice = function with { Code = [I(WebLingoOpCode.TakeRest, 1), I(WebLingoOpCode.TakeRest, 1), I(WebLingoOpCode.Return)] };
+        Assert.Contains("first instruction only", Verify(module with { Functions = [twice] }).Error);
+    }
+
     [Theory]
     [InlineData(WebLingoOpCode.MakeClosure, 0, 1, 0, 0, "function")]
     [InlineData(WebLingoOpCode.LoadCapture, 0, 0, 0, 0, "capture")]

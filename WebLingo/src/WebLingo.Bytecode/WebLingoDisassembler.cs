@@ -21,6 +21,7 @@ public static class WebLingoDisassembler
     {
         text.Append("function ").Append(label).Append(function.Name).Append(" (");
         if (function.ParameterCount > 0) text.Append(function.ParameterCount).Append(" parameters, ");
+        if (function.HasRest) text.Append("a rest parameter, ");
         if (function.Captures.Count > 0) text.Append(function.Captures.Count).Append(" captures, ");
         text.Append(function.LocalCount).Append(" locals, ").Append(function.RegisterCount).Append(" registers)\n");
         for (var i = 0; i < function.Code.Count; i++)
@@ -57,7 +58,8 @@ public static class WebLingoDisassembler
                 $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
             WebLingoOpCode.JumpIfFalse or WebLingoOpCode.JumpIfTrue or WebLingoOpCode.JumpIfGiven => $"{instruction.OpCode} {Register(function, a)}, {b:D2}",
             WebLingoOpCode.CheckBoolean => $"CheckBoolean {Register(function, a)}",
-            WebLingoOpCode.NewCell or WebLingoOpCode.BoxRegister or WebLingoOpCode.CopyCell or WebLingoOpCode.ReturnValue =>
+            WebLingoOpCode.NewCell or WebLingoOpCode.BoxRegister or WebLingoOpCode.CopyCell or WebLingoOpCode.ReturnValue
+                or WebLingoOpCode.TakeRest =>
                 $"{instruction.OpCode} {Register(function, a)}",
             WebLingoOpCode.LoadCell or WebLingoOpCode.StoreCell => $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}",
             WebLingoOpCode.LoadCapture => $"LoadCapture {Register(function, a)}, capture{b}",

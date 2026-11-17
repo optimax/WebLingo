@@ -70,6 +70,11 @@ public sealed record WebLingoIrFunction(
     public int OptionalCount { get; init; }
     /// <summary>Whether it is <c>async</c> (section 3.8).</summary>
     public bool IsAsync { get; init; }
+    /// <summary>
+    /// Whether it has a rest parameter, the local after its parameters, which it does not count, taken by its first
+    /// statement, <see cref="WebLingoIrTakeRest"/> (section 3.5).
+    /// </summary>
+    public bool HasRest { get; init; }
 }
 
 /// <summary>
@@ -83,6 +88,9 @@ public sealed record WebLingoIrNewCell(int Local, WebLingoSourceSpan Span) : Web
 
 /// <summary>Moves the local's value into a new cell, which the local then holds: a captured parameter.</summary>
 public sealed record WebLingoIrBoxLocal(int Local, WebLingoSourceSpan Span) : WebLingoIrStatement(Span);
+
+/// <summary>A rest parameter's local given the arguments its call gathered, a function's first statement (section 3.5).</summary>
+public sealed record WebLingoIrTakeRest(int Local, WebLingoSourceSpan Span) : WebLingoIrStatement(Span);
 
 /// <summary>Gives each local a new cell holding the value of its old one: a <c>for</c>'s per-iteration bindings.</summary>
 public sealed record WebLingoIrCopyCells(IReadOnlyList<int> Locals, WebLingoSourceSpan Span) : WebLingoIrStatement(Span);

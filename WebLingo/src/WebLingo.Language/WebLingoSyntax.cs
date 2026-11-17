@@ -116,6 +116,8 @@ public sealed record WebLingoParameterSyntax(string Name, WebLingoSourceSpan Spa
 {
     /// <summary>Its default value, <c>b = 1</c>, which makes it optional, or null (section 3.5).</summary>
     public WebLingoExpressionSyntax? Default { get; init; }
+    /// <summary>Whether it is a rest parameter, <c>...rest</c>, the last, an array of the arguments after the others (section 3.5).</summary>
+    public bool IsRest { get; init; }
 }
 
 /// <summary><c>function name(parameters) { body }</c>, in scope throughout its block (specification, section 3.5).</summary>

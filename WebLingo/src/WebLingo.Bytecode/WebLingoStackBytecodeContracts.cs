@@ -182,7 +182,12 @@ public enum WebLingoStackOpCode : byte
     /// </summary>
     ForEachVisits,
     /// <summary><c>%</c>: pops the right operand, then the left, and pushes their remainder (section 3.5).</summary>
-    Remainder
+    Remainder,
+    /// <summary>
+    /// A = the rest parameter's local, the one after the parameters, as the register bytecode's (section 3.5). The stack is
+    /// unchanged.
+    /// </summary>
+    TakeRest
 }
 
 public readonly record struct WebLingoStackInstruction(WebLingoStackOpCode OpCode, int A = 0, int B = 0);
@@ -219,6 +224,11 @@ public sealed record WebLingoStackFunction(
     public int OptionalCount { get; init; }
     /// <summary>Whether it is <c>async</c> (section 3.8).</summary>
     public bool IsAsync { get; init; }
+    /// <summary>
+    /// Whether it has a rest parameter after its parameters, which it does not count, as the register bytecode's, taken
+    /// by its first instruction, <see cref="WebLingoStackOpCode.TakeRest"/> (section 3.5).
+    /// </summary>
+    public bool HasRest { get; init; }
     /// <summary>Its protected regions, innermost first, as the register bytecode's (section 3.7).</summary>
     public IReadOnlyList<WebLingoStackHandler> Handlers { get; init; } = [];
 }

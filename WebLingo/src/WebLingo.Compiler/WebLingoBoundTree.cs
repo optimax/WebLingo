@@ -80,6 +80,8 @@ public sealed record WebLingoBoundFunction(
     public string? Source { get; init; }
     /// <summary>Whether it is a native class's member, which only calls its built-in, an error in it reported where it was called (section 3.9).</summary>
     public bool IsNative { get; init; }
+    /// <summary>Whether its last parameter is a rest parameter, an array of the arguments after the others (section 3.5).</summary>
+    public bool HasRest { get; init; }
 }
 
 public abstract record WebLingoBoundStatement(WebLingoSourceSpan Span);

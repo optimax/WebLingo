@@ -98,6 +98,12 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
         if (IsDigit(c)) return ReadNumericLiteral(start);
         if (c is '"' or '\'') return Run(start, c) >= 3 ? ReadRawString(start, 0) : ReadStringLiteral(start);
         if (c == '$' && Run(start, '$') is var dollars && CharAt(start + dollars) is '"' or '\'') return ReadInterpolated(start, dollars);
+        if (c == '.' && CharAt(start + 1) == '.' && CharAt(start + 2) == '.')
+        {
+            // A rest parameter's, ...rest (section 3.5).
+            _position += 3;
+            return Token(WebLingoTokenKind.Ellipsis, start);
+        }
         if (c == '?' && CharAt(start + 1) == '?' && CharAt(start + 2) == '=')
         {
             _position += 3;

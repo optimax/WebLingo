@@ -834,28 +834,44 @@ public sealed class WebLingoParser : IWebLingoParser
         if (Current.Kind != WebLingoTokenKind.CloseParen && !_statementHasError)
         {
             var optional = false;
+            WebLingoToken? rest = null;
             while (true)
             {
+                if (rest is { } earlier && !_statementHasError)
+                {
+                    Report(WebLingoDiagnosticCodes.UnexpectedToken, "A rest parameter is the last parameter.", earlier.Span);
+                }
+                var isRest = Current.Kind == WebLingoTokenKind.Ellipsis;
+                if (isRest) Advance(); // A rest parameter, ...rest (section 3.5).
                 if (Current.Kind != WebLingoTokenKind.Identifier)
                 {
                     ReportUnexpected("a parameter name");
                     break;
                 }
                 var parameter = Advance();
+                if (isRest) rest = parameter;
                 WebLingoExpressionSyntax? defaultValue = null;
-                if (Current.Kind == WebLingoTokenKind.Equals)
+                if (isRest && Current.Kind == WebLingoTokenKind.Equals)
+                {
+                    // Its value, when no argument is left for it, is an empty array.
+                    Report(WebLingoDiagnosticCodes.UnexpectedToken, "A rest parameter has no default value: it is [] when no argument is left for it.",
+                        Current.Span);
+                    Advance();
+                    ParseExpression();
+                }
+                else if (Current.Kind == WebLingoTokenKind.Equals)
                 {
                     // A default value, which makes the parameter optional (section 3.5).
                     Advance();
                     defaultValue = ParseExpression();
                     optional = true;
                 }
-                else if (optional && !_statementHasError)
+                else if (optional && !isRest && !_statementHasError)
                 {
                     Report(WebLingoDiagnosticCodes.UnexpectedToken,
                         "A parameter without a default value cannot follow one with a default value.", parameter.Span);
                 }
-                parameters.Add(new WebLingoParameterSyntax(parameter.Text, parameter.Span) { Default = defaultValue });
+                parameters.Add(new WebLingoParameterSyntax(parameter.Text, parameter.Span) { Default = defaultValue, IsRest = isRest });
                 if (Current.Kind != WebLingoTokenKind.Comma) break;
                 Advance();
             }

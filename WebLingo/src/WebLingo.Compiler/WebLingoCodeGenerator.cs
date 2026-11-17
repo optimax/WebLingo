@@ -54,6 +54,7 @@ public sealed class WebLingoCodeGenerator
                 HasThis = function.HasThis,
                 OptionalCount = function.OptionalCount,
                 IsAsync = function.IsAsync,
+                HasRest = function.HasRest,
                 Source = function.Source,
                 IsNative = function.IsNative,
                 NativeBuiltin = function.NativeBuiltin,
@@ -213,6 +214,9 @@ public sealed class WebLingoCodeGenerator
             }
             case WebLingoIrBoxLocal box:
                 Emit(new WebLingoInstruction(WebLingoOpCode.BoxRegister, box.Local), box.Span);
+                break;
+            case WebLingoIrTakeRest rest:
+                Emit(new WebLingoInstruction(WebLingoOpCode.TakeRest, rest.Local), rest.Span);
                 break;
             case WebLingoIrCopyCells copies:
                 foreach (var local in copies.Locals) Emit(new WebLingoInstruction(WebLingoOpCode.CopyCell, local), copies.Span);

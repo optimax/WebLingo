@@ -296,6 +296,9 @@ public sealed class WebLingoLowerer
         var index = _functions.Count;
         _functions.Add(null); // Its place, so that the functions it declares come after it.
         var body = new List<WebLingoIrStatement>();
+        // A rest parameter, the last, is a local the VMs do not count as a parameter, given its array first (section 3.5).
+        var parameterCount = function.HasRest ? function.ParameterCount - 1 : function.ParameterCount;
+        if (function.HasRest) body.Add(new WebLingoIrTakeRest(function.Locals[parameterCount].Index, function.Locals[parameterCount].DeclarationSpan));
         // A captured parameter moves into a cell of its own when the function begins.
         for (var i = 0; i < function.ParameterCount; i++)
         {
@@ -317,12 +320,13 @@ public sealed class WebLingoLowerer
         var captures = new List<WebLingoIrCapture>();
         foreach (var capture in function.Captures) captures.Add(new WebLingoIrCapture(capture.FromLocal, capture.Index));
         var (nativeBuiltin, nativeResult) = function.IsNative ? NativeCallOf(body, function.ParameterCount) : (-1, default);
-        _functions[index] = new WebLingoIrFunction(function.Name, function.ParameterCount, Names(function.Locals), captures, body,
+        _functions[index] = new WebLingoIrFunction(function.Name, parameterCount, Names(function.Locals), captures, body,
             function.Span)
         {
             HasThis = function.HasThis,
             OptionalCount = optional,
             IsAsync = function.IsAsync,
+            HasRest = function.HasRest,
             Source = function.Source,
             IsNative = function.IsNative,
             NativeBuiltin = nativeBuiltin,

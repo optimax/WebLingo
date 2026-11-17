@@ -1038,7 +1038,8 @@ public sealed class WebLingoBinder
             Defaults = defaults,
             IsAsync = isAsync,
             Source = _source,
-            IsNative = _nativeCallees is not null
+            IsNative = _nativeCallees is not null,
+            HasRest = parameters.Count > 0 && parameters[^1].IsRest
         };
         _function = outerFunction;
         _scope = outerScope;
@@ -1049,12 +1050,13 @@ public sealed class WebLingoBinder
     /// <summary>A function declared by name, with how many arguments a call of it may give (section 3.5).</summary>
     private WebLingoLocalSymbol? DeclareFunction(WebLingoFunctionDeclarationSyntax function)
     {
-        var local = Declare(function.Name, WebLingoDeclarationKind.Function, function.NameSpan, function.Parameters.Count);
+        var rest = function.Parameters.Count > 0 && function.Parameters[^1].IsRest;
+        var local = Declare(function.Name, WebLingoDeclarationKind.Function, function.NameSpan, rest ? AnyNumber : function.Parameters.Count);
         if (local is null) return null;
         var required = 0;
         foreach (var parameter in function.Parameters)
         {
-            if (parameter.Default is null) required++;
+            if (parameter.Default is null && !parameter.IsRest) required++;
         }
         local.FunctionMinArity = required;
         return local;
@@ -1596,12 +1598,16 @@ public sealed class WebLingoBinder
         return new WebLingoBoundCall(BindExpression(calleeSyntax), arguments, call.Span);
     }
 
+    /// <summary>The arity of a function with a rest parameter, which takes any number of arguments after the others.</summary>
+    private const int AnyNumber = int.MaxValue;
+
     private bool CheckArity(string name, int arity, int count, WebLingoSourceSpan span, int? minimum = null)
     {
         var least = minimum ?? arity;
         if (count >= least && count <= arity) return true;
         var noun = arity == 1 ? "argument" : "arguments";
-        var takes = least == arity ? $"{arity} {noun}" : $"{least} to {arity} arguments";
+        var takes = arity == AnyNumber ? $"at least {least} {(least == 1 ? "argument" : "arguments")}"
+            : least == arity ? $"{arity} {noun}" : $"{least} to {arity} arguments";
         Report(WebLingoDiagnosticCodes.WrongArgumentCount, $"'{name}' takes {takes}, not {count}.", span);
         return false;
     }
