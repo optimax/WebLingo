@@ -3004,3 +3004,17 @@ A2: (a)
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.5, and built in the lexer: `0x`/`0X` and `0b`/`0B`, int64s. Guessed, and recorded as Proposed (section 15.2, "Hexadecimal and binary literals"): a prefix without digits, or digits running into a letter, a digit or `_`, one invalid literal (WL1004); the message for one beyond int64 naming the largest in decimal. The editors' colouring (Notepad++ and VS Code) reads them, and the decimal's `m`, which the decimals' task had left out. Described in the Language Reference.
 
 Done (Claude, 2026-11-16, `e4ead72`): hexadecimal and binary literals. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
+
+## [DONE] Digit Separators: `_`
+
+`1_000_000`, `0.000_1` and `1e1_0`, the `_` ignored, in the lexer. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, where: (a) between digits only, one or more, as C# allows them, never first, last, or beside a `.` or an `e`; (b) between digits only, one at a time.
+
+A1: (b)
+
+2026-11-16 (Claude): the answer recorded as approved in the specification, sections 1.1 and 3.5, and built in the lexer, for decimal, hexadecimal and binary digits, fractions and exponents, and decimals. Guessed, and recorded as Proposed (section 15.2, "Digit separators"): a `_` that is not between two digits of the literal's base makes the literal run into it, one invalid literal (WL1004), as digits running into letters do; a token's text keeps them, the value and a decimal's constant do not. The editors' colouring reads them. Described in the Language Reference, whose list of what is not in the language yet no longer names literals.
+
+Done (Claude, 2026-11-16, `ad83018`): digit separators. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
