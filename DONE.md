@@ -3090,3 +3090,21 @@ A3: (a)
 2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.6, and built: the methods that take no function in the runtime, those that take one in WebLingo, an extension of `Array` the compiler adds where a program names one. Guessed, and recorded as Proposed (section 15.2, "Array methods"): `insert` and `removeAt` changing the array, a position outside it WL3005; `indexOf` and `contains` by `==`'s own comparison; `slice` strict; `concat` of an array; `join`'s separator a comma unless given; `reduce`'s initial value required; callbacks given the element alone; an `async` callback awaited, the method then giving a task; `sort(compare)` stable, its compare never awaited, without one by `<`; aliases `includes`, `select`, `where`, `some` and `every`, not `splice`, `Aggregate` or `First`; the warning WL2017 for `x.sort();` or `x.reverse();` whatever `x` is, the compilation now stopping for the binder's errors only. Described in the Language Reference, its example run with `weblingo`, and the Standard Library Reference.
 
 Done (Claude, 2026-11-16, `f5e9047`): array methods. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
+
+## [DONE] Regular Expressions
+
+Matching, finding and replacing by a pattern, with a limit on time against patterns that backtrack without end. The portable core cannot rely on .NET's regular expressions under Native C# without an engine of its own, which `Documents/NativeCompatibility.md` would list. From the Language Reference's "What is not in the language yet" (section 17); added by Claude, 2026-11-16, at the owner's request ("Add Missing Features").
+
+One decision each, answerable with a letter:
+
+Q1, the syntax: (a) .NET's, its engine used now, Native C# then needing one that reads the same; (b) ECMAScript's, a subset of .NET's (`RegexOptions.ECMAScript`), smaller to build for Native C#.
+
+A1: (a)
+
+Q2, how a script writes one: (a) a class only, `new Regex("a+b", "i")`, `r.test(s)`, `r.match(s)`, `s.replace(r, …)`; (b) a literal too, `/a+b/i`, which the lexer tells apart from `/`.
+
+A2: (a)
+
+2026-11-16 (Claude): the answers recorded as approved in the specification, sections 1.1 and 3.6, and built as a kind of value of its own, its class `Regex`, in the runtime and both VMs. Guessed, and recorded as Proposed (section 15.2, "Regular expressions"): the flags `i`, `m`, `s`, `x` and `n`; the invariant culture, never `RegexOptions.Compiled`; a match as an array of its groups' text, the whole match first, an unmatched group `null`; aliases `isMatch`, `exec` and `matches`; .NET's substitutions in replacements and its splitting; a second for each operation, then a `TimeoutError` (WL3010, catchable); text `Regex:/pattern/flags`; identity for `==`; no map key. The inventory lists `System.Text.RegularExpressions` as Planned. The editors' colouring knows `Regex`, and `DateTime`, `Decimal` and `DivisionByZeroError`, which earlier tasks had left out. Described in the Language Reference, its example run with `weblingo`, and the Standard Library Reference, in a section of its own, the sections after it renumbered.
+
+Done (Claude, 2026-11-16, `09f4e36`): regular expressions. Main's checks: the Release build, without warnings, and every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which the working copy's uncommitted edits to `Examples/example1` fail; both VMs and WLBC; Windows only, Linux not tried.
