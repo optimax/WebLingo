@@ -38,6 +38,13 @@ public static class WebLingoExceptions
             {
                 return false;
             }
+            foreach (var (name, value) in error.Fields ?? [])
+            {
+                var field = WebLingoValue.Null;
+                if (value is long number) field = WebLingoValue.FromInt64(number);
+                else if (value is string text && !heap.TryAllocateString(text, out field, out _)) return false;
+                if (!heap.TrySetField(instance, name, field, out _)) return false;
+            }
         }
         finally
         {

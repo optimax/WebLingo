@@ -369,7 +369,8 @@ public static class WebLingoCommandLine
 
     /// <summary>What a command line gives the programs it compiles and runs: its built-ins, its native modules and its files.</summary>
     private sealed record Host(WebLingoBuiltinRegistry Services, WebLingoNativeModuleLoader Native, WebLingoCompilerOptions Options,
-        FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoNetwork Network, IWebLingoDatabases Databases, IWebLingoFileSystem Files);
+        FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoNetwork Network, IWebLingoDatabases Databases, IWebLingoFileSystem Files,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> Allowed);
 
     /// <summary>
     /// The host for the file <paramref name="path"/>, whose program's own file is named <paramref name="mainName"/>: its
@@ -380,7 +381,7 @@ public static class WebLingoCommandLine
         TextWriter output, TextWriter error)
     {
         if (!WebLingoSchemes.TryLoad(path, program.Configuration, givenSchemes, out var schemes, out var allowedHosts, out var databases,
-            out var folders, out var wrongConfiguration))
+            out var folders, out var allowed, out var wrongConfiguration))
         {
             error.WriteLine(wrongConfiguration);
             return null;
@@ -410,7 +411,7 @@ public static class WebLingoCommandLine
         var files = program.ReachesAnyFile ? null : new DotNetFileCapabilities(program.Root ?? folder, folders.Read, folders.Write);
         return new Host(services, native, new WebLingoCompilerOptions(declarations) { Resolver = resolver, Native = native }, resolver,
             textOutput, new DotNetNetwork(program.ReachesAnyHost ? null : allowedHosts), new DotNetDatabases(databases, folder) { Files = files },
-            new DotNetFileSystem(files));
+            new DotNetFileSystem(files), allowed);
     }
 
     private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters) =>
@@ -424,6 +425,7 @@ public static class WebLingoCommandLine
             Parameters = parameters,
             FileSystem = host.Files,
             Network = host.Network,
+            Allowed = host.Allowed,
             Databases = host.Databases,
             SchedulerHost = new DotNetSchedulerHost()
         };

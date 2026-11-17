@@ -203,6 +203,7 @@ public sealed class WebLingoApplication
             Output = output,
             FileSystem = _options.ScriptFileSystem ?? _options.FileSystem,
             Network = _options.Network,
+            Allowed = _options.Allowed,
             Databases = _options.Databases,
             Clock = _options.Clock,
             WallClock = _options.WallClock,

@@ -28,6 +28,14 @@ public sealed record WebLingoNativeProperty(string Name, WebLingoNativeFunction 
 public sealed record WebLingoNativeIndexer(WebLingoNativeFunction Getter, WebLingoNativeFunction? Setter);
 
 /// <summary>
+/// A native class's fallback (section 3.10): what reads, assigns and calls the members its instances have that it does not
+/// declare, known only while the program runs, as a COM object's are. Its getter is given the instance and the member's
+/// name, a string; its setter, the instance, the name and the value assigned; its call, the instance, the name, and the
+/// call's arguments, as many as it has. The runtime runs them where a member is not found, so that neither VM knows them.
+/// </summary>
+public sealed record WebLingoNativeFallback(WebLingoNativeFunction Getter, WebLingoNativeFunction Setter, WebLingoNativeFunction Call);
+
+/// <summary>
 /// A native module's class (specification, sections 3.7 and 3.9), which <see cref="IWebLingoNativeRegistry.Class"/> gives:
 /// its constructor, its methods and its static methods, each a native function, a constructor's and a method's first
 /// argument the instance it runs on. The compiler makes it a class as any other is, extending <c>Object</c>, whose members
@@ -51,6 +59,34 @@ public sealed class WebLingoNativeClass(string name)
     public IReadOnlyList<WebLingoNativeMember> StaticMethods => _staticMethods;
     public IReadOnlyList<WebLingoNativeProperty> Properties => _properties;
     public WebLingoNativeIndexer? Indexer { get; private set; }
+
+    /// <summary>Its fallback for the members it does not declare, if it has one (section 3.10).</summary>
+    public WebLingoNativeFallback? Fallback { get; private set; }
+
+    /// <summary>Whether its module's own functions make its instances (<see cref="TryMakeOwn"/>), which the program then tells it its class.</summary>
+    public bool MadeByModule { get; private set; }
+
+    /// <summary>
+    /// Lets its module's own functions make its instances, without a factory given its class, <c>com.create(progId)</c>
+    /// (<see cref="TryMakeOwn"/>, section 3.10): the program tells the class its class value when it begins.
+    /// </summary>
+    public WebLingoNativeClass DeclareMadeByModule()
+    {
+        MadeByModule = true;
+        return this;
+    }
+
+    /// <summary>
+    /// Its fallback, which reads, assigns and calls the members its instances have that it does not declare: one that a
+    /// field, a method, a property or a static member of its class, or of a class extending it, does not hide; declared
+    /// once.
+    /// </summary>
+    public WebLingoNativeClass DeclareFallback(WebLingoNativeFunction getter, WebLingoNativeFunction setter, WebLingoNativeFunction call)
+    {
+        if (Error is null && Fallback is not null) Error = $"class '{Name}' declares its fallback twice";
+        if (Error is null) Fallback = new(getter, setter, call);
+        return this;
+    }
 
     /// <summary>Its methods written in WebLingo, each source as <see cref="DeclareWebLingoMethods"/> was given it.</summary>
     public IReadOnlyList<string> WebLingoMethods => _webLingoMethods;
@@ -159,6 +195,18 @@ public sealed class WebLingoNativeClass(string name)
         return false;
     }
 
+    /// <summary>
+    /// A new instance of this class itself, which one of its module's functions makes, as a factory does, its constructor not
+    /// run (section 3.10): WL3001 for a class not declared <see cref="DeclareMadeByModule"/>, or one the program has not made.
+    /// </summary>
+    public bool TryMakeOwn(WebLingoHeap heap, out WebLingoValue instance, out WebLingoRuntimeError? error)
+    {
+        if (heap.TryGetNativeClassValue(this, out var classValue)) return TryMake(classValue, heap, out instance, out error);
+        instance = WebLingoValue.Null;
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"The native class {Name}'s module cannot make its instances.");
+        return false;
+    }
+
     private bool CheckOptional(string name, int arity, int optional)
     {
         if (Error is null && (optional < 0 || optional > arity)) Error = $"class '{Name}' declares '{name}' with {optional} of its {arity} parameters optional";
@@ -226,6 +274,8 @@ public sealed class WebLingoNativeClass(string name)
             if (indexer.Setter is { } setter) builtins.Add(new MemberBuiltin(prefix + ".index.set", this, new("[]", 2, setter), MemberKind.Method));
             builtins.Add(new MemberBuiltin(prefix + ".index.optional", this, new("?[]", 1, Optional(indexer.Getter)), MemberKind.Method));
         }
+        // Last, for a class its module makes: what the program calls when it begins, given the class (section 3.10).
+        if (MadeByModule) builtins.Add(new MemberBuiltin(prefix + ".class", this, new("class", 0, MarksOnly), MemberKind.Class));
         return builtins;
     }
 
@@ -318,7 +368,7 @@ public sealed class WebLingoNativeClass(string name)
 
     private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
-    private enum MemberKind { Constructor, Method, Static }
+    private enum MemberKind { Constructor, Method, Static, Class }
 
     /// <summary>
     /// A member as a built-in: a constructor marks its instance, then runs; a method runs only on an instance of its class;
@@ -338,6 +388,13 @@ public sealed class WebLingoNativeClass(string name)
                 error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
                     $"The native class {owner.Name} cannot make {WebLingoValueFormatter.Describe(arguments[0], heap)} one of its instances.");
                 return false;
+            }
+            if (kind == MemberKind.Class)
+            {
+                // The class its module makes instances of, told it when the program begins (section 3.10).
+                heap.RememberNativeClass(owner, arguments[0]);
+                error = null;
+                return true;
             }
             if (kind == MemberKind.Method && !owner.IsInstance(arguments[0], heap))
             {

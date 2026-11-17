@@ -75,6 +75,7 @@ public sealed class WebLingoStackVirtualMachine
         heap.FileSystem = context.FileSystem;
         heap.Network = context.Network;
         heap.Databases = context.Databases;
+        heap.Allowed = context.Allowed;
         heap.WallClock = context.WallClock;
         heap.TimeZone = context.TimeZone;
         heap.SchedulerHost = context.SchedulerHost;
@@ -624,7 +625,12 @@ public sealed class WebLingoStackVirtualMachine
                             if (target.Kind == WebLingoValueKind.Instance)
                             {
                                 // A field's function is called as any function is; a method runs on the instance.
-                                if (!WebLingoMembers.TryFindCallee(target, name.Text, heap, out callee, out var isMethod, out error)) break;
+                                if (!WebLingoMembers.TryFindCallee(target, name.Text, heap, out callee, out var isMethod, out error))
+                                {
+                                    // A native class's member it does not declare, which its fallback calls, below (section 3.10).
+                                    if (ReferenceEquals(error, WebLingoMembers.Fallback)) goto memberFallback;
+                                    break;
+                                }
                                 self = isMethod ? target : WebLingoValue.Missing;
                                 firstArgument = first;
                                 argumentCount = ins.B;
@@ -642,6 +648,7 @@ public sealed class WebLingoStackVirtualMachine
                                 constructed = WebLingoValue.Null;
                                 goto call;
                             }
+                            memberFallback:
                             if (!WebLingoMembers.TryCall(target, name.Member, name.Text, slots, first, ins.B, heap, out var result, out error))
                             {
                                 break;

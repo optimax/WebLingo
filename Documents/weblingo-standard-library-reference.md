@@ -29,6 +29,7 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 17. [`std:db`](#17-stddb)
 18. [Native modules](#18-native-modules)
 19. [In WASP's pages](#19-in-wasps-pages)
+20. [`windows:com`](#20-windowscom)
 
 ---
 
@@ -292,6 +293,7 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `NetworkError` | WL3014 | a host that cannot be reached, a connection that fails, a request that takes too long |
 | `DatabaseError` | WL3015 | a statement a database refuses, a database that cannot be opened |
 | `PermissionError` | WL3016 | a file or a folder a site's scripts may not reach, outside the folders its `wasp.config` allows |
+| `ComError` | WL3012 | a COM object's failure, with its `number`, `source` and `description` (section 20) |
 
 ```javascript
 try {
@@ -740,3 +742,54 @@ zWebLingoz
 ```
 
 `new Html()` is WL3001: the class has no instances.
+
+---
+
+## 20. `windows:com`
+
+COM's objects, on Windows only, as classic ASP's pages used them, `Server.CreateObject("ADODB.Connection")`: a native
+module installed with the runtime in `windows/`, beside `std/`. Elsewhere, importing it is WL2015.
+
+| Member | What it is |
+|---|---|
+| `com.create(progId)` | a new object, a `ComObject`, by its ProgID, `"ADODB.Connection"`, or its CLSID, `"{00000514-…}"` |
+| `com.get(moniker)` | an object that exists, bound to by its moniker, as `GetObject` binds |
+| `x.Name`, `x.Name = v`, `x.Method(a, b)` | the object's members, through its `IDispatch`, their names' case aside; a property that takes arguments is read as a call, `rs.Fields.Item("Name")` |
+| `x[k]`, `x[k] = v` | its default member with `k`: `rs["Name"]` is the field, as `rs("Name")` was |
+| `foreach (var item in x)` | a collection's items, through its `_NewEnum` |
+| `x.call(name, arguments)`, `x.get(name)`, `x.set(name, value)` | a member that one of `ComObject`'s own hides, `toString`, `dispose` or `get` |
+| `x.dispose()` | releases the object, as `using` does; the collector or the program's end releases one never disposed |
+
+A script makes only the objects its configuration allows, `weblingo.config` beside it, or a site's `wasp.config`, by
+ProgID, CLSID or moniker, `"*"` allowing any:
+
+```json
+{ "com": { "allow": ["ADODB.Connection", "ADODB.Recordset"] } }
+```
+
+Any other is WL3001. Values go to COM and come back as their kinds: `null` as `VT_NULL` and back; Booleans; integers,
+as `VT_I4` or `VT_I8`; numbers; decimals, ADO's `MONEY` and `DECIMAL` among them; strings; `Bytes`, ADO's binary fields;
+dates, at their time on the server's clocks; arrays, a `SAFEARRAY` of several dimensions coming back as arrays of
+arrays; and objects, as `ComObject`s. A member the object does not have is a `MemberError`, WL3006, and a failure a
+`ComError`, WL3012, whose `number` is its `HRESULT`, and whose `source` and `description` are what COM said, `""`
+where it said nothing:
+
+```javascript
+import com from "windows:com";
+var tea = com.create("Scripting.Dictionary");
+tea.Add("Sencha", 6.5m);
+tea["Assam"] = 4.25m;
+writeLn([tea.Count, tea.Item("Sencha"), tea["Assam"], tea.Exists("Oolong")]);
+foreach (var name in tea) writeLn(name);
+try { tea.Add("Sencha", 7); } catch (ComError e) { writeLn(e.number); }
+```
+
+```text
+[2, 6.5m, 4.25m, false]
+Sencha
+Assam
+-2146827831
+```
+
+A call blocks its worker until the object returns, each worker a single-threaded apartment's thread, its objects its
+own. Events, arguments by reference and named arguments are not there yet.

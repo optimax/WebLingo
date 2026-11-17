@@ -222,6 +222,14 @@ public static partial class WebLingoMembers
             if (TryGetProperty(target, heap.ClassOf(target), name, heap, out result, out error)) return false;
             // An instance holding a value has that value's members too, its string's length (section 3.7).
             if (heap.IsHolding(target)) return TryGet(heap.Held(target), member, name, heap, optional, out result, out error);
+            // A native class's member it does not declare, which its fallback reads (section 3.10).
+            if (heap.FallbackOf(target) is { } fallback)
+            {
+                if (TryFallback(fallback.Getter, target, name, [], heap, out result, out error)) return true;
+                if (!optional || error?.Code != WebLingoDiagnosticCodes.NoSuchMember) return false;
+                (result, error) = (WebLingoValue.Null, null);
+                return true;
+            }
             if (optional) return true;
             error = NoSuchMember(target, name, heap);
             return false;
@@ -400,9 +408,40 @@ public static partial class WebLingoMembers
         }
         var classValue = heap.ClassOf(target);
         var assignee = heap.FindAssignee(classValue, name, out setter);
+        if (assignee == WebLingoHeap.Assignee.Field && heap.FallbackOf(target) is { } fallback && !heap.TryGetField(target, name, out _))
+        {
+            // A native class's member it does not declare, which its fallback assigns (section 3.10).
+            return TryFallback(fallback.Setter, target, name, [value], heap, out _, out error);
+        }
         if (assignee == WebLingoHeap.Assignee.Field) return heap.TrySetField(target, name, value, out error, classValue);
         error = NotAField(assignee, target, name, heap);
         return false;
+    }
+
+    /// <summary>
+    /// What <see cref="TryFindCallee"/> fails with for a native class's instance whose fallback calls the member (section
+    /// 3.10): the VM then calls it through <see cref="TryCall"/>, with the call's arguments.
+    /// </summary>
+    public static readonly WebLingoRuntimeError Fallback = new(WebLingoDiagnosticCodes.NoSuchMember, "A native class's member, which its fallback calls.");
+
+    /// <summary>A native class's fallback, given the instance, the member's name, then <paramref name="values"/>.</summary>
+    private static bool TryFallback(WebLingoNativeFunction function, WebLingoValue target, string name, ReadOnlySpan<WebLingoValue> values,
+        WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!heap.TryAllocateString(name, out var nameValue, out error)) return false;
+        var arguments = new WebLingoValue[values.Length + 2];
+        (arguments[0], arguments[1]) = (target, nameValue);
+        values.CopyTo(arguments.AsSpan(2));
+        heap.AddRoots(arguments); // While the function runs, which may collect.
+        try
+        {
+            return function(arguments, heap, out result, out error);
+        }
+        finally
+        {
+            heap.RemoveLastRoots(arguments);
+        }
     }
 
     /// <summary>
@@ -499,7 +538,7 @@ public static partial class WebLingoMembers
             error = IsProperty(instance, name, heap);
             return false;
         }
-        error = NoSuchMember(instance, name, heap);
+        error = heap.FallbackOf(instance) is not null ? Fallback : NoSuchMember(instance, name, heap);
         return false;
     }
 
@@ -836,6 +875,11 @@ public static partial class WebLingoMembers
         WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
+        // A native class's member it does not declare, which a VM calls here once TryFindCallee has not found it (section 3.10).
+        if (target.Kind == WebLingoValueKind.Instance && heap.FallbackOf(target) is { } fallback)
+        {
+            return TryFallback(fallback.Call, target, name, values.AsSpan(first, count), heap, out result, out error);
+        }
         if (member == WebLingoMember.Iterate
             && target.Kind is WebLingoValueKind.Array or WebLingoValueKind.Set or WebLingoValueKind.Map or WebLingoValueKind.String)
         {

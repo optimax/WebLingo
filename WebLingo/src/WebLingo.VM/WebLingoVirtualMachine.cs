@@ -80,6 +80,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         heap.FileSystem = context.FileSystem;
         heap.Network = context.Network;
         heap.Databases = context.Databases;
+        heap.Allowed = context.Allowed;
         heap.WallClock = context.WallClock;
         heap.TimeZone = context.TimeZone;
         heap.SchedulerHost = context.SchedulerHost;
@@ -594,8 +595,13 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             }
                             if (target.Kind == WebLingoValueKind.Instance)
                             {
-                                // A field's function is called as any function is; a method runs on the instance.
-                                if (!WebLingoMembers.TryFindCallee(target, name.Text, heap, out callee, out var isMethod, out error)) break;
+                                // A field's function is called as any function is; a method runs on the instance; a native
+                                // class's member it does not declare its fallback calls, below (section 3.10).
+                                if (!WebLingoMembers.TryFindCallee(target, name.Text, heap, out callee, out var isMethod, out error))
+                                {
+                                    if (ReferenceEquals(error, WebLingoMembers.Fallback)) goto memberFallback;
+                                    break;
+                                }
                                 self = isMethod ? target : WebLingoValue.Missing;
                                 arguments = registers;
                                 firstArgument = ins.C + 1;
@@ -617,6 +623,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                                 constructed = WebLingoValue.Null;
                                 goto call;
                             }
+                            memberFallback:
                             if (!WebLingoMembers.TryCall(target, name.Member, name.Text, registers, ins.C + 1, ins.D, heap,
                                     out var result, out error))
                             {

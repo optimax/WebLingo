@@ -84,6 +84,29 @@ public sealed class WebLingoHeap
     /// <summary>The platform's databases (<see cref="WebLingoExecutionContext.Databases"/>), for <c>std:db</c>'s functions (section 7.11).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoDatabases? Databases { get; set; }
 
+    /// <summary>What the configuration allows native modules (<see cref="WebLingoExecutionContext.Allowed"/>), COM's objects (section 3.10).</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>>? Allowed { get; set; }
+
+    /// <summary>The class values of the native classes whose modules make their instances, each its class's (section 3.10).</summary>
+    private Dictionary<object, WebLingoValue>? _nativeClassValues;
+
+    /// <summary>
+    /// Remembers a native class's class value, which the program made, for its module's functions to make instances of; it
+    /// stays reachable, as the program's local that holds it does.
+    /// </summary>
+    internal void RememberNativeClass(object nativeClass, WebLingoValue classValue) =>
+        (_nativeClassValues ??= new Dictionary<object, WebLingoValue>(ReferenceEqualityComparer.Instance))[nativeClass] = classValue;
+
+    /// <summary>A native class's class value, if the program has made it and told it.</summary>
+    internal bool TryGetNativeClassValue(object nativeClass, out WebLingoValue classValue)
+    {
+        classValue = WebLingoValue.Null;
+        return _nativeClassValues is not null && _nativeClassValues.TryGetValue(nativeClass, out classValue);
+    }
+
+    /// <summary>The native fallback of an instance's native class, if it has one (section 3.10).</summary>
+    internal WebLingoNativeFallback? FallbackOf(WebLingoValue value) => (NativeClassOf(value) as WebLingoNativeClass)?.Fallback;
+
     /// <summary>The platform's wall clock (<see cref="WebLingoExecutionContext.WallClock"/>), which dates read (section 3.2).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoClock? WallClock { get; set; }
 

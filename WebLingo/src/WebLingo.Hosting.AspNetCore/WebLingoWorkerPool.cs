@@ -31,6 +31,8 @@ public sealed class WebLingoWorkerPool : IDisposable
         {
             var worker = new WebLingoWorkerId(i);
             _threads[i] = new Thread(() => Serve(worker)) { IsBackground = true, Name = $"WebLingo worker {i}" };
+            // Each worker a single-threaded apartment's thread on Windows, its COM objects its own, its waits pumping (section 3.10).
+            if (OperatingSystem.IsWindows()) _threads[i].SetApartmentState(ApartmentState.STA);
             _threads[i].Start();
         }
     }

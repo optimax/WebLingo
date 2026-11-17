@@ -98,6 +98,8 @@ public static class WebLingoDiagnosticCodes
     public const string NetworkFailure = "WL3014";
     /// <summary>A database's failure: a statement it refuses, a file it cannot open (proposed, section 7.11, <c>DatabaseError</c>).</summary>
     public const string DatabaseFailure = "WL3015";
+    /// <summary>A COM object's failure, its <c>HRESULT</c> and what it said (approved as a code, section 3.10; <c>ComError</c>).</summary>
+    public const string ComFailure = "WL3012";
     /// <summary>
     /// A file or a folder a site's scripts may not reach, outside the folders its configuration lets it read or write, or a
     /// device's (proposed, the owner's answer, 17 November 2026; section 7.13, "File capabilities"; <c>PermissionError</c>).

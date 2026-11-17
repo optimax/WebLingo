@@ -87,5 +87,12 @@ public readonly struct WebLingoValue : IEquatable<WebLingoValue>
     public override string ToString() => WebLingoValueFormatter.Format(this);
 }
 
-/// <summary>A runtime error: its diagnostic code and message; the VM adds where it happened.</summary>
-public sealed record WebLingoRuntimeError(string Code, string Message);
+/// <summary>
+/// A runtime error: its diagnostic code and message; the VM adds where it happened. <see cref="Fields"/> are what its
+/// <c>Error</c> has besides its <c>message</c> and <c>code</c>, each a name and an integer (<see cref="long"/>), a string or
+/// null, as a <c>ComError</c> has its <c>number</c>, <c>source</c> and <c>description</c> (section 3.10).
+/// </summary>
+public sealed record WebLingoRuntimeError(string Code, string Message)
+{
+    public IReadOnlyList<KeyValuePair<string, object?>>? Fields { get; init; }
+}

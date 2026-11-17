@@ -1899,6 +1899,14 @@ public sealed class WebLingoBinder
         _nativeCallees = callees;
         var local = BindBuiltinClass(name, new WebLingoClassDeclarationSyntax(info.Name, default, methods, default), UseObject());
         _nativeCallees = outer;
+        if (info.Registration is { } registration)
+        {
+            // A class its module makes instances of: told its class value where the program begins, after the built-in
+            // classes (section 3.10).
+            var told = new WebLingoBoundBuiltinCall(UseBuiltin(new WebLingoBuiltinDeclaration(registration.Builtin, registration.Arity)),
+                [Reference(local, default)], default);
+            _nativeFunctions.Add(new WebLingoBoundExpressionStatement(told, default));
+        }
         return local;
     }
 

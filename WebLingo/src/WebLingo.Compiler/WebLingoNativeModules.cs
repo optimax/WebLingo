@@ -40,6 +40,12 @@ public sealed record WebLingoNativeClassInfo(string Name, WebLingoNativeExport C
     public IReadOnlyList<WebLingoMethodSyntax> WebLingoMethods { get; init; } = [];
 
     /// <summary>
+    /// For a class its module's functions make instances of, the built-in the program calls when it begins, given the
+    /// class, so that the module knows it (section 3.10); null for any other.
+    /// </summary>
+    public WebLingoNativeExport? Registration { get; init; }
+
+    /// <summary>
     /// A native class's methods written in WebLingo, as a class's body declares them, read; false, with why, for a source
     /// that does not parse, that declares anything but methods, or a method whose name <paramref name="taken"/> holds or
     /// another of them has.

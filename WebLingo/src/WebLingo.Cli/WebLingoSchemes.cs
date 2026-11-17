@@ -17,7 +17,9 @@ namespace WebLingo.Cli;
 /// provider reads, <c>"databases": { "shop": "sqlite:../data/shop.db" }</c>, which both read (section 7.11); and the
 /// folders its scripts may read and write, <c>"files": { "read": ["../data"], "write": ["../uploads"] }</c>, a relative
 /// folder from the file's folder, which <c>wasp</c> reads, <c>weblingo</c>'s scripts reaching any file (section 7.13,
-/// "File capabilities").
+/// "File capabilities"); and the COM objects its scripts may make, <c>"com": { "allow": ["ADODB.Connection"] }</c>, by
+/// ProgID, CLSID or moniker, <c>"*"</c> any, which both read (section 3.10). On Windows, the <c>windows</c> scheme's folder is
+/// <c>windows/</c> beside the program, unless configured, as <c>std</c>'s is <c>std/</c>.
 /// </summary>
 public static class WebLingoSchemes
 {
@@ -39,8 +41,14 @@ public static class WebLingoSchemes
     public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out IReadOnlyDictionary<string, string> databases,
         out WebLingoFileFolders files, out string? error) =>
+        TryLoad(program, configuration, given, out schemes, out allowedHosts, out databases, out files, out _, out error);
+
+    /// <summary>As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name.</summary>
+    public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
+        out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out IReadOnlyDictionary<string, string> databases,
+        out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed, out string? error) =>
         TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
-            out databases, out files, out error);
+            out databases, out files, out allowed, out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
@@ -49,7 +57,7 @@ public static class WebLingoSchemes
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out string? error) =>
-        TryLoadFolder(folder, configuration, given, out schemes, out environment, out sendTimeout, out _, out _, out _, out error);
+        TryLoadFolder(folder, configuration, given, out schemes, out environment, out sendTimeout, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, its databases,
@@ -57,8 +65,18 @@ public static class WebLingoSchemes
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
-        out IReadOnlyDictionary<string, string> databases, out WebLingoFileFolders files, out string? error)
+        out IReadOnlyDictionary<string, string> databases, out WebLingoFileFolders files, out string? error) =>
+        TryLoadFolder(folder, configuration, given, out schemes, out environment, out sendTimeout, out allowedHosts, out databases, out files,
+            out _, out error);
+
+    /// <summary>As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name.</summary>
+    public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
+        out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
+        out IReadOnlyDictionary<string, string> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
+        out string? error)
     {
+        var allowing = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        allowed = allowing;
         sendTimeout = null;
         var hosts = new List<string>();
         allowedHosts = hosts;
@@ -70,10 +88,15 @@ public static class WebLingoSchemes
         {
             ["std"] = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "std"))
         };
+        // Windows's own native modules, windows:com among them, beside the program on Windows only (section 3.10).
+        if (OperatingSystem.IsWindows()) schemes["windows"] = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "windows"));
         (environment, error) = (null, null);
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
-        if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, ref sendTimeout, hosts, named, read, write, out error)) return false;
+        if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, ref sendTimeout, hosts, named, read, write, allowing, out error))
+        {
+            return false;
+        }
         foreach (var (name, path) in given) schemes[name] = Path.GetFullPath(path);
         return true;
     }
@@ -111,7 +134,8 @@ public static class WebLingoSchemes
     }
 
     private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? environment, ref double? sendTimeout,
-        List<string> hosts, Dictionary<string, string> databases, List<string> read, List<string> write, out string? error)
+        List<string> hosts, Dictionary<string, string> databases, List<string> read, List<string> write,
+        Dictionary<string, IReadOnlyList<string>> allowed, out string? error)
     {
         error = null;
         try
@@ -186,6 +210,28 @@ public static class WebLingoSchemes
                     }
                     continue;
                 }
+                if (setting.Name == "com")
+                {
+                    // The COM objects its scripts may make, by ProgID, CLSID or moniker, "*" any (section 3.10).
+                    var objects = new List<string>();
+                    if (setting.Value.ValueKind != JsonValueKind.Object || !setting.Value.TryGetProperty("allow", out var listed)
+                        || listed.ValueKind != JsonValueKind.Array || setting.Value.EnumerateObject().Count() != 1)
+                    {
+                        error = $"{file}: \"com\" is an object, {{ \"allow\": [\"ADODB.Connection\"] }}.";
+                        return false;
+                    }
+                    foreach (var progId in listed.EnumerateArray())
+                    {
+                        if (progId.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(progId.GetString()))
+                        {
+                            error = $"{file}: \"com\"'s \"allow\" lists COM objects, each a ProgID, a CLSID, a moniker, or \"*\".";
+                            return false;
+                        }
+                        objects.Add(progId.GetString()!);
+                    }
+                    allowed["com"] = objects;
+                    continue;
+                }
                 if (setting.Name == "files")
                 {
                     // The folders its scripts may read, and read and write (section 7.13, "File capabilities").
@@ -195,7 +241,7 @@ public static class WebLingoSchemes
                 if (setting.Name != "schemes")
                 {
                     error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"environment\", \"sendTimeout\", \"network\", "
-                            + "\"databases\" and \"files\".";
+                            + "\"databases\", \"files\" and \"com\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)

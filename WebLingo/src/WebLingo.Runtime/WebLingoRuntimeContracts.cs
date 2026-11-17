@@ -63,6 +63,13 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     public WebLingo.Platform.Abstractions.IWebLingoDatabases? Databases { get; init; }
 
     /// <summary>
+    /// What the application's configuration allows its native modules, each setting's name and the names its
+    /// <c>"allow"</c> lists, <c>"com": { "allow": ["ADODB.Connection"] }</c>, which a native module reads through the heap
+    /// (<see cref="WebLingoHeap.Allowed"/>, section 3.10); none by default.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>>? Allowed { get; init; }
+
+    /// <summary>
     /// The host's side of the execution's scheduler, on which work runs off the worker, its outcome posted back to it
     /// (section 7.8, WL-P007); without one, nothing asynchronous but the execution's own tasks and timers runs.
     /// </summary>

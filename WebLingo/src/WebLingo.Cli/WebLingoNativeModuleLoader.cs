@@ -232,6 +232,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
             }
             classes.Add(new WebLingoNativeClassInfo(nativeClass.Name, constructor, methods, statics)
             {
+                Registration = nativeClass.MadeByModule ? Export("class", members[^1]) : null,
                 WebLingoMethods = written,
                 Properties = properties,
                 IndexGetter = indexGetter,
