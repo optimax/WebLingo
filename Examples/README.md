@@ -64,6 +64,10 @@ under IIS it does not, unless the site's `wasp.config` says `{ "mode": "developm
 WebLingo is installed once on a server, and every site shares it, as PHP is installed once for every PHP site: a site
 holds only its own files.
 
+On Windows, the scripts in `Scripts`, at the repository's root, written in WebLingo, do these steps as administrator:
+`install-weblingo.wl` installs WebLingo once it is published, and `add-wasp-site.wl` adds a site, served by HTTPS
+under a name of its own (`Scripts/README.md`). By hand:
+
 Once for the server:
 
 1. Turn on IIS (Windows Features' **Internet Information Services**, or, on Windows Server, the **Web Server (IIS)**
