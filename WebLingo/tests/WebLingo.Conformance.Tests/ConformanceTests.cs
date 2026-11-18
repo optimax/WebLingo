@@ -1075,6 +1075,28 @@ public sealed class ConformanceTests : IDisposable
         Assert.Equal((WebLingoCommandLine.Success, "P!|[P!]|N:\"x\"|C:1.5||5|s|  P!|\n", ""), Weblingo("run", source));
     }
 
+    [Theory]
+    // A toString() a class is given while the program runs is called by write as a declared one is, wherever the instance
+    // is (section 3.7): by setMethod, to a class new Class made, by a built-in called as a value, and from when it is given.
+    // Until 18 November 2026 write ignored it unless a class declared in the source had a toString() of its own.
+    [InlineData("class P {} P.setMethod(\"toString\", function (this) { return \"P!\"; }); "
+        + "writeLn(new P()); writeLn([new P()]); writeLn({ p: new P() }); writeLn($\"{new P()}\");", "P!\n[P!]\n{\"p\": P!}\nP!")]
+    [InlineData("var K = new Class(\"K\"); K.setMethod(\"toString\", function (this) { return \"K!\"; }); "
+        + "writeLn(new K()); write([new K()]); writeLn(\"\");", "K!\n[K!]")]
+    [InlineData("class P {} P.setMethod(\"toString\", function (this) { return \"P!\"; }); var w = writeLn; w(new P());", "P!")]
+    [InlineData("class P {} writeLn(new P()); P.setMethod(\"toString\", function (this) { return \"P!\"; }); writeLn(new P());", "P {}\nP!")]
+    public void AToStringGivenWhileTheProgramRunsIsCalledByWrite(string source, string printed)
+    {
+        Assert.Equal((WebLingoCommandLine.Success, printed + "\n", ""), Weblingo("run", source));
+
+        // On the stack VM, from a .wlbc.
+        var program = Path.Combine(_folder, "program.wl");
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
+        var output = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], output, new StringWriter()));
+        Assert.Equal(printed + "\n", output.ToString());
+    }
+
     [Fact]
     public void SignedInt64OverflowIsARuntimeError()
     {

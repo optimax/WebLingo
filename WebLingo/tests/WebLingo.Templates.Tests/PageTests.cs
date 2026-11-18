@@ -21,6 +21,9 @@ public sealed class PageTests
     [InlineData("<%= \"<a href=\\\"x\\\">Tom & 'Jerry'</a>\" %>", "&lt;a href=&quot;x&quot;&gt;Tom &amp; &#39;Jerry&#39;&lt;/a&gt;")]
     [InlineData("<%= [1, \"a\"] %>", "[1, &quot;a&quot;]")]
     [InlineData("<% class T { toString() { return \"<T>\"; } } %><%= new T() %>", "&lt;T&gt;")]
+    // And one given while the page runs (section 3.7).
+    [InlineData("<% class T {} T.setMethod(\"toString\", function (this) { return \"<T>\"; }); %><%= new T() %><%= [new T()] %>",
+        "&lt;T&gt;[&lt;T&gt;]")]
     // <%- %> writes it as it stands.
     [InlineData("<%- \"<b>bold</b>\" %>", "<b>bold</b>")]
     // null writes nothing, so that an optional read that finds nothing is blank; write(null) writes null.

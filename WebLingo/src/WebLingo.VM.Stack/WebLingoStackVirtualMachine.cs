@@ -530,7 +530,7 @@ public sealed class WebLingoStackVirtualMachine
                             continue;
                         case WebLingoStackOpCode.CallBuiltin:
                         {
-                            if (_texts is not null && _texts[ins.A] && ins.B == 1 && NeedsText(slots[sp - 1]))
+                            if (heap.ToStringGiven && _texts[ins.A] && ins.B == 1 && NeedsText(slots[sp - 1]))
                             {
                                 // A built-in that writes text, of a value that may hold an instance whose toString() must run.
                                 _text = new TextCall(new WebLingoTextBuilder(heap, slots[sp - 1], false), builtins[ins.A], sp - 1);
@@ -985,7 +985,7 @@ public sealed class WebLingoStackVirtualMachine
                             error = WrongArgumentCount(builtin.Name, builtin.Arity, argumentCount);
                             goto failed;
                         }
-                        if (_texts is not null && _texts[callee.Handle] && argumentCount == 1 && NeedsText(slots[firstArgument]))
+                        if (heap.ToStringGiven && _texts[callee.Handle] && argumentCount == 1 && NeedsText(slots[firstArgument]))
                         {
                             _text = new TextCall(new WebLingoTextBuilder(heap, slots[firstArgument], false), builtin, firstArgument - 1);
                             goto text;
@@ -1609,10 +1609,10 @@ public sealed class WebLingoStackVirtualMachine
 
         /// <summary>
         /// For each built-in, whether it writes text (<see cref="IWebLingoTextBuiltin"/>), and so is given a value's text with
-        /// the toString() its instances override run; null if no class of the module overrides toString(), as then the
-        /// formatter alone gives every text (section 3.7).
+        /// the toString() its instances override run, once a class has been given one (<c>heap.ToStringGiven</c>), as until
+        /// then the formatter alone gives every text (section 3.7).
         /// </summary>
-        private bool[]? _texts = TextBuiltins(module, builtins);
+        private bool[] _texts = TextBuiltins(builtins);
 
         /// <summary>The execution's tasks (section 3.8), made when it starts; the program's own task, if its top level awaits, a root.</summary>
         private WebLingoScheduler _scheduler = null!;
@@ -2091,7 +2091,7 @@ public sealed class WebLingoStackVirtualMachine
                 ErrorClasses = errorClasses
             };
             (constants, names, builtins, codes) = (constants2, names2, builtins2, codes2);
-            _texts = TextBuiltins(module, builtins);
+            _texts = TextBuiltins(builtins);
             _builtin = BuiltinClasses(module);
             _madeAlready = madeAlready;
             while (_unitClosures.Count < units.Count) _unitClosures.Add(WebLingoValue.Null);
@@ -2342,15 +2342,8 @@ public sealed class WebLingoStackVirtualMachine
         private TextCall? _text;
         private WebLingoValue _returned;
 
-        private static bool[]? TextBuiltins(WebLingoStackModule module, IWebLingoBuiltinFunction[] builtins)
+        private static bool[] TextBuiltins(IWebLingoBuiltinFunction[] builtins)
         {
-            var overrides = false;
-            for (var i = 0; i < module.Classes.Count && !overrides; i++)
-            {
-                if (i == module.ObjectClass) continue;
-                foreach (var method in module.Classes[i].Methods) overrides |= method.Name == "toString";
-            }
-            if (!overrides) return null;
             var texts = new bool[builtins.Length];
             for (var i = 0; i < builtins.Length; i++) texts[i] = builtins[i] is IWebLingoTextBuiltin;
             return texts;

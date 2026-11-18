@@ -69,6 +69,13 @@ public sealed class WebLingoHeap
     /// </summary>
     public WebLingoValue DefaultToString { get; set; }
 
+    /// <summary>
+    /// Whether a class has been given a <c>toString()</c> since <c>Object</c> was made, by its declaration, an
+    /// <c>extend</c> or <c>setMethod</c>, so that writing a value may call one; never unset. Until then, every value's
+    /// text is the formatter's, as <c>write</c> writes it (section 3.7).
+    /// </summary>
+    public bool ToStringGiven { get; private set; }
+
     /// <summary>The execution's tasks, which its VM runs, and which <c>delay</c> adds a timer to (section 3.8).</summary>
     public WebLingoScheduler? Scheduler { get; set; }
 
@@ -1049,6 +1056,8 @@ public sealed class WebLingoHeap
         }
         var before = Size(target);
         target.OwnMethods[name == "destructor" ? "dispose" : name] = method;
+        // Object's own, given as Object is made, before it is the heap's, writes an instance as its fields.
+        if (name == "toString" && ObjectClass.Kind == WebLingoValueKind.Class) ToStringGiven = true;
         MethodsChanged(target, classValue);
         return TryGrow(target, before, out error);
     }
