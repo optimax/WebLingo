@@ -312,6 +312,17 @@ When a test host crashes, by a stack overflow among others, `dotnet test` still 
 
 The parser recurses up to 256 levels, and every later stage as deep, and before .NET has optimized those methods their frames are large: a thread's 1 MB, Windows's default, held about 200 levels, and a deeper program crashed the process with a stack overflow, which nothing can catch. So whatever compiles runs on a thread whose stack is `WebLingoParser.CompilerStackSize`, 16 MB (the owner's answer, 17 November 2026): `weblingo`'s and `wasp`'s commands (`WebLingoCommandThread`, which their `Main`s call), and the web hosts' workers (`WebLingoWorkerPool`). A new host, or a new place that compiles, does the same; and a test that compiles source near the limits does it on such a thread (`ParserTests.ParseOnCompilerStack`, `CompilerStackTests`), xUnit's own threads having the platform's default.
 
+### An Include's Tokens Hold Positions Inside Them
+
+A page's includes are read by the lexer from their own text, then moved to their positions in the program
+(`WebLingoTemplateParser.Shift`), and a token is more than its span: an interpolated string's parts have spans of their
+own, a format's among them, and tokens of their own, all moved with it. And nothing after the lexer reads text by a
+token's span: the parser is given one source, the page's, where an include's span points into another file, so that what
+it needs of the text the lexer puts in the token (`WebLingoInterpolationPart.FormatText`). Until 17 November 2026 the
+parser read a format from the page's text by the include's span, so that `$"{d:yyyy-MM-dd}"` in an include was formatted
+by whatever the page held there, or, past the page's end, crashed the compiler, and an error in an include's
+interpolation was reported in the page (`PageTests`).
+
 ### Warnings Are Errors
 
 `TreatWarningsAsErrors` is on for every project, so a nullable or analyzer warning fails the build, locally and in CI.

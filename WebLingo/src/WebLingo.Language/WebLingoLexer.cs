@@ -513,11 +513,13 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
         _diagnostics.AddRange(lexer.Diagnostics);
         _position = token.Span.Start;
         WebLingoSourceSpan? format = null;
+        string? formatText = null;
         if (_position < limit && source[_position] == ':')
         {
             var formatStart = _position;
             while (_position < limit && source[_position] != '}') _position++;
             format = new WebLingoSourceSpan(formatStart, _position - formatStart);
+            formatText = source[(formatStart + 1).._position];
         }
         if (_position >= limit || Run(_position, '}') < braces)
         {
@@ -526,7 +528,10 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
             _position = Math.Min(Math.Max(_position, start), limit);
             return false;
         }
-        parts.Add(new WebLingoInterpolationPart(null, code, new WebLingoSourceSpan(start, _position - start)) { Format = format });
+        parts.Add(new WebLingoInterpolationPart(null, code, new WebLingoSourceSpan(start, _position - start))
+        {
+            Format = format, FormatText = formatText
+        });
         _position += braces;
         return true;
     }

@@ -433,7 +433,7 @@ public sealed class WebLingoTemplateParser
     /// <summary>A token of a block's code, at its position in the program; in a layout, <c>renderBody</c> awaiting the body.</summary>
     private void AddToken(List<WebLingoToken> into, List<WebLingoToken> code, int i, int shift)
     {
-        var token = code[i] with { Span = Shift(code[i].Span, shift) };
+        var token = Shift(code[i], shift);
         if (_kind == WebLingoTemplateKind.Layout && token.Kind == WebLingoTokenKind.Identifier && token.Text == RenderBody
             && !AfterDot(code, i))
         {
@@ -451,7 +451,7 @@ public sealed class WebLingoTemplateParser
     private int AddLayout(List<WebLingoToken> code, int at, int shift)
     {
         var keyword = Shift(code[at].Span, shift);
-        var path = code[at + 1] with { Span = Shift(code[at + 1].Span, shift) };
+        var path = Shift(code[at + 1], shift);
         var entries = new List<WebLingoToken>();
         var next = at + 2;
         var end = path.Span.Start + path.Span.Length;
@@ -466,7 +466,7 @@ public sealed class WebLingoTemplateParser
                 Report(WebLingoDiagnosticCodes.UnexpectedToken, $"Expected a layout's values, a map literal, found {found}.", span);
                 return code.Count - 1;
             }
-            for (var i = next + 1; i < close; i++) entries.Add(code[i] with { Span = Shift(code[i].Span, shift) });
+            for (var i = next + 1; i < close; i++) entries.Add(Shift(code[i], shift));
             if (entries.Count > 0 && entries[^1].Kind == WebLingoTokenKind.Comma) entries.RemoveAt(entries.Count - 1);
             end = Shift(code[close].Span, shift).Start + 1;
             next = close + 1;
@@ -836,4 +836,31 @@ public sealed class WebLingoTemplateParser
         _diagnostics.Add(new WebLingoDiagnostic(code, WebLingoDiagnosticSeverity.Error, message, span));
 
     private static WebLingoSourceSpan Shift(WebLingoSourceSpan span, int shift) => new(span.Start + shift, span.Length);
+
+    /// <summary>
+    /// A token of a file's code at its position in the program, and an interpolated string's parts with it, their formats'
+    /// spans and their code's tokens, which the token's own span does not move.
+    /// </summary>
+    private static WebLingoToken Shift(WebLingoToken token, int shift)
+    {
+        if (shift == 0) return token;
+        if (token.Parts is not { } parts) return token with { Span = Shift(token.Span, shift) };
+        var moved = new List<WebLingoInterpolationPart>(parts.Count);
+        foreach (var part in parts)
+        {
+            List<WebLingoToken>? code = null;
+            if (part.Code is not null)
+            {
+                code = new List<WebLingoToken>(part.Code.Count);
+                foreach (var inner in part.Code) code.Add(Shift(inner, shift));
+            }
+            moved.Add(part with
+            {
+                Span = Shift(part.Span, shift),
+                Code = code,
+                Format = part.Format is { } format ? Shift(format, shift) : null
+            });
+        }
+        return token with { Span = Shift(token.Span, shift), Parts = moved };
+    }
 }

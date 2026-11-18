@@ -135,6 +135,10 @@ public sealed class PageTests
     [InlineData("<html>\n<% include \"/head.wasp\"; %>\n</html>", "head.wasp=<% var t = 1; %>\n<head><%= t %></head>\n", "<html>\n<head>1</head>\n</html>")]
     // include is a name like any other where no string follows it.
     [InlineData("<% var include = 2; %><%= include %>", "", "2")]
+    // An interpolation's format is the template's own, whether the page is longer than it or shorter.
+    [InlineData("<p>0123456789 0123456789</p><% include \"/h.wasp\"; %>", "h.wasp=<%= $\"{12.5:0.00}\" %>", "<p>0123456789 0123456789</p>12.50")]
+    [InlineData("<% include \"/h.wasp\"; %>", "h.wasp=<p>A template longer than the page that includes it.</p><%= $\"{12.5:0.00}\" %>",
+        "<p>A template longer than the page that includes it.</p>12.50")]
     public void AnIncludeReadsTheTemplateInItsPlace(string page, string templates, string written)
     {
         Assert.Equal(("", written, ""), Render(page, Templates(templates)));
@@ -148,6 +152,8 @@ public sealed class PageTests
     [InlineData("<% include \"/page.wasp\"; %>", "", "WL5003 at page.wasp 1,12: Including '/page.wasp' makes a cycle: page.wasp includes page.wasp.")]
     // An error in a template is reported in it, at its own line and column.
     [InlineData("<p>\n<% include \"/h.wasp\"; %>", "h.wasp=line\n<%= y %>", "WL2001 at h.wasp 2,5: 'y' is not defined.")]
+    [InlineData("<p>\n<% include \"/h.wasp\"; %>", "h.wasp=line\n<%= $\"{y}\" %>", "WL2001 at h.wasp 2,8: 'y' is not defined.")]
+    [InlineData("<p>\n<% include \"/h.wasp\"; %>", "h.wasp=line\n<%= $\"{$\"{y}\"}\" %>", "WL2001 at h.wasp 2,11: 'y' is not defined.")]
     [InlineData("<% include \"/h.wasp\"; %>", "h.wasp=\n<% var x = 1;", "WL5001 at h.wasp 2,1: This block has no closing '%>'.")]
     public void AnIncludeThatFailsIsReportedWhereItIs(string page, string templates, string diagnostic)
     {

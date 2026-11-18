@@ -27,11 +27,17 @@ public readonly record struct WebLingoToken(
 
 /// <summary>
 /// A part of an interpolated string (specification, section 3.5): its text, as it means it, or an interpolation's code,
-/// its tokens, and the span of the format after its <c>:</c>, if it has one.
+/// its tokens, and the format after its <c>:</c>, if it has one: its span, the <c>:</c> included, and its text, after it.
 /// </summary>
 public sealed record WebLingoInterpolationPart(string? Text, IReadOnlyList<WebLingoToken>? Code, WebLingoSourceSpan Span)
 {
     public WebLingoSourceSpan? Format { get; init; }
+
+    /// <summary>
+    /// The format's text, as the lexer read it from its own source: the parser may be given tokens of other sources, a
+    /// page's includes, at positions of their own, so that it never reads the text by the span.
+    /// </summary>
+    public string? FormatText { get; init; }
 }
 
 public interface IWebLingoLexer

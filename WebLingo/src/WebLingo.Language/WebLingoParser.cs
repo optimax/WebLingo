@@ -1842,7 +1842,7 @@ public sealed class WebLingoParser : IWebLingoParser
             else
             {
                 var (value, width) = ParseInterpolation(part);
-                var format = part.Format is { } formatSpan ? ReadFormat(formatSpan) : null;
+                var format = part.Format is not null ? ReadFormat(part) : null;
                 var text = new WebLingoNameSyntax(InterpolationText, part.Span);
                 if (width is null && format is null)
                 {
@@ -1902,11 +1902,13 @@ public sealed class WebLingoParser : IWebLingoParser
 
     /// <summary>
     /// A format, the text after an interpolation's <c>:</c>, as it stands: not empty, and a standard format's precision, a
-    /// letter's digits (<c>N2</c>), at most <see cref="WebLingoInterpolation.MaxPrecision"/> (WL1012 otherwise).
+    /// letter's digits (<c>N2</c>), at most <see cref="WebLingoInterpolation.MaxPrecision"/> (WL1012 otherwise). Its text is
+    /// the lexer's, never read from this parser's source by its span, which may be another file's (a page's include).
     /// </summary>
-    private string? ReadFormat(WebLingoSourceSpan span)
+    private string? ReadFormat(WebLingoInterpolationPart part)
     {
-        var format = _source.Text.Substring(span.Start + 1, span.Length - 1);
+        var span = part.Format!.Value;
+        var format = part.FormatText!;
         if (format.Length == 0)
         {
             Report(WebLingoDiagnosticCodes.MalformedString, "A format after ':' cannot be empty.", span);
