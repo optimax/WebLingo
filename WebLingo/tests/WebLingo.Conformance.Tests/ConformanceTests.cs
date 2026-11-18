@@ -1097,6 +1097,24 @@ public sealed class ConformanceTests : IDisposable
         Assert.Equal(printed + "\n", output.ToString());
     }
 
+    [Theory]
+    // A name that is not defined, WL2001, suggests what it may have been meant as (section 3.9, the owner's decision, 18
+    // November 2026): a name in scope it differs from only by case; else a standard module's export, of that name or of
+    // one it differs from only by case, with the module to import it from; else nothing.
+    [InlineData("var db = Database.open(\"x\");", "program.wl(1,10): error WL2001: 'Database' is not defined; did you mean Database, from std:db?")]
+    [InlineData("var e = environment.machineName;",
+        "program.wl(1,9): error WL2001: 'environment' is not defined; did you mean Environment, from std:env?")]
+    [InlineData("var t = readText(\"a\");", "program.wl(1,9): error WL2001: 'readText' is not defined; did you mean readText, from std:fs?")]
+    [InlineData("writeLn(JSON.stringify(1));", "program.wl(1,9): error WL2001: 'JSON' is not defined; did you mean Json?")]
+    [InlineData("Writeln(1);", "program.wl(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn?")]
+    [InlineData("var count = 1; writeLn(Count);", "program.wl(1,24): error WL2001: 'Count' is not defined; did you mean count?")]
+    [InlineData("var x = nothingLikeIt;", "program.wl(1,9): error WL2001: 'nothingLikeIt' is not defined.")]
+    public void AnUndefinedNameSuggestsWhatItMayHaveBeenMeantAs(string source, string reported)
+    {
+        var (exit, _, error) = Weblingo("check", source);
+        Assert.Equal((WebLingoCommandLine.CompilationFailed, reported), (exit, error.Split('\n')[0].TrimEnd('\r')));
+    }
+
     [Fact]
     public void SignedInt64OverflowIsARuntimeError()
     {

@@ -1880,6 +1880,13 @@ Hello, Ann!
 
 The standard library is a set of modules named `std:` and a name, imported as any module is. The WebLingo Standard
 Library Reference (`Documents/weblingo-standard-library-reference.md`) lists them, and every built-in class's members.
+A name a standard module exports, used without importing it, is WL2001, whose message names the module to import it
+from, and a name that differs from one in scope only by case names that one:
+
+```text
+program.wl(1,10): error WL2001: 'Database' is not defined; did you mean Database, from std:db?
+program.wl(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn?
+```
 
 ### `std:system`
 

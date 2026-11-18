@@ -306,6 +306,16 @@ public sealed class WaspTests : IDisposable
     }
 
     [Fact]
+    public void AnUndefinedNameInAPageSuggestsTheImportItNeeds()
+    {
+        // As in a script (section 3.9): a standard module's export, with the module to import it from.
+        var (exit, _, error) = Wasp("check", "<p><%= Environment.machineName %></p>");
+        Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
+        Assert.EndsWith("page.wasp(1,8): error WL2001: 'Environment' is not defined; did you mean Environment, from std:env?",
+            error.TrimEnd(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void APageOpensTheDatabasesWaspConfigNames()
     {
         // A site's database outside its folder, its path from the configuration's folder (section 7.11).

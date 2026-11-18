@@ -67,10 +67,17 @@ public sealed class WebLingoBinder
     /// <summary>The native classes the host's parameters are instances of, each bound once, by name.</summary>
     private readonly Dictionary<string, WebLingoLocalSymbol> _hostClasses = new(StringComparer.Ordinal);
 
+    /// <summary>The host's native modules, which name the standard modules an undefined name's import is suggested from.</summary>
+    private readonly IWebLingoNativeResolver? _native;
+
+    /// <summary>The standard modules the host has, asked for once, by the first undefined name (section 3.9).</summary>
+    private IReadOnlyList<WebLingoNativeModuleInfo>? _standardModules;
+
     public WebLingoBinder(WebLingoCompilerOptions options)
     {
         _builtinDeclarations = options.Builtins;
         _hostParameters = options.HostParameters;
+        _native = options.Native;
         foreach (var builtin in options.Builtins) _hostBuiltins[builtin.Name] = builtin;
         _function = _main = new FunctionContext(null, "main");
         _prelude = new Scope(null, _function);
@@ -1468,8 +1475,69 @@ public sealed class WebLingoBinder
                 name.Span);
             return new WebLingoBoundError(name.Span);
         }
-        Report(WebLingoDiagnosticCodes.UndefinedIdentifier, $"'{name.Name}' is not defined.", name.Span);
+        var suggestion = Suggestion(name.Name);
+        var message = suggestion.Length > 0 ? $"'{name.Name}' is not defined{suggestion}" : $"'{name.Name}' is not defined.";
+        Report(WebLingoDiagnosticCodes.UndefinedIdentifier, message, name.Span);
         return new WebLingoBoundError(name.Span);
+    }
+
+    /// <summary>
+    /// What a name that is not defined may have been meant as, for its message (section 3.9, the owner's decision, 18
+    /// November 2026): a name in scope it differs from only by case, <c>; did you mean Json?</c>; else a standard module's
+    /// export of that name, or of one it differs from only by case, <c>; did you mean Json, from std:json?</c>, so that a
+    /// script learns the import it needs; else nothing.
+    /// </summary>
+    private string Suggestion(string name)
+    {
+        for (var scope = _scope; scope is not null; scope = scope.Parent)
+        {
+            foreach (var declared in scope.Locals.Keys)
+            {
+                if (IsCaseOf(declared, name)) return $"; did you mean {declared}?";
+            }
+        }
+        foreach (var known in EveryProgramsNames())
+        {
+            if (IsCaseOf(known, name)) return $"; did you mean {known}?";
+        }
+        string? byCase = null;
+        _standardModules ??= _native?.StandardModules() ?? [];
+        foreach (var module in _standardModules)
+        {
+            var exports = new List<string>();
+            foreach (var export in module.Exports) exports.Add(export.Name);
+            foreach (var nativeClass in module.Classes) exports.Add(nativeClass.Name);
+            foreach (var export in exports)
+            {
+                if (export == name) return $"; did you mean {export}, from {module.Name}?";
+                if (byCase is null && IsCaseOf(export, name)) byCase = $"; did you mean {export}, from {module.Name}?";
+            }
+        }
+        return byCase ?? "";
+    }
+
+    /// <summary>
+    /// The names every program has without declaring them: the built-in classes', and the host's built-ins'. A list, not an
+    /// iterator, whose state machine reads <c>System.Environment</c>, which the portable core does not (<c>PortabilityTests</c>).
+    /// </summary>
+    private List<string> EveryProgramsNames()
+    {
+        var names = new List<string> { "Object", "Error" };
+        foreach (var (valueClass, _) in WebLingoPrelude.ValueClasses) names.Add(valueClass);
+        foreach (var (errorClass, _) in WebLingoPrelude.ErrorClasses) names.Add(errorClass);
+        names.AddRange(_hostBuiltins.Keys);
+        return names;
+    }
+
+    /// <summary>Whether <paramref name="known"/>, a name a program can write, differs from <paramref name="name"/> only by case.</summary>
+    private static bool IsCaseOf(string known, string name)
+    {
+        if (known == name || !string.Equals(known, name, StringComparison.OrdinalIgnoreCase)) return false;
+        foreach (var c in known)
+        {
+            if (!char.IsLetterOrDigit(c) && c != '_') return false;
+        }
+        return true;
     }
 
     /// <summary>What holds a property's own field: the instance, or, for a static property, its class (section 3.7).</summary>

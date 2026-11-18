@@ -107,4 +107,10 @@ public interface IWebLingoNativeResolver
     bool Names(string path);
 
     bool TryResolve(string importer, string path, [NotNullWhen(true)] out WebLingoNativeModuleInfo? module, out string? error);
+
+    /// <summary>
+    /// The standard modules the host has, each loaded, but those whose names every program has, for the compiler to
+    /// suggest the import a name it does not know needs (section 3.9); asked only of a program that fails to compile.
+    /// </summary>
+    IReadOnlyList<WebLingoNativeModuleInfo> StandardModules();
 }

@@ -106,6 +106,25 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         return true;
     }
 
+    /// <summary>
+    /// The modules in the <c>std</c> scheme's folder, by their names, each loaded, but <c>std:system</c>, whose functions
+    /// every program has; one that cannot be loaded left out. Only a program that fails to compile asks, so that a module a
+    /// program does not import costs it nothing (section 3.9).
+    /// </summary>
+    public IReadOnlyList<WebLingoNativeModuleInfo> StandardModules()
+    {
+        var modules = new List<WebLingoNativeModuleInfo>();
+        if (!schemes.TryGetValue("std", out var folder) || !Directory.Exists(folder)) return modules;
+        var files = Directory.GetFiles(folder, "*" + Extension);
+        Array.Sort(files, StringComparer.Ordinal);
+        foreach (var file in files)
+        {
+            var name = "std:" + Path.GetFileNameWithoutExtension(file);
+            if (name != "std:system" && TryResolve(file, name, out var module, out _)) modules.Add(module);
+        }
+        return modules;
+    }
+
     /// <summary><c>scheme:module</c>, a scheme being two or more letters and digits, so that <c>C:</c> is a drive's.</summary>
     private static bool TrySplit(string path, out string scheme, out string module)
     {
