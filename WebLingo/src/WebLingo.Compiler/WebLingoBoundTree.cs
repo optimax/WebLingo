@@ -239,11 +239,11 @@ public sealed record WebLingoBoundIs(WebLingoBoundExpression Value, WebLingoBoun
 
 /// <summary>
 /// The text of a value, as <c>write</c> writes it, an instance as its class's name and its fields: what <c>Object</c>'s
-/// <c>toString()</c> gives; nothing but <c>Object</c> writes it (section 3.7). <paramref name="Given"/>: the value is
-/// what a <c>toString()</c> gave an interpolation, a string as it is, anything else WL3001 (section 3.5); nothing but
-/// the interpolation's class writes it.
+/// <c>toString()</c> gives; nothing but <c>Object</c> writes it (section 3.7). <paramref name="AsWritten"/>: an
+/// instance whose class overrides <c>toString()</c> as that gives too, a string or WL3001, the text being
+/// <c>write</c>'s: an interpolation's (section 3.5); nothing but the interpolation's class writes it.
 /// </summary>
-public sealed record WebLingoBoundToText(WebLingoBoundExpression Value, WebLingoSourceSpan Span, bool Given = false)
+public sealed record WebLingoBoundToText(WebLingoBoundExpression Value, WebLingoSourceSpan Span, bool AsWritten = false)
     : WebLingoBoundExpression(Span);
 
 /// <summary>The prelude's <c>toJson(value, indent)</c>: a value's JSON text, which <c>Json.stringify</c> gives (section 3.6).</summary>

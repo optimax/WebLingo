@@ -61,7 +61,7 @@ public static class WebLingoStackDisassembler
             WebLingoStackOpCode.CallMethodSpread => $"{name} .{Constant(module, a)}",
             WebLingoStackOpCode.GetIndex => a == 0 ? $"{name} []" : $"{name} ?[]",
             WebLingoStackOpCode.StoreIndex => a == 0 ? name : $"{name}, kept",
-            WebLingoStackOpCode.ToText => a == 0 ? name : $"{name} given",
+            WebLingoStackOpCode.ToText => a == 0 ? name : $"{name} written",
             WebLingoStackOpCode.SetMember => $"{name} .{Constant(module, a)}" + (b == 0 ? "" : ", kept"),
             WebLingoStackOpCode.NewArray or WebLingoStackOpCode.NewSet => $"{name} ({a} values)",
             WebLingoStackOpCode.NewMap => $"{name} ({a} entries)",

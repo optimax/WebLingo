@@ -1043,6 +1043,28 @@ public sealed class ConformanceTests : IDisposable
         Assert.Equal(expected, stackError.ToString().Replace(program, "program.wl", StringComparison.Ordinal).Split('\n')[0].TrimEnd('\r'));
     }
 
+    [Theory]
+    // An interpolation writes a value as write writes it (section 3.5): a toString() an extend block gives a kind of value
+    // built into the VMs is called by x.toString() alone, not by write nor by an interpolation, at any depth (the owner's
+    // decision, 17 November 2026); one a class's own instances have, an extension's included, by every one of them.
+    [InlineData("extend Integer { toString() { return \"int\"; } } writeLn($\"{5}|{[5]}|{5,4}|\"); writeLn(5); writeLn(5.toString());",
+        "5|[5]|   5|\n5\nint")]
+    [InlineData("extend Array { toString() { return \"arr\"; } } writeLn($\"{[5]}\"); writeLn([5]); writeLn([5].toString());", "[5]\n[5]\narr")]
+    [InlineData("extend String { toString() { return \"S\"; } } writeLn($\"{\"a\"}\"); writeLn(\"a\"); writeLn(\"a\".toString());", "a\na\nS")]
+    [InlineData("class P {} extend P { toString() { return \"P!\"; } } writeLn($\"{new P()}|{[new P()]}\"); writeLn(new P());", "P!|[P!]\nP!")]
+    [InlineData("class S extends Array {} extend S { toString() { return \"S!\"; } } writeLn($\"{new S()}\"); writeLn(new S());", "S!\nS!")]
+    public void AnInterpolationWritesAValueAsWriteDoes(string source, string printed)
+    {
+        Assert.Equal((WebLingoCommandLine.Success, printed + "\n", ""), Weblingo("run", source));
+
+        // On the stack VM, from a .wlbc.
+        var program = Path.Combine(_folder, "program.wl");
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
+        var output = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], output, new StringWriter()));
+        Assert.Equal(printed + "\n", output.ToString());
+    }
+
     [Fact]
     public void AStringAToStringGivesIsWrittenAsItIsInAnInterpolation()
     {

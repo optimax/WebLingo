@@ -123,9 +123,9 @@ public sealed class VerifierTests
     }
 
     [Fact]
-    public void AToTextIsAValuesTextOrWhatAToStringGave()
+    public void AToTextIsObjectsTextOrWritesAsWriteDoes()
     {
-        // C = 0, the text of a value, or 1, what a toString() gave an interpolation (section 3.5); nothing else.
+        // C = 0, a value's text as Object's toString() gives it, or 1, as write writes it, an interpolation's (section 3.5).
         Assert.Equal(WebLingoVerificationResult.Valid, Verify(Module(registers: 2, locals: 2, I(WebLingoOpCode.LoadNull, 0),
             I(WebLingoOpCode.ToText, 1, 0), I(WebLingoOpCode.ToText, 1, 0, 1), I(WebLingoOpCode.Return))));
         AssertRejected(Module(registers: 2, locals: 2, I(WebLingoOpCode.LoadNull, 0), I(WebLingoOpCode.ToText, 1, 0, 2),

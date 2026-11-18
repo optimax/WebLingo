@@ -1569,9 +1569,9 @@ public sealed class WebLingoBinder
         {
             return new WebLingoBoundToText(arguments[0], call.Span);
         }
-        if (_inPrelude && calleeSyntax is WebLingoNameSyntax { Name: "givenText" } && arguments.Count == 1)
+        if (_inPrelude && calleeSyntax is WebLingoNameSyntax { Name: "writtenText" } && arguments.Count == 1)
         {
-            return new WebLingoBoundToText(arguments[0], call.Span, Given: true); // What a toString() gave (section 3.5).
+            return new WebLingoBoundToText(arguments[0], call.Span, AsWritten: true); // As write writes it (section 3.5).
         }
         if (_inPrelude && calleeSyntax is WebLingoNameSyntax { Name: "hold" } && arguments.Count == 2)
         {
@@ -1824,9 +1824,9 @@ public sealed class WebLingoBinder
     /// </summary>
     /// <summary>
     /// The class an interpolated string's values are written by (section 3.5): <c>of(value)</c> gives the text
-    /// <c>write</c> writes, an instance's <c>toString()</c> included, and <c>""</c> for <c>null</c>, a <c>toString()</c>
-    /// that gives anything but a string WL3001, as <c>write</c> reports it (<c>givenText</c>); written in WebLingo, and
-    /// made where the program begins, as the built-in classes are, under a name no program can write.
+    /// <c>write</c> writes, built as <c>write</c> builds it (<c>writtenText</c>), an instance's <c>toString()</c>
+    /// included, a <c>toString()</c> that gives anything but a string WL3001, and <c>""</c> for <c>null</c>; written in
+    /// WebLingo, and made where the program begins, as the built-in classes are, under a name no program can write.
     /// </summary>
     private WebLingoLocalSymbol UseInterpolationText()
     {
@@ -1835,7 +1835,7 @@ public sealed class WebLingoBinder
             if (builtin == WebLingoParser.InterpolationText) return declaration.Local;
         }
         return BindBuiltinClass(WebLingoParser.InterpolationText,
-            "class Text { static of(value) { if (value == null) { return \"\"; } return givenText(value.toString()); } }", UseObject(),
+            "class Text { static of(value) { if (value == null) { return \"\"; } return writtenText(value); } }", UseObject(),
             inPrelude: true);
     }
 

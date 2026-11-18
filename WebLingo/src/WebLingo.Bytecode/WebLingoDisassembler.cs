@@ -76,7 +76,7 @@ public static class WebLingoDisassembler
             WebLingoOpCode.SetMember => $"SetMember {Register(function, a)}.{Constant(module, b)}, {Register(function, c)}",
             WebLingoOpCode.Dispose => $"Dispose {Register(function, a)}",
             WebLingoOpCode.Throw => $"Throw {Register(function, a)}",
-            WebLingoOpCode.ToText => $"ToText {Register(function, a)}, {Register(function, b)}" + (c == 1 ? ", given" : ""),
+            WebLingoOpCode.ToText => $"ToText {Register(function, a)}, {Register(function, b)}" + (c == 1 ? ", written" : ""),
             WebLingoOpCode.ToJson => $"ToJson {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
             WebLingoOpCode.Await => $"Await {Register(function, a)}, {Register(function, b)}",
             WebLingoOpCode.Extend => $"Extend {Register(function, a)}, class{b}",

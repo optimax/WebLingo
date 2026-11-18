@@ -854,16 +854,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             continue;
                         }
                         case WebLingoOpCode.ToText:
-                            if (ins.C == 1)
-                            {
-                                // What a toString() gave an interpolation (section 3.5): a string, as write takes it.
-                                error = WebLingoTextBuilder.Given(registers[ins.B], heap);
-                                if (error is not null) break;
-                                registers[ins.A] = registers[ins.B];
-                                pc++;
-                                continue;
-                            }
-                            _text = new TextCall(new WebLingoTextBuilder(heap, registers[ins.B], true), null, ins.A);
+                            // C = 1: as write writes it, for an interpolation (section 3.5); else as Object's toString().
+                            _text = new TextCall(new WebLingoTextBuilder(heap, registers[ins.B], ins.C != 1), null, ins.A);
                             goto text;
                         case WebLingoOpCode.ToJson:
                             // Json.stringify(value, indent): its text, built as a value's is, a toJson() called on the way (section 3.6).

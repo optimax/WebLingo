@@ -1399,7 +1399,9 @@ true
 
 Every value has `toString()`, the text `write` writes. A class may override it, as `Point` above does, and `write`,
 `writeLn`, an interpolated string and a page's `<%= %>` then use it, wherever the instance is, inside an array too.
-What it gives must be a string: anything else is an error, WL3001, where the value is written.
+What it gives must be a string: anything else is an error, WL3001, where the value is written. A `toString()` that an
+`extend` block gives a built-in kind of value, `extend Integer { … }`, is called only by `x.toString()`: `write`, an
+interpolated string and `<%= %>` write such a value as they did, `$"{5}"` giving `5`.
 
 ### Operators
 

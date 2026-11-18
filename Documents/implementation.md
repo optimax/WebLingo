@@ -329,7 +329,7 @@ The built-in classes written in WebLingo (`WebLingoPrelude`'s, `Object`, `Error`
 
 ### What a `toString()` Gives Is the Program's
 
-A class's `toString()` is the program's own method, and may give anything. Whatever writes a value's text by calling one checks what it gave, a string or WL3001, with one message (`WebLingoTextBuilder.Given`): the text builder, for `write`, `writeLn`, a page's `<%= %>` and a collection's `toString()`, and an interpolation's class, through `givenText`, `ToText` given. Until 17 November 2026 the interpolation's did not, so that `$"{x}"` gave the value itself, an integer where `toString()` gave one (`ConformanceTests.AToStringThatGivesNoStringIsAnErrorWhereItIsWritten`).
+A class's `toString()` is the program's own method, and may give anything. Whatever writes a value's text by calling one checks what it gave, a string or WL3001, with one message, as the text builder does (`WebLingoTextBuilder.Supply`), for `write`, `writeLn`, a page's `<%= %>`, a collection's `toString()` and an interpolation, whose class builds its text as `write` does (`writtenText`, `ToText` as written). Until 17 November 2026 the interpolation's gave what `value.toString()` gave, unchecked, so that `$"{x}"` gave the value itself, an integer where `toString()` gave one (`ConformanceTests.AToStringThatGivesNoStringIsAnErrorWhereItIsWritten`), and it called a `toString()` an `extend` block gives a kind of value, which `write` does not (`AnInterpolationWritesAValueAsWriteDoes`).
 
 ### Warnings Are Errors
 
