@@ -1,9 +1,22 @@
-<% import { kinds, ofKind } from "/lib/teas.wl"; %>
-<% layout "/layouts/main.wasp", { title: "Our teas", section: "teas" }; %>
+<% 
+  import { kinds, ofKind } from "/lib/teas.wl"; 
+  layout "/layouts/main.wasp", { title: "Our teas", section: "teas" };
+%>
+
 <h1>Our teas</h1>
-<% foreach (var kind in kinds()) { %>
-<h2 class="kind"><%= kind %> teas</h2>
-<div class="cards">
-<%   foreach (var tea in ofKind(kind)) { await renderComponent("/components/tea-card.wasp", { tea: tea, detailed: true }); } %>
-</div>
-<% } %>
+<% 
+  foreach (var kind in kinds()) 
+  { 
+%>
+    <h2 class="kind"><%= kind %> teas</h2>
+    <div class="cards">
+    <%  
+    foreach (var tea in ofKind(kind)) 
+    { 
+        await renderComponent("/components/tea-card.wasp", { tea: tea, detailed: true }); 
+    } 
+    %>
+    </div>
+<% 
+  } 
+%>

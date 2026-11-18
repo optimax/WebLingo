@@ -1,4 +1,12 @@
-<% param tea; param detailed = false; import { steeping } from "/lib/teas.wl"; %>
+<% 
+  // Component
+  
+  param tea; 
+  param detailed = false; 
+  
+  import { steeping } from "/lib/teas.wl"; 
+%>
+
 <article class="tea <%= tea.kind %>">
   <h3><%= tea.name %></h3>
   <p class="origin"><%= tea.origin %>, <%= tea.kind %> tea</p>

@@ -1,5 +1,8 @@
-<% import { featured } from "/lib/teas.wl"; %>
-<% layout "/layouts/main.wasp", { title: "Welcome", section: "home" }; %>
+<% 
+  import { featured } from "/lib/teas.wl"; 
+  layout "/layouts/main.wasp", { title: "Welcome", section: "home" };
+%>
+
 <section class="hero">
   <h1>Tea, brewed well.</h1>
   <p>Six teas from four countries, and how to brew each of them.</p>
@@ -7,5 +10,9 @@
 </section>
 <h2>This week's teas</h2>
 <div class="cards">
-<% foreach (var tea in featured()) { await renderComponent("/components/tea-card.wasp", { tea: tea }); } %>
+<% 
+  foreach (var tea in featured()) { 
+    await renderComponent("/components/tea-card.wasp", { tea: tea }); 
+  } 
+%>
 </div>
