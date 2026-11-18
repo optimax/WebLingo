@@ -464,7 +464,7 @@ public sealed class WebLingoCodeGenerator
                 var operand = EmitExpression(text.Value, null);
                 _nextRegister = mark;
                 var destination = target ?? Allocate();
-                Emit(new WebLingoInstruction(WebLingoOpCode.ToText, destination, operand), text.Span);
+                Emit(new WebLingoInstruction(WebLingoOpCode.ToText, destination, operand, text.Given ? 1 : 0), text.Span);
                 return destination;
             }
             case WebLingoIrToJson json:

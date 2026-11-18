@@ -223,8 +223,11 @@ public sealed record WebLingoIrAwait(WebLingoIrExpression Value, WebLingoSourceS
 /// <summary><c>value is Class</c>: the value, then the class, evaluated (section 3.7).</summary>
 public sealed record WebLingoIrIs(WebLingoIrExpression Value, WebLingoIrExpression Class, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
 
-/// <summary>The text of a value, an instance as its fields, as <c>Object</c>'s <c>toString()</c> gives it (section 3.7).</summary>
-public sealed record WebLingoIrToText(WebLingoIrExpression Value, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);
+/// <summary>
+/// The text of a value, an instance as its fields, as <c>Object</c>'s <c>toString()</c> gives it (section 3.7); given,
+/// what a <c>toString()</c> gave an interpolation, a string as it is, anything else WL3001 (section 3.5).
+/// </summary>
+public sealed record WebLingoIrToText(WebLingoIrExpression Value, WebLingoSourceSpan Span, bool Given = false) : WebLingoIrExpression(Span);
 
 /// <summary>A value's JSON text, with an indent (section 3.6, "JSON").</summary>
 public sealed record WebLingoIrToJson(WebLingoIrExpression Value, WebLingoIrExpression Indent, WebLingoSourceSpan Span) : WebLingoIrExpression(Span);

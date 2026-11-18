@@ -147,7 +147,10 @@ public enum WebLingoStackOpCode : byte
     Throw,
     /// <summary>Pops where an exception was first thrown, then the exception, and throws it again from there.</summary>
     Rethrow,
-    /// <summary>Pops a value and pushes its text, as the register bytecode's <c>ToText</c> gives it.</summary>
+    /// <summary>
+    /// Pops a value and pushes its text, as the register bytecode's <c>ToText</c> gives it; with A = 1, the value, a
+    /// string, as its C = 1 gives it.
+    /// </summary>
     ToText,
     /// <summary>Pops a class, then a value, and pushes whether the value is an instance of it, as <c>IsInstance</c> does.</summary>
     IsInstance,

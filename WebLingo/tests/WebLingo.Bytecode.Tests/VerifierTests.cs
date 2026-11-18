@@ -123,6 +123,18 @@ public sealed class VerifierTests
     }
 
     [Fact]
+    public void AToTextIsAValuesTextOrWhatAToStringGave()
+    {
+        // C = 0, the text of a value, or 1, what a toString() gave an interpolation (section 3.5); nothing else.
+        Assert.Equal(WebLingoVerificationResult.Valid, Verify(Module(registers: 2, locals: 2, I(WebLingoOpCode.LoadNull, 0),
+            I(WebLingoOpCode.ToText, 1, 0), I(WebLingoOpCode.ToText, 1, 0, 1), I(WebLingoOpCode.Return))));
+        AssertRejected(Module(registers: 2, locals: 2, I(WebLingoOpCode.LoadNull, 0), I(WebLingoOpCode.ToText, 1, 0, 2),
+            I(WebLingoOpCode.Return)), 1, "its C is 2, not 0 or 1");
+        AssertRejected(Module(registers: 2, locals: 2, I(WebLingoOpCode.LoadNull, 0), I(WebLingoOpCode.ToText, 1, 0, 1, 1),
+            I(WebLingoOpCode.Return)), 1, "not 0");
+    }
+
+    [Fact]
     public void AMissingConstantIsRejected()
     {
         AssertRejected(Module(registers: 1, locals: 1, I(WebLingoOpCode.LoadConstant, 0, 2), I(WebLingoOpCode.Return)), 0, "constant 2");

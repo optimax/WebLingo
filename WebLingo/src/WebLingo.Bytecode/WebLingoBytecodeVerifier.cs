@@ -164,9 +164,11 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             case WebLingoOpCode.Move:
             case WebLingoOpCode.Negate:
             case WebLingoOpCode.Plus:
-            case WebLingoOpCode.ToText:
             case WebLingoOpCode.Await:
                 return Register(function, a, "destination") ?? Register(function, b, "operand") ?? Unused(c, d);
+            case WebLingoOpCode.ToText:
+                return Register(function, a, "destination") ?? Register(function, b, "operand")
+                    ?? (c is 0 or 1 ? null : $"its C is {c}, not 0 or 1.") ?? Unused(d);
             case WebLingoOpCode.Add:
             case WebLingoOpCode.Subtract:
             case WebLingoOpCode.Multiply:

@@ -148,7 +148,8 @@ public enum WebLingoOpCode : byte
     /// <summary>
     /// A = destination, B = a value: its text, as <c>write</c> writes it, an instance as its class's name and its
     /// fields, the instances in it whose class overrides <c>toString()</c> as that gives (<c>Object</c>'s
-    /// <c>toString()</c>; section 3.7).
+    /// <c>toString()</c>; section 3.7). With C = 1, B is what a <c>toString()</c> gave an interpolation (section 3.5): a
+    /// string, A given it as it is, and anything else WL3001, as <c>write</c> reports it.
     /// </summary>
     ToText,
     /// <summary>

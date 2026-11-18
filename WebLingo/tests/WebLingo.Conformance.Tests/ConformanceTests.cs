@@ -1017,6 +1017,42 @@ public sealed class ConformanceTests : IDisposable
         Assert.Equal($"program.wl(13,{column}): error {code}:", FirstLineStart(stackError.ToString().Replace(program, "program.wl", StringComparison.Ordinal)));
     }
 
+    [Theory]
+    // A toString() that gives anything but a string is WL3001 where an interpolation writes it, as where write writes it
+    // (section 3.7), with write's message: alone, beside text, aligned, and giving null or a class's string. Until 17
+    // November 2026 the interpolation gave the value itself, $"{x}" an integer, and beside text the error was '+''s.
+    [InlineData("5", "writeLn($\"{new T()}\");", 12, "the integer 5")]
+    [InlineData("5", "writeLn($\"a{new T()}b\");", 13, "the integer 5")]
+    [InlineData("5", "writeLn($\"{new T(),6}\");", 12, "the integer 5")]
+    [InlineData("null", "writeLn($\"{new T()}\");", 12, "null")]
+    [InlineData("new N(\"n\")", "writeLn($\"{new T()}\");", 12, "an instance of N")]
+    [InlineData("5", "writeLn(new T());", 1, "the integer 5")]
+    public void AToStringThatGivesNoStringIsAnErrorWhereItIsWritten(string given, string call, int column, string described)
+    {
+        var source = $"class N extends String {{}} class T {{ toString() {{ return {given}; }} }}\n{call}\n";
+        var expected = $"program.wl(2,{column}): error WL3001: 'toString()' gave {described}, not a string, to be written.";
+        var (exit, output, error) = Weblingo("run", source);
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "", expected), (exit, output, error.Split('\n')[0].TrimEnd('\r')));
+
+        // On the stack VM, from a .wlbc.
+        var program = Path.Combine(_folder, "program.wl");
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
+        var stackError = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed,
+            WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], new StringWriter(), stackError));
+        Assert.Equal(expected, stackError.ToString().Replace(program, "program.wl", StringComparison.Ordinal).Split('\n')[0].TrimEnd('\r'));
+    }
+
+    [Fact]
+    public void AStringAToStringGivesIsWrittenAsItIsInAnInterpolation()
+    {
+        // What every value's own toString() gives is a string, and an instance's, a classed value's and a collection's are
+        // written as they were, null as nothing (section 3.5).
+        const string source = "class N extends String {} class C extends Number {} class P { toString() { return \"P!\"; } } "
+            + "writeLn($\"{new P()}|{[new P()]}|{new N(\"x\")}|{new C(1.5)}|{null}|{5}|{\"s\"}|{new P(),4}|\");";
+        Assert.Equal((WebLingoCommandLine.Success, "P!|[P!]|N:\"x\"|C:1.5||5|s|  P!|\n", ""), Weblingo("run", source));
+    }
+
     [Fact]
     public void SignedInt64OverflowIsARuntimeError()
     {

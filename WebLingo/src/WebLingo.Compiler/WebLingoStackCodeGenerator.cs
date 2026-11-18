@@ -385,7 +385,7 @@ public sealed class WebLingoStackCodeGenerator
                 return;
             case WebLingoIrToText text:
                 EmitValue(text.Value);
-                Emit(WebLingoStackOpCode.ToText, text.Span);
+                Emit(WebLingoStackOpCode.ToText, text.Span, text.Given ? 1 : 0);
                 return;
             case WebLingoIrToJson json:
                 EmitValue(json.Value);

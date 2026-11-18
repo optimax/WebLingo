@@ -146,14 +146,19 @@ public sealed class WebLingoTextBuilder : IWebLingoTextBuilder
     /// </summary>
     public WebLingoRuntimeError? Supply(WebLingoValue returned)
     {
-        if (returned.Kind != WebLingoValueKind.String)
-        {
-            return new WebLingoRuntimeError(WebLingo.Core.WebLingoDiagnosticCodes.InvalidOperation,
-                $"'toString()' gave {WebLingoValueFormatter.Describe(returned, _heap)}, not a string, to be written.");
-        }
+        if (Given(returned, _heap) is { } error) return error;
         _text.Append(_heap.GetString(returned));
         return null;
     }
+
+    /// <summary>
+    /// What a <c>toString()</c> gave, for a text to be written: <c>null</c> for a string, which is written as it is, and
+    /// anything else WL3001 (section 3.7), as <c>write</c> and an interpolation alike report it.
+    /// </summary>
+    public static WebLingoRuntimeError? Given(WebLingoValue returned, WebLingoHeap heap) =>
+        returned.Kind == WebLingoValueKind.String ? null
+            : new WebLingoRuntimeError(WebLingo.Core.WebLingoDiagnosticCodes.InvalidOperation,
+                $"'toString()' gave {WebLingoValueFormatter.Describe(returned, heap)}, not a string, to be written.");
 
     /// <summary>Whether an instance's class overrides <c>Object</c>'s <c>toString()</c>, and with which method.</summary>
     private bool Overrides(WebLingoValue instance, out WebLingoValue method)

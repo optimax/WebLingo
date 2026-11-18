@@ -289,11 +289,11 @@ public sealed class WebLingoStackBytecodeVerifier
                 return (a is < 0 or > WebLingoFunction.MaxRegisters ? $"its element count, {a}, is not 0 to {WebLingoFunction.MaxRegisters}." : null)
                     ?? Unused(b);
             case WebLingoStackOpCode.StoreIndex:
+            case WebLingoStackOpCode.ToText:
                 return (a is 0 or 1 ? null : $"its A is {a}, not 0 or 1.") ?? Unused(b);
             case WebLingoStackOpCode.Dispose:
             case WebLingoStackOpCode.Throw:
             case WebLingoStackOpCode.Rethrow:
-            case WebLingoStackOpCode.ToText:
             case WebLingoStackOpCode.IsInstance:
             case WebLingoStackOpCode.Await:
             case WebLingoStackOpCode.Hold:

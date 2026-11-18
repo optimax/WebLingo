@@ -898,6 +898,14 @@ public sealed class WebLingoStackVirtualMachine
                             continue;
                         }
                         case WebLingoStackOpCode.ToText:
+                            if (ins.A == 1)
+                            {
+                                // What a toString() gave an interpolation (section 3.5): a string, as write takes it.
+                                error = WebLingoTextBuilder.Given(slots[sp - 1], heap);
+                                if (error is not null) break;
+                                pc++;
+                                continue;
+                            }
                             _text = new TextCall(new WebLingoTextBuilder(heap, slots[sp - 1], true), null, sp - 1);
                             goto text;
                         case WebLingoStackOpCode.ToJson:

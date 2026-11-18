@@ -231,17 +231,20 @@ public sealed record WebLingoBoundStringLiteral(string Value, WebLingoSourceSpan
 
 public sealed record WebLingoBoundLocalReference(WebLingoLocalSymbol Local, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);
 
-/// <summary>
-/// The text of a value, as <c>write</c> writes it, an instance as its class's name and its fields: what <c>Object</c>'s
-/// <c>toString()</c> gives; nothing but <c>Object</c> writes it (section 3.7).
-/// </summary>
 /// <summary><c>await value</c> (section 3.8).</summary>
 public sealed record WebLingoBoundAwait(WebLingoBoundExpression Value, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);
 
 /// <summary><c>value is Class</c> (section 3.7).</summary>
 public sealed record WebLingoBoundIs(WebLingoBoundExpression Value, WebLingoBoundExpression Class, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);
 
-public sealed record WebLingoBoundToText(WebLingoBoundExpression Value, WebLingoSourceSpan Span) : WebLingoBoundExpression(Span);
+/// <summary>
+/// The text of a value, as <c>write</c> writes it, an instance as its class's name and its fields: what <c>Object</c>'s
+/// <c>toString()</c> gives; nothing but <c>Object</c> writes it (section 3.7). <paramref name="Given"/>: the value is
+/// what a <c>toString()</c> gave an interpolation, a string as it is, anything else WL3001 (section 3.5); nothing but
+/// the interpolation's class writes it.
+/// </summary>
+public sealed record WebLingoBoundToText(WebLingoBoundExpression Value, WebLingoSourceSpan Span, bool Given = false)
+    : WebLingoBoundExpression(Span);
 
 /// <summary>The prelude's <c>toJson(value, indent)</c>: a value's JSON text, which <c>Json.stringify</c> gives (section 3.6).</summary>
 public sealed record WebLingoBoundToJson(WebLingoBoundExpression Value, WebLingoBoundExpression Indent, WebLingoSourceSpan Span)

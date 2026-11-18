@@ -534,7 +534,7 @@ public sealed class WebLingoLowerer
             case WebLingoBoundIs test:
                 return new WebLingoIrIs(LowerExpression(test.Value), LowerExpression(test.Class), test.Span);
             case WebLingoBoundToText text:
-                return new WebLingoIrToText(LowerExpression(text.Value), text.Span);
+                return new WebLingoIrToText(LowerExpression(text.Value), text.Span, text.Given);
             case WebLingoBoundToJson json:
                 return new WebLingoIrToJson(LowerExpression(json.Value), LowerExpression(json.Indent), json.Span);
             case WebLingoBoundHold hold:

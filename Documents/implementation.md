@@ -327,6 +327,10 @@ interpolation was reported in the page (`PageTests`). `PageFuzzTests` makes posi
 
 The built-in classes written in WebLingo (`WebLingoPrelude`'s, `Object`, `Error`, `Iterator`, `BytesBuilder`, `Json`, `Html` and the rest), the array methods, the spread and a native module's methods are compiled from sources of their own, which are no file of the program's: a position in one, located in the caller's file, names some other line there, or its end. So each is bound native (`WebLingoBinder.BindBuiltinClass`, `BindNativeClass`), and the VMs report an error raised in one where the program called it (`RaisedAt`); one that has awaited, which the scheduler resumes with no caller below it, is reported where its frame says it was called (`Frame.CalledFrom`, set by `Gave` when its first run ends). A new built-in written in WebLingo is bound through `BindBuiltinClass`, and so native. Until 17 November 2026, `Iterator`'s `next()`, `BytesBuilder`'s `add`, the constructors a class extending a value's class reaches, and an error after an await in `std:db`'s `transaction` or an array method, were not: a test in a short file often had its error on the right line by chance, so a test of one names a line its source's positions would not (`ConformanceTests.AnErrorInABuiltinWrittenInWebLingoIsReportedWhereItWasCalled`).
 
+### What a `toString()` Gives Is the Program's
+
+A class's `toString()` is the program's own method, and may give anything. Whatever writes a value's text by calling one checks what it gave, a string or WL3001, with one message (`WebLingoTextBuilder.Given`): the text builder, for `write`, `writeLn`, a page's `<%= %>` and a collection's `toString()`, and an interpolation's class, through `givenText`, `ToText` given. Until 17 November 2026 the interpolation's did not, so that `$"{x}"` gave the value itself, an integer where `toString()` gave one (`ConformanceTests.AToStringThatGivesNoStringIsAnErrorWhereItIsWritten`).
+
 ### Warnings Are Errors
 
 `TreatWarningsAsErrors` is on for every project, so a nullable or analyzer warning fails the build, locally and in CI.
