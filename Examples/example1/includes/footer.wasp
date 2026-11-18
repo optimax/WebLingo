@@ -1,7 +1,7 @@
 <footer>
   <p>
   Served by WASP, WebLingo's server pages: a layout, two includes, a component and a module.
-  <br/>Page served <%=DateTime.now()%>
+  <br/>Page served <%= $"{DateTime.now():yyyy-MM-dd HH:mm}" %>
   </p>
 
 </footer>
