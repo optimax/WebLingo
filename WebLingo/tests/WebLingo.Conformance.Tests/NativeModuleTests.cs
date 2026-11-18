@@ -108,6 +108,17 @@ public sealed class NativeModuleTests : IDisposable
         Assert.Equal(("", printed + "\n", ""), Run("import { Counter } from \"native:test\"; " + source));
     }
 
+    [Theory]
+    [InlineData("Counter.limit = 7; writeLn([Counter.limit, Counter.kind]); Counter.limit = 8; writeLn(Counter.limit);", "[7, \"Counter\"]\n8")]
+    [InlineData("try { Counter.kind = \"x\"; } catch (e) { writeLn(e.code); } try { Counter.limit = \"x\"; } catch (e) { writeLn(e.message); }",
+        "WL3001\nA Counter's limit is an integer.")]
+    [InlineData("class D extends Counter {} writeLn([D.kind, Counter.kind == D.kind]);", "[\"Counter\", true]")]
+    public void ANativeClassesStaticPropertiesAreItsClasssMembers(string source, string printed)
+    {
+        // Native classes' static properties (section 3.7), as std:env's Environment.machineName is (section 7.15), on both VMs.
+        Assert.Equal(("", printed + "\n", ""), Run("import { Counter } from \"native:test\"; " + source));
+    }
+
     [Fact]
     public void ANativeClassesHostObjectsAreReleasedWhenTheExecutionEnds()
     {

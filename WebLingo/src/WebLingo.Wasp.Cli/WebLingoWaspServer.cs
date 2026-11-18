@@ -33,12 +33,12 @@ public static class WebLingoWaspServer
     /// each reload told to <paramref name="log"/>, if given, as is a page that fails after its response was sent.
     /// </summary>
     public static WebApplication? Create(string? root, int port, IReadOnlyDictionary<string, string> givenSchemes, out string? error,
-        out WebLingoEnvironment environment, TextWriter? log = null)
+        out WebLingoMode mode, TextWriter? log = null)
     {
         var site = Environment.GetEnvironmentVariable("ASPNETCORE_IIS_PHYSICAL_PATH") ?? Directory.GetCurrentDirectory();
         var full = Path.GetFullPath(Path.Combine(site, root ?? "."));
-        var application = Load(full, givenSchemes, UnderIis ? WebLingoEnvironment.Production : WebLingoEnvironment.Development, log, out var workers,
-            out environment, out error);
+        var application = Load(full, givenSchemes, UnderIis ? WebLingoMode.Production : WebLingoMode.Development, log, out var workers,
+            out mode, out error);
         if (application is null) return null;
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = AppContext.BaseDirectory });
@@ -62,17 +62,17 @@ public static class WebLingoWaspServer
 
     /// <summary>
     /// The application at <paramref name="full"/>, as <c>wasp serve</c> and <c>wasp fastcgi</c> load it: its configuration,
-    /// <c>wasp.config</c>, giving its schemes, its environment, <paramref name="defaultEnvironment"/> unless it names one, how
-    /// long a page waits for a slow client, the hosts, the folders and the COM objects its scripts may reach, and its
-    /// databases; its workers, one for each processor; null, with why, if it cannot be loaded.
+    /// <c>wasp.config</c>, giving its schemes, its mode, <paramref name="defaultMode"/> unless it names one, how long a page
+    /// waits for a slow client, the hosts, the folders and the COM objects its scripts may reach, what they may read of the
+    /// machine's environment, and its databases; its workers, one for each processor; null, with why, if it cannot be loaded.
     /// </summary>
-    public static WebLingoApplication? Load(string full, IReadOnlyDictionary<string, string> givenSchemes, WebLingoEnvironment defaultEnvironment,
-        TextWriter? log, out int workers, out WebLingoEnvironment environment, out string? error)
+    public static WebLingoApplication? Load(string full, IReadOnlyDictionary<string, string> givenSchemes, WebLingoMode defaultMode,
+        TextWriter? log, out int workers, out WebLingoMode mode, out string? error)
     {
-        (workers, environment) = (Math.Max(1, Environment.ProcessorCount), defaultEnvironment);
+        (workers, mode) = (Math.Max(1, Environment.ProcessorCount), defaultMode);
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
-            out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out error)) return null;
-        if (configured is not null) environment = configured == "production" ? WebLingoEnvironment.Production : WebLingoEnvironment.Development;
+            out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out var env, out error)) return null;
+        if (configured is not null) mode = configured == "production" ? WebLingoMode.Production : WebLingoMode.Development;
 
         // std:system, loaded once here to fail early, then by each worker on its own.
         var importer = Path.Combine(full, "index.wasp");
@@ -88,9 +88,11 @@ public static class WebLingoWaspServer
             ScriptFileSystem = new DotNetFileSystem(files),
             Allowed = allowed, // The COM objects wasp.config allows (section 3.10).
             Crypto = new DotNetCrypto(),
+            // Only what wasp.config's "env" allows of the machine's environment, and no variable set (section 7.15).
+            Environment = new DotNetEnvironment(env.MachineName, env.Variables),
             Workers = workers,
             WorkerServices = _ => Services(schemes, importer),
-            Environment = environment,
+            Mode = mode,
             Clock = new WebLingoExecutionClock(new DotNetClock()),
             WallClock = new DotNetClock(),
             TimeZone = new DotNetTimeZone(),

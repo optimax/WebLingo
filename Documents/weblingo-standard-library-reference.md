@@ -28,9 +28,10 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 16. [`std:net`](#16-stdnet)
 17. [`std:db`](#17-stddb)
 18. [`std:crypto`](#18-stdcrypto)
-19. [Native modules](#19-native-modules)
-20. [In WASP's pages](#20-in-wasps-pages)
-21. [`windows:com`](#21-windowscom)
+19. [`std:env`](#19-stdenv)
+20. [Native modules](#20-native-modules)
+21. [In WASP's pages](#21-in-wasps-pages)
+22. [`windows:com`](#22-windowscom)
 
 ---
 
@@ -294,9 +295,10 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `NetworkError` | WL3014 | a host that cannot be reached, a connection that fails, a request that takes too long |
 | `DatabaseError` | WL3015 | a statement a database refuses, a database that cannot be opened |
 | `FilePermissionError` | WL3016 | a file or a folder a site's scripts may not reach, outside the folders its `wasp.config` allows |
-| `ComError` | WL3012 | a COM object's failure, with its `number`, `source` and `description` (section 21) |
+| `ComError` | WL3012 | a COM object's failure, with its `number`, `source` and `description` (section 22) |
 | `NetworkPermissionError` | WL3017 | a host the configuration's `"network"` does not let a script reach |
-| `ComPermissionError` | WL3018 | a COM object the configuration's `"com"` does not let a script make (section 21) |
+| `ComPermissionError` | WL3018 | a COM object the configuration's `"com"` does not let a script make (section 22) |
+| `EnvironmentPermissionError` | WL3019 | a variable a site's scripts try to set, under `wasp`, which lets them read only (section 19) |
 
 ```javascript
 try {
@@ -729,17 +731,59 @@ A hash, an HMAC and random bytes are `Bytes`, which `toHex()` and `toBase64()` w
 
 ---
 
-## 19. Native modules
+## 19. `std:env`
+
+The machine's environment, through the platform's: its name and its environment variables, as a class, `Environment`,
+whose members are static.
+
+| Member | What it is |
+|---|---|
+| `Environment.machineName` | the machine's name |
+| `Environment.variable(name)` | a variable's value, a string, or `null` when it is not set |
+| `Environment.variables` | a map of the variables, each its name and its value |
+| `Environment.setVariable(name, value)` | sets a variable, for the process alone, or removes it, given `null` |
+
+A script under `weblingo` reads all of it, and sets variables. A site's pages and handlers, under `wasp`, read only what
+the site's `wasp.config` allows, `{ "env": { "machineName": true, "variables": ["PATH", "APP_*"] } }`: the machine's name
+with `"machineName": true`, and the variables it lists, a name ending in `*` allowing those it begins, `"*"` any. Anything
+else is `null`, as if it were not there, and missing from `variables`. A site sets no variable: `setVariable` is an
+`EnvironmentPermissionError`, WL3019. A variable's name is compared as the platform compares it, ignoring case on
+Windows; the map's names are as the platform gives them.
+
+```javascript
+import { Environment } from "std:env";
+Environment.setVariable("GREETING", "hello");
+writeLn(Environment.variable("GREETING"));
+writeLn(Environment.variables["GREETING"]);
+Environment.setVariable("GREETING", null);
+writeLn(Environment.variable("GREETING"));
+writeLn(Environment.machineName.length > 0);
+```
+
+```text
+hello
+hello
+null
+true
+```
+
+A name that is not a string, a name to set that is empty or holds `=`, and a value that is neither a string nor `null`,
+are each WL3001.
+
+---
+
+## 20. Native modules
 
 A native module is code compiled for .NET that extends what scripts can use: functions and classes, imported as any
 module's are, by a scheme naming a folder of them, `import db from "native:sqlite";`. The folders are named by the
 configuration, `weblingo.config` beside a script and `wasp.config` in a site, `{ "schemes": { "native":
 "C:/WebLingo/native" } }`, and by the command line's `--scheme native=folder`. The standard modules, `std:system`,
-`std:tasks`, `std:fs`, `std:http`, `std:net` and `std:db`, are native modules themselves, in the `std` folder beside `weblingo` and `wasp`.
+`std:tasks`, `std:fs`, `std:http`, `std:net`, `std:db`, `std:crypto` and `std:env`, are native modules themselves, in the `std`
+folder beside `weblingo` and `wasp`.
 
 ---
 
-## 20. In WASP's pages
+## 21. In WASP's pages
 
 A page, a layout and a component that declare `param request;` and `param response;` are given the request they
 answer and the response they make, instances of the built-in classes `Request` and `Response`, their headers instances
@@ -834,7 +878,7 @@ zWebLingoz
 
 ---
 
-## 21. `windows:com`
+## 22. `windows:com`
 
 COM's objects, on Windows only, as classic ASP's pages used them, `Server.CreateObject("ADODB.Connection")`: a native
 module installed with the runtime in `windows/`, beside `std/`. Elsewhere, importing it is WL2015.

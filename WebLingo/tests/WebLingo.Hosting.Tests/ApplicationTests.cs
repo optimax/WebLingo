@@ -91,7 +91,7 @@ public sealed class ApplicationTests
                 "<% import { twice } from \"../lib/util.wl\"; %><% layout \"/layouts/main.wasp\", { title: \"Shop\" }; %>"
                 + "<% var title = \"Menu\"; %><% include \"/includes/nav.wasp\"; %><% writeLn(twice(2)); %>"
                 + "<% foreach (var n in [1, 2]) { await renderComponent(\"/components/card.wasp\", { n: n }); } %>");
-        var app = Load(files, WebLingoEnvironment.Development);
+        var app = Load(files, WebLingoMode.Development);
         var first = Get(app, "/shop");
         Assert.True(first.Status == 200, first.Body);
         Assert.Equal((200, "<html><title>Shop</title><nav>Menu</nav>4\n<b>2</b><b>4</b></html>"), first);
@@ -109,7 +109,7 @@ public sealed class ApplicationTests
     public void AFailingPageIsA500_ItsErrorShownInDevelopmentOnly()
     {
         var files = Site().Add("/site/fails.wasp", "<p>before</p>\n<%= [\"<a>\"][5] %>");
-        var development = Load(files, WebLingoEnvironment.Development);
+        var development = Load(files, WebLingoMode.Development);
         var (status, body) = Get(development, "/fails");
         Assert.Equal(500, status);
         Assert.Contains("<h1>500 Internal Server Error</h1>", body);
@@ -131,7 +131,7 @@ public sealed class ApplicationTests
             .Add("/site/includes/broken.wasp", "<p>\n<%= nope %></p>")
             .Add("/site/escapes.wasp", "<% include \"../../secret.wasp\"; %>")
             .Add("/site/imports.wasp", "<% import { x } from \"../outside.wl\"; %>");
-        var app = Load(files, WebLingoEnvironment.Development);
+        var app = Load(files, WebLingoMode.Development);
         var (status, body) = Get(app, "/bad");
         Assert.Equal(500, status);
         Assert.Contains("<pre>includes/broken.wasp(2,5): error WL2001: &#39;nope&#39; is not defined.\n</pre>", body);
@@ -172,14 +172,14 @@ public sealed class ApplicationTests
         .Add("/site/Web.config", "<configuration/>")
         .Add("/site/.git/config", "secret");
 
-    private static WebLingoApplication Load(MemoryFileSystem files, WebLingoEnvironment environment = WebLingoEnvironment.Production)
+    private static WebLingoApplication Load(MemoryFileSystem files, WebLingoMode environment = WebLingoMode.Production)
     {
         var app = WebLingoApplication.Load(new WebLingoApplicationOptions(Root, files)
         {
             Workers = 2,
             WorkerServices = _ => new WebLingoWorkerServices(
                 new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction(), new WebLingoDelayFunction())),
-            Environment = environment
+            Mode = environment
         }, out var error);
         Assert.True(app is not null, error);
         return app;

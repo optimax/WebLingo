@@ -53,9 +53,9 @@ public sealed class StreamingTests
     }
 
     [Theory]
-    [InlineData(WebLingoEnvironment.Development)]
-    [InlineData(WebLingoEnvironment.Production)]
-    public void APageThatFailsAfterItsOutputIsSentEndsItUnfinished(WebLingoEnvironment environment)
+    [InlineData(WebLingoMode.Development)]
+    [InlineData(WebLingoMode.Production)]
+    public void APageThatFailsAfterItsOutputIsSentEndsItUnfinished(WebLingoMode environment)
     {
         var log = new List<string>();
         var response = new WebLingoBufferedResponse();
@@ -68,7 +68,7 @@ public sealed class StreamingTests
         var error = Assert.Single(log);
         Assert.StartsWith("A page failed after its response was sent: index.wasp(2,", error);
         Assert.Contains("error WL3005:", error);
-        if (environment == WebLingoEnvironment.Development)
+        if (environment == WebLingoMode.Development)
         {
             Assert.EndsWith("\n<pre>" + error["A page failed after its response was sent: ".Length..].Replace("'", "&#39;", StringComparison.Ordinal) + "\n</pre>\n", body);
         }
@@ -163,13 +163,13 @@ public sealed class StreamingTests
         }
     }
 
-    private static WebLingoApplication Load(MemoryFileSystem files, WebLingoEnvironment environment = WebLingoEnvironment.Production,
+    private static WebLingoApplication Load(MemoryFileSystem files, WebLingoMode environment = WebLingoMode.Production,
         List<string>? log = null, TimeSpan? sendTimeout = null)
     {
         var app = WebLingoApplication.Load(new WebLingoApplicationOptions(Root, files)
         {
             WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction())),
-            Environment = environment,
+            Mode = environment,
             Log = log is null ? null : log.Add,
             SendTimeout = sendTimeout ?? TimeSpan.FromSeconds(30)
         }, out var error);

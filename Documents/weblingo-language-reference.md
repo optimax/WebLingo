@@ -1626,6 +1626,7 @@ An error the runtime raises becomes an instance of a class extending `Error`, wi
 | `ComError` | WL3012 | a COM object's failure, on Windows (`windows:com`) |
 | `NetworkPermissionError` | WL3017 | a host a script's configuration does not let it reach |
 | `ComPermissionError` | WL3018 | a COM object a script's configuration does not let it make |
+| `EnvironmentPermissionError` | WL3019 | an environment variable a site's script, under `wasp`, tries to set |
 
 Two errors cannot be caught, and always end the program: running past the execution's limits (WL3003) and being
 cancelled (WL3004).
@@ -1976,6 +1977,15 @@ Cryptography, through the platform's: `randomBytes(n)`, `sha256(data)`, `sha512(
 `verifyPassword(password, hash)`, PBKDF2 with HMAC-SHA-256, with `hashPasswordAsync` and `verifyPasswordAsync`, which
 run off the worker, since a password's hash takes a large part of a second by design. Data is a string, as UTF-8, or
 `Bytes`, and a hash `Bytes`; the Standard Library Reference describes the module.
+
+### `std:env`
+
+The machine's environment, through the platform's, as a class, `import { Environment } from "std:env";`, whose members
+are static: `Environment.machineName`, `Environment.variable(name)`, a variable's value or `null`,
+`Environment.variables`, a map of them, and `Environment.setVariable(name, value)`, which sets one for the process
+alone, or removes it, given `null`. A script that `weblingo` runs reaches all of it; a site's, under `wasp`, only what
+its `wasp.config` allows, anything else `null`, and sets nothing, an `EnvironmentPermissionError`, WL3019. The Standard
+Library Reference describes the module.
 
 ### Native modules
 

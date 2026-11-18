@@ -10,7 +10,8 @@ namespace WebLingo.Native.TestModule;
 /// instances each hold a <see cref="Tally"/>, a host object, <c>new Counter(start)</c>, <c>c.add(n)</c>, <c>c.close()</c>
 /// and <c>c.dispose()</c>, which release it, <c>c.toString()</c>, and <c>Counter.describe()</c>, with the properties
 /// <c>c.value</c>, which may be assigned, and <c>c.initial</c>, which may not, and an indexer, <c>c[name]</c>, a named
-/// mark, <c>c[name] = n</c> setting it (part 4); and <c>Other</c>, whose <c>peek()</c> asks for a <c>Counter</c>'s host
+/// mark, <c>c[name] = n</c> setting it (part 4), and the static properties <c>Counter.limit</c>, which may be assigned, an
+/// integer, and <c>Counter.kind</c>, which may not; and <c>Other</c>, whose <c>peek()</c> asks for a <c>Counter</c>'s host
 /// object on its own instance. <c>released()</c> is how many tallies have been disposed, by a program or by the runtime.
 /// </summary>
 public sealed class WebLingoTestModule : IWebLingoNativeModule
@@ -18,6 +19,7 @@ public sealed class WebLingoTestModule : IWebLingoNativeModule
     private static long _count;
     private static long _released;
     private static WebLingoNativeClass? _counter;
+    private static long _limit = 10;
 
     public void Register(IWebLingoNativeRegistry registry)
     {
@@ -37,7 +39,9 @@ public sealed class WebLingoTestModule : IWebLingoNativeModule
             .DeclareStaticMethod("describe", 0, Describe)
             .DeclareProperty("value", GetValue, SetValue)
             .DeclareProperty("initial", GetInitial)
-            .DeclareIndexer(GetMark, SetMark);
+            .DeclareIndexer(GetMark, SetMark)
+            .DeclareStaticProperty("limit", GetLimit, SetLimit)
+            .DeclareStaticProperty("kind", GetKind);
         registry.Class("Other").DeclareMethod("peek", 0, Peek);
     }
 
@@ -74,6 +78,27 @@ public sealed class WebLingoTestModule : IWebLingoNativeModule
         tally.Value = arguments[1].AsInt64;
         return true;
     }
+
+    private static bool GetLimit(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        (result, error) = (WebLingoValue.FromInt64(Interlocked.Read(ref _limit)), null);
+        return true;
+    }
+
+    private static bool SetLimit(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        (result, error) = (WebLingoValue.Null, null);
+        if (arguments[0].Kind != WebLingoValueKind.Int64)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "A Counter's limit is an integer.");
+            return false;
+        }
+        Interlocked.Exchange(ref _limit, arguments[0].AsInt64);
+        return true;
+    }
+
+    private static bool GetKind(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        heap.TryAllocateString("Counter", out result, out error);
 
     private static bool GetInitial(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {

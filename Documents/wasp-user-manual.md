@@ -677,7 +677,7 @@ fails.wasp(3,8): error WL3005: The index 3 is outside 0 to 0.
 ```
 
 In **production**, the 500's page says only `500 Internal Server Error`, so that visitors never see the site's code.
-Locally, `wasp serve` runs in development; under IIS, in production; `wasp.config` may name either
+Locally, `wasp serve` runs in development; under IIS, in production; `wasp.config`'s `"mode"` may name either
 ([section 14](#14-configuration-waspconfig)).
 
 Nothing the page wrote before the error is sent: a 500 has only its own page, and none of the headers the page set.
@@ -734,18 +734,19 @@ A page's output is kept until it reaches **64 KB**, then sent as the page writes
 A site's configuration is a JSON file, `wasp.config`, in its root:
 
 ```json
-{ "environment": "development", "sendTimeout": 60 }
+{ "mode": "development", "sendTimeout": 60 }
 ```
 
 | Setting | What it says | Default |
 |---|---|---|
-| `"environment"` | `"development"`, errors shown in their pages, or `"production"`, not shown | development under `wasp serve`, production under IIS |
+| `"mode"` | `"development"`, errors shown in their pages, or `"production"`, not shown | development under `wasp serve`, production under IIS |
 | `"sendTimeout"` | how many seconds a page waits for a client that has taken nothing of its output, more than 0 | 30 |
 | `"schemes"` | folders of native modules, each a name and a folder: `{ "native": "C:/WebLingo/native" }` | `std`, WebLingo's own |
 | `"network"` | the hosts the site's pages and handlers may reach, through `std:http` and `std:net`: `{ "allow": ["api.example.com"] }` | none |
 | `"databases"` | the site's databases, each a name its scripts open it by and its connection string: `{ "fish": "sqlite:../database/fish.db" }` | none |
 | `"files"` | the folders the site's pages and handlers may read, and read and write, through `std:fs`: `{ "read": ["../data"], "write": ["../uploads"] }` | none |
 | `"com"` | the COM objects the site's pages and handlers may make, on Windows, through `windows:com`: `{ "allow": ["ADODB.Connection"] }`, `"*"` any; any other a `ComPermissionError`, WL3018 | none |
+| `"env"` | what the site's pages and handlers may read of the machine's environment, through `std:env`: `{ "machineName": true, "variables": ["PATH", "APP_*"] }` | nothing |
 
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
 which. `wasp serve` reads the file when it starts; after changing it, start `wasp serve`, or the IIS site, again.
@@ -793,6 +794,25 @@ With `Integrated Security`, the site reaches the database as the account it runs
 `TrustServerCertificate` accepts the certificate a server made for itself when it was installed; a server the site
 reaches over a network should have one its clients trust instead. WebLingo reaches SQL Server by TCP/IP, which the
 server must have enabled, as SQL Server's Developer and Express editions do not when they are installed.
+
+A site reads the machine's environment, through `std:env`, only as its `"env"` allows: the machine's name with
+`"machineName": true`, and the environment variables `"variables"` lists, a name ending in `*` allowing those it
+begins, `"*"` any, their names compared as the platform compares them, ignoring case on Windows:
+
+```json
+{ "env": { "machineName": true, "variables": ["APP_*"] } }
+```
+
+```html
+<% import { Environment } from "std:env"; %>
+<p>Served by <%= Environment.machineName %>, release <%= Environment.variable("APP_RELEASE") %></p>
+```
+
+Anything else reads as `null`, as if it were not there, so that a page cannot tell what it may not read from what is
+not set; without the setting, a site reads none of it. A site sets no variable: `Environment.setVariable` is an
+`EnvironmentPermissionError`, WL3019, which a `catch` may catch. Under IIS, a site's variables are those its
+`web.config` gives `wasp` (`<environmentVariables>`), beside the server's own, and may hold secrets: list only those
+its pages need. A script that `weblingo` runs reads all of it, and sets variables, for its own process.
 
 Its name is `wasp.config`, in lower case: Linux tells `WASP.config` from it. A `weblingo.config` configures a folder of
 scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run` and `wasp check` read the

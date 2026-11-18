@@ -73,7 +73,7 @@ public sealed class RequestAndResponseTests
     public void AWrongStatusOrHeaderIsAnErrorWhereItIsSet(string statement, string error)
     {
         var app = Load(new MemoryFileSystem().Add("/site/wrong.wasp",
-            "<% param request; param response; response.headers[\"X-Before\"] = \"set\";\n" + statement + " %>"), WebLingoEnvironment.Development);
+            "<% param request; param response; response.headers[\"X-Before\"] = \"set\";\n" + statement + " %>"), WebLingoMode.Development);
         var response = new WebLingoBufferedResponse();
         Assert.Equal(WebLingoRequestOutcomeKind.Failed, app.Handle(new WebLingoBufferedRequest("GET", "/wrong"), response, new WebLingoWorkerId(0)).Kind);
         Assert.Equal(500, response.StatusCode);
@@ -176,7 +176,7 @@ public sealed class RequestAndResponseTests
         var app = Load(new MemoryFileSystem()
             .Add("/site/api/fails.wl", "export function get(request, response) {\n  write([1][5]);\n}")
             .Add("/site/api/bad.wl", "export function get(request, response) {\n  write(nope);\n}")
-            .Add("/site/api/broken.wl", "export function get(request, response) {"), WebLingoEnvironment.Development);
+            .Add("/site/api/broken.wl", "export function get(request, response) {"), WebLingoMode.Development);
         var (status, body) = Get(app, "GET", "/api/fails");
         Assert.Equal(500, status);
         Assert.True(body.Contains("<pre>api/fails.wl(2,", StringComparison.Ordinal), body);
@@ -187,13 +187,13 @@ public sealed class RequestAndResponseTests
         Assert.Contains("<pre>api/broken.wl(1,", body);
     }
 
-    private static WebLingoApplication Load(MemoryFileSystem files, WebLingoEnvironment environment = WebLingoEnvironment.Production)
+    private static WebLingoApplication Load(MemoryFileSystem files, WebLingoMode environment = WebLingoMode.Production)
     {
         var app = WebLingoApplication.Load(new WebLingoApplicationOptions(Root, files)
         {
             Workers = 2,
             WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction())),
-            Environment = environment
+            Mode = environment
         }, out var error);
         Assert.True(app is not null, error);
         return app;

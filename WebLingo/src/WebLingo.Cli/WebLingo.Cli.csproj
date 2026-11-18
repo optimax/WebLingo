@@ -18,6 +18,7 @@
     <ProjectReference Include="../WebLingo.StdLib.Net/WebLingo.StdLib.Net.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Db/WebLingo.StdLib.Db.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Crypto/WebLingo.StdLib.Crypto.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../WebLingo.StdLib.Env/WebLingo.StdLib.Env.csproj" ReferenceOutputAssembly="false" />
     <!-- Windows's own native module, windows:com, in windows/ beside the program, which only Windows loads (section 3.10). -->
     <ProjectReference Include="../WebLingo.Windows.Com/WebLingo.Windows.Com.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
@@ -37,6 +38,8 @@
     <None Include="../WebLingo.StdLib.Db/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Db.dll" Link="std/db.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.StdLib.Crypto/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Crypto.dll" Link="std/crypto.dll"
+          CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="../WebLingo.StdLib.Env/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Env.dll" Link="std/env.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.Windows.Com/bin/$(Configuration)/$(TargetFramework)/WebLingo.Windows.Com.dll" Link="windows/com.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />

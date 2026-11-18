@@ -3,8 +3,11 @@ using WebLingo.Platform.Abstractions;
 using WebLingo.Runtime;
 namespace WebLingo.Hosting;
 
-/// <summary>Whether an application shows a runtime error's details in its response (specification, section 6.12).</summary>
-public enum WebLingoEnvironment { Production, Development }
+/// <summary>
+/// An application's mode, whether it shows a runtime error's details in its response (specification, section 6.12),
+/// its configuration's <c>"mode"</c>.
+/// </summary>
+public enum WebLingoMode { Production, Development }
 
 /// <summary>
 /// What a host gives one worker (specification, section 6.12): its built-ins, <c>std:system</c>'s among them, which every
@@ -17,8 +20,7 @@ public sealed record WebLingoWorkerServices(WebLingoBuiltinRegistry Builtins, IW
 /// <summary>
 /// What a host gives an application (specification, sections 6.3 and 6.12): its root, a folder's full path, and the
 /// platform's files, through which the application's are read; the host's workers, numbered from 0, each request run on
-/// one of them, and each worker's services; and the environment, which the host takes from the application's
-/// configuration.
+/// one of them, and each worker's services; and the mode, which the host takes from the application's configuration.
 /// </summary>
 public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem FileSystem)
 {
@@ -28,7 +30,7 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// <summary>Each worker's services, asked for once for each, when the application loads.</summary>
     public Func<WebLingoWorkerId, WebLingoWorkerServices> WorkerServices { get; init; } = _ => new WebLingoWorkerServices(new());
 
-    public WebLingoEnvironment Environment { get; init; } = WebLingoEnvironment.Production;
+    public WebLingoMode Mode { get; init; } = WebLingoMode.Production;
 
     /// <summary>The clock an execution's timers wait on, or none, for virtual time.</summary>
     public IWebLingoExecutionClock? Clock { get; init; }
@@ -50,6 +52,12 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
 
     /// <summary>The platform's cryptography, which <c>std:crypto</c> reaches (section 7.10); none without it.</summary>
     public WebLingo.Platform.Abstractions.IWebLingoCrypto? Crypto { get; init; }
+
+    /// <summary>
+    /// The machine's environment its scripts may read, through <c>std:env</c>, as far as its configuration allows (section
+    /// 7.15); none without it.
+    /// </summary>
+    public IWebLingoEnvironment? Environment { get; init; }
 
     /// <summary>What its configuration allows its native modules, <c>"com"</c>'s objects (section 3.10); none without it.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>>? Allowed { get; init; }

@@ -51,6 +51,7 @@ public sealed class WebLingoNativeClass(string name)
     private readonly List<WebLingoNativeMember> _methods = [];
     private readonly List<WebLingoNativeMember> _staticMethods = [];
     private readonly List<WebLingoNativeProperty> _properties = [];
+    private readonly List<WebLingoNativeProperty> _staticProperties = [];
     private readonly List<string> _webLingoMethods = [];
 
     public string Name { get; } = name;
@@ -58,6 +59,7 @@ public sealed class WebLingoNativeClass(string name)
     public IReadOnlyList<WebLingoNativeMember> Methods => _methods;
     public IReadOnlyList<WebLingoNativeMember> StaticMethods => _staticMethods;
     public IReadOnlyList<WebLingoNativeProperty> Properties => _properties;
+    public IReadOnlyList<WebLingoNativeProperty> StaticProperties => _staticProperties;
     public WebLingoNativeIndexer? Indexer { get; private set; }
 
     /// <summary>Its fallback for the members it does not declare, if it has one (section 3.10).</summary>
@@ -99,6 +101,17 @@ public sealed class WebLingoNativeClass(string name)
     {
         string? twice = _methods.Exists(m => m.Name == name) || _properties.Exists(p => p.Name == name) ? name : null;
         if (Check(name, 0, twice)) _properties.Add(new(name, getter, setter));
+        return this;
+    }
+
+    /// <summary>
+    /// A static property, <c>Name.name</c>, read by its getter, given nothing, and assigned by its setter, given the value,
+    /// which a property without one cannot be (section 3.7). Its name is not a static method's.
+    /// </summary>
+    public WebLingoNativeClass DeclareStaticProperty(string name, WebLingoNativeFunction getter, WebLingoNativeFunction? setter = null)
+    {
+        string? twice = _staticMethods.Exists(m => m.Name == name) || _staticProperties.Exists(p => p.Name == name) ? name : null;
+        if (Check(name, 0, twice)) _staticProperties.Add(new(name, getter, setter));
         return this;
     }
 
@@ -221,6 +234,7 @@ public sealed class WebLingoNativeClass(string name)
             if (member.Name == name) twice = name;
         }
         if (ReferenceEquals(members, _methods) && _properties.Exists(p => p.Name == name)) twice = name;
+        if (ReferenceEquals(members, _staticMethods) && _staticProperties.Exists(p => p.Name == name)) twice = name;
         if (Error is null && name is "constructor" or "destructor")
         {
             Error = name == "constructor"
@@ -247,8 +261,10 @@ public sealed class WebLingoNativeClass(string name)
     /// </summary>
     /// <remarks>
     /// After them, each property's getter, <c>.get.name</c>, given the instance, and its setter, if it has one,
-    /// <c>.set.name</c>, given the instance and the value; then the indexer's getter, <c>.index.get</c>, given the instance
-    /// and the index, its setter, <c>.index.set</c>, given the instance, the index and the value, and its optional getter,
+    /// <c>.set.name</c>, given the instance and the value; then each static property's getter, <c>.static.get.name</c>,
+    /// given nothing, and its setter, <c>.static.set.name</c>, given the value; then the indexer's getter,
+    /// <c>.index.get</c>, given the instance and the index, its setter, <c>.index.set</c>, given the instance, the index
+    /// and the value, and its optional getter,
     /// <c>.index.optional</c>, which <c>x?[k]</c> calls, the getter giving <c>null</c> where it raises a missing key or an
     /// index out of range (section 3.6).
     /// </remarks>
@@ -266,6 +282,14 @@ public sealed class WebLingoNativeClass(string name)
             if (property.Setter is { } setter)
             {
                 builtins.Add(new MemberBuiltin(prefix + ".set." + property.Name, this, new(property.Name, 1, setter), MemberKind.Method));
+            }
+        }
+        foreach (var property in _staticProperties)
+        {
+            builtins.Add(new MemberBuiltin(prefix + ".static.get." + property.Name, this, new(property.Name, 0, property.Getter), MemberKind.Static));
+            if (property.Setter is { } setter)
+            {
+                builtins.Add(new MemberBuiltin(prefix + ".static.set." + property.Name, this, new(property.Name, 1, setter), MemberKind.Static));
             }
         }
         if (Indexer is { } indexer)

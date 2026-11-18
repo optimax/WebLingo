@@ -251,6 +251,60 @@ public sealed class WaspTests : IDisposable
         Assert.Contains("\"network\" is an object", error, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A page reads only what its folder's <c>wasp.config</c>'s <c>"env"</c> allows of the machine's environment
+    /// (specification, section 7.15): nothing without it, <c>null</c> as if it were not there, its name and the variables
+    /// it lists with it, a name ending in <c>*</c> those it begins; and sets no variable, an
+    /// <c>EnvironmentPermissionError</c>, WL3019, where it tries.
+    /// </summary>
+    [Fact]
+    public void APageReadsOnlyTheEnvironmentWaspConfigAllows()
+    {
+        var name = "WL_ENV_PAGE_" + Guid.NewGuid().ToString("N").ToUpperInvariant();
+        Environment.SetEnvironmentVariable(name + "_A", "first");
+        Environment.SetEnvironmentVariable(name + "_B", "second");
+        try
+        {
+            var page = "<% import { Environment } from \"std:env\"; %>"
+                       + $"<%= [Environment.machineName, Environment.variable(\"{name}_A\"), Environment.variable(\"{name}_B\")] %>"
+                       + $"<%= Environment.variables.has(\"{name}_A\") %>,<%= Environment.variables.has(\"{name}_B\") %>"
+                       + $"<% try {{ Environment.setVariable(\"{name}_C\", \"x\"); }} "
+                       + "catch (EnvironmentPermissionError e) { write(\",\" + e.code + \" \" + e.message); } %>";
+            var refused = $",WL3019 This application may not set the environment variable '{name}_C'.";
+            Assert.Equal((WebLingoCommandLine.Success, "[null, null, null]false,false" + refused, ""), Wasp("run", page));
+
+            File.WriteAllText(Path.Combine(_folder, "wasp.config"), $"{{ \"env\": {{ \"machineName\": true, \"variables\": [\"{name}_A\"] }} }}");
+            Assert.Equal((WebLingoCommandLine.Success, $"[&quot;{Environment.MachineName}&quot;, &quot;first&quot;, null]true,false" + refused, ""),
+                Wasp("run", page));
+            File.WriteAllText(Path.Combine(_folder, "wasp.config"), $"{{ \"env\": {{ \"variables\": [\"{name}_*\"] }} }}");
+            Assert.Equal((WebLingoCommandLine.Success, "[null, &quot;first&quot;, &quot;second&quot;]true,true" + refused, ""), Wasp("run", page));
+            Assert.Null(Environment.GetEnvironmentVariable(name + "_C"));
+
+            // A variable's name as the platform compares it: ignoring case on Windows.
+            File.WriteAllText(Path.Combine(_folder, "wasp.config"), $"{{ \"env\": {{ \"variables\": [\"{name.ToLowerInvariant()}_a\"] }} }}");
+            var expected = OperatingSystem.IsWindows() ? "[null, &quot;first&quot;, null]true,false" : "[null, null, null]false,false";
+            Assert.Equal((WebLingoCommandLine.Success, expected + refused, ""), Wasp("run", page));
+
+            foreach (var wrong in new[] { "{ \"env\": true }", "{ \"env\": { \"machineName\": 1 } }", "{ \"env\": { \"names\": [] } }" })
+            {
+                File.WriteAllText(Path.Combine(_folder, "wasp.config"), wrong);
+                var (exit, _, error) = Wasp("run", page);
+                Assert.Equal(WebLingoCommandLine.FileUnreadable, exit);
+                Assert.EndsWith("wasp.config: \"env\" is an object, { \"machineName\": true, \"variables\": [\"PATH\", \"APP_*\"] }, either optional.\n",
+                    error.ReplaceLineEndings("\n"), StringComparison.Ordinal);
+            }
+            File.WriteAllText(Path.Combine(_folder, "wasp.config"), "{ \"env\": { \"variables\": [\"A*B\"] } }");
+            Assert.Contains("\"env\"'s \"variables\" lists variables' names, each a name, a name ending in '*' for those it begins, or \"*\" for any.",
+                Wasp("run", page).Error, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(name + "_A", null);
+            Environment.SetEnvironmentVariable(name + "_B", null);
+            Environment.SetEnvironmentVariable(name + "_C", null);
+        }
+    }
+
     [Fact]
     public void APageOpensTheDatabasesWaspConfigNames()
     {

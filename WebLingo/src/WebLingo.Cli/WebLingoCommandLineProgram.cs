@@ -48,6 +48,12 @@ public sealed record WebLingoCommandLineProgram(
     /// </summary>
     public bool ReachesAnyFile { get; init; } = true;
 
+    /// <summary>
+    /// Whether its scripts may read all of the machine's environment, and set its variables (specification, section 7.15):
+    /// <c>weblingo</c>'s; else only what its configuration's <c>"env"</c> allows, and none set, as <c>wasp</c>'s pages.
+    /// </summary>
+    public bool ReachesAllEnvironment { get; init; } = true;
+
     /// <summary>The application's root, from which a script's relative path is where it reaches only some files; the file's folder if null.</summary>
     public string? Root { get; init; }
 }

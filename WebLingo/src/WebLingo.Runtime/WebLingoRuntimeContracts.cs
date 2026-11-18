@@ -76,6 +76,12 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     public WebLingo.Platform.Abstractions.IWebLingoCrypto? Crypto { get; init; }
 
     /// <summary>
+    /// The machine's environment, which <c>std:env</c> reaches through the heap (<see cref="WebLingoHeap.Environment"/>,
+    /// section 7.15), as far as the application may read it; none by default, its members then WL3001.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoEnvironment? Environment { get; init; }
+
+    /// <summary>
     /// The host's side of the execution's scheduler, on which work runs off the worker, its outcome posted back to it
     /// (section 7.8, WL-P007); without one, nothing asynchronous but the execution's own tasks and timers runs.
     /// </summary>

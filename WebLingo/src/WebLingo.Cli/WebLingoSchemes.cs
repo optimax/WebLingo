@@ -9,7 +9,7 @@ namespace WebLingo.Cli;
 /// <c>{ "schemes": { "native": "C:/WebLingo/native" } }</c>, a relative folder there being from the file's folder; then
 /// those the command line gives, <c>--scheme native=folder</c>, a relative folder from the current one, each over the
 /// file's of its name. A scheme's name is ASCII letters and digits, a letter first, at least two of them, so that a drive
-/// letter is never one. And an application's environment, <c>"environment": "development"</c> or <c>"production"</c>,
+/// letter is never one. And an application's mode, <c>"mode": "development"</c> or <c>"production"</c>,
 /// and how long, in seconds, a page waits for a client that has not taken its output, <c>"sendTimeout": 30</c>, a number
 /// more than 0 (specification, section 6.12, "Streaming"), which only <c>wasp serve</c> reads; and the hosts its scripts may
 /// reach, <c>"network": { "allow": ["api.example.com"] }</c>, which <c>wasp</c> reads, <c>weblingo</c>'s scripts reaching
@@ -18,7 +18,9 @@ namespace WebLingo.Cli;
 /// folders its scripts may read and write, <c>"files": { "read": ["../data"], "write": ["../uploads"] }</c>, a relative
 /// folder from the file's folder, which <c>wasp</c> reads, <c>weblingo</c>'s scripts reaching any file (section 7.13,
 /// "File capabilities"); and the COM objects its scripts may make, <c>"com": { "allow": ["ADODB.Connection"] }</c>, by
-/// ProgID, CLSID or moniker, <c>"*"</c> any, which both read (section 3.10). On Windows, the <c>windows</c> scheme's folder is
+/// ProgID, CLSID or moniker, <c>"*"</c> any, which both read (section 3.10); and what its scripts may read of the machine's
+/// environment, <c>"env": { "machineName": true, "variables": ["PATH", "APP_*"] }</c>, which <c>wasp</c> reads,
+/// <c>weblingo</c>'s scripts reading all of it (section 7.15). On Windows, the <c>windows</c> scheme's folder is
 /// <c>windows/</c> beside the program, unless configured, as <c>std</c>'s is <c>std/</c>.
 /// </summary>
 public static class WebLingoSchemes
@@ -41,40 +43,48 @@ public static class WebLingoSchemes
     public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out IReadOnlyDictionary<string, string> databases,
         out WebLingoFileFolders files, out string? error) =>
-        TryLoad(program, configuration, given, out schemes, out allowedHosts, out databases, out files, out _, out error);
+        TryLoad(program, configuration, given, out schemes, out allowedHosts, out databases, out files, out _, out _, out error);
 
-    /// <summary>As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name.</summary>
+    /// <summary>
+    /// As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name, and what its
+    /// scripts may read of the machine's environment.
+    /// </summary>
     public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out IReadOnlyDictionary<string, string> databases,
-        out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed, out string? error) =>
+        out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed, out WebLingoEnvSettings env,
+        out string? error) =>
         TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
-            out databases, out files, out allowed, out error);
+            out databases, out files, out allowed, out env, out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
-    /// line's given over them, its environment, <c>development</c>, <c>production</c>, or null if it names none, and its send
+    /// line's given over them, its mode, <c>development</c>, <c>production</c>, or null if it names none, and its send
     /// timeout, in seconds, or null if it gives none; false, with why, otherwise.
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
-        out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out string? error) =>
-        TryLoadFolder(folder, configuration, given, out schemes, out environment, out sendTimeout, out _, out _, out _, out _, out error);
+        out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out string? error) =>
+        TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out _, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, its databases,
     /// each name's connection string, and the folders its scripts may read and write, none when it names none.
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
-        out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
+        out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, string> databases, out WebLingoFileFolders files, out string? error) =>
-        TryLoadFolder(folder, configuration, given, out schemes, out environment, out sendTimeout, out allowedHosts, out databases, out files,
-            out _, out error);
+        TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out allowedHosts, out databases, out files,
+            out _, out _, out error);
 
-    /// <summary>As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name.</summary>
+    /// <summary>
+    /// As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name, and what its
+    /// scripts may read of the machine's environment, nothing when it says nothing.
+    /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
-        out Dictionary<string, string> schemes, out string? environment, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
+        out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, string> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
-        out string? error)
+        out WebLingoEnvSettings env, out string? error)
     {
+        env = WebLingoEnvSettings.None;
         var allowing = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         allowed = allowing;
         sendTimeout = null;
@@ -90,10 +100,10 @@ public static class WebLingoSchemes
         };
         // Windows's own native modules, windows:com among them, beside the program on Windows only (section 3.10).
         if (OperatingSystem.IsWindows()) schemes["windows"] = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "windows"));
-        (environment, error) = (null, null);
+        (mode, error) = (null, null);
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
-        if (File.Exists(file) && !TryRead(file, folder, schemes, ref environment, ref sendTimeout, hosts, named, read, write, allowing, out error))
+        if (File.Exists(file) && !TryRead(file, folder, schemes, ref mode, ref sendTimeout, hosts, named, read, write, allowing, ref env, out error))
         {
             return false;
         }
@@ -122,6 +132,41 @@ public static class WebLingoSchemes
         return true;
     }
 
+    /// <summary>
+    /// <c>"env": { "machineName": true, "variables": ["PATH", "APP_*"] }</c>, either optional: whether its scripts may read
+    /// the machine's name, and the variables they may read, each a name, or a name ending in <c>*</c>, or <c>"*"</c>.
+    /// </summary>
+    private static bool TryReadEnv(string file, JsonElement setting, out WebLingoEnvSettings env, out string? error)
+    {
+        env = WebLingoEnvSettings.None;
+        error = $"{file}: \"env\" is an object, {{ \"machineName\": true, \"variables\": [\"PATH\", \"APP_*\"] }}, either optional.";
+        if (setting.ValueKind != JsonValueKind.Object) return false;
+        var (machineName, variables) = (false, new List<string>());
+        foreach (var entry in setting.EnumerateObject())
+        {
+            if (entry.Name == "machineName" && entry.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                machineName = entry.Value.ValueKind == JsonValueKind.True;
+                continue;
+            }
+            if (entry.Name != "variables" || entry.Value.ValueKind != JsonValueKind.Array) return false;
+            foreach (var variable in entry.Value.EnumerateArray())
+            {
+                var name = variable.ValueKind == JsonValueKind.String ? variable.GetString()! : "";
+                var star = name.IndexOf('*');
+                if (name.Length == 0 || name.Contains('=') || star >= 0 && star != name.Length - 1)
+                {
+                    error = $"{file}: \"env\"'s \"variables\" lists variables' names, each a name, a name ending in '*' for those it "
+                            + "begins, or \"*\" for any.";
+                    return false;
+                }
+                variables.Add(name);
+            }
+        }
+        (env, error) = (new WebLingoEnvSettings(machineName, variables), null);
+        return true;
+    }
+
     /// <summary>Whether <paramref name="name"/> may name a scheme.</summary>
     public static bool IsName(string name)
     {
@@ -133,9 +178,9 @@ public static class WebLingoSchemes
         return true;
     }
 
-    private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? environment, ref double? sendTimeout,
+    private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? mode, ref double? sendTimeout,
         List<string> hosts, Dictionary<string, string> databases, List<string> read, List<string> write,
-        Dictionary<string, IReadOnlyList<string>> allowed, out string? error)
+        Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, out string? error)
     {
         error = null;
         try
@@ -148,14 +193,20 @@ public static class WebLingoSchemes
             }
             foreach (var setting in document.RootElement.EnumerateObject())
             {
-                if (setting.Name == "environment")
+                if (setting.Name == "mode")
                 {
                     if (setting.Value.ValueKind != JsonValueKind.String || setting.Value.GetString() is not ("development" or "production"))
                     {
-                        error = $"{file}: \"environment\" is \"development\" or \"production\".";
+                        error = $"{file}: \"mode\" is \"development\" or \"production\".";
                         return false;
                     }
-                    environment = setting.Value.GetString();
+                    mode = setting.Value.GetString();
+                    continue;
+                }
+                if (setting.Name == "env")
+                {
+                    // What its scripts may read of the machine's environment (section 7.15).
+                    if (!TryReadEnv(file, setting.Value, out env, out error)) return false;
                     continue;
                 }
                 if (setting.Name == "sendTimeout")
@@ -240,8 +291,8 @@ public static class WebLingoSchemes
                 }
                 if (setting.Name != "schemes")
                 {
-                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"environment\", \"sendTimeout\", \"network\", "
-                            + "\"databases\", \"files\" and \"com\".";
+                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"mode\", \"sendTimeout\", \"network\", "
+                            + "\"databases\", \"files\", \"com\" and \"env\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)
@@ -276,3 +327,13 @@ public static class WebLingoSchemes
 /// "File capabilities").
 /// </summary>
 public sealed record WebLingoFileFolders(IReadOnlyList<string> Read, IReadOnlyList<string> Write);
+
+/// <summary>
+/// What a configuration lets its scripts read of the machine's environment (specification, section 7.15): the machine's
+/// name, or not, and the variables it lists, each a name, a name ending in <c>*</c> for those it begins, or <c>"*"</c>.
+/// </summary>
+public sealed record WebLingoEnvSettings(bool MachineName, IReadOnlyList<string> Variables)
+{
+    /// <summary>Nothing of it, as a configuration without <c>"env"</c> allows.</summary>
+    public static WebLingoEnvSettings None { get; } = new(false, []);
+}

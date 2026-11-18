@@ -205,6 +205,7 @@ public sealed class WebLingoApplication
             Network = _options.Network,
             Allowed = _options.Allowed,
             Crypto = _options.Crypto,
+            Environment = _options.Environment,
             Databases = _options.Databases,
             Clock = _options.Clock,
             WallClock = _options.WallClock,
@@ -258,7 +259,7 @@ public sealed class WebLingoApplication
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
         }
         _options.Log?.Invoke("A page failed after its response was sent: " + error);
-        if (_options.Environment == WebLingoEnvironment.Development) output.Write("\n<pre>" + WebLingoTemplateWriteFunction.Escape(error) + "\n</pre>\n");
+        if (_options.Mode == WebLingoMode.Development) output.Write("\n<pre>" + WebLingoTemplateWriteFunction.Escape(error) + "\n</pre>\n");
         output.Send(); // What it wrote before it failed.
         response.Abort();
         return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
@@ -266,7 +267,7 @@ public sealed class WebLingoApplication
 
     private WebLingoRequestOutcome Failed(IWebLingoHttpResponse response, IReadOnlyList<string> errors)
     {
-        WebLingoErrorPages.Failed(response, _options.Environment, errors);
+        WebLingoErrorPages.Failed(response, _options.Mode, errors);
         return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
     }
 

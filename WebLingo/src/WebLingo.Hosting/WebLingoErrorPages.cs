@@ -17,8 +17,8 @@ internal static class WebLingoErrorPages
     /// <summary>A 405, its <c>Allow</c> the methods the handler answers, as <c>GET, HEAD, POST</c>.</summary>
     public static void MethodNotAllowed(IWebLingoHttpResponse response, string allow) => Write(response, 405, "Method Not Allowed", [], allow);
 
-    public static void Failed(IWebLingoHttpResponse response, WebLingoEnvironment environment, IReadOnlyList<string> errors) =>
-        Write(response, 500, "Internal Server Error", environment == WebLingoEnvironment.Development ? errors : []);
+    public static void Failed(IWebLingoHttpResponse response, WebLingoMode mode, IReadOnlyList<string> errors) =>
+        Write(response, 500, "Internal Server Error", mode == WebLingoMode.Development ? errors : []);
 
     private static void Write(IWebLingoHttpResponse response, int status, string reason, IReadOnlyList<string> errors, string? allow = null)
     {

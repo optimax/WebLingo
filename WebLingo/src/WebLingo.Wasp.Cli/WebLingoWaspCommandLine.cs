@@ -26,6 +26,7 @@ public static class WebLingoWaspCommandLine
             Configuration = WebLingoRouteTable.ConfigurationFile,
             ReachesAnyHost = false,
             ReachesAnyFile = false,
+            ReachesAllEnvironment = false,
             Root = root,
             Options = "[--root <folder>] ",
             OptionsHelp =

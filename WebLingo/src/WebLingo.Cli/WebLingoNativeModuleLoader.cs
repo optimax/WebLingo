@@ -209,6 +209,13 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
                 var getter = Export(property.Name, members[next++]);
                 properties.Add(new WebLingoNativePropertyInfo(property.Name, getter, property.Setter is null ? null : Export(property.Name, members[next++])));
             }
+            var staticProperties = new List<WebLingoNativePropertyInfo>();
+            foreach (var property in nativeClass.StaticProperties)
+            {
+                var getter = Export(property.Name, members[next++]);
+                staticProperties.Add(new WebLingoNativePropertyInfo(property.Name, getter,
+                    property.Setter is null ? null : Export(property.Name, members[next++])));
+            }
             WebLingoNativeExport? indexGetter = null, indexSetter = null, indexOptional = null;
             if (nativeClass.Indexer is { } indexer)
             {
@@ -235,6 +242,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
                 Registration = nativeClass.MadeByModule ? Export("class", members[^1]) : null,
                 WebLingoMethods = written,
                 Properties = properties,
+                StaticProperties = staticProperties,
                 IndexGetter = indexGetter,
                 IndexSetter = indexSetter,
                 IndexOptional = indexOptional

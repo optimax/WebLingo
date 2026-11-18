@@ -91,7 +91,7 @@ public sealed class RequestBodyTests
         {
             WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction())),
             Scheduler = () => new DotNetSchedulerHost(),
-            Environment = WebLingoEnvironment.Development
+            Mode = WebLingoMode.Development
         }, out var error);
         Assert.True(app is not null, error);
         return app;

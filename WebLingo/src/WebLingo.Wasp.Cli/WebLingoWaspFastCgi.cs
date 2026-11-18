@@ -70,7 +70,7 @@ public static class WebLingoWaspFastCgi
         stdin |= port is null && socketPath is null && FromWebServer();
         var log = stdin ? error : output; // A web server's process writes its standard output nowhere it reads.
         var full = Path.GetFullPath(root ?? ".");
-        var application = WebLingoWaspServer.Load(full, schemes, WebLingoEnvironment.Production, log, out var workers, out var environment, out var why);
+        var application = WebLingoWaspServer.Load(full, schemes, WebLingoMode.Production, log, out var workers, out var environment, out var why);
         if (application is null)
         {
             error.WriteLine(why);

@@ -37,7 +37,7 @@ public sealed class FastCgiTests : IDisposable
         Write("broken.wasp", "<%= [1][2] %>");
         Write("css/site.css", "h1 { }");
         Write("deep.wasp", "<%= " + new string('(', 250) + "1" + new string(')', 250) + " %>");
-        var application = WebLingoWaspServer.Load(_root, new Dictionary<string, string>(), WebLingoEnvironment.Production, null, out _, out _, out var error);
+        var application = WebLingoWaspServer.Load(_root, new Dictionary<string, string>(), WebLingoMode.Production, null, out _, out _, out var error);
         Assert.True(application is not null, error);
         _server = new WebLingoFastCgiServer(application, _root, _workers);
         _listener = WebLingoWaspFastCgi.Listen(0, null, out _);

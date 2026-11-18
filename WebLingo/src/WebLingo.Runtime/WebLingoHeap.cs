@@ -97,6 +97,9 @@ public sealed class WebLingoHeap
     /// <summary>The platform's cryptography (<see cref="WebLingoExecutionContext.Crypto"/>), for <c>std:crypto</c>'s functions (section 7.10).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoCrypto? Crypto { get; set; }
 
+    /// <summary>The machine's environment (<see cref="WebLingoExecutionContext.Environment"/>), for <c>std:env</c>'s members (section 7.15).</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoEnvironment? Environment { get; set; }
+
     /// <summary>The class values of the native classes whose modules make their instances, each its class's (section 3.10).</summary>
     private Dictionary<object, WebLingoValue>? _nativeClassValues;
 

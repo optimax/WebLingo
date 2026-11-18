@@ -24,6 +24,9 @@ public sealed record WebLingoNativeClassInfo(string Name, WebLingoNativeExport C
     /// <summary>Its properties, each its getter's built-in, given the instance, and its setter's, or null (section 3.7).</summary>
     public IReadOnlyList<WebLingoNativePropertyInfo> Properties { get; init; } = [];
 
+    /// <summary>Its static properties, each its getter's built-in, given nothing, and its setter's, given the value, or null.</summary>
+    public IReadOnlyList<WebLingoNativePropertyInfo> StaticProperties { get; init; } = [];
+
     /// <summary>Its indexer's getter's built-in, given the instance and the index, or null for a class without one.</summary>
     public WebLingoNativeExport? IndexGetter { get; init; }
 

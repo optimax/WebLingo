@@ -1898,6 +1898,12 @@ public sealed class WebLingoBinder
             // A setter's value is the assignment's, whatever its built-in gives.
             if (property.Setter is { } setter) methods.Add(NativeMember("set:" + property.Name, setter, false, callees, returns: false));
         }
+        foreach (var property in info.StaticProperties)
+        {
+            // A static property, Name.name, its getter given nothing and its setter the value (section 3.7).
+            methods.Add(NativeMember("get:" + property.Name, property.Getter, true, callees));
+            if (property.Setter is { } setter) methods.Add(NativeMember("set:" + property.Name, setter, true, callees, returns: false));
+        }
         if (info.IndexGetter is { } getter) methods.Add(NativeMember(WebLingoIndexers.Getter, getter, false, callees));
         if (info.IndexSetter is { } indexSetter) methods.Add(NativeMember(WebLingoIndexers.Setter, indexSetter, false, callees, returnsLast: true));
         if (info.IndexOptional is { } optional) methods.Add(NativeMember(WebLingoIndexers.OptionalGetter, optional, false, callees));

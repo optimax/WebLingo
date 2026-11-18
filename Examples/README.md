@@ -54,7 +54,7 @@ dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples/exa
 and open <http://localhost:8080/>. Both paths are from the folder you run it in: from the solution's folder, `WebLingo`,
 the one that holds `WebLingo.slnx`, the command is `dotnet run --project src/WebLingo.Wasp.Cli -- serve --root
 ../Examples/example1`. `--port` chooses another port. Locally, an error in a page shows in the browser;
-under IIS it does not, unless the site's `wasp.config` says `{ "environment": "development" }`.
+under IIS it does not, unless the site's `wasp.config` says `{ "mode": "development" }`.
 
 ### Deploying it to IIS
 

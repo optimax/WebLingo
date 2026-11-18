@@ -115,6 +115,11 @@ public static class WebLingoDiagnosticCodes
     /// November 2026, a code of its own; section 3.10; <c>ComPermissionError</c>).
     /// </summary>
     public const string ComPermissionDenied = "WL3018";
+    /// <summary>
+    /// An environment variable a site's scripts may not set, under <c>wasp</c>, which lets them read only (proposed, the
+    /// owner's answer, 18 November 2026, an error of its own; section 7.15; <c>EnvironmentPermissionError</c>).
+    /// </summary>
+    public const string EnvironmentPermissionDenied = "WL3019";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";
