@@ -12,10 +12,12 @@ make, as `windows:com` asks of a script.
 | `install-weblingo.wl` | Installs WebLingo in `C:\Program Files\WebLingo`, or updates it, from the folder `WebLingo/publish.ps1` publishes it to, `WebLingo\publish\WebLingo`; the application pools of the sites whose `wasp` runs from there are stopped while their files are replaced, and started again |
 | `add-weblingo-to-path.wl` | Puts `C:\Program Files\WebLingo` on the machine's `PATH`, once, so that consoles started after run `weblingo` and `wasp` by their names |
 | `add-wasp-site.wl` | Adds a WASP site to IIS: its application pool, with no managed code, and its website, served by HTTPS on port 443 under a name of its own, with a certificate this machine trusts |
+| `add-sql-server-login.wl` | Gives a site's application pool its database on SQL Server: a login for the pool's account, and a user of the database that reads and changes its rows |
 | `windows.wl`, `iis.wl` | What the scripts share: running a program, the processes running, a certificate made and trusted; and IIS's configuration and its pools |
 
 Each changes the machine, and so runs as administrator, in a console run as administrator, from this folder; run
-otherwise, it stops before changing anything. Each may be run again: it keeps what is there, and adds what is missing.
+otherwise, it stops before changing anything, but for `add-sql-server-login.wl`, which changes a SQL Server, and runs
+as one of its administrators. Each may be run again: it keeps what is there, and adds what is missing.
 
 ## Installing WebLingo
 
@@ -54,6 +56,20 @@ self-signed, for that name only, not a certificate authority, its private key no
 trusted by this machine, a copy of it without its key among the machine's trusted roots (`Cert:\LocalMachine\Root`,
 where it is removed to undo that). And it puts the name in the machine's `hosts` file, for `127.0.0.1`: browsers take
 every `*.localhost` name for the machine itself, but Windows does not, so that other programs find it there.
+
+## Giving a site its database on SQL Server
+
+A site that reaches SQL Server by Windows authentication, as example3 does, reaches it under IIS as its application
+pool's account, `IIS AppPool\<name>`, which needs a login on the server and a user of the database. Once
+`add-wasp-site.wl` has added the pool, as one of the server's administrators:
+
+```bat
+weblingo run add-sql-server-login.wl name=wasp.example3 database=WebLingoTodo
+```
+
+which gives that user the database's `db_datareader` and `db_datawriter` roles, to read and change its tables' rows, and
+nothing more; `server=` names a SQL Server other than this machine's default instance. A database made anew, as
+example3's `setup.wl` makes its, has lost the user: run it again then.
 
 The scripts remove nothing: a site, its pool, its certificate and its `hosts` entry are removed in IIS's manager, the
 certificates' console and the `hosts` file. Nor do they renew a certificate: once one has expired, remove its binding,

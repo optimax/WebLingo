@@ -266,4 +266,4 @@ To use another SQL Server, change the server in both configurations, `database/w
 `"sqlserver:Server=myserver;Database=WebLingoTodo;Integrated Security=true"`, and run `setup.wl` as above; a server
 reached over a network should have a certificate its clients trust, in place of `TrustServerCertificate=true`. Under
 IIS, the site reaches the database as its application pool's account, which needs a login on that server, and the
-rights to read and change the database.
+rights to read and change the database, which `Scripts/add-sql-server-login.wl` gives it (`Scripts/README.md`).
