@@ -4,8 +4,9 @@ namespace WebLingo.StdLib;
 /// <summary>
 /// <c>std:system</c> as a native module (specification, section 3.9; section 9, "Native modules", part 3), installed with
 /// the runtime in the <c>std</c> scheme's folder as <c>system.dll</c>, which another implementation may replace: its
-/// exports, <c>write</c> and <c>writeLn</c>, writing to the execution's output, and <c>delay</c>, which a host gives every
-/// module as its built-ins.
+/// exports, <c>write</c> and <c>writeLn</c>, writing to the execution's output, and <c>delay</c>, which a host gives as its
+/// built-ins, and a program has only by importing them, <c>import { writeLn, delay } from "std:system";</c> (the owner's
+/// decision, 18 November 2026).
 /// </summary>
 public sealed class WebLingoSystemModule : IWebLingoNativeModule
 {

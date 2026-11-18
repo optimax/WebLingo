@@ -20,7 +20,7 @@ public sealed class WaspServeTests : IDisposable
     public WaspServeTests()
     {
         Write("layouts/main.wasp", "<% param title; %><html><title><%= title %></title><body><% renderBody(); %></body></html>");
-        Write("index.wasp", "<% import { write, writeLn } from \"std:io\"; layout \"/layouts/main.wasp\", { title: \"Home\" }; %><h1>Hello</h1><% writeLn(\"from std:system\"); %>");
+        Write("index.wasp", "<% import { write, writeLn } from \"std:system\"; layout \"/layouts/main.wasp\", { title: \"Home\" }; %><h1>Hello</h1><% writeLn(\"from std:system\"); %>");
         Write("broken.wasp", "<%= [1][2] %>");
         Write("css/site.css", "h1 { }");
     }

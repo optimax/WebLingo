@@ -3,8 +3,9 @@
 //
 //   weblingo run setup.wl
 
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 import { Database } from "std:db";
+import { DateTime } from "std:datetime";
 
 const fish = [
     { slug: "neon-tetra", name: "Neon tetra", species: "Paracheirodon innesi", water: "freshwater",

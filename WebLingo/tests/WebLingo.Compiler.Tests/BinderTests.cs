@@ -25,7 +25,8 @@ public sealed class BinderTests
     {
         // Each built-in class's source, which the compiler parses when a program names the class, and whose faults no
         // program could fix, so that one that does not parse fails the compiler, here, not a program (section 3.7).
-        var compilation = Compile("var classes = [Object, Error, Boolean, Integer, Number, String, Array, Map, Set, Function, Class, Task, Module, "
+        var compilation = Compile("import { Bytes, BytesBuilder } from \"std:bytes\"; "
+                                  + "var classes = [Object, Error, Boolean, Integer, Number, String, Array, Map, Set, Function, Class, Task, Module, "
                                   + "Iterator, Bytes, BytesBuilder, InitializationError, CallError, ArgumentError, TypeError, OverflowError, "
                                   + "IndexError, MemberError, KeyError, TimeoutError, IOError]; printLn(classes.length);");
         Assert.Empty(compilation.Diagnostics);

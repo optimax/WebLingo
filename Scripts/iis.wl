@@ -1,6 +1,7 @@
 // IIS, as the setup scripts reach it: its configuration, applicationHost.config, through its own COM objects
 // (Microsoft.ApplicationHost.WritableAdminManager), and its application pools' states through appcmd, which IIS installs.
 // Both need an administrator.
+import { delay } from "std:system";
 import com from "windows:com";
 import { run, runOrStop, expand } from "./windows.wl";
 

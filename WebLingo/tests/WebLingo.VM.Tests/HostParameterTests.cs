@@ -16,7 +16,7 @@ public sealed class HostParameterTests
     [Fact]
     public void TheHostsParameterIsItsInstance()
     {
-        const string program = "param thing; param n = 2; import { write, writeLn } from \"std:io\"; function f() { return thing.name; } class Late { } "
+        const string program = "param thing; param n = 2; import { write, writeLn } from \"std:system\"; function f() { return thing.name; } class Late { } "
                                + "writeLn([thing.name, n, f(), thing == f2()]); function f2() { return thing; }";
         foreach (var vm in new[] { false, true })
         {
@@ -32,7 +32,7 @@ public sealed class HostParameterTests
     {
         foreach (var vm in new[] { false, true })
         {
-            var (diagnostics, output, error) = Run("param thing; import { write, writeLn } from \"std:io\"; writeLn(thing.name);", vm);
+            var (diagnostics, output, error) = Run("param thing; import { write, writeLn } from \"std:system\"; writeLn(thing.name);", vm);
             Assert.Empty(diagnostics);
             Assert.True(error is null, error?.Message);
             Assert.Equal("from the host\n", output);

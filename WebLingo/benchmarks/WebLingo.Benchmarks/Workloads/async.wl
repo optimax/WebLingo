@@ -1,5 +1,5 @@
 // Asynchronous suspension: tasks suspended at await, each resumed in turn by the scheduler.
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 async function work(n) {
     var total = 0;
     for (var i = 0; i < n; i = i + 1) {

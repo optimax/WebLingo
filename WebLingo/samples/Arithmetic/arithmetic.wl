@@ -1,4 +1,4 @@
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var a = 10;
 const b = 20;
 var result = a + b;

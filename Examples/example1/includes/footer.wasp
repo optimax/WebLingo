@@ -1,4 +1,4 @@
-<% import { Environment } from "std:env"; %>
+<% import { Environment } from "std:env"; import { DateTime } from "std:datetime"; %>
 <footer>
   <p>
   Served by WASP, WebLingo's server pages: a layout, two includes, a component and a module.

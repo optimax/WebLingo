@@ -1,5 +1,5 @@
 // Arrays and maps: elements and entries read, written and visited with foreach.
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var words = ["alpha", "beta", "gamma", "delta"];
 var counts = {};
 foreach (var w in words) counts[w] = 0;

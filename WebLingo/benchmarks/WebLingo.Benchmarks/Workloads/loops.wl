@@ -1,5 +1,5 @@
 // Nested for loops: int64 arithmetic, comparisons and if, a million times.
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var sum = 0;
 for (var i = 0; i < 1000; i = i + 1) {
     for (var j = 0; j < 1000; j = j + 1) {

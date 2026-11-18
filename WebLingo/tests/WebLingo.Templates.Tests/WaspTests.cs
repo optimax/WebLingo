@@ -237,10 +237,10 @@ public sealed class WaspTests : IDisposable
     [Fact]
     public void APageReachesOnlyTheHostsWaspConfigAllows()
     {
-        const string page = "<% import http from \"std:http\"; import { write } from \"std:io\"; try { await http.get(\"http://127.0.0.1:1/\"); } "
+        const string page = "<% import http from \"std:http\"; import { write } from \"std:system\"; try { await http.get(\"http://127.0.0.1:1/\"); } "
                             + "catch (NetworkPermissionError e) { write(e.code + \" \" + e.message); } catch (e) { write(e.code); } %>";
         Assert.Equal((WebLingoCommandLine.Success, "WL3017 '127.0.0.1' is not a host this application may reach.", ""), Wasp("run", page));
-        const string socket = "<% import { Socket } from \"std:net\"; import { write } from \"std:io\"; try { await Socket.connect(\"127.0.0.1\", 1); } "
+        const string socket = "<% import { Socket } from \"std:net\"; import { write } from \"std:system\"; try { await Socket.connect(\"127.0.0.1\", 1); } "
                               + "catch (NetworkPermissionError e) { write(e.code); } %>";
         Assert.Equal((WebLingoCommandLine.Success, "WL3017", ""), Wasp("run", socket));
         File.WriteAllText(Path.Combine(_folder, "wasp.config"), "{ \"network\": { \"allow\": [\"127.0.0.1\"] } }");
@@ -265,7 +265,7 @@ public sealed class WaspTests : IDisposable
         Environment.SetEnvironmentVariable(name + "_B", "second");
         try
         {
-            var page = "<% import { Environment } from \"std:env\"; import { write } from \"std:io\"; %>"
+            var page = "<% import { Environment } from \"std:env\"; import { write } from \"std:system\"; %>"
                        + $"<%= [Environment.machineName, Environment.variable(\"{name}_A\"), Environment.variable(\"{name}_B\")] %>"
                        + $"<%= Environment.variables.has(\"{name}_A\") %>,<%= Environment.variables.has(\"{name}_B\") %>"
                        + $"<% try {{ Environment.setVariable(\"{name}_C\", \"x\"); }} "

@@ -13,8 +13,9 @@ param name;
 param database;
 param server = "localhost";
 
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 import { Database } from "std:db";
+import { Regex } from "std:regex";
 
 // The database's and the server's names go into a connection string, so nothing that could end or extend one.
 if (!new Regex("^[A-Za-z_][A-Za-z0-9_]*$").test(database)) {

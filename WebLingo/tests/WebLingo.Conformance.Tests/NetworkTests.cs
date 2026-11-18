@@ -34,14 +34,14 @@ public sealed class NetworkTests : IDisposable
     private int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
 
     [Theory]
-    [InlineData("import { write, writeLn } from \"std:io\"; var r = await http.get(\"URL/echo\", { \"X-Test\": \"yes\" }); writeLn([r[\"status\"], r[\"headers\"][\"content-type\"], r[\"body\"]]);",
+    [InlineData("import { write, writeLn } from \"std:system\"; var r = await http.get(\"URL/echo\", { \"X-Test\": \"yes\" }); writeLn([r[\"status\"], r[\"headers\"][\"content-type\"], r[\"body\"]]);",
         "[200, \"text/plain; charset=utf-8\", \"GET /echo x-test=yes \"]")]
-    [InlineData("import { write, writeLn } from \"std:io\"; var r = await http.post(\"URL/echo\", \"héllo\"); writeLn([r[\"status\"], r[\"body\"], r[\"bytes\"].length]);",
+    [InlineData("import { write, writeLn } from \"std:system\"; var r = await http.post(\"URL/echo\", \"héllo\"); writeLn([r[\"status\"], r[\"body\"], r[\"bytes\"].length]);",
         "[200, \"POST /echo x-test= héllo\", 25]")]
-    [InlineData("import { writeLn } from \"std:io\"; var r = await http.request(\"put\", \"URL/echo\", Bytes.from(\"hi\")); writeLn(r[\"body\"]);", "PUT /echo x-test= hi")]
-    [InlineData("import { writeLn } from \"std:io\"; var r = await http.get(\"URL/moved\"); writeLn([r[\"status\"], r[\"headers\"][\"location\"]]);", "[302, \"http://elsewhere.test/\"]")]
-    [InlineData("import { writeLn } from \"std:io\"; import { Json } from \"std:json\"; var r = await http.get(\"URL/json\"); writeLn(Json.parse(r[\"body\"])[\"tea\"]);", "Sencha")]
-    [InlineData("import { write, writeLn } from \"std:io\"; var all = await Task.all([http.get(\"URL/echo\"), http.get(\"URL/json\")]); writeLn([all[0][\"status\"], all[1][\"status\"]]);",
+    [InlineData("import { writeLn } from \"std:system\"; import { Bytes } from \"std:bytes\"; var r = await http.request(\"put\", \"URL/echo\", Bytes.from(\"hi\")); writeLn(r[\"body\"]);", "PUT /echo x-test= hi")]
+    [InlineData("import { writeLn } from \"std:system\"; var r = await http.get(\"URL/moved\"); writeLn([r[\"status\"], r[\"headers\"][\"location\"]]);", "[302, \"http://elsewhere.test/\"]")]
+    [InlineData("import { writeLn } from \"std:system\"; import { Json } from \"std:json\"; var r = await http.get(\"URL/json\"); writeLn(Json.parse(r[\"body\"])[\"tea\"]);", "Sencha")]
+    [InlineData("import { write, writeLn } from \"std:system\"; var all = await Task.all([http.get(\"URL/echo\"), http.get(\"URL/json\")]); writeLn([all[0][\"status\"], all[1][\"status\"]]);",
         "[200, 200]")]
     public void HttpRequestsGiveTheResponse(string source, string printed)
     {
@@ -52,7 +52,7 @@ public sealed class NetworkTests : IDisposable
     [Fact]
     public void ASocketTalksToTheServer()
     {
-        var source = "import { write, writeLn } from \"std:io\"; import { Socket } from \"std:net\"; var s = await Socket.connect(\"127.0.0.1\", PORT); "
+        var source = "import { write, writeLn } from \"std:system\"; import { Socket } from \"std:net\"; var s = await Socket.connect(\"127.0.0.1\", PORT); "
                      + "await s.write(\"GET /echo HTTP/1.1\\r\\nHost: t\\r\\nConnection: close\\r\\n\\r\\n\"); var all = \"\"; "
                      + "var piece = await s.read(); while (piece != null) { all += piece.text(); piece = await s.read(); } s.dispose(); s.dispose(); "
                      + "writeLn([all.startsWith(\"HTTP/1.1 200\"), all.endsWith(\"GET /echo x-test= \"), s is Socket]);";
@@ -61,13 +61,13 @@ public sealed class NetworkTests : IDisposable
     }
 
     [Theory]
-    [InlineData("import { writeLn } from \"std:io\"; import http from \"std:http\"; try { await http.get(\"http://127.0.0.1:CLOSED/\"); } catch (NetworkError e) { writeLn(e.code); }", "WL3014")]
-    [InlineData("import { writeLn } from \"std:io\"; import { Socket } from \"std:net\"; try { await Socket.connect(\"127.0.0.1\", CLOSED); } catch (NetworkError e) { writeLn(e.code); }", "WL3014")]
-    [InlineData("import { writeLn } from \"std:io\"; import http from \"std:http\"; try { await http.get(\"ftp://127.0.0.1/\"); } catch (e) { writeLn(e.code); }", "WL3001")]
-    [InlineData("import { write, writeLn } from \"std:io\"; import http from \"std:http\"; try { http.get(1); } catch (e) { writeLn([e.code, e.message]); }",
+    [InlineData("import { writeLn } from \"std:system\"; import http from \"std:http\"; try { await http.get(\"http://127.0.0.1:CLOSED/\"); } catch (NetworkError e) { writeLn(e.code); }", "WL3014")]
+    [InlineData("import { writeLn } from \"std:system\"; import { Socket } from \"std:net\"; try { await Socket.connect(\"127.0.0.1\", CLOSED); } catch (NetworkError e) { writeLn(e.code); }", "WL3014")]
+    [InlineData("import { writeLn } from \"std:system\"; import http from \"std:http\"; try { await http.get(\"ftp://127.0.0.1/\"); } catch (e) { writeLn(e.code); }", "WL3001")]
+    [InlineData("import { write, writeLn } from \"std:system\"; import http from \"std:http\"; try { http.get(1); } catch (e) { writeLn([e.code, e.message]); }",
         "[\"WL3001\", \"An address is a string, \\\"https://example.com/\\\", not the integer 1.\"]")]
-    [InlineData("import { writeLn } from \"std:io\"; import http from \"std:http\"; try { http.get(\"http://x/\", [1]); } catch (e) { writeLn(e.code); }", "WL3001")]
-    [InlineData("import { writeLn } from \"std:io\"; import { Socket } from \"std:net\"; try { Socket.connect(\"127.0.0.1\", 70000); } catch (e) { writeLn(e.code); }", "WL3001")]
+    [InlineData("import { writeLn } from \"std:system\"; import http from \"std:http\"; try { http.get(\"http://x/\", [1]); } catch (e) { writeLn(e.code); }", "WL3001")]
+    [InlineData("import { writeLn } from \"std:system\"; import { Socket } from \"std:net\"; try { Socket.connect(\"127.0.0.1\", 70000); } catch (e) { writeLn(e.code); }", "WL3001")]
     public void FailuresAreErrors(string source, string printed)
     {
         // A port nothing listens on: one the system gave, then let go of.

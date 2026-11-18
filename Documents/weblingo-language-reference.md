@@ -14,7 +14,7 @@ listed in the WebLingo Standard Library Reference (`Documents/weblingo-standard-
 An example is a program, followed by what it writes:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 writeLn("Hello, WebLingo!");
 ```
 
@@ -114,7 +114,7 @@ WASP's `.wasp` pages, and its `README.md` says how to install it.
 
 ```javascript
 // A comment runs to the end of its line.
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 /* A block comment
    may span lines. */
 var answer = 42; // after a statement too
@@ -132,7 +132,7 @@ writeLn(answer);
 `var` declares a variable, and `const` a constant, which cannot be assigned again:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var count = 1;
 const limit = 3;
 count = count + 1;
@@ -153,7 +153,7 @@ writeLn(limit);
   as JavaScript's `let` does. An inner block may declare a name an outer one has, hiding it there:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn } from "std:system";
   var x = "outer";
   {
     var x = "inner";
@@ -172,7 +172,7 @@ writeLn(limit);
   outside:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn } from "std:system";
   var x = 1;
   {
     writeLn(x);
@@ -214,7 +214,7 @@ writeLn(limit);
 `writeLn` writes each kind as its text:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 writeLn(null);
 writeLn(true);
 writeLn(42);
@@ -248,7 +248,7 @@ text
   `toString()`, every value's, gives its text, and `Integer.parse`, `Number.parse` and `Boolean.parse` read one:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn } from "std:system";
   writeLn("n = " + 5.toString());
   writeLn("n = " + (2.5).toString());
   writeLn(Integer.parse("10") + 1);
@@ -272,7 +272,7 @@ text
 A decimal is a number written with an `m`, `2.50m`, whose arithmetic is exact in decimal digits, as money needs:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var price = 2.50m;
 var total = price * 3 + 0.10m;
 writeLn(total);
@@ -299,10 +299,13 @@ writeLn([7m / 2, 1m == 1, new Decimal(0.1), new Number(total)]);
 ### Dates and times
 
 A date and time is a value of the class `DateTime`: an instant, to the millisecond, with its offset from UTC, the time on
-the clocks where it was read. Like a string, it is immutable; its years are 1 to 9999.
+the clocks where it was read. Like a string, it is immutable; its years are 1 to 9999. The class is `std:datetime`'s, which
+a program imports to name it, `import { DateTime } from "std:datetime";`; a date a module or a method gives, a database's
+row among them, keeps its members without the import.
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
+import { DateTime } from "std:datetime";
 var d = DateTime.utc(2026, 11, 16, 14, 30);
 writeLn(d);
 writeLn([d.year, d.month, d.day, d.hour, d.minute, d.dayOfWeek]);
@@ -354,7 +357,8 @@ true
   `DateTime.local(…)` makes one in the server's zone:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
+import { DateTime } from "std:datetime";
 var call = DateTime.inZone("America/New_York", 2026, 11, 16, 9, 30);
 writeLn(call);
 writeLn(call.toZone("Europe/Warsaw"));
@@ -397,7 +401,7 @@ groups to the right (`a = b = 3`). The binary operators group to the left. Paren
 ### Arithmetic
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 writeLn(7 / 2);
 writeLn(8 / 2);
 writeLn(1 + 0.5);
@@ -428,7 +432,7 @@ NaN
 - **Integers do not overflow silently**:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn } from "std:system";
   writeLn(9223372036854775807 + 1);
   ```
 
@@ -449,7 +453,7 @@ NaN
 as numbers. Strings compare their text; arrays, maps, sets, functions and instances are equal only to themselves.
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 writeLn(1 == 1.0);
 writeLn("a" == "a");
 writeLn(1 == "1");
@@ -481,7 +485,7 @@ values, never by language, so that `"B" < "a"`; `s.compare(other)` gives -1, 0 o
 no "truthiness".
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var age = 20;
 writeLn(age >= 18 && age < 65);
 writeLn(!(age > 30) || false);
@@ -493,7 +497,7 @@ true
 ```
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 if (1) writeLn("never");
 ```
 
@@ -504,7 +508,7 @@ values-truthy.wl(2,5): error WL3001: A condition needs a Boolean, not the intege
 ### Assignment's operators
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var total = 10;
 total += 5;
 total *= 2;
@@ -536,7 +540,7 @@ guest
 ### Choosing a value: `? :`, `if` and `??`
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var stock = 0;
 writeLn(stock > 0 ? "in stock" : "sold out");
 var size = if (stock > 10) "many" else "few";
@@ -566,7 +570,7 @@ items
 A string is immutable Unicode text, written in double or single quotes, which mean the same, on one line.
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var s = "héllo";
 writeLn(s.length);
 writeLn(s[1] == "é");
@@ -596,7 +600,7 @@ tab:	end
 ### String methods
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var s = "Green tea, black tea";
 writeLn([s.indexOf("tea"), s.lastIndexOf("tea"), s.contains("black"), s.startsWith("Green")]);
 writeLn(s.slice(6, 9));
@@ -630,10 +634,12 @@ tea
 
 ### Regular expressions
 
-A regular expression is made by the class `Regex`, from a pattern in .NET's syntax and flags:
+A regular expression is made by the class `Regex`, `std:regex`'s, which a program imports to name it, `import { Regex }
+from "std:regex";`, from a pattern in .NET's syntax and flags:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
+import { Regex } from "std:regex";
 var email = new Regex("(\\w+)@(\\w+)\\.com");
 var text = "ann@tea.com, bob@cake.com";
 writeLn(email.test(text));
@@ -666,7 +672,7 @@ true
 ### JSON
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 import { Json } from "std:json";
 var order = Json.parse("{\"tea\": \"Sencha\", \"cups\": 2, \"price\": 6.5, \"extras\": [\"milk\"]}");
 writeLn([order["tea"], order["cups"] is Integer, order["price"] is Number, order["extras"][0]]);
@@ -708,7 +714,7 @@ Three quotes, `"""` or `'''`, begin a string that may span lines. It is raw: `\`
 before the closing quotes' column are removed from every line, so that the string can be indented with the code:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var poem = """
     Green tea,
       steeped slow.
@@ -727,7 +733,7 @@ A string marked with `$` puts the values of the expressions in braces into its t
 nothing:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var name = "Ann";
 var price = 6.5;
 writeLn($"Hello, {name}! Tea is {price} today.");
@@ -761,7 +767,7 @@ Braces: { and }
 ### `if`
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var n = 7;
 if (n > 5) {
   writeLn("big");
@@ -782,7 +788,7 @@ A branch may be a single statement or a block, and has a scope of its own either
 ### Loops
 
 ```javascript
-import { write, writeLn } from "std:io";
+import { write, writeLn } from "std:system";
 var i = 0;
 while (i < 3) { write(i); i = i + 1; }
 writeLn("");
@@ -816,7 +822,7 @@ writeLn("");
 ### `switch`
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 class Tea { constructor(name) { this.name = name; } }
 function describe(item) {
   switch (item) {
@@ -852,7 +858,7 @@ something else
 `foreach (var item in collection)` visits a collection's items:
 
 ```javascript
-import { write, writeLn } from "std:io";
+import { write, writeLn } from "std:system";
 foreach (var tea in ["Sencha", "Assam"]) writeLn(tea);
 foreach (var c in "abc") write(c + ".");
 writeLn("");
@@ -880,7 +886,7 @@ sencha: 6.5
 ## 8. Functions
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 writeLn(add(2, 3));
 function add(a, b) { return a + b; }
 function greet(name, greeting = "Hello") { return $"{greeting}, {name}!"; }
@@ -904,7 +910,7 @@ null
 - **A call with the wrong number of arguments** is an error, when the script compiles for a function the call names:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn } from "std:system";
   function f(a, b = 1) { return a + b; }
   writeLn(f(1, 2, 3));
   ```
@@ -917,7 +923,7 @@ null
   stack:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn } from "std:system";
   function factorial(n) { if (n <= 1) return 1; return n * factorial(n - 1); }
   writeLn(factorial(20));
   ```
@@ -932,7 +938,7 @@ A function's last parameter may be written `...name`: an array of the arguments 
 function takes any number of them.
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 function sum(label, ...numbers) {
   var total = 0;
   foreach (var n in numbers) total += n;
@@ -960,7 +966,7 @@ three: 6
 `...values` spreads what `foreach` visits in `values` into a call's arguments, or into a literal's elements:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 function sum(...numbers) {
   var total = 0;
   foreach (var n in numbers) total += n;
@@ -995,7 +1001,7 @@ and `(…) => …` an arrow function, the same thing written shorter: its body m
 single parameter needs no parentheses.
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var square = function (x) { return x * x; };
 var cube = x => x * x * x;
 var sum = (a, b) => a + b;
@@ -1023,7 +1029,7 @@ An arrow function whose body is a map needs parentheses, `() => ({ a: 1 })`, sin
 A function sees the variables around it, and keeps them alive: it captures the variable itself, not a copy of its value.
 
 ```javascript
-import { write, writeLn } from "std:io";
+import { write, writeLn } from "std:system";
 function counter() {
   var count = 0;
   return () => { count = count + 1; return count; };
@@ -1053,7 +1059,7 @@ block can be called before a variable it reads has been declared; reading that v
 ### Arrays
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var a = [10, 20, 30];
 writeLn(a[0]);
 a[1] = 25;
@@ -1084,7 +1090,7 @@ null
 ### Array methods
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var a = [3, 1, 2];
 writeLn([a.map(x => x * 10), a.filter(x => x > 1), a.reduce((sum, x) => sum + x, 0)]);
 writeLn([a.find(x => x > 1), a.any(x => x > 2), a.all(x => x > 2), a.indexOf(2), a.contains(5)]);
@@ -1116,7 +1122,7 @@ writeLn([a.removeAt(1), a]);
 ### Maps
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var tea = { name: "Sencha", price: 6.5 };
 writeLn(tea["name"]);
 tea["origin"] = "Japan";
@@ -1157,7 +1163,7 @@ seven
 ### Sets
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var s = #{"red", "green"};
 writeLn(s.add("blue"));
 writeLn(s.add("red"));
@@ -1180,10 +1186,13 @@ A set's values are what a map's keys may be, and their order is not defined.
 ### Bytes
 
 Bytes are binary data, distinct from strings: what a file or a request holds as it is, before it is read as text. Like a string,
-they are immutable.
+they are immutable. Their class, `Bytes`, and `BytesBuilder` are `std:bytes`'s, which a program imports to name them,
+`import { Bytes } from "std:bytes";`; bytes a module or a method gives, a hash of `std:crypto`'s among them, keep their
+members without the import.
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
+import { Bytes } from "std:bytes";
 var b = Bytes.from("héllo");
 writeLn(b);
 writeLn([b.length, b[0], b[1]]);
@@ -1217,7 +1226,8 @@ abcd
   for the URL-safe alphabet, padded or not, read them back; any other text is an error:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn } from "std:system";
+  import { Bytes } from "std:bytes";
   var key = Bytes.from([251, 255, 0]);
   writeLn([key.toHex(), key.toBase64(), key.toBase64(true)]);
   writeLn(Bytes.fromBase64("-_8A", true) == key);
@@ -1236,7 +1246,8 @@ abcd
   signature or a token compared with the one expected, so that the time the comparison takes gives nothing away:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn } from "std:system";
+  import { Bytes } from "std:bytes";
   writeLn(Bytes.fixedTimeEqual(Bytes.from("key"), Bytes.from("key")));
   writeLn(Bytes.fixedTimeEqual(Bytes.from("key"), Bytes.from("kez")));
   ```
@@ -1250,7 +1261,8 @@ abcd
   than the bytes built:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn } from "std:system";
+  import { Bytes, BytesBuilder } from "std:bytes";
   var builder = new BytesBuilder();
   builder.add("tea").add(32).add(Bytes.from("time"));
   writeLn(builder.length);
@@ -1270,7 +1282,7 @@ abcd
 `null`, so that a chain of them stops at the first `null`:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var rows = [{ name: "Ann" }];
 writeLn(rows?[0]?["name"]);
 writeLn(rows?[1]?["name"]);
@@ -1295,7 +1307,7 @@ Arrays, maps and sets are equal only to themselves: `[1] == [1]` is false. `writ
 ## 10. Classes
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 class Point {
   constructor(x, y) { this.x = x; this.y = y; }
   length() { return (this.x * this.x + this.y * this.y); }
@@ -1329,7 +1341,7 @@ true
 ### Inheritance
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 class Animal {
   constructor(name) { this.name = name; }
   speak() { return this.name + " makes a sound."; }
@@ -1361,7 +1373,7 @@ Dog {name: "Rex", tricks: []}
 ### Static members
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 class Counter {
   static var count = 0;
   constructor() { Counter.count = Counter.count + 1; }
@@ -1382,7 +1394,7 @@ instance too. `static const` declares one that cannot be assigned. A class's sta
 ### Properties
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 class Rect {
   constructor(w, h) { this.w = w; this.h = h; }
   property area { get { return this.w * this.h; } }
@@ -1410,7 +1422,7 @@ property's own. A property with only a `get` cannot be assigned, and one with on
 `x?.name` gives `null` when `x` is `null`, or has no member `name`:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 class Box { constructor(v) { this.value = v; } }
 var b = null;
 writeLn(b?.value);
@@ -1430,7 +1442,7 @@ null
 `Object`'s giving `==`, which a class may override with a meaning of its own:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 class Money {
   constructor(cents) { this.cents = cents; }
   equal(other) { return other is Money && other.cents == this.cents; }
@@ -1459,7 +1471,7 @@ interpolated string and `<%= %>` write such a value as they did, `$"{5}"` giving
 A class may say what an operator does with its instances, with a static method named `operator` and the operator:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 class Vec {
   constructor(x, y) { this.x = x; this.y = y; }
   static operator +(a, b) { return new Vec(a.x + b.x, a.y + b.y); }
@@ -1481,7 +1493,7 @@ Every value but `null` has a class: `Boolean`, `Integer`, `Number`, `String`, `A
 ones included:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 extend Integer {
   twice() { return this * 2; }
 }
@@ -1500,7 +1512,7 @@ A class may extend `Number`, `Integer`, `String` or `Boolean`, its instances the
 and comparisons use; and `Array`, `Map` or `Set`, its instances then being such a collection with methods of their own:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 class Celsius extends Number {
   toFahrenheit() { return this * 9 / 5 + 32; }
 }
@@ -1536,7 +1548,7 @@ an instance is written as its class, a colon and its value.
 `next()` give the items in turn:
 
 ```javascript
-import { write, writeLn } from "std:io";
+import { write, writeLn } from "std:system";
 class Countdown {
   constructor(from) { this.from = from; }
   iterate() { return new CountdownIterator(this.from); }
@@ -1559,7 +1571,7 @@ writeLn(" liftoff");
 A class can also be made, and given members, while a program runs:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var Point = new Class("Point");
 Point.setMethod("constructor", function (this, x) { this.x = x; });
 Point.setMethod("describe", function (this) { return $"Point at {this.x}"; });
@@ -1588,7 +1600,7 @@ true
 ## 11. Errors and exceptions
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 function divide(a, b) {
   if (b == 0) throw new Error("Cannot divide by zero.");
   return a / b;
@@ -1614,7 +1626,7 @@ Done.
 - **`throw;`** alone, in a `catch`, throws the caught exception again:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn } from "std:system";
   function risky() { throw new Error("deep"); }
   try {
     try { risky(); } catch (e) { writeLn("logging: " + e.message); throw; }
@@ -1634,7 +1646,7 @@ A `catch` may name the class it catches; a `try` may have several, the first tha
 a class, last, catching anything:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 class NotFound extends Error { }
 function find(key) { throw new NotFound($"No {key}."); }
 try {
@@ -1710,7 +1722,7 @@ An object that holds a resource, such as a file or a connection, releases it in 
 block ends, however it ends:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 class Resource {
   constructor(name) { this.name = name; writeLn("open " + name); }
   dispose() { writeLn("close " + this.name); }
@@ -1738,7 +1750,7 @@ close other
   block throws:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn } from "std:system";
   class Base { destructor() { writeLn("base cleaned up"); } }
   class Derived extends Base { dispose() { writeLn("derived cleaned up"); } }
   using (var d = new Derived()) {
@@ -1764,7 +1776,7 @@ An `async` function gives a task at once, and runs until its first `await`; `awa
 result, or throws its exception. While a task waits, others run.
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn, delay } from "std:system";
 async function fetchTea(name, ms) {
   await delay(ms);
   return name + " ready";
@@ -1789,7 +1801,7 @@ fast ready
 - **An `async` function starts at once**, running until its first `await`, as in C# and JavaScript:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn, delay } from "std:system";
   async function work(name) {
     writeLn(name + " starts");
     await delay(1);
@@ -1813,7 +1825,7 @@ fast ready
   fails with a `TimeoutError` when it takes longer:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn, delay } from "std:system";
   async function slow() { await delay(1000); return "late"; }
   try {
     writeLn(await Task.timeout(slow(), 10));
@@ -1831,7 +1843,7 @@ fast ready
   `t.forget()` says that a task's exception may go unreported:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn, delay } from "std:system";
   async function background() { await delay(5); throw new Error("ignored"); }
   background().forget();
   async function failing() { throw new Error("nobody awaited me"); }
@@ -1864,7 +1876,7 @@ export const unit = "cm";
 ```
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 import shapes from "lib/shapes.wl";
 import { area, Square } from "lib/shapes.wl";
 writeLn(area(new Square(3)));
@@ -1888,7 +1900,7 @@ cm
 - **`await Module.import(path)`** imports a module while the program runs, its path any string:
 
   ```javascript
-  import { writeLn } from "std:io";
+  import { writeLn } from "std:system";
   var shapes = await Module.import("lib/shapes.wl");
   writeLn(shapes.unit);
   ```
@@ -1909,7 +1921,7 @@ export function describe() { return $"size {size}"; }
 ```
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 import small from "lib/sized.wl" { size: 2 };
 import big from "lib/sized.wl" { size: 10 };
 writeLn(small.describe());
@@ -1931,7 +1943,7 @@ kind:
 ```javascript
 param name = "World";
 param times = "1";
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 var n = Integer.parse(times);
 for (var i = 0; i < n; i = i + 1) writeLn($"Hello, {name}!");
 ```
@@ -1949,33 +1961,34 @@ Hello, Ann!
 
 The standard library is a set of modules named `std:` and a name, imported as any module is. The WebLingo Standard
 Library Reference (`Documents/weblingo-standard-library-reference.md`) lists them, and every built-in class's members.
-A name a standard module exports, used without importing it, is WL2001, whose message names the module to import it
-from, and a name that differs from one in scope only by case names that one:
+Nothing of a standard module is in a program that does not import it: a program has, without an import, only what the
+language itself makes, the classes its literals and statements make or need (`Object`, `Boolean`, `Integer`, `Number`,
+`Decimal`, `String`, `Array`, `Map`, `Set`, `Function`, `Class`, `Task`, `Module`, `Iterator`, `Error` and the runtime
+errors' classes) and the constants `Infinity` and `NaN`. A kind of value is every program's exactly when the language's
+own syntax makes it, as literals make integers and strings; the classes of the others are their modules', `Bytes` and
+`BytesBuilder` `std:bytes`'s, `DateTime` `std:datetime`'s, `Regex` `std:regex`'s, `Json` `std:json`'s and `Html`
+`std:html`'s, and a value of their kinds keeps its members without the import, which only naming the class needs. A name
+a standard module exports, used without importing it, is WL2001, whose message names the module to import it from, and a
+name that differs from one in scope only by case names that one:
 
 ```text
 program.wl(1,10): error WL2001: 'Database' is not defined; did you mean Database, from std:db?
-program.wl(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn, from std:io?
+program.wl(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn, from std:system?
 ```
 
-### `std:io`
+### `std:system`
 
-Writing, `import { write, writeLn } from "std:io";`: a script that imports neither cannot write.
+Writing, and waiting: `import { write, writeLn, delay } from "std:system";`. A script that imports neither `write` nor
+`writeLn` cannot write.
 
 | Function | What it does |
 |---|---|
 | `write(value)` | writes a value's text, without a line break |
 | `writeLn(value)` | writes a value's text and a line break |
+| `delay(milliseconds)` | a task that completes after that time |
 
 `write` writes where its host says: the console under `weblingo`, a response's body in a page. A page's text and its
 `<%= %>` write without an import; a block of a page that calls `write` imports it, as any script does.
-
-### `std:system`
-
-Every file imports it implicitly, so its function is always in scope:
-
-| Function | What it does |
-|---|---|
-| `delay(milliseconds)` | a task that completes after that time |
 
 ### `std:tasks`
 
@@ -1986,7 +1999,7 @@ Every file imports it implicitly, so its function is always in scope:
 Files and folders:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 import fs from "std:fs";
 await fs.writeText("note.txt", "A cup of tea.");
 writeLn(await fs.readText("note.txt"));
@@ -2022,7 +2035,7 @@ relative path from the site's root, and a path outside them is a `FilePermission
 Other servers, reached by HTTP, `std:http`'s `get(url, headers)`, `post(url, body, headers)` and `request(method, url, body, headers)`, each a task of the response, a map of its `"status"`, `"headers"`, `"body"` and `"bytes"`, or by TCP, `std:net`'s `Socket.connect(host, port)`, with `read()`, `write(data)` and `dispose()`. Given a server on this machine, at port 8080, that has a file `menu.txt`:
 
 ```javascript
-import { write, writeLn } from "std:io";
+import { write, writeLn } from "std:system";
 import http from "std:http";
 var response = await http.get("http://localhost:8080/menu.txt");
 writeLn(response["status"]);
@@ -2042,7 +2055,7 @@ A script `weblingo` runs may reach any host, and a site's only those its `wasp.c
 Databases, one module for every database, the SQL passed on as it is. `Database.open(name)` opens one by a name the configuration gives, `{ "databases": { "fish": "sqlite:../data/fish.db" } }` in `weblingo.config` or a site's `wasp.config`, or by a connection string, its provider's name, a colon, and what the provider reads, SQLite's a file's path or `:memory:`; `query(sql, values)` gives an array of maps, a map for each row, `execute(sql, values)` the number of rows it changed, and `transaction(async () => { … })` commits what its function does, or rolls it back where it throws. A statement's values are a map, each named `@name` in its SQL, never written into its text:
 
 ```javascript
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 import { Database } from "std:db";
 using (var db = await Database.open("sqlite::memory:")) {
   await db.execute("CREATE TABLE Fish (Name TEXT, Price DECIMAL(10, 2))");

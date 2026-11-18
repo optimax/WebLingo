@@ -2,6 +2,9 @@
 // running, and a certificate, made and trusted. The COM objects a script makes are listed in weblingo.config, beside it.
 import com from "windows:com";
 import fs from "std:fs";
+import { delay } from "std:system";
+import { DateTime } from "std:datetime";
+import { Regex } from "std:regex";
 
 const shell = com.create("WScript.Shell");
 

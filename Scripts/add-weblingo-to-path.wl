@@ -7,7 +7,7 @@
 // folder=<folder> adds another. It may be run again: it does nothing then.
 param folder = "C:\\Program Files\\WebLingo";
 
-import { writeLn } from "std:io";
+import { writeLn } from "std:system";
 import com from "windows:com";
 import fs from "std:fs";
 import { requireAdministrator } from "./windows.wl";

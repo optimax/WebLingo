@@ -28,13 +28,13 @@ public sealed class PageTests
     [InlineData("<%- \"<b>bold</b>\" %>", "<b>bold</b>")]
     // null writes nothing, so that an optional read that finds nothing is blank; write(null) writes null.
     [InlineData("[<%= null %>][<%- null %>]", "[][]")]
-    [InlineData("<% import { write } from \"std:io\"; var p = null; %>[<%= p?.name %>]<% write(null); %>", "[]null")]
+    [InlineData("<% import { write } from \"std:system\"; var p = null; %>[<%= p?.name %>]<% write(null); %>", "[]null")]
     // <%# %> is nothing, and ends at the first %>.
     [InlineData("a<%# a \"note %>b", "ab")]
     // A statement may span several blocks, the text between them in its body.
     [InlineData("<% foreach (var p in [\"a\", \"b\"]) { %><li><%= p %></li><% } %>", "<li>a</li><li>b</li>")]
     [InlineData("<% if (1 > 2) { %>yes<% } else { %>no<% } %>", "no")]
-    [InlineData("a<% import { write } from \"std:io\"; write(\"b\"); %>c", "abc")]
+    [InlineData("a<% import { write } from \"std:system\"; write(\"b\"); %>c", "abc")]
     // A block's code is WebLingo's tokens: %> in a string or a comment does not end it.
     [InlineData("<% var end = \"%>\"; %><%= end %>", "%&gt;")]
     [InlineData("<% /* %> */ var x = 1; %><%= x %>", "1")]
@@ -207,7 +207,7 @@ public sealed class PageTests
     [InlineData("<% await renderComponent(\"/tree.wasp\", { n: 3 }); %>",
         "tree.wasp=<% param n; %><%= n %><% if (n > 0) { await renderComponent(\"tree.wasp\", { n: n - 1 }); } %>", "3210")]
     // A missing one is a runtime error, which a catch may catch.
-    [InlineData("<% import { write } from \"std:io\"; try { await renderComponent(\"/nope.wasp\"); } catch (e) { write(e.code); } %>", "", "WL5005")]
+    [InlineData("<% import { write } from \"std:system\"; try { await renderComponent(\"/nope.wasp\"); } catch (e) { write(e.code); } %>", "", "WL5005")]
     public void AComponentRendersWhereItIsCalled(string page, string templates, string written)
     {
         Assert.Equal(("", written, ""), Render(page, Templates(templates)));
@@ -249,7 +249,7 @@ public sealed class PageTests
         "l1.wasp=<% param title; %><% layout \"l2.wasp\", { t: title }; %><main><% renderBody(); %></main>|l2.wasp=<% param t; %><html><%= t %><% renderBody(); %></html>",
         "<html>T<main>body</main></html>")]
     // The body streams where the layout has it, waiting included.
-    [InlineData("<% layout \"/l.wasp\"; %>a<% await renderComponent(\"/c.wasp\"); %>b<% await delay(1); %>c", "l.wasp=[<% renderBody(); %>]|c.wasp=C",
+    [InlineData("<% import { delay } from \"std:system\"; layout \"/l.wasp\"; %>a<% await renderComponent(\"/c.wasp\"); %>b<% await delay(1); %>c", "l.wasp=[<% renderBody(); %>]|c.wasp=C",
         "[aCbc]")]
     public void ALayoutWrapsItsPage(string page, string templates, string written)
     {

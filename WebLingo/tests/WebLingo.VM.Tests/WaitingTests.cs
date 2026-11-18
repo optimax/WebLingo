@@ -16,7 +16,7 @@ public sealed class WaitingTests
     [Fact]
     public void AnExecutionWaitingForATimerReturnsAndGoesOnWhenResumed()
     {
-        const string program = "import { write, writeLn } from \"std:io\"; var t = delay(1000); writeLn(\"before\"); await t; writeLn(\"after\"); await delay(500); writeLn(\"end\");";
+        const string program = "import { write, writeLn, delay } from \"std:system\"; var t = delay(1000); writeLn(\"before\"); await t; writeLn(\"after\"); await delay(500); writeLn(\"end\");";
         foreach (var stack in new[] { false, true })
         {
             var clock = new ManualClock();
@@ -38,7 +38,7 @@ public sealed class WaitingTests
     [Fact]
     public void AnExecutionWaitingForWorkOffItsWorkerReturnsUntilTheWorkIsPosted()
     {
-        const string program = "import { write, writeLn } from \"std:io\"; writeLn(await offWorker(20)); writeLn(await offWorker(22));";
+        const string program = "import { write, writeLn } from \"std:system\"; writeLn(await offWorker(20)); writeLn(await offWorker(22));";
         foreach (var stack in new[] { false, true })
         {
             var host = new QueuedHost();
@@ -66,7 +66,7 @@ public sealed class WaitingTests
             var clock = new ManualClock();
             var output = new WebLingoCollectedOutput();
             var context = Context(output, clock, null) with { Suspends = false };
-            var result = Vm(stack).Execute(Compile("import { write, writeLn } from \"std:io\"; await delay(1000); writeLn(\"after\");", stack), context);
+            var result = Vm(stack).Execute(Compile("import { write, writeLn, delay } from \"std:system\"; await delay(1000); writeLn(\"after\");", stack), context);
             Assert.True(result.Succeeded, result.Error?.Message);
             Assert.Equal((1, "after\n"), (clock.Waits, output.Text));
         }
@@ -80,7 +80,7 @@ public sealed class WaitingTests
             var cancellation = new WebLingoCancellationSignal();
             var vm = Vm(stack);
             var context = Context(new WebLingoCollectedOutput(), new ManualClock(), null) with { Cancellation = cancellation };
-            Assert.True(vm.Execute(Compile("await delay(1000);", stack), context).Waiting);
+            Assert.True(vm.Execute(Compile("import { delay } from \"std:system\"; await delay(1000);", stack), context).Waiting);
             cancellation.Cancel();
             var result = vm.Resume();
             Assert.Equal("WL3004", result.Error?.Code);

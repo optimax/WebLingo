@@ -2,10 +2,12 @@ namespace WebLingo.Compiler;
 
 /// <summary>
 /// The standard modules the compiler makes itself (specification, section 3.9), any other <c>std:</c> module being a
-/// native one: <c>std:system</c>, the host's built-ins, which every program imports implicitly, for now; those that export
-/// built-in classes, <c>std:json</c>'s <c>Json</c> and <c>std:html</c>'s <c>Html</c>; and those that export host's
-/// built-ins, <c>std:io</c>'s <c>write</c> and <c>writeLn</c>; each of which a program has only by importing it (the owner's
-/// decision, 18 November 2026; section 9, "M0.20 parts", parts 2 and 3).
+/// native one: those that export built-in classes, <c>std:json</c>'s <c>Json</c>, <c>std:html</c>'s <c>Html</c>,
+/// <c>std:bytes</c>'s <c>Bytes</c> and <c>BytesBuilder</c>, <c>std:datetime</c>'s <c>DateTime</c> and <c>std:regex</c>'s
+/// <c>Regex</c>, a value of those kinds keeping its members without an import; and <c>std:system</c>, which exports the
+/// host's built-ins, those its implementation gives, another implementation being free to give others, <c>write</c>,
+/// <c>writeLn</c> and <c>delay</c> among them; each standard name of which a program has only by importing it (the owner's
+/// decisions, 18 November 2026; section 9, "M0.20 parts", parts 2 to 4).
 /// </summary>
 public static class WebLingoStandardModules
 {
@@ -18,17 +20,23 @@ public static class WebLingoStandardModules
         {
             ["std:json"] = ["Json"],
             ["std:html"] = ["Html"],
+            ["std:bytes"] = ["Bytes", "BytesBuilder"],
+            ["std:datetime"] = ["DateTime"],
+            ["std:regex"] = ["Regex"],
         };
 
-    /// <summary>Each module that exports host's built-ins, and the built-ins it exports, by name, those the host gives.</summary>
+    /// <summary>
+    /// Each module that exports host's built-ins, and the standard names among them, which a program has only by importing
+    /// them; <c>std:system</c> exports the others its implementation gives too, which every program sees.
+    /// </summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<string>> Functions { get; } =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
-            ["std:io"] = ["write", "writeLn"],
+            [System] = ["write", "writeLn", "delay"],
         };
 
     /// <summary>Whether <paramref name="path"/> names a standard module the compiler makes itself.</summary>
-    public static bool IsCompilerMade(string path) => path == System || Classes.ContainsKey(path) || Functions.ContainsKey(path);
+    public static bool IsCompilerMade(string path) => Classes.ContainsKey(path) || Functions.ContainsKey(path);
 
     /// <summary>Whether a built-in class is a standard module's export, which a program has only by importing it.</summary>
     public static bool IsImported(string className) => Exports(Classes, className);

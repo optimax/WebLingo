@@ -12,7 +12,7 @@
 param source = "..\\WebLingo\\publish\\WebLingo";
 param target = "C:\\Program Files\\WebLingo";
 
-import { writeLn } from "std:io";
+import { writeLn, delay } from "std:system";
 import com from "windows:com";
 import fs from "std:fs";
 import { requireAdministrator, runningFrom } from "./windows.wl";

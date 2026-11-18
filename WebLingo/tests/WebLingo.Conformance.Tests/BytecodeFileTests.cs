@@ -54,7 +54,7 @@ public sealed class BytecodeFileTests
     public void AChangedFileIsRefusedOrRunsWithoutCrashing()
     {
         const string source = """
-            import { write, writeLn } from "std:io";
+            import { write, writeLn } from "std:system";
             class Shape { constructor(n) { this.n = n; } area() { return this.n * 2; } }
             class Square extends Shape { area() { return super.area() + 1; } }
             function make(k) { var total = 0; return function(x) { total = total + x * k; return total; }; }

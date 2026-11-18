@@ -55,7 +55,7 @@ public sealed class AspNetCoreTests : IDisposable
     public async Task AWorkerRunsOtherRequestsWhileOneWaits()
     {
         // One worker: the request that waits for its timer lets the other run, and end, first.
-        Write("slow.wasp", "<% await delay(400); %>slow");
+        Write("slow.wasp", "<% import { delay } from \"std:system\"; await delay(400); %>slow");
         Write("quick.wasp", "quick");
         using var one = new WebLingoWorkerPool(1);
         var application = Load(workers: 1);
@@ -75,7 +75,7 @@ public sealed class AspNetCoreTests : IDisposable
     [Fact]
     public async Task ARequestThatWaitsEndsWhenItsClientGoes()
     {
-        Write("forever.wasp", "<% await delay(60000); %>never");
+        Write("forever.wasp", "<% import { delay } from \"std:system\"; await delay(60000); %>never");
         using var gone = new CancellationTokenSource();
         var context = new DefaultHttpContext { RequestAborted = gone.Token };
         context.Request.Method = "GET";

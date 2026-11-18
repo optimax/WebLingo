@@ -32,7 +32,7 @@ public sealed class StreamingTests
     {
         var response = new RecordingResponse();
         var app = Load(new MemoryFileSystem().Add("/site/index.wasp",
-            "<% param response; import { writeLn } from \"std:io\"; response.headers[\"Content-Type\"] = \"text/plain\"; %>" + Page(100, "<% writeLn(response.status); %>")));
+            "<% param response; import { writeLn } from \"std:system\"; response.headers[\"Content-Type\"] = \"text/plain\"; %>" + Page(100, "<% writeLn(response.status); %>")));
         app.Handle(new WebLingoBufferedRequest("GET", "/"), response, new WebLingoWorkerId(0));
         // Committed once 64 KB were written, then sent 16 KB at a time, the rest once the page has run.
         Assert.Equal([64 * 1024, 16 * 1024, 16 * 1024, 4 * 1024 + 4], response.Writes);
@@ -96,7 +96,7 @@ public sealed class StreamingTests
     {
         // A page's writers, and a handler's write, wait once the response is full, its worker free meanwhile.
         var files = new MemoryFileSystem()
-            .Add("/site/api/rows.wl", "import { write, writeLn } from \"std:io\"; export async function get(request, response) {\n  var i = 0;\n  while (i < 70) { write(\"" + new string('x', 1024)
+            .Add("/site/api/rows.wl", "import { write, writeLn } from \"std:system\"; export async function get(request, response) {\n  var i = 0;\n  while (i < 70) { write(\"" + new string('x', 1024)
                                       + "\"); i = i + 1; }\n  write(\"end\");\n}");
         if (page is not null) files.Add("/site/index.wasp", page + Page(70, "end"));
         var response = new RecordingResponse { FullAfter = 1 };

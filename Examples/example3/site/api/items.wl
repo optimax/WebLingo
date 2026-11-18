@@ -1,6 +1,6 @@
 // /api/items: the items as JSON, those still to do; ?show=done or ?show=all, and ?list=2 for one list's.
 
-import { write } from "std:io";
+import { write } from "std:system";
 import { Json } from "std:json";
 import { items, showOf, idOf } from "/lib/todo.wl";
 
