@@ -94,6 +94,16 @@ public sealed class DatabaseTests : IDisposable
     }
 
     [Fact]
+    public void AnErrorInTransactionAfterItHasAwaitedIsReportedWhereItWasCalled()
+    {
+        // transaction, written in WebLingo, calls what it is given once its transaction has begun, after an await, with no
+        // caller below it: the error is the call's, on line 6, not a place its own source's positions name (section 3.9).
+        var (exit, _, error) = Weblingo(Setup + "\n\n\n\n\nawait db.transaction(5);\n");
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
+        Assert.StartsWith("program.wl(6,7): error WL2005:", error);
+    }
+
+    [Fact]
     public void AScriptOpensADatabaseByItsConnectionString()
     {
         // :memory: is a database in memory; SQLite's own connection string opens a file read-only. The process's current

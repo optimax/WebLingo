@@ -169,6 +169,15 @@ public sealed class PageTests
     }
 
     [Fact]
+    public void ARuntimeErrorInABuiltinCalledInATemplateIsReportedInIt()
+    {
+        // Iterator's next() is written in WebLingo, its positions its own source's, which would name the page.
+        var (_, written, error) = Render("<p>\n<% include \"/h.wasp\"; %>", Templates("h.wasp=before\n<% var it = [].iterate(); it.next(); %>"));
+        Assert.Equal("<p>\nbefore\n", written);
+        Assert.StartsWith("WL3005 at h.wasp 2,27:", error);
+    }
+
+    [Fact]
     public void IncludesNestAtMost64Deep()
     {
         var chain = new List<string>();

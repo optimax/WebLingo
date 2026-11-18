@@ -148,6 +148,29 @@ public sealed class RequestAndResponseTests
     }
 
     [Fact]
+    public void APageOrAHandlerIsRoutedOnlyByANamePortableFilesHave()
+    {
+        // A file's name on Linux may hold \, : and line breaks, which no portable name has, and which an include or an
+        // import cannot name: a page or a handler named so is not routed, a 404, where it was a route that always failed,
+        // a 500. A name with " and %> is one, the handler's page naming it in a string literal as it is; any other file
+        // named so is sent as it is.
+        var app = Load(new MemoryFileSystem()
+            .Add("/site/api/tea\\notes.wl", "export function get(request, response) { write(\"notes\"); }")
+            .Add("/site/api/two\nlines.wl", "export function get(request, response) { write(\"lines\"); }")
+            .Add("/site/tea:time.wasp", "<p>tea</p>")
+            .Add("/site/back\\slash/index.wasp", "<p>index</p>")
+            .Add("/site/api/say \"hi\" %>.wl", "export function get(request, response) { write(\"quoted\"); }")
+            .Add("/site/css/odd\\name.css", "p { }"));
+        Assert.Equal(404, Get(app, "GET", "/api/tea\\notes").Status);
+        Assert.Equal(404, Get(app, "GET", "/api/two\nlines").Status);
+        Assert.Equal(404, Get(app, "GET", "/tea:time").Status);
+        Assert.Equal(404, Get(app, "GET", "/back\\slash/").Status);
+        Assert.Equal((200, "quoted"), Get(app, "GET", "/api/say \"hi\" %>"));
+        var response = new WebLingoBufferedResponse();
+        Assert.Equal(WebLingoRequestOutcomeKind.File, app.Handle(new WebLingoBufferedRequest("GET", "/css/odd\\name.css"), response, new WebLingoWorkerId(0)).Kind);
+    }
+
+    [Fact]
     public void AHandlerThatFailsIsA500_ItsErrorsInItsFile()
     {
         var app = Load(new MemoryFileSystem()

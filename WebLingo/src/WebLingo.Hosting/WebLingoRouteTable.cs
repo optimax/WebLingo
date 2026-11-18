@@ -93,6 +93,9 @@ public sealed class WebLingoRouteTable
                 _routes.TryAdd("/" + file, new WebLingoRoute(WebLingoRouteKind.File, file));
                 continue;
             }
+            // A page or a handler is compiled from its name, which its includes and imports are found from: one whose name no
+            // portable file has (WebLingoSiteFiles.Normalize: \, : or a control character, as on Linux) could never be.
+            if (WebLingoSiteFiles.Normalize(file) is null) continue;
             var stem = name[..dot];
             var path = "/" + (folder.Length == 0 ? "" : folder + "/") + (stem == "index" ? "" : stem);
             var route = new WebLingoRoute(extension == ".wasp" ? WebLingoRouteKind.Page : WebLingoRouteKind.Handler, file);

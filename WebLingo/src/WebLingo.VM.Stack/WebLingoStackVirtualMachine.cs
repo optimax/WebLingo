@@ -191,6 +191,11 @@ public sealed class WebLingoStackVirtualMachine
         public bool Holds;
         public WebLingoRuntimeError? HeldError;
         public long HeldOrigin;
+        /// <summary>
+        /// For a native function's frame (section 3.9): where the program called it, set when its first run ends, at which an
+        /// error it raises once the scheduler has resumed it, with no caller below it, is reported.
+        /// </summary>
+        public long CalledFrom = WebLingoExceptions.Nowhere;
         /// <summary>For a toString() that a text being built waits for: that text (section 3.7).</summary>
         public TextCall? Text;
         /// <summary>
@@ -1240,7 +1245,7 @@ public sealed class WebLingoStackVirtualMachine
                 asyncGave:
                     // An async function's first run has ended, at its first await, its return or its exception: its call
                     // gives its task, to where the call's result goes, or to the text whose toString() it is.
-                    _text = Gave(frame, frames[depth - 1]);
+                    _text = Gave(frame, frames, depth);
                     frame = frames[--depth];
                     code = frame.Code;
                     slots = frame.Slots;
@@ -2224,8 +2229,10 @@ public sealed class WebLingoStackVirtualMachine
         /// An async function's first run has ended: its call gives its task (<see cref="_returned"/>) to its caller, or,
         /// for a toString() a text waits for, to that text, which this gives.
         /// </summary>
-        private TextCall? Gave(Frame frame, Frame caller)
+        private TextCall? Gave(Frame frame, Frame[] frames, int depth)
         {
+            var caller = frames[depth - 1];
+            if (frame.Function.IsNative) frame.CalledFrom = RaisedAt(frames, depth - 1, caller.Pc - 1);
             frame.FirstRun = false;
             var text = frame.Text;
             frame.Text = null;
@@ -2289,7 +2296,11 @@ public sealed class WebLingoStackVirtualMachine
                     frame.AwaitDiscards = false;
                     if (resumption.Throws) (_thrown, _thrownError, _origin) = (resumption.Value, resumption.Error, resumption.Origin);
                     // A timeout's error, which no instruction raised, is thrown from the await it reaches (section 3.8).
-                    if (resumption.Throws && _origin == WebLingoExceptions.Nowhere) _origin = OriginOf(frame.Function, frame.Pc - 1);
+                    if (resumption.Throws && _origin == WebLingoExceptions.Nowhere)
+                    {
+                        _origin = frame.Function.IsNative && frame.CalledFrom != WebLingoExceptions.Nowhere ? frame.CalledFrom
+                            : OriginOf(frame.Function, frame.Pc - 1);
+                    }
                     else if (!discards) frame.Slots[frame.Sp++] = resumption.Value;
                     return true;
                 }
@@ -2484,6 +2495,8 @@ public sealed class WebLingoStackVirtualMachine
         private long RaisedAt(Frame[] frames, int depth, int pc)
         {
             while (depth > 0 && frames[depth].Function.IsNative) pc = frames[--depth].Pc - 1;
+            // A native function the scheduler resumed has no caller below it: where it was called.
+            if (depth == 0 && frames[0].Function.IsNative && frames[0].CalledFrom != WebLingoExceptions.Nowhere) return frames[0].CalledFrom;
             return OriginOf(frames[depth].Function, pc);
         }
 

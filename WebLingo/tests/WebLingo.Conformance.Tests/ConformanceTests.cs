@@ -993,6 +993,30 @@ public sealed class ConformanceTests : IDisposable
         Assert.Equal("program.wl(2,5): error WL3008:", FirstLineStart(error));
     }
 
+    [Theory]
+    // A built-in written in WebLingo raises it where the program called it (section 3.9), on line 13, below twelve lines
+    // that its own source's positions would name: a built-in class's method and constructor, and an array method's own
+    // error after it has awaited, its call no longer on the stack.
+    [InlineData("var it = [].iterate(); it.next();", "WL3005", 24)]
+    [InlineData("var b = new BytesBuilder().add(true);", "WL3001", 9)]
+    [InlineData("class I extends Integer {} var i = new I(\"x\");", "WL3001", 36)]
+    [InlineData("class R extends Regex {} var r = new R(\"(\");", "WL3001", 34)]
+    [InlineData("var kept = await [1, 2].filter(async (x) => 5);", "WL3001", 18)]
+    public void AnErrorInABuiltinWrittenInWebLingoIsReportedWhereItWasCalled(string call, string code, int column)
+    {
+        var source = string.Concat(Enumerable.Repeat("// A line its source's positions would otherwise name.\n", 12)) + call + "\n// The end.\n";
+        var (exit, _, error) = Weblingo("run", source);
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, $"program.wl(13,{column}): error {code}:"), (exit, FirstLineStart(error)));
+
+        // On the stack VM, from a .wlbc, where the file's own positions locate it.
+        var program = Path.Combine(_folder, "program.wl");
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
+        var stackError = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed,
+            WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], new StringWriter(), stackError));
+        Assert.Equal($"program.wl(13,{column}): error {code}:", FirstLineStart(stackError.ToString().Replace(program, "program.wl", StringComparison.Ordinal)));
+    }
+
     [Fact]
     public void SignedInt64OverflowIsARuntimeError()
     {

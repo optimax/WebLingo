@@ -128,6 +128,7 @@ Some files are never sent, whatever their path:
 - a page's source, and a module's, a `.wl` that exports no handler (`/lib/catalog.wl` is a 404);
 - compiled WebLingo, `.wlbc` files;
 - the site's configuration, `wasp.config`, and IIS's, `web.config`;
+- a page or a route handler whose name holds `\`, `:` or a control character, which a file's name on Windows cannot have, and whose includes and imports could not be found;
 - every file and folder whose name starts with `.`, such as `.git`.
 
 A typical site:

@@ -1845,16 +1845,14 @@ public sealed class WebLingoBinder
         {
             if (builtin == name) return declaration.Local; // UseError() makes every runtime error's class.
         }
-        // Json's and Html's functions are native, so that an error in stringify, or in Html.js, is reported where it was
-        // called (sections 3.6 and 13).
-        var outer = _nativeCallees;
-        if (name is "Json" or "Html") _nativeCallees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
-        var made = BindBuiltinClass(name, WebLingoPrelude.Source(name), baseLocal, inPrelude: true);
-        _nativeCallees = outer;
-        return made;
+        return BindBuiltinClass(name, WebLingoPrelude.Source(name), baseLocal, inPrelude: true);
     }
 
-    /// <summary>Binds a built-in class from its source, extending <paramref name="baseLocal"/>, or nothing if null.</summary>
+    /// <summary>
+    /// Binds a built-in class from its source, extending <paramref name="baseLocal"/>, or nothing if null. Its functions
+    /// are native, so that the VMs report an error raised in one where the program called it (section 3.9): its positions
+    /// are its source's, which is no file of the program's, and would name some other place in the caller's file.
+    /// </summary>
     private WebLingoLocalSymbol BindBuiltinClass(string name, string source, WebLingoLocalSymbol? baseLocal, bool inPrelude = false)
     {
         var tree = new WebLingoParser(source, name).ParseCompilationUnit();
@@ -1866,7 +1864,11 @@ public sealed class WebLingoBinder
                 throw new InvalidOperationException($"The built-in class {name}'s source does not parse: {diagnostic.Message}");
             }
         }
-        return BindBuiltinClass(name, (WebLingoClassDeclarationSyntax)tree.Root.Statements[0], baseLocal, inPrelude);
+        var outer = _nativeCallees;
+        _nativeCallees ??= new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
+        var made = BindBuiltinClass(name, (WebLingoClassDeclarationSyntax)tree.Root.Statements[0], baseLocal, inPrelude);
+        _nativeCallees = outer;
+        return made;
     }
 
     /// <summary>
@@ -2012,15 +2014,13 @@ public sealed class WebLingoBinder
     /// <summary>
     /// The class that spreads values (section 3.5), written in WebLingo, under a name no program can write: its static
     /// <c>array</c>, <c>set</c> and <c>map</c> visit each of their parts as <c>foreach</c> does, a map's as its entries,
-    /// into a new collection. Its functions are native, so that an error in one is reported where the spread is.
+    /// into a new collection. Its functions are native, as every built-in class's are, so that an error in one is reported
+    /// where the spread is.
     /// </summary>
     private WebLingoLocalSymbol UseSpread()
     {
         if (_spread is not null) return _spread;
-        var outer = _nativeCallees;
-        _nativeCallees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
         _spread = BindBuiltinClass("spread:Spread", SpreadSource, UseObject());
-        _nativeCallees = outer;
         return _spread;
     }
 
