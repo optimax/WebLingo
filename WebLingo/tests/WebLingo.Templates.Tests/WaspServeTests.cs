@@ -279,6 +279,19 @@ public sealed class WaspServeTests : IDisposable
     }
 
     [Fact]
+    public void UnderIisTheSiteIsTheFolderTheModuleStartsWaspIn()
+    {
+        // Out of process, as a site's web.config runs wasp, IIS's ASP.NET Core Module gives the application's id as its
+        // ASPNETCORE_IIS_PHYSICAL_PATH, and starts wasp in the site's folder (found 18 November 2026): the folder it starts in,
+        // as when the variable is not set; a folder's full path, as in process, that folder.
+        Assert.Equal(_root, WebLingoWaspServer.SiteFolder("/LM/W3SVC/2/ROOT", _root));
+        Assert.Equal(_root, WebLingoWaspServer.SiteFolder(null, _root));
+        Assert.Equal(_root, WebLingoWaspServer.SiteFolder("site", _root));
+        var other = Path.GetTempPath();
+        Assert.Equal(other, WebLingoWaspServer.SiteFolder(other, _root));
+    }
+
+    [Fact]
     public void TheConfigurationNamesTheMode()
     {
         // A site's configuration is wasp.config (the owner's decision, 16 November 2026); its weblingo.config is not read.

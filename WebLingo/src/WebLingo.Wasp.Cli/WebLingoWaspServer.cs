@@ -27,6 +27,18 @@ public static class WebLingoWaspServer
         Environment.GetEnvironmentVariable("ASPNETCORE_PORT") is not null || Environment.GetEnvironmentVariable("ASPNETCORE_IIS_PHYSICAL_PATH") is not null;
 
     /// <summary>
+    /// The site's folder, which an application's root is from: the ASP.NET Core Module's
+    /// <c>ASPNETCORE_IIS_PHYSICAL_PATH</c>, <paramref name="physicalPath"/>, where it is a folder's full path; else
+    /// <paramref name="currentFolder"/>, the folder the module starts <c>wasp</c> in, the site's, or, locally, the current
+    /// one. Out of process, as a site's <c>web.config</c> runs <c>wasp</c>, the module gives the application's id there,
+    /// <c>/LM/W3SVC/2/ROOT</c>, not its folder (found 18 November 2026, under IIS 10 with .NET 10's Hosting Bundle).
+    /// </summary>
+    public static string SiteFolder(string? physicalPath, string currentFolder) =>
+        physicalPath is not null && Path.IsPathFullyQualified(physicalPath) && Directory.Exists(physicalPath)
+            ? physicalPath
+            : currentFolder;
+
+    /// <summary>
     /// The server for the application at <paramref name="root"/>, a folder from the current one, or, under IIS, from the
     /// site's; on <paramref name="port"/> (0 for one the system chooses) on the local machine only, unless under IIS; null,
     /// with why, if the application cannot be loaded. It reloads the application when its files change (section 6.5),
@@ -35,7 +47,7 @@ public static class WebLingoWaspServer
     public static WebApplication? Create(string? root, int port, IReadOnlyDictionary<string, string> givenSchemes, out string? error,
         out WebLingoMode mode, TextWriter? log = null)
     {
-        var site = Environment.GetEnvironmentVariable("ASPNETCORE_IIS_PHYSICAL_PATH") ?? Directory.GetCurrentDirectory();
+        var site = SiteFolder(Environment.GetEnvironmentVariable("ASPNETCORE_IIS_PHYSICAL_PATH"), Directory.GetCurrentDirectory());
         var full = Path.GetFullPath(Path.Combine(site, root ?? "."));
         var application = Load(full, givenSchemes, UnderIis ? WebLingoMode.Production : WebLingoMode.Development, log, out var workers,
             out mode, out error);

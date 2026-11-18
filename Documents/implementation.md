@@ -296,6 +296,10 @@ Referencing a project does not load its assembly: .NET loads it when it first co
 
 A program's static imports run, each awaited, before its top level's statements (specification, section 3.9), and a page's layout is one of them, which runs the page's body (`renderBody()`) while it is imported: so whatever the compiler makes for a program must be made before its imports, or an imported file's top level and a page's body under a layout run without it. The built-in classes are made first, and so are the built-ins the compiler writes in WebLingo for a program, a native function's optional parameters and the methods of arrays that take a function (`WebLingoBoundProgram.MadeFirst`, which `WebLingoLowerer.LowerBlock` makes after the built-in classes and before the imports); until 17 November 2026 they were made after them, so that `find` in a page's body under a layout was WL3006, and `fs.readText(path)` WL2004.
 
+### Out of Process, IIS's Physical Path Is the Application's Id
+
+IIS's ASP.NET Core Module gives the process it starts `ASPNETCORE_IIS_PHYSICAL_PATH`, which in process is the site's folder, but out of process, as a site's `web.config` runs `wasp`, the application's id in IIS's configuration, `/LM/W3SVC/2/ROOT`; it starts the process in the site's folder. So `wasp serve` takes the site's folder from the variable only where it names a folder, and from the folder it was started in otherwise (`WebLingoWaspServer.SiteFolder`); until 18 November 2026 it took the variable as it was, so that under IIS every request was a 502, the application's root `C:\LM\W3SVC\2\ROOT` not being a folder (IIS 10, .NET 10's Hosting Bundle). The module's error, 0x8027025b at its `PostStartCheck`, says only that the process stopped: `wasp`'s own output, with the site's `web.config`'s `stdoutLogEnabled` true, says why.
+
 ### SQLite Keeps a Database's File Open
 
 Microsoft.Data.Sqlite pools connections, so that a database's file stays open after its connection is closed, and Windows will not delete it: a test that removes a database's folder calls `SqliteConnection.ClearAllPools()` first (`DatabaseTests`, `WaspServeTests`).
