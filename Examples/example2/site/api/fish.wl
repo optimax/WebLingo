@@ -1,5 +1,6 @@
 // /api/fish: the catalogue as JSON, ?water=marine for one water's fish.
 
+import { Json } from "std:json";
 import { catalogue, waterOf } from "/lib/store.wl";
 
 export async function get(request, response) {

@@ -646,6 +646,7 @@ true
 ### JSON
 
 ```javascript
+import { Json } from "std:json";
 var order = Json.parse("{\"tea\": \"Sencha\", \"cups\": 2, \"price\": 6.5, \"extras\": [\"milk\"]}");
 writeLn([order["tea"], order["cups"] is Integer, order["price"] is Number, order["extras"][0]]);
 writeLn(Json.stringify({ tea: "Assam", cups: 1, paid: true, note: null }));
@@ -672,6 +673,7 @@ writeLn(Json.stringify({ list: [1, 2] }, 2));
 }
 ```
 
+- **`Json`** is `std:json`'s class, which a program has by importing it, as above.
 - **`Json.parse(text)`** gives a map for an object, an array for an array, and strings, `true`, `false` and `null`;
   a number is an integer when it has no fraction or exponent and fits 64 bits, else a number. Text that is not JSON
   is an error, which names where.

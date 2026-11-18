@@ -40,7 +40,7 @@ public sealed class NetworkTests : IDisposable
         "[200, \"POST /echo x-test= héllo\", 25]")]
     [InlineData("var r = await http.request(\"put\", \"URL/echo\", Bytes.from(\"hi\")); writeLn(r[\"body\"]);", "PUT /echo x-test= hi")]
     [InlineData("var r = await http.get(\"URL/moved\"); writeLn([r[\"status\"], r[\"headers\"][\"location\"]]);", "[302, \"http://elsewhere.test/\"]")]
-    [InlineData("var r = await http.get(\"URL/json\"); writeLn(Json.parse(r[\"body\"])[\"tea\"]);", "Sencha")]
+    [InlineData("import { Json } from \"std:json\"; var r = await http.get(\"URL/json\"); writeLn(Json.parse(r[\"body\"])[\"tea\"]);", "Sencha")]
     [InlineData("var all = await Task.all([http.get(\"URL/echo\"), http.get(\"URL/json\")]); writeLn([all[0][\"status\"], all[1][\"status\"]]);",
         "[200, 200]")]
     public void HttpRequestsGiveTheResponse(string source, string printed)

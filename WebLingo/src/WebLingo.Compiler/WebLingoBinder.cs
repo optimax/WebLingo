@@ -164,6 +164,15 @@ public sealed class WebLingoBinder
         for (var i = 1; i < modules.Count; i++)
         {
             var module = modules[i];
+            if (module.IsStandard && WebLingoStandardModules.Classes.TryGetValue(module.Name, out var moduleClasses))
+            {
+                // std:json and std:html: the built-in classes it exports, made where the program begins, as every built-in
+                // class is, which a program has only by importing them (section 3.9, the owner's decision, 18 November 2026).
+                var classesExported = new List<(string, WebLingoLocalSymbol)>();
+                foreach (var moduleClass in moduleClasses) classesExported.Add((moduleClass, UseBuiltinClass(moduleClass)));
+                units.Add(new WebLingoBoundUnit(module.Name, null, classesExported, DeclareHidden(module.Name, default)) { Builtins = [] });
+                continue;
+            }
             if (module.IsStandard)
             {
                 // std:system: the host's built-ins, its exports, made where the program begins (section 3.9).
@@ -1502,28 +1511,38 @@ public sealed class WebLingoBinder
         }
         string? byCase = null;
         _standardModules ??= _native?.StandardModules() ?? [];
+        var modules = new List<(string Name, List<string> Exports)>();
+        foreach (var (module, classes) in WebLingoStandardModules.Classes) modules.Add((module, new List<string>(classes)));
         foreach (var module in _standardModules)
         {
             var exports = new List<string>();
             foreach (var export in module.Exports) exports.Add(export.Name);
             foreach (var nativeClass in module.Classes) exports.Add(nativeClass.Name);
+            modules.Add((module.Name, exports));
+        }
+        foreach (var (module, exports) in modules)
+        {
             foreach (var export in exports)
             {
-                if (export == name) return $"; did you mean {export}, from {module.Name}?";
-                if (byCase is null && IsCaseOf(export, name)) byCase = $"; did you mean {export}, from {module.Name}?";
+                if (export == name) return $"; did you mean {export}, from {module}?";
+                if (byCase is null && IsCaseOf(export, name)) byCase = $"; did you mean {export}, from {module}?";
             }
         }
         return byCase ?? "";
     }
 
     /// <summary>
-    /// The names every program has without declaring them: the built-in classes', and the host's built-ins'. A list, not an
-    /// iterator, whose state machine reads <c>System.Environment</c>, which the portable core does not (<c>PortabilityTests</c>).
+    /// The names every program has without declaring them: the built-in classes', but a standard module's, and the host's
+    /// built-ins'. A list, not an iterator, whose state machine reads <c>System.Environment</c>, which the portable core
+    /// does not (<c>PortabilityTests</c>).
     /// </summary>
     private List<string> EveryProgramsNames()
     {
         var names = new List<string> { "Object", "Error" };
-        foreach (var (valueClass, _) in WebLingoPrelude.ValueClasses) names.Add(valueClass);
+        foreach (var (valueClass, _) in WebLingoPrelude.ValueClasses)
+        {
+            if (!WebLingoStandardModules.IsImported(valueClass)) names.Add(valueClass);
+        }
         foreach (var (errorClass, _) in WebLingoPrelude.ErrorClasses) names.Add(errorClass);
         names.AddRange(_hostBuiltins.Keys);
         return names;
@@ -1881,7 +1900,10 @@ public sealed class WebLingoBinder
             "Object" => UseObject(),
             "Error" => UseError(),
             WebLingoParser.InterpolationText => UseInterpolationText(),
-            _ when WebLingoPrelude.IsValueClass(name) || WebLingoPrelude.IsErrorClass(name) => UseBuiltinClass(name),
+            // A standard module's class, Json's and Html's, only by its import, but in the built-in classes' own sources.
+            _ when WebLingoPrelude.IsValueClass(name) && (_inPrelude || !WebLingoStandardModules.IsImported(name))
+                => UseBuiltinClass(name),
+            _ when WebLingoPrelude.IsErrorClass(name) => UseBuiltinClass(name),
             _ => null
         };
     }

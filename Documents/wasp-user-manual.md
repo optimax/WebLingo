@@ -310,7 +310,8 @@ page.wasp(6,1): error WL5008: An 'if' without an 'else' and its branches end in 
 ### What WASP cannot tell
 
 Where WASP cannot tell what an attribute holds, such as a library's own attributes (`hx-get`, `x-data`), escape the
-value yourself with the built-in class `Html`, whose text is then escaped again for where it stands, as any string is:
+value yourself with the class `Html`, which a page imports, `<% import { Html } from "std:html"; %>`, whose text is then
+escaped again for where it stands, as any string is:
 
 | Member | What it gives |
 |---|---|
@@ -322,11 +323,12 @@ value yourself with the built-in class `Html`, whose text is then escaped again 
 | `Html.css(x)` | `x`'s text, or `zWebLingoz` if it could change what a style means |
 
 ```html
+<% import { Html } from "std:html"; %>
 <div hx-get="<%= Html.url(link) %>"></div>
 ```
 
-writes `<div hx-get="#zWebLingoz"></div>`. They are in every WebLingo program, not only in pages (the Standard Library
-Reference, "In WASP's pages").
+writes `<div hx-get="#zWebLingoz"></div>`. Any WebLingo program may import it, not only a page (the Standard Library
+Reference, "In WASP's pages"); a page's own escaping needs no import.
 
 ---
 
@@ -581,6 +583,7 @@ text: an API, a redirect, a download. The function is given the request and the 
 and what it writes, with `write`, is the response's body.
 
 ```javascript
+import { Json } from "std:json";
 import { teas } from "/lib/catalog.wl";
 
 export function get(request, response) {
@@ -614,7 +617,7 @@ and `POST /api/teas`, a 201 and `Received 5 characters.` for a body of `hello`.
 - The module runs anew for each request, its top level first, then the function: nothing in it lasts between requests.
 
 `Json.stringify` writes a value as JSON, an instance as its fields, and `Json.parse(await request.text())` reads a
-JSON body (the Standard Library Reference, "`Json`").
+JSON body, `Json` imported from `std:json` (the Standard Library Reference, "`Json` and `std:json`").
 
 ---
 

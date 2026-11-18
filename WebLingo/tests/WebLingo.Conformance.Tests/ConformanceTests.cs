@@ -637,20 +637,23 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class Strict extends Regex {} var s = new Strict(\"x+\"); writeLn([s is Regex, s is Strict]);", "[true, true]")]
     [InlineData("var r = new Regex(\"a\"); writeLn([r == r, r == new Regex(r.pattern)]);", "[true, false]")]
     // JSON (the owner's answers, 16 November 2026): a class, Json; integers when integral; instances by their fields or toJson().
-    [InlineData("var v = Json.parse(\"{\\\"name\\\": \\\"Ann\\\", \\\"age\\\": 30, \\\"height\\\": 1.7, \\\"tags\\\": [\\\"a\\\", true, null], \\\"e\\\": 1e3, \\\"s\\\": \\\"\\\\u00e9\\\\n\\\\uD83D\\\\uDE00\\\"}\"); writeLn(v);", "{\"name\": \"Ann\", \"age\": 30, \"height\": 1.7, \"tags\": [\"a\", true, null], \"e\": 1000.0, \"s\": \"é\\n😀\"}")]
-    [InlineData("var v = Json.parse(\"{\\\"name\\\": \\\"Ann\\\", \\\"age\\\": 30, \\\"height\\\": 1.7, \\\"tags\\\": [\\\"a\\\", true, null], \\\"e\\\": 1e3, \\\"s\\\": \\\"\\\\u00e9\\\\n\\\\uD83D\\\\uDE00\\\"}\"); writeLn([v[\"age\"] is Integer, v[\"height\"] is Number, v[\"e\"] is Number, Json.parse(\"12345678901234567890\") is Number]);", "[true, true, true, true]")]
-    [InlineData("var v = Json.parse(\"{\\\"name\\\": \\\"Ann\\\", \\\"age\\\": 30, \\\"height\\\": 1.7, \\\"tags\\\": [\\\"a\\\", true, null], \\\"e\\\": 1e3, \\\"s\\\": \\\"\\\\u00e9\\\\n\\\\uD83D\\\\uDE00\\\"}\"); writeLn(Json.stringify(v));", "{\"name\":\"Ann\",\"age\":30,\"height\":1.7,\"tags\":[\"a\",true,null],\"e\":1000.0,\"s\":\"é\\n😀\"}")]
-    [InlineData("writeLn(Json.stringify([1, 2.5, 5.0, \"x\\\"y\", null, false, 1.5m, #{3}, DateTime.utc(2026, 11, 16, 14, 30)]));", "[1,2.5,5.0,\"x\\\"y\",null,false,1.5,[3],\"2026-11-16T14:30:00Z\"]")]
-    [InlineData("writeLn(Json.stringify({ a: [1, { b: 2 }], c: {}, d: [] }, 2));", "{\n  \"a\": [\n    1,\n    {\n      \"b\": 2\n    }\n  ],\n  \"c\": {},\n  \"d\": []\n}")]
-    [InlineData("class Point { constructor(x, y) { this.x = x; this.y = y; } } class Money { constructor(amount) { this.amount = amount; } toJson() { return { amount: this.amount, currency: \"EUR\" }; } } class Celsius extends Number {} writeLn(Json.stringify([new Point(1, 2), new Money(5), new Celsius(21.5)]));", "[{\"x\":1,\"y\":2},{\"amount\":5,\"currency\":\"EUR\"},21.5]")]
-    [InlineData("var m = {}; m[1] = \"one\"; writeLn([Json.stringify(m), Json.parse(\"  [ ]  \"), Json.parse(\"\\\"\\\\u0041\\\\/\\\"\"), Json.parse(\"-0.5e-1\")]);", "[\"{\\\"1\\\":\\\"one\\\"}\", [], \"A/\", -0.05]")]
-    [InlineData("var text = Json.stringify({ list: [1, 2.5, \"three\", null, true] }); writeLn(Json.stringify(Json.parse(text)) == text);", "true")]
+    [InlineData("import { Json } from \"std:json\"; var v = Json.parse(\"{\\\"name\\\": \\\"Ann\\\", \\\"age\\\": 30, \\\"height\\\": 1.7, \\\"tags\\\": [\\\"a\\\", true, null], \\\"e\\\": 1e3, \\\"s\\\": \\\"\\\\u00e9\\\\n\\\\uD83D\\\\uDE00\\\"}\"); writeLn(v);", "{\"name\": \"Ann\", \"age\": 30, \"height\": 1.7, \"tags\": [\"a\", true, null], \"e\": 1000.0, \"s\": \"é\\n😀\"}")]
+    [InlineData("import { Json } from \"std:json\"; var v = Json.parse(\"{\\\"name\\\": \\\"Ann\\\", \\\"age\\\": 30, \\\"height\\\": 1.7, \\\"tags\\\": [\\\"a\\\", true, null], \\\"e\\\": 1e3, \\\"s\\\": \\\"\\\\u00e9\\\\n\\\\uD83D\\\\uDE00\\\"}\"); writeLn([v[\"age\"] is Integer, v[\"height\"] is Number, v[\"e\"] is Number, Json.parse(\"12345678901234567890\") is Number]);", "[true, true, true, true]")]
+    [InlineData("import { Json } from \"std:json\"; var v = Json.parse(\"{\\\"name\\\": \\\"Ann\\\", \\\"age\\\": 30, \\\"height\\\": 1.7, \\\"tags\\\": [\\\"a\\\", true, null], \\\"e\\\": 1e3, \\\"s\\\": \\\"\\\\u00e9\\\\n\\\\uD83D\\\\uDE00\\\"}\"); writeLn(Json.stringify(v));", "{\"name\":\"Ann\",\"age\":30,\"height\":1.7,\"tags\":[\"a\",true,null],\"e\":1000.0,\"s\":\"é\\n😀\"}")]
+    [InlineData("import { Json } from \"std:json\"; writeLn(Json.stringify([1, 2.5, 5.0, \"x\\\"y\", null, false, 1.5m, #{3}, DateTime.utc(2026, 11, 16, 14, 30)]));", "[1,2.5,5.0,\"x\\\"y\",null,false,1.5,[3],\"2026-11-16T14:30:00Z\"]")]
+    [InlineData("import { Json } from \"std:json\"; writeLn(Json.stringify({ a: [1, { b: 2 }], c: {}, d: [] }, 2));", "{\n  \"a\": [\n    1,\n    {\n      \"b\": 2\n    }\n  ],\n  \"c\": {},\n  \"d\": []\n}")]
+    [InlineData("import { Json } from \"std:json\"; class Point { constructor(x, y) { this.x = x; this.y = y; } } class Money { constructor(amount) { this.amount = amount; } toJson() { return { amount: this.amount, currency: \"EUR\" }; } } class Celsius extends Number {} writeLn(Json.stringify([new Point(1, 2), new Money(5), new Celsius(21.5)]));", "[{\"x\":1,\"y\":2},{\"amount\":5,\"currency\":\"EUR\"},21.5]")]
+    [InlineData("import { Json } from \"std:json\"; var m = {}; m[1] = \"one\"; writeLn([Json.stringify(m), Json.parse(\"  [ ]  \"), Json.parse(\"\\\"\\\\u0041\\\\/\\\"\"), Json.parse(\"-0.5e-1\")]);", "[\"{\\\"1\\\":\\\"one\\\"}\", [], \"A/\", -0.05]")]
+    [InlineData("import { Json } from \"std:json\"; var text = Json.stringify({ list: [1, 2.5, \"three\", null, true] }); writeLn(Json.stringify(Json.parse(text)) == text);", "true")]
+    // std:json's instance, and std:json imported while the program runs (section 3.9, M0.20.2).
+    [InlineData("import json from \"std:json\"; var j = await Module.import(\"std:json\"); writeLn([json.Json.parse(\"2\"), j.Json.stringify([1]), j.Json == json.Json]);",
+        "[2, \"[1]\", true]")]
     // Html's escapers (section 13, "Context-aware escaping"): what a page's author calls where the compiler cannot tell.
-    [InlineData("writeLn(Html.escape(\"<a href='x'>&\")); writeLn(Html.url(\"javascript:alert(1)\")); writeLn(Html.url(\"/a b?c\")); "
+    [InlineData("import { Html } from \"std:html\"; writeLn(Html.escape(\"<a href='x'>&\")); writeLn(Html.url(\"javascript:alert(1)\")); writeLn(Html.url(\"/a b?c\")); "
         + "writeLn(Html.urlPart(\"a b&c=d\")); writeLn(Html.jsString(\"it's </script>\")); writeLn(Html.css(\"red\")); writeLn(Html.css(\"x;y\")); "
         + "writeLn(Html.escape(null)); writeLn(Html.escape(5));",
         "&lt;a href=&#39;x&#39;&gt;&amp;\n#zWebLingoz\n/a%20b?c\na%20b%26c%3Dd\nit\\u0027s \\u003c\\/script\\u003e\nred\nzWebLingoz\n\n5")]
-    [InlineData("writeLn(Html.js([1, \"<b>\", null])); writeLn(Html.js(5)); writeLn(Html.js({ a: true }));", "[1,\"\\u003cb\\u003e\",null]\n 5 \n{\"a\":true}")]
+    [InlineData("import { Html } from \"std:html\"; writeLn(Html.js([1, \"<b>\", null])); writeLn(Html.js(5)); writeLn(Html.js({ a: true }));", "[1,\"\\u003cb\\u003e\",null]\n 5 \n{\"a\":true}")]
     [InlineData("class Html { static js(v) { return \"mine\"; } } writeLn(Html.js(1));", "mine")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
@@ -705,9 +708,9 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("writeLn(new Integer(2.5m));", "WL3001")]
     [InlineData("writeLn(Decimal.parse(\"1.5m\"));", "WL3001")]
     [InlineData("writeLn(DateTime.utc(2026, 1, 1).toZone(\"Nowhere/Atlantis\"));", "WL3001")]
-    [InlineData("var h = new Html();", "WL3001")]
-    [InlineData("Html.url();", "WL2006")]
-    [InlineData("writeLn(Html.js(writeLn));", "WL3001")]
+    [InlineData("import { Html } from \"std:html\"; var h = new Html();", "WL3001")]
+    [InlineData("import { Html } from \"std:html\"; Html.url();", "WL2006")]
+    [InlineData("import { Html } from \"std:html\"; writeLn(Html.js(writeLn));", "WL3001")]
     [InlineData("function g(a, ...rest) { return rest; } var h = g; h();", "WL2006")]
     [InlineData("writeLn([...5]);", "WL3001")]
     [InlineData("var m = { ...[1] };", "WL3001")]
@@ -740,18 +743,18 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var m = \"x\".match(\"x\");", "WL3001")]
     [InlineData("var m = {}; m[new Regex(\"a\")] = 1;", "WL3001")]
     [InlineData("var t = new Regex(\"(a+)+$\").test(\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!\");", "WL3010")]
-    [InlineData("var v = Json.parse(\"{\\\"a\\\": }\");", "WL3001")]
-    [InlineData("var v = Json.parse(\"[1, 2\");", "WL3001")]
-    [InlineData("var v = Json.parse(\"01\");", "WL3001")]
-    [InlineData("var v = Json.parse(\"\\\"\\\\uD800\\\"\");", "WL3001")]
-    [InlineData("var v = Json.parse(1);", "WL3001")]
-    [InlineData("var t = Json.stringify(NaN);", "WL3001")]
-    [InlineData("var loop = []; loop.push(loop); var t = Json.stringify(loop);", "WL3001")]
-    [InlineData("var t = Json.stringify([function () {}]);", "WL3001")]
-    [InlineData("var k = {}; k[true] = 1; var t = Json.stringify(k);", "WL3001")]
-    [InlineData("class Selfish { toJson() { return this; } } var t = Json.stringify(new Selfish());", "WL3001")]
-    [InlineData("var t = Json.stringify(1, 11);", "WL3001")]
-    [InlineData("var j = new Json();", "WL3001")]
+    [InlineData("import { Json } from \"std:json\"; var v = Json.parse(\"{\\\"a\\\": }\");", "WL3001")]
+    [InlineData("import { Json } from \"std:json\"; var v = Json.parse(\"[1, 2\");", "WL3001")]
+    [InlineData("import { Json } from \"std:json\"; var v = Json.parse(\"01\");", "WL3001")]
+    [InlineData("import { Json } from \"std:json\"; var v = Json.parse(\"\\\"\\\\uD800\\\"\");", "WL3001")]
+    [InlineData("import { Json } from \"std:json\"; var v = Json.parse(1);", "WL3001")]
+    [InlineData("import { Json } from \"std:json\"; var t = Json.stringify(NaN);", "WL3001")]
+    [InlineData("import { Json } from \"std:json\"; var loop = []; loop.push(loop); var t = Json.stringify(loop);", "WL3001")]
+    [InlineData("import { Json } from \"std:json\"; var t = Json.stringify([function () {}]);", "WL3001")]
+    [InlineData("import { Json } from \"std:json\"; var k = {}; k[true] = 1; var t = Json.stringify(k);", "WL3001")]
+    [InlineData("import { Json } from \"std:json\"; class Selfish { toJson() { return this; } } var t = Json.stringify(new Selfish());", "WL3001")]
+    [InlineData("import { Json } from \"std:json\"; var t = Json.stringify(1, 11);", "WL3001")]
+    [InlineData("import { Json } from \"std:json\"; var j = new Json();", "WL3001")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);
@@ -1105,7 +1108,9 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var e = environment.machineName;",
         "program.wl(1,9): error WL2001: 'environment' is not defined; did you mean Environment, from std:env?")]
     [InlineData("var t = readText(\"a\");", "program.wl(1,9): error WL2001: 'readText' is not defined; did you mean readText, from std:fs?")]
-    [InlineData("writeLn(JSON.stringify(1));", "program.wl(1,9): error WL2001: 'JSON' is not defined; did you mean Json?")]
+    [InlineData("writeLn(JSON.stringify(1));", "program.wl(1,9): error WL2001: 'JSON' is not defined; did you mean Json, from std:json?")]
+    [InlineData("writeLn(Json.stringify(1));", "program.wl(1,9): error WL2001: 'Json' is not defined; did you mean Json, from std:json?")]
+    [InlineData("writeLn(Html.url(\"/\"));", "program.wl(1,9): error WL2001: 'Html' is not defined; did you mean Html, from std:html?")]
     [InlineData("Writeln(1);", "program.wl(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn?")]
     [InlineData("var count = 1; writeLn(Count);", "program.wl(1,24): error WL2001: 'Count' is not defined; did you mean count?")]
     [InlineData("var x = nothingLikeIt;", "program.wl(1,9): error WL2001: 'nothingLikeIt' is not defined.")]

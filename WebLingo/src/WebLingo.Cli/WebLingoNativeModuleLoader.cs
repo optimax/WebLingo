@@ -49,11 +49,11 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         : Renamed(name, function), IWebLingoTextBuiltin;
 
     /// <summary>
-    /// A configured scheme's path, but <c>std:system</c>, which the compiler makes itself, or an assembly's; any other is a
-    /// file's, as a script's import is.
+    /// A configured scheme's path, but a standard module the compiler makes itself (<see cref="WebLingoStandardModules"/>),
+    /// or an assembly's; any other is a file's, as a script's import is.
     /// </summary>
     public bool Names(string path) =>
-        (TrySplit(path, out var scheme, out _) && path != "std:system" && schemes.ContainsKey(scheme))
+        (TrySplit(path, out var scheme, out _) && !WebLingoStandardModules.IsCompilerMade(path) && schemes.ContainsKey(scheme))
         || path.EndsWith(Extension, StringComparison.OrdinalIgnoreCase);
 
     public bool TryResolve(string importer, string path, [NotNullWhen(true)] out WebLingoNativeModuleInfo? module, out string? error)

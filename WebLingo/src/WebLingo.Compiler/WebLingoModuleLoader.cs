@@ -29,7 +29,7 @@ public sealed class WebLingoModuleLoader(WebLingoCompilerOptions options) : IWeb
         if (path.StartsWith("std:", StringComparison.Ordinal) && !(Resolver is null && options.Native is { } host && host.Names(path)))
         {
             name = path;
-            error = path == "std:system" ? null : "there is no such standard module";
+            error = WebLingoStandardModules.IsCompilerMade(path) ? null : "there is no such standard module";
             return error is null;
         }
         if (Resolver is null && options.Native is { } native && native.Names(path))

@@ -107,11 +107,11 @@ public sealed class WebLingoCompilation
             {
                 if (statement is not WebLingoImportSyntax import || import.Path.Length == 0) continue;
                 string? error;
-                // A standard module the compiler makes itself, std:system; any other is native, if the host has it (section 3.9).
+                // A standard module the compiler makes itself (WebLingoStandardModules); any other is native, if the host has it (section 3.9).
                 if (import.Path.StartsWith("std:", StringComparison.Ordinal) && !(options.Native?.Names(import.Path) ?? false))
                 {
                     // A standard module, named by the scheme std:, never a path (section 3.9).
-                    if (StandardModules.Contains(import.Path))
+                    if (WebLingoStandardModules.IsCompilerMade(import.Path))
                     {
                         if (!indexes.TryGetValue(import.Path, out var standard))
                         {
@@ -167,11 +167,9 @@ public sealed class WebLingoCompilation
         {
             modules.Add(new WebLingoModuleSource(name, root, imports)
             {
-                IsStandard = StandardModules.Contains(name), Native = natives.GetValueOrDefault(name)
+                IsStandard = WebLingoStandardModules.IsCompilerMade(name), Native = natives.GetValueOrDefault(name)
             });
         }
     }
 
-    /// <summary>The standard modules there are (section 3.9): <c>std:system</c>, the host's built-ins.</summary>
-    private static readonly HashSet<string> StandardModules = new(StringComparer.Ordinal) { "std:system" };
 }

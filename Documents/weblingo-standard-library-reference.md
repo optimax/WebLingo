@@ -22,7 +22,7 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 10. [`Bytes` and `BytesBuilder`](#10-bytes-and-bytesbuilder)
 11. [`DateTime`](#11-datetime)
 12. [`Regex`](#12-regex)
-13. [`Json`](#13-json)
+13. [`Json` and `std:json`](#13-json-and-stdjson)
 14. [`std:fs`](#14-stdfs)
 15. [`std:http`](#15-stdhttp)
 16. [`std:net`](#16-stdnet)
@@ -490,7 +490,9 @@ writes a regular expression as `Regex:/pattern/flags`.
 
 ---
 
-## 13. `Json`
+## 13. `Json` and `std:json`
+
+JSON's text, read and written by the class `Json`, which a program has by importing it, `import { Json } from "std:json";`.
 
 | Member | What it is |
 |---|---|
@@ -498,6 +500,7 @@ writes a regular expression as `Regex:/pattern/flags`.
 | `Json.stringify(value, indent)` | the value's JSON text, `indent` 0 to 10 spaces, 0 unless given: maps, arrays, sets, strings, numbers, decimals, Booleans, `null`, dates as their ISO text, and instances as their fields, or as their class's `toJson()` gives |
 
 ```javascript
+import { Json } from "std:json";
 var data = Json.parse("[1, 2.5, \"three\", {\"four\": null}]");
 writeLn([data, data[0] is Integer, data[1] is Number]);
 writeLn(Json.stringify(data));
@@ -590,6 +593,7 @@ Given a server on this machine, at port 8080, that has `teas.json`, `[{"name": "
 
 ```javascript
 import http from "std:http";
+import { Json } from "std:json";
 var r = await http.get("http://localhost:8080/teas.json", { "Accept": "application/json" });
 writeLn(r["status"]);
 writeLn(r["headers"]["content-type"]);
@@ -839,11 +843,11 @@ and any change to a request's headers, are WL3001.
 A page also has `renderComponent(path, values)`, a task, which renders a component, and a layout `renderBody()`, which
 renders its page's body where it stands (the WASP User Manual, sections 6 and 7).
 
-### `Html`
+### `Html` and `std:html`
 
 A page's `<%= value %>` is escaped for where it stands in the page's HTML (the WASP User Manual, section 4). For where
-WASP cannot tell, every program has the built-in class `Html`, whose members give a value's text, as `write` writes
-it but for an instance's `toString()`, escaped; `null` gives `""`:
+WASP cannot tell, the class `Html`, which a program has by importing it, `import { Html } from "std:html";`, in a page
+too, gives a value's text, as `write` writes it but for an instance's `toString()`, escaped; `null` gives `""`:
 
 | Member | What it gives |
 |---|---|
@@ -855,6 +859,7 @@ it but for an instance's `toString()`, escaped; `null` gives `""`:
 | `Html.css(x)` | `zWebLingoz` if it could change what a style means, else the value, its CSS escapes decoded |
 
 ```javascript
+import { Html } from "std:html";
 writeLn(Html.escape("<b>Tea & cake</b>"));
 writeLn(Html.url("javascript:alert(1)"));
 writeLn(Html.url("/teas/green tea"));
