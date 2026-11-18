@@ -1,7 +1,8 @@
+<% import { Environment } from "std:env"; %>
 <footer>
   <p>
   Served by WASP, WebLingo's server pages: a layout, two includes, a component and a module.
-  <br/>Page served <%= $"{DateTime.now():yyyy-MM-dd HH:mm}" %>
+  <br/>Page served <%= $"{DateTime.now():yyyy-MM-dd HH:mm}" %> on machine <%= Environment.machineName %>
   </p>
 
 </footer>

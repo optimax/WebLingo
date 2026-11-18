@@ -13,6 +13,7 @@ layout, a header and a footer, a component that shows a tea, and a module that h
 ```text
 example1/               the site, and wasp's root
   web.config            IIS's configuration: the ASP.NET Core Module runs WebLingo's wasp
+  wasp.config           the site's configuration: its pages may read the machine's name
   index.wasp            /          the home page, with this week's teas
   teas/index.wasp       /teas      every tea, by kind
   brewing.wasp          /brewing   a table of water temperatures and steeping times
@@ -33,6 +34,8 @@ example1/               the site, and wasp's root
   writes where it calls `renderBody()`.
 - **Includes.** The layout includes `/includes/header.wasp` and `/includes/footer.wasp` as if their text stood there:
   the header reads the layout's `section` to mark the current page.
+- **The machine's environment.** The footer names the machine that served the page, `Environment.machineName`, from
+  `std:env`, which a site reads only as its `wasp.config` allows: `{ "env": { "machineName": true } }`.
 - **A component.** `await renderComponent("/components/tea-card.wasp", { tea: tea, detailed: true });` renders a tea,
   the component declaring what it takes, `param tea; param detailed = false;`.
 - **A module.** `lib/teas.wl` holds a class, `Tea`, the teas, and the functions the pages import:
