@@ -16,7 +16,7 @@ public sealed class WaitingTests
     [Fact]
     public void AnExecutionWaitingForATimerReturnsAndGoesOnWhenResumed()
     {
-        const string program = "var t = delay(1000); writeLn(\"before\"); await t; writeLn(\"after\"); await delay(500); writeLn(\"end\");";
+        const string program = "import { write, writeLn } from \"std:io\"; var t = delay(1000); writeLn(\"before\"); await t; writeLn(\"after\"); await delay(500); writeLn(\"end\");";
         foreach (var stack in new[] { false, true })
         {
             var clock = new ManualClock();
@@ -38,7 +38,7 @@ public sealed class WaitingTests
     [Fact]
     public void AnExecutionWaitingForWorkOffItsWorkerReturnsUntilTheWorkIsPosted()
     {
-        const string program = "writeLn(await offWorker(20)); writeLn(await offWorker(22));";
+        const string program = "import { write, writeLn } from \"std:io\"; writeLn(await offWorker(20)); writeLn(await offWorker(22));";
         foreach (var stack in new[] { false, true })
         {
             var host = new QueuedHost();
@@ -66,7 +66,7 @@ public sealed class WaitingTests
             var clock = new ManualClock();
             var output = new WebLingoCollectedOutput();
             var context = Context(output, clock, null) with { Suspends = false };
-            var result = Vm(stack).Execute(Compile("await delay(1000); writeLn(\"after\");", stack), context);
+            var result = Vm(stack).Execute(Compile("import { write, writeLn } from \"std:io\"; await delay(1000); writeLn(\"after\");", stack), context);
             Assert.True(result.Succeeded, result.Error?.Message);
             Assert.Equal((1, "after\n"), (clock.Waits, output.Text));
         }

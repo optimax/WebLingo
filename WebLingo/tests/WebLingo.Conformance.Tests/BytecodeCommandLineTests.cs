@@ -23,7 +23,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     [InlineData(2, "--vm", "stack")]
     public void CompileWritesTheRegisterVmsBytecodeUnlessAskedForTheStackVms(int header, params string[] options)
     {
-        var main = Write("main.wl", "writeLn(42);\n");
+        var main = Write("main.wl", "import { write, writeLn } from \"std:io\"; writeLn(42);\n");
         Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo(["compile", .. options, main]));
         Assert.Equal(header, File.ReadAllBytes(Path.Combine(_folder, "main.wlbc"))[8]);
     }
@@ -34,7 +34,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     public void ACompiledProgramRunsFromItsFileAsFromItsSource(string vm, int header)
     {
         Write("lib/greet.wl", "export function greet(name) { return \"Hello, \" + name + \"!\"; }");
-        var main = Write("main.wl", "param who;\nimport { greet } from \"lib/greet.wl\";\nwriteLn(greet(who));\n");
+        var main = Write("main.wl", "param who;import { write, writeLn } from \"std:io\"; \nimport { greet } from \"lib/greet.wl\";\nwriteLn(greet(who));\n");
         var fromSource = Weblingo("run", main, "who=WLBC");
         Assert.Equal((WebLingoCommandLine.Success, "Hello, WLBC!\n", ""), fromSource);
 
@@ -54,7 +54,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     public void ARuntimeErrorIsLocatedFromTheFileAlone(string vm)
     {
         Write("lib/util.wl", "export function f(n) {\n  return [1][n];\n}\n");
-        var main = Write("main.wl", "import { f } from \"lib/util.wl\";\nwriteLn(\"before\");\nf(2);\n");
+        var main = Write("main.wl", "import { write, writeLn } from \"std:io\"; import { f } from \"lib/util.wl\";\nwriteLn(\"before\");\nf(2);\n");
         var fromSource = Weblingo("run", main);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, fromSource.Exit);
         Assert.EndsWith("lib/util.wl(2,10): error WL3005: The index 2 is outside 0 to 0.", fromSource.Error.TrimEnd());
@@ -76,7 +76,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     public void TheFileHoldsNoneOfTheHostsPaths()
     {
         Write("lib/util.wl", "export function twice(x) { return x * 2; }");
-        var main = Write("main.wl", "import { twice } from \"lib/util.wl\";\nwriteLn(twice(21));\n");
+        var main = Write("main.wl", "import { write, writeLn } from \"std:io\"; import { twice } from \"lib/util.wl\";\nwriteLn(twice(21));\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         var text = System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(_folder, "main.wlbc")));
         Assert.DoesNotContain(Path.GetFileName(_folder), text);
@@ -88,7 +88,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     [InlineData("stack", "function main (", " stack)")]
     public void DisasmShowsTheBytecode(string vm, string start, string kind)
     {
-        var main = Write("main.wl", "var x = 40;\nwriteLn(x + 2);\n");
+        var main = Write("main.wl", "import { write, writeLn } from \"std:io\"; var x = 40;\nwriteLn(x + 2);\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
         var (exit, output, error) = Weblingo("disasm", Path.Combine(_folder, "main.wlbc"));
         Assert.Equal((WebLingoCommandLine.Success, ""), (exit, error));
@@ -100,7 +100,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     [Fact]
     public void ADamagedFileIsReportedAndNothingRuns()
     {
-        var main = Write("main.wl", "writeLn(\"never\");\n");
+        var main = Write("main.wl", "import { write, writeLn } from \"std:io\"; writeLn(\"never\");\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         var compiled = Path.Combine(_folder, "main.wlbc");
         var bytes = File.ReadAllBytes(compiled);
@@ -135,7 +135,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     {
         // A1 of M0.13's questions: weblingo run script.wl compiles in memory, and saves no .wlbc.
         Write("lib/util.wl", "export function twice(x) { return x * 2; }");
-        var main = Write("main.wl", "import { twice } from \"lib/util.wl\";\nwriteLn(twice(21));\n");
+        var main = Write("main.wl", "import { write, writeLn } from \"std:io\"; import { twice } from \"lib/util.wl\";\nwriteLn(twice(21));\n");
         var before = Files();
         Assert.Equal((WebLingoCommandLine.Success, "42\n", ""), Weblingo("run", main));
         Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo("check", main));

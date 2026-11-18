@@ -46,6 +46,13 @@ public sealed record WebLingoBoundUnit(string Name, WebLingoBoundFunction? Funct
 
     /// <summary>Its parameters (section 3.9), whose values its function takes as one map.</summary>
     public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];
+
+    /// <summary>
+    /// Whether it is a standard module the compiler makes itself (<see cref="WebLingoStandardModules"/>), made where the
+    /// program begins, nothing of it running, so that an import of it is not awaited, as its names were not when every
+    /// program had them (section 3.9).
+    /// </summary>
+    public bool IsStandard { get; init; }
 }
 
 /// <summary>

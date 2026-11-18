@@ -17,36 +17,37 @@ public sealed class StackVirtualMachineTests
     public void RunsTheSpecificationsExampleAndPrints30()
     {
         var output = new WebLingoCollectedOutput();
-        var module = Compile("var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);");
+        var module = Compile("import { write, writeLn } from \"std:io\"; var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);");
         var result = new WebLingoStackVirtualMachine().Execute(module, Context(output));
         Assert.True(result.Succeeded, result.Error?.Message);
         Assert.Equal(new[] { "30" }, output.Lines);
-        // a: LoadConstant, StoreLocal; b: the same; result: LoadLocal twice, Add, StoreLocal; writeLn: LoadLocal,
-        // CallBuiltin, Pop; then Return.
-        Assert.Equal(12, result.Instructions);
+        // std:io's import, made where the program begins, eight instructions; a: LoadConstant, StoreLocal; b: the same;
+        // result: LoadLocal twice, Add, StoreLocal; writeLn: LoadLocal, CallBuiltin, Pop; then Return.
+        Assert.Equal(20, result.Instructions);
     }
 
     [Fact]
     public void AnInstructionBudgetStopsTheProgram()
     {
         var output = new WebLingoCollectedOutput();
-        // Each writeLn is LoadConstant, CallBuiltin and Pop.
-        var module = Compile("writeLn(1); writeLn(2); writeLn(3);");
-        var result = new WebLingoStackVirtualMachine().Execute(module, Context(output) with { InstructionBudget = 6 });
+        // std:io's import, made where the program begins, is eight instructions; each writeLn is LoadConstant, CallBuiltin
+        // and Pop.
+        var module = Compile("import { write, writeLn } from \"std:io\"; writeLn(1); writeLn(2); writeLn(3);");
+        var result = new WebLingoStackVirtualMachine().Execute(module, Context(output) with { InstructionBudget = 14 });
         Assert.Equal(WebLingoDiagnosticCodes.BudgetExceeded, result.Error!.Code);
         Assert.Equal(new[] { "1", "2" }, output.Lines);
-        Assert.Equal(6, result.Instructions);
+        Assert.Equal(14, result.Instructions);
     }
 
     [Fact]
     public void ASlotBudgetKeepsAModuleFromRunning()
     {
         var output = new WebLingoCollectedOutput();
-        // Two locals and a stack of two: four slots.
-        var module = Compile("var a = 1; var b = 2; writeLn(a + b);");
+        // Two locals, std:io's module and its import, the program's own module, and a stack of four: nine slots.
+        var module = Compile("import { write, writeLn } from \"std:io\"; var a = 1; var b = 2; writeLn(a + b);");
         var result = new WebLingoStackVirtualMachine().Execute(module, Context(output) with { Resources = new WebLingoResourceBudget(3) });
         Assert.Equal(WebLingoDiagnosticCodes.BudgetExceeded, result.Error!.Code);
-        Assert.Contains("4 slots", result.Error.Message);
+        Assert.Contains("9 slots", result.Error.Message);
         Assert.Empty(output.Lines);
     }
 
@@ -70,7 +71,7 @@ public sealed class StackVirtualMachineTests
     {
         var output = new WebLingoCollectedOutput();
         var module = Compile(
-            "var t = \"\"; for (var i = 0; i < 20000; i = i + 1) { t = \"abcdefghij\" + \"klmnopqrst\"; } writeLn(t);");
+            "import { write, writeLn } from \"std:io\"; var t = \"\"; for (var i = 0; i < 20000; i = i + 1) { t = \"abcdefghij\" + \"klmnopqrst\"; } writeLn(t);");
         var context = Context(output) with { Resources = new WebLingoResourceBudget(65535, MaxHeapUnits: 10_000) };
         var result = new WebLingoStackVirtualMachine().Execute(module, context);
         Assert.True(result.Succeeded, result.Error?.Message);
@@ -91,7 +92,7 @@ public sealed class StackVirtualMachineTests
     [Fact]
     public void GarbageArraysAreCollectedOnBothVms()
     {
-        const string source = "var t = []; for (var i = 0; i < 20000; i = i + 1) { t = [i, i, i, i]; } writeLn(t.length);";
+        const string source = "import { write, writeLn } from \"std:io\"; var t = []; for (var i = 0; i < 20000; i = i + 1) { t = [i, i, i, i]; } writeLn(t.length);";
         foreach (var run in BothVms)
         {
             var output = new WebLingoCollectedOutput();
@@ -115,7 +116,7 @@ public sealed class StackVirtualMachineTests
     [Fact]
     public void GarbageMapsAreCollectedAndAGrowingOneIsBoundedOnBothVms()
     {
-        const string garbage = "var t = {}; for (var i = 0; i < 20000; i = i + 1) { t = {a: i, b: [i], c: #{i}}; } writeLn(t[\"a\"]);";
+        const string garbage = "import { write, writeLn } from \"std:io\"; var t = {}; for (var i = 0; i < 20000; i = i + 1) { t = {a: i, b: [i], c: #{i}}; } writeLn(t[\"a\"]);";
         const string growing = "var m = {}; var s = #{}; var i = 0; while (true) { m[i] = i; s.add(i); i = i + 1; }";
         foreach (var run in BothVms)
         {
@@ -132,7 +133,7 @@ public sealed class StackVirtualMachineTests
     [Fact]
     public void ADeeplyNestedArrayIsWrittenWithoutOverflowingTheStack()
     {
-        const string source = "var a = []; for (var i = 0; i < 100000; i = i + 1) { a = [a]; } write(a);";
+        const string source = "import { write, writeLn } from \"std:io\"; var a = []; for (var i = 0; i < 100000; i = i + 1) { a = [a]; } write(a);";
         foreach (var run in BothVms)
         {
             var output = new WebLingoCollectedOutput();
@@ -171,7 +172,7 @@ public sealed class StackVirtualMachineTests
         {
             var output = new WebLingoCollectedOutput();
             var clock = new SteppedClock();
-            var result = vm("writeLn(0); await delay(30); writeLn(1); var a = delay(10); var b = delay(5); await a; writeLn(2);",
+            var result = vm("import { write, writeLn } from \"std:io\"; writeLn(0); await delay(30); writeLn(1); var a = delay(10); var b = delay(5); await a; writeLn(2);",
                 Context(output) with { Clock = clock });
             Assert.True(result.Succeeded, result.Error?.Message);
             Assert.Equal(new[] { "0", "1", "2" }, output.Lines);
@@ -187,7 +188,7 @@ public sealed class StackVirtualMachineTests
             var output = new WebLingoCollectedOutput();
             var signal = new WebLingoCancellationSignal();
             var context = Context(output) with { Clock = new SteppedClock(signal.Cancel), Cancellation = signal };
-            var result = vm("writeLn(0); await delay(5); writeLn(1);", context);
+            var result = vm("import { write, writeLn } from \"std:io\"; writeLn(0); await delay(5); writeLn(1);", context);
             Assert.Equal(WebLingoDiagnosticCodes.Cancelled, result.Error!.Code);
             Assert.Equal(new[] { "0" }, output.Lines);
         }
@@ -197,7 +198,7 @@ public sealed class StackVirtualMachineTests
     public void WaitingFramesKeepTheirValuesThroughCollections()
     {
         const string source =
-            "async function keep(tag) { var mine = tag + \"!\"; var held = [mine, {k: mine}]; await delay(10); " +
+            "import { write, writeLn } from \"std:io\"; async function keep(tag) { var mine = tag + \"!\"; var held = [mine, {k: mine}]; await delay(10); " +
             "return held[0] + held[1][\"k\"] + mine; } " +
             "async function churn() { var s = \"\"; for (var i = 0; i < 40; i = i + 1) { " +
             "for (var j = 0; j < 500; j = j + 1) s = \"abcdefghij\" + \"klmnopqrst\"; await null; } return s.length; } " +
@@ -216,7 +217,7 @@ public sealed class StackVirtualMachineTests
     public void AWaitingDisposalKeepsItsInstanceThroughCollections()
     {
         const string source =
-            "class R { constructor(tag) { this.tag = tag + \"!\"; } async dispose() { await delay(10); writeLn(this.tag); } } " +
+            "import { write, writeLn } from \"std:io\"; class R { constructor(tag) { this.tag = tag + \"!\"; } async dispose() { await delay(10); writeLn(this.tag); } } " +
             "async function churn() { var s = \"\"; for (var i = 0; i < 40; i = i + 1) { " +
             "for (var j = 0; j < 500; j = j + 1) s = \"abcdefghij\" + \"klmnopqrst\"; await null; } return s.length; } " +
             "async function use() { using (var r = new R(\"a\")) {} } " +
@@ -235,7 +236,7 @@ public sealed class StackVirtualMachineTests
     public void ManyTasksWaitAtOnce()
     {
         const string source =
-            "var total = 0; async function add(n) { await delay(n); total = total + n; } var tasks = []; " +
+            "import { write, writeLn } from \"std:io\"; var total = 0; async function add(n) { await delay(n); total = total + n; } var tasks = []; " +
             "for (var i = 0; i < 2000; i = i + 1) tasks.push(add(i)); foreach (var t in tasks) await t; writeLn(total);";
         foreach (var vm in BothVms)
         {
@@ -279,7 +280,7 @@ public sealed class StackVirtualMachineTests
     [Fact]
     public void AnImportTheHostDoesNotOfferIsNotRun()
     {
-        var result = new WebLingoStackVirtualMachine().Execute(Compile("writeLn(1);"), new WebLingoExecutionContext(new WebLingoWorkerId(0)));
+        var result = new WebLingoStackVirtualMachine().Execute(Compile("import { write, writeLn } from \"std:io\"; writeLn(1);"), new WebLingoExecutionContext(new WebLingoWorkerId(0)));
         Assert.Equal(WebLingoDiagnosticCodes.UndefinedIdentifier, result.Error!.Code);
     }
 
@@ -300,7 +301,9 @@ public sealed class StackVirtualMachineTests
     public void ABuiltinThatThrowsIsARuntimeErrorNotACrash()
     {
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = new WebLingoBuiltinRegistry(new ThrowingWriteLn()) };
-        var result = new WebLingoStackVirtualMachine().Execute(Compile("writeLn(1);"), context);
+        // The host offers writeLn alone, and declares it alone.
+        var module = new WebLingoStackCompiler(new WebLingoCompilerOptions([new WebLingoBuiltinDeclaration("writeLn", 1)])).Compile("import { writeLn } from \"std:io\"; writeLn(1);", "test.wl").Module!;
+        var result = new WebLingoStackVirtualMachine().Execute(module, context);
         Assert.Equal(WebLingoDiagnosticCodes.InvalidOperation, result.Error!.Code);
         Assert.Contains("broken", result.Error.Message);
     }
@@ -309,7 +312,7 @@ public sealed class StackVirtualMachineTests
     public void DeepRecursionIsBoundedByTheCallDepth()
     {
         var output = new WebLingoCollectedOutput();
-        var module = Compile("function deep(n) { if (n == 0) return 0; return 1 + deep(n - 1); } writeLn(deep(50));");
+        var module = Compile("import { write, writeLn } from \"std:io\"; function deep(n) { if (n == 0) return 0; return 1 + deep(n - 1); } writeLn(deep(50));");
         var context = Context(output) with { Resources = new WebLingoResourceBudget(65535, MaxCallDepth: 20) };
         var result = new WebLingoStackVirtualMachine().Execute(module, context);
         Assert.Equal(WebLingoDiagnosticCodes.BudgetExceeded, result.Error!.Code);

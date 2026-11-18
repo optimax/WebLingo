@@ -12,29 +12,29 @@ public sealed class VirtualMachineTests
     [Fact]
     public void RunsTheSpecificationsExampleAndPrints30()
     {
-        var (result, lines) = Run("var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);");
+        var (result, lines) = Run("import { write, writeLn } from \"std:io\"; var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);");
         Assert.True(result.Succeeded);
         Assert.Equal(new[] { "30" }, lines);
     }
 
     [Theory]
-    [InlineData("writeLn(10 / 2);", "5.0")]
-    [InlineData("writeLn(7 / 2);", "3.5")]
-    [InlineData("writeLn(2 + 3 * 4);", "14")]
-    [InlineData("writeLn((2 + 3) * 4);", "20")]
-    [InlineData("writeLn(-(1 - 4));", "3")]
-    [InlineData("writeLn(10 / 4 + 1);", "3.5")]
-    [InlineData("var x = 1; x = 5; writeLn(x * x);", "25")]
-    [InlineData("var a = 1; var b = a = 7; writeLn(a + b);", "14")]
-    [InlineData("var x = 1; writeLn(x + (x = 5));", "6")]
-    [InlineData("writeLn(writeLn(1));", "1\nnull")]
-    [InlineData("writeLn(9223372036854775807);", "9223372036854775807")]
-    [InlineData("writeLn(+(1 - 4) + +2);", "-1")]
-    [InlineData("writeLn(1.5 + 1);", "2.5")]
-    [InlineData("writeLn(1e21);", "1E+21")]
-    [InlineData("writeLn(-0.0);", "-0.0")]
-    [InlineData("writeLn(Infinity); writeLn(-Infinity); writeLn(NaN);", "Infinity\n-Infinity\nNaN")]
-    [InlineData("write(1); write(2); writeLn(3); write(4);", "123\n4")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn(10 / 2);", "5.0")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn(7 / 2);", "3.5")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn(2 + 3 * 4);", "14")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn((2 + 3) * 4);", "20")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn(-(1 - 4));", "3")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn(10 / 4 + 1);", "3.5")]
+    [InlineData("import { writeLn } from \"std:io\"; var x = 1; x = 5; writeLn(x * x);", "25")]
+    [InlineData("import { writeLn } from \"std:io\"; var a = 1; var b = a = 7; writeLn(a + b);", "14")]
+    [InlineData("import { writeLn } from \"std:io\"; var x = 1; writeLn(x + (x = 5));", "6")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn(writeLn(1));", "1\nnull")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn(9223372036854775807);", "9223372036854775807")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn(+(1 - 4) + +2);", "-1")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn(1.5 + 1);", "2.5")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn(1e21);", "1E+21")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn(-0.0);", "-0.0")]
+    [InlineData("import { writeLn } from \"std:io\"; writeLn(Infinity); writeLn(-Infinity); writeLn(NaN);", "Infinity\n-Infinity\nNaN")]
+    [InlineData("import { write, writeLn } from \"std:io\"; write(1); write(2); writeLn(3); write(4);", "123\n4")]
     public void ComputesWhatTheProgramSays(string source, string expected)
     {
         var (result, lines) = Run(source);
@@ -45,7 +45,7 @@ public sealed class VirtualMachineTests
     [Fact]
     public void IntegerOverflowStopsTheProgramWhereItHappens()
     {
-        var source = "var big = 9223372036854775807;\nwriteLn(1);\nvar bigger = big + 1;\nwriteLn(2);";
+        var source = "import { write, writeLn } from \"std:io\"; var big = 9223372036854775807;\nwriteLn(1);\nvar bigger = big + 1;\nwriteLn(2);";
         var (result, lines) = Run(source);
         Assert.Equal(new[] { "1" }, lines);
         Assert.Equal(WebLingoDiagnosticCodes.IntegerOverflow, result.Error!.Code);
@@ -55,27 +55,29 @@ public sealed class VirtualMachineTests
     [Fact]
     public void AnInstructionBudgetStopsTheProgram()
     {
-        var module = Compile("writeLn(1); writeLn(2); writeLn(3);");
+        var module = Compile("import { write, writeLn } from \"std:io\"; writeLn(1); writeLn(2); writeLn(3);");
         var output = new WebLingoCollectedOutput();
-        var result = new WebLingoVirtualMachine().Execute(module, Context(output) with { InstructionBudget = 4 });
+        // std:io's import, made where the program begins, is five instructions (TheResultCountsTheInstructionsRun).
+        var result = new WebLingoVirtualMachine().Execute(module, Context(output) with { InstructionBudget = 9 });
         Assert.Equal(WebLingoDiagnosticCodes.BudgetExceeded, result.Error!.Code);
         Assert.Equal(new[] { "1", "2" }, output.Lines);
-        Assert.Equal(4, result.Instructions);
+        Assert.Equal(9, result.Instructions);
     }
 
     [Fact]
     public void TheResultCountsTheInstructionsRun()
     {
-        // Three times LoadConstant and CallBuiltin, then Return.
-        var result = new WebLingoVirtualMachine().Execute(Compile("writeLn(1); writeLn(2); writeLn(3);"), Context(new WebLingoCollectedOutput()));
+        // std:io's import, made where the program begins: the program's own module, std:io's two built-ins, its module
+        // and its import; then three times LoadConstant and CallBuiltin, then Return.
+        var result = new WebLingoVirtualMachine().Execute(Compile("import { write, writeLn } from \"std:io\"; writeLn(1); writeLn(2); writeLn(3);"), Context(new WebLingoCollectedOutput()));
         Assert.True(result.Succeeded);
-        Assert.Equal(7, result.Instructions);
+        Assert.Equal(12, result.Instructions);
     }
 
     [Fact]
     public void ARegisterBudgetKeepsAModuleFromRunning()
     {
-        var module = Compile("var a = 1; var b = 2; writeLn(a + b);");
+        var module = Compile("import { write, writeLn } from \"std:io\"; var a = 1; var b = 2; writeLn(a + b);");
         var output = new WebLingoCollectedOutput();
         var result = new WebLingoVirtualMachine().Execute(module, Context(output) with { Resources = new WebLingoResourceBudget(2) });
         Assert.Equal(WebLingoDiagnosticCodes.BudgetExceeded, result.Error!.Code);
@@ -105,7 +107,7 @@ public sealed class VirtualMachineTests
     {
         var output = new WebLingoCollectedOutput();
         var compiled = new WebLingoCompiler(WithWrite).Compile(
-            "var t = \"\"; for (var i = 0; i < 20000; i = i + 1) { t = \"abcdefghij\" + \"klmnopqrst\"; } writeLn(t);",
+            "import { write, writeLn } from \"std:io\"; var t = \"\"; for (var i = 0; i < 20000; i = i + 1) { t = \"abcdefghij\" + \"klmnopqrst\"; } writeLn(t);",
             "test.wl");
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0))
         {
@@ -141,7 +143,7 @@ public sealed class VirtualMachineTests
     [Fact]
     public void AnImportTheHostDoesNotOfferIsNotRun()
     {
-        var module = Compile("writeLn(1);");
+        var module = Compile("import { write, writeLn } from \"std:io\"; writeLn(1);");
         var result = new WebLingoVirtualMachine().Execute(module, new WebLingoExecutionContext(new WebLingoWorkerId(0)));
         Assert.Equal(WebLingoDiagnosticCodes.UndefinedIdentifier, result.Error!.Code);
     }
@@ -164,7 +166,8 @@ public sealed class VirtualMachineTests
     [Fact]
     public void ABuiltinThatThrowsIsARuntimeErrorNotACrash()
     {
-        var module = Compile("writeLn(1);");
+        // The host offers writeLn alone, and declares it alone.
+        var module = new WebLingoCompiler(new WebLingoCompilerOptions([new WebLingoBuiltinDeclaration("writeLn", 1)])).Compile("import { writeLn } from \"std:io\"; writeLn(1);", "test.wl").Module!;
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = new WebLingoBuiltinRegistry(new ThrowingPrint()) };
         var result = new WebLingoVirtualMachine().Execute(module, context);
         Assert.Equal(WebLingoDiagnosticCodes.InvalidOperation, result.Error!.Code);

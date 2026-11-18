@@ -21,6 +21,8 @@ public sealed class WebLingoLowerer
     private IReadOnlyList<(string Name, WebLingoBoundClass Class)> _builtinBound = [];
     private int[] _valueClasses = [];
     private readonly List<(string Code, int Class)> _errorClasses = [];
+    /// <summary>The units of the standard modules the compiler makes, whose imports give their instances at once (section 3.9).</summary>
+    private readonly HashSet<int> _standardUnits = [];
 
     private WebLingoLowerer() { }
 
@@ -35,6 +37,10 @@ public sealed class WebLingoLowerer
         // A program that imports others: each file's function, whose closure the program registers, before its own
         // instance and its imports (section 3.9).
         var units = new List<WebLingoIrUnit>();
+        for (var i = 0; i < program.Units.Count; i++)
+        {
+            if (program.Units[i].IsStandard) lowerer._standardUnits.Add(i);
+        }
         var prologue = new List<WebLingoIrStatement>();
         for (var i = 0; i < program.Units.Count; i++)
         {
@@ -164,7 +170,9 @@ public sealed class WebLingoLowerer
         {
             if (statement is not WebLingoBoundImport import) continue;
             var imported = new WebLingoIrImport(import.Unit, import.Span) { Values = import.Values is { } values ? LowerExpression(values) : null };
-            lowered.Add(Initialize(import.Local, new WebLingoIrAwait(imported, import.Span), import.Span));
+            // A standard module the compiler makes is made where the program begins, its import its instance, not awaited.
+            WebLingoIrExpression value = _standardUnits.Contains(import.Unit) ? imported : new WebLingoIrAwait(imported, import.Span);
+            lowered.Add(Initialize(import.Local, value, import.Span));
         }
         foreach (var statement in block)
         {

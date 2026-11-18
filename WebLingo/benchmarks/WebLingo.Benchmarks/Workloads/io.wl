@@ -1,5 +1,6 @@
 // I/O-bound work: 1,000 small files written and read back through std:fs, one at a time, each awaited, then all at once.
 param folder;
+import { writeLn } from "std:io";
 import fs from "std:fs";
 var count = 1000;
 var total = 0;

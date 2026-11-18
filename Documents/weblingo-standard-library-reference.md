@@ -37,15 +37,17 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 
 ## 1. Built-in functions
 
-They are `std:system`'s, a module every file imports without saying so, so they are always in scope.
+`write` and `writeLn` are `std:io`'s, which a program imports, `import { write, writeLn } from "std:io";`; `delay` is
+`std:system`'s, a module every file imports without saying so, so it is always in scope.
 
 | Function | What it does |
 |---|---|
-| `write(value)` | writes a value's text, without a line break |
-| `writeLn(value)` | writes a value's text and a line break |
+| `write(value)` | `std:io`'s: writes a value's text, without a line break |
+| `writeLn(value)` | `std:io`'s: writes a value's text and a line break |
 | `delay(milliseconds)` | a task that completes, with `null`, after that time |
 
 ```javascript
+import { write, writeLn } from "std:io";
 write("Tea ");
 writeLn("time");
 writeLn([1, "two", null]);
@@ -60,7 +62,7 @@ ten milliseconds later
 ```
 
 `write` writes where its host says: the console under `weblingo`, the response's body in a page, where it is not
-escaped. A value's text is what its `toString()` gives.
+escaped; a page's text and its `<%= %>` write without an import. A value's text is what its `toString()` gives.
 
 ---
 
@@ -78,6 +80,7 @@ The class every class extends, unless it extends another; every value but `null`
 | `new Object()` | a plain instance, with no fields |
 
 ```javascript
+import { writeLn } from "std:io";
 class Point {
   constructor(x, y) { this.x = x; this.y = y; }
   equal(other) { return other is Point && this.x == other.x && this.y == other.y; }
@@ -127,6 +130,7 @@ binary64, and `"tea"` a `String`.
 | `separator.join(array)` | the array's strings, numbers, Booleans, decimals and dates, `null` as nothing, with `separator` between them |
 
 ```javascript
+import { write, writeLn } from "std:io";
 writeLn([Integer.parse("42") + 1, Number.parse("1.5") * 2, Boolean.parse("true")]);
 writeLn([new Integer(), new Number(), new String(), new Boolean()]);
 writeLn([12.toString(), "héllo".length, "héllo"[1]]);
@@ -174,6 +178,7 @@ instances holding a value of that kind (the Language Reference, "Classes of valu
 | `new Array()`, `new Map()`, `new Set()` | an empty one, as `[]`, `{}` and `#{}` are |
 
 ```javascript
+import { writeLn } from "std:io";
 var a = [1, 2];
 a.push(3);
 writeLn([a.pop(), a, a.length]);
@@ -208,6 +213,7 @@ What `iterate()` gives, and what `foreach` asks for: a collection's, and any cla
 | `it.next()` | its next item; WL3005 past the last |
 
 ```javascript
+import { write, writeLn } from "std:io";
 var it = ["a", "b"].iterate();
 while (it.hasNext()) writeLn(it.next());
 class Countdown {
@@ -245,6 +251,7 @@ b
 | `C.name = f` | gives it a static member |
 
 ```javascript
+import { writeLn } from "std:io";
 var Greeter = new Class("Greeter");
 Greeter.setMethod("constructor", function (this, name) { this.name = name; });
 Greeter.setMethod("greet", function (this) { return "Hello, " + this.name; });
@@ -301,6 +308,7 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `EnvironmentPermissionError` | WL3019 | a variable a site's scripts try to set, under `wasp`, which lets them read only (section 19) |
 
 ```javascript
+import { writeLn } from "std:io";
 try {
   var empty = [];
   empty.pop();
@@ -337,6 +345,7 @@ The values may be tasks, or any others, which are their own results. `std:tasks`
 the same: `import { all } from "std:tasks";`.
 
 ```javascript
+import { writeLn } from "std:io";
 import { all } from "std:tasks";
 async function brew(tea, minutes) { await delay(minutes); return tea; }
 writeLn(await all([brew("green", 3), brew("black", 1)]));
@@ -369,6 +378,7 @@ When a program ends, the first fault of a task nothing awaited stops it, unless 
 | `Module.import(path, values)` | a task of the module at `path`, compiled and run when it is called, its parameters given `values`, a map |
 
 ```javascript
+import { writeLn } from "std:io";
 var maths = await Module.import("09-maths.wl", { factor: 3 });
 writeLn(maths.scale(14));
 ```
@@ -410,6 +420,7 @@ The charsets are `utf-8`, `utf-16` (or `utf-16le`), `utf-16be`, `us-ascii` and `
 without regard to case. Text that is not hexadecimal, or not Base64, is WL3001.
 
 ```javascript
+import { writeLn } from "std:io";
 var b = Bytes.from("tea");
 writeLn([b, b.length, b[0], b.slice(1).text()]);
 var builder = new BytesBuilder();
@@ -454,6 +465,7 @@ A date and time: an instant, to the millisecond, with its offset from UTC, immut
 as `DateTime:` and ISO 8601's text, and an interpolation formats one, `{d:yyyy-MM-dd}`.
 
 ```javascript
+import { writeLn } from "std:io";
 var opened = DateTime.utc(2026, 11, 16, 9);
 writeLn([opened, opened.dayOfWeek, opened.addDays(7).format("d MMMM")]);
 var closed = DateTime.parse("2026-11-16T17:30:00Z");
@@ -500,6 +512,7 @@ JSON's text, read and written by the class `Json`, which a program has by import
 | `Json.stringify(value, indent)` | the value's JSON text, `indent` 0 to 10 spaces, 0 unless given: maps, arrays, sets, strings, numbers, decimals, Booleans, `null`, dates as their ISO text, and instances as their fields, or as their class's `toJson()` gives |
 
 ```javascript
+import { writeLn } from "std:io";
 import { Json } from "std:json";
 var data = Json.parse("[1, 2.5, \"three\", {\"four\": null}]");
 writeLn([data, data[0] is Integer, data[1] is Number]);
@@ -540,6 +553,7 @@ under `wasp`, reach only the folders its `wasp.config`'s `"files"` lets them rea
 from the site's root, and a path outside them is a `FilePermissionError`, WL3016 (the WASP User Manual, "Configuration").
 
 ```javascript
+import { writeLn } from "std:io";
 import fs from "std:fs";
 await fs.makeFolder("notes");
 await fs.writeText("notes/menu.txt", "green\n");
@@ -592,6 +606,7 @@ A status that is not a success, `404`, is a response as any other. A redirect is
 Given a server on this machine, at port 8080, that has `teas.json`, `[{"name": "Sencha", "price": 4.5}, {"name": "Genmaicha", "price": 3.75}]`, and `menu.txt`, but no `green.json`:
 
 ```javascript
+import { writeLn } from "std:io";
 import http from "std:http";
 import { Json } from "std:json";
 var r = await http.get("http://localhost:8080/teas.json", { "Accept": "application/json" });
@@ -633,6 +648,7 @@ TCP connections to other servers, through the native class `Socket`. Each operat
 A host the script may not reach is a `NetworkPermissionError`, WL3017, as for `std:http`; a host that cannot be reached, and a connection that fails, are a `NetworkError`, WL3014. Given the server above:
 
 ```javascript
+import { writeLn } from "std:io";
 import { Socket } from "std:net";
 using (var socket = await Socket.connect("localhost", 8080)) {
   await socket.write("HEAD /menu.txt HTTP/1.0\r\nHost: localhost\r\n\r\n");
@@ -671,6 +687,7 @@ A configuration names a script's or a site's databases, `weblingo.config` beside
 A statement's values are a map, `{ max: 10 }`, each named `@max` in its SQL, never written into its text: `null`, Booleans, integers, numbers, decimals, strings, bytes and dates. Its options are a map, a statement's `{ timeout: 30 }`, in seconds, and a transaction's `{ isolation: "serializable" }`, one of `readUncommitted`, `readCommitted`, `repeatableRead`, `serializable` and `snapshot`, one the database does not take an error. SQLite's values come back as integers, numbers, strings and bytes, a column declared a decimal, `DECIMAL(10, 2)`, as a decimal, a Boolean, `BOOLEAN`, as one, and a date, `DATETIME`, as one. SQL Server's come back as their types say: its integers, `TINYINT` to `BIGINT`, as integers, `FLOAT` and `REAL` as numbers, `DECIMAL` and `MONEY` as decimals, `BIT` as a Boolean, text as strings, `VARBINARY` as bytes, `DATETIMEOFFSET` as a date with its offset, a date without one, `DATE` or `DATETIME2`, as one on the server's clocks, and a `UNIQUEIDENTIFIER` or a `TIME` as its text. A connection's operations run one at a time, and those a script starts without awaiting them, as `Task.all` does, in no defined order: a script awaits each one whose order matters. What cannot be asked for, a name no configuration gives, a value of another kind, an option it does not take, is WL3001; the database's own failure, a statement it refuses or a file it cannot open, a `DatabaseError`, WL3015.
 
 ```javascript
+import { writeLn } from "std:io";
 import { Database } from "std:db";
 using (var db = await Database.open("sqlite::memory:")) {
   await db.execute("CREATE TABLE Fish (Id INTEGER PRIMARY KEY, Name TEXT, Price DECIMAL(10, 2), Stock INTEGER)");
@@ -715,6 +732,7 @@ a site's page awaits `hashPasswordAsync` instead, so that its worker serves othe
 and its salt, so that one made with today's defaults still verifies after they change.
 
 ```javascript
+import { writeLn } from "std:io";
 import crypto from "std:crypto";
 writeLn(crypto.sha256("abc").toHex());
 writeLn(crypto.hmac("sha256", "Jefe", "what do ya want for nothing?").toHex());
@@ -755,6 +773,7 @@ else is `null`, as if it were not there, and missing from `variables`. A site se
 Windows; the map's names are as the platform gives them.
 
 ```javascript
+import { writeLn } from "std:io";
 import { Environment } from "std:env";
 Environment.setVariable("GREETING", "hello");
 writeLn(Environment.variable("GREETING"));
@@ -859,6 +878,7 @@ too, gives a value's text, as `write` writes it but for an instance's `toString(
 | `Html.css(x)` | `zWebLingoz` if it could change what a style means, else the value, its CSS escapes decoded |
 
 ```javascript
+import { writeLn } from "std:io";
 import { Html } from "std:html";
 writeLn(Html.escape("<b>Tea & cake</b>"));
 writeLn(Html.url("javascript:alert(1)"));
@@ -914,6 +934,7 @@ arrays; and objects, as `ComObject`s. A member the object does not have is a `Me
 where it said nothing:
 
 ```javascript
+import { writeLn } from "std:io";
 import com from "windows:com";
 var tea = com.create("Scripting.Dictionary");
 tea.Add("Sencha", 6.5m);
@@ -939,6 +960,7 @@ A `ComEnumerator` is an iterator over a collection's `_NewEnum`, which reads one
 | `e.dispose()` | releases the collection's enumerator, as `using` does; the collector releases one never disposed |
 
 ```javascript
+import { writeLn } from "std:io";
 import com from "windows:com";
 var tea = com.create("Scripting.Dictionary");
 tea.Add("Sencha", 6.5m);

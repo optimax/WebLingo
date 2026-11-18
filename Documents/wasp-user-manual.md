@@ -203,7 +203,8 @@ A few rules make pages come out as you would expect:
 - **`%>` inside a string or a comment does not end a block**: `<% var end = "%>"; %>` is one block. A `//` comment runs
   to the end of its line, so a block whose last line is a `//` comment must close on the next line.
 - **`write(value)` and `writeLn(value)`**, inside a block, write a value as `<%-` does, not escaped, `writeLn` with a
-  line break after it.
+  line break after it. A page imports them, `<% import { write, writeLn } from "std:io"; %>`, as any script does; its
+  text and its `<%= %>` need no import.
 
 Everything else inside the blocks is the WebLingo language: variables (`var`, `const`), functions, classes, arrays
 (`[1, 2]`), maps (`{ name: "Ann" }`), `if`, `while`, `for`, `foreach`, `try`, and the rest. An interpolated string,
@@ -536,6 +537,7 @@ and give the same; read in pieces, with `read()`, it cannot then be read whole t
 (`multipart/form-data`) cannot be read yet.
 
 ```javascript
+import { write } from "std:io";
 export async function post(request, response) {
   var bytes = 0;
   var piece = await request.read();
@@ -583,6 +585,7 @@ text: an API, a redirect, a download. The function is given the request and the 
 and what it writes, with `write`, is the response's body.
 
 ```javascript
+import { write } from "std:io";
 import { Json } from "std:json";
 import { teas } from "/lib/catalog.wl";
 

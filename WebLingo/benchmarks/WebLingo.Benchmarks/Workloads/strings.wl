@@ -1,4 +1,5 @@
 // Strings concatenated and compared: 200,000 new strings, which the heap's collector reclaims.
+import { writeLn } from "std:io";
 var count = 0;
 for (var i = 0; i < 20000; i = i + 1) {
     var s = "";

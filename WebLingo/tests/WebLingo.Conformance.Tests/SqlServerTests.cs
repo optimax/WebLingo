@@ -34,6 +34,7 @@ public sealed class SqlServerTests : IDisposable
     {
         Make();
         var (exit, output, error) = Weblingo("""
+            import { writeLn } from "std:io";
             using (var db = await Database.open("shop")) {
               await db.execute("CREATE TABLE Items (Id INT IDENTITY PRIMARY KEY, Title NVARCHAR(100) NOT NULL, Price DECIMAL(10, 2) NULL, " +
                                "Done BIT NOT NULL, Due DATE NULL, Added DATETIMEOFFSET NULL, Photo VARBINARY(MAX) NULL, Score FLOAT NULL, " +
@@ -62,6 +63,7 @@ public sealed class SqlServerTests : IDisposable
     {
         Make();
         var (exit, output, error) = Weblingo("""
+            import { writeLn } from "std:io";
             using (var db = await Database.open("shop")) {
               await db.execute("CREATE TABLE T (Id INT PRIMARY KEY)");
               await db.execute("INSERT INTO T VALUES (1)");

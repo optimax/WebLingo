@@ -29,7 +29,7 @@ public sealed class PageFuzzTests
         "x", "var x = 1;", "include \"/h.wasp\";", "include \"/i.wasp\";", "await renderComponent(\"/c.wasp\", {});",
         "renderComponent(\"/c.wasp\");", "if (true) {", "}", "{", "foreach (var i in [1, 2]) {", "[1][5]", "y", "\"s\"", "'%>'", "\"%>\"",
         "// c", "/* c */", "1 +", ";", "(", ")", "x?[0]", "{ a: 1 }", "#{1}", "=> 1", "class C {}", "new C()", "layout \"/l.wasp\", {};",
-        "renderBody();", "param p = 1;", "1", "null", "write(1);", "else {", "} else {", "while (false) {", "switch (1) { case 1 { } }",
+        "renderBody();", "param p = 1;", "1", "null", "import { write, writeLn } from \"std:io\"; write(1);", "else {", "} else {", "while (false) {", "switch (1) { case 1 { } }",
         "try {", "} catch (e) {", "throw 1;", "async function f() {", "await 1;", "return;", "x = 2;", "...[1]", "f(", "%", "?", ":",
         "\\", "@", "\"\\u{110000}\"", "0x", "1_", "1.5m", "Infinity", "-", "!", "&&", "[", "]", ",", ".", "?.", "??", "=",
         "[].iterate().next()", "new BytesBuilder().add(true)", "class Q extends Integer {} new Q(\"x\")", "[1, 2].map((v) => [v][3])",

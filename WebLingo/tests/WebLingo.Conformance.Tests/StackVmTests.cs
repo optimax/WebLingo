@@ -41,7 +41,7 @@ public sealed class StackVmTests
                     foreach (var row in attribute.GetData(method)) programs.Add((string)row[0]);
                 }
             }
-            programs.Add("var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);\n");
+            programs.Add("import { write, writeLn } from \"std:io\"; var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);\n");
             programs.Add("var x = 9223372036854775807 + 1;");
             return programs;
         }
@@ -90,7 +90,7 @@ public sealed class StackVmTests
     public void MalformedStackBytecodeFailsVerificationNotACrash()
     {
         var module = new WebLingoStackCompiler(Options)
-            .Compile("var a = 10; var b = a * 2 - 3; function f(n) { return n + b; } var c = 0; c = -f(b) / a; writeLn(c);",
+            .Compile("import { write, writeLn } from \"std:io\"; var a = 10; var b = a * 2 - 3; function f(n) { return n + b; } var c = 0; c = -f(b) / a; writeLn(c);",
                 "base.wl").Module!;
         var random = new Random(8_6);
         var opCodes = Enum.GetValues<WebLingoStackOpCode>();

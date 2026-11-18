@@ -1,4 +1,5 @@
 // Closures made and called: each shares a captured cell with the function that made it.
+import { writeLn } from "std:io";
 function counter() {
     var count = 0;
     return function (by) {

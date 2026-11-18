@@ -10,7 +10,7 @@ public sealed class StackCodeGeneratorTests
     [Fact]
     public void GeneratesTheSpecificationsExample()
     {
-        var module = Generate("var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);");
+        var module = Generate("var a = 10;\nvar b = 20;\nvar result = a + b;\nprintLn(result);");
         Assert.Equal(
             [
                 I(WebLingoStackOpCode.LoadConstant, 0), I(WebLingoStackOpCode.StoreLocal, 0),
@@ -70,7 +70,7 @@ public sealed class StackCodeGeneratorTests
     [Fact]
     public void AFunctionsArgumentsGoOnTheStackAboveItsCallee()
     {
-        var module = Generate("function add(a, b) { return a + b; } writeLn(add(1, 2));");
+        var module = Generate("function add(a, b) { return a + b; } printLn(add(1, 2));");
         var add = Assert.Single(module.Functions);
         Assert.Equal((2, 2, 2), (add.ParameterCount, add.LocalCount, add.MaxStack));
         Assert.Contains(I(WebLingoStackOpCode.Call, 2), module.EntryPoint.Code);
@@ -82,7 +82,7 @@ public sealed class StackCodeGeneratorTests
     {
         var compiled = new WebLingoStackCompiler(Options).Compile(
             "var s = 0; for (var i = 0; i < 10; i = i + 1) { if (i == 5) continue; if (s > 100) break; s = s + i; } " +
-            "var j = 0; do { j = j + 1; } while (j < 3 && s != 0); while (false) {} writeLn(s);", "loops.wl");
+            "var j = 0; do { j = j + 1; } while (j < 3 && s != 0); while (false) {} printLn(s);", "loops.wl");
         Assert.Empty(compiled.Diagnostics); // The compiler verifies what it generates.
         Assert.NotNull(compiled.Module);
     }
@@ -90,21 +90,21 @@ public sealed class StackCodeGeneratorTests
     [Fact]
     public void ItsDiagnosticsAreTheRegisterCompilers()
     {
-        const string source = "var x = 1; var x = 2; writeLn(y);";
+        const string source = "var x = 1; var x = 2; printLn(y);";
         var register = new WebLingoCompiler(Options).Compile(source, "bad.wl");
         var stack = new WebLingoStackCompiler(Options).Compile(source, "bad.wl");
         Assert.Null(stack.Module);
         Assert.Equal(register.Diagnostics, stack.Diagnostics);
     }
 
-    private static readonly WebLingoCompilerOptions Options = new([new WebLingoBuiltinDeclaration("writeLn", 1)]);
+    private static readonly WebLingoCompilerOptions Options = new([new WebLingoBuiltinDeclaration("printLn", 1)]);
 
     private static WebLingoStackInstruction I(WebLingoStackOpCode opCode, int a = 0, int b = 0) => new(opCode, a, b);
 
     [Fact]
     public void AnAsyncFunctionAwaitsAndATopLevelThatAwaitsIsAsync()
     {
-        var module = Generate("async function f(x) { return await x; } writeLn(f(1));");
+        var module = Generate("async function f(x) { return await x; } printLn(f(1));");
         Assert.False(module.EntryPoint.IsAsync);
         var f = Assert.Single(module.Functions);
         Assert.True(f.IsAsync);

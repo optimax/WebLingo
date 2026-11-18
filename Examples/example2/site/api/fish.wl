@@ -1,5 +1,6 @@
 // /api/fish: the catalogue as JSON, ?water=marine for one water's fish.
 
+import { write } from "std:io";
 import { Json } from "std:json";
 import { catalogue, waterOf } from "/lib/store.wl";
 

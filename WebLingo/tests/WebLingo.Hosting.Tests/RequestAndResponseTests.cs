@@ -68,7 +68,7 @@ public sealed class RequestAndResponseTests
     [InlineData("response.headers[\"X-Count\"] = 5;", "WL3001: A header&#39;s value is a string, not the integer 5.")]
     [InlineData("response.headers[5] = \"x\";", "WL3001: A header&#39;s name is a string, not the integer 5.")]
     [InlineData("request.headers[\"Accept\"] = \"x\";", "WL3001: These headers cannot be changed: a request&#39;s never can")]
-    [InlineData("write(request.headers[\"X-None\"]);", "WL3007: There is no header &#39;X-None&#39;.")]
+    [InlineData("import { write } from \"std:io\"; write(request.headers[\"X-None\"]);", "WL3007: There is no header &#39;X-None&#39;.")]
     [InlineData("request.method = \"PUT\";", "WL3001:")]
     public void AWrongStatusOrHeaderIsAnErrorWhereItIsSet(string statement, string error)
     {
@@ -124,7 +124,7 @@ public sealed class RequestAndResponseTests
     {
         var app = Load(new MemoryFileSystem()
             .Add("/site/api/teas.wl",
-                "export function get(request, response) {\n  response.headers[\"Content-Type\"] = \"application/json\";\n"
+                "import { write, writeLn } from \"std:io\"; export function get(request, response) {\n  response.headers[\"Content-Type\"] = \"application/json\";\n"
                 + "  write(\"[\\\"\" + request.query[\"kind\"] + \"\\\"]\");\n}\n"
                 + "export async function post(request, response) { response.status = 201; write(\"made \" + request.method); }\n"
                 + "export function twice(x) { return x * 2; }")
@@ -155,11 +155,11 @@ public sealed class RequestAndResponseTests
         // a 500. A name with " and %> is one, the handler's page naming it in a string literal as it is; any other file
         // named so is sent as it is.
         var app = Load(new MemoryFileSystem()
-            .Add("/site/api/tea\\notes.wl", "export function get(request, response) { write(\"notes\"); }")
-            .Add("/site/api/two\nlines.wl", "export function get(request, response) { write(\"lines\"); }")
+            .Add("/site/api/tea\\notes.wl", "import { write, writeLn } from \"std:io\"; export function get(request, response) { write(\"notes\"); }")
+            .Add("/site/api/two\nlines.wl", "import { write, writeLn } from \"std:io\"; export function get(request, response) { write(\"lines\"); }")
             .Add("/site/tea:time.wasp", "<p>tea</p>")
             .Add("/site/back\\slash/index.wasp", "<p>index</p>")
-            .Add("/site/api/say \"hi\" %>.wl", "export function get(request, response) { write(\"quoted\"); }")
+            .Add("/site/api/say \"hi\" %>.wl", "import { write, writeLn } from \"std:io\"; export function get(request, response) { write(\"quoted\"); }")
             .Add("/site/css/odd\\name.css", "p { }"));
         Assert.Equal(404, Get(app, "GET", "/api/tea\\notes").Status);
         Assert.Equal(404, Get(app, "GET", "/api/two\nlines").Status);
@@ -174,8 +174,8 @@ public sealed class RequestAndResponseTests
     public void AHandlerThatFailsIsA500_ItsErrorsInItsFile()
     {
         var app = Load(new MemoryFileSystem()
-            .Add("/site/api/fails.wl", "export function get(request, response) {\n  write([1][5]);\n}")
-            .Add("/site/api/bad.wl", "export function get(request, response) {\n  write(nope);\n}")
+            .Add("/site/api/fails.wl", "import { write, writeLn } from \"std:io\"; export function get(request, response) {\n  write([1][5]);\n}")
+            .Add("/site/api/bad.wl", "import { write, writeLn } from \"std:io\"; export function get(request, response) {\n  write(nope);\n}")
             .Add("/site/api/broken.wl", "export function get(request, response) {"), WebLingoMode.Development);
         var (status, body) = Get(app, "GET", "/api/fails");
         Assert.Equal(500, status);

@@ -28,13 +28,13 @@ public sealed class PageTests
     [InlineData("<%- \"<b>bold</b>\" %>", "<b>bold</b>")]
     // null writes nothing, so that an optional read that finds nothing is blank; write(null) writes null.
     [InlineData("[<%= null %>][<%- null %>]", "[][]")]
-    [InlineData("<% var p = null; %>[<%= p?.name %>]<% write(null); %>", "[]null")]
+    [InlineData("<% import { write } from \"std:io\"; var p = null; %>[<%= p?.name %>]<% write(null); %>", "[]null")]
     // <%# %> is nothing, and ends at the first %>.
     [InlineData("a<%# a \"note %>b", "ab")]
     // A statement may span several blocks, the text between them in its body.
     [InlineData("<% foreach (var p in [\"a\", \"b\"]) { %><li><%= p %></li><% } %>", "<li>a</li><li>b</li>")]
     [InlineData("<% if (1 > 2) { %>yes<% } else { %>no<% } %>", "no")]
-    [InlineData("a<% write(\"b\"); %>c", "abc")]
+    [InlineData("a<% import { write } from \"std:io\"; write(\"b\"); %>c", "abc")]
     // A block's code is WebLingo's tokens: %> in a string or a comment does not end it.
     [InlineData("<% var end = \"%>\"; %><%= end %>", "%&gt;")]
     [InlineData("<% /* %> */ var x = 1; %><%= x %>", "1")]
@@ -207,7 +207,7 @@ public sealed class PageTests
     [InlineData("<% await renderComponent(\"/tree.wasp\", { n: 3 }); %>",
         "tree.wasp=<% param n; %><%= n %><% if (n > 0) { await renderComponent(\"tree.wasp\", { n: n - 1 }); } %>", "3210")]
     // A missing one is a runtime error, which a catch may catch.
-    [InlineData("<% try { await renderComponent(\"/nope.wasp\"); } catch (e) { write(e.code); } %>", "", "WL5005")]
+    [InlineData("<% import { write } from \"std:io\"; try { await renderComponent(\"/nope.wasp\"); } catch (e) { write(e.code); } %>", "", "WL5005")]
     public void AComponentRendersWhereItIsCalled(string page, string templates, string written)
     {
         Assert.Equal(("", written, ""), Render(page, Templates(templates)));

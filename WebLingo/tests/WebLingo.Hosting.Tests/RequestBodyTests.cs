@@ -80,7 +80,7 @@ public sealed class RequestBodyTests
             .Add("/site/text.wasp", "<% param request; var t = await request.text(); %><%= t %>|<%= await request.text() == t %>")
             .Add("/site/form.wasp", "<% param request; var f = await request.form(); %><%= f[\"a\"] %>|<%= f[\"b\"] %>|<%= f[\"c\"] %>|"
                                     + "<%= await request.text() %>")
-            .Add("/site/api/names.wl", "export async function post(request, response) { var f = await request.form(); write(f[\"name\"]); }")
+            .Add("/site/api/names.wl", "import { write, writeLn } from \"std:io\"; export async function post(request, response) { var f = await request.form(); write(f[\"name\"]); }")
             .Add("/site/pieces.wasp", "<% param request; var pieces = 0; var bytes = 0; var first = null; var piece = await request.read(); "
                                       + "while (piece != null) { if (first == null) first = piece[0]; pieces = pieces + 1; bytes = bytes + piece.length; "
                                       + "piece = await request.read(); } %><%= pieces %> pieces, <%= bytes %> bytes, first <%= first %>")

@@ -40,6 +40,7 @@ public sealed class FileSystemTests : IDisposable
     public void TextIsWrittenAppendedAndReadBothWays(string vm)
     {
         Assert.Equal(("héllo\nworld\n|12|true|false|done", ""), Run(vm, """
+            import { write } from "std:io";
             await fs.writeText(folder + "/a.txt", "héllo\n");
             fs.appendTextSync(folder + "/a.txt", "world\n");
             write(await fs.readText(folder + "/a.txt"));
@@ -56,6 +57,7 @@ public sealed class FileSystemTests : IDisposable
     public void FoldersAreMadeListedAndRemoved(string vm)
     {
         Assert.Equal(("[\"a.txt\", \"b\", \"c.txt\"] [] false", ""), Run(vm, """
+            import { write } from "std:io";
             await fs.makeFolder(folder + "/x/b");
             fs.makeFolderSync(folder + "/x/b");
             await fs.writeText(folder + "/x/c.txt", "c");
@@ -76,6 +78,7 @@ public sealed class FileSystemTests : IDisposable
     {
         File.WriteAllText(Path.Combine(_folder, "bom.txt"), "marked", new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
         Assert.Equal(("ü 6 6 4", ""), Run(vm, """
+            import { write } from "std:io";
             fs.writeTextSync(folder + "/u.txt", "ü", "utf-16");
             write(fs.readTextSync(folder + "/u.txt", "utf-16") + " ");
             write(fs.readTextSync(folder + "/bom.txt").length.toString() + " ");
@@ -97,6 +100,7 @@ public sealed class FileSystemTests : IDisposable
     public void AFileIsOpenedReadWrittenAndDisposed(string vm)
     {
         Assert.Equal(("[one][two][three]|WL3001 This File has been disposed.", ""), Run(vm, """
+            import { write } from "std:io";
             using (var w = await fs.File.open(folder + "/f.txt", "w")) {
                 await w.write("one\ntwo");
                 w.writeSync("\n");
@@ -121,6 +125,7 @@ public sealed class FileSystemTests : IDisposable
     public void ManyOperationsRunAtOnce(string vm)
     {
         Assert.Equal(("4950", ""), Run(vm, """
+            import { write } from "std:io";
             var writes = [];
             for (var i = 0; i < 100; i = i + 1) writes.push(fs.writeText(folder + "/n" + i.toString() + ".txt", i.toString()));
             await Task.all(writes);
@@ -137,6 +142,7 @@ public sealed class FileSystemTests : IDisposable
     public void AFailureIsAnIOErrorNamingTheScriptsPath(string vm)
     {
         var (output, error) = Run(vm, """
+            import { write } from "std:io";
             try { await fs.readText(folder + "/missing.txt"); } catch (IOError e) { write(e.code + " " + e.message + "|"); }
             try { fs.removeSync("missing.txt"); } catch (IOError e) { write(e.message + "|"); }
             fs.makeFolderSync(folder + "/full");

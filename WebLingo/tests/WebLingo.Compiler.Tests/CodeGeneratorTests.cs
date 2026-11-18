@@ -9,7 +9,7 @@ public sealed class CodeGeneratorTests
     [Fact]
     public void GeneratesTheSpecificationsExample()
     {
-        var module = Generate("var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);");
+        var module = Generate("var a = 10;\nvar b = 20;\nvar result = a + b;\nprintLn(result);");
         Assert.Equal(
             """
             function main (3 locals, 4 registers)
@@ -17,12 +17,12 @@ public sealed class CodeGeneratorTests
             01  LoadConstant r1(b), 20
             02  Add r2(result), r0(a), r1(b)
             03  Move r3, r2(result)
-            04  CallBuiltin r3, writeLn(r3)
+            04  CallBuiltin r3, printLn(r3)
             05  Return
 
             """.ReplaceLineEndings("\n"),
             WebLingoDisassembler.Format(module));
-        Assert.Equal(new[] { new WebLingoImport("writeLn", 1) }, module.Imports);
+        Assert.Equal(new[] { new WebLingoImport("printLn", 1) }, module.Imports);
     }
 
     [Fact]
@@ -54,24 +54,24 @@ public sealed class CodeGeneratorTests
     [Fact]
     public void TemporariesAreReusedAcrossStatements()
     {
-        var module = Generate("var a = 1; writeLn(a * 2 + 3); writeLn(a * 4 + 5);");
+        var module = Generate("var a = 1; printLn(a * 2 + 3); printLn(a * 4 + 5);");
         Assert.Equal(4, module.EntryPoint.RegisterCount);
     }
 
     [Fact]
     public void EveryInstructionHasASourceSpan()
     {
-        var module = Generate("var a = 1;\nwriteLn(-a);");
+        var module = Generate("var a = 1;\nprintLn(-a);");
         Assert.Equal(module.EntryPoint.Code.Count, module.EntryPoint.Spans!.Count);
         var negate = module.EntryPoint.Code.ToList().FindIndex(i => i.OpCode == WebLingoOpCode.Negate);
         Assert.Equal(new WebLingoSourceSpan(19, 2), module.EntryPoint.Spans[negate]);
     }
 
     [Theory]
-    [InlineData("var a = 10; var b = 20; var result = a + b; writeLn(result);")]
-    [InlineData("var x = 0; x = (x = 1) + (x = 2) * -x; writeLn(x);")]
-    [InlineData("var a = 1; var b = a; a = b = a + b; writeLn(a - b / 2);")]
-    [InlineData("write(1); var write = 2;")]
+    [InlineData("var a = 10; var b = 20; var result = a + b; printLn(result);")]
+    [InlineData("var x = 0; x = (x = 1) + (x = 2) * -x; printLn(x);")]
+    [InlineData("var a = 1; var b = a; a = b = a + b; printLn(a - b / 2);")]
+    [InlineData("print(1); var print = 2;")]
     [InlineData("")]
     public void WhatTheCompilerGeneratesVerifies(string source)
     {
@@ -100,7 +100,7 @@ public sealed class CodeGeneratorTests
     [Fact]
     public void AnAsyncFunctionAwaitsAndATopLevelThatAwaitsIsAsync()
     {
-        var module = Generate("async function f(x) { return await x; } writeLn(f(1));");
+        var module = Generate("async function f(x) { return await x; } printLn(f(1));");
         Assert.False(module.EntryPoint.IsAsync);
         var f = Assert.Single(module.Functions);
         Assert.True(f.IsAsync);

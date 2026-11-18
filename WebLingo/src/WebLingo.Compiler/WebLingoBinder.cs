@@ -170,19 +170,41 @@ public sealed class WebLingoBinder
                 // class is, which a program has only by importing them (section 3.9, the owner's decision, 18 November 2026).
                 var classesExported = new List<(string, WebLingoLocalSymbol)>();
                 foreach (var moduleClass in moduleClasses) classesExported.Add((moduleClass, UseBuiltinClass(moduleClass)));
-                units.Add(new WebLingoBoundUnit(module.Name, null, classesExported, DeclareHidden(module.Name, default)) { Builtins = [] });
+                units.Add(new WebLingoBoundUnit(module.Name, null, classesExported, DeclareHidden(module.Name, default))
+                {
+                    Builtins = [], IsStandard = true
+                });
+                continue;
+            }
+            if (module.IsStandard && WebLingoStandardModules.Functions.TryGetValue(module.Name, out var moduleFunctions))
+            {
+                // std:io: the host's built-ins it exports, those the host gives, which a program has only by importing
+                // them (section 3.9, the owner's decision, 18 November 2026).
+                var functionsExported = new List<WebLingoBuiltinSymbol>();
+                foreach (var exportedName in moduleFunctions)
+                {
+                    if (_hostBuiltins.TryGetValue(exportedName, out var given)) functionsExported.Add(UseBuiltin(given));
+                }
+                units.Add(new WebLingoBoundUnit(module.Name, null, [], DeclareHidden(module.Name, default))
+                {
+                    Builtins = functionsExported, IsStandard = true
+                });
                 continue;
             }
             if (module.IsStandard)
             {
-                // std:system: the host's built-ins, its exports, made where the program begins (section 3.9).
+                // std:system: the host's built-ins, its exports, made where the program begins (section 3.9), but those
+                // another standard module exports.
                 var exported = new List<WebLingoBuiltinSymbol>();
                 foreach (var declaration in _builtinDeclarations)
                 {
                     // A component's render is no function, and so no export (section 13).
-                    if (!declaration.RendersComponent) exported.Add(UseBuiltin(declaration));
+                    if (!declaration.RendersComponent && !WebLingoStandardModules.IsImportedFunction(declaration.Name))
+                    {
+                        exported.Add(UseBuiltin(declaration));
+                    }
                 }
-                units.Add(new WebLingoBoundUnit(module.Name, null, [], DeclareHidden(module.Name, default)) { Builtins = exported });
+                units.Add(new WebLingoBoundUnit(module.Name, null, [], DeclareHidden(module.Name, default)) { Builtins = exported, IsStandard = true });
                 continue;
             }
             if (module.Native is { } native)
@@ -562,10 +584,17 @@ public sealed class WebLingoBinder
                 {
                     alias.ImportOf = instance;
                     alias.ImportName = imported.Name;
+                    // A standard module's host's built-in, std:io's writeLn, called directly as one every program had was.
+                    if (_moduleSources[unit].IsStandard && WebLingoStandardModules.ExportsFunction(_moduleSources[unit].Name, imported.Name)
+                        && _hostBuiltins.TryGetValue(imported.Name, out var hosted))
+                    {
+                        alias.ImportedBuiltin = hosted;
+                    }
                 }
             }
             imports.Add(import, new WebLingoBoundImport(unit, instance, import.Span) { Values = BindImportValues(import, unit) });
-            if (_function == _main) _main.Awaits = true; // Its imports are awaited (section 3.9).
+            // Its imports are awaited (section 3.9), but a standard module's the compiler makes, which nothing runs.
+            if (_function == _main && !_moduleSources[unit].IsStandard) _main.Awaits = true;
         }
         return statements;
     }
@@ -1472,12 +1501,13 @@ public sealed class WebLingoBinder
         }
         if (LookupLocal(name.Name) is { } local)
         {
+            if (local.ImportedBuiltin is { } imported) return new WebLingoBoundBuiltinReference(UseBuiltin(imported), name.Span);
             // A name an import takes is its module's export, read as it is when read (section 3.9).
             return local.ImportOf is { } module
                 ? new WebLingoBoundMember(Reference(module, name.Span), local.ImportName!, name.Span)
                 : Reference(local, name.Span);
         }
-        if (_hostBuiltins.TryGetValue(name.Name, out var builtin))
+        if (_hostBuiltins.TryGetValue(name.Name, out var builtin) && !WebLingoStandardModules.IsImportedFunction(name.Name))
         {
             if (!builtin.RendersComponent) return new WebLingoBoundBuiltinReference(UseBuiltin(builtin), name.Span);
             Report(WebLingoDiagnosticCodes.InvalidOperation, $"'{name.Name}' renders a component, and can only be called.",
@@ -1513,6 +1543,7 @@ public sealed class WebLingoBinder
         _standardModules ??= _native?.StandardModules() ?? [];
         var modules = new List<(string Name, List<string> Exports)>();
         foreach (var (module, classes) in WebLingoStandardModules.Classes) modules.Add((module, new List<string>(classes)));
+        foreach (var (module, functions) in WebLingoStandardModules.Functions) modules.Add((module, new List<string>(functions)));
         foreach (var module in _standardModules)
         {
             var exports = new List<string>();
@@ -1544,8 +1575,21 @@ public sealed class WebLingoBinder
             if (!WebLingoStandardModules.IsImported(valueClass)) names.Add(valueClass);
         }
         foreach (var (errorClass, _) in WebLingoPrelude.ErrorClasses) names.Add(errorClass);
-        names.AddRange(_hostBuiltins.Keys);
+        foreach (var builtin in _hostBuiltins.Keys)
+        {
+            if (!WebLingoStandardModules.IsImportedFunction(builtin)) names.Add(builtin);
+        }
         return names;
+    }
+
+    /// <summary>
+    /// The host's built-in a name means: a standard module's, where an import takes it, <c>import { writeLn } from
+    /// "std:io";</c>; else, where nothing declares the name, one every program has, no standard module's (section 3.9).
+    /// </summary>
+    private WebLingoBuiltinDeclaration? HostBuiltinNamed(string name)
+    {
+        if (LookupLocal(name) is { } local) return local.ImportedBuiltin;
+        return _hostBuiltins.TryGetValue(name, out var declaration) && !WebLingoStandardModules.IsImportedFunction(name) ? declaration : null;
     }
 
     /// <summary>Whether <paramref name="known"/>, a name a program can write, differs from <paramref name="name"/> only by case.</summary>
@@ -1706,8 +1750,7 @@ public sealed class WebLingoBinder
                 calleeSyntax.Span);
             return new WebLingoBoundError(call.Span);
         }
-        if (calleeSyntax is WebLingoNameSyntax name && LookupLocal(name.Name) is null
-            && _hostBuiltins.TryGetValue(name.Name, out var declaration))
+        if (calleeSyntax is WebLingoNameSyntax name && HostBuiltinNamed(name.Name) is { } declaration)
         {
             if (declaration.RendersComponent)
             {

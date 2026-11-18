@@ -3,6 +3,7 @@
 //
 //   weblingo run setup.wl
 
+import { writeLn } from "std:io";
 import { Database } from "std:db";
 
 const fish = [

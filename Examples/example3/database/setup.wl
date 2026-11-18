@@ -8,6 +8,7 @@
 
 param database = null;
 param script = "setup.sql";
+import { writeLn } from "std:io";
 
 import { Database } from "std:db";
 import fs from "std:fs";

@@ -102,6 +102,12 @@ public sealed class WebLingoLocalSymbol(string name, WebLingoDeclarationKind kin
     /// <summary>For a name an import takes (<c>import { f } from …</c>): the local holding the module, read as its member.</summary>
     public WebLingoLocalSymbol? ImportOf { get; set; }
     public string? ImportName { get; set; }
+
+    /// <summary>
+    /// For a name an import takes of a standard module's host's built-in, <c>import { writeLn } from "std:io";</c>: that
+    /// built-in, which the name means as a built-in every program had meant it, called directly (section 3.9).
+    /// </summary>
+    public WebLingoBuiltinDeclaration? ImportedBuiltin { get; set; }
     public bool IsConstant => Kind is WebLingoDeclarationKind.Const or WebLingoDeclarationKind.Function or WebLingoDeclarationKind.Class;
 }
 
