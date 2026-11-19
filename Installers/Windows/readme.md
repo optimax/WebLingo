@@ -38,12 +38,27 @@ It comes in six zips, named for the processors they run on and for whether they 
    weblingo --version
    ```
 
-The unzipped folder may then be deleted. `weblingo run script.wl` runs a script, and `weblingo check script.wl`
-reports its errors without running it. WebLingo is not signed yet: Windows may warn that `weblingo.exe` comes from an
+The unzipped folder may then be deleted, once `add-wl-file-type.wl`, below, has run, if you want it. `weblingo
+script.wl` runs a script, as `weblingo run script.wl` does, and `weblingo check script.wl` reports its errors without
+running it. WebLingo is not signed yet: Windows may warn that `weblingo.exe` comes from an
 unknown publisher (**More info**, then **Run anyway**), and Smart App Control, where it is on, blocks it.
 
 To serve WASP's sites, WebLingo's web pages, on IIS, install WASP's zip of the same version, processor and kind after
 this one, as its `readme.md` says.
+
+## Running a script by a double-click
+
+Once WebLingo is installed, `add-wl-file-type.wl`, beside this `readme.md`, makes Explorer run a `.wl` file when it is
+double-clicked, for your Windows account, in a console that waits for a key once the script has ended, so that what it
+wrote stays to be read; **Edit** on its right-click menu opens it in Notepad. It needs no administrator. In a console in
+this folder:
+
+```bat
+weblingo add-wl-file-type.wl
+```
+
+`remove=yes` takes it away again. A script double-clicked runs as any program does, one downloaded from the internet
+included: run only those you trust.
 
 ## Updating
 

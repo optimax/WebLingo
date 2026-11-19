@@ -75,7 +75,7 @@ try {
             $root = Join-Path $staging $name
             $runtime = Join-Path $root 'WebLingo'
             Publish-Project 'src/WebLingo.Cli/WebLingo.Cli.csproj' $architecture $kind $runtime
-            foreach ($script in 'install.wl', 'windows.wl', 'weblingo.config') {
+            foreach ($script in 'install.wl', 'add-wl-file-type.wl', 'windows.wl', 'weblingo.config') {
                 Copy-Item (Join-Path $repository "Scripts/$script") $root
             }
             Copy-Item (Join-Path $PSScriptRoot 'readme.md') $root

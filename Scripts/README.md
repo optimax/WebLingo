@@ -12,6 +12,7 @@ they copy through `std:fs`, without COM.
 |---|---|
 | `install.wl` | Installs WebLingo from its installer's zip, which holds it beside the folder it installs, `WebLingo`: copies that folder into WebLingo's folder for the zip's architecture, `C:\Program Files\WebLingo`, or `C:\Program Files (x86)\WebLingo` for x86 on 64-bit Windows, and puts it on the machine's `PATH` (`../Installers/Windows/readme.md`) |
 | `iis-install.wl` | Makes this machine's IIS run WASP's sites, from WASP's installer's zip: turns IIS on, unless it is; installs the ASP.NET Core Module, unless IIS has it, from Microsoft's Hosting Bundle, checked against the SHA-512 Microsoft's release metadata gives; and copies `wasp`, the zip's folder `WASP`, into WebLingo's folder for the zip's architecture, once the WebLingo there is found to be the one it was made with (`../Installers/Windows/wasp-readme.md`) |
+| `add-wl-file-type.wl` | Makes Explorer run a `.wl` file when it is double-clicked, for this Windows account, in a console that waits for a key at the end, with **Edit** in its right-click menu opening Notepad; no administrator needed; `remove=yes` undoes it |
 | `install-weblingo.wl` | Installs WebLingo in `C:\Program Files\WebLingo`, or updates it, from the folder `WebLingo/publish.ps1` publishes it to, `WebLingo\publish\WebLingo`; the application pools of the sites whose `wasp` runs from there are stopped while their files are replaced, and started again |
 | `add-weblingo-to-path.wl` | Puts `C:\Program Files\WebLingo` on the machine's `PATH`, once, so that consoles started after run `weblingo` and `wasp` by their names |
 | `add-wasp-site.wl` | Adds a WASP site to IIS: its application pool, with no managed code, and its website, served by HTTPS on port 443 under a name of its own, with a certificate this machine trusts |
@@ -20,7 +21,8 @@ they copy through `std:fs`, without COM.
 
 Each changes the machine, and so runs as administrator, in a console run as administrator, from this folder; run
 otherwise, it stops before changing anything, but for `add-sql-server-login.wl`, which changes a SQL Server, and runs
-as one of its administrators. Each may be run again: it keeps what is there, and adds what is missing.
+as one of its administrators, and `add-wl-file-type.wl`, which changes only the account's own file types, and runs as
+that account. Each may be run again: it keeps what is there, and adds what is missing.
 
 ## Installing WebLingo
 
