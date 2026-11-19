@@ -1,0 +1,34 @@
+// 06-regular-expressions.wlg: regular expressions, and the limit that keeps a bad pattern from hanging a server.
+//
+// A regular expression is made by its class, std:regex's Regex, in .NET's syntax; there is no /literal/ form.
+
+import { Regex } from "std:regex";
+
+var date = new Regex("(?<year>\\d{4})-(?<month>\\d{2})-(?<day>\\d{2})");
+writeLn(date.test("Shipped on 2026-11-18."));
+writeLn(date.match("Shipped on 2026-11-18."));
+writeLn(date.replace("2026-11-18", "${day}.${month}.${year}"));
+
+var words = new Regex("\\b[a-z]+\\b", "i");
+writeLn(words.matchAll("Green tea, Black tea").map(m => m[0]));
+writeLn("a1b22c333".split(new Regex("\\d+")));
+writeLn(date);
+
+// A pattern that backtracks without end, run on text made to trip it, would keep a worker busy forever, a classic
+// denial of service. WebLingo gives each match a second, then stops it with a TimeoutError, which a program may catch.
+var evil = new Regex("^(a+)+$");
+try {
+  evil.test("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!");
+} catch (TimeoutError e) {
+  writeLn([e.code, e.message]);
+}
+
+/* Output:
+true
+["2026-11-18", "2026", "11", "18"]
+18.11.2026
+["Green", "tea", "Black", "tea"]
+["a", "b", "c", ""]
+Regex:/(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/
+["WL3010", "The regular expression /^(a+)+$/ took longer than 1 second to match."]
+*/

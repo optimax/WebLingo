@@ -21,7 +21,7 @@ public sealed class VmLoadingTests : IDisposable
     [InlineData("stack", "WebLingo.VM.Stack")]
     public void AWlbcLoadsOnlyItsVm(string vm, string assembly)
     {
-        var main = Path.Combine(_folder, "main.wl");
+        var main = Path.Combine(_folder, "main.wlg");
         File.WriteAllText(main, "import { write, writeLn } from \"std:system\"; writeLn(6 * 7);\n");
         var compiled = Path.Combine(_folder, "main.wlbc");
         Assert.Empty(VmsLoadedBy(0, "", "compile", "--" + vm, main));
@@ -33,7 +33,7 @@ public sealed class VmLoadingTests : IDisposable
     [Fact]
     public void AScriptLoadsOnlyTheRegisterVm()
     {
-        var main = Path.Combine(_folder, "main.wl");
+        var main = Path.Combine(_folder, "main.wlg");
         File.WriteAllText(main, "import { write, writeLn } from \"std:system\"; writeLn(6 * 7);\n");
         Assert.Empty(VmsLoadedBy(0, "", "check", main));
         Assert.Equal(["WebLingo.VM"], VmsLoadedBy(0, "42\n", "run", main));

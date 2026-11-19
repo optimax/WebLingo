@@ -63,11 +63,11 @@ public sealed class HostParameterTests
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services };
         if (stack)
         {
-            var compiled = new WebLingoStackCompiler(options).Compile(program, "main.wl");
+            var compiled = new WebLingoStackCompiler(options).Compile(program, "main.wlg");
             var result = compiled.Module is { } module ? new WebLingoStackVirtualMachine().Execute(module, context) : null;
             return (compiled.Diagnostics, output.Text, result?.Error);
         }
-        var registerCompiled = new WebLingoCompiler(options).Compile(program, "main.wl");
+        var registerCompiled = new WebLingoCompiler(options).Compile(program, "main.wlg");
         var registerResult = registerCompiled.Module is { } registerModule ? new WebLingoVirtualMachine().Execute(registerModule, context) : null;
         return (registerCompiled.Diagnostics, output.Text, registerResult?.Error);
     }

@@ -1,7 +1,7 @@
 # WebLingo for Windows
 
-WebLingo is a scripting language. This zip holds `weblingo`, which runs WebLingo's scripts, `.wl` files, and its
-standard modules, and `install.wl`, a script that installs them for the whole machine, in WebLingo's folder,
+WebLingo is a scripting language. This zip holds `weblingo`, which runs WebLingo's scripts, `.wlg` files, and its
+standard modules, and `install.wlg`, a script that installs them for the whole machine, in WebLingo's folder,
 `C:\Program Files\WebLingo`, and puts that folder on the machine's `PATH`.
 
 It comes in six zips, named for the processors they run on and for whether they carry .NET:
@@ -27,7 +27,7 @@ It comes in six zips, named for the processors they run on and for whether they 
 
    ```bat
    cd /d "%USERPROFILE%\Downloads\WebLingo-0.20.0-pre-alpha-win-x64-self-contained"
-   WebLingo\weblingo.exe run install.wl
+   WebLingo\weblingo.exe run install.wlg
    ```
 
    with the folder's own name, which is the zip's. It writes where it installed WebLingo, and that it added the folder
@@ -38,8 +38,8 @@ It comes in six zips, named for the processors they run on and for whether they 
    weblingo --version
    ```
 
-The unzipped folder may then be deleted, once `add-wl-file-type.wl`, below, has run, if you want it. `weblingo
-script.wl` runs a script, as `weblingo run script.wl` does, and `weblingo check script.wl` reports its errors without
+The unzipped folder may then be deleted, once `add-wlg-file-type.wlg`, below, has run, if you want it. `weblingo
+script.wlg` runs a script, as `weblingo run script.wlg` does, and `weblingo check script.wlg` reports its errors without
 running it. WebLingo is not signed yet: Windows may warn that `weblingo.exe` comes from an
 unknown publisher (**More info**, then **Run anyway**), and Smart App Control, where it is on, blocks it.
 
@@ -48,13 +48,13 @@ this one, as its `readme.md` says.
 
 ## Running a script by a double-click
 
-Once WebLingo is installed, `add-wl-file-type.wl`, beside this `readme.md`, makes Explorer run a `.wl` file when it is
+Once WebLingo is installed, `add-wlg-file-type.wlg`, beside this `readme.md`, makes Explorer run a `.wlg` file when it is
 double-clicked, for your Windows account, in a console that waits for a key once the script has ended, so that what it
 wrote stays to be read; **Edit** on its right-click menu opens it in Notepad. It needs no administrator. In a console in
 this folder:
 
 ```bat
-weblingo add-wl-file-type.wl
+weblingo add-wlg-file-type.wlg
 ```
 
 At the first double-click, Windows asks once how to open the file, since only you may choose that, and its list may
@@ -65,16 +65,16 @@ included: run only those you trust.
 
 ## Updating
 
-Run a newer zip's `install.wl` the same way: it copies its files over the old ones, then WASP's, where it is
+Run a newer zip's `install.wlg` the same way: it copies its files over the old ones, then WASP's, where it is
 installed. A program running from WebLingo's folder, an IIS site's `wasp` among them, keeps its files in use: stop it
 first, or the installer says which programs to stop.
 
-## What `install.wl` does
+## What `install.wlg` does
 
 It stops unless it runs as administrator; copies the folder `WebLingo`, beside it, into WebLingo's folder, over any
 files of the same names; and adds that folder to the end of the machine's `PATH`, once, leaving its other entries as
 they were, so that where both WebLingo for x64 and for x86 are installed, `weblingo` by its name is the one installed
-first. `target=<folder>` installs elsewhere: `WebLingo\weblingo.exe run install.wl target=D:\WebLingo`. `windows.wl`,
+first. `target=<folder>` installs elsewhere: `WebLingo\weblingo.exe run install.wlg target=D:\WebLingo`. `windows.wlg`,
 beside it, is what it shares with WebLingo's other setup scripts, and `weblingo.config` lists the Windows objects they
 may use, through `windows:com`.
 

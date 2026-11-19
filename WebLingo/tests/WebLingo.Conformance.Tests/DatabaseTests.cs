@@ -141,7 +141,7 @@ public sealed class DatabaseTests : IDisposable
         // caller below it: the error is the call's, on line 6, not a place its own source's positions name (section 3.9).
         var (exit, _, error) = Weblingo(Setup + "\n\n\n\n\nawait db.transaction(5);\n");
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
-        Assert.StartsWith("program.wl(6,7): error WL2005:", error);
+        Assert.StartsWith("program.wlg(6,7): error WL2005:", error);
     }
 
     [Fact]
@@ -204,7 +204,7 @@ public sealed class DatabaseTests : IDisposable
 
     private string Write(string source)
     {
-        var path = Path.Combine(_folder, "scripts", "program.wl");
+        var path = Path.Combine(_folder, "scripts", "program.wlg");
         File.WriteAllText(path, source);
         return path;
     }
@@ -215,6 +215,6 @@ public sealed class DatabaseTests : IDisposable
         var output = new StringWriter();
         var error = new StringWriter();
         var exit = WebLingoCommandLine.Run(["run", path], output, error);
-        return (exit, output.ToString(), error.ToString().Replace(path, "program.wl", StringComparison.Ordinal));
+        return (exit, output.ToString(), error.ToString().Replace(path, "program.wlg", StringComparison.Ordinal));
     }
 }

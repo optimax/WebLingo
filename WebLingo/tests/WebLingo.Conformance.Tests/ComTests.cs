@@ -163,8 +163,8 @@ public sealed class ComTests : IDisposable
     public void ComIsAllowedByAListOfNames()
     {
         File.WriteAllText(Path.Combine(_folder, "weblingo.config"), "{ \"com\": [\"Scripting.Dictionary\"] }");
-        File.WriteAllText(Path.Combine(_folder, "program.wl"), "import { write, writeLn } from \"std:system\"; writeLn(1);");
-        var (exit, _, error) = Weblingo("run", Path.Combine(_folder, "program.wl"));
+        File.WriteAllText(Path.Combine(_folder, "program.wlg"), "import { write, writeLn } from \"std:system\"; writeLn(1);");
+        var (exit, _, error) = Weblingo("run", Path.Combine(_folder, "program.wlg"));
         Assert.Equal(WebLingoCommandLine.FileUnreadable, exit);
         Assert.Contains("\"com\" is an object, { \"allow\": [\"ADODB.Connection\"] }.", error, StringComparison.Ordinal);
     }
@@ -175,13 +175,13 @@ public sealed class ComTests : IDisposable
     /// </summary>
     private (string Output, string Error) Run(string program)
     {
-        var path = Path.Combine(_folder, "program.wl");
+        var path = Path.Combine(_folder, "program.wlg");
         File.WriteAllText(path, program);
         var register = OnApartment(() => Weblingo("run", path));
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", path).Exit);
         var stack = OnApartment(() => Weblingo("run", Path.ChangeExtension(path, ".wlbc")));
-        Assert.Equal((register.Output, register.Error.Replace("program.wl", "program", StringComparison.Ordinal)),
-            (stack.Output, stack.Error.Replace("program.wl", "program", StringComparison.Ordinal)));
+        Assert.Equal((register.Output, register.Error.Replace("program.wlg", "program", StringComparison.Ordinal)),
+            (stack.Output, stack.Error.Replace("program.wlg", "program", StringComparison.Ordinal)));
         return (register.Output, register.Error);
     }
 

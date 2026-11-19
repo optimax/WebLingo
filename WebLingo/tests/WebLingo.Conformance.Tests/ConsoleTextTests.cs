@@ -20,7 +20,7 @@ public sealed class ConsoleTextTests : IDisposable
     [Fact]
     public async Task TextIsWrittenAsUtf8()
     {
-        var script = Path.Combine(_folder, "letters.wl");
+        var script = Path.Combine(_folder, "letters.wlg");
         File.WriteAllText(script, "writeLn(\"żółw € 😀\");\nthrow new Error(\"ŻÓŁW\");\n");
         var start = new ProcessStartInfo(Program(), ["run", script])
         {

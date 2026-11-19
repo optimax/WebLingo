@@ -1,6 +1,6 @@
 # Editors
 
-Syntax colouring for WebLingo's files in editors: `.wl`, WebLingo's scripts and modules, and `.wasp`, WASP's pages.
+Syntax colouring for WebLingo's files in editors: `.wlg`, WebLingo's scripts and modules, and `.wasp`, WASP's pages.
 
 ## Notepad++
 
@@ -8,7 +8,7 @@ Syntax colouring for WebLingo's files in editors: `.wl`, WebLingo's scripts and 
 
 | File | Language | Files |
 |---|---|---|
-| `WebLingo.udl.xml` | WebLingo | `.wl` |
+| `WebLingo.udl.xml` | WebLingo | `.wlg` |
 | `WASP.udl.xml` | WASP | `.wasp` |
 
 To install them, in Notepad++, choose **Language → User Defined Language → Define your language…**, then **Import…**,
@@ -42,7 +42,7 @@ They were tried with Notepad++ 8.9.8, on Windows.
 
 ## VS Code
 
-`VSCode/` is an extension of VS Code, in source, which gives it two languages, WebLingo, for `.wl` files, and WASP, for
+`VSCode/` is an extension of VS Code, in source, which gives it two languages, WebLingo, for `.wlg` files, and WASP, for
 `.wasp` files, each with its TextMate grammar (`weblingo.tmLanguage.json` and `wasp.tmLanguage.json`) and its language
 configuration (comments, brackets, and the pairs VS Code closes as you type).
 

@@ -86,7 +86,7 @@ public sealed class WaspServeTests : IDisposable
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                 Assert.Contains(text, await response.Content.ReadAsStringAsync());
             }
-            foreach (var path in new[] { "/lib/teas.wl", "/index.wasp", "/web.config" })
+            foreach (var path in new[] { "/lib/teas.wlg", "/index.wasp", "/web.config" })
             {
                 Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(path)).StatusCode);
             }
@@ -100,7 +100,7 @@ public sealed class WaspServeTests : IDisposable
     [Fact]
     public async Task TheFishStoreServesItsDatabase()
     {
-        // Examples.wasp/example2, the owner's example of a site with a database: copied, its database made by its setup.wl, as
+        // Examples.wasp/example2, the owner's example of a site with a database: copied, its database made by its setup.wlg, as
         // its README says, outside the site's folder, then served (section 7.11).
         var folder = new DirectoryInfo(AppContext.BaseDirectory);
         while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Examples.wasp", "example2", "site", "web.config"))) folder = folder.Parent;
@@ -116,7 +116,7 @@ public sealed class WaspServeTests : IDisposable
         try
         {
             var (made, setupError) = (new StringWriter(), new StringWriter());
-            Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.Combine(copy, "database", "setup.wl")], made, setupError));
+            Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.Combine(copy, "database", "setup.wlg")], made, setupError));
             Assert.Equal(("fish.db has 14 fish and 3 orders.\n", ""), (made.ToString(), setupError.ToString()));
             var server = WebLingoWaspServer.Create(Path.Combine(copy, "site"), 0, new Dictionary<string, string>(), out var error, out _);
             Assert.True(server is not null, error);
@@ -138,7 +138,7 @@ public sealed class WaspServeTests : IDisposable
                     Assert.Contains(text, body);
                 }
                 Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/fish/item?id=99")).StatusCode);
-                Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/lib/store.wl")).StatusCode);
+                Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/lib/store.wlg")).StatusCode);
 
                 // An order, in a transaction: the stock lowered, the order recorded; one for more than is left refused.
                 var order = await client.PostAsync("/order", new FormUrlEncodedContent(
@@ -211,7 +211,7 @@ public sealed class WaspServeTests : IDisposable
     public async Task TheToDoListServesItsSqlServerDatabase()
     {
         // Examples.wasp/example3, the owner's example of a site on SQL Server: copied, its database made on the machine's by its
-        // setup.wl running its setup.sql, under a name of the test's own, which the copy's wasp.config names, then served,
+        // setup.wlg running its setup.sql, under a name of the test's own, which the copy's wasp.config names, then served,
         // its items added, changed, marked done and deleted (section 7.11). The database is dropped after it.
         var folder = new DirectoryInfo(AppContext.BaseDirectory);
         while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Examples.wasp", "example3", "site", "web.config"))) folder = folder.Parent;
@@ -230,7 +230,7 @@ public sealed class WaspServeTests : IDisposable
         try
         {
             var (made, setupError) = (new StringWriter(), new StringWriter());
-            var setup = Path.Combine(copy, "database", "setup.wl");
+            var setup = Path.Combine(copy, "database", "setup.wlg");
             var script = Path.Combine(copy, "database", "setup.sql");
             Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", setup, "database=" + database, "script=" + script], made, setupError));
             Assert.Equal(($"{database} has 4 lists and 36 items, 30 of them open.\n", ""), (made.ToString(), setupError.ToString()));
@@ -254,7 +254,7 @@ public sealed class WaspServeTests : IDisposable
                     Assert.Contains(text, body);
                 }
                 Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/edit?id=999")).StatusCode);
-                Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/lib/todo.wl")).StatusCode);
+                Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/lib/todo.wlg")).StatusCode);
 
                 // Added, then the browser sent back to the list (303), which shows it; a form without a title refused.
                 var added = await client.PostAsync("/add", new FormUrlEncodedContent(
@@ -285,7 +285,7 @@ public sealed class WaspServeTests : IDisposable
         }
         finally
         {
-            var drop = Path.Combine(copy, "database", "drop.wl");
+            var drop = Path.Combine(copy, "database", "drop.wlg");
             File.WriteAllText(drop, "import { Database } from \"std:db\"; using (var db = await Database.open(\"server\")) { " +
                                     $"await db.execute(\"IF DB_ID(N'{database}') IS NOT NULL BEGIN ALTER DATABASE [{database}] " +
                                     $"SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{database}]; END\"); }}");

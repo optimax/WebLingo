@@ -1,6 +1,6 @@
 # Examples of WASP's sites
 
-Scripts that show the language itself are in `../Examples.wl`.
+Scripts that show the language itself are in `../Examples.wlg`.
 
 Each example is a site's own files, as a server runs them: its pages, its modules, its other files and its
 `web.config`, side by side, as a PHP site's are; example2's and example3's sites are their `site` folders, what makes
@@ -23,14 +23,14 @@ example1/               the site, and wasp's root
   layouts/main.wasp     the layout every page has: its title, its header and its footer
   includes/             the header, with the current page marked, and the footer
   components/           tea-card.wasp, which a page renders for each tea, with its parameters
-  lib/teas.wl           the catalog: a class, the teas, and the functions the pages call
+  lib/teas.wlg           the catalog: a class, the teas, and the functions the pages call
   css/site.css          a file served as it is
 ```
 
 ### What it shows
 
 - **Pages and routes.** A page is found by its path without `.wasp`: `/brewing` is `brewing.wasp`, and `/teas` is
-  `teas/index.wasp`. A page's source, a module's (`/lib/teas.wl`), the configuration and `web.config` are never served.
+  `teas/index.wasp`. A page's source, a module's (`/lib/teas.wlg`), the configuration and `web.config` are never served.
 - **A layout.** Every page names its layout at its top, after its imports,
   `<% layout "/layouts/main.wasp", { title: "…", section: "…" }; %>`; the rest of the page is the body, which the layout
   writes where it calls `renderBody()`.
@@ -40,8 +40,8 @@ example1/               the site, and wasp's root
   `std:env`, which a site reads only as its `wasp.config` allows: `{ "env": { "machineName": true } }`.
 - **A component.** `await renderComponent("/components/tea-card.wasp", { tea: tea, detailed: true });` renders a tea,
   the component declaring what it takes, `param tea; param detailed = false;`.
-- **A module.** `lib/teas.wl` holds a class, `Tea`, the teas, and the functions the pages import:
-  `<% import { featured } from "/lib/teas.wl"; %>`.
+- **A module.** `lib/teas.wlg` holds a class, `Tea`, the teas, and the functions the pages import:
+  `<% import { featured } from "/lib/teas.wlg"; %>`.
 - **Escaping.** `<%= value %>` writes text escaped for HTML, so that `about.wasp`'s motto, `Tea & patience <always>`,
   shows as it is; an interpolated string formats a number, `$"€{tea.price:N2}"`.
 
@@ -67,7 +67,7 @@ WebLingo is installed once on a server, and every site shares it, as PHP is inst
 holds only its own files.
 
 On Windows, the scripts in `Scripts`, at the repository's root, written in WebLingo, do these steps as administrator:
-`install-weblingo.wl` installs WebLingo once it is published, and `add-wasp-site.wl` adds a site, served by HTTPS
+`install-weblingo.wlg` installs WebLingo once it is published, and `add-wasp-site.wlg` adds a site, served by HTTPS
 under a name of its own (`Scripts/README.md`). By hand:
 
 Once for the server:
@@ -117,9 +117,9 @@ The database is outside the site's folder, so that it is never served, its place
 ```text
 example2/
   database/             outside the site: the database, and the script that makes it
-    setup.wl            makes fish.db: its tables, the fish, a few orders, and the carts, empty
-    weblingo.config     names the database "fish" for setup.wl: { "databases": { "fish": "sqlite:fish.db" } }
-    fish.db             made by setup.wl, not in the repository
+    setup.wlg            makes fish.db: its tables, the fish, a few orders, and the carts, empty
+    weblingo.config     names the database "fish" for setup.wlg: { "databases": { "fish": "sqlite:fish.db" } }
+    fish.db             made by setup.wlg, not in the repository
   site/                 the site, and wasp's root
     web.config          IIS's configuration, as example1's
     wasp.config         names the database "fish" for the pages: "sqlite:../database/fish.db"
@@ -129,15 +129,15 @@ example2/
     order.wasp          /order            an order, posted by that form, placed in a transaction
     orders.wasp         /orders           the latest orders, a join of two tables
     cart/index.wasp     /cart             the cart: its fish, how many of each and their total, in one form
-    cart/add.wl         /cart/add         a fish added, posted by its page: a route handler, as the next three are
-    cart/update.wl      /cart/update      every quantity set at once, 0 taking a fish out
-    cart/remove.wl      /cart/remove      one fish taken out, by its Remove button
-    cart/empty.wl       /cart/empty       every fish taken out
+    cart/add.wlg         /cart/add         a fish added, posted by its page: a route handler, as the next three are
+    cart/update.wlg      /cart/update      every quantity set at once, 0 taking a fish out
+    cart/remove.wlg      /cart/remove      one fish taken out, by its Remove button
+    cart/empty.wlg       /cart/empty       every fish taken out
     cart/checkout.wasp  /cart/checkout    the cart ordered, every fish or none, in one transaction
     credits.wasp        /credits          each photo's author and licence, from the database
-    api/fish.wl         /api/fish         the fish as JSON, a route handler
-    lib/store.wl        the module the pages ask the database through
-    lib/cart.wl         the carts: the cookie that names each, and what the cart's pages ask the database
+    api/fish.wlg         /api/fish         the fish as JSON, a route handler
+    lib/store.wlg        the module the pages ask the database through
+    lib/cart.wlg         the carts: the cookie that names each, and what the cart's pages ask the database
     layouts/, includes/, components/, css/   as example1's
     images/             the fish's photos, 1024 x 768, and their credits, CREDITS.md
 ```
@@ -148,7 +148,7 @@ example2/
   relative path being from the configuration's folder, and a script opens it by that name, so that where it is, and
   which database it is, stay out of the scripts: `using (var db = await Database.open("fish")) { … }`.
 - **Queries with values.** `await db.query(sql, { water: water, max: max })` gives an array of maps, a map for each row,
-  each value named in the SQL as `@water` and `@max`, never pasted into its text; `lib/store.wl` asks the database for
+  each value named in the SQL as `@water` and `@max`, never pasted into its text; `lib/store.wlg` asks the database for
   each page.
 - **A transaction.** `order.wasp` checks a fish's stock, lowers it and records the order in one
   `await db.transaction(async () => { … })`, which commits, or rolls back where its function throws, as it does when
@@ -159,7 +159,7 @@ example2/
   `response.headers.add("Set-Cookie", …)`, `HttpOnly`, so that no script on a page reads it, and `SameSite=Lax`, so that
   a form another site posts does not carry it; the browser's `Cookie` header brings it back, and its fish are in the
   database, `CartItems`, so that nothing but the id goes to the browser.
-- **Forms that post, then redirect.** Each change to the cart is a form posted to a route handler, `cart/add.wl`'s
+- **Forms that post, then redirect.** Each change to the cart is a form posted to a route handler, `cart/add.wlg`'s
   `post`, which changes the cart and sends the browser back to `/cart` with a 303 (See Other), so that reloading the
   cart posts nothing again; a form no page of the site would send, a quantity of 0 to add, is refused, a 400.
 - **One form, several actions.** The cart's form posts every quantity to `/cart/update`, each field named for its
@@ -179,14 +179,14 @@ example2/
 With the .NET 10 SDK, from the repository's root, make the database first, then serve the site:
 
 ```bash
-dotnet run --project WebLingo/src/WebLingo.Cli -- run Examples/example2/database/setup.wl
+dotnet run --project WebLingo/src/WebLingo.Cli -- run Examples/example2/database/setup.wlg
 ```
 
 ```bash
 dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples/example2/site
 ```
 
-and open <http://localhost:8080/>. `setup.wl` makes `fish.db` beside itself, anew each time it runs: run it again to
+and open <http://localhost:8080/>. `setup.wlg` makes `fish.db` beside itself, anew each time it runs: run it again to
 put the stock and the orders back as they were.
 
 ### Deploying it to IIS
@@ -195,7 +195,7 @@ As example1, with WebLingo installed once on the server, and then:
 
 1. Copy both folders, `site` and `database`, to the server, side by side, so that `../database/fish.db` from the site
    is the database; or put the database elsewhere, and change the path in `wasp.config`.
-2. Make the database there, `weblingo run setup.wl` in the `database` folder, with `C:\Program Files\WebLingo\weblingo.exe`.
+2. Make the database there, `weblingo run setup.wlg` in the `database` folder, with `C:\Program Files\WebLingo\weblingo.exe`.
 3. Give the site's application pool (`IIS AppPool\<pool>`) write access to the `database` folder: SQLite writes its
    journal beside the database while it changes it.
 4. In IIS, add a website whose physical path is the `site` folder, in an application pool whose .NET CLR version is
@@ -211,8 +211,8 @@ database is made by a script the example holds, `setup.sql`, the site naming it 
 example3/
   database/             outside the site: the script that makes the database, and what runs it
     setup.sql           makes the database WebLingoTodo: its tables, Lists and Items, and the items, due around today
-    setup.wl            runs setup.sql through std:db, batch by batch, as sqlcmd would
-    weblingo.config     names the server's master database "server" for setup.wl
+    setup.wlg            runs setup.sql through std:db, batch by batch, as sqlcmd would
+    weblingo.config     names the server's master database "server" for setup.wlg
   site/                 the site, and wasp's root
     web.config          IIS's configuration, as example1's
     wasp.config         names the database "todo": "sqlserver:Server=localhost;Database=WebLingoTodo;…"
@@ -221,9 +221,9 @@ example3/
     add.wasp            /add              an item, posted by that form, added, and the browser sent back to the list
     edit.wasp           /edit?id=1        an item's form, and the item changed when it is posted
     delete.wasp         /delete?id=1      asks, then deletes the item when its form is posted
-    toggle.wl           /toggle           an item marked done, or to do again, by its checkbox: a route handler
-    api/items.wl        /api/items        the items as JSON
-    lib/todo.wl         the module the pages ask the database through, and what checks a form
+    toggle.wlg           /toggle           an item marked done, or to do again, by its checkbox: a route handler
+    api/items.wlg        /api/items        the items as JSON
+    lib/todo.wlg         the module the pages ask the database through, and what checks a form
     layouts/, includes/, components/, css/   as example1's, components/item.wasp an item on the list
 ```
 
@@ -238,7 +238,7 @@ example3/
   date that is not one, is shown again with what is wrong, a 400.
 - **SQL Server's values.** `BIT` columns come back as Booleans, `DATE` ones as dates, `TINYINT` ones as integers; a date
   from the form goes in as a date, `DateTime.parse(due, "yyyy-MM-dd")`.
-- **A route handler that only redirects.** `toggle.wl` exports `post`, which marks an item done, or to do again, and sends
+- **A route handler that only redirects.** `toggle.wlg` exports `post`, which marks an item done, or to do again, and sends
   the browser back to the list it came from, but only to an address on this site.
 
 ### Setting up SQL Server
@@ -273,7 +273,7 @@ relative path is from the current folder:
 
 ```bash
 cd Examples/example3/database
-dotnet run --project ../../../WebLingo/src/WebLingo.Cli -- run setup.wl
+dotnet run --project ../../../WebLingo/src/WebLingo.Cli -- run setup.wlg
 ```
 
 which writes `WebLingoTodo has 4 lists and 36 items, 30 of them open.`; then, from the repository's root, serve the site:
@@ -282,14 +282,14 @@ which writes `WebLingoTodo has 4 lists and 36 items, 30 of them open.`; then, fr
 dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples/example3/site
 ```
 
-and open <http://localhost:8080/>. Run `setup.wl` again to put the items back as they were: it drops the database
+and open <http://localhost:8080/>. Run `setup.wlg` again to put the items back as they were: it drops the database
 first. The server keeps the database's files in its own data folder, `WebLingoTodo.mdf` and `WebLingoTodo_log.ldf`.
 
 ### Another SQL Server
 
 To use another SQL Server, change the server in both configurations, `database/weblingo.config`'s `"server"` and
 `site/wasp.config`'s `"todo"`, to SqlClient's connection string for it,
-`"sqlserver:Server=myserver;Database=WebLingoTodo;Integrated Security=true"`, and run `setup.wl` as above; a server
+`"sqlserver:Server=myserver;Database=WebLingoTodo;Integrated Security=true"`, and run `setup.wlg` as above; a server
 reached over a network should have a certificate its clients trust, in place of `TrustServerCertificate=true`. Under
 IIS, the site reaches the database as its application pool's account, which needs a login on that server, and the
-rights to read and change the database, which `Scripts/add-sql-server-login.wl` gives it (`Scripts/README.md`).
+rights to read and change the database, which `Scripts/add-sql-server-login.wlg` gives it (`Scripts/README.md`).

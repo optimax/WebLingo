@@ -45,7 +45,7 @@ public sealed class ConsoleInputTests : IDisposable
     public void WithoutAConsoleAReadIsAnIOError()
     {
         // As a site's script, under wasp, reads: weblingo given no input, nor any host.
-        var path = Path.Combine(_folder, "noconsole.wl");
+        var path = Path.Combine(_folder, "noconsole.wlg");
         File.WriteAllText(path, "foreach (var read in [() => readLineSync(), () => readLine(), () => prompt(\"x\"), () => readPassword()]) "
                                 + "{ try { read(); } catch (IOError e) { writeLn(e.message); } }");
         var output = new StringWriter();
@@ -60,7 +60,7 @@ public sealed class ConsoleInputTests : IDisposable
     /// </summary>
     private (string Output, string Error) Run(string program, string input)
     {
-        var path = Path.Combine(_folder, "program.wl");
+        var path = Path.Combine(_folder, "program.wlg");
         File.WriteAllText(path, program);
         var register = Weblingo(["run", path], input);
         Assert.Equal(WebLingoCommandLine.Success, Weblingo(["compile", "--stack", path], "").Exit);

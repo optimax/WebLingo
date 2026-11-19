@@ -82,7 +82,7 @@ public sealed class StackCodeGeneratorTests
     {
         var compiled = new WebLingoStackCompiler(Options).Compile(
             "var s = 0; for (var i = 0; i < 10; i = i + 1) { if (i == 5) continue; if (s > 100) break; s = s + i; } " +
-            "var j = 0; do { j = j + 1; } while (j < 3 && s != 0); while (false) {} printLn(s);", "loops.wl");
+            "var j = 0; do { j = j + 1; } while (j < 3 && s != 0); while (false) {} printLn(s);", "loops.wlg");
         Assert.Empty(compiled.Diagnostics); // The compiler verifies what it generates.
         Assert.NotNull(compiled.Module);
     }
@@ -91,8 +91,8 @@ public sealed class StackCodeGeneratorTests
     public void ItsDiagnosticsAreTheRegisterCompilers()
     {
         const string source = "var x = 1; var x = 2; printLn(y);";
-        var register = new WebLingoCompiler(Options).Compile(source, "bad.wl");
-        var stack = new WebLingoStackCompiler(Options).Compile(source, "bad.wl");
+        var register = new WebLingoCompiler(Options).Compile(source, "bad.wlg");
+        var stack = new WebLingoStackCompiler(Options).Compile(source, "bad.wlg");
         Assert.Null(stack.Module);
         Assert.Equal(register.Diagnostics, stack.Diagnostics);
     }
@@ -115,7 +115,7 @@ public sealed class StackCodeGeneratorTests
 
     private static WebLingoStackModule Generate(string source)
     {
-        var compiled = new WebLingoStackCompiler(Options).Compile(source, "test.wl");
+        var compiled = new WebLingoStackCompiler(Options).Compile(source, "test.wlg");
         Assert.Empty(compiled.Diagnostics);
         return compiled.Module!;
     }

@@ -368,14 +368,14 @@ public sealed class FileSystemTests : IDisposable
         WebLingoExecutionResult result;
         if (vm == "register")
         {
-            var compiled = new WebLingoCompiler(options).Compile(source, "program.wl");
+            var compiled = new WebLingoCompiler(options).Compile(source, "program.wlg");
             Assert.True(compiled.Module is not null, string.Join("; ", compiled.Diagnostics));
             foreach (var builtin in builtins.Builtins) services.Register(builtin);
             result = new WebLingoVirtualMachine().Execute(compiled.Module, Context(services, output));
         }
         else
         {
-            var compiled = new WebLingoStackCompiler(options).Compile(source, "program.wl");
+            var compiled = new WebLingoStackCompiler(options).Compile(source, "program.wlg");
             Assert.True(compiled.Module is not null, string.Join("; ", compiled.Diagnostics));
             foreach (var builtin in builtins.Builtins) services.Register(builtin);
             result = new WebLingoStackVirtualMachine().Execute(compiled.Module, Context(services, output));

@@ -1,0 +1,14 @@
+// finally-cannot-drop.wlg: a finally block cannot jump out of itself.
+// A return, break or continue there would silently drop the exception, or the result, on its way out.
+
+function load() {
+  try {
+    throw new Error("disk full");
+  } finally {
+    return "fine";
+  }
+}
+
+/* Errors:
+finally-cannot-drop.wlg(8,5): error WL2012: 'return' would leave a 'finally' block, which nothing may leave early.
+*/

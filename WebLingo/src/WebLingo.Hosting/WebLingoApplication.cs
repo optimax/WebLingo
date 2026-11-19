@@ -39,10 +39,10 @@ public sealed record WebLingoRequestOutcome(WebLingoRequestOutcomeKind Kind, str
 /// errors shown in development only, and one that fails after it ends its response unfinished, its error logged, and shown
 /// at the output's end in development only. <see cref="Handle"/> never throws for a script's error.
 /// A page's <c>param request;</c> and <c>param response;</c> are the request's instances (<see cref="WebLingoHttpObjects"/>).
-/// A <c>.wl</c>'s route is a handler's, a module exporting a function for each method it answers, <c>get</c>,
+/// A <c>.wlg</c>'s route is a handler's, a module exporting a function for each method it answers, <c>get</c>,
 /// <c>post</c>, and so on, which is called with the request and the response, and awaited, as a page that imports the
 /// module would call it; <c>HEAD</c> calls <c>head</c>, or <c>get</c> if it has none; any other method is a 405, whose
-/// <c>Allow</c> names the ones it answers; and a <c>.wl</c> exporting none is not a handler, its path a 404.
+/// <c>Allow</c> names the ones it answers; and a <c>.wlg</c> exporting none is not a handler, its path a 404.
 /// </summary>
 public sealed class WebLingoApplication
 {
@@ -132,7 +132,7 @@ public sealed class WebLingoApplication
     }
 
     /// <summary>
-    /// A <c>.wl</c>'s route: its function for the request's method run as a page that imports it and calls it would run;
+    /// A <c>.wlg</c>'s route: its function for the request's method run as a page that imports it and calls it would run;
     /// a 405 if it has none, and a 404 if it is no handler. Its exports are read from its text, once on each worker, a text
     /// that does not parse being a handler's, so that its errors are the 500's.
     /// </summary>
@@ -163,10 +163,10 @@ public sealed class WebLingoApplication
             WebLingoRequestOutcomeKind.Handler);
     }
 
-    /// <summary>The names a <c>.wl</c> exports, read from its text, or null if it does not parse.</summary>
+    /// <summary>The names a <c>.wlg</c> exports, read from its text, or null if it does not parse.</summary>
     private HashSet<string>? ExportsOf(string file)
     {
-        var text = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wl").Read(file) ?? "";
+        var text = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wlg").Read(file) ?? "";
         var tree = new WebLingoParser(text, file).ParseCompilationUnit();
         foreach (var diagnostic in tree.Diagnostics)
         {
@@ -280,7 +280,7 @@ public sealed class WebLingoApplication
     private CompiledPage Compile(string file, WebLingoWorkerId worker, string? function = null)
     {
         var templates = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wasp");
-        var modules = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wl");
+        var modules = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wlg");
         var options = new WebLingoCompilerOptions(_declarations[worker.Value])
         {
             Resolver = modules,

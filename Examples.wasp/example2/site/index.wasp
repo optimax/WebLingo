@@ -1,4 +1,4 @@
-<% import { featured, waters, heading } from "/lib/store.wl"; %>
+<% import { featured, waters, heading } from "/lib/store.wlg"; %>
 <% layout "/layouts/main.wasp", { title: "Welcome", section: "home" }; %>
 <section class="hero">
   <h1>Fish from rivers and reefs.</h1>

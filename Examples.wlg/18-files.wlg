@@ -1,0 +1,52 @@
+// 18-files.wlg: files and folders, with std:fs.
+//
+// Each function gives a task, to await, and has a synchronous form ending in Sync. Text is UTF-8 unless another
+// encoding is named. Under weblingo a script reaches any file its user may; a site's pages under wasp reach only the
+// folders its wasp.config lists (see ../Examples.wasp). A relative path is from the current folder.
+
+param folder = "18-files-scratch";   // where it works, made here and removed at the end: a parameter comes first
+
+import fs from "std:fs";
+import { Bytes } from "std:bytes";
+
+await fs.makeFolder(folder);
+var notes = folder + "/notes.txt";
+await fs.writeText(notes, "green\n");
+await fs.appendText(notes, "black\n");
+fs.appendTextSync(notes, "oolong\n");
+writeLn([await fs.exists(notes), fs.isFolderSync(folder), await fs.readText(notes)]);
+
+// A file read line by line, with using, which closes it however the block ends.
+using (var file = await fs.File.open(notes, "r")) {
+  var line = await file.read();
+  while (line != null) {
+    writeLn($"- {line}");
+    line = await file.read();
+  }
+}
+
+// Bytes, whole, or a file copied without its bytes reaching the script.
+await fs.writeBytes(folder + "/data.bin", Bytes.fromHex("cafe0042"));
+await fs.copy(folder + "/data.bin", folder + "/copy.bin");
+writeLn([(await fs.readBytes(folder + "/copy.bin")).toHex(), (await fs.list(folder)).sort()]);
+
+// A failure is an IOError, its message naming the path as the script gave it, never more of the machine's.
+try {
+  await fs.readText(folder + "/missing.txt");
+} catch (IOError e) {
+  writeLn([e.code, e.message.replace(folder, "<folder>")]);
+}
+
+foreach (var name in await fs.list(folder)) await fs.remove(folder + "/" + name);
+await fs.removeFolder(folder);
+writeLn(await fs.exists(folder));
+
+/* Output:
+[true, true, "green\nblack\noolong\n"]
+- green
+- black
+- oolong
+["cafe0042", ["copy.bin", "data.bin", "notes.txt"]]
+["WL3011", "'<folder>/missing.txt' cannot be read: there is no such file or folder."]
+false
+*/

@@ -31,7 +31,7 @@ public sealed class WebServerTests : IDisposable
         Write("big.wasp", "<% for (var i = 0; i < 20000; i++) { %>0123456789<% } %>");
         Write("teas/index.wasp", "<p>teas</p>");
         Write("css/site.css", "h1 { }");
-        Write("lib/util.wl", "export function f() { return 1; }");
+        Write("lib/util.wlg", "export function f() { return 1; }");
         Write("wasp.config", "{ }");
     }
 
@@ -172,7 +172,7 @@ public sealed class WebServerTests : IDisposable
             Assert.Equal((HttpStatusCode.OK, "h1 { }", "text/css"),
                 (css.StatusCode, await css.Content.ReadAsStringAsync(), css.Content.Headers.ContentType?.MediaType));
         }
-        foreach (var never in new[] { "/lib/util.wl", "/wasp.config", "/nothing" })
+        foreach (var never in new[] { "/lib/util.wlg", "/wasp.config", "/nothing" })
         {
             using var response = await client.GetAsync(never);
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

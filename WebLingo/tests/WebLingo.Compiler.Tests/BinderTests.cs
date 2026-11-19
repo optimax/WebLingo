@@ -73,7 +73,7 @@ public sealed class BinderTests
     [Fact]
     public void ABuiltinIsUndefinedWhereTheHostDoesNotOfferIt()
     {
-        var compilation = WebLingoCompilation.Create("printLn(1);", "test.wl", WebLingoCompilerOptions.Empty);
+        var compilation = WebLingoCompilation.Create("printLn(1);", "test.wlg", WebLingoCompilerOptions.Empty);
         Assert.Equal(WebLingoDiagnosticCodes.UndefinedIdentifier, Assert.Single(compilation.Diagnostics).Code);
     }
 
@@ -177,11 +177,11 @@ public sealed class BinderTests
     public void BuiltinsAreNumberedInTheOrderTheProgramUsesThem()
     {
         var options = new WebLingoCompilerOptions([new WebLingoBuiltinDeclaration("first", 0), new WebLingoBuiltinDeclaration("printLn", 1)]);
-        var compilation = WebLingoCompilation.Create("printLn(1); first(); printLn(2);", "test.wl", options);
+        var compilation = WebLingoCompilation.Create("printLn(1); first(); printLn(2);", "test.wlg", options);
         Assert.Empty(compilation.Diagnostics);
         var builtins = compilation.BoundProgram!.Builtins;
         Assert.Equal(new[] { ("printLn", 0), ("first", 1) }, builtins.Select(b => (b.Name, b.Index)));
     }
 
-    internal static WebLingoCompilation Compile(string source) => WebLingoCompilation.Create(source, "test.wl", WithWrite);
+    internal static WebLingoCompilation Compile(string source) => WebLingoCompilation.Create(source, "test.wlg", WithWrite);
 }

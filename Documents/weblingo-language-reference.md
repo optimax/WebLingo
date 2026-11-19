@@ -11,7 +11,7 @@ in it was run with `weblingo`, its output shown as it came. See
 WASP User Manual's (`Documents/wasp-user-manual.md`). Every built-in class's members, and the standard modules, are
 listed in the WebLingo Standard Library Reference (`Documents/weblingo-standard-library-reference.md`).
 
-The repository's `Examples.wl` folder holds scripts that show the language at work, each ending with what it writes,
+The repository's `Examples.wlg` folder holds scripts that show the language at work, each ending with what it writes,
 and its `does-not-compile` folder scripts that WebLingo refuses on purpose, with the errors it gives them.
 
 An example is a program, followed by what it writes:
@@ -50,10 +50,10 @@ Hello, WebLingo!
 
 ## 1. Running programs
 
-A WebLingo program is a `.wl` file, a *script*, which `weblingo` runs:
+A WebLingo program is a `.wlg` file, a *script*, which `weblingo` runs:
 
 ```bash
-weblingo run hello.wl
+weblingo run hello.wlg
 ```
 
 or simply
@@ -64,19 +64,19 @@ weblingo hello.wl
 
 | Command | What it does |
 |---|---|
-| `weblingo run <file.wl> [name=value …]` | compiles the script and runs it, giving its parameters the values after it |
-| `weblingo <file.wl> [name=value …]` | the same, the file named first, as a scripting language's runner takes it; a `.wlbc` too |
-| `weblingo check <file.wl>` | compiles the script and reports its errors, without running it |
-| `weblingo compile [--register \| --stack] <file.wl>` | compiles the script into bytecode, a `.wlbc` file beside it |
+| `weblingo run <file.wlg> [name=value …]` | compiles the script and runs it, giving its parameters the values after it |
+| `weblingo <file.wlg> [name=value …]` | the same, the file named first, as a scripting language's runner takes it; a `.wlbc` too |
+| `weblingo check <file.wlg>` | compiles the script and reports its errors, without running it |
+| `weblingo compile [--register \| --stack] <file.wlg>` | compiles the script into bytecode, a `.wlbc` file beside it |
 | `weblingo run <file.wlbc>` | runs compiled bytecode without compiling anything |
 | `weblingo disasm <file.wlbc>` | shows compiled bytecode as text |
 | `weblingo --version` | its version, `WebLingo 0.20.0-pre-alpha`, which `weblingo` alone prints first, before how it is used |
 
 On Windows, `weblingo` started in a console window of its own, as Explorer starts it for a script double-clicked
-(the repository's `Scripts/add-wl-file-type.wl` sets that up), waits for a key once the script has ended, so that what
+(the repository's `Scripts/add-wlg-file-type.wlg` sets that up), waits for a key once the script has ended, so that what
 it wrote stays to be read; started from a console already open, it does not.
 
-`weblingo run` of a `.wl` compiles it in memory, and writes no file; `weblingo compile` writes one, for the register VM
+`weblingo run` of a `.wlg` compiles it in memory, and writes no file; `weblingo compile` writes one, for the register VM
 by default, or for the stack VM with `--stack`. `weblingo disasm hello.wlbc` shows what the compiler made:
 
 ```text
@@ -99,14 +99,14 @@ whatever the console's code page, so that no letter is lost. An error is written
 | 4 | a file could not be read or written |
 
 ```text
-vars-const.wl(2,1): error WL2003: 'limit' is a constant and cannot be assigned.
+vars-const.wlg(2,1): error WL2003: 'limit' is a constant and cannot be assigned.
 ```
 
 A script's own parameters ([section 14](#script-parameters)) are given after its name, each a string. A
 `weblingo.config` file in the script's folder configures where native modules are found
 ([section 15](#native-modules)).
 
-Editors can color WebLingo's files: the repository's `Editors/` folder has syntax coloring for `.wl` files, and for
+Editors can color WebLingo's files: the repository's `Editors/` folder has syntax coloring for `.wlg` files, and for
 WASP's `.wasp` pages, and its `README.md` says how to install it.
 
 ---
@@ -458,14 +458,14 @@ NaN
   ```
 
   ```text
-  values-overflow.wl(2,9): error WL3002: 9223372036854775807 + 1 does not fit in a 64-bit integer.
+  values-overflow.wlg(2,9): error WL3002: 9223372036854775807 + 1 does not fit in a 64-bit integer.
   ```
 
 - **Numbers follow IEEE 754**: `1 / 0` is `Infinity`, `0 / 0` is `NaN`, and `0.1 + 0.2` is what it always is.
 - **Nothing else is arithmetic**: `"n = " + 5` is an error, not `"n = 5"`:
 
   ```text
-  values-noconvert.wl(1,9): error WL3001: '+' joins two strings or adds two numbers, not a string and the integer 5.
+  values-noconvert.wlg(1,9): error WL3001: '+' joins two strings or adds two numbers, not a string and the integer 5.
   ```
 
 ### Equality
@@ -523,7 +523,7 @@ if (1) writeLn("never");
 ```
 
 ```text
-values-truthy.wl(2,5): error WL3001: A condition needs a Boolean, not the integer 1.
+values-truthy.wlg(2,5): error WL3001: A condition needs a Boolean, not the integer 1.
 ```
 
 ### Assignment's operators
@@ -941,7 +941,7 @@ null
   ```
 
   ```text
-  fn-arity.wl(3,9): error WL2006: 'f' takes 1 to 2 arguments, not 3.
+  fn-arity.wlg(3,9): error WL2006: 'f' takes 1 to 2 arguments, not 3.
   ```
 
 - **Recursion** is bounded by the call depth an execution allows, 10,000 by default (WL3003), not by the machine's
@@ -1108,7 +1108,7 @@ null
 - An index outside the array is an error:
 
   ```text
-  coll-index-error.wl(2,9): error WL3005: The index 5 is outside 0 to 1.
+  coll-index-error.wlg(2,9): error WL3005: The index 5 is outside 0 to 1.
   ```
 
 ### Array methods
@@ -1175,7 +1175,7 @@ seven
 - A key that is not there is an error:
 
   ```text
-  coll-key-error.wl(2,9): error WL3007: The map has no key "b".
+  coll-key-error.wlg(2,9): error WL3007: The map has no key "b".
   ```
 
 - Keys may be strings, integers, Booleans and `null`, compared as `==` compares them. A number, or a collection, is not
@@ -1756,7 +1756,7 @@ throw new Error("Unhandled.");
 ```
 
 ```text
-exc-uncaught.wl(1,1): error WL3008: An error was thrown and not caught: Unhandled.
+exc-uncaught.wlg(1,1): error WL3008: An error was thrown and not caught: Unhandled.
 ```
 
 ---
@@ -1806,7 +1806,7 @@ close other
   ```text
   derived cleaned up
   base cleaned up
-  dispose-derived.wl(5,3): error WL3008: An error was thrown and not caught: failed inside
+  dispose-derived.wlg(5,3): error WL3008: An error was thrown and not caught: failed inside
   ```
 
 - A `using` disposes one object; nest them for more. A `null` is not disposed.
@@ -1898,7 +1898,7 @@ fast ready
 
   ```text
   main ends
-  async-forget.wl(4,28): error WL3008: An error was thrown and not caught: nobody awaited me
+  async-forget.wlg(4,28): error WL3008: An error was thrown and not caught: nobody awaited me
   ```
 
 - **One at a time.** A program's tasks run on one thread, taking turns only at `await`, so that no two run at once and
@@ -1909,10 +1909,10 @@ fast ready
 
 ## 14. Modules
 
-A module is a `.wl` file whose declarations marked `export` other files import:
+A module is a `.wlg` file whose declarations marked `export` other files import:
 
 ```javascript
-// lib/shapes.wl
+// lib/shapes.wlg
 export class Square {
   constructor(side) { this.side = side; }
 }
@@ -1922,8 +1922,8 @@ export const unit = "cm";
 
 ```javascript
 import { writeLn } from "std:system";
-import shapes from "lib/shapes.wl";
-import { area, Square } from "lib/shapes.wl";
+import shapes from "lib/shapes.wlg";
+import { area, Square } from "lib/shapes.wlg";
 writeLn(area(new Square(3)));
 writeLn(shapes.unit);
 ```
@@ -1935,7 +1935,7 @@ cm
 
 - **`import name from "path";`** gives the module itself, whose exports are its members; **`import { a, b } from
   "path";`** gives its exports by name. Both may be used together.
-- **A path** is from the importing file's folder; `.wl` may be left out.
+- **A path** is from the importing file's folder; `.wlg` may be left out.
 - **Imports stand at a file's top level**, not inside a block or a function, and the modules run before the rest of
   the file, in their order.
 - **A module runs once** per execution, the first time it is imported; every later import gets the same module.
@@ -1946,7 +1946,7 @@ cm
 
   ```javascript
   import { writeLn } from "std:system";
-  var shapes = await Module.import("lib/shapes.wl");
+  var shapes = await Module.import("lib/shapes.wlg");
   writeLn(shapes.unit);
   ```
 
@@ -1960,15 +1960,15 @@ A module may declare parameters, as a function does, at its top before anything 
 `param size = 1;`. An import gives them in a map, and each set of values makes an instance of the module of its own:
 
 ```javascript
-// lib/sized.wl
+// lib/sized.wlg
 param size = 1;
 export function describe() { return $"size {size}"; }
 ```
 
 ```javascript
 import { writeLn } from "std:system";
-import small from "lib/sized.wl" { size: 2 };
-import big from "lib/sized.wl" { size: 10 };
+import small from "lib/sized.wlg" { size: 2 };
+import big from "lib/sized.wlg" { size: 10 };
 writeLn(small.describe());
 writeLn(big.describe());
 ```
@@ -1993,7 +1993,7 @@ var n = Integer.parse(times);
 for (var i = 0; i < n; i = i + 1) writeLn($"Hello, {name}!");
 ```
 
-`weblingo run script-params.wl name=Ann times=2` writes:
+`weblingo run script-params.wlg name=Ann times=2` writes:
 
 ```text
 Hello, Ann!
@@ -2017,8 +2017,8 @@ a standard module exports, used without importing it, is WL2001, whose message n
 name that differs from one in scope only by case names that one:
 
 ```text
-program.wl(1,10): error WL2001: 'Database' is not defined; did you mean Database, from std:db?
-program.wl(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn?
+program.wlg(1,10): error WL2001: 'Database' is not defined; did you mean Database, from std:db?
+program.wlg(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn?
 ```
 
 ### `std:system`

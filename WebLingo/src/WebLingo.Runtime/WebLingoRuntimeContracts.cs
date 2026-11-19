@@ -48,7 +48,7 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
 
     /// <summary>
     /// The values its host gives the program's parameters (<c>param name;</c>, section 3.9), each a string, as
-    /// <c>weblingo run script.wl name=value</c> gives them; none by default.
+    /// <c>weblingo run script.wlg name=value</c> gives them; none by default.
     /// </summary>
     public IReadOnlyDictionary<string, string> Parameters { get; init; } = new Dictionary<string, string>();
 

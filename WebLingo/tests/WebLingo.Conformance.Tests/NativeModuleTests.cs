@@ -132,24 +132,24 @@ public sealed class NativeModuleTests : IDisposable
     public void ANativeMethodsErrorIsReportedWhereItWasCalled()
     {
         // Not in the class's members, which the compiler wrote, but at the call, in the file that made it (section 3.9).
-        File.WriteAllText(Path.Combine(_folder, "lib.wl"), "export function use(c) {\n  return c.add(1);\n}");
-        var script = Path.Combine(_folder, "script.wl");
+        File.WriteAllText(Path.Combine(_folder, "lib.wlg"), "export function use(c) {\n  return c.add(1);\n}");
+        var script = Path.Combine(_folder, "script.wlg");
         File.WriteAllText(script,
-            "import { Counter } from \"lib:test\";\nimport { use } from \"./lib.wl\";\nvar c = new Counter(1);\nc.close();\n  c.add(1);");
+            "import { Counter } from \"lib:test\";\nimport { use } from \"./lib.wlg\";\nvar c = new Counter(1);\nc.close();\n  c.add(1);");
         var (exit, _, error) = Weblingo(["run", "--scheme", "lib=" + _native, script]);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
-        Assert.Contains("script.wl(5,3): error WL3001: This Counter has been disposed.", error);
+        Assert.Contains("script.wlg(5,3): error WL3001: This Counter has been disposed.", error);
         File.WriteAllText(script,
-            "import { Counter } from \"lib:test\";\nimport { use } from \"./lib.wl\";\nvar c = new Counter(1);\nc.dispose();\nuse(c);");
+            "import { Counter } from \"lib:test\";\nimport { use } from \"./lib.wlg\";\nvar c = new Counter(1);\nc.dispose();\nuse(c);");
         (exit, _, error) = Weblingo(["run", "--scheme", "lib=" + _native, script]);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
-        Assert.Contains("lib.wl(2,10): error WL3001: This Counter has been disposed.", error);
+        Assert.Contains("lib.wlg(2,10): error WL3001: This Counter has been disposed.", error);
     }
 
     [Fact]
     public void WeblingoTakesItsSchemesFromItsCommandLineAndFromWeblingoJson()
     {
-        var script = Path.Combine(_folder, "script.wl");
+        var script = Path.Combine(_folder, "script.wlg");
         File.WriteAllText(script, "import { write, writeLn } from \"std:system\"; import t from \"lib:test\"; writeLn(t.twice(4));");
         var (exit, output, error) = Weblingo(["run", "--scheme", "lib=" + _native, script]);
         Assert.Equal((WebLingoCommandLine.Success, "8\n", ""), (exit, output, error));
@@ -207,7 +207,7 @@ public sealed class NativeModuleTests : IDisposable
     {
         // weblingo loads std:system from std/system.dll, beside it unless the std scheme names another folder (section 3.9).
         Assert.True(File.Exists(Path.Combine(AppContext.BaseDirectory, "std", "system.dll")));
-        var script = Path.Combine(_folder, "script.wl");
+        var script = Path.Combine(_folder, "script.wlg");
         File.WriteAllText(script, "import { writeLn, delay } from \"std:system\"; import s from \"std:system\"; writeLn([s, s.delay == delay]);");
         Assert.Equal((WebLingoCommandLine.Success, "[module std:system, true]\n", ""), Weblingo(["run", script]));
 
@@ -244,7 +244,7 @@ public sealed class NativeModuleTests : IDisposable
     /// </summary>
     private (string Diagnostics, string Output, string Error) Run(string source)
     {
-        var name = Path.Combine(_folder, "program.wl");
+        var name = Path.Combine(_folder, "program.wlg");
         var schemes = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["native"] = _native, ["std"] = Path.Combine(AppContext.BaseDirectory, "std")

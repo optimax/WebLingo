@@ -1,0 +1,11 @@
+// await-outside-async.wlg: await stands only in an async function, or at a script's top level.
+// A function that waits says so, async, so that its callers know it gives a task.
+
+function load() {
+  await delay(10);
+  return "done";
+}
+
+/* Errors:
+await-outside-async.wlg(5,3): error WL2014: 'await' is only allowed in an async function, or at a script's top level.
+*/

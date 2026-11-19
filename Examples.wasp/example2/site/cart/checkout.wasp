@@ -1,4 +1,4 @@
-<% param request; param response; import { cartOf, checkout } from "/lib/cart.wl"; %>
+<% param request; param response; import { cartOf, checkout } from "/lib/cart.wlg"; %>
 <% layout "/layouts/main.wasp", { title: "Your order", section: "cart" }; %>
 <%
   // The cart checked out, posted by its form: the customer's name checked, then every fish in it ordered in one

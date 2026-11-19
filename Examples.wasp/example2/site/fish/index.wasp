@@ -1,4 +1,4 @@
-<% param request; import { catalogue, waterOf, heading } from "/lib/store.wl"; %>
+<% param request; import { catalogue, waterOf, heading } from "/lib/store.wlg"; %>
 <% layout "/layouts/main.wasp", { title: heading(waterOf(request.query?["water"])), section: waterOf(request.query?["water"]) ?? "fish" }; %>
 <%
   // The filters, from the query's text: ?water=marine&max=10&q=tetra, each left out when it is not given or not one.

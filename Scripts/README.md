@@ -10,26 +10,26 @@ they copy through `std:fs`, without COM.
 
 | Script | What it does |
 |---|---|
-| `install.wl` | Installs WebLingo from its installer's zip, which holds it beside the folder it installs, `WebLingo`: copies that folder into WebLingo's folder for the zip's architecture, `C:\Program Files\WebLingo`, or `C:\Program Files (x86)\WebLingo` for x86 on 64-bit Windows, and puts it on the machine's `PATH` (`../Installers/Windows/readme.md`) |
-| `iis-install.wl` | Makes this machine's IIS run WASP's sites, from WASP's installer's zip: turns IIS on, unless it is; installs the ASP.NET Core Module, unless IIS has it, from Microsoft's Hosting Bundle, checked against the SHA-512 Microsoft's release metadata gives; and copies `wasp`, the zip's folder `WASP`, into WebLingo's folder for the zip's architecture, once the WebLingo there is found to be the one it was made with (`../Installers/Windows/wasp-readme.md`) |
-| `add-wl-file-type.wl` | Makes Explorer run a `.wl` file when it is double-clicked, for this Windows account, `weblingo script.wl`, whose window waits for a key at the end, with **Edit** in its right-click menu opening Notepad, and WebLingo named in Windows's "open with" choice; no administrator needed; `remove=yes` undoes it |
-| `install-weblingo.wl` | Installs WebLingo in `C:\Program Files\WebLingo`, or updates it, from the folder `WebLingo/publish.ps1` publishes it to, `WebLingo\publish\WebLingo`; the application pools of the sites whose `wasp` runs from there are stopped while their files are replaced, and started again |
-| `add-weblingo-to-path.wl` | Puts `C:\Program Files\WebLingo` on the machine's `PATH`, once, so that consoles started after run `weblingo` and `wasp` by their names |
-| `add-wasp-site.wl` | Adds a WASP site to IIS: its application pool, with no managed code, and its website, served by HTTPS on port 443 under a name of its own, with a certificate this machine trusts |
-| `add-sql-server-login.wl` | Gives a site's application pool its database on SQL Server: a login for the pool's account, and a user of the database that reads and changes its rows |
-| `windows.wl`, `iis.wl` | What the scripts share: running a program, the processes running, a folder copied, the machine's `PATH`, a certificate made and trusted; and IIS's configuration, its modules, its pools, and the installation copied into with the sites that run it stopped |
+| `install.wlg` | Installs WebLingo from its installer's zip, which holds it beside the folder it installs, `WebLingo`: copies that folder into WebLingo's folder for the zip's architecture, `C:\Program Files\WebLingo`, or `C:\Program Files (x86)\WebLingo` for x86 on 64-bit Windows, and puts it on the machine's `PATH` (`../Installers/Windows/readme.md`) |
+| `iis-install.wlg` | Makes this machine's IIS run WASP's sites, from WASP's installer's zip: turns IIS on, unless it is; installs the ASP.NET Core Module, unless IIS has it, from Microsoft's Hosting Bundle, checked against the SHA-512 Microsoft's release metadata gives; and copies `wasp`, the zip's folder `WASP`, into WebLingo's folder for the zip's architecture, once the WebLingo there is found to be the one it was made with (`../Installers/Windows/wasp-readme.md`) |
+| `add-wlg-file-type.wlg` | Makes Explorer run a `.wlg` file when it is double-clicked, for this Windows account, `weblingo script.wlg`, whose window waits for a key at the end, with **Edit** in its right-click menu opening Notepad, and WebLingo named in Windows's "open with" choice; no administrator needed; `remove=yes` undoes it |
+| `install-weblingo.wlg` | Installs WebLingo in `C:\Program Files\WebLingo`, or updates it, from the folder `WebLingo/publish.ps1` publishes it to, `WebLingo\publish\WebLingo`; the application pools of the sites whose `wasp` runs from there are stopped while their files are replaced, and started again |
+| `add-weblingo-to-path.wlg` | Puts `C:\Program Files\WebLingo` on the machine's `PATH`, once, so that consoles started after run `weblingo` and `wasp` by their names |
+| `add-wasp-site.wlg` | Adds a WASP site to IIS: its application pool, with no managed code, and its website, served by HTTPS on port 443 under a name of its own, with a certificate this machine trusts |
+| `add-sql-server-login.wlg` | Gives a site's application pool its database on SQL Server: a login for the pool's account, and a user of the database that reads and changes its rows |
+| `windows.wlg`, `iis.wlg` | What the scripts share: running a program, the processes running, a folder copied, the machine's `PATH`, a certificate made and trusted; and IIS's configuration, its modules, its pools, and the installation copied into with the sites that run it stopped |
 
 Each changes the machine, and so runs as administrator, in a console run as administrator, from this folder; run
-otherwise, it stops before changing anything, but for `add-sql-server-login.wl`, which changes a SQL Server, and runs
-as one of its administrators, and `add-wl-file-type.wl`, which changes only the account's own file types, and runs as
+otherwise, it stops before changing anything, but for `add-sql-server-login.wlg`, which changes a SQL Server, and runs
+as one of its administrators, and `add-wlg-file-type.wlg`, which changes only the account's own file types, and runs as
 that account. Each may be run again: it keeps what is there, and adds what is missing.
 
 ## Installing WebLingo
 
 On a machine without WebLingo, its installer's zips install it, `weblingo` and the standard modules, each with
-`install.wl` and the scripts it shares, which `../Installers/Windows/package.ps1` makes and its `readme.md` explains;
+`install.wlg` and the scripts it shares, which `../Installers/Windows/package.ps1` makes and its `readme.md` explains;
 one holds .NET's runtime too, and the other needs it installed. WASP's zips, made with them, then make IIS run
-WASP's sites, with `iis-install.wl`, as `../Installers/Windows/wasp-readme.md` explains. On a server that builds
+WASP's sites, with `iis-install.wlg`, as `../Installers/Windows/wasp-readme.md` explains. On a server that builds
 WebLingo from this repository, `wasp` with it:
 
 With IIS turned on, and the ASP.NET Core Hosting Bundle for .NET 10 installed after it (`Examples.wasp/README.md`, example1,
@@ -43,11 +43,11 @@ then, from this folder, as administrator, install it with the published `webling
 replace itself while it runs, and put it on the machine's `PATH`:
 
 ```bat
-..\WebLingo\publish\WebLingo\weblingo.exe run install-weblingo.wl
-"C:\Program Files\WebLingo\weblingo.exe" run add-weblingo-to-path.wl
+..\WebLingo\publish\WebLingo\weblingo.exe run install-weblingo.wlg
+"C:\Program Files\WebLingo\weblingo.exe" run add-weblingo-to-path.wlg
 ```
 
-Run `install-weblingo.wl` again, the same way, after publishing a newer WebLingo: it updates every site at once.
+Run `install-weblingo.wlg` again, the same way, after publishing a newer WebLingo: it updates every site at once.
 
 ## Adding a site
 
@@ -55,8 +55,8 @@ From this folder, as administrator, with the site's folder, the one that holds i
 IIS is to serve it from, example1 and example2 copied to `C:\WWW`:
 
 ```bat
-weblingo run add-wasp-site.wl name=wasp.example1 folder=C:\WWW\wasp.example1 host=example1.wasp.localhost
-weblingo run add-wasp-site.wl name=wasp.example2 folder=C:\WWW\wasp.example2\site host=example2.wasp.localhost writable=C:\WWW\wasp.example2\database
+weblingo run add-wasp-site.wlg name=wasp.example1 folder=C:\WWW\wasp.example1 host=example1.wasp.localhost
+weblingo run add-wasp-site.wlg name=wasp.example2 folder=C:\WWW\wasp.example2\site host=example2.wasp.localhost writable=C:\WWW\wasp.example2\database
 ```
 
 `name` names the application pool and the website; `host` the name the site is served under, `https://<host>/`, on
@@ -72,16 +72,16 @@ every `*.localhost` name for the machine itself, but Windows does not, so that o
 
 A site that reaches SQL Server by Windows authentication, as example3 does, reaches it under IIS as its application
 pool's account, `IIS AppPool\<name>`, which needs a login on the server and a user of the database. Once
-`add-wasp-site.wl` has added the pool, as one of the server's administrators:
+`add-wasp-site.wlg` has added the pool, as one of the server's administrators:
 
 ```bat
-weblingo run add-sql-server-login.wl name=wasp.example3 database=WebLingoTodo
+weblingo run add-sql-server-login.wlg name=wasp.example3 database=WebLingoTodo
 ```
 
 which gives that user the database's `db_datareader` and `db_datawriter` roles, to read and change its tables' rows, and
 nothing more; `server=` names a SQL Server other than this machine's default instance. A database made anew, as
-example3's `setup.wl` makes its, has lost the user: run it again then.
+example3's `setup.wlg` makes its, has lost the user: run it again then.
 
 The scripts remove nothing: a site, its pool, its certificate and its `hosts` entry are removed in IIS's manager, the
 certificates' console and the `hosts` file. Nor do they renew a certificate: once one has expired, remove its binding,
-`netsh http delete sslcert hostnameport=<host>:443`, and run `add-wasp-site.wl` again, which makes another.
+`netsh http delete sslcert hostnameport=<host>:443`, and run `add-wasp-site.wlg` again, which makes another.

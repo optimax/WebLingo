@@ -82,8 +82,8 @@ public sealed class OperatorTests
     private static void AssertTheVmGives(string left, string symbol, string right, WebLingoValue value, WebLingoRuntimeError? error)
     {
         var source = $"import {{ write, writeLn }} from \"std:system\"; var a = {left}; var b = {right}; writeLn(a {symbol} b);";
-        var registerModule = new WebLingoCompiler(WithWriteLn).Compile(source, "operators.wl").Module;
-        var stackModule = new WebLingoStackCompiler(WithWriteLn).Compile(source, "operators.wl").Module;
+        var registerModule = new WebLingoCompiler(WithWriteLn).Compile(source, "operators.wlg").Module;
+        var stackModule = new WebLingoStackCompiler(WithWriteLn).Compile(source, "operators.wlg").Module;
         Assert.True(registerModule is not null && stackModule is not null, source);
         foreach (var vm in new[] { "register", "stack" })
         {

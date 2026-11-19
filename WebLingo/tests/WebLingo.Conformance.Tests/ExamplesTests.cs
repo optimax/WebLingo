@@ -6,7 +6,7 @@ using Xunit;
 namespace WebLingo.Conformance.Tests;
 
 /// <summary>
-/// The repository's <c>Examples.wl</c>, scripts that show the language (its <c>README.md</c>): each run through
+/// The repository's <c>Examples.wlg</c>, scripts that show the language (its <c>README.md</c>): each run through
 /// <c>weblingo</c>, from a copy, writes what the block at its end says, <c>/* Output: … */</c> its output and
 /// <c>/* Errors: … */</c> its errors, from its source on the register VM, and from its WLBC on the stack VM; each in
 /// <c>does-not-compile</c> gives the errors its block says, and nothing runs. A script's <c>// Run:</c> line gives its
@@ -35,7 +35,7 @@ public sealed class ExamplesTests : IDisposable
     public static TheoryData<string> Scripts()
     {
         var scripts = new TheoryData<string>();
-        var files = Directory.GetFiles(Examples, "*.wl").Concat(Directory.GetFiles(Path.Combine(Examples, "does-not-compile"), "*.wl"));
+        var files = Directory.GetFiles(Examples, "*.wlg").Concat(Directory.GetFiles(Path.Combine(Examples, "does-not-compile"), "*.wlg"));
         foreach (var file in files.Order(StringComparer.Ordinal))
         {
             if (!OperatingSystem.IsWindows() && Read(file).Contains("\n// Windows only.\n", StringComparison.Ordinal)) continue;
@@ -116,8 +116,8 @@ public sealed class ExamplesTests : IDisposable
     private static string FindExamples()
     {
         var folder = new DirectoryInfo(AppContext.BaseDirectory);
-        while (folder is not null && !Directory.Exists(Path.Combine(folder.FullName, "Examples.wl"))) folder = folder.Parent;
-        return folder is null ? throw new DirectoryNotFoundException("Examples.wl is not in a folder above the tests.")
-            : Path.Combine(folder.FullName, "Examples.wl");
+        while (folder is not null && !Directory.Exists(Path.Combine(folder.FullName, "Examples.wlg"))) folder = folder.Parent;
+        return folder is null ? throw new DirectoryNotFoundException("Examples.wlg is not in a folder above the tests.")
+            : Path.Combine(folder.FullName, "Examples.wlg");
     }
 }

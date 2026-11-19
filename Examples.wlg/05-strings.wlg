@@ -1,0 +1,52 @@
+// 05-strings.wlg: strings, their methods, interpolation and multi-line strings.
+//
+// A string is immutable Unicode text. Its length and its indices count Unicode scalar values, not bytes or UTF-16 code
+// units, so that "żółw" has 4, and an emoji 1. Case is changed by the invariant culture: the same on every server.
+
+var word = "żółw";
+writeLn([word.length, word[0], "😀".length, word.toUpper()]);
+
+var path = "  /var/www/site//  ";
+writeLn([path.trim(), path.trim().trimEnd("/"), "report.txt".removeSuffix(".txt"), "report.txt".removeSuffix(".md")]);
+writeLn(["tea,coffee,water".split(","), " + ".join(["a", "b", "c"]), "ab".repeat(3), "7".padStart(3, "0")]);
+writeLn(["green tea".indexOf("tea"), "green tea".contains("tea"), "green tea".startsWith("green"), "tea".slice(1)]);
+writeLn(["a-b-c".replace("-", "+"), "apple" < "banana", "b".compare("a")]);
+
+// JavaScript's and C#'s names work too, as aliases: includes, toUpperCase, replaceAll, padLeft.
+writeLn(["tea".includes("e"), "tea".toUpperCase(), "a.b".replaceAll(".", "/"), "5".padLeft(2)]);
+
+// Interpolation: $"…{expression}…", with C#'s formats after a colon and alignments after a comma, always in the
+// invariant culture, so that a page shows 1,234.50 on every server, whatever its regional settings.
+var price = 1234.5;
+var name = "Sencha";
+writeLn($"{name} costs {price:N2}, or {price * 2:0.00} for two.");
+writeLn($"[{name,10}] [{name,-10}] {255:X4} {3.14159:F2}");
+writeLn($"Braces are doubled: {{literal}}, and a condition goes in parentheses: {(price > 1000 ? "dear" : "cheap")}.");
+
+// A multi-line string is raw, and loses the indentation before its closing quotes.
+var poem = """
+    Green tea, black tea,
+      "oolong" too,\n stays as written.
+    """;
+writeLn(poem);
+
+// A multi-line interpolated string with $$ takes {{…}} as its holes, so that JSON's own braces stay as they are.
+var json = $$"""
+    { "name": "{{name}}", "price": {{price}} }
+    """;
+writeLn(json);
+
+/* Output:
+[4, "ż", 1, "ŻÓŁW"]
+["/var/www/site//", "/var/www/site", "report", "report.txt"]
+[["tea", "coffee", "water"], "a + b + c", "ababab", "007"]
+[6, true, true, "ea"]
+["a+b+c", true, 1]
+[true, "TEA", "a/b", " 5"]
+Sencha costs 1,234.50, or 2469.00 for two.
+[    Sencha] [Sencha    ] 00FF 3.14
+Braces are doubled: {literal}, and a condition goes in parentheses: dear.
+Green tea, black tea,
+  "oolong" too,\n stays as written.
+{ "name": "Sencha", "price": 1234.5 }
+*/

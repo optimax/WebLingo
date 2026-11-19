@@ -17,15 +17,15 @@ public sealed class ModuleTests
     {
         var files = new Dictionary<string, string>
         {
-            ["main.wl"] = "import { write, writeLn } from \"std:system\"; import db from \"lib/db\"; import { twice, Point } from \"lib/util.wl\"; writeLn(\"main\"); " +
+            ["main.wlg"] = "import { write, writeLn } from \"std:system\"; import db from \"lib/db\"; import { twice, Point } from \"lib/util.wlg\"; writeLn(\"main\"); " +
                           "writeLn(db.count); db.bump(); writeLn(db.count); writeLn(twice(21)); writeLn(new Point(1, 2)); " +
                           "writeLn([db is Module, db]);",
-            ["lib/db.wl"] = "import { write, writeLn } from \"std:system\"; import { twice } from \"util.wl\"; writeLn(\"db\"); export var count = twice(1); " +
+            ["lib/db.wlg"] = "import { write, writeLn } from \"std:system\"; import { twice } from \"util.wlg\"; writeLn(\"db\"); export var count = twice(1); " +
                             "export function bump() { count = count + 1; }",
-            ["lib/util.wl"] = "import { write, writeLn } from \"std:system\"; writeLn(\"util\"); export function twice(x) { return x * 2; } " +
+            ["lib/util.wlg"] = "import { write, writeLn } from \"std:system\"; writeLn(\"util\"); export function twice(x) { return x * 2; } " +
                               "export class Point { constructor(x, y) { this.x = x; this.y = y; } }",
         };
-        AssertBoth(files, "util\ndb\nmain\n2\n3\n42\nPoint {x: 1, y: 2}\n[true, module lib/db.wl]\n");
+        AssertBoth(files, "util\ndb\nmain\n2\n3\n42\nPoint {x: 1, y: 2}\n[true, module lib/db.wlg]\n");
     }
 
     [Fact]
@@ -33,13 +33,13 @@ public sealed class ModuleTests
     {
         var files = new Dictionary<string, string>
         {
-            ["a.wl"] = "import { write, writeLn } from \"std:system\"; import b from \"b\"; writeLn(\"a: \" + b.fromB); export var fromA = \"A\"; writeLn(b.later());",
-            ["b.wl"] = "import { write, writeLn } from \"std:system\"; import a from \"a\"; export var fromB = \"B\"; export function later() { return a.fromA; } " +
+            ["a.wlg"] = "import { write, writeLn } from \"std:system\"; import b from \"b\"; writeLn(\"a: \" + b.fromB); export var fromA = \"A\"; writeLn(b.later());",
+            ["b.wlg"] = "import { write, writeLn } from \"std:system\"; import a from \"a\"; export var fromB = \"B\"; export function later() { return a.fromA; } " +
                        "try { writeLn(a.fromA); } catch (e) { writeLn(e.code); }",
-            ["self.wl"] = "import { write, writeLn } from \"std:system\"; import me from \"self\"; export var x = 1; writeLn(me.x);",
+            ["self.wlg"] = "import { write, writeLn } from \"std:system\"; import me from \"self\"; export var x = 1; writeLn(me.x);",
         };
-        AssertBoth(files, "WL2004\na: B\nA\n", "a.wl");
-        AssertBoth(files, "1\n", "self.wl");
+        AssertBoth(files, "WL2004\na: B\nA\n", "a.wlg");
+        AssertBoth(files, "1\n", "self.wlg");
     }
 
     [Fact]
@@ -47,9 +47,9 @@ public sealed class ModuleTests
     {
         var files = new Dictionary<string, string>
         {
-            ["main.wl"] = "import { write, writeLn } from \"std:system\"; import m from \"m\"; import { n } from \"m\"; try { m.n = 2; } catch (e) { writeLn(e.code); } " +
+            ["main.wlg"] = "import { write, writeLn } from \"std:system\"; import m from \"m\"; import { n } from \"m\"; try { m.n = 2; } catch (e) { writeLn(e.code); } " +
                           "writeLn([n, m.n, m?.missing]); try { writeLn(m.missing); } catch (e) { writeLn(e.code); }",
-            ["m.wl"] = "export var n = 1; var hidden = 2;",
+            ["m.wlg"] = "export var n = 1; var hidden = 2;",
         };
         AssertBoth(files, "WL3001\n[1, 1, null]\nWL3006\n");
     }
@@ -59,21 +59,21 @@ public sealed class ModuleTests
     {
         var files = new Dictionary<string, string>
         {
-            ["main.wl"] = "import r from \"lib/r\";\nr.f();",
-            ["lib/r.wl"] = "export function f() {\n    return [1][5];\n}",
-            ["broken.wl"] = "import b from \"lib/b\";",
-            ["lib/b.wl"] = "export var y = 1 +;",
-            ["missing.wl"] = "import { write, writeLn } from \"std:system\"; writeLn(1);\nimport x from \"nowhere\";",
+            ["main.wlg"] = "import r from \"lib/r\";\nr.f();",
+            ["lib/r.wlg"] = "export function f() {\n    return [1][5];\n}",
+            ["broken.wlg"] = "import b from \"lib/b\";",
+            ["lib/b.wlg"] = "export var y = 1 +;",
+            ["missing.wlg"] = "import { write, writeLn } from \"std:system\"; writeLn(1);\nimport x from \"nowhere\";",
         };
         foreach (var run in BothVms)
         {
-            var (diagnostics, _, error) = run(files, "main.wl");
+            var (diagnostics, _, error) = run(files, "main.wlg");
             Assert.Empty(diagnostics);
-            Assert.Equal((WebLingoDiagnosticCodes.IndexOutOfRange, "lib/r.wl"), (error!.Code, error.Source));
-            Assert.Equal(2, new WebLingoSourceText(files["lib/r.wl"]).GetLocation(error.Span.Start).Line);
-            (diagnostics, _, _) = run(files, "broken.wl");
-            Assert.Equal((WebLingoDiagnosticCodes.UnexpectedToken, "lib/b.wl"), (diagnostics[0].Code, diagnostics[0].Source));
-            (diagnostics, _, _) = run(files, "missing.wl");
+            Assert.Equal((WebLingoDiagnosticCodes.IndexOutOfRange, "lib/r.wlg"), (error!.Code, error.Source));
+            Assert.Equal(2, new WebLingoSourceText(files["lib/r.wlg"]).GetLocation(error.Span.Start).Line);
+            (diagnostics, _, _) = run(files, "broken.wlg");
+            Assert.Equal((WebLingoDiagnosticCodes.UnexpectedToken, "lib/b.wlg"), (diagnostics[0].Code, diagnostics[0].Source));
+            (diagnostics, _, _) = run(files, "missing.wlg");
             Assert.Equal((WebLingoDiagnosticCodes.ModuleNotFound, null), (diagnostics[0].Code, diagnostics[0].Source));
         }
     }
@@ -84,15 +84,15 @@ public sealed class ModuleTests
         var files = new Dictionary<string, string>
         {
             // std:system holds write and writeLn (section 3.9, M0.20.3), its members and its imports' names the same built-ins.
-            ["main.wl"] = "import io from \"std:system\"; import { writeLn } from \"std:system\"; import m from \"m\"; " +
+            ["main.wlg"] = "import io from \"std:system\"; import { writeLn } from \"std:system\"; import m from \"m\"; " +
                           "io.writeLn(1); writeLn([io, io.write == m.w, io.writeLn == writeLn, m.f()]); try { io.writeLn = 1; } catch (e) { writeLn(e.code); }",
-            ["m.wl"] = "import { write } from \"std:system\"; export var w = write; export function f() { write(\"m: \"); return 2; }",
-            ["nope.wl"] = "import x from \"std:nope\";",
+            ["m.wlg"] = "import { write } from \"std:system\"; export var w = write; export function f() { write(\"m: \"); return 2; }",
+            ["nope.wlg"] = "import x from \"std:nope\";",
         };
         AssertBoth(files, "1\nm: [module std:system, true, true, 2]\nWL3001\n");
         foreach (var run in BothVms)
         {
-            Assert.Equal(WebLingoDiagnosticCodes.ModuleNotFound, run(files, "nope.wl").Diagnostics[0].Code);
+            Assert.Equal(WebLingoDiagnosticCodes.ModuleNotFound, run(files, "nope.wlg").Diagnostics[0].Code);
         }
     }
 
@@ -101,13 +101,13 @@ public sealed class ModuleTests
     {
         var files = new Dictionary<string, string>
         {
-            ["main.wl"] = "import { write, writeLn } from \"std:system\"; import a from \"box\" { size: 1 }; import b from \"box\" { size: 2, label: \"big\" }; " +
+            ["main.wlg"] = "import { write, writeLn } from \"std:system\"; import a from \"box\" { size: 1 }; import b from \"box\" { size: 2, label: \"big\" }; " +
                           "import c from \"box\" { size: 1 }; import d, { describe } from \"box\" { \"size\": 1, label: \"box\" }; " +
                           "import n from \"nested\" { n: 3 }; " +
                           "writeLn([a.describe(), b.describe(), a == c, a == d, b.made, describe(), n.inner.describe()]);",
-            ["box.wl"] = "param size; param label = \"box\"; import { write, writeLn } from \"std:system\"; writeLn(\"running \" + label + \" \" + size.toString()); " +
+            ["box.wlg"] = "param size; param label = \"box\"; import { write, writeLn } from \"std:system\"; writeLn(\"running \" + label + \" \" + size.toString()); " +
                          "export function describe() { return label + \":\" + size.toString(); } export var made = size * 2;",
-            ["nested.wl"] = "param n; import box from \"box\" { size: n * 10 }; export var inner = box;",
+            ["nested.wlg"] = "param n; import box from \"box\" { size: n * 10 }; export var inner = box;",
         };
         AssertBoth(files, "running box 1\nrunning big 2\nrunning box 1\nrunning box 30\n" +
                           "[\"box:1\", \"big:2\", true, false, 4, \"box:1\", \"box:30\"]\n");
@@ -126,12 +126,12 @@ public sealed class ModuleTests
     {
         var files = new Dictionary<string, string>
         {
-            ["main.wl"] = main,
-            ["box.wl"] = "param size; param label = \"box\";",
-            ["plain.wl"] = "export var n = 1;",
-            ["setter.wl"] = "param size; size = 2;",
+            ["main.wlg"] = main,
+            ["box.wlg"] = "param size; param label = \"box\";",
+            ["plain.wlg"] = "export var n = 1;",
+            ["setter.wlg"] = "param size; size = 2;",
         };
-        foreach (var run in BothVms) Assert.Equal(code, run(files, "main.wl").Diagnostics[0].Code);
+        foreach (var run in BothVms) Assert.Equal(code, run(files, "main.wlg").Diagnostics[0].Code);
     }
 
     [Fact]
@@ -139,18 +139,18 @@ public sealed class ModuleTests
     {
         var files = new Dictionary<string, string>
         {
-            ["main.wl"] = "import { write, writeLn } from \"std:system\"; import { twice } from \"lib/util\"; writeLn(\"main \" + twice(2).toString()); " +
+            ["main.wlg"] = "import { write, writeLn } from \"std:system\"; import { twice } from \"lib/util\"; writeLn(\"main \" + twice(2).toString()); " +
                           "var g = await Module.import(\"lib/greet\"); writeLn([g.hello(), g.n, new g.Point(3), new g.Point(3) is Object, g]); " +
                           "var h = await Module.import(\"lib/greet\", { who: \"Ann\" }); var g2 = await Module.import(\"lib/greet\"); " +
                           "writeLn([h.hello(), g2 == g, h == g, (await Module.import(\"lib/util\")).twice(5), (await g.later()).n]); " +
                           "var s = await Module.import(\"std:system\"); s.writeLn(\"via std:system\");",
-            ["lib/greet.wl"] = "param who = \"world\"; import { write, writeLn } from \"std:system\"; import { twice } from \"util\"; writeLn(\"greet runs for \" + who); " +
+            ["lib/greet.wlg"] = "param who = \"world\"; import { write, writeLn } from \"std:system\"; import { twice } from \"util\"; writeLn(\"greet runs for \" + who); " +
                                "export function hello() { return \"hello, \" + who; } export class Point { constructor(x) { this.x = x; } } " +
                                "export var n = twice(21); export async function later() { return await Module.import(\"late\"); }",
-            ["lib/util.wl"] = "import { write, writeLn } from \"std:system\"; writeLn(\"util runs\"); export function twice(x) { return x * 2; }",
-            ["lib/late.wl"] = "export var n = 7;",
+            ["lib/util.wlg"] = "import { write, writeLn } from \"std:system\"; writeLn(\"util runs\"); export function twice(x) { return x * 2; }",
+            ["lib/late.wlg"] = "export var n = 7;",
         };
-        AssertBoth(files, "util runs\nmain 4\ngreet runs for world\n[\"hello, world\", 42, Point {x: 3}, true, module lib/greet.wl]\n" +
+        AssertBoth(files, "util runs\nmain 4\ngreet runs for world\n[\"hello, world\", 42, Point {x: 3}, true, module lib/greet.wlg]\n" +
                           "greet runs for Ann\n[\"hello, Ann\", true, false, 10, 7]\nvia std:system\n");
     }
 
@@ -167,14 +167,14 @@ public sealed class ModuleTests
     {
         var files = new Dictionary<string, string>
         {
-            ["main.wl"] = main,
-            ["box.wl"] = "param size;",
-            ["broken.wl"] = "export var x = 1 +;",
-            ["thrower.wl"] = "throw \"no\";",
+            ["main.wlg"] = main,
+            ["box.wlg"] = "param size;",
+            ["broken.wlg"] = "export var x = 1 +;",
+            ["thrower.wlg"] = "throw \"no\";",
         };
         foreach (var run in BothVms)
         {
-            var (diagnostics, _, error) = run(files, "main.wl");
+            var (diagnostics, _, error) = run(files, "main.wlg");
             Assert.Empty(diagnostics);
             Assert.True(code == error?.Code, error?.Code + ": " + error?.Message);
         }
@@ -185,7 +185,7 @@ public sealed class ModuleTests
     {
         var files = new Dictionary<string, string>
         {
-            ["main.wl"] = "import { write, writeLn } from \"std:system\"; class Module {} Module.import = function (path) { return \"mine: \" + path; }; writeLn(Module.import(\"x\"));",
+            ["main.wlg"] = "import { write, writeLn } from \"std:system\"; class Module {} Module.import = function (path) { return \"mine: \" + path; }; writeLn(Module.import(\"x\"));",
         };
         AssertBoth(files, "mine: x\n");
     }
@@ -193,7 +193,7 @@ public sealed class ModuleTests
     [Fact]
     public void AProgramsOwnParametersAreItsDefaultsForNow()
     {
-        var files = new Dictionary<string, string> { ["main.wl"] = "param n = 5; param s = \"x\"; import { write, writeLn } from \"std:system\"; writeLn([n, s]);" };
+        var files = new Dictionary<string, string> { ["main.wlg"] = "param n = 5; param s = \"x\"; import { write, writeLn } from \"std:system\"; writeLn([n, s]);" };
         AssertBoth(files, "[5, \"x\"]\n");
     }
 
@@ -205,11 +205,11 @@ public sealed class ModuleTests
     [InlineData("import m from \"r\";", WebLingoDiagnosticCodes.ReturnOutsideFunction)]
     public void ImportsAndExportsStandAtTheTopLevel(string main, string code)
     {
-        var files = new Dictionary<string, string> { ["main.wl"] = main, ["m.wl"] = "export var n = 1;", ["r.wl"] = "return 1;" };
-        foreach (var run in BothVms) Assert.Equal(code, run(files, "main.wl").Diagnostics[0].Code);
+        var files = new Dictionary<string, string> { ["main.wlg"] = main, ["m.wlg"] = "export var n = 1;", ["r.wlg"] = "return 1;" };
+        foreach (var run in BothVms) Assert.Equal(code, run(files, "main.wlg").Diagnostics[0].Code);
     }
 
-    private static void AssertBoth(Dictionary<string, string> files, string expected, string main = "main.wl")
+    private static void AssertBoth(Dictionary<string, string> files, string expected, string main = "main.wlg")
     {
         foreach (var run in BothVms)
         {
@@ -254,14 +254,14 @@ public sealed class ModuleTests
     private static WebLingoExecutionContext Context(IWebLingoTextOutput output) =>
         new(new WebLingoWorkerId(0)) { Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output)) };
 
-    /// <summary>Files by their paths from one folder, an import's path from its importer's folder, <c>.wl</c> optional.</summary>
+    /// <summary>Files by their paths from one folder, an import's path from its importer's folder, <c>.wlg</c> optional.</summary>
     private sealed class MemoryResolver(Dictionary<string, string> files) : IWebLingoSourceResolver
     {
         public bool TryResolve(string importer, string path, out string name, out string source, out string? error)
         {
             var folder = importer.Contains('/') ? importer[..importer.LastIndexOf('/')] + "/" : "";
             name = folder + path.Replace("./", "", StringComparison.Ordinal);
-            if (!name.EndsWith(".wl", StringComparison.Ordinal)) name += ".wl";
+            if (!name.EndsWith(".wlg", StringComparison.Ordinal)) name += ".wlg";
             error = files.TryGetValue(name, out source!) ? null : "there is no such file";
             source ??= "";
             return error is null;

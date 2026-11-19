@@ -30,7 +30,7 @@ public sealed record WebLingoCommandLineProgram(
     public bool Bytecode { get; init; }
 
     /// <summary>
-    /// Whether a file named first, without a command, is run, <c>weblingo script.wl</c> as <c>weblingo run script.wl</c>, as
+    /// Whether a file named first, without a command, is run, <c>weblingo script.wlg</c> as <c>weblingo run script.wlg</c>, as
     /// a scripting language's runner runs one: a file of its <see cref="Extension"/>, or a <c>.wlbc</c> where it has them.
     /// </summary>
     public bool RunsFileNamedFirst { get; init; }

@@ -39,7 +39,7 @@ public sealed class ApplicationTests
     [InlineData("/Products")]
     [InlineData("/index")]
     [InlineData("/lib/util")]
-    [InlineData("/lib/util.wl")]
+    [InlineData("/lib/util.wlg")]
     [InlineData("/app.wlbc")]
     [InlineData("/WASP.config")]
     [InlineData("/wasp.config")]
@@ -71,9 +71,9 @@ public sealed class ApplicationTests
     [Fact]
     public void TwoFilesOfOneRouteAreAnError()
     {
-        var files = new MemoryFileSystem().Add("/site/products.wasp", "a").Add("/site/products.wl", "b");
+        var files = new MemoryFileSystem().Add("/site/products.wasp", "a").Add("/site/products.wlg", "b");
         Assert.Null(WebLingoApplication.Load(new WebLingoApplicationOptions(Root, files), out var error));
-        Assert.Equal("'products.wasp' and 'products.wl' are both the route /products", error);
+        Assert.Equal("'products.wasp' and 'products.wlg' are both the route /products", error);
 
         Assert.Null(WebLingoApplication.Load(new WebLingoApplicationOptions("/nowhere", files), out error));
         Assert.Equal("the application's root is not a folder", error);
@@ -86,9 +86,9 @@ public sealed class ApplicationTests
         var files = Site()
             .Add("/site/layouts/main.wasp", "<% param title; %><html><title><%= title %></title><% renderBody(); %></html>")
             .Add("/site/includes/nav.wasp", "<nav><%= title %></nav>")
-            .Add("/site/components/card.wasp", "<% param n; import { twice } from \"/lib/util.wl\"; %><b><%= twice(n) %></b>")
+            .Add("/site/components/card.wasp", "<% param n; import { twice } from \"/lib/util.wlg\"; %><b><%= twice(n) %></b>")
             .Add("/site/shop/index.wasp",
-                "<% import { twice } from \"../lib/util.wl\"; import { writeLn } from \"std:system\"; %><% layout \"/layouts/main.wasp\", { title: \"Shop\" }; %>"
+                "<% import { twice } from \"../lib/util.wlg\"; import { writeLn } from \"std:system\"; %><% layout \"/layouts/main.wasp\", { title: \"Shop\" }; %>"
                 + "<% var title = \"Menu\"; %><% include \"/includes/nav.wasp\"; %><% writeLn(twice(2)); %>"
                 + "<% foreach (var n in [1, 2]) { await renderComponent(\"/components/card.wasp\", { n: n }); } %>");
         var app = Load(files, WebLingoMode.Development);
@@ -130,7 +130,7 @@ public sealed class ApplicationTests
             .Add("/site/bad.wasp", "<% include \"/includes/broken.wasp\"; %>")
             .Add("/site/includes/broken.wasp", "<p>\n<%= nope %></p>")
             .Add("/site/escapes.wasp", "<% include \"../../secret.wasp\"; %>")
-            .Add("/site/imports.wasp", "<% import { x } from \"../outside.wl\"; %>");
+            .Add("/site/imports.wasp", "<% import { x } from \"../outside.wlg\"; %>");
         var app = Load(files, WebLingoMode.Development);
         var (status, body) = Get(app, "/bad");
         Assert.Equal(500, status);
@@ -155,16 +155,16 @@ public sealed class ApplicationTests
         Assert.Equal((200, "<p>News</p>"), Get(app, "/news"));
 
         // A generation whose routes cannot be made does not displace the one served.
-        files.Add("/site/news.wl", "export function get() { }");
+        files.Add("/site/news.wlg", "export function get() { }");
         Assert.False(app.TryReload(out error));
-        Assert.Equal("'news.wasp' and 'news.wl' are both the route /news", error);
+        Assert.Equal("'news.wasp' and 'news.wlg' are both the route /news", error);
         Assert.Equal((2, (200, "<p>News</p>")), (app.GenerationNumber, Get(app, "/news")));
     }
 
     private static MemoryFileSystem Site() => new MemoryFileSystem()
         .Add("/site/index.wasp", "<h1>Home</h1>")
         .Add("/site/products.wasp", "<p>Products</p>")
-        .Add("/site/lib/util.wl", "export function twice(x) { return x * 2; }")
+        .Add("/site/lib/util.wlg", "export function twice(x) { return x * 2; }")
         .Add("/site/css/site.css", "body { }")
         .Add("/site/app.wlbc", "WLBC")
         .Add("/site/wasp.config", "{ }")

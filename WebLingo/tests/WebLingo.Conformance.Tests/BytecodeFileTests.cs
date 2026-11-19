@@ -20,10 +20,10 @@ public sealed class BytecodeFileTests
     [MemberData(nameof(StackVmTests.ConformancePrograms), MemberType = typeof(StackVmTests))]
     public void AProgramReadBackFromItsFileRunsAsCompiled(string source)
     {
-        var text = new WebLingoSourceText(source, "program.wl");
+        var text = new WebLingoSourceText(source, "program.wlg");
         WebLingoSourceText? TextOf(string? name) => name is null ? text : null;
 
-        if (new WebLingoCompiler(Options).Compile(source, "program.wl").Module is { } module)
+        if (new WebLingoCompiler(Options).Compile(source, "program.wlg").Module is { } module)
         {
             var file = WebLingoBytecodeFile.Write(module, TextOf);
             Assert.True(WebLingoBytecodeFile.TryReadRegister(file, out var read, out var positions, out var error), error);
@@ -31,7 +31,7 @@ public sealed class BytecodeFileTests
             Assert.Equal(WebLingoDisassembler.Format(module), WebLingoDisassembler.Format(read));
             Assert.Equal(Run(module, text, null), Run(read, text, positions));
         }
-        if (new WebLingoStackCompiler(Options).Compile(source, "program.wl").Module is { } stack)
+        if (new WebLingoStackCompiler(Options).Compile(source, "program.wlg").Module is { } stack)
         {
             var file = WebLingoBytecodeFile.Write(stack, TextOf);
             Assert.True(WebLingoBytecodeFile.TryReadStack(file, out var read, out var positions, out var error), error);
@@ -67,8 +67,8 @@ public sealed class BytecodeFileTests
             """;
         var files = new[]
         {
-            WebLingoBytecodeFile.Write(new WebLingoCompiler(Options).Compile(source, "p.wl").Module!),
-            WebLingoBytecodeFile.Write(new WebLingoStackCompiler(Options).Compile(source, "p.wl").Module!)
+            WebLingoBytecodeFile.Write(new WebLingoCompiler(Options).Compile(source, "p.wlg").Module!),
+            WebLingoBytecodeFile.Write(new WebLingoStackCompiler(Options).Compile(source, "p.wlg").Module!)
         };
         var random = new Random(13_1);
         var ran = 0;

@@ -5,7 +5,7 @@ using WebLingo.Runtime;
 namespace WebLingo.Hosting;
 
 /// <summary>
-/// A request and its response as a page and a <c>.wl</c> route handler see them (specification, section 6.12, "The request
+/// A request and its response as a page and a <c>.wlg</c> route handler see them (specification, section 6.12, "The request
 /// and the response in a page"; section 9, "M0.14 parts", part 3): instances of the native classes <c>Request</c> and
 /// <c>Response</c>, which a page's <c>param request;</c> and <c>param response;</c> are given, and a handler's function
 /// is called with. Their headers are instances of <c>Headers</c>, whose names are compared without regard to case. A

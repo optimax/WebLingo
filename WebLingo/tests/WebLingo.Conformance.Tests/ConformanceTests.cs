@@ -175,7 +175,7 @@ public sealed class ConformanceTests : IDisposable
             var (exit, output, error) = Weblingo(command, source);
             Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
             Assert.Equal("", output);
-            Assert.Equal($"program.wl({line},{column}): error {code}:", FirstLineStart(error));
+            Assert.Equal($"program.wlg({line},{column}): error {code}:", FirstLineStart(error));
         }
     }
 
@@ -191,7 +191,7 @@ public sealed class ConformanceTests : IDisposable
         var (exit, output, error) = Weblingo("run", source);
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n"), (exit, output));
         var line = source.Contains('\n') ? 2 : 1;
-        Assert.StartsWith($"program.wl({line},{column}): warning WL2017:", error);
+        Assert.StartsWith($"program.wlg({line},{column}): warning WL2017:", error);
         Assert.Equal((WebLingoCommandLine.Success, ""), (Weblingo("check", "var a = [2, 1]; var b = a.sort();").Exit, Weblingo("check", "var a = [2, 1]; var b = a.sort();").Error));
     }
 
@@ -1115,7 +1115,7 @@ public sealed class ConformanceTests : IDisposable
         var (exit, output, error) = Weblingo("run", "import { write, writeLn } from \"std:system\"; import { BytesBuilder } from \"std:bytes\"; import { Regex } from \"std:regex\"; async function f() {\n    throw \"lost\";\n}\nf();\nwriteLn(\"end\");");
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Equal("end\n", output);
-        Assert.Equal("program.wl(2,5): error WL3008:", FirstLineStart(error));
+        Assert.Equal("program.wlg(2,5): error WL3008:", FirstLineStart(error));
     }
 
     [Theory]
@@ -1133,15 +1133,15 @@ public sealed class ConformanceTests : IDisposable
         var source = "import { BytesBuilder } from \"std:bytes\"; import { Regex } from \"std:regex\";\n"
             + string.Concat(Enumerable.Repeat("// A line its source's positions would otherwise name.\n", 11)) + call + "\n// The end.\n";
         var (exit, _, error) = Weblingo("run", source);
-        Assert.Equal((WebLingoCommandLine.RuntimeFailed, $"program.wl(13,{column}): error {code}:"), (exit, FirstLineStart(error)));
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, $"program.wlg(13,{column}): error {code}:"), (exit, FirstLineStart(error)));
 
         // On the stack VM, from a .wlbc, where the file's own positions locate it.
-        var program = Path.Combine(_folder, "program.wl");
+        var program = Path.Combine(_folder, "program.wlg");
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
         var stackError = new StringWriter();
         Assert.Equal(WebLingoCommandLine.RuntimeFailed,
             WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], new StringWriter(), stackError));
-        Assert.Equal($"program.wl(13,{column}): error {code}:", FirstLineStart(stackError.ToString().Replace(program, "program.wl", StringComparison.Ordinal)));
+        Assert.Equal($"program.wlg(13,{column}): error {code}:", FirstLineStart(stackError.ToString().Replace(program, "program.wlg", StringComparison.Ordinal)));
     }
 
     [Theory]
@@ -1157,17 +1157,17 @@ public sealed class ConformanceTests : IDisposable
     public void AToStringThatGivesNoStringIsAnErrorWhereItIsWritten(string given, string call, int column, string described)
     {
         var source = $"import {{ writeLn }} from \"std:system\"; class N extends String {{}} class T {{ toString() {{ return {given}; }} }}\n{call}\n";
-        var expected = $"program.wl(2,{column}): error WL3001: 'toString()' gave {described}, not a string, to be written.";
+        var expected = $"program.wlg(2,{column}): error WL3001: 'toString()' gave {described}, not a string, to be written.";
         var (exit, output, error) = Weblingo("run", source);
         Assert.Equal((WebLingoCommandLine.RuntimeFailed, "", expected), (exit, output, error.Split('\n')[0].TrimEnd('\r')));
 
         // On the stack VM, from a .wlbc.
-        var program = Path.Combine(_folder, "program.wl");
+        var program = Path.Combine(_folder, "program.wlg");
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
         var stackError = new StringWriter();
         Assert.Equal(WebLingoCommandLine.RuntimeFailed,
             WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], new StringWriter(), stackError));
-        Assert.Equal(expected, stackError.ToString().Replace(program, "program.wl", StringComparison.Ordinal).Split('\n')[0].TrimEnd('\r'));
+        Assert.Equal(expected, stackError.ToString().Replace(program, "program.wlg", StringComparison.Ordinal).Split('\n')[0].TrimEnd('\r'));
     }
 
     [Theory]
@@ -1185,7 +1185,7 @@ public sealed class ConformanceTests : IDisposable
         Assert.Equal((WebLingoCommandLine.Success, printed + "\n", ""), Weblingo("run", source));
 
         // On the stack VM, from a .wlbc.
-        var program = Path.Combine(_folder, "program.wl");
+        var program = Path.Combine(_folder, "program.wlg");
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], output, new StringWriter()));
@@ -1217,7 +1217,7 @@ public sealed class ConformanceTests : IDisposable
         Assert.Equal((WebLingoCommandLine.Success, printed + "\n", ""), Weblingo("run", source));
 
         // On the stack VM, from a .wlbc.
-        var program = Path.Combine(_folder, "program.wl");
+        var program = Path.Combine(_folder, "program.wlg");
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], output, new StringWriter()));
@@ -1228,24 +1228,24 @@ public sealed class ConformanceTests : IDisposable
     // A name that is not defined, WL2001, suggests what it may have been meant as (section 3.9, the owner's decision, 18
     // November 2026): a name in scope it differs from only by case; else a standard module's export, of that name or of
     // one it differs from only by case, with the module to import it from; else nothing.
-    [InlineData("var db = Database.open(\"x\");", "program.wl(1,10): error WL2001: 'Database' is not defined; did you mean Database, from std:db?")]
+    [InlineData("var db = Database.open(\"x\");", "program.wlg(1,10): error WL2001: 'Database' is not defined; did you mean Database, from std:db?")]
     [InlineData("var e = environment.machineName;",
-        "program.wl(1,9): error WL2001: 'environment' is not defined; did you mean Environment, from std:env?")]
-    [InlineData("var t = readText(\"a\");", "program.wl(1,9): error WL2001: 'readText' is not defined; did you mean readText, from std:fs?")]
-    [InlineData("import { writeLn } from \"std:system\"; writeLn(JSON.stringify(1));", "program.wl(1,47): error WL2001: 'JSON' is not defined; did you mean Json, from std:json?")]
-    [InlineData("import { writeLn } from \"std:system\"; writeLn(Json.stringify(1));", "program.wl(1,47): error WL2001: 'Json' is not defined; did you mean Json, from std:json?")]
-    [InlineData("import { writeLn } from \"std:system\"; writeLn(Html.url(\"/\"));", "program.wl(1,47): error WL2001: 'Html' is not defined; did you mean Html, from std:html?")]
-    [InlineData("Writeln(1);", "program.wl(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn?")]
+        "program.wlg(1,9): error WL2001: 'environment' is not defined; did you mean Environment, from std:env?")]
+    [InlineData("var t = readText(\"a\");", "program.wlg(1,9): error WL2001: 'readText' is not defined; did you mean readText, from std:fs?")]
+    [InlineData("import { writeLn } from \"std:system\"; writeLn(JSON.stringify(1));", "program.wlg(1,47): error WL2001: 'JSON' is not defined; did you mean Json, from std:json?")]
+    [InlineData("import { writeLn } from \"std:system\"; writeLn(Json.stringify(1));", "program.wlg(1,47): error WL2001: 'Json' is not defined; did you mean Json, from std:json?")]
+    [InlineData("import { writeLn } from \"std:system\"; writeLn(Html.url(\"/\"));", "program.wlg(1,47): error WL2001: 'Html' is not defined; did you mean Html, from std:html?")]
+    [InlineData("Writeln(1);", "program.wlg(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn?")]
     // The classes of the kinds of values no literal makes, each a module's, only by an import (section 3.9, M0.20.4).
-    [InlineData("var b = Bytes.from(\"x\");", "program.wl(1,9): error WL2001: 'Bytes' is not defined; did you mean Bytes, from std:bytes?")]
+    [InlineData("var b = Bytes.from(\"x\");", "program.wlg(1,9): error WL2001: 'Bytes' is not defined; did you mean Bytes, from std:bytes?")]
     [InlineData("var b = new BytesBuilder();",
-        "program.wl(1,13): error WL2001: 'BytesBuilder' is not defined; did you mean BytesBuilder, from std:bytes?")]
-    [InlineData("var d = DateTime.now();", "program.wl(1,9): error WL2001: 'DateTime' is not defined; did you mean DateTime, from std:datetime?")]
-    [InlineData("var d = Datetime.now();", "program.wl(1,9): error WL2001: 'Datetime' is not defined; did you mean DateTime, from std:datetime?")]
-    [InlineData("var r = new Regex(\"a\");", "program.wl(1,13): error WL2001: 'Regex' is not defined; did you mean Regex, from std:regex?")]
-    [InlineData("var t = \"a\" is Regex;", "program.wl(1,16): error WL2001: 'Regex' is not defined; did you mean Regex, from std:regex?")]
-    [InlineData("import { writeLn } from \"std:system\"; var count = 1; writeLn(Count);", "program.wl(1,62): error WL2001: 'Count' is not defined; did you mean count?")]
-    [InlineData("var x = nothingLikeIt;", "program.wl(1,9): error WL2001: 'nothingLikeIt' is not defined.")]
+        "program.wlg(1,13): error WL2001: 'BytesBuilder' is not defined; did you mean BytesBuilder, from std:bytes?")]
+    [InlineData("var d = DateTime.now();", "program.wlg(1,9): error WL2001: 'DateTime' is not defined; did you mean DateTime, from std:datetime?")]
+    [InlineData("var d = Datetime.now();", "program.wlg(1,9): error WL2001: 'Datetime' is not defined; did you mean DateTime, from std:datetime?")]
+    [InlineData("var r = new Regex(\"a\");", "program.wlg(1,13): error WL2001: 'Regex' is not defined; did you mean Regex, from std:regex?")]
+    [InlineData("var t = \"a\" is Regex;", "program.wlg(1,16): error WL2001: 'Regex' is not defined; did you mean Regex, from std:regex?")]
+    [InlineData("import { writeLn } from \"std:system\"; var count = 1; writeLn(Count);", "program.wlg(1,62): error WL2001: 'Count' is not defined; did you mean count?")]
+    [InlineData("var x = nothingLikeIt;", "program.wlg(1,9): error WL2001: 'nothingLikeIt' is not defined.")]
     public void AnUndefinedNameSuggestsWhatItMayHaveBeenMeantAs(string source, string reported)
     {
         var (exit, _, error) = Weblingo("check", source);
@@ -1273,7 +1273,7 @@ public sealed class ConformanceTests : IDisposable
         Assert.Equal((WebLingoCommandLine.Success, "[32, 2, 44, 32]\n", ""), Weblingo("run", source));
         var (exit, _, error) = Weblingo("check", "import { writeLn } from \"std:io\";");
         Assert.Equal((WebLingoCommandLine.CompilationFailed,
-            "program.wl(1,25): error WL2015: The module 'std:io' cannot be imported: there is no such standard module."), (exit, error.Split('\n')[0].TrimEnd('\r')));
+            "program.wlg(1,25): error WL2015: The module 'std:io' cannot be imported: there is no such standard module."), (exit, error.Split('\n')[0].TrimEnd('\r')));
     }
 
     [Fact]
@@ -1283,7 +1283,7 @@ public sealed class ConformanceTests : IDisposable
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("check", source).Exit);
         var (exit, _, error) = Weblingo("run", source);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
-        Assert.Equal("program.wl(1,9): error WL3002:", FirstLineStart(error));
+        Assert.Equal("program.wlg(1,9): error WL3002:", FirstLineStart(error));
     }
 
     [Fact]
@@ -1315,7 +1315,7 @@ public sealed class ConformanceTests : IDisposable
     [Theory]
     [InlineData("run")]
     [InlineData("--unknown")]
-    [InlineData("run", "a.wl", "b.wl")]
+    [InlineData("run", "a.wlg", "b.wlg")]
     public void AUsageErrorExitsWith2(params string[] args)
     {
         var output = new StringWriter();
@@ -1327,7 +1327,7 @@ public sealed class ConformanceTests : IDisposable
     public void AFileThatCannotBeReadExitsWith4()
     {
         var error = new StringWriter();
-        var missing = Path.Combine(_folder, "missing.wl");
+        var missing = Path.Combine(_folder, "missing.wlg");
         Assert.Equal(WebLingoCommandLine.FileUnreadable, WebLingoCommandLine.Run(["run", missing], new StringWriter(), error));
         Assert.Contains("cannot read the file", error.ToString());
     }
@@ -1335,7 +1335,7 @@ public sealed class ConformanceTests : IDisposable
     [Fact]
     public void TheHelloWorldSampleGreets()
     {
-        var sample = Path.Combine(SolutionFolder(), "samples", "HelloWorld", "hello.wl");
+        var sample = Path.Combine(SolutionFolder(), "samples", "HelloWorld", "hello.wlg");
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", sample], output, new StringWriter()));
         Assert.Equal("Hello from WebLingo!\n", output.ToString());
@@ -1344,7 +1344,7 @@ public sealed class ConformanceTests : IDisposable
     [Fact]
     public void TheArithmeticSamplePrints30()
     {
-        var sample = Path.Combine(SolutionFolder(), "samples", "Arithmetic", "arithmetic.wl");
+        var sample = Path.Combine(SolutionFolder(), "samples", "Arithmetic", "arithmetic.wlg");
         var output = new StringWriter();
         var error = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", sample], output, error));
@@ -1360,7 +1360,7 @@ public sealed class ConformanceTests : IDisposable
         var good = string.Join(newline, "import { writeLn } from \"std:system\"; var a = 2;", "var b = a * 3;", "writeLn(b);");
         Assert.Equal((WebLingoCommandLine.Success, "6\n", ""), Weblingo("run", good));
         var bad = string.Join(newline, "import { writeLn } from \"std:system\"; var x = 1;", "writeLn(y);");
-        Assert.Equal("program.wl(2,9): error WL2001:", FirstLineStart(Weblingo("run", bad).Error));
+        Assert.Equal("program.wlg(2,9): error WL2001:", FirstLineStart(Weblingo("run", bad).Error));
     }
 
     [Fact]
@@ -1379,7 +1379,7 @@ public sealed class ConformanceTests : IDisposable
         for (var round = 0; round < 5_000; round++)
         {
             var source = string.Concat(Enumerable.Range(0, random.Next(1, 30)).Select(_ => fragments[random.Next(fragments.Length)] + " "));
-            var result = compiler.Compile(source, "fuzz.wl");
+            var result = compiler.Compile(source, "fuzz.wlg");
             if (result.Module is null)
             {
                 Assert.NotEmpty(result.Diagnostics);
@@ -1402,7 +1402,7 @@ public sealed class ConformanceTests : IDisposable
     public void MalformedBytecodeFailsVerificationNotACrash()
     {
         var module = new WebLingoCompiler(new WebLingoCompilerOptions([new WebLingoBuiltinDeclaration("writeLn", 1)]))
-            .Compile("import { write, writeLn } from \"std:system\"; var a = 10; var b = a * 2 - 3; var c = 0; c = -b / a; writeLn(c);", "base.wl").Module!;
+            .Compile("import { write, writeLn } from \"std:system\"; var a = 10; var b = a * 2 - 3; var c = 0; c = -b / a; writeLn(c);", "base.wlg").Module!;
         var random = new Random(8_6);
         var opCodes = Enum.GetValues<WebLingoOpCode>();
         var vm = new WebLingoVirtualMachine();
@@ -1437,14 +1437,14 @@ public sealed class ConformanceTests : IDisposable
     public void ModulesAreFoundFromTheirImporter()
     {
         Directory.CreateDirectory(Path.Combine(_folder, "lib"));
-        File.WriteAllText(Path.Combine(_folder, "lib", "util.wl"), "export function twice(x) { return x * 2; }");
-        File.WriteAllText(Path.Combine(_folder, "lib", "db.wl"),
+        File.WriteAllText(Path.Combine(_folder, "lib", "util.wlg"), "export function twice(x) { return x * 2; }");
+        File.WriteAllText(Path.Combine(_folder, "lib", "db.wlg"),
             "import { twice } from \"./util\";\nexport var n = twice(2);\nexport function f() {\n    return [1][3];\n}");
-        var (exit, output, error) = Weblingo("run", "import { write, writeLn } from \"std:system\"; import db from \"lib/db.wl\";\nwriteLn(db.n);\ndb.f();");
+        var (exit, output, error) = Weblingo("run", "import { write, writeLn } from \"std:system\"; import db from \"lib/db.wlg\";\nwriteLn(db.n);\ndb.f();");
         Assert.Equal((WebLingoCommandLine.RuntimeFailed, "4\n"), (exit, output));
         // An imported file is named by its path from the current folder, which the test's folder is somewhere below.
         var folder = Path.GetRelativePath(Directory.GetCurrentDirectory(), _folder).Replace('\\', '/') + "/";
-        Assert.Equal("lib/db.wl(4,12): error WL3005:", FirstLineStart(error.Replace(folder, "", StringComparison.Ordinal)));
+        Assert.Equal("lib/db.wlg(4,12): error WL3005:", FirstLineStart(error.Replace(folder, "", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -1454,12 +1454,12 @@ public sealed class ConformanceTests : IDisposable
         // classes, before the program's imports run, so that a module's top level has them too (sections 3.6 and 3.9), on
         // either VM.
         Directory.CreateDirectory(Path.Combine(_folder, "lib"));
-        File.WriteAllText(Path.Combine(_folder, "lib", "top.wl"),
+        File.WriteAllText(Path.Combine(_folder, "lib", "top.wlg"),
             "import fs from \"std:fs\";\nexport var code = null;\ntry { fs.readTextSync(\"no-such-file.txt\"); } catch (IOError e) { code = e.code; }\n" +
             "export const found = [1, 2, 3].find(x => x > 1);\nexport const doubled = [1, 2].map(x => x * 2);");
-        var source = "import { write, writeLn } from \"std:system\"; import { code, found, doubled } from \"lib/top.wl\";\nwriteLn([code, found, doubled]);";
+        var source = "import { write, writeLn } from \"std:system\"; import { code, found, doubled } from \"lib/top.wlg\";\nwriteLn([code, found, doubled]);";
         Assert.Equal((WebLingoCommandLine.Success, "[\"WL3011\", 2, [2, 4]]\n", ""), Weblingo("run", source));
-        var program = Path.Combine(_folder, "program.wl");
+        var program = Path.Combine(_folder, "program.wlg");
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], output, new StringWriter()));
@@ -1470,7 +1470,7 @@ public sealed class ConformanceTests : IDisposable
     public void TheCliImportsModulesWhileTheProgramRuns()
     {
         Directory.CreateDirectory(Path.Combine(_folder, "lib"));
-        File.WriteAllText(Path.Combine(_folder, "lib", "util.wl"), "export function twice(x) { return x * 2; }");
+        File.WriteAllText(Path.Combine(_folder, "lib", "util.wlg"), "export function twice(x) { return x * 2; }");
         var (exit, output, _) = Weblingo("run", "import { write, writeLn } from \"std:system\"; var u = await Module.import(\"lib/util\");\nwriteLn(u.twice(21));");
         Assert.Equal((WebLingoCommandLine.Success, "42\n"), (exit, output));
     }
@@ -1484,9 +1484,9 @@ public sealed class ConformanceTests : IDisposable
         (exit, output, _) = Weblingo("run", script, "size=10");
         Assert.Equal((WebLingoCommandLine.Success, "[\"10\", \"x\", 20]\n"), (exit, output));
         (exit, _, error) = Weblingo("run", script);
-        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "program.wl(1,1): error WL2016:"), (exit, FirstLineStart(error)));
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "program.wlg(1,1): error WL2016:"), (exit, FirstLineStart(error)));
         (exit, _, error) = Weblingo("run", script, "size=1", "colour=red");
-        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "program.wl(1,1): error WL2016:"), (exit, FirstLineStart(error)));
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "program.wlg(1,1): error WL2016:"), (exit, FirstLineStart(error)));
         Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("run", script, "size").Exit);
         Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("run", script, "size=1", "size=2").Exit);
         Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("run", script, "=1").Exit);
@@ -1497,13 +1497,13 @@ public sealed class ConformanceTests : IDisposable
     {
         var (exit, output, error) = Weblingo("run", "import x from \"none\";");
         Assert.Equal((WebLingoCommandLine.CompilationFailed, ""), (exit, output));
-        Assert.Equal("program.wl(1,15): error WL2015:", FirstLineStart(error));
+        Assert.Equal("program.wlg(1,15): error WL2015:", FirstLineStart(error));
     }
 
     [Fact]
     public void TheModulesSampleRuns()
     {
-        var sample = Path.Combine(SolutionFolder(), "samples", "Modules", "main.wl");
+        var sample = Path.Combine(SolutionFolder(), "samples", "Modules", "main.wlg");
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", sample], output, new StringWriter()));
         Assert.Equal("Hello, WebLingo!\nHello, modules!\n2 greetings\n", output.ToString());
@@ -1511,13 +1511,13 @@ public sealed class ConformanceTests : IDisposable
 
     private (int Exit, string Output, string Error) Weblingo(string command, string source, params string[] parameters)
     {
-        var path = Path.Combine(_folder, "program.wl");
+        var path = Path.Combine(_folder, "program.wlg");
         File.WriteAllText(path, source);
         var output = new StringWriter();
         var error = new StringWriter();
         var exit = WebLingoCommandLine.Run([command, path, .. parameters], output, error);
         // Diagnostics name the file as it was given; show only its name, so the expectations hold on every machine.
-        return (exit, output.ToString(), error.ToString().Replace(path, "program.wl", StringComparison.Ordinal));
+        return (exit, output.ToString(), error.ToString().Replace(path, "program.wlg", StringComparison.Ordinal));
     }
 
     /// <summary>The first line of the error output, up to the end of its "error CODE:".</summary>

@@ -1,5 +1,5 @@
 <% 
-  import { featured } from "/lib/teas.wl"; 
+  import { featured } from "/lib/teas.wlg";
   layout "/layouts/main.wasp", { title: "Welcome", section: "home" };
 %>
 

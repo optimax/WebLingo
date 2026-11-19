@@ -1,4 +1,4 @@
-<% param request; param response; import { lists, one, read, update, idOf, priorities, dateValue } from "/lib/todo.wl"; %>
+<% param request; param response; import { lists, one, read, update, idOf, priorities, dateValue } from "/lib/todo.wlg"; %>
 <% layout "/layouts/main.wasp", { title: "Edit" }; %>
 <%
   // One item's form, /edit?id=12: shown, and, when it is posted, the item changed and the browser sent back to its

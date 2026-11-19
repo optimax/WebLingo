@@ -1,4 +1,4 @@
-<% param request; param response; import { cartOf, linesOf } from "/lib/cart.wl"; %>
+<% param request; param response; import { cartOf, linesOf } from "/lib/cart.wlg"; %>
 <% layout "/layouts/main.wasp", { title: "Your cart", section: "cart" }; %>
 <%
   // The cart this browser's cookie names. Its fish are in one form: its Update button posts every quantity at once, to

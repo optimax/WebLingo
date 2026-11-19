@@ -1,4 +1,4 @@
-<% param request; param response; import { one, remove, idOf } from "/lib/todo.wl"; %>
+<% param request; param response; import { one, remove, idOf } from "/lib/todo.wlg"; %>
 <% layout "/layouts/main.wasp", { title: "Delete" }; %>
 <%
   // /delete?id=12: asks first, then, when its form is posted, deletes the item and sends the browser back to its list.

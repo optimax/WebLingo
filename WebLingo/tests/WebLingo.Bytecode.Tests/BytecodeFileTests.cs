@@ -79,8 +79,8 @@ public sealed class BytecodeFileTests
     {
         Assert.True(WebLingoBytecodeFile.TryReadRegister(WebLingoBytecodeFile.Write(RegisterModule(), Texts), out _, out var positions,
             out var error), error);
-        Assert.Equal([null, "lib.wl"], positions.Select(p => p.Source));
-        // The program's own spans start at 0 and 7 (line 2, column 1); lib.wl's at 3 (line 1, column 3: "😀" is one scalar).
+        Assert.Equal([null, "lib.wlg"], positions.Select(p => p.Source));
+        // The program's own spans start at 0 and 7 (line 2, column 1); lib.wlg's at 3 (line 1, column 3: "😀" is one scalar).
         Assert.Equal([new(0, 1, 1), new(7, 2, 1)], positions[0].Locations);
         Assert.Equal([new WebLingoSourceLocation(3, 1, 3)], positions[1].Locations);
         Assert.Equal(new WebLingoSourceLocation(9, 2, 3), positions[0].GetLocation(9));
@@ -212,14 +212,14 @@ public sealed class BytecodeFileTests
         Assert.InRange(read, 1, 20_000);
     }
 
-    // The program's text, its second line starting at 7, and lib.wl's, where "😀" puts y, at 3, in column 3.
-    private static readonly WebLingoSourceText OwnText = new("var a;\nwriteLn(a);\n", "main.wl");
-    private static readonly WebLingoSourceText LibText = new("x😀y = 1;", "lib.wl");
+    // The program's text, its second line starting at 7, and lib.wlg's, where "😀" puts y, at 3, in column 3.
+    private static readonly WebLingoSourceText OwnText = new("var a;\nwriteLn(a);\n", "main.wlg");
+    private static readonly WebLingoSourceText LibText = new("x😀y = 1;", "lib.wlg");
 
     private static WebLingoSourceText? Texts(string? source) => source switch
     {
         null => OwnText,
-        "lib.wl" => LibText,
+        "lib.wlg" => LibText,
         _ => null
     };
 
@@ -244,25 +244,25 @@ public sealed class BytecodeFileTests
             ],
             [new WebLingoSourceSpan(3, 1), new WebLingoSourceSpan(3, 1), new WebLingoSourceSpan(3, 1)], ["e"])
         {
-            Source = "lib.wl",
+            Source = "lib.wlg",
             Handlers = [new WebLingoHandler(0, 2, 2, 0, 1)]
         };
-        var lib = new WebLingoFunction("lib.wl", 1, 0, [new WebLingoInstruction(WebLingoOpCode.Return)])
+        var lib = new WebLingoFunction("lib.wlg", 1, 0, [new WebLingoInstruction(WebLingoOpCode.Return)])
         {
             IsAsync = true,
-            Source = "lib.wl"
+            Source = "lib.wlg"
         };
-        return new WebLingoCompiledModule("main.wl", [WebLingoConstant.Int64(42), WebLingoConstant.String("oops")],
+        return new WebLingoCompiledModule("main.wlg", [WebLingoConstant.Int64(42), WebLingoConstant.String("oops")],
             [new WebLingoImport("writeLn", 1)], main)
         {
             Functions = [closure, lib],
             Classes = [new WebLingoClassInfo("C", -1, []) { StaticFields = ["count"] }],
-            Units = [new WebLingoUnitInfo("main.wl", -1, []), new WebLingoUnitInfo("lib.wl", 1, ["x"])],
+            Units = [new WebLingoUnitInfo("main.wlg", -1, []), new WebLingoUnitInfo("lib.wlg", 1, ["x"])],
         };
     }
 
     private static WebLingoStackModule StackModule() =>
-        new("stack.wl", [WebLingoConstant.String("s")], [new WebLingoImport("writeLn", 1)],
+        new("stack.wlg", [WebLingoConstant.String("s")], [new WebLingoImport("writeLn", 1)],
             new WebLingoStackFunction("main", 2, 1,
                 [
                     new WebLingoStackInstruction(WebLingoStackOpCode.LoadConstant, 0),

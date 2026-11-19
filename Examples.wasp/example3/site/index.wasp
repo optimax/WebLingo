@@ -1,4 +1,4 @@
-<% param request; import { lists, counts, items, showOf, idOf, priorities } from "/lib/todo.wl"; %>
+<% param request; import { lists, counts, items, showOf, idOf, priorities } from "/lib/todo.wlg"; %>
 <% layout "/layouts/main.wasp", { title: "Your lists", section: showOf(request.query?["show"]) }; %>
 <%
   // The items to show, chosen by the query: ?show=done or ?show=all, ?list=2 for one list, ?q=word to search.

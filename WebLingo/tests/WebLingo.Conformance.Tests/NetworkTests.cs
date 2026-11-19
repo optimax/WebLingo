@@ -101,12 +101,12 @@ public sealed class NetworkTests : IDisposable
 
     private (int Exit, string Output, string Error) Weblingo(string source)
     {
-        var path = Path.Combine(_folder, "program.wl");
+        var path = Path.Combine(_folder, "program.wlg");
         File.WriteAllText(path, source);
         var output = new StringWriter();
         var error = new StringWriter();
         var exit = WebLingoCommandLine.Run(["run", path], output, error);
-        return (exit, output.ToString(), error.ToString().Replace(path, "program.wl", StringComparison.Ordinal));
+        return (exit, output.ToString(), error.ToString().Replace(path, "program.wlg", StringComparison.Ordinal));
     }
 
     /// <summary>The test's server: each connection one request, answered and closed.</summary>

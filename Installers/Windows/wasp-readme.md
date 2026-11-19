@@ -1,14 +1,14 @@
 # WASP for Windows and IIS
 
-WASP, Web Application Server Pages, serves sites written in WebLingo: pages, `.wasp` files, and handlers, `.wl` files,
-as PHP serves PHP's. This zip holds `wasp` and `iis-install.wl`, a script that makes this machine's IIS run WASP's
+WASP, Web Application Server Pages, serves sites written in WebLingo: pages, `.wasp` files, and handlers, `.wlg` files,
+as PHP serves PHP's. This zip holds `wasp` and `iis-install.wlg`, a script that makes this machine's IIS run WASP's
 sites, and installs `wasp` beside `weblingo`, in WebLingo's folder, `C:\Program Files\WebLingo`, where every site
 finds it, or, for the zips for x86, on 64-bit Windows, `C:\Program Files (x86)\WebLingo`.
 
 It needs WebLingo installed first, from WebLingo's zip of the same version, processor and kind: `…-win-x64-…` with
 WebLingo's `…-win-x64-…`, `…-win-arm64-…` with its `…-win-arm64-…`, `…-win-x86-…` with its `…-win-x86-…`,
 `…-self-contained.zip` with WebLingo's self-contained zip, and `…-framework-dependent.zip` with its framework-dependent
-one. Its files go with that WebLingo's, and `iis-install.wl` stops, saying so, where WebLingo is another. The zips for
+one. Its files go with that WebLingo's, and `iis-install.wlg` stops, saying so, where WebLingo is another. The zips for
 arm64 are for Windows on ARM, which the x64 ones run on too, more slowly. The zips for x86 are for 32-bit Windows,
 or for a site on 64-bit Windows that uses a COM component made for 32 bits only, which a 64-bit `wasp` cannot load:
 its `web.config` then runs `C:\Program Files (x86)\WebLingo\wasp.exe`.
@@ -23,12 +23,12 @@ its `web.config` then runs `C:\Program Files (x86)\WebLingo\wasp.exe`.
 
    ```bat
    cd /d "%USERPROFILE%\Downloads\WASP-0.20.0-pre-alpha-win-x64-self-contained"
-   weblingo run iis-install.wl
+   weblingo run iis-install.wlg
    ```
 
    with the folder's own name, which is the zip's. It takes a few minutes where it turns IIS on, and writes each step.
 
-## What `iis-install.wl` does
+## What `iis-install.wlg` does
 
 1. **IIS.** Unless IIS is on, it turns it on, with what a site needs and IIS's manager, through DISM. Windows may then
    ask to be restarted.
@@ -70,12 +70,12 @@ beside an `index.wasp`, its home page:
 <html><body><h1>Hello from WASP</h1><p>You asked for <%= request.path %>.</p></body></html>
 ```
 
-Then, from this folder, as administrator, `add-wasp-site.wl` adds it to IIS: an application pool and a website of
+Then, from this folder, as administrator, `add-wasp-site.wlg` adds it to IIS: an application pool and a website of
 that name, served by HTTPS on port 443 under its host's name, with a certificate this machine trusts, and the name in
 the machine's `hosts` file:
 
 ```bat
-weblingo run add-wasp-site.wl name=mysite folder=C:\WWW\mysite host=mysite.localhost
+weblingo run add-wasp-site.wlg name=mysite folder=C:\WWW\mysite host=mysite.localhost
 ```
 
 and it is at <https://mysite.localhost/>. `writable=<folders>` gives the site's pool write access to folders outside

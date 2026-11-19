@@ -1,7 +1,7 @@
 using WebLingo.Platform.Abstractions;
 namespace WebLingo.Hosting;
 
-/// <summary>What a route leads to: a page, a <c>.wl</c> that may be a route handler, or a file served as it is.</summary>
+/// <summary>What a route leads to: a page, a <c>.wlg</c> that may be a route handler, or a file served as it is.</summary>
 public enum WebLingoRouteKind { Page, Handler, File }
 
 /// <summary>A route: its kind, and its file, from the application's root, with <c>/</c> between its folders.</summary>
@@ -9,12 +9,12 @@ public sealed record WebLingoRoute(WebLingoRouteKind Kind, string File);
 
 /// <summary>
 /// An application's routes (specification, section 6.12, "Routes"), made once for each generation from the files under its
-/// root: a page or a <c>.wl</c> by its path without its extension, <c>/products</c> for <c>products.wasp</c>, a folder's
+/// root: a page or a <c>.wlg</c> by its path without its extension, <c>/products</c> for <c>products.wasp</c>, a folder's
 /// <c>index</c> by the folder's path, <c>/</c> and <c>/docs/</c> (and <c>/docs</c>, when nothing else is that), and any
 /// other file by its own path. A path is compared as it is, its case included, on every platform. Never routed: files
 /// and folders whose names start with <c>.</c>, <c>.wlbc</c> files, and, in the root, whatever their names' case, since
 /// Windows finds them so, the site's configuration (<c>wasp.config</c>), a script's (<c>weblingo.config</c>), and IIS's
-/// <c>web.config</c>; nor, as files served as they are, a page or a <c>.wl</c> by its own name.
+/// <c>web.config</c>; nor, as files served as they are, a page or a <c>.wlg</c> by its own name.
 /// </summary>
 public sealed class WebLingoRouteTable
 {
@@ -87,7 +87,7 @@ public sealed class WebLingoRouteTable
             var dot = name.LastIndexOf('.');
             var extension = dot > 0 ? name[dot..] : "";
             if (extension == ".wlbc") continue;
-            if (extension is not (".wasp" or ".wl"))
+            if (extension is not (".wasp" or ".wlg"))
             {
                 // A page or a handler of the same path is the route, whichever is listed first.
                 _routes.TryAdd("/" + file, new WebLingoRoute(WebLingoRouteKind.File, file));

@@ -5,7 +5,7 @@ gives you a file to save, an output to compare, and something to try on your own
 
 ## 1. Run your first script
 
-Create a folder for the lessons. Save this as `hello.wl` in that folder. WebLingo source files currently use `.wl`.
+Create a folder for the lessons. Save this as `hello.wlg` in that folder. WebLingo source files currently use `.wlg`.
 
 ```javascript
 import { writeLn } from "std:system";
@@ -13,17 +13,17 @@ import { writeLn } from "std:system";
 writeLn("Hello, WebLingo!");
 ```
 
-From your lesson folder, run `weblingo run hello.wl`. It prints:
+From your lesson folder, run `weblingo run hello.wlg`. It prints:
 
 ```text
 Hello, WebLingo!
 ```
 
 If you’re working from a checkout and haven’t installed the CLI, install the .NET 10 SDK and run the following
-from the repository root. Replace `PATH_TO_HELLO.wl` with the path to your file.
+from the repository root. Replace `PATH_TO_HELLO.wlg` with the path to your file.
 
 ```sh
-dotnet run --project WebLingo/src/WebLingo.Cli -- run "PATH_TO_HELLO.wl"
+dotnet run --project WebLingo/src/WebLingo.Cli -- run "PATH_TO_HELLO.wlg"
 ```
 
 Use the same command with each lesson’s filename. To check a script without running it, replace `run` with `check`.
@@ -34,7 +34,7 @@ reports the error. Put the semicolon back before continuing.
 
 ## 2. Store values and format a message
 
-Save as `order.wl`. Use `const` for a name you won’t assign again and `var` for one you will. Both need an initial
+Save as `order.wlg`. Use `const` for a name you won’t assign again and `var` for one you will. Both need an initial
 value. A string starting with `$"` can insert the result of an expression inside braces.
 
 ```javascript
@@ -56,7 +56,7 @@ calculate a total without floating-point rounding.
 
 ## 3. Make decisions and repeat work
 
-Save as `steeping.wl`. A condition takes a Boolean, so test `minutes > 3` explicitly. A `foreach` loop visits
+Save as `steeping.wlg`. A condition takes a Boolean, so test `minutes > 3` explicitly. A `foreach` loop visits
 each item in the array in order. The name `minutes` belongs to the loop.
 
 ```javascript
@@ -82,7 +82,7 @@ foreach (var minutes in times) {
 
 ## 4. Look up information in a map
 
-Save as `prices.wl`. A map stores values by key. Use `prices["sencha"]` when the key must exist. Optional
+Save as `prices.wlg`. A map stores values by key. Use `prices["sencha"]` when the key must exist. Optional
 indexing, `prices?[name]`, gives `null` for a missing key. The `??` operator gives a default when its left
 side is `null`.
 
@@ -104,7 +104,7 @@ the missing value.
 
 ## 5. Give repeated work a name
 
-Save as `receipts.wl`. A function can take arguments and return a value. Give a parameter a default to let callers
+Save as `receipts.wlg`. A function can take arguments and return a value. Give a parameter a default to let callers
 omit it.
 
 ```javascript
@@ -127,7 +127,7 @@ assam x2: 600 cents
 
 ## 6. Give your script parameters and handle bad input
 
-Save as `cups.wl`. Declare parameters at the top of the file. The command line supplies them as text.
+Save as `cups.wlg`. Declare parameters at the top of the file. The command line supplies them as text.
 Use `Integer.parse` to get an integer before doing arithmetic. Catch `TypeError` to handle text that
 cannot be parsed as an integer.
 
@@ -147,7 +147,7 @@ try {
 }
 ```
 
-Run `weblingo run cups.wl cups=3`. Then run `weblingo run cups.wl cups=three`.
+Run `weblingo run cups.wlg cups=3`. Then run `weblingo run cups.wlg cups=three`.
 
 ```text
 Total: 750 cents
@@ -158,7 +158,7 @@ Enter a whole number of cups.
 
 ## 7. Put related values and behavior in a class
 
-Save as `tea.wl`. The constructor sets the fields of a new object. Its methods use `this` to access those fields.
+Save as `tea.wlg`. The constructor sets the fields of a new object. Its methods use `this` to access those fields.
 
 ```javascript
 import { writeLn } from "std:system";
@@ -186,7 +186,7 @@ Steep sencha for 2 minutes.
 
 ## 8. Wait for a task
 
-Save as `timer.wl`. An `async` function gives the caller a task. Use `await` to get its result.
+Save as `timer.wlg`. An `async` function gives the caller a task. Use `await` to get its result.
 You can use `await` at the top level of a script as well as inside an `async` function.
 
 ```javascript
@@ -211,7 +211,7 @@ awaiting either result. Print both results in the order you want to serve them.
 
 ## 9. Build a two-file tea menu
 
-A module is a script that exposes declarations with `export`. Save this one as `menu-data.wl`.
+A module is a script that exposes declarations with `export`. Save this one as `menu-data.wlg`.
 
 ```javascript
 const prices = { sencha: 250, assam: 300, oolong: 275 };
@@ -221,13 +221,13 @@ export function priceFor(tea) {
 }
 ```
 
-Save the following as `menu.wl` in the same folder. It imports `priceFor` by name. The path in the
-import is relative to `menu.wl`. Run the main script, which loads the module.
+Save the following as `menu.wlg` in the same folder. It imports `priceFor` by name. The path in the
+import is relative to `menu.wlg`. Run the main script, which loads the module.
 
 ```javascript
 param tea = "sencha";
 import { writeLn } from "std:system";
-import { priceFor } from "./menu-data.wl";
+import { priceFor } from "./menu-data.wlg";
 
 var cents = priceFor(tea);
 if (cents == null) {
@@ -237,19 +237,19 @@ if (cents == null) {
 }
 ```
 
-Run `weblingo run menu.wl tea=assam` and then `weblingo run menu.wl tea=mint`.
+Run `weblingo run menu.wlg tea=assam` and then `weblingo run menu.wlg tea=mint`.
 
 ```text
 assam: 300 cents per cup
 No price for mint.
 ```
 
-**Try it.** Give `menu.wl` a `cups` parameter. Reuse the parsing and validation from lesson 6 to print
+**Try it.** Give `menu.wlg` a `cups` parameter. Reuse the parsing and validation from lesson 6 to print
 a total when the tea exists and the number of cups is positive.
 
 ## Keep going
 
-- Browse the [example scripts](../Examples.wl/) for strings, collections, classes, modules, and more. Many include
+- Browse the [example scripts](../Examples.wlg/) for strings, collections, classes, modules, and more. Many include
   their expected output at the end of the file.
 - Use the [language reference](weblingo-language-reference.md) for syntax and the
   [standard library reference](weblingo-standard-library-reference.md) for built-in classes and modules.

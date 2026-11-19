@@ -1,7 +1,7 @@
 {
   "name": "weblingo",
   "displayName": "WebLingo",
-  "description": "Syntax highlighting for WebLingo's scripts and modules (.wl) and WASP's pages (.wasp).",
+  "description": "Syntax highlighting for WebLingo's scripts and modules (.wlg) and WASP's pages (.wasp).",
   "version": "0.1.0",
   "publisher": "weblingo",
   "engines": { "vscode": "^1.80.0" },
@@ -11,7 +11,7 @@
       {
         "id": "weblingo",
         "aliases": [ "WebLingo", "weblingo" ],
-        "extensions": [ ".wl" ],
+        "extensions": [ ".wlg" ],
         "configuration": "./weblingo.language-configuration.json"
       },
       {

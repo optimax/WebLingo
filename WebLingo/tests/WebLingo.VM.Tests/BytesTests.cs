@@ -125,12 +125,12 @@ public sealed class BytesTests
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output)) };
         if (stack)
         {
-            var stackCompiled = new WebLingoStackCompiler(options).Compile(program, "main.wl");
+            var stackCompiled = new WebLingoStackCompiler(options).Compile(program, "main.wlg");
             Assert.Empty(stackCompiled.Diagnostics);
             var stackError = new WebLingoStackVirtualMachine().Execute(stackCompiled.Module!, context).Error;
             return (output.Text, stackError);
         }
-        var compiled = new WebLingoCompiler(options).Compile(program, "main.wl");
+        var compiled = new WebLingoCompiler(options).Compile(program, "main.wlg");
         Assert.Empty(compiled.Diagnostics);
         // Run first: the output is read once the program has written it.
         var error = new WebLingoVirtualMachine().Execute(compiled.Module!, context).Error;

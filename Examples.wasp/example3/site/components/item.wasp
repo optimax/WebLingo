@@ -1,4 +1,4 @@
-<% param item; param back; import { dueText } from "/lib/todo.wl"; %>
+<% param item; param back; import { dueText } from "/lib/todo.wlg"; %>
 <li class="item p<%= item["Priority"] %><%= item["Done"] ? " done" : "" %><%= item["Overdue"] ? " overdue" : "" %>">
   <form method="post" action="/toggle">
     <input type="hidden" name="id" value="<%= item["Id"] %>">

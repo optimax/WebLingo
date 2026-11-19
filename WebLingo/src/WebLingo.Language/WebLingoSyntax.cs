@@ -176,7 +176,7 @@ public sealed record WebLingoExtendSyntax(WebLingoExpressionSyntax Target, IRead
 }
 
 /// <summary>
-/// <c>import db from "lib/db.wl";</c>, <c>import { f, g } from "lib/util.wl";</c>, or both, <c>import db, { f } from …;</c>:
+/// <c>import db from "lib/db.wlg";</c>, <c>import { f, g } from "lib/util.wlg";</c>, or both, <c>import db, { f } from …;</c>:
 /// a module's instance, or names it exports, at a module's top level (section 3.9).
 /// </summary>
 public sealed record WebLingoImportSyntax(string? Name, WebLingoSourceSpan NameSpan, IReadOnlyList<WebLingoImportedNameSyntax> Names,

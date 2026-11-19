@@ -41,8 +41,8 @@ public static class WebLingoCommandLine
     /// <summary>The extension of a WLBC file (section 5.3).</summary>
     public const string BytecodeExtension = ".wlbc";
 
-    /// <summary><c>weblingo</c>: scripts, <c>.wl</c> files, compiled by the WebLingo compiler, and their <c>.wlbc</c> files.</summary>
-    public static WebLingoCommandLineProgram Scripts { get; } = new("weblingo", Version, ".wl", _ => [],
+    /// <summary><c>weblingo</c>: scripts, <c>.wlg</c> files, compiled by the WebLingo compiler, and their <c>.wlbc</c> files.</summary>
+    public static WebLingoCommandLineProgram Scripts { get; } = new("weblingo", Version, ".wlg", _ => [],
         (file, options) => new WebLingoCommandLineCompilation(new WebLingoCompiler(options).Compile(file.Text, file.Name)))
     {
         Bytecode = true,
@@ -62,7 +62,7 @@ public static class WebLingoCommandLine
     public static int Run(WebLingoCommandLineProgram program, string[] args, TextWriter output, TextWriter error,
         IWebLingoConsoleInput? input = null)
     {
-        // A file named first is run, weblingo script.wl name=Ann as weblingo run script.wl name=Ann (the owner's answer,
+        // A file named first is run, weblingo script.wlg name=Ann as weblingo run script.wlg name=Ann (the owner's answer,
         // 18 November 2026, "Minimal WebLingo Installer: Linux", Q1).
         if (program.RunsFileNamedFirst && args.Length >= 1 && (args[0].EndsWith(program.Extension, StringComparison.OrdinalIgnoreCase)
             || program.Bytecode && args[0].EndsWith(BytecodeExtension, StringComparison.OrdinalIgnoreCase)))
@@ -557,7 +557,7 @@ public static class WebLingoCommandLine
 
     /// <summary>
     /// The files a program imports (specification, section 3.9): a path from the importing file's folder, <c>./</c>
-    /// being that folder and <c>/</c> the drive's root, <c>.wl</c> added to one without an extension. A file is named
+    /// being that folder and <c>/</c> the drive's root, <c>.wlg</c> added to one without an extension. A file is named
     /// by its path from the current folder, with <c>/</c> between its folders, and the program's own by the path it was
     /// given, so that each is one module however many import it.
     /// </summary>
@@ -580,7 +580,7 @@ public static class WebLingoCommandLine
                     ? Path.Combine(Path.GetPathRoot(importerFull) ?? "", path.TrimStart('/'))
                     : Path.Combine(Path.GetDirectoryName(importerFull) ?? "", path);
                 full = Path.GetFullPath(full);
-                if (Path.GetExtension(full).Length == 0) full += ".wl";
+                if (Path.GetExtension(full).Length == 0) full += ".wlg";
                 if (full == _mainFull)
                 {
                     name = mainPath;

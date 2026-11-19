@@ -1,8 +1,8 @@
 # WASP User Manual
 
 WASP, Web Application Server Pages, is how WebLingo builds websites. A WASP site is a folder of files, as a PHP site is:
-pages (`.wasp`), which are HTML with WebLingo in them, modules (`.wl`), which hold the code the pages share, route
-handlers (also `.wl`), which answer a path with code alone, and any other files, such as stylesheets and images, which
+pages (`.wasp`), which are HTML with WebLingo in them, modules (`.wlg`), which hold the code the pages share, route
+handlers (also `.wlg`), which answer a path with code alone, and any other files, such as stylesheets and images, which
 are sent as they are. WebLingo is installed once on a server, and every site uses it.
 
 This manual shows how to write and serve such a site. It explains as much of the WebLingo language as pages need, but
@@ -112,20 +112,20 @@ A site is a folder, its *root*, and everything in it. A request's path finds the
 | `/` | `index.wasp` |
 | `/teas` and `/teas/` | `teas/index.wasp` |
 | `/teas/green` | `teas/green.wasp` |
-| `/api/teas` | `api/teas.wl`, a route handler ([section 10](#10-route-handlers)) |
+| `/api/teas` | `api/teas.wlg`, a route handler ([section 10](#10-route-handlers)) |
 | `/css/site.css` | `css/site.css`, sent as it is |
 
 - A page, or a route handler, is found by its path **without** its extension: `/hello`, not `/hello.wasp`, which is a
   404.
-- A folder's `index.wasp` (or `index.wl`) answers the folder's path, with or without its closing `/`.
+- A folder's `index.wasp` (or `index.wlg`) answers the folder's path, with or without its closing `/`.
 - Any other file is sent as it is, with the content type its extension gives (`text/css` for `.css`, `image/png` for
   `.png`, and so on); a file whose extension the server does not know is a 404.
 - Paths are compared exactly, their case included, on every operating system: `/Hello` does not find `hello.wasp`.
-- `products.wasp` and `products.wl` in one folder are both `/products`, which is an error: the site does not load.
+- `products.wasp` and `products.wlg` in one folder are both `/products`, which is an error: the site does not load.
 
 Some files are never sent, whatever their path:
 
-- a page's source, and a module's, a `.wl` that exports no handler (`/lib/catalog.wl` is a 404);
+- a page's source, and a module's, a `.wlg` that exports no handler (`/lib/catalog.wlg` is a 404);
 - compiled WebLingo, `.wlbc` files;
 - the site's configuration, `wasp.config`, and IIS's, `web.config`;
 - a page or a route handler whose name holds `\`, `:` or a control character, which a file's name on Windows cannot have, and whose includes and imports could not be found;
@@ -139,11 +139,11 @@ mysite/
   shop.wasp              /shop
   contact.wasp           /contact
   teas/index.wasp        /teas
-  api/teas.wl            /api/teas, a route handler
+  api/teas.wlg            /api/teas, a route handler
   layouts/main.wasp      the layout the pages share
   includes/header.wasp   a piece of a page
   components/tea.wasp    a part a page renders, with values of its own
-  lib/catalog.wl         a module of shared code
+  lib/catalog.wlg         a module of shared code
   css/site.css           sent as it is
   wasp.config            the site's configuration
   web.config             IIS's, when the site runs under IIS
@@ -418,7 +418,7 @@ A page renders it with `renderComponent(path, values)`, and awaits it:
 
 ## 8. Modules
 
-Code that pages share, such as classes, data and functions, goes into a module, a `.wl` file, whose declarations
+Code that pages share, such as classes, data and functions, goes into a module, a `.wlg` file, whose declarations
 marked `export` a page imports:
 
 ```javascript
@@ -435,12 +435,12 @@ export function cheapest() {
 }
 ```
 
-A page imports names from it, `import { teas, cheapest } from "/lib/catalog.wl";`, or the module itself, `import
-catalog from "/lib/catalog.wl";`, then `catalog.teas`. Here is `shop.wasp`, which uses the module, the layout of
+A page imports names from it, `import { teas, cheapest } from "/lib/catalog.wlg";`, or the module itself, `import
+catalog from "/lib/catalog.wlg";`, then `catalog.teas`. Here is `shop.wasp`, which uses the module, the layout of
 [section 6](#6-layouts) and the component of [section 7](#7-components):
 
 ```html
-<% import { teas, cheapest } from "/lib/catalog.wl"; %>
+<% import { teas, cheapest } from "/lib/catalog.wlg"; %>
 <% layout "/layouts/main.wasp", { title: "Shop" }; %>
 <% foreach (var tea in teas) { %>
 <% await renderComponent("/components/tea.wasp", { name: tea.name, price: tea.price, featured: tea == cheapest() }); %>
@@ -463,7 +463,7 @@ catalog from "/lib/catalog.wl";`, then `catalog.teas`. Here is `shop.wasp`, whic
 </html>
 ```
 
-- An import's path that starts with `/` is from the site's root, any other from the importing file's folder; `.wl`
+- An import's path that starts with `/` is from the site's root, any other from the importing file's folder; `.wlg`
   may be left out.
 - An import stands at a page's or a module's top level, not inside a block or a function; wherever it stands there, the
   module it imports runs before anything else the file does.
@@ -581,14 +581,14 @@ A page run by `wasp run` has no request: there, a page's parameters are values g
 
 ## 10. Route handlers
 
-A `.wl` file that exports a function named after an HTTP method answers its path with code alone, without a page's
+A `.wlg` file that exports a function named after an HTTP method answers its path with code alone, without a page's
 text: an API, a redirect, a download. The function is given the request and the response, as a page's parameters are,
 and what it writes, with `write`, is the response's body.
 
 ```javascript
 import { write } from "std:system";
 import { Json } from "std:json";
-import { teas } from "/lib/catalog.wl";
+import { teas } from "/lib/catalog.wlg";
 
 export function get(request, response) {
   response.headers["Content-Type"] = "application/json";
@@ -603,7 +603,7 @@ export async function post(request, response) {
 }
 ```
 
-As `api/teas.wl`, `GET /api/teas` gives
+As `api/teas.wlg`, `GET /api/teas` gives
 
 ```json
 [{"name":"Sencha","price":6.5},{"name":"Assam","price":4.25}]
@@ -616,7 +616,7 @@ and `POST /api/teas`, a 201 and `Received 5 characters.` for a body of `hello`.
 - `HEAD` calls `head`, or `get` when there is no `head`, its body not sent.
 - Any other method is a 405, whose `Allow` header lists the methods the handler answers: `PUT /api/teas` is a 405 with
   `Allow: GET, HEAD, POST`.
-- A `.wl` that exports none of those functions is a module, not a handler, and its path is a 404.
+- A `.wlg` that exports none of those functions is a module, not a handler, and its path is a 404.
 - A handler's `Content-Type` is `text/html; charset=utf-8` unless it sets another.
 - The module runs anew for each request, its top level first, then the function: nothing in it lasts between requests.
 
@@ -844,7 +844,7 @@ scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run
   folder.
 - **`wasp check`** reports a page's errors without running it, and `wasp run` runs it, which is quicker than a browser
   for a page that needs no request ([section 16](#16-the-wasp-command-line)).
-- **Editors colour pages and modules**: the repository's `Editors/` folder has syntax colouring for `.wasp` and `.wl`
+- **Editors colour pages and modules**: the repository's `Editors/` folder has syntax colouring for `.wasp` and `.wlg`
   files, and its `README.md` says how to install it.
 
 ---

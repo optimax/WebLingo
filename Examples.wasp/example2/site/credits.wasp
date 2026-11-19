@@ -1,4 +1,4 @@
-<% import { credits } from "/lib/store.wl"; %>
+<% import { credits } from "/lib/store.wlg"; %>
 <% layout "/layouts/main.wasp", { title: "Photo credits", section: "credits" }; %>
 <h1>Photo credits</h1>
 <p>Every photo is from Wikimedia Commons, cropped to 4:3 and scaled to 1024 by 768 pixels. Each is its author's,

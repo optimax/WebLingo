@@ -108,7 +108,7 @@ public sealed class VirtualMachineTests
         var output = new WebLingoCollectedOutput();
         var compiled = new WebLingoCompiler(WithWrite).Compile(
             "import { write, writeLn } from \"std:system\"; var t = \"\"; for (var i = 0; i < 20000; i = i + 1) { t = \"abcdefghij\" + \"klmnopqrst\"; } writeLn(t);",
-            "test.wl");
+            "test.wlg");
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0))
         {
             Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output)),
@@ -123,7 +123,7 @@ public sealed class VirtualMachineTests
     public void AStringGrowingPastTheBudgetStopsTheProgram()
     {
         var compiled = new WebLingoCompiler(WithWrite).Compile(
-            "var t = \"x\"; while (true) t = t + t;", "test.wl");
+            "var t = \"x\"; while (true) t = t + t;", "test.wlg");
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Resources = new WebLingoResourceBudget(65535, MaxHeapUnits: 100_000) };
         var result = new WebLingoVirtualMachine().Execute(compiled.Module!, context);
         Assert.Equal(WebLingoDiagnosticCodes.BudgetExceeded, result.Error!.Code);
@@ -167,7 +167,7 @@ public sealed class VirtualMachineTests
     public void ABuiltinThatThrowsIsARuntimeErrorNotACrash()
     {
         // The host offers writeLn alone, and declares it alone.
-        var module = new WebLingoCompiler(new WebLingoCompilerOptions([new WebLingoBuiltinDeclaration("writeLn", 1)])).Compile("import { writeLn } from \"std:system\"; writeLn(1);", "test.wl").Module!;
+        var module = new WebLingoCompiler(new WebLingoCompilerOptions([new WebLingoBuiltinDeclaration("writeLn", 1)])).Compile("import { writeLn } from \"std:system\"; writeLn(1);", "test.wlg").Module!;
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = new WebLingoBuiltinRegistry(new ThrowingPrint()) };
         var result = new WebLingoVirtualMachine().Execute(module, context);
         Assert.Equal(WebLingoDiagnosticCodes.InvalidOperation, result.Error!.Code);
@@ -194,7 +194,7 @@ public sealed class VirtualMachineTests
 
     private static WebLingoCompiledModule Compile(string source)
     {
-        var compiled = new WebLingoCompiler(WithWrite).Compile(source, "test.wl");
+        var compiled = new WebLingoCompiler(WithWrite).Compile(source, "test.wlg");
         Assert.Empty(compiled.Diagnostics);
         return compiled.Module!;
     }

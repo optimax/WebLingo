@@ -1,0 +1,65 @@
+// Gives a WASP site's application pool its database on SQL Server: a login for the pool's account, IIS AppPool\<name>, by
+// Windows authentication, and a user of the database for it, which reads and changes its tables' rows (db_datareader and
+// db_datawriter), as a site that reaches its database by Windows authentication needs under IIS, where it runs as its
+// pool's account. Run it once add-wasp-site.wlg has added the pool, as an account that may add logins to the server, one
+// of its administrators (sysadmin):
+//
+//   weblingo run add-sql-server-login.wlg name=wasp.example3 database=WebLingoTodo
+//
+// server=<server> names another SQL Server than this machine's default instance, as SqlClient names it. It may be run
+// again: it keeps what is there, and adds what is missing. A database made anew, as example3's setup.wlg makes its, has
+// lost its user: run this again then.
+param name;
+param database;
+param server = "localhost";
+
+import { writeLn } from "std:system";
+import { Database } from "std:db";
+import { Regex } from "std:regex";
+
+// The database's and the server's names go into a connection string, so nothing that could end or extend one.
+if (!new Regex("^[A-Za-z_][A-Za-z0-9_]*$").test(database)) {
+    throw new Error($"{database}: a database's name of letters, digits and underscores only, please.");
+}
+if (server.contains(";") || server.contains("=")) {
+    throw new Error($"{server}: a server's name, without ; or =, please.");
+}
+function connection(to) {
+    return $"sqlserver:Server={server};Database={to};Integrated Security=true;TrustServerCertificate=true";
+}
+var account = $"IIS AppPool\\{name}";
+
+// The login: the pool's account, which Windows knows once IIS has the pool.
+using (var master = await Database.open(connection("master"))) {
+    if ((await master.query("SELECT 1 AS Found FROM sys.server_principals WHERE name = @account", { account: account })).length == 0) {
+        await master.execute("""
+            DECLARE @sql nvarchar(max) = N'CREATE LOGIN ' + QUOTENAME(@account) + N' FROM WINDOWS';
+            EXEC sp_executesql @sql;
+            """, { account: account });
+        writeLn($"Login {account} added to {server}");
+    }
+}
+
+// Its user in the database, under whatever name the database gives the login, and the roles that read and write rows.
+using (var db = await Database.open(connection(database))) {
+    var users = await db.query("SELECT name FROM sys.database_principals WHERE sid = SUSER_SID(@account)", { account: account });
+    if (users.length == 0) {
+        await db.execute("""
+            DECLARE @sql nvarchar(max) = N'CREATE USER ' + QUOTENAME(@account) + N' FOR LOGIN ' + QUOTENAME(@account);
+            EXEC sp_executesql @sql;
+            """, { account: account });
+        users = await db.query("SELECT name FROM sys.database_principals WHERE sid = SUSER_SID(@account)", { account: account });
+        writeLn($"User {users[0]["name"]} added to {database}");
+    }
+    var user = users[0]["name"];
+    foreach (var role in ["db_datareader", "db_datawriter"]) {
+        if ((await db.query("SELECT IS_ROLEMEMBER(@role, @user) AS Member", { role: role, user: user }))[0]["Member"] != 1) {
+            await db.execute("""
+                DECLARE @sql nvarchar(max) = N'ALTER ROLE ' + QUOTENAME(@role) + N' ADD MEMBER ' + QUOTENAME(@user);
+                EXEC sp_executesql @sql;
+                """, { role: role, user: user });
+            writeLn($"{user} added to {database}'s {role}");
+        }
+    }
+}
+writeLn($"{account} reads and changes {database}'s rows on {server}");

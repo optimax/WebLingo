@@ -75,7 +75,7 @@ public sealed class CodeGeneratorTests
     [InlineData("")]
     public void WhatTheCompilerGeneratesVerifies(string source)
     {
-        var result = new WebLingoCompiler(BinderTests.WithWrite).Compile(source, "test.wl");
+        var result = new WebLingoCompiler(BinderTests.WithWrite).Compile(source, "test.wlg");
         Assert.Empty(result.Diagnostics);
         Assert.True(new WebLingoBytecodeVerifier().Verify(result.Module!).IsValid);
     }
@@ -83,7 +83,7 @@ public sealed class CodeGeneratorTests
     [Fact]
     public void ASourceWithErrorsGivesNoModule()
     {
-        var result = new WebLingoCompiler(BinderTests.WithWrite).Compile("var x = ;", "test.wl");
+        var result = new WebLingoCompiler(BinderTests.WithWrite).Compile("var x = ;", "test.wlg");
         Assert.Null(result.Module);
         Assert.Equal(WebLingoDiagnosticCodes.UnexpectedToken, Assert.Single(result.Diagnostics).Code);
     }
@@ -92,7 +92,7 @@ public sealed class CodeGeneratorTests
     public void TooManyVariablesForAFunctionIsADiagnostic()
     {
         var source = string.Concat(Enumerable.Range(0, WebLingoFunction.MaxRegisters + 1).Select(i => $"var v{i} = 1;"));
-        var result = new WebLingoCompiler(BinderTests.WithWrite).Compile(source, "test.wl");
+        var result = new WebLingoCompiler(BinderTests.WithWrite).Compile(source, "test.wlg");
         Assert.Null(result.Module);
         Assert.Equal(WebLingoDiagnosticCodes.ProgramTooLarge, Assert.Single(result.Diagnostics).Code);
     }
@@ -112,7 +112,7 @@ public sealed class CodeGeneratorTests
 
     private static WebLingoCompiledModule Generate(string source)
     {
-        var result = new WebLingoCompiler(BinderTests.WithWrite).Compile(source, "test.wl");
+        var result = new WebLingoCompiler(BinderTests.WithWrite).Compile(source, "test.wlg");
         Assert.Empty(result.Diagnostics);
         return result.Module!;
     }

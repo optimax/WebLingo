@@ -92,7 +92,7 @@ public sealed class MathTests : IDisposable
     /// </summary>
     private (string Output, string Error) Run(string program)
     {
-        var path = Path.Combine(_folder, "program.wl");
+        var path = Path.Combine(_folder, "program.wlg");
         File.WriteAllText(path, program);
         var register = Weblingo("run", path);
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", path).Exit);

@@ -1,5 +1,5 @@
 <% 
-  import { kinds, ofKind } from "/lib/teas.wl"; 
+  import { kinds, ofKind } from "/lib/teas.wlg";
   layout "/layouts/main.wasp", { title: "Our teas", section: "teas" };
 %>
 

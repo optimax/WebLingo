@@ -1,4 +1,4 @@
-<% param title; param section = ""; param request; import { cartOf, countOf } from "/lib/cart.wl"; %>
+<% param title; param section = ""; param request; import { cartOf, countOf } from "/lib/cart.wlg"; %>
 <%
   // How many fish this browser's cart holds, for the header.
   var inCart = await countOf(cartOf(request));

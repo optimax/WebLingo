@@ -91,7 +91,7 @@ public sealed class StackVmTests
     {
         var module = new WebLingoStackCompiler(Options)
             .Compile("import { write, writeLn } from \"std:system\"; var a = 10; var b = a * 2 - 3; function f(n) { return n + b; } var c = 0; c = -f(b) / a; writeLn(c);",
-                "base.wl").Module!;
+                "base.wlg").Module!;
         var random = new Random(8_6);
         var opCodes = Enum.GetValues<WebLingoStackOpCode>();
         var vm = new WebLingoStackVirtualMachine();
@@ -141,7 +141,7 @@ public sealed class StackVmTests
 
     private static Outcome RunOnRegisterVm(string source, long budget)
     {
-        var compiled = new WebLingoCompiler(Options).Compile(source, "program.wl");
+        var compiled = new WebLingoCompiler(Options).Compile(source, "program.wlg");
         var output = new WebLingoCollectedOutput();
         var result = compiled.Module is { } module ? new WebLingoVirtualMachine().Execute(module, Context(output, budget)) : null;
         return OutcomeOf(compiled.Diagnostics, output, result);
@@ -149,7 +149,7 @@ public sealed class StackVmTests
 
     private static Outcome RunOnStackVm(string source, long budget)
     {
-        var compiled = new WebLingoStackCompiler(Options).Compile(source, "program.wl");
+        var compiled = new WebLingoStackCompiler(Options).Compile(source, "program.wlg");
         var output = new WebLingoCollectedOutput();
         var result = compiled.Module is { } module ? new WebLingoStackVirtualMachine().Execute(module, Context(output, budget)) : null;
         return OutcomeOf(compiled.Diagnostics, output, result);

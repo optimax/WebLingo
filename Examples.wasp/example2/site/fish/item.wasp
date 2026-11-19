@@ -1,4 +1,4 @@
-<% param request; param response; import { one, idOf, heading } from "/lib/store.wl"; %>
+<% param request; param response; import { one, idOf, heading } from "/lib/store.wlg"; %>
 <% layout "/layouts/main.wasp", { title: (await one(idOf(request.query?["id"])))?["Name"] ?? "No such fish", section: "fish" }; %>
 <% var fish = await one(idOf(request.query?["id"])); %>
 <% if (fish == null) { response.status = 404; %>

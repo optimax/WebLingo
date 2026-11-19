@@ -1,0 +1,152 @@
+// Makes the fish store's database, fish.db, beside this script, outside the site, as weblingo.config names it:
+// the fish the store sells, a few orders, and the shoppers' carts, empty. Run it again to start afresh: it drops the
+// tables first.
+//
+//   weblingo run setup.wlg
+
+import { writeLn } from "std:system";
+import { Database } from "std:db";
+import { DateTime } from "std:datetime";
+
+const fish = [
+    { slug: "neon-tetra", name: "Neon tetra", species: "Paracheirodon innesi", water: "freshwater",
+      origin: "the Amazon basin: Peru, Colombia and Brazil", size: 3.5, low: 20, high: 26, care: "easy", temperament: "peaceful",
+      price: 2.50m, stock: 120,
+      description: "A shoaling fish whose blue and red stripes glow in a planted tank. Keep six or more together.",
+      author: "Holger Krisp", licence: "CC BY 3.0", source: "https://commons.wikimedia.org/wiki/File:Neonsalmler_Paracheirodon_innesi.jpg" },
+    { slug: "cardinal-tetra", name: "Cardinal tetra", species: "Paracheirodon axelrodi", water: "freshwater",
+      origin: "the Rio Negro and the Orinoco", size: 4, low: 23, high: 29, care: "moderate", temperament: "peaceful",
+      price: 3.20m, stock: 80,
+      description: "The neon's larger cousin, its red running the whole length of its belly. It likes soft, warm water.",
+      author: "Paolo Neo", licence: "Public domain", source: "https://commons.wikimedia.org/wiki/File:Paracheirodon_axelrodi_2.jpg" },
+    { slug: "betta", name: "Betta", species: "Betta splendens", water: "freshwater",
+      origin: "Thailand and its neighbours", size: 6.5, low: 24, high: 30, care: "easy", temperament: "semi-aggressive",
+      price: 14.90m, stock: 15,
+      description: "The Siamese fighting fish, its long fins in every colour. Keep one male to a tank, as two will fight.",
+      author: "ivabalk (Pixabay)", licence: "CC0", source: "https://commons.wikimedia.org/wiki/File:Male_Betta_-34245661920.jpg" },
+    { slug: "guppy", name: "Guppy", species: "Poecilia reticulata", water: "freshwater",
+      origin: "Venezuela, Trinidad and the Guianas", size: 4, low: 22, high: 28, care: "easy", temperament: "peaceful",
+      price: 3.90m, stock: 60,
+      description: "A live-bearer bred for its colours for a century; this one is a cobra-green male.",
+      author: "5snake5", licence: "CC0", source: "https://commons.wikimedia.org/wiki/File:Poecilia_reticulata_-_Guppy,_male,_cobra-green_morph.jpg" },
+    { slug: "angelfish", name: "Angelfish", species: "Pterophyllum scalare", water: "freshwater",
+      origin: "the Amazon basin", size: 15, low: 24, high: 30, care: "moderate", temperament: "semi-aggressive",
+      price: 12.50m, stock: 18,
+      description: "A tall cichlid with trailing fins, here in its marble form. It may eat a fish as small as a neon.",
+      author: "CONTERALLY at Italian Wikipedia", licence: "CC BY 3.0", source: "https://commons.wikimedia.org/wiki/File:Pterophyllum_scalare_marmorizzato_20120212.jpg" },
+    { slug: "discus", name: "Discus", species: "Symphysodon aequifasciatus", water: "freshwater",
+      origin: "the Amazon basin", size: 15, low: 26, high: 31, care: "demanding", temperament: "peaceful",
+      price: 49.00m, stock: 6,
+      description: "Round, blue and calm, the king of the aquarium. It needs warm, soft and very clean water.",
+      author: "Brian Gratwicke", licence: "CC BY 2.0", source: "https://commons.wikimedia.org/wiki/File:Blue_Discus_fish_Symphysodon_aequifasciatus.jpg" },
+    { slug: "corydoras", name: "Sterba's corydoras", species: "Corydoras sterbai", water: "freshwater",
+      origin: "the Rio Guaporé, in Brazil and Bolivia", size: 6, low: 24, high: 28, care: "easy", temperament: "peaceful",
+      price: 5.90m, stock: 40,
+      description: "A small armoured catfish that sifts the sand in groups, and one of the few at home in a discus tank.",
+      author: "Matthew Mannell", licence: "Public domain", source: "https://commons.wikimedia.org/wiki/File:Corydoras_Sterbai.jpg" },
+    { slug: "platy", name: "Platy", species: "Xiphophorus maculatus", water: "freshwater",
+      origin: "Mexico and Central America", size: 5, low: 20, high: 26, care: "easy", temperament: "peaceful",
+      price: 2.90m, stock: 70,
+      description: "A hardy live-bearer in sunset colours, and a good first fish.",
+      author: "Usien", licence: "CC BY-SA 4.0", source: "https://commons.wikimedia.org/wiki/File:Xiphophorus_maculatus_Platy.JPG" },
+    { slug: "pearl-gourami", name: "Pearl gourami", species: "Trichopodus leerii", water: "freshwater",
+      origin: "the Malay Peninsula, Sumatra and Borneo", size: 12, low: 24, high: 28, care: "easy", temperament: "peaceful",
+      price: 7.50m, stock: 25,
+      description: "Its body is dotted as if with pearls, and a breeding male's throat turns orange.",
+      author: "Chmee2", licence: "CC BY 3.0", source: "https://commons.wikimedia.org/wiki/File:Trichopodus_leerii_in_Botanic_garden_in_Teplice_(1).JPG" },
+    { slug: "oscar", name: "Oscar", species: "Astronotus ocellatus", water: "freshwater",
+      origin: "the Amazon basin", size: 30, low: 22, high: 28, care: "moderate", temperament: "semi-aggressive",
+      price: 19.00m, stock: 8,
+      description: "A large, clever cichlid that learns who feeds it. It needs a big tank of its own.",
+      author: "George Chernilevsky", licence: "Public domain", source: "https://commons.wikimedia.org/wiki/File:Astronotus_ocellatus_2015_G1.jpg" },
+    { slug: "clownfish", name: "Clownfish", species: "Amphiprion ocellaris", water: "marine",
+      origin: "the eastern Indian Ocean and the western Pacific", size: 8, low: 24, high: 27, care: "easy", temperament: "peaceful",
+      price: 24.90m, stock: 20,
+      description: "It lives among an anemone's stinging tentacles, which its coat of mucus protects it from.",
+      author: "Janderk", licence: "Public domain", source: "https://commons.wikimedia.org/wiki/File:Common_clownfish.jpg" },
+    { slug: "yellow-tang", name: "Yellow tang", species: "Zebrasoma flavescens", water: "marine",
+      origin: "the Pacific, around Hawaii", size: 20, low: 24, high: 28, care: "moderate", temperament: "semi-aggressive",
+      price: 69.00m, stock: 5,
+      description: "A bright yellow surgeonfish that grazes algae all day, and needs room to swim.",
+      author: "Holger Krisp", licence: "CC BY 3.0", source: "https://commons.wikimedia.org/wiki/File:Gelbe_Segelflossendoktor_Zebrasoma_flavescens.jpg" },
+    { slug: "mandarinfish", name: "Mandarinfish", species: "Synchiropus splendidus", water: "marine",
+      origin: "the western Pacific", size: 6, low: 24, high: 27, care: "demanding", temperament: "peaceful",
+      price: 39.00m, stock: 4,
+      description: "Among the reef's most colourful fish. It eats only tiny live crustaceans, so it suits a mature tank.",
+      author: "Luc Viatour", licence: "CC BY-SA 3.0", source: "https://commons.wikimedia.org/wiki/File:Synchiropus_splendidus_2_Luc_Viatour.jpg" },
+    { slug: "royal-gramma", name: "Royal gramma", species: "Gramma loreto", water: "marine",
+      origin: "the Caribbean", size: 8, low: 24, high: 27, care: "easy", temperament: "peaceful",
+      price: 29.00m, stock: 12,
+      description: "Purple in front and yellow behind, it hides in the rockwork and keeps the peace.",
+      author: "Brian Gratwicke", licence: "CC BY 2.0", source: "https://commons.wikimedia.org/wiki/File:Gramma_loreto,_Fairy_Basslet.jpg" }
+];
+
+const orders = [
+    { slug: "neon-tetra", quantity: 12, customer: "Ana", placed: DateTime.utc(2026, 11, 14, 10, 5) },
+    { slug: "corydoras", quantity: 6, customer: "Ana", placed: DateTime.utc(2026, 11, 14, 10, 6) },
+    { slug: "clownfish", quantity: 2, customer: "Tomás", placed: DateTime.utc(2026, 11, 15, 16, 40) }
+];
+
+using (var db = await Database.open("fish")) {
+    await db.transaction(async () => {
+        await db.execute("DROP TABLE IF EXISTS CartItems");
+        await db.execute("DROP TABLE IF EXISTS Orders");
+        await db.execute("DROP TABLE IF EXISTS Fish");
+        await db.execute("""
+            CREATE TABLE Fish (
+                Id INTEGER PRIMARY KEY,
+                Slug TEXT NOT NULL UNIQUE,
+                Name TEXT NOT NULL,
+                Species TEXT NOT NULL,
+                Water TEXT NOT NULL CHECK (Water IN ('freshwater', 'marine')),
+                Origin TEXT NOT NULL,
+                SizeCm REAL NOT NULL,
+                LowC INTEGER NOT NULL,
+                HighC INTEGER NOT NULL,
+                Care TEXT NOT NULL,
+                Temperament TEXT NOT NULL,
+                Price DECIMAL(10, 2) NOT NULL,
+                Stock INTEGER NOT NULL CHECK (Stock >= 0),
+                Description TEXT NOT NULL,
+                PhotoAuthor TEXT NOT NULL,
+                PhotoLicence TEXT NOT NULL,
+                PhotoSource TEXT NOT NULL
+            )
+            """);
+        await db.execute("""
+            CREATE TABLE Orders (
+                Id INTEGER PRIMARY KEY,
+                FishId INTEGER NOT NULL REFERENCES Fish (Id),
+                Quantity INTEGER NOT NULL CHECK (Quantity > 0),
+                Customer TEXT NOT NULL,
+                Placed DATETIME NOT NULL
+            )
+            """);
+        // Each shopping cart's fish, by the cart's id, which its browser keeps in a cookie; a fish once in a cart.
+        await db.execute("""
+            CREATE TABLE CartItems (
+                Cart TEXT NOT NULL,
+                FishId INTEGER NOT NULL REFERENCES Fish (Id),
+                Quantity INTEGER NOT NULL CHECK (Quantity BETWEEN 1 AND 100),
+                Added DATETIME NOT NULL,
+                PRIMARY KEY (Cart, FishId)
+            )
+            """);
+        foreach (var one in fish) {
+            await db.execute("""
+                INSERT INTO Fish (Slug, Name, Species, Water, Origin, SizeCm, LowC, HighC, Care, Temperament, Price, Stock,
+                                  Description, PhotoAuthor, PhotoLicence, PhotoSource)
+                VALUES (@slug, @name, @species, @water, @origin, @size, @low, @high, @care, @temperament, @price, @stock,
+                        @description, @author, @licence, @source)
+                """, one);
+        }
+        foreach (var order in orders) {
+            await db.execute("""
+                INSERT INTO Orders (FishId, Quantity, Customer, Placed)
+                SELECT Id, @quantity, @customer, @placed FROM Fish WHERE Slug = @slug
+                """, order);
+        }
+    });
+    var counts = (await db.query("SELECT (SELECT COUNT(*) FROM Fish) AS Fish, (SELECT COUNT(*) FROM Orders) AS Orders"))[0];
+    writeLn($"fish.db has {counts["Fish"]} fish and {counts["Orders"]} orders.");
+}

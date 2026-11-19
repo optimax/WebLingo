@@ -96,7 +96,7 @@ public sealed class StreamingTests
     {
         // A page's writers, and a handler's write, wait once the response is full, its worker free meanwhile.
         var files = new MemoryFileSystem()
-            .Add("/site/api/rows.wl", "import { write, writeLn } from \"std:system\"; export async function get(request, response) {\n  var i = 0;\n  while (i < 70) { write(\"" + new string('x', 1024)
+            .Add("/site/api/rows.wlg", "import { write, writeLn } from \"std:system\"; export async function get(request, response) {\n  var i = 0;\n  while (i < 70) { write(\"" + new string('x', 1024)
                                       + "\"); i = i + 1; }\n  write(\"end\");\n}");
         if (page is not null) files.Add("/site/index.wasp", page + Page(70, "end"));
         var response = new RecordingResponse { FullAfter = 1 };

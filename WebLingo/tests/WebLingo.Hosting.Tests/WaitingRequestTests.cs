@@ -19,7 +19,7 @@ public sealed class WaitingRequestTests
         var clock = new ManualClock();
         var app = WebLingoApplication.Load(new WebLingoApplicationOptions("/site", new MemoryFileSystem()
             .Add("/site/index.wasp", "<% import { delay } from \"std:system\"; await delay(50); %>done")
-            .Add("/site/api/later.wl", "import { write, writeLn, delay } from \"std:system\"; export async function get(request, response) { await delay(20); write(\"later\"); }"))
+            .Add("/site/api/later.wlg", "import { write, writeLn, delay } from \"std:system\"; export async function get(request, response) { await delay(20); write(\"later\"); }"))
         {
             WorkerServices = _ => new WebLingoWorkerServices(
                 new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction(), new WebLingoDelayFunction())),

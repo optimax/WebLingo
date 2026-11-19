@@ -1,0 +1,117 @@
+// Makes this machine's IIS run WASP's sites, from WASP's installer's zip (Installers/Windows/wasp-readme.md), with
+// WebLingo installed from its own zip, of the same version, architecture and kind, in WebLingo's folder, C:\Program Files\WebLingo,
+// or, for the zips for x86, 32-bit programs, on 64-bit Windows, C:\Program Files (x86)\WebLingo:
+//   1. IIS turned on, unless it is, with the features its sites need and its manager, through DISM;
+//   2. the ASP.NET Core Module, through which IIS runs wasp, unless IIS has it: Microsoft's ASP.NET Core Hosting Bundle
+//      for .NET 10, its latest release, found in Microsoft's release metadata, downloaded and checked against the
+//      SHA-512 that names, then run quietly; with the module alone for a self-contained WASP, which carries its runtime,
+//      and with .NET's 32-bit runtimes too for a framework-dependent WASP for x86;
+//   3. wasp, the folder WASP beside this script, copied into WebLingo's installation, once the installed files it needs
+//      are found to be the ones it was made with, by their SHA-256 in wasp-needs.json, beside it.
+// Run it as administrator, from the unzipped folder:
+//
+//   weblingo run iis-install.wlg
+//
+// target=<folder> names another installation of WebLingo. It may be run again, from a newer zip, after WebLingo's own:
+// it keeps what is there, and copies wasp anew, the application pools of the sites that run it stopped meanwhile.
+param source = "WASP";
+param needs = "wasp-needs.json";
+param target = "";
+
+import { writeLn } from "std:system";
+import com from "windows:com";
+import fs from "std:fs";
+import http from "std:http";
+import crypto from "std:crypto";
+import { Json } from "std:json";
+import { requireAdministrator, run, runOrStop, expand, architectureOf, programFiles } from "./windows.wlg";
+
+await requireAdministrator();
+
+// The folders' full paths, a relative one from the current folder; WebLingo's folder for the zip's architecture, unless
+// target names another, whatever the weblingo running this is for.
+var files = com.create("Scripting.FileSystemObject");
+var zipped = files.GetAbsolutePathName(source);
+if (!(await fs.exists($"{zipped}\\wasp.exe"))) {
+    throw new Error($"{zipped} has no wasp.exe: run this from the unzipped folder, which holds the folder WASP.");
+}
+var architecture = await architectureOf(zipped, "wasp");
+var installed = files.GetAbsolutePathName(target == "" ? $"{programFiles(architecture)}\\WebLingo" : target);
+if (!(await fs.exists($"{installed}\\weblingo.exe"))) {
+    throw new Error($"WebLingo is not installed in {installed}: install it first, from its installer's zip of this version, architecture and kind.");
+}
+
+// The WebLingo this WASP was made with: each file of the installation that wasp shares, as it was then. A WebLingo of
+// another version, architecture or kind, self-contained or not, differs, and wasp would not run with it.
+var differing = [];
+foreach (var (path, hash) in Json.parse(await fs.readText(files.GetAbsolutePathName(needs)))) {
+    var file = $"{installed}\\{path.replace("/", "\\")}";
+    if (!(await fs.exists(file)) || crypto.sha256(await fs.readBytes(file)).toHex() != hash) {
+        differing.push(path);
+    }
+}
+if (differing.length > 0) {
+    throw new Error($"The WebLingo in {installed} is not the one this WASP was made with, {differing.length} of its files "
+        + $"differing, {differing[0]} among them: install the WebLingo zip made with it, of the same version, architecture and kind, first.");
+}
+var selfContained = (await fs.readText($"{zipped}\\wasp.runtimeconfig.json")).contains("\"includedFrameworks\"");
+
+// 1. IIS, unless it is on. DISM exits with 3010 where Windows must restart to finish.
+if (!(await fs.exists(expand("%SystemRoot%\\System32\\inetsrv\\appcmd.exe")))) {
+    var features = ["IIS-WebServerRole", "IIS-WebServer", "IIS-CommonHttpFeatures", "IIS-HttpErrors", "IIS-HealthAndDiagnostics",
+        "IIS-HttpLogging", "IIS-Security", "IIS-RequestFiltering", "IIS-WebServerManagementTools", "IIS-ManagementConsole"];
+    writeLn("Turning IIS on, which takes a few minutes");
+    var names = " ".join(features.map(feature => $"/featurename:{feature}"));
+    var dism = await run($"dism.exe /online /enable-feature {names} /all /norestart /quiet");
+    if (dism.code != 0 && dism.code != 3010) {
+        throw new Error($"DISM could not turn IIS on: exit code {dism.code}. {dism.output.trim()}");
+    }
+    writeLn(dism.code == 3010 ? "IIS is on; Windows asks to be restarted to finish" : "IIS is on");
+}
+
+// IIS's configuration is there only once IIS is on.
+var iis = await Module.import("./iis.wlg");
+
+// 2. The ASP.NET Core Module, unless IIS has it. A Hosting Bundle installed before IIS was is repaired, as Microsoft
+// asks, so that it gives IIS the module.
+if (iis.hasGlobalModule("AspNetCoreModuleV2")) {
+    writeLn("IIS has the ASP.NET Core Module");
+} else {
+    var metadata = await http.get("https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json");
+    if (metadata["status"] != 200) {
+        throw new Error($"Microsoft's release metadata for .NET 10 could not be read: HTTP {metadata["status"]}.");
+    }
+    var release = Json.parse(metadata["body"])["releases"][0];
+    var bundle = release["aspnetcore-runtime"]["files"].find(file => file["name"] == "dotnet-hosting-win.exe");
+    if (bundle == null) {
+        throw new Error($"Microsoft's release metadata names no Hosting Bundle for .NET {release["release-version"]}.");
+    }
+    var installer = expand($"%TEMP%\\dotnet-hosting-{release["release-version"]}-win.exe");
+    writeLn($"Downloading the ASP.NET Core Hosting Bundle {release["release-version"]}, from {bundle["url"]}");
+    await runOrStop($"curl.exe --fail --silent --show-error --location --output \"{installer}\" \"{bundle["url"]}\"");
+    // certutil writes the hash as hexadecimal, on the line after the first, with spaces between bytes in older Windows.
+    var hashed = (await runOrStop($"certutil -hashfile \"{installer}\" SHA512")).split("\n")[1].replace(" ", "").trim().toLower();
+    if (hashed != bundle["hash"].toLower()) {
+        await fs.remove(installer);
+        throw new Error($"The Hosting Bundle downloaded is not the one Microsoft's metadata names: its SHA-512 is {hashed}.");
+    }
+    var module = expand("%ProgramFiles%\\IIS\\Asp.Net Core Module\\V2\\aspnetcorev2.dll");
+    var action = (await fs.exists(module)) ? "/repair" : "/install";
+    // A 32-bit, framework-dependent wasp needs the 32-bit runtimes, which the bundle leaves out where told to.
+    var options = selfContained ? " OPT_NO_RUNTIME=1 OPT_NO_SHAREDFX=1 OPT_NO_X86=1"
+        : architecture == "x86" ? "" : " OPT_NO_X86=1";
+    writeLn($"Installing it, {(selfContained ? "the module alone" : "with .NET's runtimes")}");
+    var setup = await run($"\"{installer}\" {action} /quiet /norestart{options}");
+    await fs.remove(installer);
+    if (setup.code != 0 && setup.code != 3010) {
+        throw new Error($"The Hosting Bundle's installer failed: exit code {setup.code}.");
+    }
+    // IIS loads a module it is given when it starts again.
+    await runOrStop("net stop was /y");
+    await runOrStop("net start w3svc");
+    writeLn("IIS has the ASP.NET Core Module");
+}
+
+// 3. wasp, beside weblingo.
+await iis.copyIntoInstallation(zipped, installed);
+writeLn($"WASP installed in {installed}: add a site with add-wasp-site.wlg, as readme.md says");

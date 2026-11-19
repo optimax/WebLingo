@@ -1,4 +1,4 @@
-<% import { all, steeping } from "/lib/teas.wl"; %>
+<% import { all, steeping } from "/lib/teas.wlg"; %>
 <% layout "/layouts/main.wasp", { title: "Brewing", section: "brewing" }; %>
 <h1>Brewing guide</h1>
 <p>Each tea wants its own water and its own time: too hot or too long, and it turns bitter.</p>

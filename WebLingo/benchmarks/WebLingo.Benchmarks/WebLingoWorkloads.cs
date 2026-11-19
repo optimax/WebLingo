@@ -2,11 +2,11 @@ namespace WebLingo.Benchmarks;
 
 /// <summary>
 /// A fixed program the benchmark runs, what it exercises, and the output it must give; its file's name, a script's
-/// (<c>.wl</c>) or a page's (<c>.wasp</c>, section 13), which the template compiler compiles.
+/// (<c>.wlg</c>) or a page's (<c>.wasp</c>, section 13), which the template compiler compiles.
 /// </summary>
 public sealed record WebLingoWorkload(string Name, string Exercises, string Source, string ExpectedOutput)
 {
-    public string FileName { get; init; } = Name + ".wl";
+    public string FileName { get; init; } = Name + ".wlg";
 
     /// <summary>Whether it takes a folder of its own, its parameter <c>folder</c>, for the files it writes (section 3.9, <c>std:fs</c>).</summary>
     public bool UsesFolder { get; init; }
@@ -15,7 +15,7 @@ public sealed record WebLingoWorkload(string Name, string Exercises, string Sour
 /// <summary>
 /// The benchmark's workloads (specification, section 5.6): loops, calls, closures, strings, collections, objects (property
 /// access), async (asynchronous suspension), templates (template output) and io (I/O-bound work, in a folder of its own,
-/// which the benchmark makes and removes). Each is a <c>.wl</c> file in
+/// which the benchmark makes and removes). Each is a <c>.wlg</c> file in
 /// <c>Workloads/</c>, embedded in the assembly, that <c>weblingo run</c> also runs, and each writes one result, which
 /// every VM must give; or, for templates, a <c>.wasp</c> page, which <c>wasp run</c> runs, and which writes its page. A
 /// file's line breaks are read as LF, whatever the checkout gave it, so that a page writes the same on every platform.
@@ -36,7 +36,7 @@ public static class WebLingoWorkloads
         Load("io", "files written and read through std:fs, one at a time, each awaited, then all at once", "15780\n") with { UsesFolder = true },
     ];
 
-    private static WebLingoWorkload Load(string name, string exercises, string expectedOutput, string extension = ".wl")
+    private static WebLingoWorkload Load(string name, string exercises, string expectedOutput, string extension = ".wlg")
     {
         using var stream = typeof(WebLingoWorkloads).Assembly.GetManifestResourceStream($"Workloads/{name}{extension}")
             ?? throw new InvalidOperationException($"The workload '{name}' is not embedded in the benchmark.");

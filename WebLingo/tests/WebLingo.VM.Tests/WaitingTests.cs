@@ -95,11 +95,11 @@ public sealed class WaitingTests
         var options = new WebLingoCompilerOptions([new("write", 1), new("writeLn", 1), new("delay", 1), new("offWorker", 1)]);
         if (stack)
         {
-            var stackCompiled = new WebLingoStackCompiler(options).Compile(program, "main.wl");
+            var stackCompiled = new WebLingoStackCompiler(options).Compile(program, "main.wlg");
             Assert.Empty(stackCompiled.Diagnostics);
             return stackCompiled.Module!;
         }
-        var compiled = new WebLingoCompiler(options).Compile(program, "main.wl");
+        var compiled = new WebLingoCompiler(options).Compile(program, "main.wlg");
         Assert.Empty(compiled.Diagnostics);
         return compiled.Module!;
     }

@@ -39,15 +39,15 @@ public sealed class WaspTests : IDisposable
     [Fact]
     public void APageImportsModulesFromItsFolder()
     {
-        File.WriteAllText(Path.Combine(_folder, "lib.wl"), "export function twice(x) { return x * 2; }");
-        Assert.Equal((WebLingoCommandLine.Success, "<b>42</b>", ""), Wasp("run", "<% import { twice } from \"lib.wl\"; %><b><%= twice(21) %></b>"));
+        File.WriteAllText(Path.Combine(_folder, "lib.wlg"), "export function twice(x) { return x * 2; }");
+        Assert.Equal((WebLingoCommandLine.Success, "<b>42</b>", ""), Wasp("run", "<% import { twice } from \"lib.wlg\"; %><b><%= twice(21) %></b>"));
     }
 
     [Fact]
     public void AnImportFromSlashIsFromTheRoot_AsWaspServeHasIt()
     {
-        Write("site/lib/util.wl", "export function twice(x) { return x * 2; }");
-        var page = Write("site/pages/index.wasp", "<% import { twice } from \"/lib/util.wl\"; %><b><%= twice(21) %></b>");
+        Write("site/lib/util.wlg", "export function twice(x) { return x * 2; }");
+        var page = Write("site/pages/index.wasp", "<% import { twice } from \"/lib/util.wlg\"; %><b><%= twice(21) %></b>");
         Assert.Equal((WebLingoCommandLine.Success, "<b>42</b>", ""), Run(["run", "--root", Path.Combine(_folder, "site"), page]));
     }
 
@@ -194,8 +194,8 @@ public sealed class WaspTests : IDisposable
         // layout, an include, and a component that imports a module leaves the application's folder as it found it.
         Write("site/layouts/main.wasp", "<html><% renderBody(); %></html>");
         Write("site/includes/nav.wasp", "<nav></nav>");
-        Write("site/components/lib.wl", "export function twice(x) { return x * 2; }");
-        Write("site/components/card.wasp", "<% param n; import { twice } from \"lib.wl\"; %><p><%= twice(n) %></p>");
+        Write("site/components/lib.wlg", "export function twice(x) { return x * 2; }");
+        Write("site/components/card.wasp", "<% param n; import { twice } from \"lib.wlg\"; %><p><%= twice(n) %></p>");
         var page = Write("site/index.wasp", "<% layout \"/layouts/main.wasp\"; %><% include \"/includes/nav.wasp\"; %>"
             + "<% await renderComponent(\"/components/card.wasp\", { n: 21 }); %>");
         var before = Files();
@@ -589,7 +589,7 @@ public sealed class WaspTests : IDisposable
     public void WeblingoStillRunsScriptsOnly()
     {
         // weblingo compiles the language only: a page's block is not WebLingo.
-        var path = Path.Combine(_folder, "page.wl");
+        var path = Path.Combine(_folder, "page.wlg");
         File.WriteAllText(path, "<p><%= 1 %></p>");
         Assert.Equal(WebLingoCommandLine.CompilationFailed, WebLingoCommandLine.Run(["check", path], new StringWriter(), new StringWriter()));
     }

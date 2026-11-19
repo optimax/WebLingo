@@ -5,11 +5,11 @@
 #   WASP-<version>-win-<architecture>-self-contained.zip and WASP-<version>-win-<architecture>-framework-dependent.zip,
 #   for a machine with WebLingo installed from the zip of the same version, architecture and kind, made by the same run
 #   of this script.
-# WebLingo's hold the folder WebLingo, weblingo and the standard modules, which install.wl installs in WebLingo's
+# WebLingo's hold the folder WebLingo, weblingo and the standard modules, which install.wlg installs in WebLingo's
 # folder, C:\Program Files\WebLingo, or for x86 on 64-bit Windows C:\Program Files (x86)\WebLingo, and puts on the
-# machine's PATH; WASP's the folder WASP, what wasp adds to them, which iis-install.wl installs there, once IIS has what
+# machine's PATH; WASP's the folder WASP, what wasp adds to them, which iis-install.wlg installs there, once IIS has what
 # it needs to run wasp, with wasp-needs.json, the SHA-256 of each file of WebLingo's that wasp needs, as this run made
-# it, and add-wasp-site.wl, to add a site. The scripts are the repository's, from its Scripts folder, and readme.md, a
+# it, and add-wasp-site.wlg, to add a site. The scripts are the repository's, from its Scripts folder, and readme.md, a
 # human's steps, this folder's readme.md and wasp-readme.md.
 # Run it on a machine with the .NET 10 SDK, from any folder:
 #   powershell -ExecutionPolicy Bypass -File Installers\Windows\package.ps1
@@ -75,7 +75,7 @@ try {
             $root = Join-Path $staging $name
             $runtime = Join-Path $root 'WebLingo'
             Publish-Project 'src/WebLingo.Cli/WebLingo.Cli.csproj' $architecture $kind $runtime
-            foreach ($script in 'install.wl', 'add-wl-file-type.wl', 'windows.wl', 'weblingo.config') {
+            foreach ($script in 'install.wlg', 'add-wlg-file-type.wlg', 'windows.wlg', 'weblingo.config') {
                 Copy-Item (Join-Path $repository "Scripts/$script") $root
             }
             Copy-Item (Join-Path $PSScriptRoot 'readme.md') $root
@@ -100,7 +100,7 @@ try {
                 }
             }
             $needs | ConvertTo-Json | Set-Content -Encoding ASCII (Join-Path $waspRoot 'wasp-needs.json')
-            foreach ($script in 'iis-install.wl', 'add-wasp-site.wl', 'windows.wl', 'iis.wl', 'weblingo.config') {
+            foreach ($script in 'iis-install.wlg', 'add-wasp-site.wlg', 'windows.wlg', 'iis.wlg', 'weblingo.config') {
                 Copy-Item (Join-Path $repository "Scripts/$script") $waspRoot
             }
             Copy-Item (Join-Path $PSScriptRoot 'wasp-readme.md') (Join-Path $waspRoot 'readme.md')

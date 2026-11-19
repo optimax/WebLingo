@@ -4,7 +4,7 @@
   param tea; 
   param detailed = false; 
   
-  import { steeping } from "/lib/teas.wl"; 
+  import { steeping } from "/lib/teas.wlg";
 %>
 
 <article class="tea <%= tea.kind %>">

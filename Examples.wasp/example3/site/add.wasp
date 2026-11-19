@@ -1,4 +1,4 @@
-<% param request; param response; import { lists, read, add } from "/lib/todo.wl"; %>
+<% param request; param response; import { lists, read, add } from "/lib/todo.wlg"; %>
 <% layout "/layouts/main.wasp", { title: "Add" }; %>
 <%
   // A new item, posted by the list's form: added, then the browser sent back to the list (303, See Other), so that

@@ -75,7 +75,7 @@ ten milliseconds later
 escaped; a page's text and its `<%= %>` write without an import. A value's text is what its `toString()` gives.
 
 The console's reading reads a script's standard input under `weblingo`, typed, or piped from a file or another
-program, `type data.txt | weblingo filter.wl`, UTF-8; a site's pages and handlers, under `wasp`, have no console, and
+program, `type data.txt | weblingo filter.wlg`, UTF-8; a site's pages and handlers, under `wasp`, have no console, and
 each read is an `IOError`, WL3011, saying so. Given the lines `Ann`, `green tea` and `black tea`, piped:
 
 ```javascript
@@ -439,11 +439,11 @@ report: 42
 
 ```javascript
 import { writeLn } from "std:system";
-var maths = await Module.import("09-maths.wl", { factor: 3 });
+var maths = await Module.import("09-maths.wlg", { factor: 3 });
 writeLn(maths.scale(14));
 ```
 
-with `09-maths.wl`:
+with `09-maths.wlg`:
 
 ```javascript
 param factor = 2;
@@ -1025,7 +1025,7 @@ folder beside `weblingo` and `wasp`. A native module's function may have optiona
 
 A page, a layout and a component that declare `param request;` and `param response;` are given the request they
 answer and the response they make, instances of the built-in classes `Request` and `Response`, their headers instances
-of `Headers`; a `.wl` route handler is given them as its function's arguments. How a site uses them is the WASP User
+of `Headers`; a `.wlg` route handler is given them as its function's arguments. How a site uses them is the WASP User
 Manual's, section 9.
 
 The three classes' names are not in scope, `request is Request` being WL2001: a script reaches them as

@@ -1,9 +1,0 @@
-// declaration-without-value.wl: every variable has a value from its declaration on.
-// There is no undefined: a declaration says what its variable starts as, null if nothing else.
-
-var total;
-total = 5;
-
-/* Errors:
-declaration-without-value.wl(4,5): error WL1006: 'total' needs a value where it is declared: 'var total = …;'.
-*/

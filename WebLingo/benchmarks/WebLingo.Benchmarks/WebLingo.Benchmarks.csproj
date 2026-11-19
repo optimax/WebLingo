@@ -6,7 +6,7 @@
     <TieredCompilation>false</TieredCompilation>
   </PropertyGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Workloads/*.wl" LogicalName="Workloads/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Workloads/*.wlg" LogicalName="Workloads/%(Filename)%(Extension)" />
     <EmbeddedResource Include="Workloads/*.wasp" LogicalName="Workloads/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>

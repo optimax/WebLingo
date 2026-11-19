@@ -8,7 +8,7 @@ namespace WebLingo.Hosting.Tests;
 /// <summary>
 /// The request and the response in scripts (specification, section 6.12; section 9, "M0.14 parts", part 3): a page's
 /// <c>param request;</c> and <c>param response;</c>, instances of <c>Request</c> and <c>Response</c>, read and changed
-/// through their members; and a <c>.wl</c> route handler, a module exporting a function for each method it answers.
+/// through their members; and a <c>.wlg</c> route handler, a module exporting a function for each method it answers.
 /// </summary>
 public sealed class RequestAndResponseTests
 {
@@ -123,12 +123,12 @@ public sealed class RequestAndResponseTests
     public void AHandlerAnswersTheMethodsItExports()
     {
         var app = Load(new MemoryFileSystem()
-            .Add("/site/api/teas.wl",
+            .Add("/site/api/teas.wlg",
                 "import { write, writeLn } from \"std:system\"; export function get(request, response) {\n  response.headers[\"Content-Type\"] = \"application/json\";\n"
                 + "  write(\"[\\\"\" + request.query[\"kind\"] + \"\\\"]\");\n}\n"
                 + "export async function post(request, response) { response.status = 201; write(\"made \" + request.method); }\n"
                 + "export function twice(x) { return x * 2; }")
-            .Add("/site/lib/util.wl", "export function twice(x) { return x * 2; }"));
+            .Add("/site/lib/util.wlg", "export function twice(x) { return x * 2; }"));
         var response = new WebLingoBufferedResponse();
         var outcome = app.Handle(new WebLingoBufferedRequest("GET", "/api/teas", "kind=green"), response, new WebLingoWorkerId(0));
         Assert.True(outcome.Kind == WebLingoRequestOutcomeKind.Handler, Body(response));
@@ -143,7 +143,7 @@ public sealed class RequestAndResponseTests
         Assert.Contains("<h1>405 Method Not Allowed</h1>", Body(response));
         Assert.Equal(405, Get(app, "get", "/api/teas").Status);
 
-        // A .wl exporting no method's function is a module, not a handler.
+        // A .wlg exporting no method's function is a module, not a handler.
         Assert.Equal(404, Get(app, "GET", "/lib/util").Status);
     }
 
@@ -155,11 +155,11 @@ public sealed class RequestAndResponseTests
         // a 500. A name with " and %> is one, the handler's page naming it in a string literal as it is; any other file
         // named so is sent as it is.
         var app = Load(new MemoryFileSystem()
-            .Add("/site/api/tea\\notes.wl", "import { write, writeLn } from \"std:system\"; export function get(request, response) { write(\"notes\"); }")
-            .Add("/site/api/two\nlines.wl", "import { write, writeLn } from \"std:system\"; export function get(request, response) { write(\"lines\"); }")
+            .Add("/site/api/tea\\notes.wlg", "import { write, writeLn } from \"std:system\"; export function get(request, response) { write(\"notes\"); }")
+            .Add("/site/api/two\nlines.wlg", "import { write, writeLn } from \"std:system\"; export function get(request, response) { write(\"lines\"); }")
             .Add("/site/tea:time.wasp", "<p>tea</p>")
             .Add("/site/back\\slash/index.wasp", "<p>index</p>")
-            .Add("/site/api/say \"hi\" %>.wl", "import { write, writeLn } from \"std:system\"; export function get(request, response) { write(\"quoted\"); }")
+            .Add("/site/api/say \"hi\" %>.wlg", "import { write, writeLn } from \"std:system\"; export function get(request, response) { write(\"quoted\"); }")
             .Add("/site/css/odd\\name.css", "p { }"));
         Assert.Equal(404, Get(app, "GET", "/api/tea\\notes").Status);
         Assert.Equal(404, Get(app, "GET", "/api/two\nlines").Status);
@@ -174,17 +174,17 @@ public sealed class RequestAndResponseTests
     public void AHandlerThatFailsIsA500_ItsErrorsInItsFile()
     {
         var app = Load(new MemoryFileSystem()
-            .Add("/site/api/fails.wl", "import { write, writeLn } from \"std:system\"; export function get(request, response) {\n  write([1][5]);\n}")
-            .Add("/site/api/bad.wl", "import { write, writeLn } from \"std:system\"; export function get(request, response) {\n  write(nope);\n}")
-            .Add("/site/api/broken.wl", "export function get(request, response) {"), WebLingoMode.Development);
+            .Add("/site/api/fails.wlg", "import { write, writeLn } from \"std:system\"; export function get(request, response) {\n  write([1][5]);\n}")
+            .Add("/site/api/bad.wlg", "import { write, writeLn } from \"std:system\"; export function get(request, response) {\n  write(nope);\n}")
+            .Add("/site/api/broken.wlg", "export function get(request, response) {"), WebLingoMode.Development);
         var (status, body) = Get(app, "GET", "/api/fails");
         Assert.Equal(500, status);
-        Assert.True(body.Contains("<pre>api/fails.wl(2,", StringComparison.Ordinal), body);
+        Assert.True(body.Contains("<pre>api/fails.wlg(2,", StringComparison.Ordinal), body);
         Assert.Contains("error WL3005:", body);
-        Assert.Contains("<pre>api/bad.wl(2,9): error WL2001: &#39;nope&#39; is not defined.", Get(app, "GET", "/api/bad").Body);
+        Assert.Contains("<pre>api/bad.wlg(2,9): error WL2001: &#39;nope&#39; is not defined.", Get(app, "GET", "/api/bad").Body);
         (status, body) = Get(app, "GET", "/api/broken");
         Assert.Equal(500, status);
-        Assert.Contains("<pre>api/broken.wl(1,", body);
+        Assert.Contains("<pre>api/broken.wlg(1,", body);
     }
 
     private static WebLingoApplication Load(MemoryFileSystem files, WebLingoMode environment = WebLingoMode.Production)

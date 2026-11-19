@@ -1,4 +1,4 @@
-<% import { recentOrders } from "/lib/store.wl"; %>
+<% import { recentOrders } from "/lib/store.wlg"; %>
 <% layout "/layouts/main.wasp", { title: "Orders", section: "orders" }; %>
 <h1>The latest orders</h1>
 <table class="orders">

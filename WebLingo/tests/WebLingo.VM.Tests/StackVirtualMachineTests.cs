@@ -149,7 +149,7 @@ public sealed class StackVirtualMachineTests
     /// <summary>A program compiled for each VM and run on it.</summary>
     private static Func<string, WebLingoExecutionContext, WebLingoExecutionResult>[] BothVms =>
     [
-        (source, context) => new WebLingoVirtualMachine().Execute(new WebLingoCompiler(WithWrite).Compile(source, "test.wl").Module!, context),
+        (source, context) => new WebLingoVirtualMachine().Execute(new WebLingoCompiler(WithWrite).Compile(source, "test.wlg").Module!, context),
         (source, context) => new WebLingoStackVirtualMachine().Execute(Compile(source), context),
     ];
 
@@ -304,7 +304,7 @@ public sealed class StackVirtualMachineTests
     {
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = new WebLingoBuiltinRegistry(new ThrowingWriteLn()) };
         // The host offers writeLn alone, and declares it alone.
-        var module = new WebLingoStackCompiler(new WebLingoCompilerOptions([new WebLingoBuiltinDeclaration("writeLn", 1)])).Compile("import { writeLn } from \"std:system\"; writeLn(1);", "test.wl").Module!;
+        var module = new WebLingoStackCompiler(new WebLingoCompilerOptions([new WebLingoBuiltinDeclaration("writeLn", 1)])).Compile("import { writeLn } from \"std:system\"; writeLn(1);", "test.wlg").Module!;
         var result = new WebLingoStackVirtualMachine().Execute(module, context);
         Assert.Equal(WebLingoDiagnosticCodes.InvalidOperation, result.Error!.Code);
         Assert.Contains("broken", result.Error.Message);
@@ -334,7 +334,7 @@ public sealed class StackVirtualMachineTests
 
     private static WebLingoStackModule Compile(string source)
     {
-        var compiled = new WebLingoStackCompiler(WithWrite).Compile(source, "test.wl");
+        var compiled = new WebLingoStackCompiler(WithWrite).Compile(source, "test.wlg");
         Assert.Empty(compiled.Diagnostics);
         return compiled.Module!;
     }
