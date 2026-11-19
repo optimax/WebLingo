@@ -20,6 +20,9 @@
     <ProjectReference Include="../WebLingo.StdLib.Crypto/WebLingo.StdLib.Crypto.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Env/WebLingo.StdLib.Env.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Math/WebLingo.StdLib.Math.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../WebLingo.StdLib.Path/WebLingo.StdLib.Path.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../WebLingo.StdLib.Url/WebLingo.StdLib.Url.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../WebLingo.StdLib.Csv/WebLingo.StdLib.Csv.csproj" ReferenceOutputAssembly="false" />
     <!-- Windows's own native module, windows:com, in windows/ beside the program, which only Windows loads (section 3.10). -->
     <ProjectReference Include="../WebLingo.Windows.Com/WebLingo.Windows.Com.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
@@ -43,6 +46,12 @@
     <None Include="../WebLingo.StdLib.Env/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Env.dll" Link="std/env.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.StdLib.Math/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Math.dll" Link="std/math.dll"
+          CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="../WebLingo.StdLib.Path/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Path.dll" Link="std/path.dll"
+          CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="../WebLingo.StdLib.Url/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Url.dll" Link="std/url.dll"
+          CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="../WebLingo.StdLib.Csv/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Csv.dll" Link="std/csv.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.Windows.Com/bin/$(Configuration)/$(TargetFramework)/WebLingo.Windows.Com.dll" Link="windows/com.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />

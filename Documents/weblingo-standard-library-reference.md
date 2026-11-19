@@ -33,6 +33,9 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 21. [Native modules](#21-native-modules)
 22. [In WASP's pages](#22-in-wasps-pages)
 23. [`windows:com`](#23-windowscom)
+24. [`std:path`](#24-stdpath)
+25. [`std:url`](#25-stdurl)
+26. [`std:csv`](#26-stdcsv)
 
 ---
 
@@ -1229,3 +1232,65 @@ for `is`. Only the module makes their instances: one made by `new` holds no obje
 
 A call blocks its worker until the object returns, each worker a single-threaded apartment's thread, its objects its
 own. Events, arguments by reference and named arguments are not there yet.
+
+## 24. `std:path`
+
+These helpers work on path strings without accessing the filesystem. They accept `/` and `\` on both platforms and
+emit the host separator. They recognize drive prefixes and UNC shares on both platforms.
+
+- `join(...parts)` joins the nonempty parts. A rooted or drive-prefixed part starts a new path. It leaves `.` and `..` as written.
+- `dirname(path)` gives the parent path, or the empty string for a lone relative filename. A root is its own parent.
+- `basename(path)` gives the final component, ignoring trailing separators.
+- `extension(path)` gives the final extension with its dot, or the empty string for names such as `.profile`.
+
+```javascript
+import path from "std:path";
+var file = path.join("reports\\daily", "sales.csv");
+writeLn([path.basename(file), path.extension(file)]);
+```
+
+```text
+["sales.csv", ".csv"]
+```
+
+## 25. `std:url`
+
+- `parse(url)` takes an absolute URL and returns a map with `scheme`, `host`, `port`, `path`, `query`, and `fragment`.
+  The port is `null` when the scheme's default applies. Query and fragment omit their leading delimiter.
+- `resolve(base, relative)` resolves a URL reference against an absolute base and returns an absolute URL string.
+- `parseQuery(query)` decodes ordered `[name, value]` string pairs. It accepts a leading `?`, decodes `+` as a space,
+  and gives a missing value as the empty string.
+- `formatQuery(pairs)` encodes the pairs in order, with spaces as `+`, and returns the query without a leading `?`.
+  Repeated names remain separate pairs.
+
+```javascript
+import url from "std:url";
+writeLn(url.resolve("https://example.test/menu/", "../tea"));
+writeLn(url.parseQuery("tea=green&tea=black"));
+```
+
+```text
+https://example.test/tea
+[["tea", "green"], ["tea", "black"]]
+```
+
+## 26. `std:csv`
+
+`parse(text, headers = false)` returns rows as arrays of strings. With `headers = true`, it reads the first record
+as the header and returns the remaining rows as maps. Headers must be unique, and each following row must have
+the same number of fields. The parser accepts CRLF, LF, and CR record endings and preserves newlines inside quoted fields.
+
+`stringify(rows, headers = null)` writes arrays of strings with CRLF record endings. To write maps, supply a nonempty
+array of unique header strings in the desired order. Each map must supply a string for every header.
+Fields containing commas, quotation marks, or newlines are quoted, with quotation marks doubled.
+
+```javascript
+import csv from "std:csv";
+var text = csv.stringify([{ tea: "sencha", note: "warm, please" }], ["tea", "note"]);
+var rows = csv.parse(text, true);
+writeLn([rows[0]["tea"], rows[0]["note"]]);
+```
+
+```text
+["sencha", "warm, please"]
+```

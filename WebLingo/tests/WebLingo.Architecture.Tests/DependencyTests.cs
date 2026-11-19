@@ -29,6 +29,7 @@ public sealed class DependencyTests
         { "WebLingo.StdLib.Crypto", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.StdLib.Env", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.StdLib.Math", ["WebLingo.Core", "WebLingo.Runtime"] },
+        { "WebLingo.StdLib.Csv", ["WebLingo.Core", "WebLingo.Runtime"] },
         { "WebLingo.Platform.Abstractions", ["WebLingo.Core"] },
         { "WebLingo.Hosting.Abstractions", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         // The host's core composes the engine for every adapter (section 6.12), the register VM its pages' only.
@@ -67,7 +68,15 @@ public sealed class DependencyTests
     [Fact]
     public void TheRulesCoverEveryPortableAssembly()
     {
-        Assert.Equal(20, PortableCore.Count); // Section 3 of Documents/implementation.md lists twenty.
+        Assert.Equal(21, PortableCore.Count); // Section 3 of Documents/implementation.md lists the portable assemblies.
+    }
+
+    [Theory]
+    [InlineData("WebLingo.StdLib.Path")]
+    [InlineData("WebLingo.StdLib.Url")]
+    public void HostUtilityModulesDependOnlyOnCoreAndRuntime(string assembly)
+    {
+        APortableAssemblyReferencesOnlyTheWebLingoAssembliesItMay(assembly, ["WebLingo.Core", "WebLingo.Runtime"]);
     }
 
     private static IEnumerable<string> References(string assembly) =>
