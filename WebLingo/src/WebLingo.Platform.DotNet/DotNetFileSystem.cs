@@ -37,6 +37,24 @@ public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = n
         return true;
     });
 
+    public byte[] ReadBytes(string path) => Translated(() => File.ReadAllBytes(Reach(path, false)));
+
+    public void WriteBytes(string path, byte[] bytes, bool append) => Translated(() =>
+    {
+        using var stream = new FileStream(Reach(path, true), append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.Read);
+        stream.Write(bytes);
+        return true;
+    });
+
+    public void Copy(string source, string target) => Translated(() =>
+    {
+        var from = Reach(source, false);
+        var to = Reach(target, true);
+        if (Directory.Exists(from)) throw new WebLingoFileSystemException(WebLingoFileErrorKind.Other, "it is a folder, and only a file is copied");
+        File.Copy(from, to, overwrite: true);
+        return true;
+    });
+
     public bool Exists(string path) => Translated(() =>
     {
         var reached = Reach(path, false);
@@ -72,9 +90,13 @@ public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = n
         return true;
     });
 
-    public IWebLingoFile Open(string path, WebLingoFileMode mode, string encoding) => Translated<IWebLingoFile>(() => mode == WebLingoFileMode.Read
-        ? new DotNetFile(Reader(Reach(path, false), encoding), null)
-        : new DotNetFile(null, new StreamWriter(Reach(path, true), mode == WebLingoFileMode.Append, EncodingOf(encoding))));
+    public IWebLingoFile Open(string path, WebLingoFileMode mode, string encoding) => Translated<IWebLingoFile>(() => mode switch
+    {
+        WebLingoFileMode.Read => new DotNetFile(Reader(Reach(path, false), encoding), null, null),
+        WebLingoFileMode.ReadBytes => new DotNetFile(null, null, new FileStream(Reach(path, false), FileMode.Open, FileAccess.Read, FileShare.Read)),
+        WebLingoFileMode.WriteBytes => new DotNetFile(null, null, new FileStream(Reach(path, true), FileMode.Create, FileAccess.Write, FileShare.Read)),
+        _ => new DotNetFile(null, new StreamWriter(Reach(path, true), mode == WebLingoFileMode.Append, EncodingOf(encoding)), null)
+    });
 
     /// <summary>
     /// An encoding by its name, as .NET names them (<c>utf-8</c>, <c>utf-16</c>, <c>utf-16BE</c>, <c>utf-32</c>,
@@ -126,8 +148,8 @@ public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = n
         _ => null
     };
 
-    /// <summary>A file opened to read its lines, or to write text, one operation at a time.</summary>
-    private sealed class DotNetFile(StreamReader? reader, StreamWriter? writer) : IWebLingoFile
+    /// <summary>A file opened to read its lines, or to write text, or to read or write its bytes, one operation at a time.</summary>
+    private sealed class DotNetFile(StreamReader? reader, StreamWriter? writer, FileStream? bytes) : IWebLingoFile
     {
         private readonly object _gate = new();
 
@@ -135,7 +157,7 @@ public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = n
         {
             lock (_gate)
             {
-                if (reader is null) throw new WebLingoFileSystemException(WebLingoFileErrorKind.Other, "it was opened to be written, not read");
+                if (reader is null) throw Misused(bytes is not null ? "it was opened for its bytes, not its text" : "it was opened to be written, not read");
                 return Translated(reader.ReadLine);
             }
         }
@@ -144,7 +166,7 @@ public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = n
         {
             lock (_gate)
             {
-                if (writer is null) throw new WebLingoFileSystemException(WebLingoFileErrorKind.Other, "it was opened to be read, not written");
+                if (writer is null) throw Misused(bytes is not null ? "it was opened for its bytes, not its text" : "it was opened to be read, not written");
                 Translated(() =>
                 {
                     writer.Write(text);
@@ -153,12 +175,54 @@ public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = n
             }
         }
 
+        public byte[]? ReadBytes(int count)
+        {
+            lock (_gate)
+            {
+                if (bytes is null) throw Misused("it was opened for its text, not its bytes");
+                if (!bytes.CanRead) throw Misused("it was opened to be written, not read");
+                return Translated(() =>
+                {
+                    // No more than what is left, so that a large count makes no large buffer for a small file.
+                    var size = (int)Math.Min(count, Math.Max(0, bytes.Length - bytes.Position));
+                    var buffer = new byte[size];
+                    var read = 0;
+                    while (read < size)
+                    {
+                        var got = bytes.Read(buffer, read, size - read);
+                        if (got == 0) break;
+                        read += got;
+                    }
+                    if (read == 0) return null;
+                    if (read < size) Array.Resize(ref buffer, read);
+                    return buffer;
+                });
+            }
+        }
+
+        public void WriteBytes(byte[] data)
+        {
+            lock (_gate)
+            {
+                if (bytes is null) throw Misused("it was opened for its text, not its bytes");
+                if (!bytes.CanWrite) throw Misused("it was opened to be read, not written");
+                Translated(() =>
+                {
+                    bytes.Write(data);
+                    return true;
+                });
+            }
+        }
+
+        private static WebLingoFileSystemException Misused(string reason) => new(WebLingoFileErrorKind.Other, reason);
+
         public void Dispose()
         {
             lock (_gate)
             {
                 reader?.Dispose();
                 writer?.Dispose();
+                bytes?.Dispose();
             }
         }
     }

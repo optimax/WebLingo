@@ -407,6 +407,39 @@ public sealed class WaspTests : IDisposable
     }
 
     /// <summary>
+    /// <c>std:fs</c>'s bytes, <c>isFolder</c> and <c>copy</c> are checked as its text is (section 7.13, "File capabilities";
+    /// the owner's answers, 18 November 2026): a copy reads its source and writes its target, each where the site may.
+    /// </summary>
+    [Fact]
+    public void BytesFoldersAndCopiesAreCheckedAsTextIs()
+    {
+        Write("data/teas.txt", "Sencha");
+        Write("secret/key.txt", "hidden");
+        Directory.CreateDirectory(Path.Combine(_folder, "uploads"));
+        Write("site/wasp.config", "{ \"files\": { \"read\": [\"../data\"], \"write\": [\"../uploads\"] } }");
+        var page = Write("site/page.wasp", Reaching(
+            "fs.readBytesSync(\"../data/teas.txt\").length", "fs.readBytesSync(\"../secret/key.txt\")",
+            "fs.writeBytesSync(\"../data/new.bin\", fs.readBytesSync(\"../data/teas.txt\"))",
+            "fs.isFolderSync(\"../data\")", "fs.isFolderSync(\"../secret\")",
+            "{ fs.copySync(\"../data/teas.txt\", \"../uploads/copy.txt\"); return fs.readTextSync(\"../uploads/copy.txt\"); }",
+            "fs.copySync(\"../uploads/copy.txt\", \"../data/back.txt\")", "fs.copySync(\"../secret/key.txt\", \"../uploads/key.txt\")",
+            "fs.File.openSync(\"../data/new.bin\", \"wb\")"));
+        Assert.Equal((WebLingoCommandLine.Success,
+            "6\n" +
+            "WL3016 '../secret/key.txt' cannot be read: it is not in a folder this site may read.\n" +
+            "WL3016 '../data/new.bin' cannot be written: it is not in a folder this site may write.\n" +
+            "true\n" +
+            "WL3016 '../secret' cannot be looked for: it is not in a folder this site may read.\n" +
+            "Sencha\n" +
+            "WL3016 '../uploads/copy.txt' cannot be copied to '../data/back.txt': it is not in a folder this site may write.\n" +
+            "WL3016 '../secret/key.txt' cannot be copied to '../uploads/key.txt': it is not in a folder this site may read.\n" +
+            "WL3016 '../data/new.bin' cannot be written: it is not in a folder this site may write.\n", ""), Run(["run", page]));
+        Assert.False(File.Exists(Path.Combine(_folder, "data", "new.bin")));
+        Assert.False(File.Exists(Path.Combine(_folder, "data", "back.txt")));
+        Assert.False(File.Exists(Path.Combine(_folder, "uploads", "key.txt")));
+    }
+
+    /// <summary>
     /// A path is checked as the file system reads it (section 7.13, "File capabilities"): a link or a junction inside an
     /// allowed folder that leads out of it refused; on Windows, a name in another case, and a device's name refused.
     /// </summary>

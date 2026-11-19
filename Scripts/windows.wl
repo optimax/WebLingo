@@ -8,6 +8,21 @@ import { Regex } from "std:regex";
 
 const shell = com.create("WScript.Shell");
 
+// A folder copied whole, through std:fs, without COM: its folders made, and its files copied as they are, over any of
+// the same names; files the target has that the source lacks are kept.
+export async function copyFolder(source, target) {
+    await fs.makeFolder(target);
+    foreach (var name in await fs.list(source)) {
+        var from = $"{source}\\{name}";
+        var to = $"{target}\\{name}";
+        if (await fs.isFolder(from)) {
+            await copyFolder(from, to);
+        } else {
+            await fs.copy(from, to);
+        }
+    }
+}
+
 // What a program gave: its exit code, and what it wrote, its errors among it.
 export class Ran {
     constructor(code, output) {

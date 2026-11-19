@@ -8,14 +8,20 @@ namespace WebLingo.StdLib.Fs;
 /// the <c>std</c> scheme's folder as <c>fs.dll</c>: files and folders through the platform's file system
 /// (<see cref="WebLingoHeap.FileSystem"/>). Each operation is asynchronous, a task that the work, run off the worker,
 /// completes, and has a synchronous form named with <c>Sync</c>, which blocks the worker (WL-P004): <c>readText</c>,
-/// <c>writeText</c>, <c>appendText</c>, <c>exists</c>, <c>remove</c>, <c>list</c>, <c>makeFolder</c> and
-/// <c>removeFolder</c>; and the class <c>File</c>, a file opened as a handle, <c>File.open(path, mode)</c>, its lines read
-/// by <c>read()</c>, its text written by <c>write(text)</c>, closed by <c>dispose()</c>. Text is UTF-8 unless an encoding
-/// is named. A failure is an <c>IOError</c> (WL3011) naming the path as the script gave it, never the host's own.
+/// <c>writeText</c>, <c>appendText</c>, <c>readBytes</c>, <c>writeBytes</c>, <c>appendBytes</c>, <c>exists</c>,
+/// <c>isFolder</c>, <c>copy</c>, <c>remove</c>, <c>list</c>, <c>makeFolder</c> and <c>removeFolder</c>; and the class
+/// <c>File</c>, a file opened as a handle, <c>File.open(path, mode)</c>: for its text, its lines read by <c>read()</c>, its
+/// text written by <c>write(text)</c>; for its bytes, <c>"rb"</c> and <c>"wb"</c>, up to a count of them read by
+/// <c>read(count)</c>, <c>null</c> at its end, bytes written by <c>write(bytes)</c>; closed by <c>dispose()</c> (the owner's
+/// answers, 18 November 2026, for bytes, <c>isFolder</c> and <c>copy</c>). Text is UTF-8 unless an encoding is named. A
+/// failure is an <c>IOError</c> (WL3011) naming the path as the script gave it, never the host's own.
 /// </summary>
 public sealed class WebLingoFsModule : IWebLingoNativeModule
 {
     private const string Utf8 = "utf-8";
+
+    /// <summary>The most bytes one <c>read(count)</c> gives, a larger count giving this many, so that a count makes no buffer larger.</summary>
+    public const int MostBytesRead = 16 * 1024 * 1024;
 
     public void Register(IWebLingoNativeRegistry registry)
     {
@@ -48,7 +54,44 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
                 return true;
             }, Nothing);
         }
+        PathOperation(registry, "readBytes", "read", (fs, path) => fs.ReadBytes(path), BytesValue);
+        foreach (var (name, append) in new[] { ("writeBytes", false), ("appendBytes", true) })
+        {
+            Operation(registry, name, 2, 0, "written", (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out string path, out Func<IWebLingoFileSystem, bool> work,
+                out WebLingoRuntimeError? error) =>
+            {
+                work = null!;
+                if (!TryPath(a, 0, heap, out path, out error) || !TryBytes(a, 1, $"'{name}'", heap, out var bytes, out error)) return false;
+                var at = path;
+                work = fs =>
+                {
+                    fs.WriteBytes(at, bytes, append);
+                    return true;
+                };
+                return true;
+            }, Nothing);
+        }
         PathOperation(registry, "exists", "looked for", (fs, path) => fs.Exists(path), Boolean);
+        PathOperation(registry, "isFolder", "looked for", (fs, path) => fs.IsFolder(path), Boolean);
+        foreach (var sync in new[] { false, true })
+        {
+            // Its errors name both paths, as the script gave them: 'a.txt' cannot be copied to 'b.txt': ….
+            registry.Function(sync ? "copySync" : "copy", 2, 0,
+                (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+                {
+                    result = WebLingoValue.Null;
+                    if (!TryFileSystem(heap, out var fs, out error) || !TryPath(a, 0, heap, out var source, out error)
+                        || !TryPath(a, 1, heap, out var target, out error))
+                    {
+                        return false;
+                    }
+                    return Run(sync, heap, $"copied to '{target}'", source, () =>
+                    {
+                        fs.Copy(source, target);
+                        return true;
+                    }, Nothing, out result, out error);
+                });
+        }
         PathOperation(registry, "remove", "removed", (fs, path) =>
         {
             fs.Remove(path);
@@ -74,22 +117,45 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
         }
         foreach (var (name, sync) in new[] { ("read", false), ("readSync", true) })
         {
-            file.DeclareMethod(name, 0, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+            // A file opened for its text gives its next line, read(); one opened for its bytes up to a count of them, read(count).
+            file.DeclareMethod(name, 1, 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
             {
                 result = WebLingoValue.Null;
                 if (!file.TryGetHostObject<OpenFile>(a[0], heap, out var open, out error)) return false;
-                return Run(sync, heap, "read", open.Path, () => open.File.ReadLine(), Line, out result, out error);
+                if (!open.Bytes)
+                {
+                    if (a[1].Kind == WebLingoValueKind.Null) return Run(sync, heap, "read", open.Path, () => open.File.ReadLine(), Line, out result, out error);
+                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                        "A file opened for its text is read a line at a time, by read(), which takes no count.");
+                    return false;
+                }
+                if (a[1].Kind != WebLingoValueKind.Int64 || a[1].AsInt64 < 1)
+                {
+                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                        $"A file opened for its bytes is read by read(count), how many at most, an integer from 1, not {WebLingoValueFormatter.Describe(a[1], heap)}.");
+                    return false;
+                }
+                var count = (int)Math.Min(a[1].AsInt64, MostBytesRead);
+                return Run(sync, heap, "read", open.Path, () => open.File.ReadBytes(count), BytesOrNull, out result, out error);
             });
         }
         foreach (var (name, sync) in new[] { ("write", false), ("writeSync", true) })
         {
+            // A file opened for its text is written text, write(text); one opened for its bytes, bytes, write(bytes).
             file.DeclareMethod(name, 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
             {
                 result = WebLingoValue.Null;
-                if (!file.TryGetHostObject<OpenFile>(a[0], heap, out var open, out error) || !TryString(a, 1, "text", heap, out var text, out error))
+                if (!file.TryGetHostObject<OpenFile>(a[0], heap, out var open, out error)) return false;
+                if (open.Bytes)
                 {
-                    return false;
+                    if (!TryBytes(a, 1, "A file opened for its bytes", heap, out var bytes, out error)) return false;
+                    return Run(sync, heap, "written", open.Path, () =>
+                    {
+                        open.File.WriteBytes(bytes);
+                        return true;
+                    }, Nothing, out result, out error);
                 }
+                if (!TryString(a, 1, "text", heap, out var text, out error)) return false;
                 return Run(sync, heap, "written", open.Path, () =>
                 {
                     open.File.Write(text);
@@ -107,8 +173,8 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
         });
     }
 
-    /// <summary>A file opened as a handle, and its path, as the script gave it, which its errors name.</summary>
-    private sealed record OpenFile(IWebLingoFile File, string Path) : IDisposable
+    /// <summary>A file opened as a handle, its path, as the script gave it, which its errors name, and whether it was opened for its bytes.</summary>
+    private sealed record OpenFile(IWebLingoFile File, string Path, bool Bytes) : IDisposable
     {
         public void Dispose() => File.Dispose();
     }
@@ -194,15 +260,23 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
             case "r": mode = WebLingoFileMode.Read; break;
             case "w": mode = WebLingoFileMode.Write; break;
             case "a": mode = WebLingoFileMode.Append; break;
+            case "rb": mode = WebLingoFileMode.ReadBytes; break;
+            case "wb": mode = WebLingoFileMode.WriteBytes; break;
             default:
                 error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"A file is opened to read it, \"r\", to write it, \"w\", or to append to it, \"a\", not \"{modeName}\".");
+                    $"A file is opened to read it, \"r\", to write it, \"w\", or to append to it, \"a\", or for its bytes, \"rb\" or \"wb\", not \"{modeName}\".");
                 return false;
         }
-        return Run(sync, heap, mode == WebLingoFileMode.Read ? "read" : "written", path, () => fs.Open(path, mode, encoding),
+        var bytes = mode is WebLingoFileMode.ReadBytes or WebLingoFileMode.WriteBytes;
+        if (bytes && a[3].Kind != WebLingoValueKind.Null)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "A file opened for its bytes has no encoding.");
+            return false;
+        }
+        return Run(sync, heap, mode is WebLingoFileMode.Read or WebLingoFileMode.ReadBytes ? "read" : "written", path, () => fs.Open(path, mode, encoding),
             (IWebLingoFile opened, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? wrong) =>
             {
-                if (file.TryMake(classValue, h, out made, out wrong) && file.TrySetHostObject(made, new OpenFile(opened, path), h, out wrong)) return true;
+                if (file.TryMake(classValue, h, out made, out wrong) && file.TrySetHostObject(made, new OpenFile(opened, path, bytes), h, out wrong)) return true;
                 opened.Dispose();
                 return false;
             }, out result, out error);
@@ -257,8 +331,34 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
         return a[index].Kind == WebLingoValueKind.Null || TryString(a, index, "encoding's name", heap, out encoding, out error);
     }
 
+    /// <summary>Bytes the script gave, <c>Bytes</c>, never copied, being immutable; else why not, in <paramref name="what"/>'s words.</summary>
+    private static bool TryBytes(ReadOnlySpan<WebLingoValue> a, int index, string what, WebLingoHeap heap, out byte[] bytes, out WebLingoRuntimeError? error)
+    {
+        bytes = [];
+        error = null;
+        if (a[index].Kind == WebLingoValueKind.Bytes)
+        {
+            bytes = heap.GetBytes(a[index]);
+            return true;
+        }
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+            $"{what} writes bytes, not {WebLingoValueFormatter.Describe(a[index], heap)}.");
+        return false;
+    }
+
     private static bool Text(string text, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         heap.TryAllocateString(text, out result, out error);
+
+    private static bool BytesValue(byte[] bytes, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        heap.TryAllocateBytes(bytes, out result, out error);
+
+    private static bool BytesOrNull(byte[]? bytes, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        if (bytes is not null) return heap.TryAllocateBytes(bytes, out result, out error);
+        result = WebLingoValue.Null;
+        error = null;
+        return true;
+    }
 
     private static bool Line(string? line, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {

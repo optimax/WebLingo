@@ -122,6 +122,98 @@ public sealed class FileSystemTests : IDisposable
 
     [Theory]
     [MemberData(nameof(Vms))]
+    public void BytesAreWrittenAppendedAndReadBothWays(string vm)
+    {
+        // Every byte as it is, 0, 255 and line breaks among them, never read as text (the owner's answers, 18 November 2026).
+        Assert.Equal(("Bytes:[0, 255, 10, 13, 200]|Bytes:[0, 255, 10, 13, 200, 7]|true", ""), Run(vm, """
+            import { write } from "std:system";
+            var data = fs.readBytesSync(folder + "/given.bin");
+            await fs.writeBytes(folder + "/b.bin", data);
+            write(await fs.readBytes(folder + "/b.bin"));
+            fs.appendBytesSync(folder + "/b.bin", fs.readBytesSync(folder + "/seven.bin"));
+            write("|" + fs.readBytesSync(folder + "/b.bin").toString());
+            write("|" + (fs.readBytesSync(folder + "/b.bin").slice(0, 5) == data).toString());
+            """, ("given.bin", [0, 255, 10, 13, 200]), ("seven.bin", [7])));
+        Assert.Equal(new byte[] { 0, 255, 10, 13, 200, 7 }, File.ReadAllBytes(Path.Combine(_folder, "b.bin")));
+    }
+
+    [Theory]
+    [MemberData(nameof(Vms))]
+    public void AFileIsOpenedForItsBytes(string vm)
+    {
+        // "wb" writes bytes anew; "rb" reads them, up to a count at a time, null at the end, however large the count.
+        Assert.Equal(("[tea][ ti][me]|[tea time]|null", ""), Run(vm, """
+            import { write } from "std:system";
+            var tea = fs.readBytesSync(folder + "/tea.txt");
+            using (var w = await fs.File.open(folder + "/f.bin", "wb")) {
+                await w.write(tea.slice(0, 4));
+                w.writeSync(tea.slice(4));
+            }
+            using (var r = fs.File.openSync(folder + "/f.bin", "rb")) {
+                var part = await r.read(3);
+                while (part != null) {
+                    write("[" + part.text() + "]");
+                    part = r.readSync(3);
+                }
+            }
+            using (var r = fs.File.openSync(folder + "/f.bin", "rb")) {
+                write("|[" + r.readSync(1099511627776).text() + "]|");
+                write(r.readSync(1));
+            }
+            """, ("tea.txt", "tea time"u8.ToArray())));
+        Assert.Equal("tea time"u8.ToArray(), File.ReadAllBytes(Path.Combine(_folder, "f.bin")));
+    }
+
+    [Theory]
+    [MemberData(nameof(Vms))]
+    public void AFolderIsToldFromAFileAndAFileIsCopied(string vm)
+    {
+        // A copy is the file as it is, replacing one there; a folder is not copied (the owner's answers, 18 November 2026).
+        var (output, error) = Run(vm, """
+            import { write } from "std:system";
+            fs.makeFolderSync(folder + "/sub");
+            write([fs.isFolderSync(folder + "/sub"), await fs.isFolder(folder + "/given.bin"), fs.isFolderSync(folder + "/missing")]);
+            fs.writeTextSync(folder + "/copy.bin", "old, and longer than the copy");
+            await fs.copy(folder + "/given.bin", folder + "/copy.bin");
+            write("|" + (fs.readBytesSync(folder + "/copy.bin") == fs.readBytesSync(folder + "/given.bin")).toString());
+            fs.copySync(folder + "/given.bin", folder + "/sub/copy.bin");
+            write("|" + fs.listSync(folder + "/sub").toString() + "|");
+            try { await fs.copy(folder + "/missing.bin", folder + "/x.bin"); } catch (IOError e) { write(e.code + " " + e.message + "|"); }
+            fs.copySync(folder + "/sub", folder + "/x");
+            """, ("given.bin", [0, 255, 10]));
+        Assert.Equal("[true, false, false]|true|[\"copy.bin\"]|"
+                     + $"WL3011 '{_folder}/missing.bin' cannot be copied to '{_folder}/x.bin': there is no such file or folder.|", output);
+        Assert.Equal($"WL3011 '{_folder}/sub' cannot be copied to '{_folder}/x': it is a folder, and only a file is copied.", error);
+        Assert.Equal(new byte[] { 0, 255, 10 }, File.ReadAllBytes(Path.Combine(_folder, "copy.bin")));
+    }
+
+    [Theory]
+    [MemberData(nameof(Vms))]
+    public void AFileIsReadAndWrittenAsItWasOpened(string vm)
+    {
+        // Text by a line, read(), and text written; bytes by a count, read(count), and bytes written.
+        var (output, _) = Run(vm, """
+            import { write } from "std:system";
+            fs.writeTextSync(folder + "/t.txt", "tea\n");
+            function t(f) { try { f(); } catch (e) { write(e.code + " " + e.message + "|"); } }
+            using (var text = fs.File.openSync(folder + "/t.txt", "r")) { t(() => text.readSync(4)); }
+            using (var bytes = fs.File.openSync(folder + "/t.txt", "rb")) {
+                t(() => bytes.readSync());
+                t(() => bytes.readSync(0));
+                t(() => bytes.writeSync(fs.readBytesSync(folder + "/t.txt")));
+            }
+            using (var bytes = fs.File.openSync(folder + "/w.bin", "wb")) { t(() => bytes.writeSync("text")); t(() => bytes.readSync(1)); }
+            """);
+        Assert.Equal("WL3001 A file opened for its text is read a line at a time, by read(), which takes no count.|"
+                     + "WL3001 A file opened for its bytes is read by read(count), how many at most, an integer from 1, not null.|"
+                     + "WL3001 A file opened for its bytes is read by read(count), how many at most, an integer from 1, not the integer 0.|"
+                     + $"WL3011 '{_folder}/t.txt' cannot be written: it was opened to be read, not written.|"
+                     + "WL3001 A file opened for its bytes writes bytes, not a string.|"
+                     + $"WL3011 '{_folder}/w.bin' cannot be read: it was opened to be written, not read.|", output);
+    }
+
+    [Theory]
+    [MemberData(nameof(Vms))]
     public void ManyOperationsRunAtOnce(string vm)
     {
         Assert.Equal(("4950", ""), Run(vm, """
@@ -171,16 +263,26 @@ public sealed class FileSystemTests : IDisposable
     [InlineData("fs.writeTextSync(\"x.txt\", 5);", "WL3001 A text is a string, not the integer 5.")]
     [InlineData("fs.readTextSync(\"x.txt\", 8);", "WL3001 An encoding's name is a string, not the integer 8.")]
     [InlineData("fs.readTextSync(\"x.txt\", \"klingon\");", "WL3001 'x.txt' cannot be read: there is no encoding 'klingon'.")]
-    [InlineData("fs.File.openSync(\"x.txt\", \"rw\");", "WL3001 A file is opened to read it, \"r\", to write it, \"w\", or to append to it, \"a\", not \"rw\".")]
+    [InlineData("fs.File.openSync(\"x.txt\", \"rw\");",
+        "WL3001 A file is opened to read it, \"r\", to write it, \"w\", or to append to it, \"a\", or for its bytes, \"rb\" or \"wb\", not \"rw\".")]
+    [InlineData("fs.File.openSync(\"x.txt\", \"rb\", \"utf-8\");", "WL3001 A file opened for its bytes has no encoding.")]
+    [InlineData("fs.writeBytesSync(\"x.bin\", \"text\");", "WL3001 'writeBytes' writes bytes, not a string.")]
+    [InlineData("fs.appendBytesSync(\"x.bin\", 5);", "WL3001 'appendBytes' writes bytes, not the integer 5.")]
+    [InlineData("fs.copySync(\"x.bin\", 5);", "WL3001 A path is a string, not the integer 5.")]
+    [InlineData("fs.copySync(\"x.bin\");", "WL2006")]
     [InlineData("fs.readTextSync();", "WL2006")]
     public void WrongArgumentsAreReported(string source, string error)
     {
         foreach (var vm in new[] { "register", "stack" }) Assert.StartsWith(error, Run(vm, source).Error);
     }
 
-    /// <summary>Runs a program, given its folder as <c>folder</c>, with <c>std:fs</c> imported; its output and its error.</summary>
-    private (string Output, string Error) Run(string vm, string body)
+    /// <summary>
+    /// Runs a program, given its folder as <c>folder</c>, with <c>std:fs</c> imported, and <paramref name="files"/> written
+    /// there first, each its bytes; its output and its error.
+    /// </summary>
+    private (string Output, string Error) Run(string vm, string body, params (string Name, byte[] Bytes)[] files)
     {
+        foreach (var (name, bytes) in files) File.WriteAllBytes(Path.Combine(_folder, name), bytes);
         var source = "param folder;\nimport fs from \"std:fs\";\n" + body;
         var builtins = new WebLingoBuiltinRegistry();
         var loader = new WebLingoNativeModuleLoader(new Dictionary<string, string> { ["std"] = Path.Combine(AppContext.BaseDirectory, "std") }, builtins);

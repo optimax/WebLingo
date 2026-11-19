@@ -2019,10 +2019,17 @@ false
 | `readText(path)` | a file's text, UTF-8 unless a second argument names another encoding |
 | `writeText(path, text)` | writes a file, replacing it |
 | `appendText(path, text)` | adds to the end of a file |
+| `readBytes(path)`, `writeBytes(path, bytes)`, `appendBytes(path, bytes)` | a file's bytes, as they are, read, written and added to |
 | `exists(path)` | whether a file or a folder is there |
+| `isFolder(path)` | whether a folder is there |
+| `copy(source, target)` | copies a file as it is, replacing one at `target` |
 | `remove(path)` | deletes a file |
 | `list(path)` | the names in a folder |
 | `makeFolder(path)`, `removeFolder(path)` | makes and removes a folder |
+
+A file is also opened as a handle, `fs.File.open(path, mode)`, for its text, `"r"`, `"w"` or `"a"`, read a line at a time,
+or for its bytes, `"rb"` or `"wb"`, read a count of them at a time, `file.read(4096)`, `null` at its end (the Standard
+Library Reference, section 14).
 | `File.open(path, mode)` | a file opened as a handle, with `read`, `write` and `dispose()` |
 
 Each is asynchronous, giving a task, and each has a synchronous form whose name ends in `Sync`: `readTextSync(path)`.

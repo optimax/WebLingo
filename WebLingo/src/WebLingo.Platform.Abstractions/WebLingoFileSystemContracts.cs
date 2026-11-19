@@ -14,6 +14,18 @@ public interface IWebLingoFileSystem
     /// <summary>Writes a file's text, in the encoding named, a UTF-8 file without a byte order mark, after its text if <paramref name="append"/>.</summary>
     void WriteText(string path, string text, string encoding, bool append);
 
+    /// <summary>A whole file's bytes, as they are.</summary>
+    byte[] ReadBytes(string path);
+
+    /// <summary>Writes a file's bytes, as they are, after its bytes if <paramref name="append"/>.</summary>
+    void WriteBytes(string path, byte[] bytes, bool append);
+
+    /// <summary>
+    /// Copies the file <paramref name="source"/>, as it is, to <paramref name="target"/>, replacing a file there; a folder is
+    /// not copied.
+    /// </summary>
+    void Copy(string source, string target);
+
     /// <summary>Whether a file or a folder is there.</summary>
     bool Exists(string path);
 
@@ -32,7 +44,10 @@ public interface IWebLingoFileSystem
     /// <summary>Removes an empty folder.</summary>
     void RemoveFolder(string path);
 
-    /// <summary>Opens a file as a handle, to read its lines or to write text, in the encoding named.</summary>
+    /// <summary>
+    /// Opens a file as a handle: to read its lines or to write text, in the encoding named; or to read or write its bytes,
+    /// the encoding then unused.
+    /// </summary>
     IWebLingoFile Open(string path, WebLingoFileMode mode, string encoding);
 }
 
@@ -44,10 +59,19 @@ public interface IWebLingoFile : IDisposable
 
     /// <summary>Writes text at its end.</summary>
     void Write(string text);
+
+    /// <summary>Its next <paramref name="count"/> bytes, fewer only where it ends first, or null at its end.</summary>
+    byte[]? ReadBytes(int count);
+
+    /// <summary>Writes bytes at its end.</summary>
+    void WriteBytes(byte[] bytes);
 }
 
-/// <summary>How a file is opened: to read it; to write it anew, made if it is not there; or to write after its text.</summary>
-public enum WebLingoFileMode { Read, Write, Append }
+/// <summary>
+/// How a file is opened: to read its text; to write text anew, the file made if it is not there; or to write after its
+/// text; to read its bytes; or to write bytes anew, made if it is not there.
+/// </summary>
+public enum WebLingoFileMode { Read, Write, Append, ReadBytes, WriteBytes }
 
 /// <summary>
 /// What failed, a portable category, not the host's exception (section 7.13, WL-P015); <see cref="NotAllowed"/>, a path a

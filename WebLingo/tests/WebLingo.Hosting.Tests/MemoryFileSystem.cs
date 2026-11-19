@@ -36,6 +36,9 @@ internal sealed class MemoryFileSystem : IWebLingoFileSystem
     }
 
     public void WriteText(string path, string text, string encoding, bool append) => throw Unsupported();
+    public byte[] ReadBytes(string path) => throw Unsupported();
+    public void WriteBytes(string path, byte[] bytes, bool append) => throw Unsupported();
+    public void Copy(string source, string target) => throw Unsupported();
     public void Remove(string path) => throw Unsupported();
     public void MakeFolder(string path) => throw Unsupported();
     public void RemoveFolder(string path) => throw Unsupported();

@@ -546,14 +546,20 @@ synchronous form whose name ends in `Sync`: `readText` and `readTextSync`.
 | `readText(path, encoding)` | a file's text |
 | `writeText(path, text, encoding)` | writes a file, replacing it |
 | `appendText(path, text, encoding)` | adds to a file's end, making it if it is not there |
+| `readBytes(path)` | a file's bytes, as `Bytes`, as they are |
+| `writeBytes(path, bytes)` | writes a file's bytes, replacing it |
+| `appendBytes(path, bytes)` | adds bytes to a file's end, making it if it is not there |
 | `exists(path)` | whether a file or a folder is there |
+| `isFolder(path)` | whether a folder is there; a file is not one |
+| `copy(source, target)` | copies a file as it is, replacing one at `target`; a folder is not copied |
 | `remove(path)` | removes a file |
 | `list(path)` | the names of a folder's files and folders |
 | `makeFolder(path)` | makes a folder, and the folders it is in |
 | `removeFolder(path)` | removes a folder, which must be empty |
-| `File.open(path, mode, encoding)` | a file opened, to read it, `"r"`, to write it, `"w"`, or to append to it, `"a"` |
-| `file.read()` | the file's next line, without its line break, or `null` at its end |
-| `file.write(text)` | writes text to it |
+| `File.open(path, mode, encoding)` | a file opened for its text, to read it, `"r"`, to write it, `"w"`, or to append to it, `"a"`; or for its bytes, to read them, `"rb"`, or to write them, `"wb"`, without an encoding |
+| `file.read()` | a file opened for its text: its next line, without its line break, or `null` at its end |
+| `file.read(count)` | a file opened for its bytes: its next bytes, as many as `count`, at most 16 MiB, fewer at its end, or `null` there |
+| `file.write(value)` | writes text to a file opened for its text, or bytes to one opened for its bytes |
 | `file.dispose()` | closes it, as `using` does |
 
 Text is UTF-8 unless an encoding is named, as .NET names them: `utf-16`, `utf-16be`, `utf-32`, `us-ascii`,
@@ -588,6 +594,34 @@ try { fs.readTextSync("missing.txt"); } catch (IOError e) { writeLn([e.code, e.m
 - black
 false
 ["WL3011", "'missing.txt' cannot be read: there is no such file or folder."]
+```
+
+Bytes are read and written as they are, never as text, so that a script copies any file, an image or a program:
+
+```javascript
+import { writeLn } from "std:system";
+import { Bytes } from "std:bytes";
+import fs from "std:fs";
+await fs.writeBytes("logo.bin", Bytes.from([137, 80, 78, 71, 0, 255]));
+await fs.copy("logo.bin", "copy.bin");
+writeLn([fs.isFolderSync("copy.bin"), fs.isFolderSync("."), (await fs.readBytes("copy.bin")).length]);
+using (var file = await fs.File.open("copy.bin", "rb")) {
+  var part = await file.read(4);
+  while (part != null) {
+    writeLn(part);
+    part = await file.read(4);
+  }
+}
+try { fs.copySync("missing.bin", "copy.bin"); } catch (IOError e) { writeLn(e.message); }
+await fs.remove("logo.bin");
+await fs.remove("copy.bin");
+```
+
+```text
+[false, true, 6]
+Bytes:[137, 80, 78, 71]
+Bytes:[0, 255]
+'missing.bin' cannot be copied to 'copy.bin': there is no such file or folder.
 ```
 
 ---

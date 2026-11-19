@@ -1,5 +1,5 @@
 // Installs WebLingo for the whole machine, or updates it: wasp, weblingo and the standard modules, copied from a published
-// folder into C:\Program Files\WebLingo, where every WASP site's web.config names wasp. The application pools of the IIS
+// folder into C:\Program Files\WebLingo by std:fs, where every WASP site's web.config names wasp. The application pools of the IIS
 // sites whose wasp runs from there are stopped while their files are replaced, then started again. Run it as administrator,
 // from this folder, once WebLingo/publish.ps1 has published WebLingo into WebLingo\publish\WebLingo, with that folder's
 // weblingo.exe, not the installed one, which cannot replace itself while it runs:
@@ -15,7 +15,7 @@ param target = "C:\\Program Files\\WebLingo";
 import { writeLn, delay } from "std:system";
 import com from "windows:com";
 import fs from "std:fs";
-import { requireAdministrator, runningFrom } from "./windows.wl";
+import { requireAdministrator, runningFrom, copyFolder } from "./windows.wl";
 import { sites, stopPool, startPool } from "./iis.wl";
 
 await requireAdministrator();
@@ -64,7 +64,7 @@ for (var i = 0; runningFrom(installed).length > 0; i++) {
 }
 
 try {
-    files.CopyFolder(published, installed, true);
+    await copyFolder(published, installed);
     writeLn($"WebLingo installed in {installed}, from {published}");
 } finally {
     foreach (var pool in running) {
