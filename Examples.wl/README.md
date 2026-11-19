@@ -109,8 +109,6 @@ through, each ending with the errors `weblingo check` gives it:
 
 WebLingo is pre-alpha. These scripts show it as it is today, and these are among what it does not have yet:
 
-- **Integer division.** `/` always divides exactly, `7 / 2` being `3.5`; a quotient is `math.truncate(7 / 2)`, from
-  `std:math`.
 - **A database's rows one at a time**, for results too large to hold whole, and databases other than SQLite and SQL
   Server.
 - **A module defined in code that `import` can find**: `new Module(name)` makes one, which no path names

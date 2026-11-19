@@ -365,6 +365,10 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             if (!Arithmetic(WebLingoOpCode.Remainder, registers, ins, out error)) break;
                             pc++;
                             continue;
+                        case WebLingoOpCode.IntegerDivide:
+                            if (!IntegerDivide(registers, ins, out error)) break;
+                            pc++;
+                            continue;
                         case WebLingoOpCode.Equal:
                             if (!Compare(WebLingoOpCode.Equal, registers, ins, out error)) break;
                             pc++;
@@ -1366,11 +1370,14 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     case WebLingoOpCode.Remainder:
                         if (b is 0 or -1) break;
                         return Done(WebLingoValue.FromInt64(a % b), registers, ins);
+                    case WebLingoOpCode.IntegerDivide:
+                        if (b is 0 or -1) break;
+                        return Done(WebLingoValue.FromInt64(a / b), registers, ins);
                     default:
                         return Done(WebLingoValue.FromBinary64((double)a / b), registers, ins);
                 }
             }
-            else if (left.Kind == WebLingoValueKind.Binary64 && right.Kind == WebLingoValueKind.Binary64)
+            else if (opCode != WebLingoOpCode.IntegerDivide && left.Kind == WebLingoValueKind.Binary64 && right.Kind == WebLingoValueKind.Binary64)
             {
                 var (x, y) = (left.AsBinary64, right.AsBinary64);
                 return Done(WebLingoValue.FromBinary64(opCode switch
@@ -1392,6 +1399,14 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             registers[ins.A] = value;
             return true;
         }
+
+        /// <summary>
+        /// Integer division, <c>\</c>, rarer than the other operations, the arithmetic above in a helper of its own, which
+        /// .NET does not inline into the dispatch method.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool IntegerDivide(WebLingoValue[] registers, in WebLingoInstruction ins, out WebLingoRuntimeError? error) =>
+            Arithmetic(WebLingoOpCode.IntegerDivide, registers, ins, out error);
 
         /// <summary>
         /// A comparison: two int64s, or two binary64s (IEEE 754's, so that NaN is unordered and unequal to itself),
@@ -1632,6 +1647,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             WebLingoOpCode.Multiply => "operator*",
             WebLingoOpCode.Divide => "operator/",
             WebLingoOpCode.Remainder => "operator%",
+            WebLingoOpCode.IntegerDivide => "operator\\",
             WebLingoOpCode.Less => "operator<",
             WebLingoOpCode.LessOrEqual => "operator<=",
             WebLingoOpCode.Greater => "operator>",
@@ -2756,6 +2772,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         WebLingoOpCode.Subtract => WebLingoArithmeticOperator.Subtract,
         WebLingoOpCode.Multiply => WebLingoArithmeticOperator.Multiply,
         WebLingoOpCode.Remainder => WebLingoArithmeticOperator.Remainder,
+        WebLingoOpCode.IntegerDivide => WebLingoArithmeticOperator.IntegerDivide,
         _ => WebLingoArithmeticOperator.Divide
     };
 

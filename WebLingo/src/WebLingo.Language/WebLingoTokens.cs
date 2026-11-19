@@ -8,6 +8,8 @@ public enum WebLingoTokenKind
     EqualEqual, BangEqual, Less, LessEqual, Greater, GreaterEqual, Bang, AmpAmp, PipePipe,
     OpenParen, CloseParen, OpenBrace, CloseBrace, Comma, Dot, OpenBracket, CloseBracket, Colon, Foreach, HashBrace, QuestionBracket, Class, New, This, QuestionDot, Extends, Super, Using, Static, Try, Catch, Finally, Throw, Is, Async, Await, Extend, Import, Export, Param, Arrow, InterpolatedString, Percent,
     PlusEquals, MinusEquals, StarEquals, SlashEquals, PercentEquals, PlusPlus, MinusMinus, Question, QuestionQuestion,
+    /// <summary><c>\</c>, integer division, and <c>\=</c> (section 3.5).</summary>
+    Backslash, BackslashEquals,
     QuestionQuestionEquals, DecimalLiteral, Ellipsis
 }
 

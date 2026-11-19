@@ -201,7 +201,9 @@ public enum WebLingoStackOpCode : byte
     /// <summary><c>new Class(...values)</c>: as <see cref="New"/>, with the array's elements.</summary>
     NewSpread,
     /// <summary>Pops an indent, then a value, and pushes the value's JSON text, as the register bytecode's <c>ToJson</c> gives it.</summary>
-    ToJson
+    ToJson,
+    /// <summary>The quotient of the two integers on top of the stack, which replaces them (section 3.5).</summary>
+    IntegerDivide
 }
 
 public readonly record struct WebLingoStackInstruction(WebLingoStackOpCode OpCode, int A = 0, int B = 0);

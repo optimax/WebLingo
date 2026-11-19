@@ -251,7 +251,9 @@ public enum WebLingoBinaryOperator
     /// <summary><c>%</c>, the remainder, its sign the dividend's (section 3.5).</summary>
     Remainder,
     /// <summary><c>??</c>, its left operand unless it is <c>null</c>, its right one only then (section 3.5).</summary>
-    Coalesce
+    Coalesce,
+    /// <summary><c>\</c>, two integers' quotient, rounded towards zero, as <c>%</c> pairs with it (section 3.5).</summary>
+    IntegerDivide
 }
 
 /// <summary><c>condition ? whenTrue : whenFalse</c>, and <c>if (condition) whenTrue else whenFalse</c> (section 3.5).</summary>

@@ -6,7 +6,7 @@
 import math from "std:math";
 
 writeLn([42, 0x2A, 0b101010, 1_000_000]);          // the same integer three ways, and digits grouped
-writeLn([7 / 2, 7 % 2, -7 % 3]);                    // / always divides exactly; % keeps the dividend's sign
+writeLn([7 / 2, 7 \ 2, 7 % 2, -7 % 3]);            // / always divides exactly, \ two integers; % keeps the dividend's sign
 writeLn([0.1 + 0.2, 0.1m + 0.2m]);                  // binary64 rounds; a decimal does not
 writeLn([1.50m, 1.5m + 1, 19.99m * 3]);             // a decimal written with its fewest digits; an integer joins it exactly
 writeLn([1 == 1.0, NaN == NaN, Infinity > 1e308]);  // integers and numbers compare as numbers, NaN as IEEE 754 says
@@ -26,7 +26,7 @@ writeLn([nothing, nothing == null, nothing ?? "a default"]);
 
 /* Output:
 [42, 42, 42, 1000000]
-[3.5, 1, -1]
+[3.5, 3, 1, -1]
 [0.30000000000000004, 0.3m]
 [1.5m, 2.5m, 59.97m]
 [true, false, true]

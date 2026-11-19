@@ -1,7 +1,7 @@
 using WebLingo.Core;
 namespace WebLingo.Runtime;
 
-public enum WebLingoArithmeticOperator { Add, Subtract, Multiply, Divide, Remainder }
+public enum WebLingoArithmeticOperator { Add, Subtract, Multiply, Divide, Remainder, IntegerDivide }
 
 public enum WebLingoComparisonOperator { Equal, NotEqual, Less, LessOrEqual, Greater, GreaterOrEqual }
 
@@ -34,6 +34,7 @@ public static class WebLingoOperators
         {
             return TryHeld(op, left, right, heap, out result, out error);
         }
+        if (op == WebLingoArithmeticOperator.IntegerDivide) return TryIntegerDivide(left, right, heap, out result, out error);
         if (op == WebLingoArithmeticOperator.Add && (left.Kind == WebLingoValueKind.String || right.Kind == WebLingoValueKind.String))
         {
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
@@ -91,6 +92,43 @@ public static class WebLingoOperators
             WebLingoArithmeticOperator.Remainder => x % y,
             _ => x / y
         });
+        return true;
+    }
+
+    /// <summary>
+    /// <c>a \ b</c>, two integers' quotient, rounded towards zero, as <c>%</c>'s remainder pairs with it,
+    /// <c>a == (a \ b) * b + a % b</c>; by 0 WL3013, as <c>%</c>'s; the smallest integer by -1 WL3002; and anything but two
+    /// integers WL3001, a number or a decimal made an integer first (the owner's answers, 18 November 2026, "Mathematics").
+    /// </summary>
+    private static bool TryIntegerDivide(WebLingoValue left, WebLingoValue right, WebLingoHeap? heap, out WebLingoValue result,
+        out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (left.Kind != WebLingoValueKind.Int64 || right.Kind != WebLingoValueKind.Int64)
+        {
+            var (a, b) = heap is null
+                ? (WebLingoValueFormatter.Describe(left), WebLingoValueFormatter.Describe(right))
+                : (WebLingoValueFormatter.Describe(left, heap), WebLingoValueFormatter.Describe(right, heap));
+            // A number or a decimal, the error says how to make it an integer.
+            var hint = left.Kind is WebLingoValueKind.Binary64 or WebLingoValueKind.Decimal || right.Kind is WebLingoValueKind.Binary64 or WebLingoValueKind.Decimal
+                ? ": make a number an integer first, with std:math's floor, round or truncate" : "";
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'\\' divides two integers, not {a} and {b}{hint}.");
+            return false;
+        }
+        var (dividend, divisor) = (left.AsInt64, right.AsInt64);
+        if (divisor == 0)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.DivisionByZero, $"{Invariant(dividend)} \\ 0 divides by zero.");
+            return false;
+        }
+        if (dividend == long.MinValue && divisor == -1)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.IntegerOverflow,
+                $"{Invariant(dividend)} \\ -1 does not fit in a 64-bit integer.");
+            return false;
+        }
+        result = WebLingoValue.FromInt64(dividend / divisor);
+        error = null;
         return true;
     }
 
@@ -456,6 +494,7 @@ public static class WebLingoOperators
         WebLingoArithmeticOperator.Subtract => "-",
         WebLingoArithmeticOperator.Multiply => "*",
         WebLingoArithmeticOperator.Remainder => "%",
+        WebLingoArithmeticOperator.IntegerDivide => "\\",
         _ => "/"
     };
 

@@ -510,7 +510,8 @@ public sealed class WebLingoParser : IWebLingoParser
 
     /// <summary>The operators a class may declare: arithmetic's and the orderings, not <c>==</c> (section 3.7).</summary>
     private static bool IsOperator(WebLingoTokenKind kind) => kind is WebLingoTokenKind.Plus or WebLingoTokenKind.Minus or WebLingoTokenKind.Star
-        or WebLingoTokenKind.Slash or WebLingoTokenKind.Percent or WebLingoTokenKind.Less or WebLingoTokenKind.LessEqual or WebLingoTokenKind.Greater or WebLingoTokenKind.GreaterEqual;
+        or WebLingoTokenKind.Slash or WebLingoTokenKind.Percent or WebLingoTokenKind.Backslash or WebLingoTokenKind.Less or WebLingoTokenKind.LessEqual
+        or WebLingoTokenKind.Greater or WebLingoTokenKind.GreaterEqual;
 
     /// <summary>
     /// <c>static var name = value;</c>, after its <c>static</c>: a field of a class itself, or with <c>const</c> a constant
@@ -1125,6 +1126,7 @@ public sealed class WebLingoParser : IWebLingoParser
         WebLingoTokenKind.StarEquals => WebLingoBinaryOperator.Multiply,
         WebLingoTokenKind.SlashEquals => WebLingoBinaryOperator.Divide,
         WebLingoTokenKind.PercentEquals => WebLingoBinaryOperator.Remainder,
+        WebLingoTokenKind.BackslashEquals => WebLingoBinaryOperator.IntegerDivide,
         WebLingoTokenKind.QuestionQuestionEquals => WebLingoBinaryOperator.Coalesce,
         _ => null
     };
@@ -1253,7 +1255,7 @@ public sealed class WebLingoParser : IWebLingoParser
     private WebLingoExpressionSyntax ParseMultiplicative()
     {
         var left = ParseSwitchExpression();
-        while (Current.Kind is WebLingoTokenKind.Star or WebLingoTokenKind.Slash or WebLingoTokenKind.Percent)
+        while (Current.Kind is WebLingoTokenKind.Star or WebLingoTokenKind.Slash or WebLingoTokenKind.Percent or WebLingoTokenKind.Backslash)
         {
             var op = Advance();
             var right = ParseSwitchExpression();
@@ -1261,6 +1263,7 @@ public sealed class WebLingoParser : IWebLingoParser
             {
                 WebLingoTokenKind.Star => WebLingoBinaryOperator.Multiply,
                 WebLingoTokenKind.Slash => WebLingoBinaryOperator.Divide,
+                WebLingoTokenKind.Backslash => WebLingoBinaryOperator.IntegerDivide,
                 _ => WebLingoBinaryOperator.Remainder
             };
             left = new WebLingoBinaryExpressionSyntax(kind, left, right, op.Span, Between(left.Span, right.Span));

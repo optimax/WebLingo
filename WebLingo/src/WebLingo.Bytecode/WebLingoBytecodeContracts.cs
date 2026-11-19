@@ -230,7 +230,9 @@ public enum WebLingoOpCode : byte
     /// A = destination, B = a value, C = an indent: the value's JSON text, a toJson() its instances' classes have called
     /// on the way, as <see cref="ToText"/> calls a toString() (section 3.6, "JSON").
     /// </summary>
-    ToJson
+    ToJson,
+    /// <summary><c>A = B \ C</c>, two integers' quotient (section 3.5).</summary>
+    IntegerDivide
 }
 
 public readonly record struct WebLingoInstruction(WebLingoOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);

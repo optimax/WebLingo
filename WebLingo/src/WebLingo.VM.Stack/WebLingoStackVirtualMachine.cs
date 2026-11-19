@@ -395,6 +395,11 @@ public sealed class WebLingoStackVirtualMachine
                             sp--;
                             pc++;
                             continue;
+                        case WebLingoStackOpCode.IntegerDivide:
+                            if (!IntegerDivide(slots, sp, out error)) break;
+                            sp--;
+                            pc++;
+                            continue;
                         case WebLingoStackOpCode.Equal:
                             if (!Compare(WebLingoStackOpCode.Equal, slots, sp, out error)) break;
                             sp--;
@@ -1421,11 +1426,14 @@ public sealed class WebLingoStackVirtualMachine
                     case WebLingoStackOpCode.Remainder:
                         if (b is 0 or -1) break;
                         return Done(WebLingoValue.FromInt64(a % b), slots, sp);
+                    case WebLingoStackOpCode.IntegerDivide:
+                        if (b is 0 or -1) break;
+                        return Done(WebLingoValue.FromInt64(a / b), slots, sp);
                     default:
                         return Done(WebLingoValue.FromBinary64((double)a / b), slots, sp);
                 }
             }
-            else if (left.Kind == WebLingoValueKind.Binary64 && right.Kind == WebLingoValueKind.Binary64)
+            else if (opCode != WebLingoStackOpCode.IntegerDivide && left.Kind == WebLingoValueKind.Binary64 && right.Kind == WebLingoValueKind.Binary64)
             {
                 var (x, y) = (left.AsBinary64, right.AsBinary64);
                 return Done(WebLingoValue.FromBinary64(opCode switch
@@ -1445,6 +1453,14 @@ public sealed class WebLingoStackVirtualMachine
             if (!WebLingoOperators.TryBinary(ArithmeticOf(opCode), left, right, heap, out var value, out error)) return false;
             return Done(value, slots, sp);
         }
+
+        /// <summary>
+        /// Integer division, <c>\</c>, rarer than the other operations, the arithmetic above in a helper of its own, which
+        /// .NET does not inline into the dispatch method.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool IntegerDivide(WebLingoValue[] slots, int sp, out WebLingoRuntimeError? error) =>
+            Arithmetic(WebLingoStackOpCode.IntegerDivide, slots, sp, out error);
 
         /// <summary>
         /// A comparison of the two values on top of the stack, whose result replaces the left one: two int64s, or two
@@ -1731,6 +1747,7 @@ public sealed class WebLingoStackVirtualMachine
             WebLingoStackOpCode.Multiply => "operator*",
             WebLingoStackOpCode.Divide => "operator/",
             WebLingoStackOpCode.Remainder => "operator%",
+            WebLingoStackOpCode.IntegerDivide => "operator\\",
             WebLingoStackOpCode.Less => "operator<",
             WebLingoStackOpCode.LessOrEqual => "operator<=",
             WebLingoStackOpCode.Greater => "operator>",
@@ -2867,6 +2884,7 @@ public sealed class WebLingoStackVirtualMachine
         WebLingoStackOpCode.Subtract => WebLingoArithmeticOperator.Subtract,
         WebLingoStackOpCode.Multiply => WebLingoArithmeticOperator.Multiply,
         WebLingoStackOpCode.Remainder => WebLingoArithmeticOperator.Remainder,
+        WebLingoStackOpCode.IntegerDivide => WebLingoArithmeticOperator.IntegerDivide,
         _ => WebLingoArithmeticOperator.Divide
     };
 

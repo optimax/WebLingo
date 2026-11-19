@@ -311,6 +311,7 @@ public sealed class WebLingoStackBytecodeVerifier
             case WebLingoStackOpCode.Multiply:
             case WebLingoStackOpCode.Divide:
             case WebLingoStackOpCode.Remainder:
+            case WebLingoStackOpCode.IntegerDivide:
             case WebLingoStackOpCode.Equal:
             case WebLingoStackOpCode.NotEqual:
             case WebLingoStackOpCode.Less:
@@ -461,7 +462,7 @@ public sealed class WebLingoStackBytecodeVerifier
         WebLingoStackOpCode.Duplicate => (1, 2),
         WebLingoStackOpCode.Negate or WebLingoStackOpCode.Plus or WebLingoStackOpCode.Not or WebLingoStackOpCode.CheckBoolean => (1, 1),
         WebLingoStackOpCode.Add or WebLingoStackOpCode.Subtract or WebLingoStackOpCode.Multiply or WebLingoStackOpCode.Divide or WebLingoStackOpCode.Remainder
-            or WebLingoStackOpCode.Equal or WebLingoStackOpCode.NotEqual or WebLingoStackOpCode.Less or WebLingoStackOpCode.LessOrEqual
+            or WebLingoStackOpCode.IntegerDivide or WebLingoStackOpCode.Equal or WebLingoStackOpCode.NotEqual or WebLingoStackOpCode.Less or WebLingoStackOpCode.LessOrEqual
             or WebLingoStackOpCode.Greater or WebLingoStackOpCode.GreaterOrEqual => (2, 1),
         WebLingoStackOpCode.Call => (instruction.A + 1, 1),
         WebLingoStackOpCode.CallBuiltin => (instruction.B, 1),

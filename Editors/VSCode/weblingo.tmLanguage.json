@@ -228,7 +228,7 @@
         { "name": "keyword.operator.comparison.weblingo", "match": "==|!=|<=|>=|<|>" },
         { "name": "keyword.operator.logical.weblingo", "match": "&&|\\|\\||!" },
         { "name": "keyword.operator.assignment.weblingo", "match": "=" },
-        { "name": "keyword.operator.arithmetic.weblingo", "match": "[+\\-*/]" }
+        { "name": "keyword.operator.arithmetic.weblingo", "match": "[+\\-*/%\\\\]" }
       ]
     },
     "punctuation": {

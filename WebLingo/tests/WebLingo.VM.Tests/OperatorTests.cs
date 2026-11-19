@@ -41,6 +41,7 @@ public sealed class OperatorTests
     [InlineData("*", WebLingoArithmeticOperator.Multiply)]
     [InlineData("/", WebLingoArithmeticOperator.Divide)]
     [InlineData("%", WebLingoArithmeticOperator.Remainder)]
+    [InlineData("\\", WebLingoArithmeticOperator.IntegerDivide)]
     public void ArithmeticIsTheRuntimes(string symbol, WebLingoArithmeticOperator op)
     {
         foreach (var (left, a) in Operands)

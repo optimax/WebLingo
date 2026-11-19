@@ -390,6 +390,7 @@ true
 |---|---|
 | `-x`, `+x` | negation, and the number itself |
 | `a * b`, `a / b` | multiplication and division |
+| `a % b`, `a \ b` | an integer's remainder and quotient, or a number's remainder |
 | `a + b`, `a - b` | addition and subtraction; `+` also joins two strings |
 | `a < b`, `a <= b`, `a > b`, `a >= b` | comparisons of numbers |
 | `a == b`, `a != b` | equality |
@@ -398,7 +399,7 @@ true
 | `a \|\| b` | or, short-circuit |
 | `x = value` | assignment, whose value is the value assigned |
 
-Precedence, from the tightest: unary `- + ! ++ --`; `* / %`; `+ -`; `< <= > >=`; `== !=`; `&&`; `||`; `??`; `? :`; and
+Precedence, from the tightest: unary `- + ! ++ --`; `* / % \`; `+ -`; `< <= > >=`; `== !=`; `&&`; `||`; `??`; `? :`; and
 assignment, which
 groups to the right (`a = b = 3`). The binary operators group to the left. Parentheses group as usual.
 
@@ -429,7 +430,11 @@ NaN
 0.30000000000000004
 ```
 
-- **`/` always gives a number**: `7 / 2` is `3.5` and `8 / 2` is `4.0`; there is no integer division.
+- **`/` always gives a number**: `7 / 2` is `3.5` and `8 / 2` is `4.0`.
+- **`\` divides two integers**, as tight as `*` and `/`, its quotient rounded towards zero, as `%`'s remainder pairs with
+  it, `a == (a \ b) * b + a % b`: `7 \ 2` is `3`, and `-7 \ 2` is `-3`; `n \= 2` assigns it. It takes integers
+  only, a number or a decimal being WL3001, made an integer first by `std:math`'s `floor`, `round` or `truncate`; by 0
+  it is WL3013, as `%` is, and the smallest integer by -1, whose quotient no integer holds, WL3002.
 - **`%` is the remainder**, as tight as `*` and `/`, its sign the dividend's: `7 % 3` is `1`, `-7 % 3` is `-1`, and
   `5.5 % 2` is `1.5`. An integer's remainder by 0 is an error, WL3013 (`DivisionByZeroError`); a number's is `NaN`.
 - **An integer meeting a number** becomes a number: `1 + 0.5` is `1.5`.
@@ -2222,6 +2227,4 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Integer division**: `/` always divides exactly, `7 / 2` being `3.5`; an integer's quotient is
-  `math.truncate(a / b)`, from `std:math`, for integers that a number holds exactly.
 - **Library**: a database's rows read one at a time, for results too large to hold whole; databases other than SQLite and SQL Server.

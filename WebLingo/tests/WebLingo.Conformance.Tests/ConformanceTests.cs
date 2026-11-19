@@ -551,6 +551,17 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { writeLn } from \"std:system\"; writeLn([(-9223372036854775807 - 1) % -1, 7.0 % 0, 1 + 7 % 4 * 2]);", "[0, NaN, 7]")]
     [InlineData("import { writeLn } from \"std:system\"; class C { constructor(v) { this.v = v; } static operator %(a, b) { return a.v % b; } } writeLn(new C(7) % 4);", "3")]
     [InlineData("import { writeLn } from \"std:system\"; try { writeLn(7 % 0); } catch (DivisionByZeroError e) { writeLn([e.code, e.message, e is Error]); }", "[\"WL3013\", \"7 % 0 divides by zero.\", true]")]
+    // \ (the owner's answers, 18 November 2026, "Mathematics"): two integers' quotient, rounded towards zero, pairing with %; by 0 WL3013, the smallest by -1 WL3002, anything but integers WL3001.
+    [InlineData("import { writeLn } from \"std:system\"; writeLn([7 \\ 2, -7 \\ 2, 7 \\ -2, -7 \\ -2, 0 \\ 5, 9223372036854775807 \\ 2, (-9223372036854775807 - 1) \\ 2]);",
+        "[3, -3, -3, 3, 0, 4611686018427387903, -4611686018427387904]")]
+    [InlineData("import { writeLn } from \"std:system\"; var ok = true; foreach (var a in [-7, -6, 0, 6, 7]) { foreach (var b in [-3, -2, 2, 3]) { ok = ok && a == (a \\ b) * b + a % b; } } writeLn(ok);",
+        "true")]
+    [InlineData("import { writeLn } from \"std:system\"; var n = 17; n \\= 5; writeLn([n, $\"{17 \\ 5}\", 2 * 7 \\ 3, 7 \\ 2 * 3, 1 + 7 \\ 2, 7 \\ 2 % 2]);",
+        "[3, \"3\", 4, 9, 4, 1]")]
+    [InlineData("import { writeLn } from \"std:system\"; class Money { constructor(c) { this.c = c; } static operator \\(a, b) { return new Money(a.c \\ b); } } class Count extends Integer {} writeLn([(new Money(1000) \\ 3).c, new Count(7) \\ 2]);",
+        "[333, Count:3]")]
+    [InlineData("import { writeLn } from \"std:system\"; foreach (var f in [() => 7 \\ 0, () => (-9223372036854775807 - 1) \\ -1, () => 7.0 \\ 2, () => 7 \\ 2m, () => \"7\" \\ 2]) { try { writeLn(f()); } catch (e) { writeLn($\"{e.__instanceOf.__className} {e.code}: {e.message}\"); } }",
+        "DivisionByZeroError WL3013: 7 \\ 0 divides by zero.\nOverflowError WL3002: -9223372036854775808 \\ -1 does not fit in a 64-bit integer.\nTypeError WL3001: '\\' divides two integers, not the number 7.0 and the integer 2: make a number an integer first, with std:math's floor, round or truncate.\nTypeError WL3001: '\\' divides two integers, not the integer 7 and the decimal 2m: make a number an integer first, with std:math's floor, round or truncate.\nTypeError WL3001: '\\' divides two integers, not a string and the integer 2.")]
     // Compound assignment, ++ and --, ??, ??=, ?: and if expressions (the owner's answers, 16 November 2026).
     [InlineData("import { writeLn } from \"std:system\"; var x = 5; x += 3; x -= 1; x *= 2; x /= 7; var n = 10; n %= 4; writeLn([x, n]);", "[2.0, 2]")]
     [InlineData("import { writeLn } from \"std:system\"; var calls = 0; function at() { calls = calls + 1; return 1; } var a = [10, 20, 30]; a[at()] += 5; writeLn([a, calls]);", "[[10, 25, 30], 1]")]
@@ -747,6 +758,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { writeLn } from \"std:system\"; f(); var y = 1; function f() { writeLn(y); }", "WL2004")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn(7 % 0);", "WL3013")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn(\"a\" % 2);", "WL3001")]
+    [InlineData("import { writeLn } from \"std:system\"; writeLn(7 \\ 0);", "WL3013")]
+    [InlineData("import { writeLn } from \"std:system\"; writeLn(7.5 \\ 2);", "WL3001")]
     [InlineData("var i = 9223372036854775807; i++;", "WL3002")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn(1 ? 2 : 3);", "WL3001")]
     [InlineData("var s = \"a\"; s -= 1;", "WL3001")]

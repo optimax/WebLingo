@@ -118,7 +118,8 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
             ('=', '>') => WebLingoTokenKind.Arrow,
             ('+', '=') => WebLingoTokenKind.PlusEquals, ('-', '=') => WebLingoTokenKind.MinusEquals,
             ('*', '=') => WebLingoTokenKind.StarEquals, ('/', '=') => WebLingoTokenKind.SlashEquals,
-            ('%', '=') => WebLingoTokenKind.PercentEquals, ('+', '+') => WebLingoTokenKind.PlusPlus,
+            ('%', '=') => WebLingoTokenKind.PercentEquals, ('\\', '=') => WebLingoTokenKind.BackslashEquals,
+            ('+', '+') => WebLingoTokenKind.PlusPlus,
             ('-', '-') => WebLingoTokenKind.MinusMinus, ('?', '?') => WebLingoTokenKind.QuestionQuestion,
             _ => WebLingoTokenKind.Bad
         };
@@ -131,7 +132,7 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
         {
             '<' => WebLingoTokenKind.Less, '>' => WebLingoTokenKind.Greater, '!' => WebLingoTokenKind.Bang,
             '{' => WebLingoTokenKind.OpenBrace, '}' => WebLingoTokenKind.CloseBrace, '+' => WebLingoTokenKind.Plus, '-' => WebLingoTokenKind.Minus,
-            '*' => WebLingoTokenKind.Star, '/' => WebLingoTokenKind.Slash, '%' => WebLingoTokenKind.Percent,
+            '*' => WebLingoTokenKind.Star, '/' => WebLingoTokenKind.Slash, '%' => WebLingoTokenKind.Percent, '\\' => WebLingoTokenKind.Backslash,
             '=' => WebLingoTokenKind.Equals, ';' => WebLingoTokenKind.Semicolon,
             '(' => WebLingoTokenKind.OpenParen, ')' => WebLingoTokenKind.CloseParen,
             ',' => WebLingoTokenKind.Comma, '.' => WebLingoTokenKind.Dot, '[' => WebLingoTokenKind.OpenBracket,

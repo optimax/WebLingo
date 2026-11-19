@@ -38,6 +38,19 @@ public sealed class LexerTests
     }
 
     [Fact]
+    public void ReadsIntegerDivisionAndItsAssignment()
+    {
+        // \, integer division, and \=, which meant nothing outside a string before (section 3.5).
+        Assert.Equal(
+            new[] {
+                WebLingoTokenKind.Identifier, WebLingoTokenKind.Backslash, WebLingoTokenKind.Identifier, WebLingoTokenKind.BackslashEquals,
+                WebLingoTokenKind.IntegerLiteral, WebLingoTokenKind.Percent, WebLingoTokenKind.Identifier, WebLingoTokenKind.EndOfFile
+            },
+            Kinds(@"a \ b \= 2 % c", out var diagnostics));
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
     public void RecognizesComparisonAndLogicalOperators()
     {
         Assert.Equal(
