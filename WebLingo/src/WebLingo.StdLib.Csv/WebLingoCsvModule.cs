@@ -5,6 +5,8 @@ namespace WebLingo.StdLib.Csv;
 /// <summary>Comma-separated text as arrays of strings or header-keyed maps.</summary>
 public sealed class WebLingoCsvModule : IWebLingoNativeModule
 {
+    private const char ByteOrderMark = '\uFEFF';
+
     public void Register(IWebLingoNativeRegistry registry)
     {
         registry.Function("parse", 2, 1, Parse);
@@ -97,7 +99,7 @@ public sealed class WebLingoCsvModule : IWebLingoNativeModule
     {
         rows = [];
         problem = "";
-        var at = text.Length > 0 && text[0] == '\uFEFF' ? 1 : 0;
+        var at = text.StartsWith(ByteOrderMark) ? 1 : 0;
         var fields = new List<string>();
         while (at < text.Length)
         {
@@ -235,7 +237,8 @@ public sealed class WebLingoCsvModule : IWebLingoNativeModule
         {
             if (i > 0) output.Append(',');
             var field = fields[i];
-            if (field.IndexOfAny([',', '"', '\r', '\n']) >= 0)
+            var startsWithBom = output.Length == 0 && field.StartsWith(ByteOrderMark);
+            if (startsWithBom || field.IndexOfAny([',', '"', '\r', '\n']) >= 0)
                 output.Append('"').Append(field.Replace("\"", "\"\"")).Append('"');
             else
                 output.Append(field);

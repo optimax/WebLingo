@@ -72,6 +72,39 @@ public sealed class UtilityModuleTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void CsvPreservesALiteralLeadingBomInDataAndHeaders(bool stack)
+    {
+        Run(stack, """
+            import csv from "std:csv";
+            var literal = "\u{FEFF}Tea";
+            var text = csv.stringify([[literal, "green"], [literal, "black"]]);
+            var rows = csv.parse(text);
+            writeLn([text.startsWith("\""), rows[0][0] == literal, rows[1][0] == literal]);
+            var maps = [{ color: "green" }];
+            maps[0][literal] = "Sencha";
+            var headed = csv.stringify(maps, [literal, "color"]);
+            var decoded = csv.parse(headed, true)[0];
+            writeLn([headed.startsWith("\""), decoded?[literal] == "Sencha", decoded["color"]]);
+            """, "[true, true, true]\n[true, true, \"green\"]\n");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CsvConsumesOnlyTheBomAtTheStartOfTheText(bool stack)
+    {
+        Run(stack, """
+            import csv from "std:csv";
+            var raw = "\u{FEFF}Tea,\u{FEFF}green\r\n";
+            var quoted = "\u{FEFF}\"\u{FEFF}Tea\",green\r\n";
+            writeLn([csv.parse(raw)[0][0] == "Tea", csv.parse(raw)[0][1] == "\u{FEFF}green",
+                csv.parse(quoted)[0][0] == "\u{FEFF}Tea"]);
+            """, "[true, true, true]\n");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void GzipAndZipRoundTripBytesAndEnforceDecompressionLimits(bool stack)
     {
         Run(stack, """

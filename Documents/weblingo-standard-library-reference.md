@@ -1288,10 +1288,12 @@ https://example.test/tea
 `parse(text, headers = false)` returns rows as arrays of strings. With `headers = true`, it reads the first record
 as the header and returns the remaining rows as maps. Headers must be unique, and each following row must have
 the same number of fields. The parser accepts CRLF, LF, and CR record endings and preserves newlines inside quoted fields.
+It consumes a byte-order mark at the start of the text.
 
 `stringify(rows, headers = null)` writes arrays of strings with CRLF record endings. To write maps, supply a nonempty
 array of unique header strings in the desired order. Each map must supply a string for every header.
 Fields containing commas, quotation marks, or newlines are quoted, with quotation marks doubled.
+A first field or header beginning with a literal U+FEFF is also quoted so the character survives parsing.
 
 ```javascript
 import csv from "std:csv";
