@@ -187,7 +187,7 @@ public static class WebLingoCommandLine
         if (!run) return Success;
 
         // The VM imports modules while the program runs as the compiler imports them, with the same resolver (section 3.9).
-        var result = OnRegisterVm(compiled.Module, new WebLingoModuleLoader(host.Options), compilation.Components, Context(host, parameters));
+        var result = OnRegisterVm(compiled.Module, new WebLingoModuleLoader(host.Options), compilation.Components, Context(host, parameters, LineOf));
         output.Flush();
         if (result.Succeeded) return Success;
         var located = compilation.Locate(result.Error!);
@@ -200,6 +200,16 @@ public static class WebLingoCommandLine
             diagnostic.Source is not { } name ? text
             : host.Resolver.Texts.TryGetValue(name, out var imported) ? imported
             : compilation.TextOf(name) ?? text;
+
+        // A position's line, in the file it is in, located as an error is, for a message that names it (section 3.8).
+        int LineOf(string? source, int offset)
+        {
+            var at = compilation.Locate(new WebLingoDiagnostic("", WebLingoDiagnosticSeverity.Error, "", new WebLingoSourceSpan(offset, 0))
+            {
+                Source = source
+            });
+            return TextOf(at).GetLocation(at.Span.Start).Line;
+        }
     }
 
     /// <summary>
@@ -294,8 +304,8 @@ public static class WebLingoCommandLine
         }
         var loader = new WebLingoModuleLoader(host.Options);
         var result = register is not null
-            ? OnRegisterVm(register, loader, null, Context(host, parameters))
-            : OnStackVm(stack!, loader, Context(host, parameters));
+            ? OnRegisterVm(register, loader, null, Context(host, parameters, LineOf))
+            : OnStackVm(stack!, loader, Context(host, parameters, LineOf));
         output.Flush();
         if (result.Succeeded) return Success;
         var diagnostic = result.Error!;
@@ -309,6 +319,12 @@ public static class WebLingoCommandLine
 
         // A file that cannot be read is one thing, and one that is not WLBC a reader can use is another.
         static int Failed(byte[]? bytes) => bytes is null ? FileUnreadable : CompilationFailed;
+
+        // A position's line, from the file's source positions, as an error is located, for a message that names it (section 3.8).
+        int LineOf(string? source, int offset) =>
+            (located.Find(table => table.Source == source) is { } positionsOf ? positionsOf.GetLocation(offset)
+                : host.Resolver.Texts.TryGetValue(source ?? mainName, out var imported) ? imported.GetLocation(offset)
+                : new WebLingoSourceLocation(offset, 1, 1)).Line;
     }
 
     /// <summary>
@@ -427,9 +443,10 @@ public static class WebLingoCommandLine
             program.ReachesAllEnvironment ? new DotNetEnvironment() : new DotNetEnvironment(env.MachineName, env.Variables));
     }
 
-    private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters) =>
+    private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters, Func<string?, int, int> lines) =>
         new(new WebLingoWorkerId(0))
         {
+            Lines = lines,
             Services = host.Services,
             Clock = new SystemClock(new DotNetClock()),
             WallClock = new DotNetClock(),

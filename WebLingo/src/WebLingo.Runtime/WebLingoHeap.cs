@@ -135,6 +135,25 @@ public sealed class WebLingoHeap
 
     public WebLingoTask GetTask(WebLingoValue task) => Get<WebLingoTask>(task, WebLingoValueKind.Task);
 
+    /// <summary>
+    /// A task <c>new Task()</c> made that something awaits and nothing has completed, the first the heap holds, and the
+    /// first task waiting for it, which a program stuck on it is told so at (section 3.8, "Tasks completed by hand");
+    /// false for none.
+    /// </summary>
+    public bool TryFindStuckTask(out WebLingoValue task, out WebLingoValue waiter)
+    {
+        for (var i = 0; i < _objects.Count; i++)
+        {
+            if (_objects[i] is WebLingoTask { ByHand: true, State: WebLingoTaskState.Pending } found && found.Waiters.Count > 0)
+            {
+                (task, waiter) = (WebLingoValue.FromHandle(WebLingoValueKind.Task, i), found.Waiters[0]);
+                return true;
+            }
+        }
+        (task, waiter) = (WebLingoValue.Null, WebLingoValue.Null);
+        return false;
+    }
+
     /// <summary>The class <c>Object</c>, once the program has made it, whose methods every value has (section 3.7).</summary>
     public WebLingoValue ObjectClass { get; set; }
 
@@ -359,6 +378,19 @@ public sealed class WebLingoHeap
         var classObject = Get<ClassObject>(classValue, WebLingoValueKind.Class);
         if (classObject.MakesClasses) return TryNewClass(values, first, count, out result, out error);
         if (classObject.Makes == WebLingoValueKind.Module) return TryNewModule(classObject.Name, values, first, count, out result, out error);
+        if (classObject.Makes == WebLingoValueKind.Task)
+        {
+            // new Task(): a task its program completes by hand (section 3.8, "Tasks completed by hand").
+            result = WebLingoValue.Null;
+            if (count != 0)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.WrongArgumentCount, $"'{classObject.Name}' takes 0 arguments, not {count}.");
+                return false;
+            }
+            if (!TryAllocateTask(out result, out error)) return false;
+            GetTask(result).ByHand = true;
+            return true;
+        }
         if (classObject.Holds == WebLingoValueKind.Regex) return TryMakeRegex(values, first, count, out result, out error);
         // new Bytes(…) and new DateTime(…) make what Bytes.from(…) and DateTime.utc(…) make (section 3.7, "No sealed classes").
         if (classObject.Holds == WebLingoValueKind.Bytes)
@@ -1073,6 +1105,17 @@ public sealed class WebLingoHeap
         if (target.Methods.ContainsKey(name)) return Assignee.Method;
         if (target.Setters is { } setters && setters.TryGetValue(name, out setter)) return Assignee.Setter;
         return target.Getters is { } getters && getters.ContainsKey(name) ? Assignee.ReadOnly : Assignee.Field;
+    }
+
+    /// <summary>
+    /// Marks the built-in class <c>Task</c>, whose <c>new</c> makes a task its program completes by hand (section 3.8,
+    /// "Tasks completed by hand").
+    /// </summary>
+    public void MarkTaskClass(WebLingoValue classValue)
+    {
+        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        target.IsValueClass = true;
+        target.Makes = WebLingoValueKind.Task;
     }
 
     /// <summary>

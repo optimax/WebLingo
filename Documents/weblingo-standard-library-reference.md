@@ -316,6 +316,7 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `NetworkPermissionError` | WL3017 | a host the configuration's `"network"` does not let a script reach |
 | `ComPermissionError` | WL3018 | a COM object the configuration's `"com"` does not let a script make (section 22) |
 | `EnvironmentPermissionError` | WL3019 | a variable a site's scripts try to set, under `wasp`, which lets them read only (section 19) |
+| `DeadlockError` | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run, thrown at that `await`, naming where the task was made and where it is awaited |
 
 ```javascript
 import { writeLn } from "std:system";
@@ -350,6 +351,7 @@ A call of an `async` function gives a task, a `Task`, which `await` waits for.
 | `Task.any(values)` | a task of the first of them to complete, or to fault |
 | `Task.timeout(task, milliseconds)` | the task's result, or a `TimeoutError` if it takes longer; the task goes on |
 | `t.forget()` | its fault, if it faults, reported nowhere |
+| `new Task()`, `t.complete(value)`, `t.fail(error)` | a task its program completes by hand, whoever holds it; `complete` and `fail` give whether they completed it, a task completing once, and are an error on a task `new` did not make |
 
 The values may be tasks, or any others, which are their own results. `std:tasks` exports `all`, `any` and `timeout`,
 the same: `import { all } from "std:tasks";`.

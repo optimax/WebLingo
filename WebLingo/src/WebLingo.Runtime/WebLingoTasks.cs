@@ -25,6 +25,13 @@ public sealed class WebLingoTask
     /// <summary>The tasks whose <c>async</c> functions wait for it, each resumed when it completes, in order.</summary>
     public List<WebLingoValue> Waiters { get; } = [];
 
+    /// <summary>
+    /// Whether <c>new Task()</c> made it, a task its program completes by hand, <c>complete</c> or <c>fail</c>, and where
+    /// (section 3.8, "Tasks completed by hand").
+    /// </summary>
+    public bool ByHand { get; set; }
+    public long MadeAt { get; set; } = WebLingoExceptions.Nowhere;
+
     /// <summary>While its <c>async</c> function waits: the VM's frame of it, and the values that frame holds.</summary>
     public object? Frame { get; set; }
     public WebLingoValue[][]? FrameRoots { get; set; }
@@ -295,6 +302,17 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
     }
 
     public bool TryTakeReady(out WebLingoResumption resumption) => _ready.TryDequeue(out resumption);
+
+    /// <summary>
+    /// Throws <paramref name="error"/> at the <c>await</c> where <paramref name="waiter"/>'s function waits for
+    /// <paramref name="task"/>, which goes on waiting for nothing: a program stuck awaiting a task made by hand (section
+    /// 3.8, "Tasks completed by hand").
+    /// </summary>
+    public void Raise(WebLingoValue task, WebLingoValue waiter, WebLingoRuntimeError error)
+    {
+        heap.GetTask(task).Waiters.Remove(waiter);
+        _ready.Enqueue(new WebLingoResumption(waiter, WebLingoValue.Null, true, error, WebLingoExceptions.Nowhere));
+    }
 
     /// <summary>The tasks of operations running off the worker, which the collector keeps until they finish.</summary>
     private readonly List<WebLingoValue> _operations = [];

@@ -665,6 +665,14 @@ public sealed class ConformanceTests : IDisposable
         "[42, null, true]")]
     [InlineData("import { writeLn } from \"std:system\"; class Plugin extends Module {} try { new Plugin(5); } catch (e) { writeLn(e.message); } try { new Module(); } catch (e) { writeLn(e.message); } try { new Module(\"m\").y = 2; } catch (e) { writeLn(e.code); } var p = new Plugin(\"p\"); p.y = 2; writeLn(p.y);",
         "The argument of 'Module' must be a module's name, a string, not the integer 5.\n'Module' takes 1 argument, not 0.\nWL3001\n2")]
+    // A task completed by hand: new Task(), complete(value) and fail(error), whether they completed it, an error on a task new
+    // did not make; a program stuck awaiting one given a DeadlockError at that await (section 3.8, "Tasks completed by hand").
+    [InlineData("import { writeLn } from \"std:system\"; var t = new Task(); async function later() { await delay(10); t.complete(42); } later(); writeLn(await t); writeLn([t.complete(1), t.fail(new Error(\"x\")), t is Task, await t]);",
+        "42\n[false, false, true, 42]")]
+    [InlineData("import { writeLn } from \"std:system\"; var f = new Task(); writeLn(f.fail(new Error(\"broken\"))); try { await f; } catch (e) { writeLn(e.message); } async function work() { return 1; } try { work().complete(2); } catch (e) { writeLn(e.code); } try { Task.all([]).fail(1); } catch (e) { writeLn(e.code); }",
+        "true\nbroken\nWL3001\nWL3001")]
+    [InlineData("import { writeLn } from \"std:system\"; var stuck = new Task(); try { await stuck; } catch (DeadlockError e) { writeLn([e.code, e.message, e is Error]); } async function waits() { await stuck; } try { await waits(); } catch (DeadlockError e) { writeLn(e.code); } var never = new Task(); writeLn(\"done\");",
+        "[\"WL3020\", \"The program waits for a task nothing can complete: made at line 1, awaited at line 1.\", true]\nWL3020\ndone")]
     [InlineData("import { writeLn } from \"std:system\"; import { Regex } from \"std:regex\"; var r = new Regex(\"a\"); writeLn([r == r, r == new Regex(r.pattern)]);", "[true, false]")]
     // JSON (the owner's answers, 16 November 2026): a class, Json; integers when integral; instances by their fields or toJson().
     [InlineData("import { writeLn } from \"std:system\"; import { Json } from \"std:json\"; var v = Json.parse(\"{\\\"name\\\": \\\"Ann\\\", \\\"age\\\": 30, \\\"height\\\": 1.7, \\\"tags\\\": [\\\"a\\\", true, null], \\\"e\\\": 1e3, \\\"s\\\": \\\"\\\\u00e9\\\\n\\\\uD83D\\\\uDE00\\\"}\"); writeLn(v);", "{\"name\": \"Ann\", \"age\": 30, \"height\": 1.7, \"tags\": [\"a\", true, null], \"e\": 1000.0, \"s\": \"é\\n😀\"}")]
@@ -788,6 +796,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { Json } from \"std:json\"; var k = {}; k[true] = 1; var t = Json.stringify(k);", "WL3001")]
     [InlineData("import { Json } from \"std:json\"; class Selfish { toJson() { return this; } } var t = Json.stringify(new Selfish());", "WL3001")]
     [InlineData("import { Json } from \"std:json\"; var t = Json.stringify(1, 11);", "WL3001")]
+    [InlineData("var t = new Task();\n\nawait t;", "WL3020")]
+    [InlineData("var t = new Task(1);", "WL2006")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);
@@ -1055,7 +1065,6 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { delay } from \"std:system\"; delay(0).forget(1);", "WL2006")]
     [InlineData("var n = 5; n.forget();", "WL3006")]
     [InlineData("class T extends Task {}", "WL3001")]
-    [InlineData("var t = new Task();", "WL3001")]
     [InlineData("import { delay } from \"std:system\"; var m = {}; m[delay(0)] = 1;", "WL3001")]
     [InlineData("class R { async dispose() {} } function f() { using (var r = new R()) {} } f();", "WL3001")]
     [InlineData("class R { async dispose() {} } var f = function () { using (var r = new R()) {} }; f();", "WL3001")]

@@ -17,6 +17,14 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
 
     public IWebLingoRuntimeServices Services { get; init; } = WebLingoBuiltinRegistry.None;
     public WebLingoCancellationSignal? Cancellation { get; init; }
+    /// <summary>
+    /// The line a position stands at, a UTF-16 index into a file of the program, named as its runtime errors name it, null
+    /// for the program's own, which a message may name, the host knowing its files' texts: a <c>DeadlockError</c>'s, "made
+    /// at line 12, awaited at line 30" (section 3.8, "Tasks completed by hand"); none by default, the message then
+    /// naming no lines.
+    /// </summary>
+    public Func<string?, int, int>? Lines { get; init; }
+
     /// <summary>How many instructions the execution may run before it is stopped (WL3003).</summary>
     public long InstructionBudget { get; init; } = long.MaxValue;
     public WebLingoResourceBudget Resources { get; init; } = WebLingoResourceBudget.Default;

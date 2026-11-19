@@ -44,6 +44,8 @@ public enum WebLingoMember : byte
     Format,
     /// <summary><c>Html</c>'s escapers, besides <c>js</c>, which is written in WebLingo (section 13, "Context-aware escaping").</summary>
     Escape, Url, UrlPart, JsString, Css,
+    /// <summary>A task's <c>complete(value)</c> and <c>fail(error)</c>, a task made by hand's (section 3.8).</summary>
+    Complete, Fail,
     /// <summary>The names every value, or every class, has (section 3.7), last, so that one comparison finds them.</summary>
     ClassName, InstanceOf, Parent
 }
@@ -71,6 +73,8 @@ public static partial class WebLingoMembers
         "toString" => WebLingoMember.ToString,
         "equal" => WebLingoMember.Equal,
         "forget" => WebLingoMember.Forget,
+        "complete" => WebLingoMember.Complete,
+        "fail" => WebLingoMember.Fail,
         "setMethod" => WebLingoMember.SetMethod,
         "removeMethod" => WebLingoMember.RemoveMethod,
         "setProperty" => WebLingoMember.SetProperty,
@@ -846,7 +850,7 @@ public static partial class WebLingoMembers
         (target.Kind == WebLingoValueKind.Array && (member is WebLingoMember.Push or WebLingoMember.Pop || IsArrayMethod(member)))
         || (target.Kind == WebLingoValueKind.Map && member is WebLingoMember.Has or WebLingoMember.Remove)
         || (target.Kind == WebLingoValueKind.Set && member is WebLingoMember.Add or WebLingoMember.Has or WebLingoMember.Remove)
-        || (target.Kind == WebLingoValueKind.Task && member == WebLingoMember.Forget)
+        || (target.Kind == WebLingoValueKind.Task && member is WebLingoMember.Forget or WebLingoMember.Complete or WebLingoMember.Fail)
         || (target.Kind == WebLingoValueKind.Bytes && IsBytesMethod(member))
         || (target.Kind == WebLingoValueKind.BytesBuilder && member is WebLingoMember.Add or WebLingoMember.ToBytes)
         || (target.Kind == WebLingoValueKind.DateTime && IsDateTimeMethod(member))
@@ -1049,6 +1053,27 @@ public static partial class WebLingoMembers
             if (count != 0) return WrongArgumentCount(name, 0, count, out error);
             heap.GetTask(target).Forgotten = true;
             error = null;
+            return true;
+        }
+        if (target.Kind == WebLingoValueKind.Task && member is WebLingoMember.Complete or WebLingoMember.Fail)
+        {
+            // t.complete(value) and t.fail(error), of a task new Task() made: whether they completed it, a task completing
+            // once (section 3.8, "Tasks completed by hand").
+            if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+            var task = heap.GetTask(target);
+            if (!task.ByHand)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"'{name}' completes only a task 'new Task()' made, not one an async function, Task.all, Task.any, Task.timeout "
+                    + "or the host gives, which completes itself.");
+                return false;
+            }
+            error = null;
+            result = WebLingoValue.FromBoolean(task.State == WebLingoTaskState.Pending);
+            if (!result.AsBoolean) return true;
+            var scheduler = heap.Scheduler ?? throw new InvalidOperationException("The execution has no scheduler.");
+            if (member == WebLingoMember.Complete) scheduler.Complete(target, values[first]);
+            else scheduler.Fault(target, values[first], null, WebLingoExceptions.Nowhere);
             return true;
         }
         if (target.Kind == WebLingoValueKind.Bytes && IsBytesMethod(member))

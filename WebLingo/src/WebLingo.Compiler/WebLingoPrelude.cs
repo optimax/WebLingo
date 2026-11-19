@@ -32,7 +32,8 @@ internal static class WebLingoPrelude
         ("ComError", WebLingoDiagnosticCodes.ComFailure),
         ("NetworkPermissionError", WebLingoDiagnosticCodes.NetworkPermissionDenied),
         ("ComPermissionError", WebLingoDiagnosticCodes.ComPermissionDenied),
-        ("EnvironmentPermissionError", WebLingoDiagnosticCodes.EnvironmentPermissionDenied)
+        ("EnvironmentPermissionError", WebLingoDiagnosticCodes.EnvironmentPermissionDenied),
+        ("DeadlockError", WebLingoDiagnosticCodes.WaitsForever)
     ];
 
     public static bool IsValueClass(string name)

@@ -213,7 +213,8 @@ public sealed class WebLingoApplication
             SchedulerHost = scheduler ?? _options.Scheduler?.Invoke(),
             Suspends = scheduler is not null,
             InstructionBudget = _options.InstructionBudget,
-            Cancellation = cancellation
+            Cancellation = cancellation,
+            Lines = page.LineOf
         };
         var vm = new WebLingoVirtualMachine { Loader = page.Modules, Components = page.Components };
         return Ended(vm.Execute(page.Module, context), vm, page, output, response, done);
@@ -386,11 +387,23 @@ public sealed class WebLingoApplication
         public string Describe(WebLingoDiagnostic diagnostic)
         {
             var located = compiler.Sources.Locate(diagnostic);
-            var file = located.Source is not { } name ? text
-                : compiler.Sources.TextOf(name) ?? (modules.Texts.TryGetValue(name, out var module) ? module : text);
+            var file = FileOf(located);
             var location = file.GetLocation(located.Span.Start);
             return $"{file.Name}({location.Line},{location.Column}): error {located.Code}: {located.Message}";
         }
+
+        /// <summary>A position's line, in the file it is in, located as an error is, for a message that names it (section 3.8).</summary>
+        public int LineOf(string? source, int offset)
+        {
+            var located = compiler.Sources.Locate(new WebLingoDiagnostic("", WebLingoDiagnosticSeverity.Error, "", new WebLingoSourceSpan(offset, 0))
+            {
+                Source = source
+            });
+            return FileOf(located).GetLocation(located.Span.Start).Line;
+        }
+
+        private WebLingoSourceText FileOf(WebLingoDiagnostic located) => located.Source is not { } name ? text
+            : compiler.Sources.TextOf(name) ?? (modules.Texts.TryGetValue(name, out var module) ? module : text);
     }
 
     /// <summary>A loader that compiles each module once, its result kept (WL-T007: a component is not compiled for every render).</summary>

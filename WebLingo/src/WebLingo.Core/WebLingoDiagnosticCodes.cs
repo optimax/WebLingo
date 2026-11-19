@@ -121,6 +121,13 @@ public static class WebLingoDiagnosticCodes
     /// </summary>
     public const string EnvironmentPermissionDenied = "WL3019";
 
+    /// <summary>
+    /// A program stuck awaiting a task only <c>complete</c> or <c>fail</c> could finish, <c>new Task()</c>'s, nothing else
+    /// able to run, raised at the <c>await</c>, a <c>DeadlockError</c>, which a catch may catch (section 3.8, "Tasks
+    /// completed by hand"); its name and code Proposed.
+    /// </summary>
+    public const string WaitsForever = "WL3020";
+
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";
     /// <summary>A program too large for the bytecode, such as one needing more registers than a function has (proposed).</summary>

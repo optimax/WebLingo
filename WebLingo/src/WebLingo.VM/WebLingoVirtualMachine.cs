@@ -716,7 +716,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             if (heap.MakesPlainValue(classValue, ins.D))
                             {
                                 // new Integer(42) is 42, and new Integer() 0 (section 3.7).
-                                if (!heap.TryMakeValue(classValue, registers, ins.C, ins.D, out registers[ins.A], out error)) break;
+                                if (!TryMakeValue(classValue, registers, ins.C, ins.D, ins.A, frame.Function, pc, out error)) break;
                                 pc++;
                                 continue;
                             }
@@ -2186,6 +2186,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         _waits = true;
                         return false;
                     }
+                    if (TryRaiseStuck()) continue;
                     _ended = Failure(WebLingoDiagnosticCodes.Deadlock, "The program waits for a task that nothing will complete.",
                         new WebLingoSourceSpan(0, 0)) with { Instructions = executed };
                     return false;
@@ -2288,8 +2289,13 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 else if (i == (int)WebLingoValueClass.DateTime) heap.MarkValueClass(made, WebLingoValueKind.DateTime);
                 // A module's: new making a module, a class extending it modules of its own (section 3.7, "No sealed classes").
                 else if (i == (int)WebLingoValueClass.Module) heap.MarkModuleClass(made);
-                // Json's and Html's are plain classes, with static members; Task's sealed, for now.
-                else if (i == (int)WebLingoValueClass.Task) heap.SealClass(made);
+                // Task's: new making a task completed by hand (section 3.8); no class extends it yet. Json's and Html's are
+                // plain classes, with static members.
+                else if (i == (int)WebLingoValueClass.Task)
+                {
+                    heap.MarkTaskClass(made);
+                    heap.SealClass(made);
+                }
             }
             for (var i = 0; i < module.ErrorClasses.Count; i++)
             {
@@ -2329,6 +2335,48 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 if (ReferenceEquals(module.Functions[i], function)) return WebLingoExceptions.Origin(i + 1, pc);
             }
             return WebLingoExceptions.Origin(0, pc);
+        }
+
+        /// <summary>
+        /// Nothing able to run, but a task <c>new Task()</c> made, which something awaits: a <c>DeadlockError</c> thrown at
+        /// that <c>await</c>, naming where the task was made and where it is awaited, as lines where the host knows them
+        /// (section 3.8, "Tasks completed by hand"); false where no such task is awaited.
+        /// </summary>
+        private bool TryRaiseStuck()
+        {
+            if (!heap.TryFindStuckTask(out var task, out var waiter)) return false;
+            var message = "The program waits for a task nothing can complete";
+            if (heap.GetTask(waiter).Frame is Frame frame && context.Lines is { } lines)
+            {
+                var made = heap.GetTask(task).MadeAt;
+                var awaited = frame.Function.IsNative && frame.CalledFrom != WebLingoExceptions.Nowhere ? frame.CalledFrom
+                    : OriginOf(frame.Function, frame.Pc - 1);
+                var awaitedIn = OwnerOfOrigin(awaited)?.Source;
+                var at = $"awaited at line {lines(awaitedIn, SpanOfOrigin(awaited).Start)}";
+                if (made != WebLingoExceptions.Nowhere)
+                {
+                    var madeIn = OwnerOfOrigin(made)?.Source;
+                    var file = madeIn == awaitedIn ? "" : $" of {madeIn ?? "the program"}";
+                    at = $"made at line {lines(madeIn, SpanOfOrigin(made).Start)}{file}, " + at;
+                }
+                message += ": " + at;
+            }
+            _scheduler.Raise(task, waiter, new WebLingoRuntimeError(WebLingoDiagnosticCodes.WaitsForever, message + "."));
+            return true;
+        }
+
+        /// <summary>
+        /// <c>new</c> on a kind of value's class, <c>new Integer(42)</c>, its value written where it goes; a task made by
+        /// hand told where it was made, for a program stuck on it (section 3.8). Kept out of <c>Run</c>, whose locals it would
+        /// otherwise change.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool TryMakeValue(WebLingoValue classValue, WebLingoValue[] values, int first, int count, int destination, WebLingoFunction function,
+            int pc, out WebLingoRuntimeError? error)
+        {
+            if (!heap.TryMakeValue(classValue, values, first, count, out values[destination], out error)) return false;
+            if (values[destination].Kind == WebLingoValueKind.Task) heap.GetTask(values[destination]).MadeAt = OriginOf(function, pc);
+            return true;
         }
 
         /// <summary>Where an origin is in the source; nowhere if it names no function of the module.</summary>

@@ -1723,6 +1723,7 @@ An error the runtime raises becomes an instance of a class extending `Error`, wi
 | `NetworkPermissionError` | WL3017 | a host a script's configuration does not let it reach |
 | `ComPermissionError` | WL3018 | a COM object a script's configuration does not let it make |
 | `EnvironmentPermissionError` | WL3019 | an environment variable a site's script, under `wasp`, tries to set |
+| `DeadlockError` | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run, thrown at that `await` |
 
 Two errors cannot be caught, and always end the program: running past the execution's limits (WL3003) and being
 cancelled (WL3004).
