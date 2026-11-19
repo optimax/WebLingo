@@ -21,6 +21,7 @@ dotnet run --project src/WebLingo.Cli -- run samples/HelloWorld/hello.wl
 
 ## Learn more
 
+- [Getting started with WebLingo](Documents/getting-started-guide.md)
 - [Language reference](Documents/weblingo-language-reference.md) and [example scripts](Examples.wl/)
 - [Standard library reference](Documents/weblingo-standard-library-reference.md)
 - [WASP user manual](Documents/wasp-user-manual.md) and [example sites](Examples.wasp/)
