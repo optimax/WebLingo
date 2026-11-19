@@ -57,8 +57,10 @@ this folder:
 weblingo add-wl-file-type.wl
 ```
 
-`remove=yes` takes it away again. A script double-clicked runs as any program does, one downloaded from the internet
-included: run only those you trust.
+Where another program has opened a `.wl` file before, VS Code say, Windows asks once, at the first double-click, how to
+open it, since no program may choose that for you: choose **WebLingo**, then **Always**. `remove=yes` takes it away
+again. A script double-clicked runs as any program does, one downloaded from the internet included: run only those
+you trust.
 
 ## Updating
 

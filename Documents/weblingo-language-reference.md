@@ -65,6 +65,10 @@ weblingo run hello.wl
 | `weblingo disasm <file.wlbc>` | shows compiled bytecode as text |
 | `weblingo --version` | its version, `WebLingo 0.20.0-pre-alpha`, which `weblingo` alone prints first, before how it is used |
 
+On Windows, `weblingo` started in a console window of its own, as Explorer starts it for a script double-clicked
+(the repository's `Scripts/add-wl-file-type.wl` sets that up), waits for a key once the script has ended, so that what
+it wrote stays to be read; started from a console already open, it does not.
+
 `weblingo run` of a `.wl` compiles it in memory, and writes no file; `weblingo compile` writes one, for the register VM
 by default, or for the stack VM with `--stack`. `weblingo disasm hello.wlbc` shows what the compiler made:
 
