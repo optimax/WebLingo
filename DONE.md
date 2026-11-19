@@ -3994,7 +3994,7 @@ Done (Codex, 2026-11-19, `c98446d`). The Release build on main had zero warnings
 
 Replace `.wl` with `.wlg` throughout WebLingo. Rename scripts, modules, WASP route handlers, and paths such as `Examples.wl`. Update CLI and WASP file discovery, import resolution, editor grammars and associations, the Windows file-association script, installers, build and CI scripts, examples, tests, and documentation. Wolfram Language already uses `.wl` for package source.
 
-Done (Codex, 2026-11-19, `db41a60`). On Windows, the Release build on main had zero errors or warnings. The suite passed 4,151 tests and six integration tests were skipped. The CLI samples ran, the WASP sample rendered, and the Windows installer scripts passed `weblingo check`. Registry registration, packaging, and Linux were not exercised.
+Done (Codex, 2026-11-19, `55ebd2a`). On Windows, the Release build on main had zero errors or warnings. The suite passed 4,151 tests and six integration tests were skipped. The CLI samples ran, the WASP sample rendered, and the Windows installer scripts passed `weblingo check`. Registry registration, packaging, and Linux were not exercised.
 
 ## [DONE] BytesBuilder Extendability
 
@@ -4014,7 +4014,7 @@ Verified already implemented (Codex, 2026-11-19, `578d5d2`). `AFileIsOpenedToApp
 
 Python's `items[-1]` reads the last item. WebLingo rejects that index with `WL3005`. Make it work in WebLingo. Also, take into account similar indexing scheme with C#.
 
-Done (Codex, 2026-11-19, `634636a`). Negative array subscripts work for reads, assignments, compound assignments, and optional indexing. `-1` selects the last element. The Language Reference compares this spelling with `^1` in C#. On Windows, the Release build on main had zero errors or warnings. The CLI samples and the indexing example ran. The suite passed 4,165 tests with six integration tests skipped. Linux was not tried.
+Done (Codex, 2026-11-19, `28c4b01`). Negative array subscripts work for reads, assignments, compound assignments, and optional indexing. `-1` selects the last element. The Language Reference compares this spelling with `^1` in C#. On Windows, the Release build on main had zero errors or warnings. The CLI samples and the indexing example ran. The suite passed 4,165 tests with six integration tests skipped. Linux was not tried.
 
 ## [DONE] Argument Errors That Name the Argument
 
@@ -4022,19 +4022,19 @@ Done (Codex, 2026-11-19, `634636a`). Negative array subscripts work for reads, a
 
 EXPLAIN: How are other methods that expect a certain type of argument handle it? How can a programmer annotate a method to expect a certain type of value so that the compiler could issue a similar error message for user-defined functions?
 
-2026-11-19 (Codex). The shared argument formatter was added in `59a5cab`. Commit `5518785` adds named diagnostics for invalid map and set arguments and documents runtime validation with `is` and `TypeError` for user-defined functions. Those changes passed the Windows checks on main. Array callbacks remain a separate case: `[1].map(1)` raises WL2005 at the attempted call, while an empty array never invokes the callback.
+2026-11-19 (Codex). The shared argument formatter was added in `59a5cab`. Commit `0ecc35e` adds named diagnostics for invalid map and set arguments and documents runtime validation with `is` and `TypeError` for user-defined functions. Those changes passed the Windows checks on main. Array callbacks remain a separate case: `[1].map(1)` raises WL2005 at the attempted call, while an empty array never invokes the callback.
 
 Should higher-order array methods reject non-callable arguments up front with a named WL3001 diagnostic, including when the array is empty?
 
 A: Yes.
 
-Done (Codex, 2026-11-19, `a1d3a83`). Higher-order array methods reject non-callable callbacks with a named WL3001 before visiting any elements. The Windows Release build on main passed with zero warnings or errors. The full suite passed 4,182 tests with six integration tests skipped. CLI samples, register and stack bytecode, and a WASP page with a valid callback were exercised. Linux was not tried.
+Done (Codex, 2026-11-19, `f657ed6`). Higher-order array methods reject non-callable callbacks with a named WL3001 before visiting any elements. The Windows Release build on main passed with zero warnings or errors. The full suite passed 4,182 tests with six integration tests skipped. CLI samples, register and stack bytecode, and a WASP page with a valid callback were exercised. Linux was not tried.
 
 ## [DONE] Stream Database Rows
 
 Implement `db.rows(sql, values)` and the disposable async cursor approved in the parent task. Exercise row conversion, exhaustion, early disposal, and both VMs.
 
-Done (Codex, 2026-11-19, `474e237`). On Windows, the Release build on main passed with zero warnings or errors. 4,184 tests passed and six integration tests were skipped. SQLite cursor tests covered both VMs, early disposal, exhaustion, and a later row failing after the first row was read. CLI and WASP samples passed. Live SQL Server and Linux were not tried.
+Done (Codex, 2026-11-19, `a2c3fe0`). On Windows, the Release build on main passed with zero warnings or errors. 4,184 tests passed and six integration tests were skipped. SQLite cursor tests covered both VMs, early disposal, exhaustion, and a later row failing after the first row was read. CLI and WASP samples passed. Live SQL Server and Linux were not tried.
 
 ## [DONE] Identify Standard Library Gaps
 
@@ -4075,4 +4075,4 @@ Q6. Approve `std:csv` with `parse(text, headers = false)` and `stringify(rows, h
 
 A6: Yes.
 
-Done for the three approved modules (Codex, 2026-11-19, `55c64a4`). The Windows Release build on main passed with zero warnings or errors. 4,195 tests passed and six integration tests were skipped. The CLI and WASP reference examples passed. Linux was not tried. The remaining candidates are in “Choose the Next Standard-Library Additions.”
+Done for the three approved modules (Codex, 2026-11-19, `fabe2aa`). The Windows Release build on main passed with zero warnings or errors. 4,195 tests passed and six integration tests were skipped. The CLI and WASP reference examples passed. Linux was not tried. The remaining candidates are in “Choose the Next Standard-Library Additions.”

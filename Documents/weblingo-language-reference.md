@@ -59,7 +59,7 @@ weblingo run hello.wlg
 or simply
 
 ```bash
-weblingo hello.wl
+weblingo hello.wlg
 ```
 
 | Command | What it does |
