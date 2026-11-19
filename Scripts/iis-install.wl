@@ -1,9 +1,11 @@
 // Makes this machine's IIS run WASP's sites, from WASP's installer's zip (Installers/Windows/wasp-readme.md), with
-// WebLingo installed in C:\Program Files\WebLingo from its own zip, of the same version and kind:
+// WebLingo installed from its own zip, of the same version, architecture and kind, in WebLingo's folder, C:\Program Files\WebLingo,
+// or, for the zips for x86, 32-bit programs, on 64-bit Windows, C:\Program Files (x86)\WebLingo:
 //   1. IIS turned on, unless it is, with the features its sites need and its manager, through DISM;
 //   2. the ASP.NET Core Module, through which IIS runs wasp, unless IIS has it: Microsoft's ASP.NET Core Hosting Bundle
 //      for .NET 10, its latest release, found in Microsoft's release metadata, downloaded and checked against the
-//      SHA-512 that names, then run quietly; with the module alone for a self-contained WASP, which carries its runtime;
+//      SHA-512 that names, then run quietly; with the module alone for a self-contained WASP, which carries its runtime,
+//      and with .NET's 32-bit runtimes too for a framework-dependent WASP for x86;
 //   3. wasp, the folder WASP beside this script, copied into WebLingo's installation, once the installed files it needs
 //      are found to be the ones it was made with, by their SHA-256 in wasp-needs.json, beside it.
 // Run it as administrator, from the unzipped folder:
@@ -14,7 +16,7 @@
 // it keeps what is there, and copies wasp anew, the application pools of the sites that run it stopped meanwhile.
 param source = "WASP";
 param needs = "wasp-needs.json";
-param target = "C:\\Program Files\\WebLingo";
+param target = "";
 
 import { writeLn } from "std:system";
 import com from "windows:com";
@@ -22,23 +24,25 @@ import fs from "std:fs";
 import http from "std:http";
 import crypto from "std:crypto";
 import { Json } from "std:json";
-import { requireAdministrator, run, runOrStop, expand } from "./windows.wl";
+import { requireAdministrator, run, runOrStop, expand, architectureOf, programFiles } from "./windows.wl";
 
 await requireAdministrator();
 
-// The folders' full paths, a relative one from the current folder.
+// The folders' full paths, a relative one from the current folder; WebLingo's folder for the zip's architecture, unless
+// target names another, whatever the weblingo running this is for.
 var files = com.create("Scripting.FileSystemObject");
 var zipped = files.GetAbsolutePathName(source);
-var installed = files.GetAbsolutePathName(target);
 if (!(await fs.exists($"{zipped}\\wasp.exe"))) {
     throw new Error($"{zipped} has no wasp.exe: run this from the unzipped folder, which holds the folder WASP.");
 }
+var architecture = await architectureOf(zipped, "wasp");
+var installed = files.GetAbsolutePathName(target == "" ? $"{programFiles(architecture)}\\WebLingo" : target);
 if (!(await fs.exists($"{installed}\\weblingo.exe"))) {
-    throw new Error($"WebLingo is not installed in {installed}: install it first, from its installer's zip of this version and kind.");
+    throw new Error($"WebLingo is not installed in {installed}: install it first, from its installer's zip of this version, architecture and kind.");
 }
 
 // The WebLingo this WASP was made with: each file of the installation that wasp shares, as it was then. A WebLingo of
-// another version, or of the other kind, self-contained or not, differs, and wasp would not run with it.
+// another version, architecture or kind, self-contained or not, differs, and wasp would not run with it.
 var differing = [];
 foreach (var (path, hash) in Json.parse(await fs.readText(files.GetAbsolutePathName(needs)))) {
     var file = $"{installed}\\{path.replace("/", "\\")}";
@@ -48,7 +52,7 @@ foreach (var (path, hash) in Json.parse(await fs.readText(files.GetAbsolutePathN
 }
 if (differing.length > 0) {
     throw new Error($"The WebLingo in {installed} is not the one this WASP was made with, {differing.length} of its files "
-        + $"differing, {differing[0]} among them: install the WebLingo zip made with it, of the same version and kind, first.");
+        + $"differing, {differing[0]} among them: install the WebLingo zip made with it, of the same version, architecture and kind, first.");
 }
 var selfContained = (await fs.readText($"{zipped}\\wasp.runtimeconfig.json")).contains("\"includedFrameworks\"");
 
@@ -93,7 +97,9 @@ if (iis.hasGlobalModule("AspNetCoreModuleV2")) {
     }
     var module = expand("%ProgramFiles%\\IIS\\Asp.Net Core Module\\V2\\aspnetcorev2.dll");
     var action = (await fs.exists(module)) ? "/repair" : "/install";
-    var options = selfContained ? " OPT_NO_RUNTIME=1 OPT_NO_SHAREDFX=1 OPT_NO_X86=1" : " OPT_NO_X86=1";
+    // A 32-bit, framework-dependent wasp needs the 32-bit runtimes, which the bundle leaves out where told to.
+    var options = selfContained ? " OPT_NO_RUNTIME=1 OPT_NO_SHAREDFX=1 OPT_NO_X86=1"
+        : architecture == "x86" ? "" : " OPT_NO_X86=1";
     writeLn($"Installing it, {(selfContained ? "the module alone" : "with .NET's runtimes")}");
     var setup = await run($"\"{installer}\" {action} /quiet /norestart{options}");
     await fs.remove(installer);

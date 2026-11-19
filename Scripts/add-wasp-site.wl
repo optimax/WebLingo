@@ -1,4 +1,5 @@
-// Adds a WASP site to IIS, with WebLingo installed in C:\Program Files\WebLingo (install-weblingo.wl): an application pool
+// Adds a WASP site to IIS, with WebLingo and WASP installed where its web.config names wasp, C:\Program Files\WebLingo
+// (install-weblingo.wl, or WASP's zip's iis-install.wl), or C:\Program Files (x86)\WebLingo for x86: an application pool
 // and a website, both named name, whose folder holds the site's pages beside its web.config, served on https://<host>/,
 // HTTPS's standard port, 443, for that name alone (SNI), with a self-signed certificate this machine trusts, the name
 // in the hosts file; and the pool given write access to the folders outside the site that writable lists, separated by
@@ -23,8 +24,14 @@ await requireAdministrator();
 if (!(await fs.exists($"{folder}\\web.config"))) {
     throw new Error($"{folder} has no web.config: give the folder that holds the site's pages and web.config.");
 }
-if (!(await fs.exists("C:\\Program Files\\WebLingo\\wasp.exe"))) {
-    throw new Error("WebLingo is not installed in C:\\Program Files\\WebLingo: install it first, with install-weblingo.wl.");
+// The wasp the site's web.config runs, C:\Program Files\WebLingo's, or C:\Program Files (x86)\WebLingo's for a site that
+// runs WebLingo for x86, installed.
+var wasp = new Regex("processPath=\"([^\"]+)\"").match(await fs.readText($"{folder}\\web.config"));
+if (wasp == null) {
+    throw new Error($"{folder}\\web.config names no processPath, the wasp IIS's ASP.NET Core Module is to run.");
+}
+if (!(await fs.exists(expand(wasp[1])))) {
+    throw new Error($"{wasp[1]}, which {folder}\\web.config runs, is not there: install WebLingo and WASP first.");
 }
 var writables = writable == "" ? [] : writable.split(";");
 foreach (var other in writables) {

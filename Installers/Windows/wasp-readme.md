@@ -1,13 +1,16 @@
 # WASP for Windows and IIS
 
 WASP, Web Application Server Pages, serves sites written in WebLingo: pages, `.wasp` files, and handlers, `.wl` files,
-as PHP serves PHP's. This zip holds `wasp`, for Windows on x64, and `iis-install.wl`, a script that makes this
-machine's IIS run WASP's sites, and installs `wasp` beside `weblingo`, in `C:\Program Files\WebLingo`, where every site
-finds it.
+as PHP serves PHP's. This zip holds `wasp` and `iis-install.wl`, a script that makes this machine's IIS run WASP's
+sites, and installs `wasp` beside `weblingo`, in WebLingo's folder, `C:\Program Files\WebLingo`, where every site
+finds it, or, for the zips for x86, on 64-bit Windows, `C:\Program Files (x86)\WebLingo`.
 
-It needs WebLingo installed first, from WebLingo's zip of the same version and the same kind: `…-self-contained.zip`
-with WebLingo's self-contained zip, and `…-framework-dependent.zip` with its framework-dependent one. Its files go with
-that WebLingo's, and `iis-install.wl` stops, saying so, where WebLingo is another.
+It needs WebLingo installed first, from WebLingo's zip of the same version, processor and kind: `…-win-x64-…` with
+WebLingo's `…-win-x64-…`, `…-win-x86-…` with its `…-win-x86-…`, `…-self-contained.zip` with WebLingo's
+self-contained zip, and `…-framework-dependent.zip` with its framework-dependent one. Its files go with that
+WebLingo's, and `iis-install.wl` stops, saying so, where WebLingo is another. The zips for x86 are for 32-bit Windows,
+or for a site on 64-bit Windows that uses a COM component made for 32 bits only, which a 64-bit `wasp` cannot load:
+its `web.config` then runs `C:\Program Files (x86)\WebLingo\wasp.exe`.
 
 ## Installing
 
@@ -32,10 +35,10 @@ that WebLingo's, and `iis-install.wl` stops, saying so, where WebLingo is anothe
    metadata for .NET 10, downloads the latest ASP.NET Core Hosting Bundle it names, from Microsoft, checks that its
    SHA-512 is the one the metadata gives, and runs it quietly: for the self-contained kind, with the module alone,
    since that `wasp` carries its own runtime; for the framework-dependent kind, with .NET's and ASP.NET Core's runtimes,
-   which `wasp` then needs. It restarts IIS, which loads the module then.
+   which `wasp` then needs, their 32-bit ones too for the zip for x86. It restarts IIS, which loads the module then.
 3. **`wasp`.** It checks, by the SHA-256 of each, `wasp-needs.json`, that the WebLingo installed is the one this `wasp`
-   was made with, then copies the folder `WASP` into `C:\Program Files\WebLingo`. The application pools of the sites
-   that run `wasp` from there are stopped meanwhile, and started again after.
+   was made with, then copies the folder `WASP` into WebLingo's folder. The application pools of the sites that run
+   `wasp` from there are stopped meanwhile, and started again after.
 
 It may be run again, from a newer zip, once WebLingo's newer zip is installed: it keeps what is there, and copies
 `wasp` anew. `target=<folder>` names another installation of WebLingo.

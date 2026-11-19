@@ -1,0 +1,1 @@
+powershell -ExecutionPolicy Bypass -File Installers\Windows\package.ps1

@@ -5,6 +5,7 @@ import fs from "std:fs";
 import { delay } from "std:system";
 import { DateTime } from "std:datetime";
 import { Regex } from "std:regex";
+import { Json } from "std:json";
 
 const shell = com.create("WScript.Shell");
 
@@ -83,6 +84,21 @@ export function addToMachinePath(folder) {
 function pathEntry(entry) {
     var text = entry.trim().toLower();
     return text.endsWith("\\") ? text.slice(0, text.length - 1) : text;
+}
+
+// The architecture a published program is for, "x86" or "x64", from the runtime its .deps.json names,
+// ".NETCoreApp,Version=v10.0/win-x86"; "x64" where it names none, as a program published for any machine.
+export async function architectureOf(folder, program) {
+    var target = Json.parse(await fs.readText($"{folder}\\{program}.deps.json"))["runtimeTarget"]["name"];
+    return target.endsWith("/win-x86") ? "x86" : "x64";
+}
+
+// The folder Windows installs an architecture's programs in: for x64, Program Files; for x86, Program Files (x86) on
+// 64-bit Windows, and Program Files on 32-bit Windows, which has no other; whatever the program asking is.
+export function programFiles(architecture) {
+    var named = architecture == "x86" ? expand("%ProgramFiles(x86)%") : expand("%ProgramW6432%");
+    // A variable Windows does not set is left as it was written, its % first.
+    return named.startsWith("%") ? expand("%ProgramFiles%") : named;
 }
 
 // The paths of the programs running from a folder, through WMI, which shows every process's path to an administrator.
