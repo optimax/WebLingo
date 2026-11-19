@@ -36,9 +36,12 @@ The unzipped folder may then be deleted. `weblingo run script.wl` runs a script,
 reports its errors without running it. WebLingo is not signed yet: Windows may warn that `weblingo.exe` comes from an
 unknown publisher (**More info**, then **Run anyway**), and Smart App Control, where it is on, blocks it.
 
+To serve WASP's sites, WebLingo's web pages, on IIS, install WASP's zip of the same version and the same kind after
+this one, as its `readme.md` says.
+
 ## Updating
 
-Run a newer zip's `install.wl` the same way: it copies its files over the old ones. A program running from
+Run a newer zip's `install.wl` the same way: it copies its files over the old ones, then WASP's, where it is installed. A program running from
 `C:\Program Files\WebLingo`, an IIS site's `wasp` among them, keeps its files in use: stop it first, or the installer
 says which programs to stop.
 

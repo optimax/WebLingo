@@ -11,11 +11,12 @@ they copy through `std:fs`, without COM.
 | Script | What it does |
 |---|---|
 | `install.wl` | Installs WebLingo from its installer's zip, which holds it beside the folder it installs, `WebLingo`: copies that folder into `C:\Program Files\WebLingo` and puts it on the machine's `PATH` (`../Installers/Windows/readme.md`) |
+| `iis-install.wl` | Makes this machine's IIS run WASP's sites, from WASP's installer's zip: turns IIS on, unless it is; installs the ASP.NET Core Module, unless IIS has it, from Microsoft's Hosting Bundle, checked against the SHA-512 Microsoft's release metadata gives; and copies `wasp`, the zip's folder `WASP`, into `C:\Program Files\WebLingo`, once the WebLingo there is found to be the one it was made with (`../Installers/Windows/wasp-readme.md`) |
 | `install-weblingo.wl` | Installs WebLingo in `C:\Program Files\WebLingo`, or updates it, from the folder `WebLingo/publish.ps1` publishes it to, `WebLingo\publish\WebLingo`; the application pools of the sites whose `wasp` runs from there are stopped while their files are replaced, and started again |
 | `add-weblingo-to-path.wl` | Puts `C:\Program Files\WebLingo` on the machine's `PATH`, once, so that consoles started after run `weblingo` and `wasp` by their names |
 | `add-wasp-site.wl` | Adds a WASP site to IIS: its application pool, with no managed code, and its website, served by HTTPS on port 443 under a name of its own, with a certificate this machine trusts |
 | `add-sql-server-login.wl` | Gives a site's application pool its database on SQL Server: a login for the pool's account, and a user of the database that reads and changes its rows |
-| `windows.wl`, `iis.wl` | What the scripts share: running a program, the processes running, a folder copied, the machine's `PATH`, a certificate made and trusted; and IIS's configuration and its pools |
+| `windows.wl`, `iis.wl` | What the scripts share: running a program, the processes running, a folder copied, the machine's `PATH`, a certificate made and trusted; and IIS's configuration, its modules, its pools, and the installation copied into with the sites that run it stopped |
 
 Each changes the machine, and so runs as administrator, in a console run as administrator, from this folder; run
 otherwise, it stops before changing anything, but for `add-sql-server-login.wl`, which changes a SQL Server, and runs
@@ -25,8 +26,9 @@ as one of its administrators. Each may be run again: it keeps what is there, and
 
 On a machine without WebLingo, its installer's zips install it, `weblingo` and the standard modules, each with
 `install.wl` and the scripts it shares, which `../Installers/Windows/package.ps1` makes and its `readme.md` explains;
-one holds .NET's runtime too, and the other needs it installed. On a server that builds WebLingo from this repository,
-`wasp` with it:
+one holds .NET's runtime too, and the other needs it installed. WASP's zips, made with them, then make IIS run
+WASP's sites, with `iis-install.wl`, as `../Installers/Windows/wasp-readme.md` explains. On a server that builds
+WebLingo from this repository, `wasp` with it:
 
 With IIS turned on, and the ASP.NET Core Hosting Bundle for .NET 10 installed after it (`Examples.wasp/README.md`, example1,
 "Deploying it to IIS"), publish WebLingo from the solution's folder, `WebLingo`:

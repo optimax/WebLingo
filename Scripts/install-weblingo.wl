@@ -12,11 +12,11 @@
 param source = "..\\WebLingo\\publish\\WebLingo";
 param target = "C:\\Program Files\\WebLingo";
 
-import { writeLn, delay } from "std:system";
+import { writeLn } from "std:system";
 import com from "windows:com";
 import fs from "std:fs";
-import { requireAdministrator, runningFrom, copyFolder } from "./windows.wl";
-import { sites, stopPool, startPool } from "./iis.wl";
+import { requireAdministrator, runningFrom } from "./windows.wl";
+import { copyIntoInstallation } from "./iis.wl";
 
 await requireAdministrator();
 
@@ -35,40 +35,5 @@ foreach (var path in runningFrom(installed)) {
     }
 }
 
-// The pools of the sites whose web.config runs this installation's wasp; stopped, those running, and started again after.
-var wasp = $"{installed}\\wasp.exe".toLower();
-var pools = [];
-foreach (var site in sites()) {
-    if (site.folder == null || pools.contains(site.pool)) {
-        continue;
-    }
-    var config = $"{site.folder}\\web.config";
-    if ((await fs.exists(config)) && (await fs.readText(config)).toLower().contains(wasp)) {
-        pools.push(site.pool);
-    }
-}
-var running = [];
-foreach (var pool in pools) {
-    if (await stopPool(pool)) {
-        running.push(pool);
-        writeLn($"Stopped the application pool {pool}");
-    }
-}
-
-// A pool's wasp ends soon after the pool stops; any other wasp running from there keeps its files in use.
-for (var i = 0; runningFrom(installed).length > 0; i++) {
-    if (i == 60) {
-        throw new Error($"Programs still run from {installed}, {runningFrom(installed)}: stop them, then run this again.");
-    }
-    await delay(500);
-}
-
-try {
-    await copyFolder(published, installed);
-    writeLn($"WebLingo installed in {installed}, from {published}");
-} finally {
-    foreach (var pool in running) {
-        await startPool(pool);
-        writeLn($"Started the application pool {pool}");
-    }
-}
+await copyIntoInstallation(published, installed);
+writeLn($"WebLingo installed in {installed}, from {published}");

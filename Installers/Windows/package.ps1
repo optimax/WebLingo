@@ -1,45 +1,106 @@
-# Makes WebLingo's installers for Windows, on x64: two zips of weblingo and the standard modules, each with install.wl,
-# which installs them in C:\Program Files\WebLingo and puts that folder on the machine's PATH, and readme.md, which says
-# how, for a human:
+# Makes WebLingo's and WASP's installers for Windows, on x64, into zips, two of each:
 #   WebLingo-<version>-win-x64-self-contained.zip, which holds .NET's runtime too, for a machine without it;
-#   WebLingo-<version>-win-x64-framework-dependent.zip, for a machine with .NET 10's runtime installed.
-# In each, the folder WebLingo is what install.wl installs, beside install.wl, windows.wl and weblingo.config, from the
-# repository's Scripts folder, and readme.md, from this one. Run it on a machine with the .NET 10 SDK, from any folder:
+#   WebLingo-<version>-win-x64-framework-dependent.zip, for a machine with .NET 10's runtime installed;
+#   WASP-<version>-win-x64-self-contained.zip and WASP-<version>-win-x64-framework-dependent.zip, for a machine with
+#   WebLingo installed from the zip of the same version and kind, made by the same run of this script.
+# WebLingo's hold the folder WebLingo, weblingo and the standard modules, which install.wl installs in
+# C:\Program Files\WebLingo and puts on the machine's PATH; WASP's the folder WASP, what wasp adds to them, which
+# iis-install.wl installs there, once IIS has what it needs to run wasp, with wasp-needs.json, the SHA-256 of each file
+# of WebLingo's that wasp needs, as this run made it, and add-wasp-site.wl, to add a site. The scripts are the
+# repository's, from its Scripts folder, and readme.md, a human's steps, this folder's readme.md and wasp-readme.md.
+# Run it on a machine with the .NET 10 SDK, from any folder:
 #   powershell -ExecutionPolicy Bypass -File Installers\Windows\package.ps1
 # -Destination names the folder the zips go to, WebLingo/publish/installers in the repository by default.
 param([string] $Destination = (Join-Path $PSScriptRoot '../../WebLingo/publish/installers'))
 $ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$project = Join-Path $repository 'WebLingo/src/WebLingo.Cli/WebLingo.Cli.csproj'
+$solution = Join-Path $repository 'WebLingo'
 # The solution's one version, which every assembly carries (Directory.Build.props).
-$props = [xml](Get-Content (Join-Path $repository 'WebLingo/Directory.Build.props'))
+$props = [xml](Get-Content (Join-Path $solution 'Directory.Build.props'))
 $version = @($props.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ })[0]
 New-Item -ItemType Directory -Force $Destination | Out-Null
 $Destination = (Resolve-Path $Destination).Path
 $staging = Join-Path ([IO.Path]::GetTempPath()) ('weblingo-installers-' + [Guid]::NewGuid().ToString('N'))
+
+# A project published for Windows on x64, keeping only what runs: no symbols, nor SqlClient's messages in other
+# languages, each a folder of resources alone.
+function Publish-Project([string] $project, [string] $kind, [string] $folder) {
+    $selfContained = if ($kind -eq 'self-contained') { 'true' } else { 'false' }
+    dotnet publish (Join-Path $solution $project) -c Release -r win-x64 --self-contained $selfContained -o $folder
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    Get-ChildItem $folder -Filter *.pdb -Recurse | Remove-Item
+    Get-ChildItem $folder -Directory |
+        Where-Object { -not (Get-ChildItem $_.FullName -File -Recurse | Where-Object { $_.Name -notlike '*.resources.dll' }) } |
+        Remove-Item -Recurse
+}
+
+# A folder's files, each by its path within it, with forward slashes, and its SHA-256, in lower case.
+function Get-Hashes([string] $folder) {
+    $hashes = @{}
+    foreach ($file in Get-ChildItem $folder -File -Recurse) {
+        $path = $file.FullName.Substring($folder.Length + 1).Replace('\', '/')
+        $hashes[$path] = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    return $hashes
+}
+
+# The folder's files zipped, not the folder, so that Explorer's Extract All makes one folder, not two; each entry named
+# with forward slashes, as the zip format has them, which Windows PowerShell's ZipFile.CreateFromDirectory does not.
+function New-Zip([string] $folder, [string] $name) {
+    $zip = Join-Path $Destination "$name.zip"
+    if (Test-Path $zip) { Remove-Item $zip }
+    $archive = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach ($file in Get-ChildItem $folder -File -Recurse) {
+            $entry = $file.FullName.Substring($folder.Length + 1).Replace('\', '/')
+            [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file.FullName, $entry,
+                [IO.Compression.CompressionLevel]::Optimal) | Out-Null
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
+    Write-Host ("Made {0}, {1:N1} MB" -f $zip, ((Get-Item $zip).Length / 1MB))
+}
+
 try {
     foreach ($kind in 'self-contained', 'framework-dependent') {
+        # WebLingo's: weblingo, the standard modules, and the scripts that install them.
         $name = "WebLingo-$version-win-x64-$kind"
         $root = Join-Path $staging $name
         $runtime = Join-Path $root 'WebLingo'
-        $selfContained = if ($kind -eq 'self-contained') { 'true' } else { 'false' }
-        dotnet publish $project -c Release -r win-x64 --self-contained $selfContained -o $runtime
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        # Only what runs: no symbols, nor SqlClient's messages in other languages, each a folder of resources alone.
-        Get-ChildItem $runtime -Filter *.pdb -Recurse | Remove-Item
-        Get-ChildItem $runtime -Directory |
-            Where-Object { -not (Get-ChildItem $_.FullName -File -Recurse | Where-Object { $_.Name -notlike '*.resources.dll' }) } |
-            Remove-Item -Recurse
+        Publish-Project 'src/WebLingo.Cli/WebLingo.Cli.csproj' $kind $runtime
         foreach ($script in 'install.wl', 'windows.wl', 'weblingo.config') {
             Copy-Item (Join-Path $repository "Scripts/$script") $root
         }
         Copy-Item (Join-Path $PSScriptRoot 'readme.md') $root
-        # The zip holds the folder's files, not the folder, so that Explorer's Extract All makes one folder, not two.
-        $zip = Join-Path $Destination "$name.zip"
-        if (Test-Path $zip) { Remove-Item $zip }
-        [IO.Compression.ZipFile]::CreateFromDirectory($root, $zip, [IO.Compression.CompressionLevel]::Optimal, $false)
-        Write-Host ("Made {0}, {1:N1} MB" -f $zip, ((Get-Item $zip).Length / 1MB))
+        New-Zip $root $name
+
+        # WASP's: what wasp's own publish has that WebLingo's has not, or has otherwise, such as ASP.NET Core's
+        # libraries, newer than the packages weblingo takes; and the hashes of the files of WebLingo's it shares.
+        $waspName = "WASP-$version-win-x64-$kind"
+        $waspRoot = Join-Path $staging $waspName
+        $published = Join-Path $staging "wasp-$kind"
+        Publish-Project 'src/WebLingo.Wasp.Cli/WebLingo.Wasp.Cli.csproj' $kind $published
+        $weblingo = Get-Hashes $runtime
+        $wasp = Get-Hashes $published
+        $needs = [ordered]@{}
+        foreach ($path in $wasp.Keys | Sort-Object) {
+            if ($weblingo[$path] -eq $wasp[$path]) {
+                $needs[$path] = $wasp[$path]
+            } else {
+                $target = Join-Path (Join-Path $waspRoot 'WASP') $path
+                New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
+                Copy-Item (Join-Path $published $path) $target
+            }
+        }
+        $needs | ConvertTo-Json | Set-Content -Encoding ASCII (Join-Path $waspRoot 'wasp-needs.json')
+        foreach ($script in 'iis-install.wl', 'add-wasp-site.wl', 'windows.wl', 'iis.wl', 'weblingo.config') {
+            Copy-Item (Join-Path $repository "Scripts/$script") $waspRoot
+        }
+        Copy-Item (Join-Path $PSScriptRoot 'wasp-readme.md') (Join-Path $waspRoot 'readme.md')
+        New-Zip $waspRoot $waspName
     }
 }
 finally {
