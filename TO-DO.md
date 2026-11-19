@@ -10,20 +10,6 @@ Buiid an extension for VS Code to debug WebLingo.
 
 **Q1. Should the first VS Code debugger launch local `.wlg` scripts on the register VM with breakpoints, stepping, a call stack and local variables, with WASP, the stack VM and attaching to running processes left for follow-up tasks?**
 
-## [IDLE] Choose the Next Standard-Library Additions
-
-Path, URL, and CSV have shipped on local main. The remaining candidates are compression, seeded random numbers, and subprocess execution.
-
-Q1. Which of these should be the next standard-library addition?
-
-A1: As you list them. Don't ask trivial questions. Act autonomously.
-
-2026-11-19 (Codex). The owner approved the order. See the architecture specification, §7.16, “Standard-library utilities”. This task waits for its three tasks below.
-
-## [WORKING] Add CLI Subprocess Execution
-
-Run a local program from a CLI script with an argument array, capturing its exit status and output. Keep WASP subprocess access for a separate decision.
-
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value

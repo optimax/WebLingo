@@ -4165,3 +4165,21 @@ Add in-memory gzip and ZIP compression and decompression with explicit decompres
 Add a seeded generator that produces reproducible sequences for tests and simulations.
 
 2026-11-19 (Codex). Added `std:random` in `0f251ee`. Each `Random(seed)` uses SplitMix64, with `next()` in [0, 1) and unbiased `nextInt(min, max)` with an exclusive upper bound. Known sequences, range boundaries and errors passed on both VMs. Windows Release built cleanly and the full suite passed 4,214 tests with six skipped on the branch and main. The CLI and WASP examples and CLI publish passed on main. Linux was not tested locally.
+
+## [DONE] Add CLI Subprocess Execution
+
+Run a local program from a CLI script with an argument array, capturing its exit status and output. Keep WASP subprocess access for a separate decision.
+
+2026-11-19 (Codex). In `480d4dd`, added `std:process` for the CLI, passing arguments directly and collecting the exit code and both UTF-8 streams. The default deadline is 30 seconds and the combined output limit is 1 MiB, both configurable per call. Windows Release built cleanly and the full suite passed 4,221 tests with six skipped on the branch and main. CLI samples on both VMs, WASP denial and the CLI publish passed. Linux was not tested locally.
+
+## [DONE] Choose the Next Standard-Library Additions
+
+Path, URL, and CSV have shipped on local main. The remaining candidates are compression, seeded random numbers, and subprocess execution.
+
+Q1. Which of these should be the next standard-library addition?
+
+A1: As you list them. Don't ask trivial questions. Act autonomously.
+
+2026-11-19 (Codex). The owner approved the order. See the architecture specification, §7.16, “Standard-library utilities”. This task waits for its three tasks below.
+
+2026-11-19 (Codex). Completed the three additions defined in the architecture specification, §7.16, “Standard-library utilities”. Gzip and ZIP landed in `37622d1`, seeded random in `0f251ee`, and CLI subprocess execution in `480d4dd`. Each passed its Windows Release checks and complete test suite on main. Linux was not tested locally.
