@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="376" height="104" viewBox="0 0 376 104"
+     role="img" aria-labelledby="title">
+  <title id="title">WebLingo</title>
+  <rect width="376" height="104" rx="22" fill="#14302F"/>
+  <path d="M24 52 39 34l13 30 12-22 12 22 13-30 15 18"
+        fill="none" stroke="#60E2B2" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="124" y="66" fill="#F5F9F7" font-family="Segoe UI, Arial, sans-serif"
+        font-size="49" font-weight="700" letter-spacing="-1.4"><tspan fill="#60E2B2">Web</tspan>Lingo<tspan dx="4" dy="-23" font-size="15" font-weight="600" letter-spacing="0" opacity="0.72">&#8482;</tspan></text>
+</svg>
