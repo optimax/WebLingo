@@ -528,7 +528,8 @@ public static partial class WebLingoMembers
     /// </summary>
     public static bool IsClassedCollection(WebLingoValue value, WebLingoHeap heap, out WebLingoValue classValue)
     {
-        classValue = value.Kind is WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Module && value.HasClass
+        classValue = value.Kind is WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Module
+                     or WebLingoValueKind.Task && value.HasClass
             ? heap.ClassOfValue(value)
             : WebLingoValue.Null;
         return classValue.Kind == WebLingoValueKind.Class;
@@ -603,6 +604,11 @@ public static partial class WebLingoMembers
     /// </summary>
     public static bool TryGetValueMethod(WebLingoValue target, WebLingoMember member, string name, WebLingoHeap heap, out WebLingoValue method)
     {
+        // A task a class extending Task made: its class's methods, before a task's own (section 3.7, "No sealed classes").
+        if (target.HasClass && target.Kind == WebLingoValueKind.Task && heap.TryGetMethod(heap.ClassOfValue(target), member, name, out method))
+        {
+            return true;
+        }
         var classValue = ExtendedClassOf(target, heap);
         if (classValue.Kind == WebLingoValueKind.Class && heap.TryGetMethod(classValue, member, name, out method)) return true;
         return TryGetObjectMethod(member, name, heap, out method);

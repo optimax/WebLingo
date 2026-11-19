@@ -381,6 +381,26 @@ true
 
 When a program ends, the first fault of a task nothing awaited stops it, unless the task was forgotten.
 
+A class may extend `Task`, its instances then tasks completed by hand, its own members first:
+
+```javascript
+import { writeLn } from "std:system";
+class Job extends Task {
+  constructor(name) { super(); this.name = name; }
+  finish(value) { return this.complete($"{this.name}: {value}"); }
+}
+var job = new Job("report");
+async function later() { await delay(5); job.finish(42); }
+later();
+writeLn(await job);
+writeLn([job is Task, job]);
+```
+
+```text
+report: 42
+[true, Job:task]
+```
+
 ---
 
 ## 9. `Module`

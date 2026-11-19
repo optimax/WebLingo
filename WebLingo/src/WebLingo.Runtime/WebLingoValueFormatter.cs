@@ -30,6 +30,7 @@ public static class WebLingoValueFormatter
             WebLingoValueKind.Module when heap.ClassOfValue(value) is { Kind: WebLingoValueKind.Class } moduleClass =>
                 heap.ClassName(moduleClass) + ":module " + heap.ModuleName(value),
             WebLingoValueKind.Module => "module " + heap.ModuleName(value),
+            WebLingoValueKind.Task when heap.ClassOfValue(value) is { Kind: WebLingoValueKind.Class } taskClass => heap.ClassName(taskClass) + ":task",
             _ => Format(value)
         };
     }

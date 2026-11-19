@@ -665,6 +665,12 @@ public sealed class ConformanceTests : IDisposable
         "[42, null, true]")]
     [InlineData("import { writeLn } from \"std:system\"; class Plugin extends Module {} try { new Plugin(5); } catch (e) { writeLn(e.message); } try { new Module(); } catch (e) { writeLn(e.message); } try { new Module(\"m\").y = 2; } catch (e) { writeLn(e.code); } var p = new Plugin(\"p\"); p.y = 2; writeLn(p.y);",
         "The argument of 'Module' must be a module's name, a string, not the integer 5.\n'Module' takes 1 argument, not 0.\nWL3001\n2")]
+    // A class extending Task makes tasks of its own, completed by hand, awaited and combined as any task, its own members first
+    // (section 3.7, "No sealed classes").
+    [InlineData("import { writeLn } from \"std:system\"; class Job extends Task { constructor(name) { super(); this.name = name; } finish(value) { return this.complete($\"{this.name}: {value}\"); } } var job = new Job(\"report\"); writeLn([job is Task, job is Job, job]); async function later() { await delay(5); job.finish(42); } later(); writeLn(await job); writeLn([job.finish(1), job.name, (await Task.all([job, 1]))[0]]);",
+        "[true, true, Job:task]\nreport: 42\n[false, \"report\", \"report: 42\"]")]
+    [InlineData("import { writeLn } from \"std:system\"; class Job extends Task {} var other = new Job(); writeLn(other.fail(new Error(\"no\"))); try { await other; } catch (e) { writeLn(e.message); } var stuck = new Job(); try { await stuck; } catch (DeadlockError e) { writeLn(e.message); }",
+        "true\nno\nThe program waits for a task nothing can complete: awaited at line 1.")]
     // A task completed by hand: new Task(), complete(value) and fail(error), whether they completed it, an error on a task new
     // did not make; a program stuck awaiting one given a DeadlockError at that await (section 3.8, "Tasks completed by hand").
     [InlineData("import { writeLn } from \"std:system\"; var t = new Task(); async function later() { await delay(10); t.complete(42); } later(); writeLn(await t); writeLn([t.complete(1), t.fail(new Error(\"x\")), t is Task, await t]);",
@@ -1003,7 +1009,6 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("class Meta extends Class {} new Meta(5);", "WL3001")]
     [InlineData("class Meta extends Class {} new Meta(\"A\", 5);", "WL3001")]
     [InlineData("class Bad extends Class { constructor() { super(\"B\", this); } } new Bad();", "WL3001")]
-    [InlineData("class Meta extends Class {} new Meta(\"A\", Task);", "WL3001")]
     [InlineData("Task.all(5);", "WL3001")]
     [InlineData("Task.any([]);", "WL3001")]
     [InlineData("Task.timeout(1, -1);", "WL3001")]
@@ -1064,7 +1069,6 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { delay } from \"std:system\"; delay(1.5);", "WL3001")]
     [InlineData("import { delay } from \"std:system\"; delay(0).forget(1);", "WL2006")]
     [InlineData("var n = 5; n.forget();", "WL3006")]
-    [InlineData("class T extends Task {}", "WL3001")]
     [InlineData("import { delay } from \"std:system\"; var m = {}; m[delay(0)] = 1;", "WL3001")]
     [InlineData("class R { async dispose() {} } function f() { using (var r = new R()) {} } f();", "WL3001")]
     [InlineData("class R { async dispose() {} } var f = function () { using (var r = new R()) {} }; f();", "WL3001")]

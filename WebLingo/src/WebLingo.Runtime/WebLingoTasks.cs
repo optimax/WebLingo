@@ -32,6 +32,12 @@ public sealed class WebLingoTask
     public bool ByHand { get; set; }
     public long MadeAt { get; set; } = WebLingoExceptions.Nowhere;
 
+    /// <summary>
+    /// For a task a class extending <c>Task</c> made, that class and its fields, the heap's, an instance of it as the task
+    /// is (section 3.7, "No sealed classes"); null for any other task.
+    /// </summary>
+    internal object? Instance { get; init; }
+
     /// <summary>While its <c>async</c> function waits: the VM's frame of it, and the values that frame holds.</summary>
     public object? Frame { get; set; }
     public WebLingoValue[][]? FrameRoots { get; set; }

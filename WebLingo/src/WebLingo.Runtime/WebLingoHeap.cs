@@ -571,6 +571,8 @@ public sealed class WebLingoHeap
         WebLingoValueKind.Map or WebLingoValueKind.Set when value.HasClass =>
             Get<MapObject>(value, value.Kind).Instance?.Class ?? WebLingoValue.Null,
         WebLingoValueKind.Module when value.HasClass => Get<ModuleObject>(value, WebLingoValueKind.Module).Instance?.Class ?? WebLingoValue.Null,
+        WebLingoValueKind.Task when value.HasClass =>
+            (Get<WebLingoTask>(value, WebLingoValueKind.Task).Instance as InstanceObject)?.Class ?? WebLingoValue.Null,
         _ => WebLingoValue.Null
     };
 
@@ -615,6 +617,7 @@ public sealed class WebLingoHeap
     {
         WebLingoValueKind.Array => Get<ArrayObject>(value, WebLingoValueKind.Array).Instance,
         WebLingoValueKind.Module => Get<ModuleObject>(value, WebLingoValueKind.Module).Instance,
+        WebLingoValueKind.Task => Get<WebLingoTask>(value, WebLingoValueKind.Task).Instance as InstanceObject,
         WebLingoValueKind.Map or WebLingoValueKind.Set => Get<MapObject>(value, value.Kind).Instance,
         _ => Get<InstanceObject>(value, WebLingoValueKind.Instance)
     } ?? throw new ArgumentException("The collection has no class, and no fields.", nameof(value));
@@ -1347,6 +1350,8 @@ public sealed class WebLingoHeap
             WebLingoValueKind.Class => TryAllocateMetaclassInstance(classValue, out instance, out error),
             WebLingoValueKind.Module =>
                 TryAllocate(new ModuleObject("") { Instance = own }, WebLingoValueKind.Module, 0, out instance, out error, own is not null),
+            WebLingoValueKind.Task =>
+                TryAllocate(new WebLingoTask { ByHand = true, Instance = own }, WebLingoValueKind.Task, 2, out instance, out error, own is not null),
             _ => TryAllocate(new InstanceObject(classValue) { Holds = classObject.Holds != WebLingoValueKind.Null },
                 WebLingoValueKind.Instance, 0, out instance, out error)
         };
@@ -1695,6 +1700,7 @@ public sealed class WebLingoHeap
                     for (var i = 0; i < instance.Count; i++) Mark(instance.At(i).Value, marked, pending);
                     break;
                 case WebLingoTask task:
+                    MarkFields(task.Instance as InstanceObject, marked, pending);
                     Mark(task.Result, marked, pending);
                     Mark(task.Exception, marked, pending);
                     Mark(task.Results, marked, pending);
@@ -1776,7 +1782,7 @@ public sealed class WebLingoHeap
         ClassObject classObject => Size(classObject),
         InstanceObject instance => instance.Count,
         BoundMethodObject => 2,
-        WebLingoTask => 2,
+        WebLingoTask task => 2 + ((task.Instance as InstanceObject)?.Count ?? 0),
         ModuleObject module => module.Exports.Count + (module.Instance?.Count ?? 0),
         _ => 0
     };

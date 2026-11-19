@@ -2289,13 +2289,9 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 else if (i == (int)WebLingoValueClass.DateTime) heap.MarkValueClass(made, WebLingoValueKind.DateTime);
                 // A module's: new making a module, a class extending it modules of its own (section 3.7, "No sealed classes").
                 else if (i == (int)WebLingoValueClass.Module) heap.MarkModuleClass(made);
-                // Task's: new making a task completed by hand (section 3.8); no class extends it yet. Json's and Html's are
-                // plain classes, with static members.
-                else if (i == (int)WebLingoValueClass.Task)
-                {
-                    heap.MarkTaskClass(made);
-                    heap.SealClass(made);
-                }
+                // Task's: new making a task completed by hand (section 3.8), and a class extending it tasks of its own
+                // (section 3.7, "No sealed classes"). Json's and Html's are plain classes, with static members.
+                else if (i == (int)WebLingoValueClass.Task) heap.MarkTaskClass(made);
             }
             for (var i = 0; i < module.ErrorClasses.Count; i++)
             {
