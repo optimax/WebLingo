@@ -1,13 +1,13 @@
 # WebLingo Language Reference
 
-WebLingo is a general-purpose scripting language, embeddable in other programs, and the language of WASP, WebLingo's
-server pages. Its syntax will look familiar to anyone who knows JavaScript, C# or Java, but it is a language of its own,
-not JavaScript: it is stricter. Nothing converts implicitly, a condition must be a Boolean, a variable always has a
-value, and integers do not silently overflow.
+WebLingo aims to be a language with no surprises. It is a general-purpose scripting language, embeddable in other
+programs, and the language of WASP, WebLingo's server pages. Its syntax will look familiar to JavaScript, C# and Java
+programmers. Conversions are explicit, conditions require Booleans, variables always have a value, and integer
+overflow raises an error.
 
 This reference describes the language as it is built today, which is pre-alpha: what it says works, and every example
-in it was run with `weblingo`, its output shown as it came. What the language does not have yet is listed at the end,
-in [What is not in the language yet](#17-what-is-not-in-the-language-yet). Pages, which put WebLingo into HTML, are the
+in it was run with `weblingo`, its output shown as it came. See
+[What is not in the language yet](#17-what-is-not-in-the-language-yet) for current limits. Pages, which put WebLingo into HTML, are the
 WASP User Manual's (`Documents/wasp-user-manual.md`). Every built-in class's members, and the standard modules, are
 listed in the WebLingo Standard Library Reference (`Documents/weblingo-standard-library-reference.md`).
 
@@ -44,6 +44,7 @@ Hello, WebLingo!
 15. [The standard library](#15-the-standard-library)
 16. [Diagnostic codes](#16-diagnostic-codes)
 17. [What is not in the language yet](#17-what-is-not-in-the-language-yet)
+18. [Comparison with Other Languages](#18-comparison-with-other-languages)
 
 ---
 
@@ -2239,3 +2240,64 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
 - **Library**: a database's rows read one at a time, for results too large to hold whole; databases other than SQLite and SQL Server.
+
+## 18. Comparison with Other Languages
+
+### JavaScript
+
+- **Conditions and defaults.** JavaScript accepts `if (count)` and uses the truthiness of `count`. In WebLingo, an
+  integer in that condition raises `WL3001`. Use `if (count != 0)` for a nonzero test and `count ?? 10` for a
+  default that applies only to `null`, preserving a count of zero. See [Comparisons and logic](#comparisons-and-logic).
+  [ECMAScript specification](https://tc39.es/ecma262/multipage/abstract-operations.html#sec-toboolean)
+- **Declaration and string length.** WebLingo's `var` is block-scoped and requires an initializer, so use
+  `var count = 0;` and declare it outside the block if later statements need it. WebLingo counts Unicode scalar
+  values in strings, so `"😀".length` is `1`; JavaScript counts UTF-16 code units and gives `2`.
+  See [Variables and scope](#3-variables-and-scope) and [Strings](#6-strings).
+  [ECMAScript specification](https://tc39.es/ecma262/multipage/ecmascript-data-types-and-values.html#sec-ecmascript-language-types-string-type)
+
+### Python
+
+- **Blocks and conditions.** WebLingo uses braces for blocks and requires semicolons after declarations and expression
+  statements. Where Python uses `if items:`, use `if (items.length != 0) { writeLn(items[0]); }` in WebLingo with
+  `writeLn` imported from `std:system`. Passing the array itself as the condition raises `WL3001`.
+  See [Statements](#7-statements). [Python built-in types](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
+- **Indexes and integers.** Python's `items[-1]` reads the last item. WebLingo rejects that index with `WL3005`.
+  After checking that the array has an item, use `items[items.length - 1]`. Python integers grow beyond 64 bits.
+  WebLingo's `9223372036854775807 + 1` raises `WL3002`. See [Arrays](#arrays) and [Arithmetic](#arithmetic).
+  [Python built-in types](https://docs.python.org/3/library/stdtypes.html)
+
+### PHP
+
+- **Equality and concatenation.** PHP's `"2" == 2` is true. WebLingo's `"2" == 2` is false. PHP uses `.` to
+  concatenate and can convert numbers to strings in that operation. In WebLingo, `"Count: " + 2` raises `WL3001`.
+  Use `$"Count: {2}"` to produce `Count: 2`. See [Equality](#equality) and [Interpolation](#interpolation).
+  [PHP comparison operators](https://www.php.net/manual/en/language.operators.comparison.php)
+  · [PHP string operators](https://www.php.net/manual/en/language.operators.string.php)
+- **Collections.** PHP uses its array type for lists and keyed values. In WebLingo, use `[10, 20]` for an array
+  and `{"tea": 10}` for a map. With `var prices = {"tea": 10};`, `prices["coffee"]` raises `WL3007` for
+  the missing key and `prices?["coffee"]` gives `null`. See [Collections](#9-collections).
+  [PHP arrays](https://www.php.net/manual/en/language.types.array.php)
+
+### Perl
+
+- **Operand types and interpolation.** Perl's `"2" + 3` gives `5` by treating the string as a number.
+  In WebLingo it raises `WL3001`. Use `2 + 3` for arithmetic and `"2" + "3"` for the string `"23"`.
+  With `var name = "Ada";`, an ordinary WebLingo string `"Hello, $name"` includes the literal `$name`.
+  Use `$"Hello, {name}"` to produce `Hello, Ada`. See [Arithmetic](#arithmetic) and [Interpolation](#interpolation).
+  [Perl operators and string literals](https://perldoc.perl.org/perlop)
+
+### C#
+
+- **`var` and checked arithmetic.** C# infers a static type for a local declared with `var`. WebLingo checks values
+  at runtime, so `var value = 1; value = "one";` is valid. C# can run integer arithmetic in an unchecked context.
+  WebLingo's `9223372036854775807 + 1` raises `WL3002` in ordinary code. See [Variables and scope](#3-variables-and-scope)
+  and [Arithmetic](#arithmetic). [C# implicitly typed local variables](https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/implicitly-typed-local-variables)
+  · [C# checked and unchecked](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/statements/checked-and-unchecked)
+
+### Java
+
+- **Equality and concatenation.** Java's `==` compares references for strings, where `String.equals` compares
+  contents. In WebLingo, with `var prefix = "te";`, `(prefix + "a") == "tea"` is true. Arrays use identity,
+  so `[1, 2] == [1, 2]` is false. Java's `"Count: " + 2` produces a string. WebLingo raises `WL3001`
+  for those operands. Use `$"Count: {2}"`. See [Equality](#equality) and [Interpolation](#interpolation).
+  [Java Language Specification, expressions](https://docs.oracle.com/javase/specs/jls/se25/html/jls-15.html)
