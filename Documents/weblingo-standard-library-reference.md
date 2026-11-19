@@ -618,7 +618,8 @@ imports to name it, `import { Regex } from "std:regex";`.
 | `s.match(r)`, `s.matchAll(r)` | as `r.match(s)` and `r.matchAll(s)` |
 | `r.pattern`, `r.flags` | the pattern and the flags it was made of |
 
-Each operation may take a second; a pattern that backtracks longer stops with a `TimeoutError` (WL3010). `write`
+A match that exceeds its time limit stops with a `TimeoutError` (WL3010). The default is one second. Use
+`weblingo run --timeout 300 script.wlg` or `wasp run --timeout 300 page.wasp` to set it in milliseconds for that run. `write`
 writes a regular expression as `Regex:/pattern/flags`.
 
 ---

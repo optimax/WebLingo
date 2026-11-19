@@ -87,6 +87,36 @@ public sealed class BytecodeCommandLineTests : IDisposable
     }
 
     [Fact]
+    public void ARuntimeRegexTimeoutAppliesToSourceAndBothBytecodeKinds()
+    {
+        var main = Write("main.wlg", "import { Regex } from \"std:regex\";\n"
+            + "new Regex(\"^(a+)+$\").test(\"" + new string('a', 120) + "!\");\n");
+        var expected = Weblingo("run", "--timeout", "10", main);
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, expected.Exit);
+        Assert.Contains("ERROR WL3010 (TimeoutError): The regular expression /^(a+)+$/ took longer than 10 milliseconds to match.",
+            expected.Error);
+        foreach (var vm in new[] { "--register", "--stack" })
+        {
+            Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", vm, main).Exit);
+            Assert.Equal(expected, Weblingo("run", "--timeout", "10", Path.ChangeExtension(main, ".wlbc")));
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("0.5")]
+    [InlineData("2147483647")]
+    public void RunRejectsAnInvalidRegexTimeout(string? value)
+    {
+        var args = value is null ? new[] { "run", "--timeout" } : ["run", "--timeout", value, "main.wlg"];
+        var (exit, _, error) = Weblingo(args);
+        Assert.Equal(WebLingoCommandLine.UsageError, exit);
+        Assert.StartsWith("--timeout requires a whole number of milliseconds", error);
+    }
+
+    [Fact]
     public void TheFileHoldsNoneOfTheHostsPaths()
     {
         Write("lib/util.wlg", "export function twice(x) { return x * 2; }");

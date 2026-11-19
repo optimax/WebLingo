@@ -874,6 +874,8 @@ wasp --version
   ```
 
   `wasp run cli.wasp` writes `<p>Hello, World!</p>`, and `wasp run cli.wasp name=Ann`, `<p>Hello, Ann!</p>`.
+  `wasp run --timeout 300 cli.wasp` sets the regular expression match limit for this run to 300 milliseconds.
+  The default is one second.
 - **`wasp check`** compiles a page and reports its errors, without running it: `wasp check broken.wasp` writes
   `broken.wasp(1,8): ERROR WL2001: 'nope' is not defined.`
 - **`--scheme name=folder`** names a folder of native modules, over the configuration's.

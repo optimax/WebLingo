@@ -28,12 +28,21 @@ public sealed class WebLingoHeap
     public const int ObjectOverhead = 16;
 
     private readonly long _maxUnits;
+    private readonly TimeSpan _regexTimeout;
     private readonly List<object?> _objects = [];
     private readonly Stack<int> _free = new();
     private readonly List<WebLingoValue[]> _roots = [];
     private long _nextCollectionAt = FirstCollectionAt;
 
-    public WebLingoHeap(long maxUnits = DefaultMaxUnits) => _maxUnits = maxUnits;
+    public WebLingoHeap(long maxUnits = DefaultMaxUnits) : this(maxUnits, DefaultRegexTimeoutMilliseconds) { }
+
+    public WebLingoHeap(long maxUnits, int regexTimeoutMilliseconds)
+    {
+        if (regexTimeoutMilliseconds is < 1 or > MaxRegexTimeoutMilliseconds)
+            throw new ArgumentOutOfRangeException(nameof(regexTimeoutMilliseconds));
+        _maxUnits = maxUnits;
+        _regexTimeout = TimeSpan.FromMilliseconds(regexTimeoutMilliseconds);
+    }
 
     /// <summary>The units the live and the not yet collected objects take.</summary>
     public long Units { get; private set; }
@@ -715,8 +724,11 @@ public sealed class WebLingoHeap
     /// <summary>The value a decimal of this heap holds.</summary>
     public decimal GetDecimal(WebLingoValue value) => Get<DecimalObject>(value, WebLingoValueKind.Decimal).Value;
 
-    /// <summary>How long a regular expression's operation may take, a pattern that backtracks without end then a TimeoutError (section 3.6).</summary>
-    public static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
+    public const int DefaultRegexTimeoutMilliseconds = 1000;
+    public const int MaxRegexTimeoutMilliseconds = int.MaxValue - 1;
+
+    /// <summary>The default regular expression timeout (specification, section 3.6).</summary>
+    public static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(DefaultRegexTimeoutMilliseconds);
 
     /// <summary>The units of memory the execution may still use, without collecting.</summary>
     public long RoomLeft => _maxUnits - Units;
@@ -752,7 +764,7 @@ public sealed class WebLingoHeap
         System.Text.RegularExpressions.Regex regex;
         try
         {
-            regex = new System.Text.RegularExpressions.Regex(pattern, options, RegexTimeout);
+            regex = new System.Text.RegularExpressions.Regex(pattern, options, _regexTimeout);
         }
         catch (ArgumentException exception)
         {

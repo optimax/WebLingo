@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using WebLingo.Bytecode;
@@ -79,14 +80,34 @@ public static class WebLingoCommandLine
         if (args.Length >= 2 && (args[0] is "run" or "check" || (args[0] == "compile" && program.Bytecode)))
         {
             // run|check|compile [--scheme name=folder]… [for compile, --register, the default, or --stack, or their aliases
-            // --vm register and --vm stack] file [name=value …, for run]: the schemes over the configuration's (section 3.9).
+            // --vm register and --vm stack] [--timeout ms, for run] file [name=value …, for run].
             var schemes = new Dictionary<string, string>(StringComparer.Ordinal);
             WebLingoBytecodeKind? vm = null;
+            var run = args[0] == "run";
+            int? regexTimeout = null;
             var at = 1;
             string? wrong = null;
             while (wrong is null && at < args.Length
-                   && (args[at] == "--scheme" || (args[at] is "--register" or "--stack" or "--vm" && args[0] == "compile")))
+                   && (args[at] == "--scheme" || (args[at] == "--timeout" && run)
+                       || (args[at] is "--register" or "--stack" or "--vm" && args[0] == "compile")))
             {
+                if (args[at] == "--timeout")
+                {
+                    if (regexTimeout is not null)
+                    {
+                        wrong = "--timeout may be given only once.";
+                        break;
+                    }
+                    if (at + 1 == args.Length || !int.TryParse(args[at + 1], NumberStyles.None, CultureInfo.InvariantCulture, out var ms)
+                        || ms is < 1 or > WebLingoHeap.MaxRegexTimeoutMilliseconds)
+                    {
+                        wrong = "--timeout requires a whole number of milliseconds from 1 to 2147483646.";
+                        break;
+                    }
+                    regexTimeout = ms;
+                    at += 2;
+                    continue;
+                }
                 if (args[at] is "--register" or "--stack" or "--vm")
                 {
                     var named = args[at] == "--vm" ? (at + 1 < args.Length ? args[at + 1] : "") : args[at][2..];
@@ -129,8 +150,9 @@ public static class WebLingoCommandLine
                 }
                 else if (TryParameters(args, at + 1, out var parameters, out var value))
                 {
-                    return bytecode ? RunBytecode(program, true, path, parameters, schemes, output, error, input)
-                        : RunFile(program, true, path, parameters, schemes, output, error, input);
+                    var timeout = regexTimeout ?? WebLingoHeap.DefaultRegexTimeoutMilliseconds;
+                    return bytecode ? RunBytecode(program, true, path, parameters, schemes, output, error, input, timeout)
+                        : RunFile(program, true, path, parameters, schemes, output, error, input, timeout);
                 }
                 else
                 {
@@ -142,11 +164,13 @@ public static class WebLingoCommandLine
 
         // Without arguments, its version first, then how it is used (the owner's answer, 18 November 2026).
         if (args.Length == 0) output.WriteLine(program.Version);
-        var file = program.Options + "[--scheme <name>=<folder> …] <file" + program.Extension + ">";
+        var file = $"<file{program.Extension}>";
+        var options = program.Options + "[--scheme <name>=<folder> …]";
         var bytecodeUsage = program.Bytecode
             ? $" | compile [--register|--stack] [--scheme <name>=<folder> …] <file{program.Extension}> | disasm <file{BytecodeExtension}>"
             : "";
-        output.WriteLine($"Usage: {program.Name} --version | run {file} [name=value …] | check {file}{bytecodeUsage}");
+        output.WriteLine($"Usage: {program.Name} --version | run {options} [--timeout <ms>] {file} [name=value …]"
+            + $" | check {options} {file}{bytecodeUsage}");
         output.WriteLine("  run       compiles the file and runs it, giving its parameters the values after it, each a string");
         if (program.RunsFileNamedFirst) output.WriteLine($"            {program.Name} <file{program.Extension}> [name=value …] is the same as run");
         output.WriteLine("  check     compiles the file and reports its errors, without running it");
@@ -158,6 +182,7 @@ public static class WebLingoCommandLine
             output.WriteLine($"            run and check take a {BytecodeExtension} too, which run runs on the VM it is for");
         }
         output.WriteLine($"  --scheme  names a folder of native modules, over {program.Configuration}'s, in the file's folder");
+        output.WriteLine("  --timeout sets the regular expression match timeout for run, in milliseconds (default 1000)");
         foreach (var line in program.OptionsHelp) output.WriteLine(line);
         return args.Length == 0 ? Success : UsageError;
     }
@@ -194,7 +219,8 @@ public static class WebLingoCommandLine
     }
 
     private static int RunFile(WebLingoCommandLineProgram program, bool run, string path, IReadOnlyDictionary<string, string> parameters,
-        IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error, IWebLingoConsoleInput? input)
+        IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error, IWebLingoConsoleInput? input,
+        int regexTimeout = WebLingoHeap.DefaultRegexTimeoutMilliseconds)
     {
         if (!TryReadText(path, error, out var source)) return FileUnreadable;
         var text = new WebLingoSourceText(source, path);
@@ -206,7 +232,8 @@ public static class WebLingoCommandLine
         if (!run) return Success;
 
         // The VM imports modules while the program runs as the compiler imports them, with the same resolver (section 3.9).
-        var result = OnRegisterVm(compiled.Module, new WebLingoModuleLoader(host.Options), compilation.Components, Context(host, parameters, LineOf));
+        var context = Context(host, parameters, LineOf, regexTimeout);
+        var result = OnRegisterVm(compiled.Module, new WebLingoModuleLoader(host.Options), compilation.Components, context);
         output.Flush();
         if (result.Succeeded) return Success;
         var located = compilation.Locate(result.Error!);
@@ -297,7 +324,8 @@ public static class WebLingoCommandLine
     /// the VM it is for, a runtime error located from the file's source positions.
     /// </summary>
     private static int RunBytecode(WebLingoCommandLineProgram program, bool run, string path, IReadOnlyDictionary<string, string> parameters,
-        IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error, IWebLingoConsoleInput? input)
+        IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error, IWebLingoConsoleInput? input,
+        int regexTimeout = WebLingoHeap.DefaultRegexTimeoutMilliseconds)
     {
         if (!TryRead(path, error, out var bytes, out var register, out var stack, out var positions)) return Failed(bytes);
         var main = register?.Name ?? stack!.Name;
@@ -322,9 +350,8 @@ public static class WebLingoCommandLine
             }
         }
         var loader = new WebLingoModuleLoader(host.Options);
-        var result = register is not null
-            ? OnRegisterVm(register, loader, null, Context(host, parameters, LineOf))
-            : OnStackVm(stack!, loader, Context(host, parameters, LineOf));
+        var context = Context(host, parameters, LineOf, regexTimeout);
+        var result = register is not null ? OnRegisterVm(register, loader, null, context) : OnStackVm(stack!, loader, context);
         output.Flush();
         if (result.Succeeded) return Success;
         var diagnostic = result.Error!;
@@ -463,10 +490,12 @@ public static class WebLingoCommandLine
             input);
     }
 
-    private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters, Func<string?, int, int> lines) =>
+    private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters,
+        Func<string?, int, int> lines, int regexTimeout) =>
         new(new WebLingoWorkerId(0))
         {
             Lines = lines,
+            RegexTimeoutMilliseconds = regexTimeout,
             Services = host.Services,
             Clock = new SystemClock(new DotNetClock()),
             WallClock = new DotNetClock(),

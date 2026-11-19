@@ -83,8 +83,8 @@ public sealed class WaspTests : IDisposable
 
         output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.UsageError, WebLingoWaspCommandLine.Run(["page.wasp"], output, new StringWriter()));
-        Assert.StartsWith("Usage: wasp --version | run [--root <folder>] [--scheme <name>=<folder> …] <file.wasp> [name=value …] | "
-            + "check [--root <folder>] [--scheme <name>=<folder> …] <file.wasp>", output.ToString());
+        Assert.StartsWith("Usage: wasp --version | run [--root <folder>] [--scheme <name>=<folder> …] [--timeout <ms>] "
+            + "<file.wasp> [name=value …] | check [--root <folder>] [--scheme <name>=<folder> …] <file.wasp>", output.ToString());
         Assert.Contains("  --root the application's root", output.ToString());
 
         output = new StringWriter();

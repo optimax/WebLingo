@@ -7,7 +7,7 @@ namespace WebLingo.Runtime;
 // literal: r.test(s) or r.isMatch(s), r.match(s) or r.exec(s), r.matchAll(s) or r.matches(s), r.replace(s, replacement)
 // and r.split(s), and a string's replace, split, match and matchAll given one; and r.pattern and r.flags. A match is a
 // new array of its groups' text, the whole match first, a group that took part in none null. Each operation's time is
-// limited (WebLingoHeap.RegexTimeout), so that a pattern that backtracks without end is a TimeoutError (WL3010).
+// limited (WebLingoExecutionContext.RegexTimeoutMilliseconds), so that a slow match is a TimeoutError (WL3010).
 public static partial class WebLingoMembers
 {
     private static bool IsRegexMethod(WebLingoMember member) =>
@@ -83,10 +83,17 @@ public static partial class WebLingoMembers
                     return TryStrings(regex.Split(text), heap, out result, out error);
             }
         }
-        catch (RegexMatchTimeoutException)
+        catch (RegexMatchTimeoutException timeout)
         {
+            var milliseconds = (int)timeout.MatchTimeout.TotalMilliseconds;
+            var duration = milliseconds switch
+            {
+                1 => "1 millisecond",
+                WebLingoHeap.DefaultRegexTimeoutMilliseconds => "1 second",
+                _ => milliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture) + " milliseconds"
+            };
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.Timeout,
-                $"The regular expression /{pattern}/{flags} took longer than {(int)WebLingoHeap.RegexTimeout.TotalSeconds} second to match.");
+                $"The regular expression /{pattern}/{flags} took longer than {duration} to match.");
             return false;
         }
         catch (InsufficientRoom room)

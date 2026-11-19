@@ -28,6 +28,10 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     /// <summary>How many instructions the execution may run before it is stopped (WL3003).</summary>
     public long InstructionBudget { get; init; } = long.MaxValue;
     public WebLingoResourceBudget Resources { get; init; } = WebLingoResourceBudget.Default;
+
+    /// <summary>The time limit in milliseconds for a regular expression match in this execution. The default is one second.</summary>
+    public int RegexTimeoutMilliseconds { get; init; } = WebLingoHeap.DefaultRegexTimeoutMilliseconds;
+
     /// <summary>The host's clock, which <c>delay</c>'s timers wait on; without one, the execution runs in virtual time (section 3.8).</summary>
     public IWebLingoExecutionClock? Clock { get; init; }
 

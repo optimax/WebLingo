@@ -693,7 +693,8 @@ true
 - **Replacing and splitting**: `s.replace(r, replacement)` or `r.replace(s, replacement)` replaces every match, `$1` in
   the replacement standing for the first group, `$0` for the whole match; `s.split(r)` or `r.split(s)` splits at each.
 - **A pattern is written in a string**, so its backslashes are doubled: `"\\d+"` is the pattern `\d+`.
-- **A pattern that takes more than a second** to match, as some do on some text, stops with a `TimeoutError`.
+- **A slow match** stops with a `TimeoutError` after one second by default. To set the limit for a script run, use
+  `weblingo run --timeout 300 script.wlg`. The timeout is a whole number of milliseconds, from 1 to 2,147,483,646.
 
 ### JSON
 

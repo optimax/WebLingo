@@ -76,7 +76,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         }
 
         // The execution's own heap (worker-local, section 4.3), whose roots are the constants and the frames.
-        var heap = new WebLingoHeap(context.Resources.MaxHeapUnits);
+        var heap = new WebLingoHeap(context.Resources.MaxHeapUnits, context.RegexTimeoutMilliseconds);
         heap.FileSystem = context.FileSystem;
         heap.Network = context.Network;
         heap.Databases = context.Databases;
