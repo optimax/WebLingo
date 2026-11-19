@@ -941,6 +941,16 @@ row conversion as `query`. The existing `query` method continues to return an ar
 
 **As built** (18 November 2026; Proposed, §15.2, "The machine's environment"): `std:env`, `std/env.dll`, through the platform's `IWebLingoEnvironment`, `DotNetEnvironment` on .NET.
 
+### 7.16 Standard-library utilities
+
+The owner approved the following order on 19 November 2026 after the path, URL and CSV modules shipped.
+
+- **Add Gzip and ZIP Compression.** Work with bytes in memory. Require an explicit output limit for decompression.
+- **Add Seeded Random Numbers.** Produce reproducible sequences for tests and simulations. Secure random bytes
+  are available through `std:crypto`.
+- **Add CLI Subprocess Execution.** Let `weblingo` scripts run a program with arguments and read its exit status
+  and output. WASP subprocess access remains a separate decision.
+
 ---
 
 ## 8. M0.6 solution scaffolding (WL-S001–WL-S016) — approved
