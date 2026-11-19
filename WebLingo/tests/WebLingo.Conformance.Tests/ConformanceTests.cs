@@ -360,7 +360,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { writeLn } from \"std:system\"; class P { constructor(x = 0, y = 0) { this.x = x; this.y = y; } move(dx = 1) { return new P(this.x + dx, this.y); } } writeLn(new P()); writeLn(new P(1).move()); writeLn(new P(1, 2).move(5));", "P {x: 0, y: 0}\nP {x: 2, y: 0}\nP {x: 6, y: 2}")]
     [InlineData("import { writeLn } from \"std:system\"; var f = function (a = \"x\") { return a; }; writeLn(f()); var g = f; writeLn(g(\"y\"));", "x\ny")]
     [InlineData("import { writeLn } from \"std:system\"; var b = 9; function f(a, b = b) { return b; } writeLn(f(1));", "9")]
-    [InlineData("import { writeLn } from \"std:system\"; var m = {a: 1}; writeLn(m?[\"a\"]); writeLn(m?[\"b\"]); writeLn([1]?[5]); writeLn([1]?[-1]); writeLn(\"ab\"?[9]); writeLn(\"ab\"?[1]);", "1\nnull\nnull\nnull\nnull\nb")]
+    [InlineData("import { writeLn } from \"std:system\"; var m = {a: 1}; writeLn(m?[\"a\"]); writeLn(m?[\"b\"]); "
+        + "writeLn([1]?[5]); writeLn([1]?[-2]); writeLn(\"ab\"?[9]); writeLn(\"ab\"?[1]);", "1\nnull\nnull\nnull\nnull\nb")]
     [InlineData("import { writeLn } from \"std:system\"; var rows = null; writeLn(rows?[0]?[\"name\"]); rows = [{name: \"x\"}]; writeLn(rows?[0]?[\"name\"]); writeLn(rows?[1]?[\"name\"]);", "null\nx\nnull")]
     [InlineData("import { writeLn } from \"std:system\"; var i = 0; var n = null; writeLn(n?[i = 5]); writeLn(i); var m = {a: [1]}; writeLn(m?[\"a\"]?[0]); writeLn(m?[\"b\"]?[0]);", "null\n5\n1\nnull")]
     [InlineData("import { writeLn } from \"std:system\"; var s = #{1, \"a\", 1, null}; writeLn(s.length); writeLn(s.has(\"a\")); writeLn(s.has(2)); writeLn(#{}); writeLn(#{\"q\"}); writeLn([#{true}]);", "3\ntrue\nfalse\n#{}\n#{\"q\"}\n[#{true}]")]
@@ -718,6 +719,15 @@ public sealed class ConformanceTests : IDisposable
         "&lt;a href=&#39;x&#39;&gt;&amp;\n#zWebLingoz\n/a%20b?c\na%20b%26c%3Dd\nit\\u0027s \\u003c\\/script\\u003e\nred\nzWebLingoz\n\n5")]
     [InlineData("import { writeLn } from \"std:system\"; import { Html } from \"std:html\"; writeLn(Html.js([1, \"<b>\", null])); writeLn(Html.js(5)); writeLn(Html.js({ a: true }));", "[1,\"\\u003cb\\u003e\",null]\n 5 \n{\"a\":true}")]
     [InlineData("import { writeLn } from \"std:system\"; class Html { static js(v) { return \"mine\"; } } writeLn(Html.js(1));", "mine")]
+    [InlineData("import { writeLn } from \"std:system\"; var a = [10, 20, 30]; a[-1] += 2; a[-2] = 25; "
+        + "writeLn([a[-3], a?[-2], a[-1], a?[-4], []?[-1], a?[-9223372036854775807 - 1]]); "
+        + "var m = {}; m[-1] = 50; writeLn(m[-1]);", "[10, 25, 32, null, null, null]\n50")]
+    [InlineData("import { writeLn } from \"std:system\"; class Items extends Array {} "
+        + "var a = new Items(); a.push(1); a[-1] = 2; writeLn(a[-1]);", "2")]
+    [InlineData("import { writeLn } from \"std:system\"; var a = [1, 2]; "
+        + "try { a[-3] = 0; } catch (IndexError e) { writeLn(e.code + \" \" + e.message); } "
+        + "try { writeLn(a[-3]); } catch (IndexError e) { writeLn(e.code + \" \" + e.message); }",
+        "WL3005 The index -3 is outside -2 to -1.\nWL3005 The index -3 is outside -2 to -1.")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -942,7 +952,7 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("var a = [1]; a.length = 2;", "WL3001")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn([].pop());", "WL3005")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn([1, 2][2]);", "WL3005")]
-    [InlineData("var a = [1]; a[-1] = 0;", "WL3005")]
+    [InlineData("var a = [1]; a[-2] = 0;", "WL3005")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn([1][\"0\"]);", "WL3001")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn([1].push);", "WL3001")]
     [InlineData("import { writeLn } from \"std:system\"; class P { iterate() { return 5; } } foreach (var x in new P()) writeLn(x);", "WL3006")]

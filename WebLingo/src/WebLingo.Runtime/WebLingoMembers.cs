@@ -1195,7 +1195,7 @@ public static partial class WebLingoMembers
         if (target.Kind == WebLingoValueKind.Array)
         {
             var elements = heap.GetArray(target);
-            if (!TryIndex(index, elements.Count, out var at, out error)) return Absent(optional, ref error);
+            if (!TryIndex(index, elements.Count, out var at, out error, fromEnd: true)) return Absent(optional, ref error);
             result = elements[(int)at];
             return true;
         }
@@ -1283,7 +1283,7 @@ public static partial class WebLingoMembers
         if (target.Kind == WebLingoValueKind.Array)
         {
             var elements = heap.GetArray(target);
-            if (!TryIndex(index, elements.Count, out var at, out error)) return false;
+            if (!TryIndex(index, elements.Count, out var at, out error, fromEnd: true)) return false;
             elements[(int)at] = value;
             return true;
         }
@@ -1518,8 +1518,9 @@ public static partial class WebLingoMembers
         return i;
     }
 
-    /// <summary>An index, which must be an int64 from 0 to <paramref name="length"/> − 1.</summary>
-    private static bool TryIndex(WebLingoValue index, long length, out long position, out WebLingoRuntimeError? error)
+    /// <summary>An int64 index. An array may also count from the end, starting at −1 for the last element.</summary>
+    private static bool TryIndex(WebLingoValue index, long length, out long position, out WebLingoRuntimeError? error,
+        bool fromEnd = false)
     {
         position = 0;
         if (index.Kind != WebLingoValueKind.Int64)
@@ -1528,12 +1529,16 @@ public static partial class WebLingoMembers
                 $"An index must be an integer, not {WebLingoValueFormatter.Describe(index)}.");
             return false;
         }
-        position = index.AsInt64;
+        var offset = index.AsInt64;
+        var negative = fromEnd && offset < 0;
+        position = negative ? length + offset : offset;
         if (position < 0 || position >= length)
         {
+            var first = negative ? -length : 0;
+            var last = negative ? -1 : length - 1;
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.IndexOutOfRange, length == 0
-                ? $"There is no index {Invariant(position)} in something empty."
-                : $"The index {Invariant(position)} is outside 0 to {Invariant(length - 1)}.");
+                ? $"There is no index {Invariant(offset)} in something empty."
+                : $"The index {Invariant(offset)} is outside {Invariant(first)} to {Invariant(last)}.");
             return false;
         }
         error = null;

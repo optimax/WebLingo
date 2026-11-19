@@ -1132,6 +1132,10 @@ null
 
 - `[a, b, c]` makes an array, of any values; `[]` an empty one.
 - `a[i]` reads element `i`, from 0, and `a[i] = v` replaces it. The index must be an integer.
+- Negative array indexes count from the end. For `var items = [10, 20, 30];`, `items[-1]` is `30` and
+  `items[-3]` is `10`. After `items[-1] = 40;`, the array is `[10, 20, 40]`. An optional read such as
+  `items?[-4]` gives `null` when the array is too short. Map keys and arguments to methods such as `slice`
+  follow their own rules.
 - `a.push(v)` adds at the end, `a.pop()` removes the last and gives it, and `a.length` is the number of elements.
 - An index outside the array is an error:
 
@@ -2292,8 +2296,8 @@ WebLingo is pre-alpha, and some of what other languages have is still to come. T
   statements. Where Python uses `if items:`, use `if (items.length != 0) { writeLn(items[0]); }` in WebLingo with
   `writeLn` imported from `std:system`. Passing the array itself as the condition raises `WL3001`.
   See [Statements](#7-statements). [Python built-in types](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
-- **Indexes and integers.** Python's `items[-1]` reads the last item. WebLingo rejects that index with `WL3005`.
-  After checking that the array has an item, use `items[items.length - 1]`. Python integers grow beyond 64 bits.
+- **Indexes and integers.** In both Python and WebLingo, `items[-1]` reads the last item of an array or list.
+  WebLingo also lets you write through that index. Python integers grow beyond 64 bits.
   WebLingo's `9223372036854775807 + 1` raises `WL3002`. See [Arrays](#arrays) and [Arithmetic](#arithmetic).
   [Python built-in types](https://docs.python.org/3/library/stdtypes.html)
 
@@ -2319,6 +2323,8 @@ WebLingo is pre-alpha, and some of what other languages have is still to come. T
 
 ### C#
 
+- **Indexing from the end.** C# spells the last array index `items[^1]`. In WebLingo, write `items[-1]`.
+  See [Arrays](#arrays).
 - **`var` and checked arithmetic.** C# infers a static type for a local declared with `var`. WebLingo checks values
   at runtime, so `var value = 1; value = "one";` is valid. C# can run integer arithmetic in an unchecked context.
   WebLingo's `9223372036854775807 + 1` raises `WL3002` in ordinary code. See [Variables and scope](#3-variables-and-scope)

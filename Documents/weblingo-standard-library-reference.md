@@ -191,7 +191,7 @@ instances holding a value of that kind (the Language Reference, "Classes of valu
 | Member | What it is |
 |---|---|
 | `a.length` | how many elements an array has |
-| `a[i]`, `a[i] = v` | its element `i`, from 0; WL3005 outside it, `a?[i]` `null` there |
+| `a[i]`, `a[i] = v` | reads or replaces its element `i`, counting from 0 or from the end with a negative index. `-1` is the last element. WL3005 outside the array, or `null` from `a?[i]` |
 | `a.push(v)` | adds `v` at its end |
 | `a.pop()` | removes its last element, and gives it; WL3005 when it is empty |
 | `a.insert(i, v)`, `a.removeAt(i)` | puts `v` at `i`, from 0 to its length; removes the element at `i`, and gives it |
