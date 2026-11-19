@@ -37,9 +37,10 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 
 ## 1. Built-in functions
 
-`write`, `writeLn` and `delay` are `std:system`'s, which a program imports, `import { write, writeLn, delay } from
-"std:system";`: nothing of a standard module is in a program that does not import it. The classes of the kinds of values
-no literal makes are their modules' too, `Bytes` and `BytesBuilder` `std:bytes`'s, `DateTime` `std:datetime`'s, `Regex`
+`write`, `writeLn` and `delay` are `std:system`'s, which every program imports implicitly, so that they are in its scope
+without an import; an import of them, `import { write, writeLn, delay } from "std:system";`, is allowed, and means the
+same. Nothing of another standard module is in a program that does not import it: the classes of the kinds of values no
+literal makes are their modules', `Bytes` and `BytesBuilder` `std:bytes`'s, `DateTime` `std:datetime`'s, `Regex`
 `std:regex`'s, `Json` `std:json`'s and `Html` `std:html`'s, imported to name them, `import { DateTime } from
 "std:datetime";`; a value of their kinds, which a module or a method gives, keeps its members without the import.
 

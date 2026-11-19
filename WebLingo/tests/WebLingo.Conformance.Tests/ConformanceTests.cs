@@ -1126,12 +1126,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { writeLn } from \"std:system\"; writeLn(JSON.stringify(1));", "program.wl(1,47): error WL2001: 'JSON' is not defined; did you mean Json, from std:json?")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn(Json.stringify(1));", "program.wl(1,47): error WL2001: 'Json' is not defined; did you mean Json, from std:json?")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn(Html.url(\"/\"));", "program.wl(1,47): error WL2001: 'Html' is not defined; did you mean Html, from std:html?")]
-    [InlineData("Writeln(1);", "program.wl(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn, from std:system?")]
-    // write and writeLn, std:system's, only by an import (section 3.9, M0.20.3).
-    [InlineData("writeLn(1);", "program.wl(1,1): error WL2001: 'writeLn' is not defined; did you mean writeLn, from std:system?")]
-    // delay, std:system's too, and the classes of the kinds of values no literal makes, each a module's, only by an import
-    // (section 3.9, M0.20.4).
-    [InlineData("delay(1);", "program.wl(1,1): error WL2001: 'delay' is not defined; did you mean delay, from std:system?")]
+    [InlineData("Writeln(1);", "program.wl(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn?")]
+    // The classes of the kinds of values no literal makes, each a module's, only by an import (section 3.9, M0.20.4).
     [InlineData("var b = Bytes.from(\"x\");", "program.wl(1,9): error WL2001: 'Bytes' is not defined; did you mean Bytes, from std:bytes?")]
     [InlineData("var b = new BytesBuilder();",
         "program.wl(1,13): error WL2001: 'BytesBuilder' is not defined; did you mean BytesBuilder, from std:bytes?")]
@@ -1145,6 +1141,17 @@ public sealed class ConformanceTests : IDisposable
     {
         var (exit, _, error) = Weblingo("check", source);
         Assert.Equal((WebLingoCommandLine.CompilationFailed, reported), (exit, error.Split('\n')[0].TrimEnd('\r')));
+    }
+
+    [Fact]
+    public void StdSystemIsImportedImplicitly()
+    {
+        // write, writeLn and delay, std:system's, are every program's without an import, an import of them allowed and
+        // meaning the same (the owner's answer, 18 November 2026, "Standard Modules, Imported: The Rest", A3).
+        Assert.Equal((WebLingoCommandLine.Success, "tea time\n", ""), Weblingo("run", "write(\"tea \"); await delay(1); writeLn(\"time\");"));
+        Assert.Equal((WebLingoCommandLine.Success, "tea\n", ""), Weblingo("run", "import { writeLn, delay } from \"std:system\"; await delay(1); writeLn(\"tea\");"));
+        Assert.Equal((WebLingoCommandLine.Success, "[module std:system, true]\n", ""),
+            Weblingo("run", "import system from \"std:system\"; writeLn([system, system.delay == delay]);"));
     }
 
     [Fact]

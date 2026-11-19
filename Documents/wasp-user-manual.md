@@ -203,8 +203,8 @@ A few rules make pages come out as you would expect:
 - **`%>` inside a string or a comment does not end a block**: `<% var end = "%>"; %>` is one block. A `//` comment runs
   to the end of its line, so a block whose last line is a `//` comment must close on the next line.
 - **`write(value)` and `writeLn(value)`**, inside a block, write a value as `<%-` does, not escaped, `writeLn` with a
-  line break after it. A page imports them, `<% import { write, writeLn } from "std:system"; %>`, as any script does;
-  its text and its `<%= %>` need no import.
+  line break after it. A page has them without an import, as any script does, every program importing `std:system`
+  implicitly; an import of them, `<% import { write, writeLn } from "std:system"; %>`, is allowed, and means the same.
 
 Everything else inside the blocks is the WebLingo language: variables (`var`, `const`), functions, classes, arrays
 (`[1, 2]`), maps (`{ name: "Ann" }`), `if`, `while`, `for`, `foreach`, `try`, and the rest. An interpolated string,

@@ -1965,8 +1965,8 @@ Hello, Ann!
 
 The standard library is a set of modules named `std:` and a name, imported as any module is. The WebLingo Standard
 Library Reference (`Documents/weblingo-standard-library-reference.md`) lists them, and every built-in class's members.
-Nothing of a standard module is in a program that does not import it: a program has, without an import, only what the
-language itself makes, the classes its literals and statements make or need (`Object`, `Boolean`, `Integer`, `Number`,
+Nothing of a standard module is in a program that does not import it, but `std:system`'s, which every program imports
+implicitly: a program has, without an import, only what the language itself makes, the classes its literals and statements make or need (`Object`, `Boolean`, `Integer`, `Number`,
 `Decimal`, `String`, `Array`, `Map`, `Set`, `Function`, `Class`, `Task`, `Module`, `Iterator`, `Error` and the runtime
 errors' classes) and the constants `Infinity` and `NaN`. A kind of value is every program's exactly when the language's
 own syntax makes it, as literals make integers and strings; the classes of the others are their modules', `Bytes` and
@@ -1977,13 +1977,14 @@ name that differs from one in scope only by case names that one:
 
 ```text
 program.wl(1,10): error WL2001: 'Database' is not defined; did you mean Database, from std:db?
-program.wl(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn, from std:system?
+program.wl(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn?
 ```
 
 ### `std:system`
 
-Writing, and waiting: `import { write, writeLn, delay } from "std:system";`. A script that imports neither `write` nor
-`writeLn` cannot write.
+Writing, and waiting. Every program imports it implicitly, so that `write`, `writeLn` and `delay` are in its scope
+without an import; an import of them, `import { write, writeLn, delay } from "std:system";`, is allowed, and means the
+same.
 
 | Function | What it does |
 |---|---|
