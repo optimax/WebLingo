@@ -4219,3 +4219,11 @@ On accounts that registered WebLingo for `.wl`, running `Scripts/add-wlg-file-ty
 Verify an upgrade with both WebLingo and another application's entries already present for `.wl`. Check that `.wlg` opens with WebLingo when selected, that the other application's entries survive, and that running the migration twice produces the same result.
 
 2026-11-19 (Codex): Fixed in `e7028b2`. The migration removes WebLingo's legacy ProgID and supported-type entries, including the unnamed default when it still points to WebLingo. Generic extension metadata and the explicit Windows default choice are preserved. Windows checks on the task branch and main included `weblingo check`, a Release build with zero warnings, and the full suite (4,233 passed, six skipped). In a temporary registry subtree, two runs produced identical contents with either WebLingo or another app's existing ProgID. Windows resolved the new open command by extension and by application, and it ran a .wlg script. The live Explorer defaults were untouched. The migration is Windows-only.
+
+## [DONE] Preserve a literal U+FEFF in the first CSV field
+
+When the first field starts with U+FEFF, `WebLingoCsvModule.WriteRow` can emit the character unquoted. The parser then consumes it as a byte-order mark. A four-character field containing U+FEFF followed by `Tea` came back as the three-character string `Tea`. Quote the first field when its leading U+FEFF would otherwise appear at the start of the CSV text.
+
+Add round-trip tests for a leading U+FEFF in the first data field and in the first header. Also check that parsing an input file with a genuine byte-order mark still removes the mark.
+
+2026-11-19 (Codex): Fixed in `08e97c7`. The writer quotes an initial field or header beginning with a literal U+FEFF. Regressions on both VMs confirmed data and header round-trips and consumption of a leading BOM in the input. The Windows Release build and full suite passed on the task branch and main (4,237 passed, six skipped, zero build warnings). The round-trips worked in the CLI and WASP, and the CLI parsed a real UTF-8 CSV file decoded with its BOM intact. Linux was not run locally.

@@ -2,12 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## Preserve a literal U+FEFF in the first CSV field
-
-When the first field starts with U+FEFF, `WebLingoCsvModule.WriteRow` can emit the character unquoted. The parser then consumes it as a byte-order mark. A four-character field containing U+FEFF followed by `Tea` came back as the three-character string `Tea`. Quote the first field when its leading U+FEFF would otherwise appear at the start of the CSV text.
-
-Add round-trip tests for a leading U+FEFF in the first data field and in the first header. Also check that parsing an input file with a genuine byte-order mark still removes the mark.
-
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value
