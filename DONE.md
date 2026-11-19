@@ -4195,3 +4195,11 @@ Q1. Should the first VS Code debugger launch local `.wlg` scripts on the registe
 A: Use the register VM (the default) and yes to all of your suggestions.
 
 2026-11-19 (Codex). Implemented in `70b49ad`, following the approved scope in the architecture specification §5.7. The extension launches local .wlg scripts on the register VM. Debug metadata stays in memory and variables show bounded previews. VS Code 1.129.1 on Windows hit a breakpoint and inspected a local. The protocol tests covered stepping, stack frames, shadowing and termination. The Windows Release builds passed with zero warnings or errors and the full suite passed 4,223 tests with six skipped on the branch and main. CLI and WASP samples passed. Linux was not tested locally.
+
+## [DONE] Use the heap's byte accounting for gzip and ZIP decompression
+
+`gunzip` rejected a 2,048-byte result with `WL3003` when 979 heap units were free. A direct `Bytes` allocation of the same size succeeded. In `WebLingoCompressionModule.TryRead`, use the heap's allocation rule of one unit per eight bytes plus object overhead, and allow collection before reporting exhaustion. Keep the caller's `maxBytes` limit in bytes, cumulative across ZIP entries.
+
+Verify that both `gunzip` and `unzip` accept output that fits under both limits, including when collection frees the necessary space. Check that exceeding `maxBytes` still reports `WL3001` and exhausting the heap still reports `WL3003`.
+
+2026-11-19 (Codex): Fixed in `dbbee82`. gzip and ZIP use the heap byte-allocation rule and can collect before reporting WL3003. The cumulative caller byte limit still reports WL3001. The Windows Release build and full suite passed on the task branch and main (4,231 passed, six skipped, zero build warnings). The CLI and WASP compression examples and CLI reading of an independently generated ZIP passed. Linux was not run locally.
