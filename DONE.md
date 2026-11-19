@@ -3989,3 +3989,29 @@ Analyze WL syntax and try to discover anything that would or could be potentiall
 Cover at the very least the following languages: JavaScript, Python, PHP, Perl, C#, Java.
 
 Done (Codex, 2026-11-19, `c98446d`). The Release build on main had zero warnings and errors. The Windows suite passed 4,151 tests, with six integration tests skipped. Seventeen comparison examples passed on both VMs. Linux was not tried.
+
+## [DONE] Change the WebLingo Source Extension to `.wlg`
+
+Replace `.wl` with `.wlg` throughout WebLingo. Rename scripts, modules, WASP route handlers, and paths such as `Examples.wl`. Update CLI and WASP file discovery, import resolution, editor grammars and associations, the Windows file-association script, installers, build and CI scripts, examples, tests, and documentation. Wolfram Language already uses `.wl` for package source.
+
+Done (Codex, 2026-11-19, `db41a60`). On Windows, the Release build on main had zero errors or warnings. The suite passed 4,151 tests and six integration tests were skipped. The CLI samples ran, the WASP sample rendered, and the Windows installer scripts passed `weblingo check`. Registry registration, packaging, and Linux were not exercised.
+
+## [DONE] BytesBuilder Extendability
+
+A builder prints as `BytesBuilder:[104, 105]`, and nothing can extend `BytesBuilder` now, the same as `Bytes`. Previously a class could extend it — make it extensible again.
+
+All standard classes must behave like real classes from the script's perspective.
+
+Verified already implemented (Codex, 2026-11-19, `fded9a3`, `76a1e84`, `c9fcbe9`). `BytesTests` covers both VMs, including extending `Bytes` and `BytesBuilder`, construction, and inherited behavior. The full Windows suite on main passed with six integration tests skipped. Linux was not tried.
+
+## [DONE] Append Mode
+
+`read(count)` returns at most 16 MiB at a time, and there’s no `"ab"` (append bytes) mode yet. Support append mode.
+
+Verified already implemented (Codex, 2026-11-19, `578d5d2`). `AFileIsOpenedToAppendBytes` passed on both VMs and covers appending to an existing file, creating a new one, and refusing reads on an append-only handle. The 16 MiB per-read limit is independent of append mode. Linux was not tried.
+
+## [DONE] Indexes and Integers
+
+Python's `items[-1]` reads the last item. WebLingo rejects that index with `WL3005`. Make it work in WebLingo. Also, take into account similar indexing scheme with C#.
+
+Done (Codex, 2026-11-19, `634636a`). Negative array subscripts work for reads, assignments, compound assignments, and optional indexing. `-1` selects the last element. The Language Reference compares this spelling with `^1` in C#. On Windows, the Release build on main had zero errors or warnings. The CLI samples and the indexing example ran. The suite passed 4,165 tests with six integration tests skipped. Linux was not tried.
