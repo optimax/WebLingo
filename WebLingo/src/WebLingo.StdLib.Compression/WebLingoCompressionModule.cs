@@ -192,25 +192,23 @@ public sealed class WebLingoCompressionModule : IWebLingoNativeModule
         out byte[] bytes, out WebLingoRuntimeError? error)
     {
         bytes = [];
-        var room = Math.Max(0, heap.RoomLeft - WebLingoHeap.ObjectOverhead);
-        var capacity = Math.Min(remaining, room);
         using var output = new MemoryStream();
         while (true)
         {
-            var count = input.Read(buffer.AsSpan(0, (int)Math.Min(buffer.Length, 1 + capacity - output.Length)));
+            var count = input.Read(buffer.AsSpan(0, (int)Math.Min(buffer.Length, 1L + remaining - output.Length)));
             if (count == 0)
             {
                 bytes = output.ToArray();
                 error = null;
                 return true;
             }
-            if (output.Length + count > capacity)
+            var length = output.Length + count;
+            if (length > remaining)
             {
-                error = remaining <= room
-                    ? Invalid($"Decompressed data exceeds the limit of {limit.ToString(CultureInfo.InvariantCulture)} bytes.")
-                    : new WebLingoRuntimeError(WebLingoDiagnosticCodes.BudgetExceeded, "Decompressed data does not fit in the heap.");
+                error = Invalid($"Decompressed data exceeds the limit of {limit.ToString(CultureInfo.InvariantCulture)} bytes.");
                 return false;
             }
+            if (!heap.TryFitBytes((int)length, out error)) return false;
             output.Write(buffer.AsSpan(0, count));
         }
     }

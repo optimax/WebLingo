@@ -2,7 +2,7 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## Use the heap's byte accounting for gzip and ZIP decompression
+## [WORKING] Use the heap's byte accounting for gzip and ZIP decompression
 
 `gunzip` rejected a 2,048-byte result with `WL3003` when 979 heap units were free. A direct `Bytes` allocation of the same size succeeded. In `WebLingoCompressionModule.TryRead`, use the heap's allocation rule of one unit per eight bytes plus object overhead, and allow collection before reporting exhaustion. Keep the caller's `maxBytes` limit in bytes, cumulative across ZIP entries.
 

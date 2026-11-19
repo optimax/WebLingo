@@ -670,7 +670,13 @@ public sealed class WebLingoHeap
     /// immutable, as a string is. They take a unit for every eight bytes.
     /// </summary>
     public bool TryAllocateBytes(byte[] data, out WebLingoValue value, out WebLingoRuntimeError? error) =>
-        TryAllocate(data, WebLingoValueKind.Bytes, (data.Length + 7) / 8, out value, out error);
+        TryAllocate(data, WebLingoValueKind.Bytes, ByteContentUnits(data.Length), out value, out error);
+
+    /// <summary>Checks whether bytes of this length can be allocated, collecting if necessary, without allocating them.</summary>
+    public bool TryFitBytes(int length, out WebLingoRuntimeError? error) =>
+        TryReserve(ByteContentUnits(length) + ObjectOverhead, out error);
+
+    private static long ByteContentUnits(int length) => (length + 7L) / 8;
 
     /// <summary>
     /// A new <c>BytesBuilder</c> (section 3.2, "Bytes"), empty: a buffer of bytes that grows, doubling, as bytes are added

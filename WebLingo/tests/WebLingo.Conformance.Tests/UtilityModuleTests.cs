@@ -1,4 +1,7 @@
+using System.IO.Compression;
 using WebLingo.Cli;
+using WebLingo.Core;
+using WebLingo.Runtime;
 using Xunit;
 namespace WebLingo.Conformance.Tests;
 
@@ -95,6 +98,53 @@ public sealed class UtilityModuleTests : IDisposable
             + "WL3001 Decompressed data exceeds the limit of 4 bytes.\n"
             + "WL3001 The argument of 'gunzip' contains invalid gzip data.\n"
             + "WL3001 The argument of 'unzip' is not a valid ZIP archive.\n");
+    }
+
+    [Theory]
+    [InlineData(false, 1024, false, 2048, null)]
+    [InlineData(true, 1024, false, 2048, null)]
+    [InlineData(false, 1024, true, 2048, null)]
+    [InlineData(true, 1024, true, 2048, null)]
+    [InlineData(false, 1024, false, 2047, WebLingoDiagnosticCodes.InvalidOperation)]
+    [InlineData(true, 1024, false, 2047, WebLingoDiagnosticCodes.InvalidOperation)]
+    [InlineData(false, 250, false, 2048, WebLingoDiagnosticCodes.BudgetExceeded)]
+    [InlineData(true, 250, false, 2048, WebLingoDiagnosticCodes.BudgetExceeded)]
+    public void DecompressionUsesByteUnitsAndCollectsBeforeRefusing(bool zip, int heapUnits, bool garbage, int limit, string? code)
+    {
+        var original = new byte[2048];
+        using var compressed = new MemoryStream();
+        if (zip)
+        {
+            using var archive = new ZipArchive(compressed, ZipArchiveMode.Create, leaveOpen: true);
+            using var entry = archive.CreateEntry("entry").Open();
+            entry.Write(original);
+        }
+        else
+        {
+            using var gzip = new GZipStream(compressed, CompressionMode.Compress, leaveOpen: true);
+            gzip.Write(original);
+        }
+
+        var heap = new WebLingoHeap(heapUnits);
+        var args = new[] { WebLingoValue.Null, WebLingoValue.FromInt64(limit) };
+        heap.AddRoots(args);
+        Assert.True(heap.TryAllocateBytes(compressed.ToArray(), out args[0], out _));
+        if (garbage) Assert.True(heap.TryAllocateString(new string('x', 800), out _, out _));
+        Assert.Equal(0, heap.CollectionCount);
+
+        var loader = new WebLingoNativeModuleLoader(
+            new Dictionary<string, string> { ["std"] = Path.Combine(AppContext.BaseDirectory, "std") }, new WebLingoBuiltinRegistry());
+        Assert.True(loader.TryResolve("program.wlg", "std:compression", out var module, out var why), why);
+        var function = loader.FunctionsOf(module!).Single(item => item.Name == (zip ? "unzip" : "gunzip"));
+        var success = function.TryInvoke(args, heap, out var decoded, out var error);
+        Assert.Equal(code, error?.Code);
+        Assert.Equal(code is null, success);
+        if (success)
+        {
+            if (zip) decoded = heap.MapEntryAt(decoded, 0).Value;
+            Assert.Equal(original, heap.GetBytes(decoded));
+        }
+        if (garbage) Assert.True(heap.CollectionCount > 0);
     }
 
     [Theory]
