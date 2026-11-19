@@ -953,8 +953,11 @@ The owner approved the following order on 19 November 2026 after the path, URL a
   per instance. `next()` uses 53 bits for a number in `[0, 1)`. `nextInt(min, max)` uses rejection sampling
   to give each integer in `[min, max)` equal probability. A seed and the same calls give the same sequence on
   every host. Secure random bytes are available through `std:crypto`.
-- **Add CLI Subprocess Execution.** Let `weblingo` scripts run a program with arguments and read its exit status
-  and output. WASP subprocess access remains a separate decision.
+- **Add CLI Subprocess Execution.** `std:process` runs a local executable off the worker through
+  `IWebLingoProcessRunner`. The adapter passes an argument array directly, closes stdin, and reads stdout and
+  stderr concurrently. The task returns the exit code and both streams as UTF-8 text. The default deadline is
+  30 seconds and the default combined output limit is 1 MiB. A deadline or an output overflow stops capture
+  and requests termination of the running child and its process tree. WASP has no subprocess runner.
 
 ---
 

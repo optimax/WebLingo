@@ -75,6 +75,7 @@ public sealed class WebLingoStackVirtualMachine
         heap.FileSystem = context.FileSystem;
         heap.Network = context.Network;
         heap.Databases = context.Databases;
+        heap.Processes = context.Processes;
         heap.Allowed = context.Allowed;
         heap.Crypto = context.Crypto;
         heap.Environment = context.Environment;

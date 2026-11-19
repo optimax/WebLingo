@@ -48,7 +48,8 @@ public static class WebLingoCommandLine
         (file, options) => new WebLingoCommandLineCompilation(new WebLingoCompiler(options).Compile(file.Text, file.Name)))
     {
         Bytecode = true,
-        RunsFileNamedFirst = true
+        RunsFileNamedFirst = true,
+        AllowsProcesses = true
     };
 
     public static int Run(string[] args, TextWriter output, TextWriter error) => Run(Scripts, args, output, error);
@@ -443,7 +444,8 @@ public static class WebLingoCommandLine
     /// <summary>What a command line gives the programs it compiles and runs: its built-ins, its native modules and its files.</summary>
     private sealed record Host(WebLingoBuiltinRegistry Services, WebLingoNativeModuleLoader Native, WebLingoCompilerOptions Options,
         FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoNetwork Network, IWebLingoDatabases Databases, IWebLingoFileSystem Files,
-        IReadOnlyDictionary<string, IReadOnlyList<string>> Allowed, IWebLingoEnvironment Environment, IWebLingoConsoleInput? ConsoleInput);
+        IReadOnlyDictionary<string, IReadOnlyList<string>> Allowed, IWebLingoEnvironment Environment, IWebLingoConsoleInput? ConsoleInput,
+        IWebLingoProcessRunner? Processes);
 
     /// <summary>
     /// The host for the file <paramref name="path"/>, whose program's own file is named <paramref name="mainName"/>: its
@@ -487,7 +489,7 @@ public static class WebLingoCommandLine
             new DotNetFileSystem(files), allowed,
             // All of the machine's environment for a script's, what its configuration's "env" allows for a page's (section 7.15).
             program.ReachesAllEnvironment ? new DotNetEnvironment() : new DotNetEnvironment(env.MachineName, env.Variables, env.Platform),
-            input);
+            input, program.AllowsProcesses ? new DotNetProcessRunner() : null);
     }
 
     private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters,
@@ -509,6 +511,7 @@ public static class WebLingoCommandLine
             Environment = host.Environment,
             ConsoleInput = host.ConsoleInput,
             Databases = host.Databases,
+            Processes = host.Processes,
             SchedulerHost = new DotNetSchedulerHost()
         };
 

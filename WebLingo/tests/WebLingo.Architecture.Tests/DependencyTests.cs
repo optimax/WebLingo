@@ -31,6 +31,7 @@ public sealed class DependencyTests
         { "WebLingo.StdLib.Math", ["WebLingo.Core", "WebLingo.Runtime"] },
         { "WebLingo.StdLib.Csv", ["WebLingo.Core", "WebLingo.Runtime"] },
         { "WebLingo.StdLib.Random", ["WebLingo.Core", "WebLingo.Runtime"] },
+        { "WebLingo.StdLib.Process", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.Platform.Abstractions", ["WebLingo.Core"] },
         { "WebLingo.Hosting.Abstractions", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         // The host's core composes the engine for every adapter (section 6.12), the register VM its pages' only.
@@ -69,7 +70,7 @@ public sealed class DependencyTests
     [Fact]
     public void TheRulesCoverEveryPortableAssembly()
     {
-        Assert.Equal(22, PortableCore.Count); // Section 3 of Documents/implementation.md lists the portable assemblies.
+        Assert.Equal(23, PortableCore.Count); // Section 3 of Documents/implementation.md lists the portable assemblies.
     }
 
     [Theory]

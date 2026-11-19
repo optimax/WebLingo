@@ -71,6 +71,14 @@ public sealed class WaspTests : IDisposable
     }
 
     [Fact]
+    public void APageCannotLaunchSubprocesses()
+    {
+        var (exit, output, error) = Wasp("run", "<% import process from \"std:process\"; await process.run(\"anything\"); %>");
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, ""), (exit, output));
+        Assert.EndsWith("ERROR WL3011 (IOError): Subprocess execution is available only to the WebLingo CLI.", error.TrimEnd());
+    }
+
+    [Fact]
     public void VersionAndUsageNameWasp()
     {
         var output = new StringWriter();

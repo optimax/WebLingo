@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using WebLingo.Cli;
 using Xunit;
 
 namespace WebLingo.Conformance.Tests;
@@ -38,6 +39,60 @@ public sealed class ConsoleTextTests : IDisposable
         Assert.Equal(3, process.ExitCode);
         Assert.Equal("żółw € 😀\n", Strict(output.ToArray()));
         Assert.EndsWith("An error was thrown and not caught: ŻÓŁW", Strict(error.ToArray()).TrimEnd());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ASubprocessReceivesLiteralArgumentsAndReturnsItsOutputAndExitCode(bool stack)
+    {
+        var child = Write("child.wlg", "param message; writeLn(message); throw new Error(\"from the child\");");
+        var script = Write("run.wlg", """
+            param executable;
+            param child;
+            import process from "std:process";
+            var result = await process.run(executable, ["run", child, "message= spaces & \"quoted\" żółw"]);
+            writeLn([result["exitCode"], result["stdout"] == " spaces & \"quoted\" żółw\n",
+                result["stderr"].contains("ERROR WL3008 (Error): An error was thrown and not caught: from the child")]);
+            """);
+        var output = new StringWriter();
+        var error = new StringWriter();
+        if (stack)
+        {
+            Assert.Equal(WebLingoCommandLine.Success,
+                WebLingoCommandLine.Run(["compile", "--stack", script], output, error));
+            script = Path.ChangeExtension(script, ".wlbc");
+        }
+        var exit = WebLingoCommandLine.Run(["run", script, "executable=" + Program(), "child=" + child], output, error);
+        Assert.Equal((WebLingoCommandLine.Success, "[3, true, true]\n", ""), (exit, output.ToString(), error.ToString()));
+    }
+
+    [Fact]
+    public void ASubprocessReportsOutputLimitsAndTimeouts()
+    {
+        var child = Write("child.wlg", "param slow = \"no\"; if (slow == \"yes\") await delay(60000); writeLn(\"tea\");");
+        var script = Write("run.wlg", """
+            param executable;
+            param child;
+            import process from "std:process";
+            try { await process.run(executable, ["run", child], { maxOutputBytes: 3 }); }
+            catch (IOError e) { writeLn(e.code + " " + e.message); }
+            try { await process.run(executable, ["run", child, "slow=yes"], { timeoutMs: 100 }); }
+            catch (TimeoutError e) { writeLn(e.code + " " + e.message); }
+            """);
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var exit = WebLingoCommandLine.Run(["run", script, "executable=" + Program(), "child=" + child], output, error);
+        Assert.Equal((WebLingoCommandLine.Success,
+            "WL3011 Process output exceeded 3 bytes.\nWL3010 The process exceeded its 100 ms timeout.\n", ""),
+            (exit, output.ToString(), error.ToString()));
+    }
+
+    private string Write(string name, string source)
+    {
+        var file = Path.Combine(_folder, name);
+        File.WriteAllText(file, source);
+        return file;
     }
 
     /// <summary>The bytes read as UTF-8, a byte-order mark or a byte that is not UTF-8 failing the test.</summary>

@@ -60,6 +60,9 @@ public sealed record WebLingoCommandLineProgram(
     /// </summary>
     public bool ReachesAllEnvironment { get; init; } = true;
 
+    /// <summary>Whether this command line gives scripts the subprocess runner.</summary>
+    public bool AllowsProcesses { get; init; }
+
     /// <summary>The application's root, from which a script's relative path is where it reaches only some files; the file's folder if null.</summary>
     public string? Root { get; init; }
 }

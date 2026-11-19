@@ -37,6 +37,7 @@ This reference describes the standard library in the current pre-alpha release a
 26. [`std:csv`](#26-stdcsv)
 27. [`std:compression`](#27-stdcompression)
 28. [`std:random`](#28-stdrandom)
+29. [`std:process`](#29-stdprocess)
 
 ---
 
@@ -1353,4 +1354,33 @@ writeLn([rng.nextInt(0, 100), rng.nextInt(0, 100), rng.nextInt(0, 100)]);
 
 ```text
 [13, 91, 58]
+```
+
+## 29. `std:process`
+
+`await process.run(program, args = null, options = null)` starts a local executable from a `weblingo` script.
+Pass an array of argument strings. The runtime launches the executable directly and closes its standard input.
+The child uses the CLI's working directory and environment.
+
+The result is a map with an integer `exitCode` and the captured `stdout` and `stderr` strings, decoded as UTF-8.
+A nonzero exit code is returned in the map. `options` may contain either of these keys.
+
+| Option | Default | Allowed values |
+|---|---|---|
+| `timeoutMs` | 30,000 | integers from 1 to 2,147,483,647 |
+| `maxOutputBytes` | 1,048,576 | integers from 0 to 16,777,216, counting both streams together |
+
+A timeout raises `TimeoutError` (WL3010). A launch failure or an exceeded output limit raises `IOError` (WL3011).
+WASP returns `IOError` for subprocess calls.
+
+```javascript
+param program = "weblingo";
+import process from "std:process";
+
+var child = await process.run(program, ["--version"]);
+writeLn([child["exitCode"], child["stdout"].startsWith("WebLingo ")]);
+```
+
+```text
+[0, true]
 ```

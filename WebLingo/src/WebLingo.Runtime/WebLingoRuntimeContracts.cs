@@ -74,6 +74,9 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     /// </summary>
     public WebLingo.Platform.Abstractions.IWebLingoDatabases? Databases { get; init; }
 
+    /// <summary>The host's subprocess runner, if the execution is allowed to launch local programs.</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoProcessRunner? Processes { get; init; }
+
     /// <summary>
     /// What the application's configuration allows its native modules, each setting's name and the names its
     /// <c>"allow"</c> lists, <c>"com": { "allow": ["ADODB.Connection"] }</c>, which a native module reads through the heap

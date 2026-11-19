@@ -36,6 +36,8 @@ public sealed class PortabilityTests
         ("System.IO.DirectoryInfo", "file access is CLI/bootstrap only"),
         ("System.IO.Path", "paths are the PAL's, not the platform's"),
         ("System.Console", "the console belongs to a host"),
+        ("System.Diagnostics.Process", "subprocess execution belongs to the host's IWebLingoProcessRunner"),
+        ("System.Diagnostics.ProcessStartInfo", "subprocess execution belongs to the host's IWebLingoProcessRunner"),
         ("System.Environment", "the core must not depend on the platform (its line ending among others)"),
         ("System.Threading.Thread", "OS threads are adapter-only"),
         ("System.Threading.ThreadPool", "OS threads are adapter-only"),
@@ -69,7 +71,7 @@ public sealed class PortabilityTests
         "WebLingo.VM", "WebLingo.VM.Stack", "WebLingo.Templates", "WebLingo.StdLib", "WebLingo.StdLib.Tasks", "WebLingo.Platform.Abstractions",
         "WebLingo.StdLib.Fs", "WebLingo.StdLib.Http", "WebLingo.StdLib.Net", "WebLingo.StdLib.Db", "WebLingo.StdLib.Crypto", "WebLingo.Hosting.Abstractions",
         "WebLingo.Hosting", "WebLingo.StdLib.Env", "WebLingo.StdLib.Math",
-        "WebLingo.StdLib.Csv", "WebLingo.StdLib.Random",
+        "WebLingo.StdLib.Csv", "WebLingo.StdLib.Random", "WebLingo.StdLib.Process",
     };
 
     [Theory]

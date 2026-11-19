@@ -100,6 +100,8 @@ public sealed class WebLingoHeap
     /// <summary>The platform's databases (<see cref="WebLingoExecutionContext.Databases"/>), for <c>std:db</c>'s functions (section 7.11).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoDatabases? Databases { get; set; }
 
+    public WebLingo.Platform.Abstractions.IWebLingoProcessRunner? Processes { get; set; }
+
     /// <summary>What the configuration allows native modules (<see cref="WebLingoExecutionContext.Allowed"/>), COM's objects (section 3.10).</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>>? Allowed { get; set; }
 
