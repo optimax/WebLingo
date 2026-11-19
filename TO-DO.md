@@ -34,11 +34,13 @@ The owner chose PostgreSQL after MySQL. The local NuGet cache has no PostgreSQL 
 
 A1: Yes.
 
-## [QUESTION] Choose the Next Standard-Library Additions
+## Choose the Next Standard-Library Additions
 
 Path, URL, and CSV have shipped on local main. The remaining candidates are compression, seeded random numbers, and subprocess execution.
 
 **Q1. Which of these should be the next standard-library addition?**
+
+A1: As you list them. Don't ask trivial questions. Act autonomously.
 
 # END-OF-TO-DO
 
