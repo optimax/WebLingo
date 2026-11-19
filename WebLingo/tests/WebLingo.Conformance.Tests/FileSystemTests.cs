@@ -225,10 +225,10 @@ public sealed class FileSystemTests : IDisposable
             using (var bytes = fs.File.openSync(folder + "/w.bin", "wb")) { t(() => bytes.writeSync("text")); t(() => bytes.readSync(1)); }
             """);
         Assert.Equal("WL3001 A file opened for its text is read a line at a time, by read(), which takes no count.|"
-                     + "WL3001 A file opened for its bytes is read by read(count), how many at most, an integer from 1, not null.|"
-                     + "WL3001 A file opened for its bytes is read by read(count), how many at most, an integer from 1, not the integer 0.|"
+                     + "WL3001 The argument of 'readSync' must be an integer from 1, how many bytes at most, for a file opened for its bytes, not null.|"
+                     + "WL3001 The argument of 'readSync' must be an integer from 1, how many bytes at most, for a file opened for its bytes, not the integer 0.|"
                      + $"WL3011 '{_folder}/t.txt' cannot be written: it was opened to be read, not written.|"
-                     + "WL3001 A file opened for its bytes writes bytes, not a string.|"
+                     + "WL3001 The argument of 'writeSync' must be bytes, for a file opened for its bytes, not a string.|"
                      + $"WL3011 '{_folder}/w.bin' cannot be read: it was opened to be written, not read.|", output);
     }
 
@@ -278,18 +278,18 @@ public sealed class FileSystemTests : IDisposable
     }
 
     [Theory]
-    [InlineData("fs.readTextSync(5);", "WL3001 A path is a string, not the integer 5.")]
-    [InlineData("fs.readTextSync(\"\");", "WL3001 A path is a string of one character or more, without '\\0'.")]
-    [InlineData("fs.writeTextSync(\"x.txt\", 5);", "WL3001 A text is a string, not the integer 5.")]
-    [InlineData("fs.readTextSync(\"x.txt\", 8);", "WL3001 An encoding's name is a string, not the integer 8.")]
+    [InlineData("fs.readTextSync(5);", "WL3001 The first argument of 'readTextSync', the path, must be a string, not the integer 5.")]
+    [InlineData("fs.readTextSync(\"\");", "WL3001 The first argument of 'readTextSync', the path, must be a path, a string of one character or more, without '\\0'.")]
+    [InlineData("fs.writeTextSync(\"x.txt\", 5);", "WL3001 The second argument of 'writeTextSync', the text, must be a string, not the integer 5.")]
+    [InlineData("fs.readTextSync(\"x.txt\", 8);", "WL3001 The second argument of 'readTextSync', the encoding, must be an encoding's name, a string, not the integer 8.")]
     [InlineData("fs.readTextSync(\"x.txt\", \"klingon\");", "WL3001 'x.txt' cannot be read: there is no encoding 'klingon'.")]
     [InlineData("fs.File.openSync(\"x.txt\", \"rw\");",
         "WL3001 A file is opened to read it, \"r\", to write it, \"w\", or to append to it, \"a\", or for its bytes, \"rb\", \"wb\" or \"ab\", not \"rw\".")]
     [InlineData("fs.File.openSync(\"x.bin\", \"ab\", \"utf-8\");", "WL3001 A file opened for its bytes has no encoding.")]
     [InlineData("fs.File.openSync(\"x.txt\", \"rb\", \"utf-8\");", "WL3001 A file opened for its bytes has no encoding.")]
-    [InlineData("fs.writeBytesSync(\"x.bin\", \"text\");", "WL3001 'writeBytes' writes bytes, not a string.")]
-    [InlineData("fs.appendBytesSync(\"x.bin\", 5);", "WL3001 'appendBytes' writes bytes, not the integer 5.")]
-    [InlineData("fs.copySync(\"x.bin\", 5);", "WL3001 A path is a string, not the integer 5.")]
+    [InlineData("fs.writeBytesSync(\"x.bin\", \"text\");", "WL3001 The second argument of 'writeBytesSync', the bytes, must be bytes, not a string.")]
+    [InlineData("fs.appendBytesSync(\"x.bin\", 5);", "WL3001 The second argument of 'appendBytesSync', the bytes, must be bytes, not the integer 5.")]
+    [InlineData("fs.copySync(\"x.bin\", 5);", "WL3001 The second argument of 'copySync', the target, must be a string, not the integer 5.")]
     [InlineData("fs.copySync(\"x.bin\");", "WL2006")]
     [InlineData("fs.readTextSync();", "WL2006")]
     public void WrongArgumentsAreReported(string source, string error)

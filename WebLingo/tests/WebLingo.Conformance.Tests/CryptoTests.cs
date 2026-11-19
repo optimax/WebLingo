@@ -48,18 +48,18 @@ public sealed class CryptoTests : IDisposable
     }
 
     [Theory]
-    [InlineData("crypto.hmac(\"md5\", \"k\", \"d\");", "'hmac' hashes by \"sha256\" or \"sha512\", not \"md5\".")]
-    [InlineData("crypto.randomBytes(-1);", "'randomBytes' gives 0 to 1048576 bytes, not the integer -1.")]
-    [InlineData("crypto.randomBytes(1048577);", "'randomBytes' gives 0 to 1048576 bytes, not the integer 1048577.")]
-    [InlineData("crypto.sha256(5);", "'sha256' takes its data as a string or bytes, not the integer 5.")]
-    [InlineData("crypto.hashPassword(null);", "'hashPassword' takes its password as a string or bytes, not null.")]
+    [InlineData("crypto.hmac(\"md5\", \"k\", \"d\");", "The first argument of 'hmac', the hash, must be \"sha256\" or \"sha512\", not \"md5\".")]
+    [InlineData("crypto.randomBytes(-1);", "The argument of 'randomBytes' must be an integer from 0 to 1048576, not the integer -1.")]
+    [InlineData("crypto.randomBytes(1048577);", "The argument of 'randomBytes' must be an integer from 0 to 1048576, not the integer 1048577.")]
+    [InlineData("crypto.sha256(5);", "The argument of 'sha256' must be a string or bytes, not the integer 5.")]
+    [InlineData("crypto.hashPassword(null);", "The argument of 'hashPassword' must be a string or bytes, not null.")]
     [InlineData("crypto.verifyPassword(\"p\", \"md5$x\");",
-        "'verifyPassword' takes a hash 'hashPassword' made, \"pbkdf2-sha256$iterations$salt$hash\", which this string is not.")]
+        "The second argument of 'verifyPassword', the hash, must be a hash 'hashPassword' made, \"pbkdf2-sha256$iterations$salt$hash\", which this string is not.")]
     [InlineData("crypto.verifyPassword(\"p\", \"pbkdf2-sha256$0$c2FsdA==$c2FsdA==\");",
-        "'verifyPassword' takes a hash 'hashPassword' made, \"pbkdf2-sha256$iterations$salt$hash\", which this string is not.")]
+        "The second argument of 'verifyPassword', the hash, must be a hash 'hashPassword' made, \"pbkdf2-sha256$iterations$salt$hash\", which this string is not.")]
     [InlineData("crypto.verifyPassword(\"p\", \"pbkdf2-sha256$99999999$c2FsdA==$c2FsdA==\");",
-        "'verifyPassword' takes a hash 'hashPassword' made, \"pbkdf2-sha256$iterations$salt$hash\", which this string is not.")]
-    [InlineData("crypto.verifyPassword(\"p\", 5);", "'verifyPassword' takes a hash 'hashPassword' made, \"pbkdf2-sha256$iterations$salt$hash\", not the integer 5.")]
+        "The second argument of 'verifyPassword', the hash, must be a hash 'hashPassword' made, \"pbkdf2-sha256$iterations$salt$hash\", which this string is not.")]
+    [InlineData("crypto.verifyPassword(\"p\", 5);", "The second argument of 'verifyPassword', the hash, must be a hash 'hashPassword' made, \"pbkdf2-sha256$iterations$salt$hash\", not the integer 5.")]
     public void WrongArgumentsAreTypeErrors(string call, string message)
     {
         Assert.Equal(("WL3001 " + message + "\n", ""), Run("import { write, writeLn } from \"std:system\"; import crypto from \"std:crypto\"; try { " + call + " } catch (TypeError e) { writeLn(e.code + \" \" + e.message); }"));

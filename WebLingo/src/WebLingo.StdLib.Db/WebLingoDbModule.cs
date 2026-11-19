@@ -47,7 +47,8 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
             var classValue = a[0];
             if (a[1].Kind != WebLingoValueKind.String || heap.GetString(a[1]).Length == 0)
             {
-                error = Wrong($"A database is named by the configuration's name for it, or by a connection string, \"sqlite:C:/data/shop.db\", not {WebLingoValueFormatter.Describe(a[1], heap)}.");
+                error = new WebLingoArgument("open", 0, 1, "the database",
+                    "the configuration's name for a database, or a connection string, \"sqlite:C:/data/shop.db\"").Wrong(a[1], heap);
                 return false;
             }
             if (!TryServices(heap, out var databases, out var scheduler, out error)) return false;
@@ -87,7 +88,7 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
         {
             result = WebLingoValue.Null;
             if (!database.TryGetHostObject<IWebLingoDatabaseConnection>(a[0], heap, out var connection, out error)
-                || !TryServices(heap, out _, out var scheduler, out error) || !TryOptions(a[1], "begin", heap, out _, out var isolation, out error))
+                || !TryServices(heap, out _, out var scheduler, out error) || !TryOptions(new("begin", 0, 1, "the options", "a map, { isolation: … }"), a[1], "begin", heap, out _, out var isolation, out error))
             {
                 return false;
             }
@@ -148,17 +149,18 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
         connection = open;
         if (a[1].Kind != WebLingoValueKind.String)
         {
-            error = Wrong($"A statement is SQL, a string, not {WebLingoValueFormatter.Describe(a[1], heap)}.");
+            error = new WebLingoArgument(method, 0, 3, "the statement", "SQL, a string").Wrong(a[1], heap);
             return false;
         }
         sql = heap.GetString(a[1]);
-        return TryValues(a[2], heap, out values, out error) && TryOptions(a[3], method, heap, out timeout, out _, out error)
+        return TryValues(new(method, 1, 3, "the values", "a map of names to values, { max: 10 }"), a[2], heap, out values, out error)
+               && TryOptions(new(method, 2, 3, "the options", "a map, { timeout: … }"), a[3], method, heap, out timeout, out _, out error)
                && TryServices(heap, out _, out scheduler, out error);
     }
 
     /// <summary>A statement's values: a map of names, each <c>@name</c> in its SQL, to values a database takes, or none.</summary>
-    private static bool TryValues(WebLingoValue given, WebLingoHeap heap, out IReadOnlyList<KeyValuePair<string, object?>> values,
-        out WebLingoRuntimeError? error)
+    private static bool TryValues(WebLingoArgument argument, WebLingoValue given, WebLingoHeap heap,
+        out IReadOnlyList<KeyValuePair<string, object?>> values, out WebLingoRuntimeError? error)
     {
         var list = new List<KeyValuePair<string, object?>>();
         values = list;
@@ -166,7 +168,7 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
         if (given.Kind == WebLingoValueKind.Null) return true;
         if (given.Kind != WebLingoValueKind.Map)
         {
-            error = Wrong($"A statement's values are a map of names to values, {{ max: 10 }}, not {WebLingoValueFormatter.Describe(given, heap)}.");
+            error = argument.Wrong(given, heap);
             return false;
         }
         for (var i = 0; i < heap.MapCount(given); i++)
@@ -174,7 +176,7 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
             var (key, value) = heap.MapEntryAt(given, i);
             if (key.Kind != WebLingoValueKind.String || !IsName(heap.GetString(key)))
             {
-                error = Wrong($"A statement's value is named by a name, letters, digits and _, as @max is, not {WebLingoValueFormatter.Describe(key, heap)}.");
+                error = Wrong($"{argument.Named} must name each value by a name, letters, digits and _, as @max is, not {WebLingoValueFormatter.Describe(key, heap)}.");
                 return false;
             }
             object? held;
@@ -191,7 +193,8 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
                     held = DateTimeOffset.FromUnixTimeMilliseconds(value.UnixMilliseconds).ToOffset(TimeSpan.FromMinutes(value.OffsetMinutes));
                     break;
                 default:
-                    error = Wrong($"@{heap.GetString(key)} is null, a Boolean, a number, a decimal, a string, bytes or a date, which a database takes, not {WebLingoValueFormatter.Describe(value, heap)}.");
+                    error = Wrong($"{argument.Named} must give @{heap.GetString(key)} null, a Boolean, a number, a decimal, a string, bytes or a date, "
+                        + $"which a database takes, not {WebLingoValueFormatter.Describe(value, heap)}.");
                     return false;
             }
             list.Add(new(heap.GetString(key), held));
@@ -203,15 +206,15 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
     /// An operation's options: a map, or none, of those the method takes, <c>timeout</c>, a statement's, an integer of
     /// seconds, 0 or more, and <c>isolation</c>, a transaction's, named; WL3001 for any other.
     /// </summary>
-    private static bool TryOptions(WebLingoValue given, string method, WebLingoHeap heap, out int? timeout, out string? isolation,
-        out WebLingoRuntimeError? error)
+    private static bool TryOptions(WebLingoArgument argument, WebLingoValue given, string method, WebLingoHeap heap, out int? timeout,
+        out string? isolation, out WebLingoRuntimeError? error)
     {
         (timeout, isolation, error) = (null, null, null);
         if (given.Kind == WebLingoValueKind.Null) return true;
         var takes = method == "begin" ? "isolation" : "timeout";
         if (given.Kind != WebLingoValueKind.Map)
         {
-            error = Wrong($"{method}'s options are a map, {{ {takes}: … }}, not {WebLingoValueFormatter.Describe(given, heap)}.");
+            error = argument.Wrong(given, heap);
             return false;
         }
         for (var i = 0; i < heap.MapCount(given); i++)
@@ -221,14 +224,15 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
             if (name != takes)
             {
                 var named = name is null ? WebLingoValueFormatter.Describe(key, heap) : $"\"{name}\"";
-                error = Wrong($"{method}'s option is \"{takes}\", not {named}.");
+                error = Wrong($"{argument.Named} must give \"{takes}\" alone, not {named}.");
                 return false;
             }
             if (name == "timeout")
             {
                 if (value.Kind != WebLingoValueKind.Int64 || value.AsInt64 is < 0 or > int.MaxValue)
                 {
-                    error = Wrong($"A statement's timeout is a number of seconds, an integer, 0 or more, not {WebLingoValueFormatter.Describe(value, heap)}.");
+                    error = Wrong($"{argument.Named} must give \"timeout\" a number of seconds, an integer, 0 or more, "
+                        + $"not {WebLingoValueFormatter.Describe(value, heap)}.");
                     return false;
                 }
                 timeout = (int)value.AsInt64;
@@ -237,7 +241,8 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
             {
                 if (value.Kind != WebLingoValueKind.String || Array.IndexOf(Isolations, heap.GetString(value)) < 0)
                 {
-                    error = Wrong($"A transaction's isolation is \"{string.Join("\", \"", Isolations)}\", not {WebLingoValueFormatter.Describe(value, heap)}.");
+                    error = Wrong($"{argument.Named} must give \"isolation\" one of \"{string.Join("\", \"", Isolations)}\", "
+                        + $"not {WebLingoValueFormatter.Describe(value, heap)}.");
                     return false;
                 }
                 isolation = heap.GetString(value);

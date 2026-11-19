@@ -45,9 +45,9 @@ public sealed class EnvironmentTests : IDisposable
     }
 
     [Theory]
-    [InlineData("Environment.variable(5);", "'variable' takes a variable's name as a string, not the integer 5.")]
-    [InlineData("Environment.setVariable(null, \"x\");", "'setVariable' takes a variable's name as a string, not null.")]
-    [InlineData("Environment.setVariable(\"WL_ENV_TEST\", 5);", "'setVariable' sets a variable to a string, or removes it, given null, not the integer 5.")]
+    [InlineData("Environment.variable(5);", "The argument of 'variable' must be a variable's name, a string, not the integer 5.")]
+    [InlineData("Environment.setVariable(null, \"x\");", "The first argument of 'setVariable', the name, must be a variable's name, a string, not null.")]
+    [InlineData("Environment.setVariable(\"WL_ENV_TEST\", 5);", "The second argument of 'setVariable', the value, must be a string, or null, which removes the variable, not the integer 5.")]
     [InlineData("Environment.setVariable(\"A=B\", \"x\");",
         "'setVariable' cannot set 'A=B': a variable's name is not empty, and holds neither '=' nor U+0000.")]
     [InlineData("Environment.setVariable(\"\", \"x\");",

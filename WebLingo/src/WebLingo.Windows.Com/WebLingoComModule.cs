@@ -86,7 +86,7 @@ internal sealed unsafe class WebLingoComObjects(WebLingoNativeClass objects, Web
     public bool Create(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
-        if (!TryName(a[0], "create", "a ProgID or a CLSID", heap, out var name, out error) || !TryAllow(name, heap, out error)
+        if (!TryName(new("create", 0, 1, "the ProgID", "a ProgID or a CLSID, a string"), a[0], heap, out var name, out error) || !TryAllow(name, heap, out error)
             || !TryEnter(out error))
         {
             return false;
@@ -105,7 +105,7 @@ internal sealed unsafe class WebLingoComObjects(WebLingoNativeClass objects, Web
     public bool GetObject(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
-        if (!TryName(a[0], "get", "a moniker", heap, out var moniker, out error) || !TryAllow(moniker, heap, out error) || !TryEnter(out error))
+        if (!TryName(new("get", 0, 1, "the moniker", "a moniker, a string"), a[0], heap, out var moniker, out error) || !TryAllow(moniker, heap, out error) || !TryEnter(out error))
         {
             return false;
         }
@@ -120,7 +120,7 @@ internal sealed unsafe class WebLingoComObjects(WebLingoNativeClass objects, Web
     public bool Get(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
-        if (!TryHandle(a[0], heap, out var handle, out error) || !TryName(a[1], "get", "a member's name", heap, out var name, out error)) return false;
+        if (!TryHandle(a[0], heap, out var handle, out error) || !TryName(new("get", 0, 1, "the name", MemberName), a[1], heap, out var name, out error)) return false;
         return TryInvoke(handle, name, null, PropertyGet | Method, [], heap, out result, out error);
     }
 
@@ -128,7 +128,7 @@ internal sealed unsafe class WebLingoComObjects(WebLingoNativeClass objects, Web
     public bool Set(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
-        if (!TryHandle(a[0], heap, out var handle, out error) || !TryName(a[1], "set", "a member's name", heap, out var name, out error)) return false;
+        if (!TryHandle(a[0], heap, out var handle, out error) || !TryName(new("set", 0, 2, "the name", MemberName), a[1], heap, out var name, out error)) return false;
         return TryPut(handle, name, null, [a[2]], heap, out error);
     }
 
@@ -136,7 +136,10 @@ internal sealed unsafe class WebLingoComObjects(WebLingoNativeClass objects, Web
     public bool Call(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
-        if (!TryHandle(a[0], heap, out var handle, out error) || !TryName(a[1], "call", "a member's name", heap, out var name, out error)) return false;
+        if (!TryHandle(a[0], heap, out var handle, out error) || !TryName(new("call", 0, 2, "the name", MemberName), a[1], heap, out var name, out error))
+        {
+            return false;
+        }
         return TryInvoke(handle, name, null, Method | PropertyGet, a[2..], heap, out result, out error);
     }
 
@@ -144,11 +147,13 @@ internal sealed unsafe class WebLingoComObjects(WebLingoNativeClass objects, Web
     public bool CallNamed(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
-        if (!TryHandle(a[0], heap, out var handle, out error) || !TryName(a[1], "call", "a member's name", heap, out var name, out error)) return false;
+        if (!TryHandle(a[0], heap, out var handle, out error) || !TryName(new("call", 0, 2, "the name", MemberName), a[1], heap, out var name, out error))
+        {
+            return false;
+        }
         if (a[2].Kind != WebLingoValueKind.Array)
         {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'call' takes its member's arguments as an array, not {WebLingoValueFormatter.Describe(a[2], heap)}.");
+            error = new WebLingoArgument("call", 1, 2, "the member's arguments", "an array").Wrong(a[2], heap);
             return false;
         }
         return TryInvoke(handle, name, null, Method | PropertyGet, [.. heap.GetArray(a[2])], heap, out result, out error);
@@ -274,7 +279,10 @@ internal sealed unsafe class WebLingoComObjects(WebLingoNativeClass objects, Web
         return false;
     }
 
-    private static bool TryName(WebLingoValue value, string function, string what, WebLingoHeap heap, out string name, out WebLingoRuntimeError? error)
+    /// <summary>What a member's name must be, as an argument's error says.</summary>
+    private const string MemberName = "a member's name, a string";
+
+    private static bool TryName(WebLingoArgument argument, WebLingoValue value, WebLingoHeap heap, out string name, out WebLingoRuntimeError? error)
     {
         (name, error) = ("", null);
         if (value.Kind == WebLingoValueKind.String && heap.GetString(value).Length > 0)
@@ -282,8 +290,7 @@ internal sealed unsafe class WebLingoComObjects(WebLingoNativeClass objects, Web
             name = heap.GetString(value);
             return true;
         }
-        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-            $"'{function}' takes {what}, a string, not {WebLingoValueFormatter.Describe(value, heap)}.");
+        error = argument.Wrong(value, heap);
         return false;
     }
 

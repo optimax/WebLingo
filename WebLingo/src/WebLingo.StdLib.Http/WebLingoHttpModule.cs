@@ -20,29 +20,36 @@ public sealed class WebLingoHttpModule : IWebLingoNativeModule
     public void Register(IWebLingoNativeRegistry registry)
     {
         registry.Function("get", 2, 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
-            Send(heap, "GET", a[0], WebLingoValue.Null, a[1], out result, out error));
+            Send(heap, new("get", 0, 2, "the address", Address), "GET", a[0], default, WebLingoValue.Null, new("get", 1, 2, "the headers", Headers), a[1],
+                out result, out error));
         registry.Function("post", 3, 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
-            Send(heap, "POST", a[0], a[1], a[2], out result, out error));
+            Send(heap, new("post", 0, 3, "the address", Address), "POST", a[0], new("post", 1, 3, "the body", Body), a[1],
+                new("post", 2, 3, "the headers", Headers), a[2], out result, out error));
         registry.Function("request", 4, 2, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         {
             result = WebLingoValue.Null;
             if (a[0].Kind != WebLingoValueKind.String || !IsToken(heap.GetString(a[0])))
             {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"A request's method is a name, \"GET\" or \"PUT\", not {WebLingoValueFormatter.Describe(a[0], heap)}.");
+                error = new WebLingoArgument("request", 0, 4, "the method", "a method's name, \"GET\" or \"PUT\"").Wrong(a[0], heap);
                 return false;
             }
-            return Send(heap, heap.GetString(a[0]).ToUpperInvariant(), a[1], a[2], a[3], out result, out error);
+            return Send(heap, new("request", 1, 4, "the address", Address), heap.GetString(a[0]).ToUpperInvariant(), a[1],
+                new("request", 2, 4, "the body", Body), a[2], new("request", 3, 4, "the headers", Headers), a[3], out result, out error);
         });
     }
 
-    private static bool Send(WebLingoHeap heap, string method, WebLingoValue url, WebLingoValue body, WebLingoValue headers, out WebLingoValue result,
-        out WebLingoRuntimeError? error)
+    /// <summary>What an address, a body and headers must be, as an argument's error says.</summary>
+    private const string Address = "a string, \"https://example.com/\"";
+    private const string Body = "a string or bytes";
+    private const string Headers = "a map of names to strings, { \"Accept\": \"text/plain\" }";
+
+    private static bool Send(WebLingoHeap heap, WebLingoArgument urlArgument, string method, WebLingoValue url, WebLingoArgument bodyArgument,
+        WebLingoValue body, WebLingoArgument headersArgument, WebLingoValue headers, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
         if (url.Kind != WebLingoValueKind.String)
         {
-            error = Wrong($"An address is a string, \"https://example.com/\", not {WebLingoValueFormatter.Describe(url, heap)}.");
+            error = urlArgument.Wrong(url, heap);
             return false;
         }
         byte[]? data = null;
@@ -50,7 +57,7 @@ public sealed class WebLingoHttpModule : IWebLingoNativeModule
         else if (body.Kind == WebLingoValueKind.Bytes) data = heap.GetBytes(body);
         else if (body.Kind != WebLingoValueKind.Null)
         {
-            error = Wrong($"A request's body is a string or bytes, not {WebLingoValueFormatter.Describe(body, heap)}.");
+            error = bodyArgument.Wrong(body, heap);
             return false;
         }
         var sent = new List<KeyValuePair<string, string>>();
@@ -61,7 +68,7 @@ public sealed class WebLingoHttpModule : IWebLingoNativeModule
                 var (name, value) = heap.MapEntryAt(headers, i);
                 if (name.Kind != WebLingoValueKind.String || value.Kind != WebLingoValueKind.String || !IsToken(heap.GetString(name)))
                 {
-                    error = Wrong("A request's headers are a map of names to strings, { \"Accept\": \"text/plain\" }.");
+                    error = Wrong($"{headersArgument.Named} must be {Headers}.");
                     return false;
                 }
                 sent.Add(new(heap.GetString(name), heap.GetString(value)));
@@ -69,7 +76,7 @@ public sealed class WebLingoHttpModule : IWebLingoNativeModule
         }
         else if (headers.Kind != WebLingoValueKind.Null)
         {
-            error = Wrong($"A request's headers are a map, not {WebLingoValueFormatter.Describe(headers, heap)}.");
+            error = headersArgument.Wrong(headers, heap);
             return false;
         }
         if (heap.Network is not { } network)

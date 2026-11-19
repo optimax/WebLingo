@@ -70,8 +70,7 @@ public static partial class WebLingoMembers
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
                 if (values[first].Kind != WebLingoValueKind.String)
                 {
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"'compare' compares two strings, not a string and {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                    error = new WebLingoArgument(name, 0, 1, "the other string", "a string").Wrong(values[first], heap);
                     return false;
                 }
                 return Done(WebLingoValue.FromInt64(WebLingoOperators.CompareStrings(text, heap.GetString(values[first]))), out result, out error);
@@ -80,23 +79,26 @@ public static partial class WebLingoMembers
             {
                 // The first place the search starts, at from or after it, else -1.
                 if (count is < 1 or > 2) return WrongArgumentCount(name, 1, 2, count, out error);
-                if (!TryText(name, values[first], heap, out var search, out error)) return false;
+                if (!TryText(new(name, 0, 2, "the search", "a string"), values[first], heap, out var search, out error)) return false;
                 var from = 0L;
-                if (count == 2 && !TryPosition(name, values[first + 1], ScalarCount(text), out from, out error)) return false;
+                if (count == 2 && !TryPosition(new(name, 1, 2, "the start", "an integer"), values[first + 1], ScalarCount(text), out from, out error))
+                {
+                    return false;
+                }
                 var at = text.IndexOf(search, ScalarStart(text, from), StringComparison.Ordinal);
                 return Done(WebLingoValue.FromInt64(at < 0 ? -1 : ScalarsBefore(text, at)), out result, out error);
             }
             case WebLingoMember.LastIndexOf:
             {
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
-                if (!TryText(name, values[first], heap, out var search, out error)) return false;
+                if (!TryText(new(name, 0, 1, "the search", "a string"), values[first], heap, out var search, out error)) return false;
                 var at = search.Length == 0 ? text.Length : text.LastIndexOf(search, StringComparison.Ordinal);
                 return Done(WebLingoValue.FromInt64(at < 0 ? -1 : ScalarsBefore(text, at)), out result, out error);
             }
             case WebLingoMember.Contains or WebLingoMember.StartsWith or WebLingoMember.EndsWith:
             {
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
-                if (!TryText(name, values[first], heap, out var search, out error)) return false;
+                if (!TryText(new(name, 0, 1, "the text to look for", "a string"), values[first], heap, out var search, out error)) return false;
                 var found = member switch
                 {
                     WebLingoMember.Contains => text.Contains(search, StringComparison.Ordinal),
@@ -114,9 +116,7 @@ public static partial class WebLingoMembers
                 var end = count == 2 ? values[first + 1] : WebLingoValue.FromInt64(length);
                 if (start.Kind != WebLingoValueKind.Int64 || end.Kind != WebLingoValueKind.Int64)
                 {
-                    var bad = start.Kind != WebLingoValueKind.Int64 ? start : end;
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"'slice' takes integers, not {WebLingoValueFormatter.Describe(bad, heap)}.");
+                    error = SliceArgument(name, start).Wrong(start.Kind != WebLingoValueKind.Int64 ? start : end, heap);
                     return false;
                 }
                 var (from, to) = (start.AsInt64, end.AsInt64);
@@ -134,7 +134,10 @@ public static partial class WebLingoMembers
                 // The parts between the separators, empty ones included; an empty separator, each Unicode scalar value.
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
                 if (values[first].Kind == WebLingoValueKind.Regex) return TryRegex(values[first], member, text, "", heap, out result, out error);
-                if (!TryText(name, values[first], heap, out var separator, out error)) return false;
+                if (!TryText(new(name, 0, 1, "the separator", "a string or a regular expression"), values[first], heap, out var separator, out error))
+                {
+                    return false;
+                }
                 if (separator.Length == 0) return TrySnapshot(target, heap, out result, out error);
                 return TryStrings(text.Split(separator), heap, out result, out error);
             }
@@ -153,7 +156,10 @@ public static partial class WebLingoMembers
                         _ => text.TrimEnd()
                     }, out result, out error);
                 }
-                if (!TryText(name, values[first], heap, out var characters, out error)) return false;
+                if (!TryText(new(name, 0, 1, "the characters", "a string of characters to trim"), values[first], heap, out var characters, out error))
+                {
+                    return false;
+                }
                 var start = member == WebLingoMember.TrimEnd ? 0 : TrimmedStart(text, characters);
                 var end = member == WebLingoMember.TrimStart ? text.Length : TrimmedEnd(text, characters, start);
                 return heap.TryAllocateString(text[start..end], out result, out error);
@@ -163,7 +169,7 @@ public static partial class WebLingoMembers
                 // removePrefix(text) and removeSuffix(text): text removed once, only where the string begins, or ends, with it,
                 // else the string as it is, as Python's and Kotlin's (the owner's answer, 18 November 2026).
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
-                if (!TryText(name, values[first], heap, out var affix, out error)) return false;
+                if (!TryText(new(name, 0, 1, "the text", "a string"), values[first], heap, out var affix, out error)) return false;
                 var prefix = member == WebLingoMember.RemovePrefix;
                 if (prefix ? !text.StartsWith(affix, StringComparison.Ordinal) : !text.EndsWith(affix, StringComparison.Ordinal))
                 {
@@ -184,10 +190,11 @@ public static partial class WebLingoMembers
                 if (values[first].Kind == WebLingoValueKind.Regex)
                 {
                     // A regular expression's matches, each replaced, by .NET's substitutions (section 3.6).
-                    if (!TryText(name, values[first + 1], heap, out var substitution, out error)) return false;
+                    if (!TryText(new(name, 1, 2, "the replacement", "a string"), values[first + 1], heap, out var substitution, out error)) return false;
                     return TryRegex(values[first], member, text, substitution, heap, out result, out error);
                 }
-                if (!TryText(name, values[first], heap, out var old, out error) || !TryText(name, values[first + 1], heap, out var replacement, out error))
+                if (!TryText(new(name, 0, 2, "the text replaced", "a string or a regular expression"), values[first], heap, out var old, out error)
+                    || !TryText(new(name, 1, 2, "the replacement", "a string"), values[first + 1], heap, out var replacement, out error))
                 {
                     return false;
                 }
@@ -209,8 +216,7 @@ public static partial class WebLingoMembers
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
                 if (values[first].Kind != WebLingoValueKind.Int64 || values[first].AsInt64 < 0)
                 {
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"'repeat' takes an integer, 0 or more, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                    error = new WebLingoArgument(name, 0, 1, "the count", "an integer, 0 or more").Wrong(values[first], heap);
                     return false;
                 }
                 var times = values[first].AsInt64;
@@ -226,12 +232,11 @@ public static partial class WebLingoMembers
                 if (count is < 1 or > 2) return WrongArgumentCount(name, 1, 2, count, out error);
                 if (values[first].Kind != WebLingoValueKind.Int64)
                 {
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"'{name}' takes a width, an integer, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                    error = new WebLingoArgument(name, 0, 2, "the width", "an integer").Wrong(values[first], heap);
                     return false;
                 }
                 var pad = " ";
-                if (count == 2 && !TryText(name, values[first + 1], heap, out pad, out error)) return false;
+                if (count == 2 && !TryText(new(name, 1, 2, "the pad", "a string"), values[first + 1], heap, out pad, out error)) return false;
                 var missing = values[first].AsInt64 - ScalarCount(text);
                 if (missing <= 0 || pad.Length == 0) return Done(target, out result, out error);
                 if (!heap.TryMakeRoom(text.Length + (long)Math.Min((decimal)missing * 2, long.MaxValue), out error)) return false;
@@ -250,31 +255,30 @@ public static partial class WebLingoMembers
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
                 if (values[first].Kind != WebLingoValueKind.Regex)
                 {
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"'{name}' takes a regular expression, new Regex(…), not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                    error = new WebLingoArgument(name, 0, 1, "the regular expression", "a regular expression, new Regex(…)").Wrong(values[first], heap);
                     return false;
                 }
                 return TryRegex(values[first], member, text, "", heap, out result, out error);
             }
             default:
-                return TryJoin(text, name, values, first, count, heap, out result, out error);
+                return TryJoin(text, name, values, first, count, true, heap, out result, out error);
         }
     }
 
     /// <summary>
     /// <c>separator.join(array)</c>: the array's elements' text, between separators: a string as it is, <c>null</c> as
     /// nothing, as an interpolation writes it, an integer, a number, a decimal, a Boolean or a date as <c>write</c> writes
-    /// it; anything else WL3001, its text being its <c>toString()</c>'s, which a program gives first.
+    /// it; anything else WL3001, its text being its <c>toString()</c>'s, which a program gives first. The array is the
+    /// argument, <paramref name="given"/>, or, for an array's own <c>join(separator)</c>, the array itself.
     /// </summary>
-    private static bool TryJoin(string separator, string name, WebLingoValue[] values, int first, int count, WebLingoHeap heap,
+    private static bool TryJoin(string separator, string name, WebLingoValue[] values, int first, int count, bool given, WebLingoHeap heap,
         out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
         if (count != 1) return WrongArgumentCount(name, 1, count, out error);
         if (values[first].Kind != WebLingoValueKind.Array)
         {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'join' joins an array's elements, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+            error = new WebLingoArgument(name, 0, 1, "the array", "an array").Wrong(values[first], heap);
             return false;
         }
         var elements = heap.GetArray(values[first]);
@@ -293,8 +297,9 @@ public static partial class WebLingoMembers
             };
             if (texts[i] is null)
             {
+                var what = given ? $"{new WebLingoArgument(name, 0, 1, "the array", "an array").Named} must hold" : $"'{name}' writes";
                 error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"'join' writes strings, numbers, Booleans, decimals, dates and null, not {WebLingoValueFormatter.Describe(element, heap)}: "
+                    $"{what} strings, numbers, Booleans, decimals, dates and null, not {WebLingoValueFormatter.Describe(element, heap)}: "
                     + "give its text first, x.toString().");
                 return false;
             }
@@ -325,7 +330,8 @@ public static partial class WebLingoMembers
         }
     }
 
-    private static bool TryText(string name, WebLingoValue value, WebLingoHeap heap, out string text, out WebLingoRuntimeError? error)
+    /// <summary>An argument that must be a string, its text; WL3001 naming the argument otherwise.</summary>
+    private static bool TryText(WebLingoArgument argument, WebLingoValue value, WebLingoHeap heap, out string text, out WebLingoRuntimeError? error)
     {
         if (value.Kind == WebLingoValueKind.String)
         {
@@ -333,19 +339,25 @@ public static partial class WebLingoMembers
             return true;
         }
         text = "";
-        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-            $"'{name}' takes a string, not {WebLingoValueFormatter.Describe(value, heap)}.");
+        error = argument.Wrong(value, heap);
         return false;
     }
 
+    /// <summary>
+    /// <c>slice(start, end)</c>'s argument that is not an integer, of a string, an array or bytes: its start, unless that is
+    /// one, then its end.
+    /// </summary>
+    private static WebLingoArgument SliceArgument(string name, WebLingoValue start) => start.Kind != WebLingoValueKind.Int64
+        ? new(name, 0, 2, "the start", "an integer")
+        : new(name, 1, 2, "the end", "an integer");
+
     /// <summary>A position in a string, an integer from 0 to its length; WL3005 outside it.</summary>
-    private static bool TryPosition(string name, WebLingoValue value, long length, out long position, out WebLingoRuntimeError? error)
+    private static bool TryPosition(WebLingoArgument argument, WebLingoValue value, long length, out long position, out WebLingoRuntimeError? error)
     {
         position = 0;
         if (value.Kind != WebLingoValueKind.Int64)
         {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'{name}' takes a position, an integer, not {WebLingoValueFormatter.Describe(value)}.");
+            error = argument.Wrong(value);
             return false;
         }
         position = value.AsInt64;

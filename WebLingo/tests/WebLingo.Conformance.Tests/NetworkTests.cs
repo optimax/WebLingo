@@ -65,9 +65,13 @@ public sealed class NetworkTests : IDisposable
     [InlineData("import { writeLn } from \"std:system\"; import { Socket } from \"std:net\"; try { await Socket.connect(\"127.0.0.1\", CLOSED); } catch (NetworkError e) { writeLn(e.code); }", "WL3014")]
     [InlineData("import { writeLn } from \"std:system\"; import http from \"std:http\"; try { await http.get(\"ftp://127.0.0.1/\"); } catch (e) { writeLn(e.code); }", "WL3001")]
     [InlineData("import { write, writeLn } from \"std:system\"; import http from \"std:http\"; try { http.get(1); } catch (e) { writeLn([e.code, e.message]); }",
-        "[\"WL3001\", \"An address is a string, \\\"https://example.com/\\\", not the integer 1.\"]")]
-    [InlineData("import { writeLn } from \"std:system\"; import http from \"std:http\"; try { http.get(\"http://x/\", [1]); } catch (e) { writeLn(e.code); }", "WL3001")]
-    [InlineData("import { writeLn } from \"std:system\"; import { Socket } from \"std:net\"; try { Socket.connect(\"127.0.0.1\", 70000); } catch (e) { writeLn(e.code); }", "WL3001")]
+        "[\"WL3001\", \"The first argument of 'get', the address, must be a string, \\\"https://example.com/\\\", not the integer 1.\"]")]
+    [InlineData("import { write, writeLn } from \"std:system\"; import http from \"std:http\"; try { http.get(\"http://x/\", [1]); } catch (e) { writeLn([e.code, e.message]); }",
+        "[\"WL3001\", \"The second argument of 'get', the headers, must be a map of names to strings, { \\\"Accept\\\": \\\"text/plain\\\" }, not an array.\"]")]
+    [InlineData("import { write, writeLn } from \"std:system\"; import http from \"std:http\"; try { http.post(\"http://x/\", 5); } catch (e) { writeLn([e.code, e.message]); }",
+        "[\"WL3001\", \"The second argument of 'post', the body, must be a string or bytes, not the integer 5.\"]")]
+    [InlineData("import { write, writeLn } from \"std:system\"; import { Socket } from \"std:net\"; try { Socket.connect(\"127.0.0.1\", 70000); } catch (e) { writeLn([e.code, e.message]); }",
+        "[\"WL3001\", \"The second argument of 'connect', the port, must be an integer from 1 to 65535, not the integer 70000.\"]")]
     public void FailuresAreErrors(string source, string printed)
     {
         // A port nothing listens on: one the system gave, then let go of.

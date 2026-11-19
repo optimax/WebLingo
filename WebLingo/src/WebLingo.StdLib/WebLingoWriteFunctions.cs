@@ -66,8 +66,7 @@ public sealed class WebLingoDelayFunction : IWebLingoBuiltinFunction
         result = WebLingoValue.Null;
         if (arguments[0].Kind != WebLingoValueKind.Int64 || arguments[0].AsInt64 < 0)
         {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'delay' takes a number of milliseconds, an integer of 0 or more, not {WebLingoValueFormatter.Describe(arguments[0], heap)}.");
+            error = new WebLingoArgument("delay", 0, 1, "the milliseconds", "a number of milliseconds, an integer, 0 or more").Wrong(arguments[0], heap);
             return false;
         }
         if (heap.Scheduler is not { } scheduler)

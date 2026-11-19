@@ -36,7 +36,7 @@ public sealed class WebLingoEnvModule : IWebLingoNativeModule
     {
         result = WebLingoValue.Null;
         if (!TryEnvironment(heap, out var environment, out error)) return false;
-        if (!TryName(a[0], "variable", heap, out var name, out error)) return false;
+        if (!TryName(new("variable", 0, 1, "the name", "a variable's name, a string"), a[0], heap, out var name, out error)) return false;
         return environment.GetVariable(name) is not { } value || heap.TryAllocateString(value, out result, out error);
     }
 
@@ -72,13 +72,12 @@ public sealed class WebLingoEnvModule : IWebLingoNativeModule
     {
         result = WebLingoValue.Null;
         if (!TryEnvironment(heap, out var environment, out error)) return false;
-        if (!TryName(a[0], "setVariable", heap, out var name, out error)) return false;
+        if (!TryName(new("setVariable", 0, 2, "the name", "a variable's name, a string"), a[0], heap, out var name, out error)) return false;
         string? value = null;
         if (a[1].Kind == WebLingoValueKind.String) value = heap.GetString(a[1]);
         else if (a[1].Kind != WebLingoValueKind.Null)
         {
-            var given = WebLingoValueFormatter.Describe(a[1], heap);
-            error = Invalid($"'setVariable' sets a variable to a string, or removes it, given null, not {given}.");
+            error = new WebLingoArgument("setVariable", 1, 2, "the value", "a string, or null, which removes the variable").Wrong(a[1], heap);
             return false;
         }
         if (!environment.MaySetVariables)
@@ -99,7 +98,7 @@ public sealed class WebLingoEnvModule : IWebLingoNativeModule
     }
 
     /// <summary>A variable's name, a string; WL3001 for anything else.</summary>
-    private static bool TryName(WebLingoValue value, string function, WebLingoHeap heap, out string name, out WebLingoRuntimeError? error)
+    private static bool TryName(WebLingoArgument argument, WebLingoValue value, WebLingoHeap heap, out string name, out WebLingoRuntimeError? error)
     {
         (name, error) = ("", null);
         if (value.Kind == WebLingoValueKind.String)
@@ -107,7 +106,7 @@ public sealed class WebLingoEnvModule : IWebLingoNativeModule
             name = heap.GetString(value);
             return true;
         }
-        error = Invalid($"'{function}' takes a variable's name as a string, not {WebLingoValueFormatter.Describe(value, heap)}.");
+        error = argument.Wrong(value, heap);
         return false;
     }
 

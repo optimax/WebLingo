@@ -73,11 +73,17 @@ public sealed class DatabaseTests : IDisposable
     [InlineData("try { await db.query(\"SELECT * FROM Fishes\"); } catch (DatabaseError e) { writeLn([e.code, e.message]); }",
         "[\"WL3015\", \"SQLite Error 1: 'no such table: Fishes'.\"]")]
     [InlineData("try { await db.query(\"SELECT 1\", null, { wait: 1 }); } catch (e) { writeLn([e.code, e.message]); }",
-        "[\"WL3001\", \"query's option is \\\"timeout\\\", not \\\"wait\\\".\"]")]
-    [InlineData("try { await db.query(\"SELECT @x\", { x: [1] }); } catch (e) { writeLn(e.code); }", "WL3001")]
-    [InlineData("try { await db.query(\"SELECT @x\", [1]); } catch (e) { writeLn(e.code); }", "WL3001")]
-    [InlineData("try { await db.query(1); } catch (e) { writeLn(e.code); }", "WL3001")]
-    [InlineData("try { await db.begin({ isolation: \"loose\" }); } catch (e) { writeLn(e.code); }", "WL3001")]
+        "[\"WL3001\", \"The third argument of 'query', the options, must give \\\"timeout\\\" alone, not \\\"wait\\\".\"]")]
+    [InlineData("try { await db.query(\"SELECT @x\", { x: [1] }); } catch (e) { writeLn([e.code, e.message]); }",
+        "[\"WL3001\", \"The second argument of 'query', the values, must give @x null, a Boolean, a number, a decimal, a string, bytes or a date, which a database takes, not an array.\"]")]
+    [InlineData("try { await db.query(\"SELECT @x\", [1]); } catch (e) { writeLn([e.code, e.message]); }",
+        "[\"WL3001\", \"The second argument of 'query', the values, must be a map of names to values, { max: 10 }, not an array.\"]")]
+    [InlineData("try { await db.query(1); } catch (e) { writeLn([e.code, e.message]); }",
+        "[\"WL3001\", \"The first argument of 'query', the statement, must be SQL, a string, not the integer 1.\"]")]
+    [InlineData("try { await db.begin({ isolation: \"loose\" }); } catch (e) { writeLn([e.code, e.message]); }",
+        "[\"WL3001\", \"The argument of 'begin' must give \\\"isolation\\\" one of \\\"readUncommitted\\\", \\\"readCommitted\\\", \\\"repeatableRead\\\", \\\"serializable\\\", \\\"snapshot\\\", not a string.\"]")]
+    [InlineData("try { await Database.open(5); } catch (e) { writeLn([e.code, e.message]); }",
+        "[\"WL3001\", \"The argument of 'open' must be the configuration's name for a database, or a connection string, \\\"sqlite:C:/data/shop.db\\\", not the integer 5.\"]")]
     [InlineData("try { await Database.open(\"nowhere\"); } catch (e) { writeLn([e.code, e.message]); }",
         "[\"WL3001\", \"'nowhere' is not a database the configuration names.\"]")]
     [InlineData("try { await Database.open(\"postgres:x\"); } catch (e) { writeLn(e.message); }",

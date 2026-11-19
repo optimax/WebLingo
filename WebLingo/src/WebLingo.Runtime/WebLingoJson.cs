@@ -58,8 +58,7 @@ public sealed class WebLingoJsonBuilder : IWebLingoTextBuilder
             _indent = (int)indent.AsInt64;
             return;
         }
-        Error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-            $"'stringify' indents by 0 to 10 spaces, not {WebLingoValueFormatter.Describe(indent, heap)}.");
+        Error = new WebLingoArgument("stringify", 1, 2, "the indent", "a number of spaces, an integer from 0 to 10").Wrong(indent, heap);
     }
 
     public List<WebLingoValue> Roots { get; } = [];

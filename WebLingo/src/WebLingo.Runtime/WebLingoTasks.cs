@@ -195,8 +195,7 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         combined = WebLingoValue.Null;
         if (milliseconds.Kind != WebLingoValueKind.Int64 || milliseconds.AsInt64 < 0)
         {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'timeout' takes a time in milliseconds, an integer of 0 or more, not {WebLingoValueFormatter.Describe(milliseconds, heap)}.");
+            error = new WebLingoArgument("timeout", 1, 2, "the time in milliseconds", "an integer, 0 or more").Wrong(milliseconds, heap);
             return false;
         }
         if (!heap.TryAllocateTask(out combined, out error)) return false;

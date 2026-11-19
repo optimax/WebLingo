@@ -25,6 +25,9 @@ public sealed class WebLingoCryptoModule : IWebLingoNativeModule
     public const int MostRandomBytes = 1024 * 1024;
 
     private const string Scheme = "pbkdf2-sha256";
+
+    /// <summary>What data to hash or compare must be, as an argument's error says.</summary>
+    private const string Data = "a string or bytes";
     private const int SaltLength = 16;
     private const int HashLength = 32;
 
@@ -53,7 +56,7 @@ public sealed class WebLingoCryptoModule : IWebLingoNativeModule
         if (!TryCrypto(heap, out var crypto, out error)) return false;
         if (a[0].Kind != WebLingoValueKind.Int64 || a[0].AsInt64 is < 0 or > MostRandomBytes)
         {
-            error = Invalid($"'randomBytes' gives 0 to {MostRandomBytes} bytes, not {WebLingoValueFormatter.Describe(a[0], heap)}.");
+            error = new WebLingoArgument("randomBytes", 0, 1, "the count", $"an integer from 0 to {MostRandomBytes}").Wrong(a[0], heap);
             return false;
         }
         var bytes = new byte[a[0].AsInt64];
@@ -64,7 +67,7 @@ public sealed class WebLingoCryptoModule : IWebLingoNativeModule
     private static bool Hash(string algorithm, ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
-        if (!TryCrypto(heap, out var crypto, out error) || !TryData(a[0], algorithm, "data", heap, out var data, out error)) return false;
+        if (!TryCrypto(heap, out var crypto, out error) || !TryData(new(algorithm, 0, 1, "the data", Data), a[0], heap, out var data, out error)) return false;
         return heap.TryAllocateBytes(crypto.Hash(algorithm, data), out result, out error);
     }
 
@@ -75,18 +78,22 @@ public sealed class WebLingoCryptoModule : IWebLingoNativeModule
         if (a[0].Kind != WebLingoValueKind.String || heap.GetString(a[0]) is not ("sha256" or "sha512"))
         {
             var given = a[0].Kind == WebLingoValueKind.String ? $"\"{heap.GetString(a[0])}\"" : WebLingoValueFormatter.Describe(a[0], heap);
-            error = Invalid($"'hmac' hashes by \"sha256\" or \"sha512\", not {given}.");
+            error = new WebLingoArgument("hmac", 0, 3, "the hash", "\"sha256\" or \"sha512\"").Wrong(given);
             return false;
         }
-        if (!TryData(a[1], "hmac", "key", heap, out var key, out error) || !TryData(a[2], "hmac", "data", heap, out var data, out error)) return false;
+        if (!TryData(new("hmac", 1, 3, "the key", Data), a[1], heap, out var key, out error)
+            || !TryData(new("hmac", 2, 3, "the data", Data), a[2], heap, out var data, out error))
+        {
+            return false;
+        }
         return heap.TryAllocateBytes(crypto.Hmac(heap.GetString(a[0]), key, data), out result, out error);
     }
 
     private static bool Equal(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
-        if (!TryCrypto(heap, out var crypto, out error) || !TryData(a[0], "equal", "first value", heap, out var first, out error)
-            || !TryData(a[1], "equal", "second value", heap, out var second, out error))
+        if (!TryCrypto(heap, out var crypto, out error) || !TryData(new("equal", 0, 2, "the first value", Data), a[0], heap, out var first, out error)
+            || !TryData(new("equal", 1, 2, "the second value", Data), a[1], heap, out var second, out error))
         {
             return false;
         }
@@ -102,7 +109,10 @@ public sealed class WebLingoCryptoModule : IWebLingoNativeModule
     {
         result = WebLingoValue.Null;
         var name = sync ? "hashPassword" : "hashPasswordAsync";
-        if (!TryCrypto(heap, out var crypto, out error) || !TryData(a[0], name, "password", heap, out var password, out error)) return false;
+        if (!TryCrypto(heap, out var crypto, out error) || !TryData(new(name, 0, 1, "the password", Data), a[0], heap, out var password, out error))
+        {
+            return false;
+        }
         var salt = new byte[SaltLength];
         crypto.FillRandom(salt);
         return Run(sync, heap, () => Scheme + "$" + Iterations.ToString(System.Globalization.CultureInfo.InvariantCulture) + "$" + WebLingoBinaryText.ToBase64(salt) + "$"
@@ -119,11 +129,14 @@ public sealed class WebLingoCryptoModule : IWebLingoNativeModule
     {
         result = WebLingoValue.Null;
         var name = sync ? "verifyPassword" : "verifyPasswordAsync";
-        if (!TryCrypto(heap, out var crypto, out error) || !TryData(a[0], name, "password", heap, out var password, out error)) return false;
+        if (!TryCrypto(heap, out var crypto, out error) || !TryData(new(name, 0, 2, "the password", Data), a[0], heap, out var password, out error))
+        {
+            return false;
+        }
         if (a[1].Kind != WebLingoValueKind.String || !TryParse(heap.GetString(a[1]), out var iterations, out var salt, out var expected))
         {
             // A string's text is not repeated: a hash, even one wrongly written, is kept out of messages and logs.
-            error = Invalid($"'{name}' takes a hash 'hashPassword' made, \"{Scheme}$iterations$salt$hash\""
+            error = Invalid($"{new WebLingoArgument(name, 1, 2, "the hash", "").Named} must be a hash 'hashPassword' made, \"{Scheme}$iterations$salt$hash\""
                 + (a[1].Kind == WebLingoValueKind.String ? ", which this string is not." : $", not {WebLingoValueFormatter.Describe(a[1], heap)}."));
             return false;
         }
@@ -173,7 +186,7 @@ public sealed class WebLingoCryptoModule : IWebLingoNativeModule
     }
 
     /// <summary>Data as bytes: a string's UTF-8, or bytes as they are; WL3001 for anything else.</summary>
-    private static bool TryData(WebLingoValue value, string function, string what, WebLingoHeap heap, out byte[] data, out WebLingoRuntimeError? error)
+    private static bool TryData(WebLingoArgument argument, WebLingoValue value, WebLingoHeap heap, out byte[] data, out WebLingoRuntimeError? error)
     {
         (data, error) = ([], null);
         if (value.Kind == WebLingoValueKind.String)
@@ -186,7 +199,7 @@ public sealed class WebLingoCryptoModule : IWebLingoNativeModule
             data = heap.GetBytes(value);
             return true;
         }
-        error = Invalid($"'{function}' takes its {what} as a string or bytes, not {WebLingoValueFormatter.Describe(value, heap)}.");
+        error = argument.Wrong(value, heap);
         return false;
     }
 

@@ -781,8 +781,7 @@ public static partial class WebLingoMembers
         if (count != arity) return WrongArgumentCount(name, arity, count, out error);
         if (values[first].Kind != WebLingoValueKind.String || !IsName(heap.GetString(values[first])))
         {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"A member's name is a name, letters, digits and '_', not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+            error = new WebLingoArgument(name, 0, arity, "the member's name", "a name, letters, digits and '_'").Wrong(values[first], heap);
             return false;
         }
         var memberName = heap.GetString(values[first]);
@@ -794,9 +793,9 @@ public static partial class WebLingoMembers
             {
                 continue;
             }
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, member == WebLingoMember.SetMethod
-                ? $"A method is a function, not {WebLingoValueFormatter.Describe(function, heap)}."
-                : $"A property's getter or setter is a function, or null, not {WebLingoValueFormatter.Describe(function, heap)}.");
+            error = (member == WebLingoMember.SetMethod
+                ? new WebLingoArgument(name, i, arity, "the method", "a function")
+                : new WebLingoArgument(name, i, arity, i == 1 ? "the getter" : "the setter", "a function, or null")).Wrong(function, heap);
             return false;
         }
         return member == WebLingoMember.SetMethod
@@ -818,8 +817,7 @@ public static partial class WebLingoMembers
         if (member == WebLingoMember.Timeout) return scheduler.TryTimeout(values[first], values[first + 1], out result, out error);
         if (values[first].Kind != WebLingoValueKind.Array)
         {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'{name}' takes an array of values, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+            error = new WebLingoArgument(name, 0, 1, "the values", "an array of values").Wrong(values[first], heap);
             return false;
         }
         var given = new List<WebLingoValue>(heap.GetArray(values[first]));
@@ -1003,7 +1001,7 @@ public static partial class WebLingoMembers
             {
                 // Json.parse(text): a value made from JSON's text (section 3.6).
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
-                if (!TryText(name, values[first], heap, out var json, out error)) return false;
+                if (!TryText(new(name, 0, 1, "the text", "a string"), values[first], heap, out var json, out error)) return false;
                 return WebLingoJsonParser.TryParse(json, heap, out result, out error);
             }
             if (member == WebLingoMember.Parse)
@@ -1014,8 +1012,7 @@ public static partial class WebLingoMembers
                 {
                     return WebLingoConversions.TryParse(ParsedKind(target, heap), heap.GetString(values[first]), heap, out result, out error);
                 }
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"'parse' reads a string, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                error = new WebLingoArgument(name, 0, 1, "the text", "a string").Wrong(values[first], heap);
                 return false;
             }
             if (member == WebLingoMember.Format)
@@ -1030,8 +1027,7 @@ public static partial class WebLingoMembers
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
                 if (values[first].Kind != WebLingoValueKind.String || !IsName(heap.GetString(values[first])))
                 {
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"A member's name is a name, letters, digits and '_', not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                    error = new WebLingoArgument(name, 0, 1, "the member's name", "a name, letters, digits and '_'").Wrong(values[first], heap);
                     return false;
                 }
                 result = WebLingoValue.FromBoolean(heap.RemoveMethod(target, heap.GetString(values[first])));

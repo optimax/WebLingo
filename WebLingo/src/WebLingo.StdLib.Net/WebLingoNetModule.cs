@@ -26,12 +26,12 @@ public sealed class WebLingoNetModule : IWebLingoNativeModule
             var classValue = a[0];
             if (a[1].Kind != WebLingoValueKind.String || heap.GetString(a[1]).Length == 0)
             {
-                error = Wrong($"A host is a name or an address, a string, not {WebLingoValueFormatter.Describe(a[1], heap)}.");
+                error = new WebLingoArgument("connect", 0, 2, "the host", "a name or an address, a string").Wrong(a[1], heap);
                 return false;
             }
             if (a[2].Kind != WebLingoValueKind.Int64 || a[2].AsInt64 is < 1 or > 65535)
             {
-                error = Wrong($"A port is an integer from 1 to 65535, not {WebLingoValueFormatter.Describe(a[2], heap)}.");
+                error = new WebLingoArgument("connect", 1, 2, "the port", "an integer from 1 to 65535").Wrong(a[2], heap);
                 return false;
             }
             if (!TryServices(heap, out var network, out var scheduler, out error)) return false;
@@ -76,7 +76,7 @@ public sealed class WebLingoNetModule : IWebLingoNativeModule
             else if (a[1].Kind == WebLingoValueKind.Bytes) data = heap.GetBytes(a[1]);
             else
             {
-                error = Wrong($"A socket writes a string or bytes, not {WebLingoValueFormatter.Describe(a[1], heap)}.");
+                error = new WebLingoArgument("write", 0, 1, "the data", "a string or bytes").Wrong(a[1], heap);
                 return false;
             }
             return scheduler.TryRunOffWorker(() =>

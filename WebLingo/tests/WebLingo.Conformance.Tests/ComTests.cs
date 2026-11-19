@@ -121,6 +121,8 @@ public sealed class ComTests : IDisposable
             try { c.Open("Provider=Nothing.Here"); } catch (ComError e) { writeLn([e.source, e.description.length > 0]); }
             try { d.Add(writeLn, 1); } catch (TypeError e) { writeLn(e.message); }
             try { com.create("Nothing.Here"); } catch (e) { writeLn(e.code); }
+            try { com.create(5); } catch (TypeError e) { writeLn(e.message); }
+            try { d.call("Add", 1); } catch (TypeError e) { writeLn(e.message); }
             """;
         Assert.Equal(("""
             ["WL3012", -2146827831, "", "", true]
@@ -129,6 +131,8 @@ public sealed class ComTests : IDisposable
             ["ADODB.Connection", true]
             A function cannot be given to a COM object.
             WL3018
+            The argument of 'create' must be a ProgID or a CLSID, a string, not the integer 5.
+            The second argument of 'call', the member's arguments, must be an array, not the integer 1.
 
             """.ReplaceLineEndings("\n"), ""), Run(program));
     }

@@ -26,23 +26,28 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
 
     public void Register(IWebLingoNativeRegistry registry)
     {
-        Operation(registry, "readText", 2, 1, "read", (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out string path, out Func<IWebLingoFileSystem, string> work,
-            out WebLingoRuntimeError? error) =>
+        Operation(registry, "readText", 2, 1, "read", (string m, ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out string path,
+            out Func<IWebLingoFileSystem, string> work, out WebLingoRuntimeError? error) =>
         {
             work = null!;
-            if (!TryPath(a, 0, heap, out path, out error) || !TryEncoding(a, 1, heap, out var encoding, out error)) return false;
+            if (!TryPath(new(m, 0, 2, "the path", "a string"), a, 0, heap, out path, out error)
+                || !TryEncoding(new(m, 1, 2, "the encoding", Encoding), a, 1, heap, out var encoding, out error))
+            {
+                return false;
+            }
             var at = path;
             work = fs => fs.ReadText(at, encoding);
             return true;
         }, Text);
         foreach (var (name, append) in new[] { ("writeText", false), ("appendText", true) })
         {
-            Operation(registry, name, 3, 1, "written", (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out string path, out Func<IWebLingoFileSystem, bool> work,
-                out WebLingoRuntimeError? error) =>
+            Operation(registry, name, 3, 1, "written", (string m, ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out string path,
+                out Func<IWebLingoFileSystem, bool> work, out WebLingoRuntimeError? error) =>
             {
                 work = null!;
-                if (!TryPath(a, 0, heap, out path, out error) || !TryString(a, 1, "text", heap, out var text, out error)
-                    || !TryEncoding(a, 2, heap, out var encoding, out error))
+                if (!TryPath(new(m, 0, 3, "the path", "a string"), a, 0, heap, out path, out error)
+                    || !TryString(new(m, 1, 3, "the text", "a string"), a, 1, heap, out var text, out error)
+                    || !TryEncoding(new(m, 2, 3, "the encoding", Encoding), a, 2, heap, out var encoding, out error))
                 {
                     return false;
                 }
@@ -58,11 +63,15 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
         PathOperation(registry, "readBytes", "read", (fs, path) => fs.ReadBytes(path), BytesValue);
         foreach (var (name, append) in new[] { ("writeBytes", false), ("appendBytes", true) })
         {
-            Operation(registry, name, 2, 0, "written", (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out string path, out Func<IWebLingoFileSystem, bool> work,
-                out WebLingoRuntimeError? error) =>
+            Operation(registry, name, 2, 0, "written", (string m, ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out string path,
+                out Func<IWebLingoFileSystem, bool> work, out WebLingoRuntimeError? error) =>
             {
                 work = null!;
-                if (!TryPath(a, 0, heap, out path, out error) || !TryBytes(a, 1, $"'{name}'", heap, out var bytes, out error)) return false;
+                if (!TryPath(new(m, 0, 2, "the path", "a string"), a, 0, heap, out path, out error)
+                    || !TryBytes(new(m, 1, 2, "the bytes", "bytes"), a, 1, heap, out var bytes, out error))
+                {
+                    return false;
+                }
                 var at = path;
                 work = fs =>
                 {
@@ -77,12 +86,13 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
         foreach (var sync in new[] { false, true })
         {
             // Its errors name both paths, as the script gave them: 'a.txt' cannot be copied to 'b.txt': ….
-            registry.Function(sync ? "copySync" : "copy", 2, 0,
+            var m = sync ? "copySync" : "copy";
+            registry.Function(m, 2, 0,
                 (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
                 {
                     result = WebLingoValue.Null;
-                    if (!TryFileSystem(heap, out var fs, out error) || !TryPath(a, 0, heap, out var source, out error)
-                        || !TryPath(a, 1, heap, out var target, out error))
+                    if (!TryFileSystem(heap, out var fs, out error) || !TryPath(new(m, 0, 2, "the source", "a string"), a, 0, heap, out var source, out error)
+                        || !TryPath(new(m, 1, 2, "the target", "a string"), a, 1, heap, out var target, out error))
                     {
                         return false;
                     }
@@ -114,7 +124,7 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
         foreach (var (name, sync) in new[] { ("open", false), ("openSync", true) })
         {
             file.DeclareFactory(name, 3, 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
-                Open(file, sync, a, heap, out result, out error));
+                Open(file, sync, name, a, heap, out result, out error));
         }
         foreach (var (name, sync) in new[] { ("read", false), ("readSync", true) })
         {
@@ -132,8 +142,8 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
                 }
                 if (a[1].Kind != WebLingoValueKind.Int64 || a[1].AsInt64 < 1)
                 {
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"A file opened for its bytes is read by read(count), how many at most, an integer from 1, not {WebLingoValueFormatter.Describe(a[1], heap)}.");
+                    error = new WebLingoArgument(name, 0, 1, "the count", "an integer from 1, how many bytes at most, for a file opened for its bytes")
+                        .Wrong(a[1], heap);
                     return false;
                 }
                 var count = (int)Math.Min(a[1].AsInt64, MostBytesRead);
@@ -149,14 +159,14 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
                 if (!file.TryGetHostObject<OpenFile>(a[0], heap, out var open, out error)) return false;
                 if (open.Bytes)
                 {
-                    if (!TryBytes(a, 1, "A file opened for its bytes", heap, out var bytes, out error)) return false;
+                    if (!TryBytes(new(name, 0, 1, "the bytes", "bytes, for a file opened for its bytes"), a, 1, heap, out var bytes, out error)) return false;
                     return Run(sync, heap, "written", open.Path, () =>
                     {
                         open.File.WriteBytes(bytes);
                         return true;
                     }, Nothing, out result, out error);
                 }
-                if (!TryString(a, 1, "text", heap, out var text, out error)) return false;
+                if (!TryString(new(name, 0, 1, "the text", "a string, for a file opened for its text"), a, 1, heap, out var text, out error)) return false;
                 return Run(sync, heap, "written", open.Path, () =>
                 {
                     open.File.Write(text);
@@ -181,8 +191,8 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
     }
 
     /// <summary>An operation's arguments checked: the path the script gave, and the work on the file system; or why not.</summary>
-    private delegate bool Prepare<T>(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out string path, out Func<IWebLingoFileSystem, T> work,
-        out WebLingoRuntimeError? error);
+    private delegate bool Prepare<T>(string member, ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out string path,
+        out Func<IWebLingoFileSystem, T> work, out WebLingoRuntimeError? error);
 
     /// <summary>An operation, asynchronous as <paramref name="name"/>, synchronous with <c>Sync</c> after it.</summary>
     private static void Operation<T>(IWebLingoNativeRegistry registry, string name, int arity, int optional, string doing, Prepare<T> prepare,
@@ -190,11 +200,12 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
     {
         foreach (var sync in new[] { false, true })
         {
-            registry.Function(sync ? name + "Sync" : name, arity, optional,
+            var member = sync ? name + "Sync" : name;
+            registry.Function(member, arity, optional,
                 (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
                 {
                     result = WebLingoValue.Null;
-                    if (!TryFileSystem(heap, out var fs, out error) || !prepare(a, heap, out var path, out var work, out error)) return false;
+                    if (!TryFileSystem(heap, out var fs, out error) || !prepare(member, a, heap, out var path, out var work, out error)) return false;
                     return Run(sync, heap, doing, path, () => work(fs), finish, out result, out error);
                 });
         }
@@ -203,11 +214,11 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
     /// <summary>An operation on a path alone.</summary>
     private static void PathOperation<T>(IWebLingoNativeRegistry registry, string name, string doing, Func<IWebLingoFileSystem, string, T> operation,
         WebLingoOffWorkerFinish<T> finish) =>
-        Operation(registry, name, 1, 0, doing, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out string path, out Func<IWebLingoFileSystem, T> work,
-            out WebLingoRuntimeError? error) =>
+        Operation(registry, name, 1, 0, doing, (string m, ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out string path,
+            out Func<IWebLingoFileSystem, T> work, out WebLingoRuntimeError? error) =>
         {
             work = null!;
-            if (!TryPath(a, 0, heap, out path, out error)) return false;
+            if (!TryPath(new(m, 0, 1, "the path", "a path, a string"), a, 0, heap, out path, out error)) return false;
             var at = path;
             work = fs => operation(fs, at);
             return true;
@@ -245,13 +256,14 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
     }
 
     /// <summary><c>File.open(path, mode)</c>: an instance of the class it was called on, holding the file, opened.</summary>
-    private static bool Open(WebLingoNativeClass file, bool sync, ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result,
-        out WebLingoRuntimeError? error)
+    private static bool Open(WebLingoNativeClass file, bool sync, string m, ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap,
+        out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
         var classValue = a[0];
-        if (!TryFileSystem(heap, out var fs, out error) || !TryPath(a, 1, heap, out var path, out error)
-            || !TryString(a, 2, "mode", heap, out var modeName, out error) || !TryEncoding(a, 3, heap, out var encoding, out error))
+        if (!TryFileSystem(heap, out var fs, out error) || !TryPath(new(m, 0, 3, "the path", "a string"), a, 1, heap, out var path, out error)
+            || !TryString(new(m, 1, 3, "the mode", "a mode, a string"), a, 2, heap, out var modeName, out error)
+            || !TryEncoding(new(m, 2, 3, "the encoding", Encoding), a, 3, heap, out var encoding, out error))
         {
             return false;
         }
@@ -302,15 +314,22 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
         return error is null;
     }
 
-    private static bool TryPath(ReadOnlySpan<WebLingoValue> a, int index, WebLingoHeap heap, out string path, out WebLingoRuntimeError? error)
+    /// <summary>What an encoding's name must be, as an argument's error says.</summary>
+    private const string Encoding = "an encoding's name, a string";
+
+    /// <summary>A path, a string of one character or more, without <c>'\0'</c>; WL3001 naming the argument otherwise.</summary>
+    private static bool TryPath(WebLingoArgument argument, ReadOnlySpan<WebLingoValue> a, int index, WebLingoHeap heap, out string path,
+        out WebLingoRuntimeError? error)
     {
-        if (!TryString(a, index, "path", heap, out path, out error)) return false;
+        if (!TryString(argument, a, index, heap, out path, out error)) return false;
         if (path.Length > 0 && path.IndexOf('\0', StringComparison.Ordinal) < 0) return true;
-        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "A path is a string of one character or more, without '\\0'.");
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+            $"{argument.Named} must be a path, a string of one character or more, without '\\0'.");
         return false;
     }
 
-    private static bool TryString(ReadOnlySpan<WebLingoValue> a, int index, string what, WebLingoHeap heap, out string text, out WebLingoRuntimeError? error)
+    private static bool TryString(WebLingoArgument argument, ReadOnlySpan<WebLingoValue> a, int index, WebLingoHeap heap, out string text,
+        out WebLingoRuntimeError? error)
     {
         text = "";
         error = null;
@@ -319,22 +338,22 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
             text = heap.GetString(a[index]);
             return true;
         }
-        var article = what[0] is 'a' or 'e' or 'i' or 'o' or 'u' ? "An" : "A";
-        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-            $"{article} {what} is a string, not {WebLingoValueFormatter.Describe(a[index], heap)}.");
+        error = argument.Wrong(a[index], heap);
         return false;
     }
 
     /// <summary>An encoding's name, or UTF-8's for <c>null</c>, an argument left out.</summary>
-    private static bool TryEncoding(ReadOnlySpan<WebLingoValue> a, int index, WebLingoHeap heap, out string encoding, out WebLingoRuntimeError? error)
+    private static bool TryEncoding(WebLingoArgument argument, ReadOnlySpan<WebLingoValue> a, int index, WebLingoHeap heap, out string encoding,
+        out WebLingoRuntimeError? error)
     {
         encoding = Utf8;
         error = null;
-        return a[index].Kind == WebLingoValueKind.Null || TryString(a, index, "encoding's name", heap, out encoding, out error);
+        return a[index].Kind == WebLingoValueKind.Null || TryString(argument, a, index, heap, out encoding, out error);
     }
 
-    /// <summary>Bytes the script gave, <c>Bytes</c>, never copied, being immutable; else why not, in <paramref name="what"/>'s words.</summary>
-    private static bool TryBytes(ReadOnlySpan<WebLingoValue> a, int index, string what, WebLingoHeap heap, out byte[] bytes, out WebLingoRuntimeError? error)
+    /// <summary>Bytes the script gave, <c>Bytes</c>, never copied, being immutable; WL3001 naming the argument otherwise.</summary>
+    private static bool TryBytes(WebLingoArgument argument, ReadOnlySpan<WebLingoValue> a, int index, WebLingoHeap heap, out byte[] bytes,
+        out WebLingoRuntimeError? error)
     {
         bytes = [];
         error = null;
@@ -343,8 +362,7 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
             bytes = heap.GetBytes(a[index]);
             return true;
         }
-        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-            $"{what} writes bytes, not {WebLingoValueFormatter.Describe(a[index], heap)}.");
+        error = argument.Wrong(a[index], heap);
         return false;
     }
 

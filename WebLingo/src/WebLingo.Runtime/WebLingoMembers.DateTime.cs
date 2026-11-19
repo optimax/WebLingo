@@ -96,12 +96,15 @@ public static partial class WebLingoMembers
             case WebLingoMember.ToZone:
             {
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
-                if (!TryFindZone(name, values[first], heap, out var zone, out error)) return false;
+                if (!TryFindZone(new(name, 0, 1, "the zone's name", "a time zone's name, a string"), values[first], heap, out var zone, out error))
+                {
+                    return false;
+                }
                 return TryMakeDateTime(instant, zone.OffsetMinutesAt(instant), out result, out error);
             }
             case WebLingoMember.FormatWith:
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
-                if (!TryFormatDateTime(target, values[first], heap, out var text, out error)) return false;
+                if (!TryFormatDateTime(new(name, 0, 1, "the format", "a string"), target, values[first], heap, out var text, out error)) return false;
                 return heap.TryAllocateString(text, out result, out error);
         }
         if (count != 1) return WrongArgumentCount(name, 1, count, out error);
@@ -111,8 +114,7 @@ public static partial class WebLingoMembers
             // Calendar months, the day kept, or the month's last where it has fewer; the offset kept, as .NET keeps it.
             if (amount.Kind != WebLingoValueKind.Int64)
             {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"'{name}' takes an integer, not {WebLingoValueFormatter.Describe(amount, heap)}.");
+                error = new WebLingoArgument(name, 0, 1, "the amount", "an integer").Wrong(amount, heap);
                 return false;
             }
             var date = AsDateTimeOffset(target);
@@ -154,8 +156,7 @@ public static partial class WebLingoMembers
         }
         else
         {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'{name}' takes a number, not {WebLingoValueFormatter.Describe(amount, heap)}.");
+            error = new WebLingoArgument(name, 0, 1, "the amount", "a number").Wrong(amount, heap);
             return false;
         }
         return TryMakeDateTime(instant + delta, offset, out result, out error);
@@ -200,7 +201,7 @@ public static partial class WebLingoMembers
                 var named = member == WebLingoMember.InZone ? 1 : 0;
                 if (count - named is < 3 or > 7) return WrongArgumentCount(name, 3 + named, 7 + named, count, out error);
                 var zone = member == WebLingoMember.Local ? heap.TimeZone : null;
-                if (named == 1 && !TryFindZone(name, values[first], heap, out zone, out error)) return false;
+                if (named == 1 && !TryFindZone(new(name, 0, 8, "the zone's name", "a string"), values[first], heap, out zone, out error)) return false;
                 (first, count) = (first + named, count - named);
                 Span<long> parts = [0, 0, 0, 0, 0, 0, 0];
                 ReadOnlySpan<string> names = ["year", "month", "day", "hour", "minute", "second", "millisecond"];
@@ -208,8 +209,7 @@ public static partial class WebLingoMembers
                 {
                     if (values[first + i].Kind != WebLingoValueKind.Int64)
                     {
-                        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                            $"A date's {names[i]} is an integer, not {WebLingoValueFormatter.Describe(values[first + i], heap)}.");
+                        error = new WebLingoArgument(name, named + i, named + 7, "the " + names[i], "an integer").Wrong(values[first + i], heap);
                         return false;
                     }
                     parts[i] = values[first + i].AsInt64;
@@ -222,8 +222,7 @@ public static partial class WebLingoMembers
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
                 if (values[first].Kind != WebLingoValueKind.Int64)
                 {
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"'{name}' takes an integer, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                    error = new WebLingoArgument(name, 0, 1, "the milliseconds", "an integer").Wrong(values[first], heap);
                     return false;
                 }
                 return TryMakeDateTime(values[first].AsInt64, 0, out result, out error);
@@ -231,12 +230,14 @@ public static partial class WebLingoMembers
             {
                 // parse(text, format): ISO 8601 without a format, as a date's text gives it; else the format's.
                 if (count is < 1 or > 2) return WrongArgumentCount(name, 1, 2, count, out error);
-                var bad = values[first].Kind != WebLingoValueKind.String ? values[first]
-                    : count == 2 && values[first + 1].Kind != WebLingoValueKind.String ? values[first + 1] : (WebLingoValue?)null;
-                if (bad is { } notText)
+                if (values[first].Kind != WebLingoValueKind.String)
                 {
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"'parse' reads a string, with a format that is a string, not {WebLingoValueFormatter.Describe(notText, heap)}.");
+                    error = new WebLingoArgument(name, 0, 2, "the text", "a string").Wrong(values[first], heap);
+                    return false;
+                }
+                if (count == 2 && values[first + 1].Kind != WebLingoValueKind.String)
+                {
+                    error = new WebLingoArgument(name, 1, 2, "the format", "a string").Wrong(values[first + 1], heap);
                     return false;
                 }
                 var text = heap.GetString(values[first]);
@@ -251,21 +252,20 @@ public static partial class WebLingoMembers
     /// is not written as IANA writes its names, letters, digits, <c>_</c>, <c>-</c> and <c>+</c>, its parts between
     /// <c>/</c>, or that the platform does not know, and for a host that gives no zone.
     /// </summary>
-    private static bool TryFindZone(string member, WebLingoValue name, WebLingoHeap heap,
+    private static bool TryFindZone(WebLingoArgument argument, WebLingoValue name, WebLingoHeap heap,
         [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out WebLingo.Platform.Abstractions.IWebLingoTimeZone? zone,
         out WebLingoRuntimeError? error)
     {
         zone = null;
         if (name.Kind != WebLingoValueKind.String)
         {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'{member}' takes a time zone's name, a string, not {WebLingoValueFormatter.Describe(name, heap)}.");
+            error = argument.Wrong(name, heap);
             return false;
         }
         if (heap.TimeZone is not { } server)
         {
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'{member}' reads the host's time zones, and this host gives none.");
+                $"'{argument.Member}' reads the host's time zones, and this host gives none.");
             return false;
         }
         var text = heap.GetString(name);
@@ -293,13 +293,13 @@ public static partial class WebLingoMembers
     }
 
     /// <summary>A date's text by a format of .NET's, standard or custom, with the invariant culture (section 3.2).</summary>
-    internal static bool TryFormatDateTime(WebLingoValue date, WebLingoValue format, WebLingoHeap heap, out string text, out WebLingoRuntimeError? error)
+    internal static bool TryFormatDateTime(WebLingoArgument argument, WebLingoValue date, WebLingoValue format, WebLingoHeap heap, out string text,
+        out WebLingoRuntimeError? error)
     {
         text = "";
         if (format.Kind != WebLingoValueKind.String)
         {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"A date's format is a string, not {WebLingoValueFormatter.Describe(format, heap)}.");
+            error = argument.Wrong(format, heap);
             return false;
         }
         return TryFormatDateTime(date, heap.GetString(format), out text, out error);

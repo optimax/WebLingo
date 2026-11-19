@@ -788,6 +788,63 @@ public sealed class ConformanceTests : IDisposable
     }
 
     [Theory]
+    // A wrong argument's error names the member, and, where the member has several parameters, the argument by its place
+    // and its name, then says what it must be and what it was given (the owner's answers, 18 November 2026, "Argument
+    // Errors That Name the Argument"); an array's own elements, not an argument, keep the member's words.
+    [InlineData("\"tea\".trim(1)", "The argument of 'trim' must be a string of characters to trim, not the integer 1.")]
+    [InlineData("\"7\".padStart(\"3\")", "The first argument of 'padStart', the width, must be an integer, not a string.")]
+    [InlineData("\"7\".padStart(3, 0)", "The second argument of 'padStart', the pad, must be a string, not the integer 0.")]
+    [InlineData("\"tea\".indexOf(1)", "The first argument of 'indexOf', the search, must be a string, not the integer 1.")]
+    [InlineData("\"tea\".indexOf(\"e\", \"1\")", "The second argument of 'indexOf', the start, must be an integer, not a string.")]
+    [InlineData("\"tea\".includes(1)", "The argument of 'includes' must be a string, not the integer 1.")]
+    [InlineData("\"tea\".slice(\"1\")", "The first argument of 'slice', the start, must be an integer, not a string.")]
+    [InlineData("\"tea\".slice(1, 2.5)", "The second argument of 'slice', the end, must be an integer, not the number 2.5.")]
+    [InlineData("\"tea\".split(1)", "The argument of 'split' must be a string or a regular expression, not the integer 1.")]
+    [InlineData("\"tea\".replace(1, \"x\")", "The first argument of 'replace', the text replaced, must be a string or a regular expression, not the integer 1.")]
+    [InlineData("\"tea\".replace(\"t\", 1)", "The second argument of 'replace', the replacement, must be a string, not the integer 1.")]
+    [InlineData("\"tea\".repeat(-1)", "The argument of 'repeat' must be an integer, 0 or more, not the integer -1.")]
+    [InlineData("\"tea\".compare(1)", "The argument of 'compare' must be a string, not the integer 1.")]
+    [InlineData("\"tea\".match(\"t\")", "The argument of 'match' must be a regular expression, new Regex(…), not a string.")]
+    [InlineData("\"tea\".removePrefix(1)", "The argument of 'removePrefix' must be a string, not the integer 1.")]
+    [InlineData("\", \".join(5)", "The argument of 'join' must be an array, not the integer 5.")]
+    [InlineData("\", \".join([new P()])", "The argument of 'join' must hold strings, numbers, Booleans, decimals, dates and null, not an instance of P: give its text first, x.toString().")]
+    [InlineData("[new P()].join()", "'join' writes strings, numbers, Booleans, decimals, dates and null, not an instance of P: give its text first, x.toString().")]
+    [InlineData("[1].join(5)", "The argument of 'join' must be a string, not the integer 5.")]
+    [InlineData("[1].insert(\"0\", 2)", "The first argument of 'insert', the position, must be an integer, not a string.")]
+    [InlineData("[1].removeAt(\"0\")", "The argument of 'removeAt' must be a position, an integer, not a string.")]
+    [InlineData("[1].concat(2)", "The argument of 'concat' must be an array, not the integer 2.")]
+    [InlineData("[1].slice(0, \"1\")", "The second argument of 'slice', the end, must be an integer, not a string.")]
+    [InlineData("Integer.parse(1)", "The argument of 'parse' must be a string, not the integer 1.")]
+    [InlineData("Task.all(1)", "The argument of 'all' must be an array of values, not the integer 1.")]
+    [InlineData("Task.timeout(null, -1)", "The second argument of 'timeout', the time in milliseconds, must be an integer, 0 or more, not the integer -1.")]
+    [InlineData("delay(-1)", "The argument of 'delay' must be a number of milliseconds, an integer, 0 or more, not the integer -1.")]
+    [InlineData("P.setMethod(\"a b\", null)", "The first argument of 'setMethod', the member's name, must be a name, letters, digits and '_', not a string.")]
+    [InlineData("P.setMethod(\"go\", 1)", "The second argument of 'setMethod', the method, must be a function, not the integer 1.")]
+    [InlineData("P.setProperty(\"p\", null, 1)", "The third argument of 'setProperty', the setter, must be a function, or null, not the integer 1.")]
+    [InlineData("P.removeMethod(1)", "The argument of 'removeMethod' must be a name, letters, digits and '_', not the integer 1.")]
+    [InlineData("new Regex(\"a\").test(1)", "The argument of 'test' must be a string, not the integer 1.")]
+    [InlineData("new Regex(\"a\").replace(\"a\", 1)", "The second argument of 'replace', the replacement, must be a string, not the integer 1.")]
+    [InlineData("Json.stringify(1, 11)", "The second argument of 'stringify', the indent, must be a number of spaces, an integer from 0 to 10, not the integer 11.")]
+    [InlineData("Json.parse(1)", "The argument of 'parse' must be a string, not the integer 1.")]
+    [InlineData("DateTime.parse(1)", "The first argument of 'parse', the text, must be a string, not the integer 1.")]
+    [InlineData("DateTime.parse(\"2026-01-01\", 1)", "The second argument of 'parse', the format, must be a string, not the integer 1.")]
+    [InlineData("DateTime.utc(2026, 1, 1).format(1)", "The argument of 'format' must be a string, not the integer 1.")]
+    [InlineData("DateTime.inZone(1, 2026, 1, 1)", "The first argument of 'inZone', the zone's name, must be a string, not the integer 1.")]
+    [InlineData("DateTime.fromUnixMilliseconds(\"0\")", "The argument of 'fromUnixMilliseconds' must be an integer, not a string.")]
+    [InlineData("Bytes.from(\"x\").text(1)", "The argument of 'text' must be a charset's name, a string, not the integer 1.")]
+    [InlineData("Bytes.fromBase64(\"\", 1)", "The second argument of 'fromBase64', whether the alphabet is URL-safe, must be a Boolean, not the integer 1.")]
+    [InlineData("Bytes.from(\"x\", 1)", "The second argument of 'from', the charset, must be a charset's name, a string, not the integer 1.")]
+    [InlineData("Bytes.fixedTimeEqual(Bytes.from(\"x\"), \"x\")", "The second argument of 'fixedTimeEqual', b, must be bytes, not a string.")]
+    public void AWrongArgumentsErrorNamesTheArgument(string call, string message)
+    {
+        var source = "import { writeLn } from \"std:system\"; import { Regex } from \"std:regex\"; import { Json } from \"std:json\"; "
+            + "import { Bytes } from \"std:bytes\"; import { DateTime } from \"std:datetime\"; class P {} "
+            + "try { " + call + "; } catch (e) { writeLn(e.code + \" \" + e.message); }";
+        var (exit, output, error) = Weblingo("run", source);
+        Assert.Equal((WebLingoCommandLine.Success, "WL3001 " + message + "\n", ""), (exit, output, error));
+    }
+
+    [Theory]
     [InlineData("import { writeLn } from \"std:system\"; writeLn(\"abc\"[3]);", "WL3005")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn(\"abc\"[-1]);", "WL3005")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn(\"\"[0]);", "WL3005")]

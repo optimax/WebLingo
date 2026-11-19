@@ -38,8 +38,7 @@ public sealed class WebLingoTasksModule : IWebLingoNativeModule
         if (!TryScheduler(heap, out var scheduler, out error)) return false;
         if (values.Kind != WebLingoValueKind.Array)
         {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'{name}' takes an array of values, not {WebLingoValueFormatter.Describe(values, heap)}.");
+            error = new WebLingoArgument(name, 0, 1, "the values", "an array of values").Wrong(values, heap);
             return false;
         }
         var given = new List<WebLingoValue>(heap.GetArray(values));

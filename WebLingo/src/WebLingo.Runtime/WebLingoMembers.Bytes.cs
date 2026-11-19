@@ -36,7 +36,8 @@ public static partial class WebLingoMembers
         if (member == WebLingoMember.Text)
         {
             if (count > 1) return WrongArgumentCount(name, 0, 1, count, out error);
-            if (!TryCharset(count == 1 ? values[first] : WebLingoValue.Null, heap, out var charset, out error)) return false;
+            var charsetArgument = new WebLingoArgument(name, 0, 1, "the charset", "a charset's name, a string");
+            if (!TryCharset(charsetArgument, count == 1 ? values[first] : WebLingoValue.Null, heap, out var charset, out error)) return false;
             return heap.TryAllocateString(WebLingoTextCodec.Decode(data, charset), out result, out error);
         }
         if (member == WebLingoMember.ToHex)
@@ -48,7 +49,8 @@ public static partial class WebLingoMembers
         {
             // toBase64(urlSafe): RFC 4648's standard alphabet, padded, or, given true, its URL-safe one, unpadded.
             if (count > 1) return WrongArgumentCount(name, 0, 1, count, out error);
-            if (!TryUrlSafe(values, first, count == 1, name, heap, out var urlSafe, out error)) return false;
+            var urlSafeArgument = new WebLingoArgument(name, 0, 1, "whether the alphabet is URL-safe", "a Boolean");
+            if (!TryUrlSafe(urlSafeArgument, values, first, count == 1, heap, out var urlSafe, out error)) return false;
             return heap.TryAllocateString(WebLingoBinaryText.ToBase64(data, urlSafe), out result, out error);
         }
         // slice(start, end): from start to end, end left out the bytes' end; WL3005 for a range outside them.
@@ -57,9 +59,7 @@ public static partial class WebLingoMembers
         var end = count == 2 ? values[first + 1] : WebLingoValue.FromInt64(data.Length);
         if (start.Kind != WebLingoValueKind.Int64 || end.Kind != WebLingoValueKind.Int64)
         {
-            var bad = start.Kind != WebLingoValueKind.Int64 ? start : end;
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'slice' takes integers, not {WebLingoValueFormatter.Describe(bad, heap)}.");
+            error = SliceArgument(name, start).Wrong(start.Kind != WebLingoValueKind.Int64 ? start : end, heap);
             return false;
         }
         var (from, to) = (start.AsInt64, end.AsInt64);
@@ -95,9 +95,11 @@ public static partial class WebLingoMembers
                 // which are themselves.
                 if (count is < 1 or > 2) return WrongArgumentCount(name, 1, 2, count, out error);
                 var value = values[first];
+                var valueArgument = new WebLingoArgument(name, 0, 2, "the value", "a string, an array of integers from 0 to 255, or bytes");
                 if (value.Kind == WebLingoValueKind.String)
                 {
-                    if (!TryCharset(count == 2 ? values[first + 1] : WebLingoValue.Null, heap, out var charset, out error)) return false;
+                    var charsetArgument = new WebLingoArgument(name, 1, 2, "the charset", "a charset's name, a string");
+                    if (!TryCharset(charsetArgument, count == 2 ? values[first + 1] : WebLingoValue.Null, heap, out var charset, out error)) return false;
                     return heap.TryAllocateBytes(WebLingoTextCodec.Encode(heap.GetString(value), charset), out result, out error);
                 }
                 if (count == 2)
@@ -116,22 +118,21 @@ public static partial class WebLingoMembers
                     var data = new byte[elements.Count];
                     for (var i = 0; i < data.Length; i++)
                     {
-                        if (!TryByte(elements[i], heap, $"'{name}' takes an array of integers from 0 to 255", out data[i], out error)) return false;
+                        if (!TryByte(elements[i], heap, $"{valueArgument.Named} must hold integers from 0 to 255", out data[i], out error)) return false;
                     }
                     return heap.TryAllocateBytes(data, out result, out error);
                 }
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"'{name}' makes bytes from a string, an array of integers from 0 to 255, or bytes, not {WebLingoValueFormatter.Describe(value, heap)}.");
+                error = valueArgument.Wrong(value, heap);
                 return false;
             }
             case WebLingoMember.Concat:
             {
                 // An array of bytes and integers from 0 to 255, joined into new bytes, each copied once.
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+                var partsArgument = new WebLingoArgument(name, 0, 1, "the parts", "an array of bytes and integers from 0 to 255");
                 if (values[first].Kind != WebLingoValueKind.Array)
                 {
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"'concat' takes an array of bytes, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                    error = partsArgument.Wrong(values[first], heap);
                     return false;
                 }
                 var parts = heap.GetArray(values[first]);
@@ -139,7 +140,7 @@ public static partial class WebLingoMembers
                 foreach (var part in parts)
                 {
                     if (part.Kind == WebLingoValueKind.Bytes) length += heap.GetBytes(part).Length;
-                    else if (TryByte(part, heap, "'concat' takes bytes and integers from 0 to 255", out _, out error)) length++;
+                    else if (TryByte(part, heap, $"{partsArgument.Named} must hold bytes and integers from 0 to 255", out _, out error)) length++;
                     else return false;
                 }
                 if (length > int.MaxValue)
@@ -175,13 +176,13 @@ public static partial class WebLingoMembers
                 }
                 if (values[first].Kind != WebLingoValueKind.String)
                 {
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"'{name}' reads a string, not {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                    error = new WebLingoArgument(name, 0, hex ? 1 : 2, "the text", "a string").Wrong(values[first], heap);
                     return false;
                 }
                 var text = heap.GetString(values[first]);
                 var urlSafe = false;
-                if (!hex && !TryUrlSafe(values, first + 1, count == 2, name, heap, out urlSafe, out error)) return false;
+                var urlSafeArgument = new WebLingoArgument(name, 1, 2, "whether the alphabet is URL-safe", "a Boolean");
+                if (!hex && !TryUrlSafe(urlSafeArgument, values, first + 1, count == 2, heap, out urlSafe, out error)) return false;
                 if (hex ? WebLingoBinaryText.TryFromHex(text, out var read) : WebLingoBinaryText.TryFromBase64(text, urlSafe, out read))
                 {
                     return heap.TryAllocateBytes(read, out result, out error);
@@ -200,9 +201,8 @@ public static partial class WebLingoMembers
                 var (a, b) = (values[first], values[first + 1]);
                 if (a.Kind != WebLingoValueKind.Bytes || b.Kind != WebLingoValueKind.Bytes)
                 {
-                    var bad = a.Kind != WebLingoValueKind.Bytes ? a : b;
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"'fixedTimeEqual' compares bytes, not {WebLingoValueFormatter.Describe(bad, heap)}.");
+                    error = (a.Kind != WebLingoValueKind.Bytes ? new WebLingoArgument(name, 0, 2, "a", "bytes") : new WebLingoArgument(name, 1, 2, "b", "bytes"))
+                        .Wrong(a.Kind != WebLingoValueKind.Bytes ? a : b, heap);
                     return false;
                 }
                 (result, error) = (WebLingoValue.FromBoolean(FixedTimeEqual(heap.GetBytes(a), heap.GetBytes(b))), null);
@@ -226,7 +226,7 @@ public static partial class WebLingoMembers
     }
 
     /// <summary>Base64's <c>urlSafe</c>, a Boolean, at <paramref name="at"/> if <paramref name="given"/>, else <c>false</c>.</summary>
-    private static bool TryUrlSafe(WebLingoValue[] values, int at, bool given, string name, WebLingoHeap heap, out bool urlSafe,
+    private static bool TryUrlSafe(WebLingoArgument argument, WebLingoValue[] values, int at, bool given, WebLingoHeap heap, out bool urlSafe,
         out WebLingoRuntimeError? error)
     {
         (urlSafe, error) = (false, null);
@@ -236,8 +236,7 @@ public static partial class WebLingoMembers
             urlSafe = values[at].AsBoolean;
             return true;
         }
-        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-            $"'{name}' takes whether the URL-safe alphabet is meant, a Boolean, not {WebLingoValueFormatter.Describe(values[at], heap)}.");
+        error = argument.Wrong(values[at], heap);
         return false;
     }
 
@@ -254,15 +253,20 @@ public static partial class WebLingoMembers
         return false;
     }
 
-    /// <summary>A charset by name, or UTF-8 for <c>null</c>; WL3001 for one the core does not read and write.</summary>
-    private static bool TryCharset(WebLingoValue name, WebLingoHeap heap, out WebLingoCharset charset, out WebLingoRuntimeError? error)
+    /// <summary>
+    /// A charset by name, or UTF-8 for <c>null</c>; WL3001 for one the core does not read and write, and for an argument,
+    /// <paramref name="argument"/>, that is not a string.
+    /// </summary>
+    private static bool TryCharset(WebLingoArgument argument, WebLingoValue name, WebLingoHeap heap, out WebLingoCharset charset,
+        out WebLingoRuntimeError? error)
     {
         (charset, error) = (WebLingoCharset.Utf8, null);
         if (name.Kind == WebLingoValueKind.Null) return true;
         if (name.Kind == WebLingoValueKind.String && WebLingoTextCodec.TryFind(heap.GetString(name), out charset)) return true;
-        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, name.Kind == WebLingoValueKind.String
-            ? $"'{heap.GetString(name)}' is not a charset WebLingo reads: utf-8, utf-16, utf-16be, us-ascii or iso-8859-1."
-            : $"A charset is named by a string, not {WebLingoValueFormatter.Describe(name, heap)}.");
+        error = name.Kind == WebLingoValueKind.String
+            ? new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                $"'{heap.GetString(name)}' is not a charset WebLingo reads: utf-8, utf-16, utf-16be, us-ascii or iso-8859-1.")
+            : argument.Wrong(name, heap);
         return false;
     }
 
@@ -292,12 +296,11 @@ public static partial class WebLingoMembers
                 added = heap.TryAddToBuilder(target, [(byte)value.AsInt64], out error);
                 break;
             case WebLingoValueKind.String:
-                if (!TryCharset(WebLingoValue.Null, heap, out var utf8, out error)) return false;
+                if (!TryCharset(default, WebLingoValue.Null, heap, out var utf8, out error)) return false;
                 added = heap.TryAddToBuilder(target, WebLingoTextCodec.Encode(heap.GetString(value), utf8), out error);
                 break;
             default:
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"'{name}' takes bytes, an integer from 0 to 255, or a string, not {WebLingoValueFormatter.Describe(value, heap)}.");
+                error = new WebLingoArgument(name, 0, 1, "the value", "bytes, an integer from 0 to 255, or a string").Wrong(value, heap);
                 return false;
         }
         if (!added) return false;

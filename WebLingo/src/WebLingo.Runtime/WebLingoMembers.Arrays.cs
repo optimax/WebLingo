@@ -24,14 +24,17 @@ public static partial class WebLingoMembers
             {
                 // insert(i, v): v at i, from 0 to the length, the elements from i on moved up.
                 if (count != 2) return WrongArgumentCount(name, 2, count, out error);
-                if (!TryArrayPosition(name, values[first], elements.Count, out var at, out error)) return false;
+                if (!TryArrayPosition(new(name, 0, 2, "the position", "an integer"), values[first], elements.Count, out var at, out error)) return false;
                 return heap.TryInsertIntoArray(target, at, values[first + 1], out error);
             }
             case WebLingoMember.RemoveAt:
             {
                 // removeAt(i): the element at i, removed, the elements after it moved down.
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
-                if (!TryArrayPosition(name, values[first], elements.Count - 1, out var at, out error)) return false;
+                if (!TryArrayPosition(new(name, 0, 1, "the position", "a position, an integer"), values[first], elements.Count - 1, out var at, out error))
+                {
+                    return false;
+                }
                 return Done(heap.RemoveFromArray(target, at), out result, out error);
             }
             case WebLingoMember.IndexOf or WebLingoMember.Contains:
@@ -58,9 +61,7 @@ public static partial class WebLingoMembers
                 var end = count == 2 ? values[first + 1] : WebLingoValue.FromInt64(elements.Count);
                 if (start.Kind != WebLingoValueKind.Int64 || end.Kind != WebLingoValueKind.Int64)
                 {
-                    var bad = start.Kind != WebLingoValueKind.Int64 ? start : end;
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"'slice' takes integers, not {WebLingoValueFormatter.Describe(bad, heap)}.");
+                    error = SliceArgument(name, start).Wrong(start.Kind != WebLingoValueKind.Int64 ? start : end, heap);
                     return false;
                 }
                 var (from, to) = (start.AsInt64, end.AsInt64);
@@ -77,8 +78,7 @@ public static partial class WebLingoMembers
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
                 if (values[first].Kind != WebLingoValueKind.Array)
                 {
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        $"'concat' joins an array to another, not to {WebLingoValueFormatter.Describe(values[first], heap)}.");
+                    error = new WebLingoArgument(name, 0, 1, "the other array", "an array").Wrong(values[first], heap);
                     return false;
                 }
                 WebLingoValue[] both = [.. elements, .. heap.GetArray(values[first])];
@@ -89,8 +89,8 @@ public static partial class WebLingoMembers
                 // join(separator): a comma unless one is given, as JavaScript's; the elements' text as a string's join writes it.
                 if (count > 1) return WrongArgumentCount(name, 0, 1, count, out error);
                 var separator = ",";
-                if (count == 1 && !TryText(name, values[first], heap, out separator, out error)) return false;
-                return TryJoin(separator, name, [target], 0, 1, heap, out result, out error);
+                if (count == 1 && !TryText(new(name, 0, 1, "the separator", "a string"), values[first], heap, out separator, out error)) return false;
+                return TryJoin(separator, name, [target], 0, 1, false, heap, out result, out error);
             }
             default:
             {
@@ -104,13 +104,13 @@ public static partial class WebLingoMembers
     }
 
     /// <summary>A position in an array, an integer from 0 to <paramref name="last"/>; WL3005 outside it.</summary>
-    private static bool TryArrayPosition(string name, WebLingoValue value, int last, out int position, out WebLingoRuntimeError? error)
+    private static bool TryArrayPosition(WebLingoArgument argument, WebLingoValue value, int last, out int position, out WebLingoRuntimeError? error)
     {
         position = 0;
+        var name = argument.Member;
         if (value.Kind != WebLingoValueKind.Int64)
         {
-            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                $"'{name}' takes a position, an integer, not {WebLingoValueFormatter.Describe(value)}.");
+            error = argument.Wrong(value);
             return false;
         }
         if (value.AsInt64 < 0 || value.AsInt64 > last)

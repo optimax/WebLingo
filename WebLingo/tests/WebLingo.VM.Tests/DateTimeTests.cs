@@ -82,15 +82,15 @@ public sealed class DateTimeTests
 
     [Theory]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(new DateTime());", "WL2006", "'DateTime' takes 3 to 7 arguments, not 0.")]
-    [InlineData("import { DateTime } from \"std:datetime\"; class Day extends DateTime {} new Day(2026, \"x\", 1);", "WL3001", "A date's month is an integer, not a string.")]
+    [InlineData("import { DateTime } from \"std:datetime\"; class Day extends DateTime {} new Day(2026, \"x\", 1);", "WL3001", "The second argument of 'DateTime', the month, must be an integer, not a string.")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 2, 29));", "WL3001", "A date's day is from 1 to 28, not 29.")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 13, 1));", "WL3001", "A date's month is from 1 to 12, not 13.")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1));", "WL2006", "'utc' takes 3 to 7 arguments, not 2.")]
-    [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1, 1.5));", "WL3001", "A date's day is an integer, not the number 1.5.")]
+    [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1, 1.5));", "WL3001", "The third argument of 'utc', the day, must be an integer, not the number 1.5.")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(9999, 12, 31).addDays(1));", "WL3001", "A date and time is within the years 1 to 9999.")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(9999, 12, 31, 23).toLocal());", "WL3001", "A date and time is within the years 1 to 9999.")]
-    [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1, 1).addMonths(1.5));", "WL3001", "'addMonths' takes an integer, not the number 1.5.")]
-    [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1, 1).addDays(\"1\"));", "WL3001", "'addDays' takes a number, not a string.")]
+    [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1, 1).addMonths(1.5));", "WL3001", "The argument of 'addMonths' must be an integer, not the number 1.5.")]
+    [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1, 1).addDays(\"1\"));", "WL3001", "The argument of 'addDays' must be a number, not a string.")]
     [InlineData("import { write, writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.parse(\"16 November 2026\"));", "WL3001",
         "\"16 November 2026\" is not a date and time as ISO 8601 writes it, such as 2026-11-16T14:30:00Z.")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.parse(\"2026\", \"dd/MM/yyyy\"));", "WL3001", "\"2026\" is not a date and time of the format 'dd/MM/yyyy'.")]
@@ -106,7 +106,7 @@ public sealed class DateTimeTests
         "\"Mars/Olympus\" is not a time zone this server knows: a zone is named as IANA names it, such as Europe/Warsaw.")]
     [InlineData("import { write, writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1, 1).toZone(\"../Test/Kolkata\"));", "WL3001",
         "\"../Test/Kolkata\" is not a time zone this server knows: a zone is named as IANA names it, such as Europe/Warsaw.")]
-    [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1, 1).toZone(1));", "WL3001", "'toZone' takes a time zone's name, a string, not the integer 1.")]
+    [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1, 1).toZone(1));", "WL3001", "The argument of 'toZone' must be a time zone's name, a string, not the integer 1.")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1, 1).toZone());", "WL2006", "'toZone' takes 1 argument, not 0.")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.inZone(\"Test/Kolkata\", 2026, 1));", "WL2006", "'inZone' takes 4 to 8 arguments, not 3.")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.inZone(\"Test/Kolkata\", 2026, 1, 32));", "WL3001", "A date's day is from 1 to 31, not 32.")]

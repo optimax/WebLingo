@@ -21,9 +21,12 @@ public static partial class WebLingoMembers
         result = WebLingoValue.Null;
         var arity = member == WebLingoMember.Replace ? 2 : 1;
         if (count != arity) return WrongArgumentCount(name, arity, count, out error);
-        if (!TryText(name, values[first], heap, out var text, out error)) return false;
+        if (!TryText(new(name, 0, arity, "the text", "a string"), values[first], heap, out var text, out error)) return false;
         var replacement = "";
-        if (member == WebLingoMember.Replace && !TryText(name, values[first + 1], heap, out replacement, out error)) return false;
+        if (member == WebLingoMember.Replace && !TryText(new(name, 1, 2, "the replacement", "a string"), values[first + 1], heap, out replacement, out error))
+        {
+            return false;
+        }
         return TryRegex(target, member, text, replacement, heap, out result, out error);
     }
 
