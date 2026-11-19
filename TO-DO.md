@@ -2,7 +2,7 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [QUESTION] Identify Standard Library Gaps
+## [WORKING] Identify Standard Library Gaps
 
 Identify everything that's not in the standard library but should be either because it would be very useful, or because other languages predominantly offer it. Implement it as new std: modules.
 
@@ -15,21 +15,63 @@ Identify everything that's not in the standard library but should be either beca
 - Seeded random numbers for reproducible tests and simulations. Secure random bytes are already in `std:crypto`.
 - Subprocess execution for CLI scripts, with a separate decision about what WASP sites may launch.
 
-**Q1. Should path manipulation, URL handling, and CSV be the first standard-library additions?**
+Q1. Should path manipulation, URL handling, and CSV be the first standard-library additions?
 
-**Q2. Path helpers should accept either separator. Should they emit the host separator or always emit `/`?**
+A1: Yes.
 
-**Q3. Should the first CSV API handle arrays of strings only or also support maps keyed by the header row?**
+Q2. Path helpers should accept either separator. Should they emit the host separator or always emit `/`?
 
-## [QUESTION] Implement What's Not in the Language
+A2: Emit host, but accept either.
+
+Q3. Should the first CSV API handle arrays of strings only or also support maps keyed by the header row?
+
+A3: Both.
+
+2026-11-19 (Codex). Your answers set the priority, separator policy, and CSV row types. The names, signatures, and data formats below are proposed public APIs.
+
+Q4. Approve `std:path` with `join(...parts)`, `dirname(path)`, `basename(path)`, and `extension(path)`, recognizing both separators, drive prefixes, and UNC roots on both platforms?
+
+A4: Yes.
+
+Q5. Approve `std:url` with `parse(url)` returning named components, `resolve(base, relative)`, and query parsing and writing that use ordered name/value pairs so duplicate keys round-trip?
+
+A5: Yes.
+
+Q6. Approve `std:csv` with `parse(text, headers = false)` and `stringify(rows, headers = null)`, where parsing with headers returns row maps and writing row maps takes an explicit ordered header array?
+
+A6: Yes.
+
+## [IDLE] Implement What's Not in the Language
 
 `Documents\weblingo-language-reference.md` has section "17. What is not in the language yet". Implement everything it describes, and remove that section.
 
 2026-11-19 (Codex). The Language Reference lists streaming database rows and providers beyond SQLite and SQL Server. The architecture specification (§10, item 11) still leaves the streaming API open. A disposable async cursor would let callers read one row at a time and release the reader on early exit. PostgreSQL is a candidate for the first additional provider, followed by MySQL or MariaDB.
 
-**Q1. Should `await db.rows(sql, values)` return a disposable cursor whose `await cursor.next()` gives a row map or `null` at end of input?**
+Q1. Should `await db.rows(sql, values)` return a disposable cursor whose `await cursor.next()` gives a row map or `null` at end of input?
 
-**Q2. Which additional database provider should ship first?**
+A1: Yes.
+
+Q2. Which additional database provider should ship first?
+
+A2: MySQL, PostgreSQL
+
+2026-11-19 (Codex). The owner approved the cursor and chose MySQL before PostgreSQL. See the architecture specification, §7.11, “Streaming rows and additional providers”. Streaming landed in `474e237`. The parent task waits for the MySQL and PostgreSQL adapters.
+
+## Add the MySQL Database Provider
+
+The owner chose MySQL as the first new provider. The local NuGet cache has no MySQL provider. Proposed adapter dependency: MySqlConnector, with the existing ADO.NET connection contract and a `mysql:` provider prefix.
+
+**Q1. May I restore MySqlConnector from the configured NuGet feeds for the MySQL adapter?**
+
+A1: Yes.
+
+## Add the PostgreSQL Database Provider
+
+The owner chose PostgreSQL after MySQL. The local NuGet cache has no PostgreSQL provider. Proposed adapter dependency: Npgsql, with the existing ADO.NET connection contract and a `postgresql:` provider prefix.
+
+**Q1. May I restore Npgsql from the configured NuGet feeds for the PostgreSQL adapter?**
+
+A1: Yes.
 
 # END-OF-TO-DO
 

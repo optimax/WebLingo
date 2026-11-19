@@ -4029,3 +4029,9 @@ Should higher-order array methods reject non-callable arguments up front with a 
 A: Yes.
 
 Done (Codex, 2026-11-19, `a1d3a83`). Higher-order array methods reject non-callable callbacks with a named WL3001 before visiting any elements. The Windows Release build on main passed with zero warnings or errors. The full suite passed 4,182 tests with six integration tests skipped. CLI samples, register and stack bytecode, and a WASP page with a valid callback were exercised. Linux was not tried.
+
+## [DONE] Stream Database Rows
+
+Implement `db.rows(sql, values)` and the disposable async cursor approved in the parent task. Exercise row conversion, exhaustion, early disposal, and both VMs.
+
+Done (Codex, 2026-11-19, `474e237`). On Windows, the Release build on main passed with zero warnings or errors. 4,184 tests passed and six integration tests were skipped. SQLite cursor tests covered both VMs, early disposal, exhaustion, and a later row failing after the first row was read. CLI and WASP samples passed. Live SQL Server and Linux were not tried.
