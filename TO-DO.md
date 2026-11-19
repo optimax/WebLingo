@@ -10,6 +10,30 @@ Buiid an extension for VS Code to debug WebLingo.
 
 **Q1. Should the first VS Code debugger launch local `.wlg` scripts on the register VM with breakpoints, stepping, a call stack and local variables, with WASP, the stack VM and attaching to running processes left for follow-up tasks?**
 
+## Use the heap's byte accounting for gzip and ZIP decompression
+
+`gunzip` rejected a 2,048-byte result with `WL3003` when 979 heap units were free. A direct `Bytes` allocation of the same size succeeded. In `WebLingoCompressionModule.TryRead`, use the heap's allocation rule of one unit per eight bytes plus object overhead, and allow collection before reporting exhaustion. Keep the caller's `maxBytes` limit in bytes, cumulative across ZIP entries.
+
+Verify that both `gunzip` and `unzip` accept output that fits under both limits, including when collection frees the necessary space. Check that exceeding `maxBytes` still reports `WL3001` and exhausting the heap still reports `WL3003`.
+
+## Stop surviving subprocesses when capture times out
+
+A launcher can exit while a descendant still holds an output pipe open. When `std:process.run` reaches its deadline, `DotNetProcessRunner.StopIfRunning` sees that the launcher has exited and skips termination. Track the launched process tree through capture so timeout and output-limit cleanup can terminate descendants even after the launcher exits.
+
+Add a regression test with a short-lived launcher and a descendant that inherits an output pipe. Verify that the caller receives `TimeoutError` on timeout or `IOError` on output overflow, and that the descendant terminates in both cases.
+
+## Migrate WebLingo's old Windows `.wl` file association
+
+On accounts that registered WebLingo for `.wl`, running `Scripts/add-wlg-file-type.wlg` registers `.wlg` but leaves Explorer offering WebLingo for the old extension. Remove WebLingo's legacy entries, including its `OpenWithProgids` and `SupportedTypes` entries, while preserving other applications' registrations and the user's explicit default-app choice.
+
+Verify an upgrade with both WebLingo and another application's entries already present for `.wl`. Check that `.wlg` opens with WebLingo when selected, that the other application's entries survive, and that running the migration twice produces the same result.
+
+## Preserve a literal U+FEFF in the first CSV field
+
+When the first field starts with U+FEFF, `WebLingoCsvModule.WriteRow` can emit the character unquoted. The parser then consumes it as a byte-order mark. A four-character field containing U+FEFF followed by `Tea` came back as the three-character string `Tea`. Quote the first field when its leading U+FEFF would otherwise appear at the start of the CSV text.
+
+Add round-trip tests for a leading U+FEFF in the first data field and in the first header. Also check that parsing an input file with a genuine byte-order mark still removes the mark.
+
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value
