@@ -4,15 +4,17 @@ WebLingo is a scripting language. This zip holds `weblingo`, which runs WebLingo
 standard modules, and `install.wl`, a script that installs them for the whole machine, in WebLingo's folder,
 `C:\Program Files\WebLingo`, and puts that folder on the machine's `PATH`.
 
-It comes in four zips, named for the processors they run on and for whether they carry .NET:
+It comes in six zips, named for the processors they run on and for whether they carry .NET:
 
-- **`…-win-x64-…`** is for 64-bit Windows, which nearly every Windows machine is.
+- **`…-win-x64-…`** is for 64-bit Windows on Intel's and AMD's processors, which most Windows machines are.
+- **`…-win-arm64-…`** is for Windows on ARM, such as a laptop with a Snapdragon processor. The x64 zips run there too,
+  through Windows's emulation, but more slowly.
 - **`…-win-x86-…`** is for 32-bit Windows, or, on 64-bit Windows, for a site or a script that uses a COM component
   made for 32 bits only, such as an old Access database's driver, which a 64-bit program cannot load. On 64-bit
   Windows it installs in `C:\Program Files (x86)\WebLingo`, beside the x64 one where both are installed.
 - **`…-self-contained.zip`** holds .NET's runtime too: nothing else needs installing.
 - **`…-framework-dependent.zip`** is smaller, and needs .NET 10's runtime: install it first, ".NET Runtime 10.0" for
-  the same processor, x64 or x86, from <https://dotnet.microsoft.com/download/dotnet/10.0>.
+  the same processor, x64, Arm64 or x86, from <https://dotnet.microsoft.com/download/dotnet/10.0>.
 
 ## Installing
 

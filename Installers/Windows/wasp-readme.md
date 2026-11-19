@@ -6,9 +6,10 @@ sites, and installs `wasp` beside `weblingo`, in WebLingo's folder, `C:\Program 
 finds it, or, for the zips for x86, on 64-bit Windows, `C:\Program Files (x86)\WebLingo`.
 
 It needs WebLingo installed first, from WebLingo's zip of the same version, processor and kind: `…-win-x64-…` with
-WebLingo's `…-win-x64-…`, `…-win-x86-…` with its `…-win-x86-…`, `…-self-contained.zip` with WebLingo's
-self-contained zip, and `…-framework-dependent.zip` with its framework-dependent one. Its files go with that
-WebLingo's, and `iis-install.wl` stops, saying so, where WebLingo is another. The zips for x86 are for 32-bit Windows,
+WebLingo's `…-win-x64-…`, `…-win-arm64-…` with its `…-win-arm64-…`, `…-win-x86-…` with its `…-win-x86-…`,
+`…-self-contained.zip` with WebLingo's self-contained zip, and `…-framework-dependent.zip` with its framework-dependent
+one. Its files go with that WebLingo's, and `iis-install.wl` stops, saying so, where WebLingo is another. The zips for
+arm64 are for Windows on ARM, which the x64 ones run on too, more slowly. The zips for x86 are for 32-bit Windows,
 or for a site on 64-bit Windows that uses a COM component made for 32 bits only, which a 64-bit `wasp` cannot load:
 its `web.config` then runs `C:\Program Files (x86)\WebLingo\wasp.exe`.
 

@@ -1,5 +1,5 @@
-# Makes WebLingo's and WASP's installers for Windows, into zips, four of each, for x64 and for x86, 32-bit Windows, or
-# 64-bit Windows's 32-bit programs, such as a site that uses a COM component made for 32 bits:
+# Makes WebLingo's and WASP's installers for Windows, into zips, six of each: for x64; for x86, 32-bit Windows, or 64-bit
+# Windows's 32-bit programs, such as a site that uses a COM component made for 32 bits; and for arm64, Windows on ARM:
 #   WebLingo-<version>-win-<architecture>-self-contained.zip, which holds .NET's runtime too, for a machine without it;
 #   WebLingo-<version>-win-<architecture>-framework-dependent.zip, for a machine with .NET 10's runtime installed;
 #   WASP-<version>-win-<architecture>-self-contained.zip and WASP-<version>-win-<architecture>-framework-dependent.zip,
@@ -68,7 +68,7 @@ function New-Zip([string] $folder, [string] $name) {
 }
 
 try {
-    foreach ($architecture in 'x64', 'x86') {
+    foreach ($architecture in 'x64', 'x86', 'arm64') {
         foreach ($kind in 'self-contained', 'framework-dependent') {
             # WebLingo's: weblingo, the standard modules, and the scripts that install them.
             $name = "WebLingo-$version-win-$architecture-$kind"

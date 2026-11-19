@@ -86,15 +86,15 @@ function pathEntry(entry) {
     return text.endsWith("\\") ? text.slice(0, text.length - 1) : text;
 }
 
-// The architecture a published program is for, "x86" or "x64", from the runtime its .deps.json names,
+// The architecture a published program is for, "x64", "x86" or "arm64", from the runtime its .deps.json names,
 // ".NETCoreApp,Version=v10.0/win-x86"; "x64" where it names none, as a program published for any machine.
 export async function architectureOf(folder, program) {
     var target = Json.parse(await fs.readText($"{folder}\\{program}.deps.json"))["runtimeTarget"]["name"];
-    return target.endsWith("/win-x86") ? "x86" : "x64";
+    return target.endsWith("/win-x86") ? "x86" : target.endsWith("/win-arm64") ? "arm64" : "x64";
 }
 
-// The folder Windows installs an architecture's programs in: for x64, Program Files; for x86, Program Files (x86) on
-// 64-bit Windows, and Program Files on 32-bit Windows, which has no other; whatever the program asking is.
+// The folder Windows installs an architecture's programs in: for x64 and arm64, Program Files; for x86, Program Files
+// (x86) on 64-bit Windows, and Program Files on 32-bit Windows, which has no other; whatever the program asking is.
 export function programFiles(architecture) {
     var named = architecture == "x86" ? expand("%ProgramFiles(x86)%") : expand("%ProgramW6432%");
     // A variable Windows does not set is left as it was written, its % first.
