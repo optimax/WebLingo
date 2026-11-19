@@ -138,12 +138,12 @@ public sealed class NativeModuleTests : IDisposable
             "import { Counter } from \"lib:test\";\nimport { use } from \"./lib.wlg\";\nvar c = new Counter(1);\nc.close();\n  c.add(1);");
         var (exit, _, error) = Weblingo(["run", "--scheme", "lib=" + _native, script]);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
-        Assert.Contains("script.wlg(5,3): error WL3001: This Counter has been disposed.", error);
+        Assert.Contains("script.wlg(5,3): ERROR WL3001 (TypeError): This Counter has been disposed.", error);
         File.WriteAllText(script,
             "import { Counter } from \"lib:test\";\nimport { use } from \"./lib.wlg\";\nvar c = new Counter(1);\nc.dispose();\nuse(c);");
         (exit, _, error) = Weblingo(["run", "--scheme", "lib=" + _native, script]);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
-        Assert.Contains("lib.wlg(2,10): error WL3001: This Counter has been disposed.", error);
+        Assert.Contains("lib.wlg(2,10): ERROR WL3001 (TypeError): This Counter has been disposed.", error);
     }
 
     [Fact]
@@ -227,7 +227,7 @@ public sealed class NativeModuleTests : IDisposable
         File.WriteAllText(script, "import { twice } from \"std:system\"; if (twice(2) == 4) { throws(); }");
         (exit, _, error) = Weblingo(["run", "--scheme", "std=" + other, script]);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
-        Assert.Contains("error WL3001: 'throws' failed: thrown by the test module", error);
+        Assert.Contains("ERROR WL3001 (TypeError): 'throws' failed: thrown by the test module", error);
     }
 
     private static (int Exit, string Output, string Error) Weblingo(string[] args)

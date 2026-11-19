@@ -57,7 +57,7 @@ public sealed class WaspTests : IDisposable
         var (exit, output, error) = Wasp("check", "<p>\n  <% var x = 1;\n");
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
         Assert.Equal("", output);
-        Assert.Equal("page.wasp(2,3): error WL5001: This block has no closing '%>'.", error.TrimEnd());
+        Assert.Equal("page.wasp(2,3): ERROR WL5001: This block has no closing '%>'.", error.TrimEnd());
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public sealed class WaspTests : IDisposable
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Equal("<p>before</p>\n", output);
         Assert.StartsWith("page.wasp(2,", error);
-        Assert.Contains("error WL3005", error);
+        Assert.Contains("ERROR WL3005", error);
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public sealed class WaspTests : IDisposable
         // Without --root, the root is the page's folder, where there is no includes folder.
         (exit, _, error) = Run(["run", page]);
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
-        Assert.Contains("(2,12): error WL5002: The template '/includes/header.wasp' cannot be included: there is no such file.", error);
+        Assert.Contains("(2,12): ERROR WL5002: The template '/includes/header.wasp' cannot be included: there is no such file.", error);
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public sealed class WaspTests : IDisposable
         var page = Write("site/index.wasp", "<% include \"../secret.wasp\"; %>");
         var (exit, _, error) = Run(["run", page]);
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
-        Assert.Contains("(1,12): error WL5002: The template '../secret.wasp' cannot be included: it is outside the application's root.", error);
+        Assert.Contains("(1,12): ERROR WL5002: The template '../secret.wasp' cannot be included: it is outside the application's root.", error);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public sealed class WaspTests : IDisposable
         var page = Write("index.wasp", "<% include \"parts/bad.wasp\"; %>");
         var (exit, _, error) = Run(["check", page]);
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
-        Assert.EndsWith("parts/bad.wasp(2,5): error WL2001: 'y' is not defined.", error.TrimEnd());
+        Assert.EndsWith("parts/bad.wasp(2,5): ERROR WL2001: 'y' is not defined.", error.TrimEnd());
 
         Write("parts/fails.wasp", "<p>before</p>\n<%= [1][5] %>");
         page = Write("index.wasp", "<% include \"parts/fails.wasp\"; %>");
@@ -136,7 +136,7 @@ public sealed class WaspTests : IDisposable
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Equal("<p>before</p>\n", output);
         Assert.Contains("parts/fails.wasp(2,", error);
-        Assert.Contains("error WL3005", error);
+        Assert.Contains("ERROR WL3005", error);
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public sealed class WaspTests : IDisposable
         page = Write("site/index.wasp", "<% await renderComponent(\"/components/none.wasp\"); %>");
         (exit, _, error) = Run(["run", page]);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
-        Assert.Contains("index.wasp(1,10): error WL5005: The component '/components/none.wasp' cannot be rendered: there is no such file.", error);
+        Assert.Contains("index.wasp(1,10): ERROR WL5005: The component '/components/none.wasp' cannot be rendered: there is no such file.", error);
     }
 
     [Fact]
@@ -184,7 +184,7 @@ public sealed class WaspTests : IDisposable
         Write("site/layouts/main.wasp", "<% param title; %>\n<%= nope %>");
         var (exit, _, error) = Run(["check", "--root", Path.Combine(_folder, "site"), page]);
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
-        Assert.EndsWith("layouts/main.wasp(2,5): error WL2001: 'nope' is not defined.", error.TrimEnd());
+        Assert.EndsWith("layouts/main.wasp(2,5): ERROR WL2001: 'nope' is not defined.", error.TrimEnd());
     }
 
     [Fact]
@@ -346,7 +346,7 @@ public sealed class WaspTests : IDisposable
         // As in a script (section 3.9): a standard module's export, with the module to import it from.
         var (exit, _, error) = Wasp("check", "<p><%= Environment.machineName %></p>");
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
-        Assert.EndsWith("page.wasp(1,8): error WL2001: 'Environment' is not defined; did you mean Environment, from std:env?",
+        Assert.EndsWith("page.wasp(1,8): ERROR WL2001: 'Environment' is not defined; did you mean Environment, from std:env?",
             error.TrimEnd(), StringComparison.Ordinal);
     }
 

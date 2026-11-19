@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace WebLingo.Cli;
@@ -31,4 +32,46 @@ public static class WebLingoConsoleText
     /// <summary>A file's or a pipe's writer, UTF-8 without a byte-order mark, each write sent at once, as .NET's own are.</summary>
     private static TextWriter Utf8(Stream stream) =>
         new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)) { AutoFlush = true };
+
+    internal static void WriteErrorLine(TextWriter error, string location, string description)
+    {
+        const string bold = "\u001b[1mERROR\u001b[22m";
+        if (!ReferenceEquals(error, Console.Error) || Console.IsErrorRedirected
+            || Environment.GetEnvironmentVariable("TERM") == "dumb")
+        {
+            error.WriteLine($"{location}: ERROR {description}");
+            return;
+        }
+        if (!OperatingSystem.IsWindows())
+        {
+            error.WriteLine($"{location}: {bold} {description}");
+            return;
+        }
+
+        const int standardError = -12;
+        const uint virtualTerminal = 0x0004;
+        var handle = GetStdHandle(standardError);
+        if (!GetConsoleMode(handle, out var mode) || !SetConsoleMode(handle, mode | virtualTerminal))
+        {
+            error.WriteLine($"{location}: ERROR {description}");
+            return;
+        }
+        try
+        {
+            error.WriteLine($"{location}: {bold} {description}");
+        }
+        finally
+        {
+            if ((mode & virtualTerminal) == 0) SetConsoleMode(handle, mode);
+        }
+    }
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetStdHandle(int standardHandle);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool GetConsoleMode(IntPtr handle, out uint mode);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool SetConsoleMode(IntPtr handle, uint mode);
 }

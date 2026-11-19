@@ -5,5 +5,5 @@ var total;
 total = 5;
 
 /* Errors:
-declaration-without-value.wlg(4,5): error WL1006: 'total' needs a value where it is declared: 'var total = …;'.
+declaration-without-value.wlg(4,5): ERROR WL1006: 'total' needs a value where it is declared: 'var total = …;'.
 */

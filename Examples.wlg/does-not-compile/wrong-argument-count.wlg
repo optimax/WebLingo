@@ -6,5 +6,5 @@ function brew(tea, minutes) { return $"{tea} for {minutes} min"; }
 writeLn(brew("sencha"));
 
 /* Errors:
-wrong-argument-count.wlg(6,9): error WL2006: 'brew' takes 2 arguments, not 1.
+wrong-argument-count.wlg(6,9): ERROR WL2006 (ArgumentError): 'brew' takes 2 arguments, not 1.
 */

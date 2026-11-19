@@ -34,7 +34,7 @@ public sealed class CompilerStackTests : IDisposable
         var file = Write("deeper.wlg", "import { write, writeLn } from \"std:system\"; writeLn(" + new string('(', 100_000) + "1" + new string(')', 100_000) + ");\n");
         var (exit, output, error) = Weblingo("check", file);
         Assert.Equal((WebLingoCommandLine.CompilationFailed, ""), (exit, output));
-        Assert.Contains("error WL1008: The expression nests more than 256 levels deep.", error, StringComparison.Ordinal);
+        Assert.Contains("ERROR WL1008: The expression nests more than 256 levels deep.", error, StringComparison.Ordinal);
     }
 
     private string Write(string name, string text)

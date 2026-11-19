@@ -206,7 +206,7 @@ public sealed class DatabaseTests : IDisposable
         // caller below it: the error is the call's, on line 6, not a place its own source's positions name (section 3.9).
         var (exit, _, error) = Weblingo(Setup + "\n\n\n\n\nawait db.transaction(5);\n");
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
-        Assert.StartsWith("program.wlg(6,7): error WL2005:", error);
+        Assert.StartsWith("program.wlg(6,7): ERROR WL2005 (CallError):", error);
     }
 
     [Fact]

@@ -5,5 +5,5 @@
 function describe() { return this.name; }
 
 /* Errors:
-this-outside-a-method.wlg(5,30): error WL2009: 'this' is only allowed in a method or a constructor.
+this-outside-a-method.wlg(5,30): ERROR WL2009: 'this' is only allowed in a method or a constructor.
 */

@@ -4,5 +4,5 @@ var tea = "sencha";
 var tea = "assam";
 
 /* Errors:
-declared-twice.wlg(4,5): error WL2002: 'tea' is already declared in this scope.
+declared-twice.wlg(4,5): ERROR WL2002: 'tea' is already declared in this scope.
 */

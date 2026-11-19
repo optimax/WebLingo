@@ -6,5 +6,5 @@ var tea = "sencha"
 writeLn(tea);
 
 /* Errors:
-missing-semicolon.wlg(5,19): error WL1002: A ';' is missing here.
+missing-semicolon.wlg(5,19): ERROR WL1002: A ';' is missing here.
 */

@@ -2440,11 +2440,15 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// <summary>An exception that nothing caught: the program stops, reporting it where it was first thrown.</summary>
         private WebLingoExecutionResult Uncaught(long executed)
         {
+            string? exceptionClass = null;
             var (code, message) = _thrownError is { } error
                 ? (error.Code, error.Message)
-                : WebLingoExceptions.Uncaught(_thrown, _errorClass[0], heap);
+                : WebLingoExceptions.Uncaught(_thrown, _errorClass[0], heap, out exceptionClass);
             var failure = Failure(code, message, SpanOfOrigin(_origin)) with { Instructions = executed };
-            return OwnerOfOrigin(_origin)?.Source is { } source ? failure with { Error = failure.Error! with { Source = source } } : failure;
+            return failure with
+            {
+                Error = failure.Error! with { Source = OwnerOfOrigin(_origin)?.Source, ExceptionClass = exceptionClass }
+            };
         }
 
         /// <summary>The first handler whose region holds the instruction, or -1.</summary>

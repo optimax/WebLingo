@@ -10,5 +10,5 @@ function load() {
 }
 
 /* Errors:
-finally-cannot-drop.wlg(8,5): error WL2012: 'return' would leave a 'finally' block, which nothing may leave early.
+finally-cannot-drop.wlg(8,5): ERROR WL2012: 'return' would leave a 'finally' block, which nothing may leave early.
 */

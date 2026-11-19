@@ -5,5 +5,5 @@
 let cups = 2;
 
 /* Errors:
-let-is-reserved.wlg(5,1): error WL1001: 'let' is not a declaration keyword in WebLingo: use 'var' for a variable, or 'const' for a constant.
+let-is-reserved.wlg(5,1): ERROR WL1001: 'let' is not a declaration keyword in WebLingo: use 'var' for a variable, or 'const' for a constant.
 */

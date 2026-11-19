@@ -69,13 +69,21 @@ public static class WebLingoExceptions
     /// What an exception that nothing caught is reported as: an <c>Error</c> whose code is a string, as a runtime
     /// error becomes, as that code and its message, as the runtime error itself would be; any other value as WL3008.
     /// </summary>
-    public static (string Code, string Message) Uncaught(WebLingoValue exception, WebLingoValue errorClass, WebLingoHeap heap)
+    public static (string Code, string Message) Uncaught(WebLingoValue exception, WebLingoValue errorClass, WebLingoHeap heap) =>
+        Uncaught(exception, errorClass, heap, out _);
+
+    /// <summary>Reports an uncaught exception and gives its class name if it is an instance of Error.</summary>
+    public static (string Code, string Message) Uncaught(WebLingoValue exception, WebLingoValue errorClass, WebLingoHeap heap,
+        out string? exceptionClass)
     {
+        exceptionClass = null;
         if (!IsError(exception, errorClass, heap))
         {
             return (WebLingoDiagnosticCodes.UncaughtException,
                 $"An exception was thrown and not caught: {WebLingoValueFormatter.Format(exception, heap)}");
         }
+        var actualClass = heap.ClassOf(exception);
+        if (heap.IsNamed(actualClass)) exceptionClass = heap.ClassName(actualClass);
         heap.TryGetField(exception, "message", out var message);
         var text = message.Kind == WebLingoValueKind.String ? heap.GetString(message) : WebLingoValueFormatter.Format(message, heap);
         if (heap.TryGetField(exception, "code", out var code) && code.Kind == WebLingoValueKind.String) return (heap.GetString(code), text);

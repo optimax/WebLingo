@@ -875,10 +875,12 @@ wasp --version
 
   `wasp run cli.wasp` writes `<p>Hello, World!</p>`, and `wasp run cli.wasp name=Ann`, `<p>Hello, Ann!</p>`.
 - **`wasp check`** compiles a page and reports its errors, without running it: `wasp check broken.wasp` writes
-  `broken.wasp(1,8): error WL2001: 'nope' is not defined.`
+  `broken.wasp(1,8): ERROR WL2001: 'nope' is not defined.`
 - **`--scheme name=folder`** names a folder of native modules, over the configuration's.
 
-An error is written as `file(line,column): error CODE: message`, to the error output. The exit code says how it went:
+Command-line diagnostics go to standard error. An error starts with the file, line, column and `ERROR CODE`.
+If there is a WebLingo exception class, it follows the code in parentheses, as in `ERROR WL3005 (IndexError)`.
+Terminals that support bold display `ERROR` in bold. The exit code says how it went.
 
 | Exit code | Meaning |
 |---|---|

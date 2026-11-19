@@ -7,4 +7,7 @@ public sealed record WebLingoDiagnostic(string Code, WebLingoDiagnosticSeverity 
 {
     /// <summary>The source the span is in, when it is not the program's own: a module it imports (section 3.9).</summary>
     public string? Source { get; init; }
+
+    /// <summary>The actual class of an uncaught Error instance, when one was thrown.</summary>
+    public string? ExceptionClass { get; init; }
 }

@@ -87,8 +87,9 @@ function main (0 locals, 1 registers)
 ```
 
 What a script writes, and its errors, `weblingo` writes as UTF-8, on Windows too, to a file, a pipe or a console,
-whatever the console's code page, so that no letter is lost. An error is written to the error output as
-`file(line,column): error CODE: message`, and the exit code says what happened:
+whatever the console's code page, so that no letter is lost. An error begins with `file(line,column): ERROR CODE`.
+When it has a WebLingo exception class, the name follows the code in parentheses, as in `ERROR WL2006 (ArgumentError)`.
+Terminals that support bold display `ERROR` in bold. The exit code says what happened:
 
 | Exit code | Meaning |
 |---|---|
@@ -99,7 +100,7 @@ whatever the console's code page, so that no letter is lost. An error is written
 | 4 | a file could not be read or written |
 
 ```text
-vars-const.wlg(2,1): error WL2003: 'limit' is a constant and cannot be assigned.
+vars-const.wlg(2,1): ERROR WL2003: 'limit' is a constant and cannot be assigned.
 ```
 
 A script's own parameters ([section 14](#script-parameters)) are given after its name, each a string. A
@@ -458,14 +459,14 @@ NaN
   ```
 
   ```text
-  values-overflow.wlg(2,9): error WL3002: 9223372036854775807 + 1 does not fit in a 64-bit integer.
+  values-overflow.wlg(2,9): ERROR WL3002 (OverflowError): 9223372036854775807 + 1 does not fit in a 64-bit integer.
   ```
 
 - **Numbers follow IEEE 754**: `1 / 0` is `Infinity`, `0 / 0` is `NaN`, and `0.1 + 0.2` is what it always is.
 - **Nothing else is arithmetic**: `"n = " + 5` is an error, not `"n = 5"`:
 
   ```text
-  values-noconvert.wlg(1,9): error WL3001: '+' joins two strings or adds two numbers, not a string and the integer 5.
+  values-noconvert.wlg(1,9): ERROR WL3001 (TypeError): '+' joins two strings or adds two numbers, not a string and the integer 5.
   ```
 
 ### Equality
@@ -523,7 +524,7 @@ if (1) writeLn("never");
 ```
 
 ```text
-values-truthy.wlg(2,5): error WL3001: A condition needs a Boolean, not the integer 1.
+values-truthy.wlg(2,5): ERROR WL3001 (TypeError): A condition needs a Boolean, not the integer 1.
 ```
 
 ### Assignment's operators
@@ -941,7 +942,7 @@ null
   ```
 
   ```text
-  fn-arity.wlg(3,9): error WL2006: 'f' takes 1 to 2 arguments, not 3.
+  fn-arity.wlg(3,9): ERROR WL2006 (ArgumentError): 'f' takes 1 to 2 arguments, not 3.
   ```
 
 - **Recursion** is bounded by the call depth an execution allows, 10,000 by default (WL3003), not by the machine's
@@ -1140,7 +1141,7 @@ null
 - An index outside the array is an error:
 
   ```text
-  coll-index-error.wlg(2,9): error WL3005: The index 5 is outside 0 to 1.
+  coll-index-error.wlg(2,9): ERROR WL3005 (IndexError): The index 5 is outside 0 to 1.
   ```
 
 ### Array methods
@@ -1207,7 +1208,7 @@ seven
 - A key that is not there is an error:
 
   ```text
-  coll-key-error.wlg(2,9): error WL3007: The map has no key "b".
+  coll-key-error.wlg(2,9): ERROR WL3007 (KeyError): The map has no key "b".
   ```
 
 - Keys may be strings, integers, Booleans and `null`, compared as `==` compares them. A number, or a collection, is not
@@ -1788,7 +1789,7 @@ throw new Error("Unhandled.");
 ```
 
 ```text
-exc-uncaught.wlg(1,1): error WL3008: An error was thrown and not caught: Unhandled.
+exc-uncaught.wlg(1,1): ERROR WL3008 (Error): An error was thrown and not caught: Unhandled.
 ```
 
 ---
@@ -1838,7 +1839,7 @@ close other
   ```text
   derived cleaned up
   base cleaned up
-  dispose-derived.wlg(5,3): error WL3008: An error was thrown and not caught: failed inside
+  dispose-derived.wlg(5,3): ERROR WL3008 (Error): An error was thrown and not caught: failed inside
   ```
 
 - A `using` disposes one object; nest them for more. A `null` is not disposed.
@@ -1930,7 +1931,7 @@ fast ready
 
   ```text
   main ends
-  async-forget.wlg(4,28): error WL3008: An error was thrown and not caught: nobody awaited me
+  async-forget.wlg(4,28): ERROR WL3008 (Error): An error was thrown and not caught: nobody awaited me
   ```
 
 - **One at a time.** A program's tasks run on one thread, taking turns only at `await`, so that no two run at once and
@@ -2049,8 +2050,8 @@ a standard module exports, used without importing it, is WL2001, whose message n
 name that differs from one in scope only by case names that one:
 
 ```text
-program.wlg(1,10): error WL2001: 'Database' is not defined; did you mean Database, from std:db?
-program.wlg(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn?
+program.wlg(1,10): ERROR WL2001: 'Database' is not defined; did you mean Database, from std:db?
+program.wlg(1,1): ERROR WL2001: 'Writeln' is not defined; did you mean writeLn?
 ```
 
 ### `std:system`

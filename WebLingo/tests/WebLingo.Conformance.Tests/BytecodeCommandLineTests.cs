@@ -57,7 +57,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         var main = Write("main.wlg", "import { write, writeLn } from \"std:system\"; import { f } from \"lib/util.wlg\";\nwriteLn(\"before\");\nf(2);\n");
         var fromSource = Weblingo("run", main);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, fromSource.Exit);
-        Assert.EndsWith("lib/util.wlg(2,10): error WL3005: The index 2 is outside 0 to 0.", fromSource.Error.TrimEnd());
+        Assert.EndsWith("lib/util.wlg(2,10): ERROR WL3005 (IndexError): The index 2 is outside 0 to 0.", fromSource.Error.TrimEnd());
 
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
         File.Delete(Path.Combine(_folder, "lib", "util.wlg"));
@@ -70,6 +70,20 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Equal(Weblingo("run", main).Error, error);
         Assert.StartsWith(main + "(2,", error);
+    }
+
+    [Theory]
+    [InlineData("register")]
+    [InlineData("stack")]
+    public void AnUncaughtExceptionNamesItsOwnClass(string vm)
+    {
+        var main = Write("main.wlg", "class MyError extends Error {}\nthrow new MyError(\"broken\");\n");
+        var fromSource = Weblingo("run", main);
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, fromSource.Exit);
+        Assert.Equal(main + "(2,1): ERROR WL3008 (MyError): An error was thrown and not caught: broken", fromSource.Error.TrimEnd());
+
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+        Assert.Equal(fromSource, Weblingo("run", Path.ChangeExtension(main, ".wlbc")));
     }
 
     [Fact]
@@ -110,7 +124,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         {
             var (exit, output, error) = Weblingo(command, compiled);
             Assert.Equal((WebLingoCommandLine.CompilationFailed, ""), (exit, output));
-            Assert.StartsWith(compiled + ": error WL4001: The file is damaged: its source positions section does not match its CRC-32.", error);
+            Assert.StartsWith(compiled + ": ERROR WL4001: The file is damaged: its source positions section does not match its CRC-32.", error);
         }
         Assert.Equal(WebLingoCommandLine.FileUnreadable, Weblingo("run", Path.Combine(_folder, "none.wlbc")).Exit);
     }
@@ -121,7 +135,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         var main = Write("main.wlg", "var x = ;\n");
         var (exit, _, error) = Weblingo("compile", main);
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
-        Assert.StartsWith(main + "(1,9): error WL1001:", error);
+        Assert.StartsWith(main + "(1,9): ERROR WL1001:", error);
         Assert.False(File.Exists(Path.Combine(_folder, "main.wlbc")));
         Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("compile", "--fast", main).Exit);
         var (usage, _, why) = Weblingo("compile", "--stack", "--vm", "register", main);

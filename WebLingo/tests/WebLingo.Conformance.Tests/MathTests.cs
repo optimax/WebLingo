@@ -70,8 +70,8 @@ public sealed class MathTests : IDisposable
     }
 
     [Theory]
-    [InlineData("math.min();", "error WL2006: 'min' takes at least 1 argument, not 0.")]
-    [InlineData("math.sqrt(1, 2);", "error WL2006: 'std:math.sqrt' takes 1 argument, not 2.")]
+    [InlineData("math.min();", "ERROR WL2006 (ArgumentError): 'min' takes at least 1 argument, not 0.")]
+    [InlineData("math.sqrt(1, 2);", "ERROR WL2006 (ArgumentError): 'std:math.sqrt' takes 1 argument, not 2.")]
     public void ACallGivesTheArgumentsItTakes(string call, string message)
     {
         var (output, error) = Run(Math + call);

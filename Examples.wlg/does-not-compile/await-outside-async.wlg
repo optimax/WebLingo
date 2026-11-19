@@ -7,5 +7,5 @@ function load() {
 }
 
 /* Errors:
-await-outside-async.wlg(5,3): error WL2014: 'await' is only allowed in an async function, or at a script's top level.
+await-outside-async.wlg(5,3): ERROR WL2014: 'await' is only allowed in an async function, or at a script's top level.
 */

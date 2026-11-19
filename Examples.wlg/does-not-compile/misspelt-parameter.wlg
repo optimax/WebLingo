@@ -4,5 +4,5 @@
 import teas from "../lib/teas.wlg" { curency: "CHF" };
 
 /* Errors:
-misspelt-parameter.wlg(4,38): error WL2016: 'curency' is not a parameter of "../lib/teas.wlg".
+misspelt-parameter.wlg(4,38): ERROR WL2016: 'curency' is not a parameter of "../lib/teas.wlg".
 */

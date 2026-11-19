@@ -17,7 +17,8 @@ namespace WebLingo.Cli;
 /// <c>disasm</c> and <c>--version</c>. It is the host: it registers <c>write</c> and <c>writeLn</c>, writing to standard
 /// output, compiles a file, and runs it in the VM; or it writes the compiled file as WLBC, a <c>.wlbc</c> (section 5.3),
 /// which <c>run</c> runs on the VM it is for, without compiling anything. Diagnostics go to standard error as
-/// <c>file(line,column): error CODE: message</c>. Exit codes (section 15.2): 0 success, 1 compilation errors or a
+/// <c>file(line,column): ERROR CODE (ExceptionClass): message</c>, with the class if available.
+/// Exit codes (section 15.2): 0 success, 1 compilation errors or a
 /// <c>.wlbc</c> that cannot be used, 2 a usage error, 3 a runtime error, 4 a file that cannot be read or written.
 /// </summary>
 public static class WebLingoCommandLine
@@ -200,7 +201,7 @@ public static class WebLingoCommandLine
         if (TryHost(program, path, path, givenSchemes, output, error, input) is not { } host) return FileUnreadable;
         var compilation = program.Compile(text, host.Options);
         var compiled = compilation.Result;
-        foreach (var diagnostic in compiled.Diagnostics) error.WriteLine(Format(TextOf(diagnostic), diagnostic));
+        foreach (var diagnostic in compiled.Diagnostics) WriteDiagnostic(error, TextOf(diagnostic), diagnostic);
         if (compiled.Module is null) return CompilationFailed;
         if (!run) return Success;
 
@@ -209,7 +210,7 @@ public static class WebLingoCommandLine
         output.Flush();
         if (result.Succeeded) return Success;
         var located = compilation.Locate(result.Error!);
-        error.WriteLine(Format(TextOf(located), located));
+        WriteDiagnostic(error, TextOf(located), located);
         return RuntimeFailed;
 
         // A diagnostic's file: a module the program imports, a file the program's compiler read itself (a page's include,
@@ -256,7 +257,7 @@ public static class WebLingoCommandLine
         foreach (var diagnostic in diagnostics)
         {
             var file = diagnostic.Source is { } name && host.Resolver.Texts.TryGetValue(name, out var imported) ? imported : text;
-            error.WriteLine(Format(file, diagnostic));
+            WriteDiagnostic(error, file, diagnostic);
         }
         if (register is null && stack is null) return CompilationFailed;
 
@@ -332,7 +333,7 @@ public static class WebLingoCommandLine
             ? positionsOf.GetLocation(diagnostic.Span.Start)
             : host.Resolver.Texts.TryGetValue(file, out var imported) ? imported.GetLocation(diagnostic.Span.Start)
             : new WebLingoSourceLocation(diagnostic.Span.Start, 1, 1);
-        error.WriteLine(Format(file, location, diagnostic));
+        WriteDiagnostic(error, file, location, diagnostic);
         return RuntimeFailed;
 
         // A file that cannot be read is one thing, and one that is not WLBC a reader can use is another.
@@ -392,7 +393,7 @@ public static class WebLingoCommandLine
         var read = WebLingoBytecodeFile.TryReadKind(bytes, out var kind, out why) && (kind == WebLingoBytecodeKind.Register
             ? WebLingoBytecodeFile.TryReadRegister(bytes, out register, out positions, out why)
             : WebLingoBytecodeFile.TryReadStack(bytes, out stack, out positions, out why));
-        if (!read) error.WriteLine($"{path}: error {WebLingoDiagnosticCodes.BytecodeVerificationFailure}: {why}");
+        if (!read) WebLingoConsoleText.WriteErrorLine(error, path, $"{WebLingoDiagnosticCodes.BytecodeVerificationFailure}: {why}");
         return read;
     }
 
@@ -605,20 +606,37 @@ public static class WebLingoCommandLine
         }
     }
 
-    /// <summary>A diagnostic as a line: <c>file(line,column): error CODE: message</c>.</summary>
+    /// <summary>A diagnostic as plain text, with the source location.</summary>
     public static string Format(WebLingoSourceText source, WebLingoDiagnostic diagnostic) =>
         Format(source.Name, source.GetLocation(diagnostic.Span.Start), diagnostic);
 
     /// <summary>A diagnostic as a line, in the file <paramref name="name"/>, at <paramref name="location"/>.</summary>
-    public static string Format(string name, WebLingoSourceLocation location, WebLingoDiagnostic diagnostic)
+    public static string Format(string name, WebLingoSourceLocation location, WebLingoDiagnostic diagnostic) =>
+        $"{name}({location.Line},{location.Column}): {SeverityOf(diagnostic)} {Describe(diagnostic)}";
+
+    private static string SeverityOf(WebLingoDiagnostic diagnostic) => diagnostic.Severity switch
     {
-        var severity = diagnostic.Severity switch
-        {
-            WebLingoDiagnosticSeverity.Error => "error",
-            WebLingoDiagnosticSeverity.Warning => "warning",
-            _ => "info"
-        };
-        return $"{name}({location.Line},{location.Column}): {severity} {diagnostic.Code}: {diagnostic.Message}";
+        WebLingoDiagnosticSeverity.Error => "ERROR",
+        WebLingoDiagnosticSeverity.Warning => "warning",
+        _ => "info"
+    };
+
+    private static string Describe(WebLingoDiagnostic diagnostic)
+    {
+        var exception = diagnostic.Severity == WebLingoDiagnosticSeverity.Error
+            ? diagnostic.ExceptionClass ?? WebLingoErrorClasses.NameOf(diagnostic.Code) : null;
+        return exception is null ? $"{diagnostic.Code}: {diagnostic.Message}"
+            : $"{diagnostic.Code} ({exception}): {diagnostic.Message}";
+    }
+
+    private static void WriteDiagnostic(TextWriter error, WebLingoSourceText source, WebLingoDiagnostic diagnostic) =>
+        WriteDiagnostic(error, source.Name, source.GetLocation(diagnostic.Span.Start), diagnostic);
+
+    private static void WriteDiagnostic(TextWriter error, string name, WebLingoSourceLocation location, WebLingoDiagnostic diagnostic)
+    {
+        if (diagnostic.Severity == WebLingoDiagnosticSeverity.Error)
+            WebLingoConsoleText.WriteErrorLine(error, $"{name}({location.Line},{location.Column})", Describe(diagnostic));
+        else error.WriteLine(Format(name, location, diagnostic));
     }
 
     /// <summary>
