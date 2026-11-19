@@ -4153,3 +4153,9 @@ A2: MySQL, PostgreSQL
 2026-11-19 (Codex). The owner approved the cursor and chose MySQL before PostgreSQL. See the architecture specification, §7.11, “Streaming rows and additional providers”. Streaming landed in `a2c3fe0`. MySQL landed in `4b45d3b`. The parent task waits for the PostgreSQL adapter.
 
 2026-11-19 (Codex). Streaming rows shipped in `a2c3fe0`, MySQL in `4b45d3b`, and PostgreSQL in `6a89a2b`. The last provider change removed the obsolete Language Reference section. The Windows Release build and full suite passed on the task branch and main. Live MySQL, live PostgreSQL and Linux were not tested locally.
+
+## [DONE] Add Gzip and ZIP Compression
+
+Add in-memory gzip and ZIP compression and decompression with explicit decompressed output limits.
+
+2026-11-19 (Codex). In `37622d1`, added in-memory `std:compression` with gzip and ZIP. ZIPs use file-name-to-bytes maps. The required unzip limit applies to the total file bytes. The heap budget also applies. Windows Release built cleanly and the full suite passed 4,209 tests with six skipped on the branch and on main. Both VMs covered limits, round trips, and damaged inputs. CLI and WASP samples and an externally generated ZIP ran on main, and the CLI publish included the module. Linux was not tested locally.
