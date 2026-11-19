@@ -10,8 +10,8 @@
 # repository's, from its Scripts folder, and readme.md, a human's steps, this folder's readme.md and wasp-readme.md.
 # Run it on a machine with the .NET 10 SDK, from any folder:
 #   powershell -ExecutionPolicy Bypass -File Installers\Windows\package.ps1
-# -Destination names the folder the zips go to, WebLingo/publish/installers in the repository by default.
-param([string] $Destination = (Join-Path $PSScriptRoot '../../WebLingo/publish/installers'))
+# -Destination names the folder the zips go to, the repository's Installers folder by default, which git ignores them in.
+param([string] $Destination = (Join-Path $PSScriptRoot '..'))
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
