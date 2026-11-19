@@ -60,6 +60,14 @@ public sealed class BytesTests
                 + "var all = b.toBytes(); writeLn([b.length, all[0], all[255], all[256], all[99999]]);", "[100000, 0, 255, 0, 159]\n")]
     [InlineData("import { Bytes, BytesBuilder } from \"std:bytes\"; extend BytesBuilder { twice(v) { return this.add(v).add(v); } } "
                 + "writeLn(new BytesBuilder().twice(\"ab\").add(Bytes.from([1])).toBytes());", "Bytes:[97, 98, 97, 98, 1]\n")]
+    // A class extending Bytes or BytesBuilder holds a value of its kind, made as Bytes.from(…) and new BytesBuilder() make
+    // them, with its members and its class's own; and new Bytes(…) makes bytes (section 3.7, "No sealed classes").
+    [InlineData("import { writeLn } from \"std:system\"; import { Bytes } from \"std:bytes\"; class Blob extends Bytes { size() { return this.length; } } var b = new Blob(\"tea\"); "
+                + "writeLn([b, b.size(), b.toHex(), b is Bytes, b is Blob, new Bytes(\"hi\"), new Blob([1, 2]).length, Blob.fromHex(\"00ff\"), new Blob(\"a\") == new Blob(\"a\")]);",
+        "[Blob:Bytes:[116, 101, 97], 3, \"746561\", true, true, Bytes:[104, 105], 2, Bytes:[0, 255], true]\n")]
+    [InlineData("import { writeLn } from \"std:system\"; import { BytesBuilder } from \"std:bytes\"; class Log extends BytesBuilder { line(s) { this.add(s).add(10); return this; } } "
+                + "var l = new Log(); l.line(\"a\").line(\"b\"); writeLn([l, l.toBytes().text(), l is BytesBuilder, l.length]);",
+        "[Log:BytesBuilder:[97, 10, 98, 10], \"a\\nb\\n\", true, 4]\n")]
     public void BytesBehaveAlikeOnBothVms(string program, string output)
     {
         foreach (var stack in new[] { false, true })
@@ -82,9 +90,11 @@ public sealed class BytesTests
     [InlineData("import { writeLn } from \"std:system\"; import { Bytes } from \"std:bytes\"; writeLn(Bytes.fixedTimeEqual(\"a\", \"a\"));", "WL3001", "'fixedTimeEqual' compares bytes, not a string.")]
     [InlineData("import { Bytes } from \"std:bytes\"; var m = {}; m[Bytes.from(\"x\")] = 1;", "WL3001", "Bytes cannot be a key: keys are strings, integers, Booleans and null.")]
     [InlineData("import { writeLn } from \"std:system\"; import { Bytes } from \"std:bytes\"; writeLn(Bytes.from(\"a\") + Bytes.from(\"b\"));", "WL3001", "'+' needs two numbers or two strings, not bytes.")]
-    [InlineData("import { writeLn } from \"std:system\"; import { Bytes } from \"std:bytes\"; writeLn(new Bytes());", "WL3001", "'new' cannot make a value of the class Bytes.")]
+    [InlineData("import { writeLn } from \"std:system\"; import { Bytes } from \"std:bytes\"; writeLn(new Bytes());", "WL2006", "'Bytes' takes 1 to 2 arguments, not 0.")]
+    [InlineData("import { Bytes } from \"std:bytes\"; class Blob extends Bytes {} new Blob(5);", "WL3001",
+        "'Bytes' makes bytes from a string, an array of integers from 0 to 255, or bytes, not the integer 5.")]
     [InlineData("import { BytesBuilder } from \"std:bytes\"; new BytesBuilder().add(1.5);", "WL3001", "'add' takes bytes, an integer from 0 to 255, or a string, not the number 1.5.")]
-    [InlineData("import { BytesBuilder } from \"std:bytes\"; class Mine extends BytesBuilder {}", "WL3001", "The class BytesBuilder cannot be extended.")]
+    [InlineData("import { BytesBuilder } from \"std:bytes\"; class Mine extends BytesBuilder {} new Mine(1);", "WL2006", "'BytesBuilder' takes 0 arguments, not 1.")]
     [InlineData("import { BytesBuilder } from \"std:bytes\"; new BytesBuilder(1);", "WL2006", "'BytesBuilder' takes 0 arguments, not 1.")]
     [InlineData("import { BytesBuilder } from \"std:bytes\"; new BytesBuilder().length();", "WL2005", "'length' of a BytesBuilder is not a method, and cannot be called.")]
     [InlineData("import { Bytes } from \"std:bytes\"; Bytes.fromHex(\"abc\");", "WL3001", "\"abc\" is not hexadecimal: two digits, 0 to 9 and a to f, for each byte.")]

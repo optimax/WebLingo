@@ -73,6 +73,13 @@ public static partial class WebLingoMembers
     }
 
     /// <summary>
+    /// <c>new Bytes(value, charset)</c>, as <c>Bytes.from(value, charset)</c> makes bytes (section 3.7, "No sealed classes"),
+    /// <paramref name="name"/> the class's name, as its errors give it.
+    /// </summary>
+    internal static bool TryNewBytes(string name, WebLingoValue[] values, int first, int count, WebLingoHeap heap, out WebLingoValue result,
+        out WebLingoRuntimeError? error) => TryCallBytesClass(WebLingoMember.From, name, values, first, count, heap, out result, out error);
+
+    /// <summary>
     /// <c>Bytes.from(value, charset)</c>, <c>Bytes.concat(parts)</c>, <c>Bytes.fixedTimeEqual(a, b)</c>,
     /// <c>Bytes.fromHex(text)</c> and <c>Bytes.fromBase64(text, urlSafe)</c>, the methods of the class <c>Bytes</c>.
     /// </summary>
@@ -95,7 +102,7 @@ public static partial class WebLingoMembers
                 }
                 if (count == 2)
                 {
-                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "'from' takes a charset only with a string.");
+                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'{name}' takes a charset only with a string.");
                     return false;
                 }
                 if (value.Kind == WebLingoValueKind.Bytes)
@@ -109,12 +116,12 @@ public static partial class WebLingoMembers
                     var data = new byte[elements.Count];
                     for (var i = 0; i < data.Length; i++)
                     {
-                        if (!TryByte(elements[i], heap, "'from' takes an array of integers from 0 to 255", out data[i], out error)) return false;
+                        if (!TryByte(elements[i], heap, $"'{name}' takes an array of integers from 0 to 255", out data[i], out error)) return false;
                     }
                     return heap.TryAllocateBytes(data, out result, out error);
                 }
                 error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"'from' makes bytes from a string, an array of integers from 0 to 255, or bytes, not {WebLingoValueFormatter.Describe(value, heap)}.");
+                    $"'{name}' makes bytes from a string, an array of integers from 0 to 255, or bytes, not {WebLingoValueFormatter.Describe(value, heap)}.");
                 return false;
             }
             case WebLingoMember.Concat:

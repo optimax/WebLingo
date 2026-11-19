@@ -861,31 +861,45 @@ public static partial class WebLingoMembers
         target.Kind == WebLingoValueKind.Class
         && (member is WebLingoMember.SetMethod or WebLingoMember.SetProperty or WebLingoMember.SetStaticProperty or WebLingoMember.SetConstant
                 or WebLingoMember.RemoveMethod
-            || (member is WebLingoMember.All or WebLingoMember.Any or WebLingoMember.Timeout && heap.ValueClasses is { } classes
-                && classes[(int)WebLingoValueClass.Task] == target)
+            || (member is WebLingoMember.All or WebLingoMember.Any or WebLingoMember.Timeout && Reaches(target, WebLingoValueClass.Task, heap))
             || (member == WebLingoMember.Parse && ParsedKind(target, heap) != WebLingoValueKind.Null)
-            || (IsBytesClassMethod(member) && heap.ValueClasses is { } bytesClasses && bytesClasses[(int)WebLingoValueClass.Bytes] == target)
-            || (IsDateTimeClassMethod(member) && heap.ValueClasses is { } dateClasses && dateClasses[(int)WebLingoValueClass.DateTime] == target)
+            || (IsBytesClassMethod(member) && Reaches(target, WebLingoValueClass.Bytes, heap))
+            || (IsDateTimeClassMethod(member) && Reaches(target, WebLingoValueClass.DateTime, heap))
             || (member == WebLingoMember.Parse && IsJson(target, heap))
             || (member is >= WebLingoMember.Escape and <= WebLingoMember.Css && IsHtml(target, heap))
             || member == WebLingoMember.Format);
 
-    /// <summary>Whether a class is <c>Html</c>, whose escapers the runtime gives (section 13, "Context-aware escaping").</summary>
-    private static bool IsHtml(WebLingoValue target, WebLingoHeap heap) =>
-        heap.ValueClasses is { Length: > (int)WebLingoValueClass.Html } classes && classes[(int)WebLingoValueClass.Html] == target;
+    /// <summary>
+    /// Whether a class is the built-in class given, or extends it, so that the methods the runtime gives that class are its
+    /// too, as a base's static members are a class's (section 3.7, "No sealed classes"): <c>MyJson.parse(text)</c>.
+    /// </summary>
+    private static bool Reaches(WebLingoValue target, WebLingoValueClass builtin, WebLingoHeap heap)
+    {
+        if (heap.ValueClasses is not { } classes || classes.Length <= (int)builtin) return false;
+        if (classes[(int)builtin].Kind != WebLingoValueKind.Class) return false;
+        for (var current = target; current.Kind == WebLingoValueKind.Class; current = heap.ClassBase(current))
+        {
+            if (current == classes[(int)builtin]) return true;
+        }
+        return false;
+    }
 
-    /// <summary>Whether a class is <c>Json</c>, whose <c>parse</c> the runtime gives (section 3.6, "JSON").</summary>
-    private static bool IsJson(WebLingoValue target, WebLingoHeap heap) =>
-        heap.ValueClasses is { Length: > (int)WebLingoValueClass.Json } classes && classes[(int)WebLingoValueClass.Json] == target;
+    /// <summary>Whether a class is <c>Html</c>, or extends it, whose escapers the runtime gives (section 13, "Context-aware escaping").</summary>
+    private static bool IsHtml(WebLingoValue target, WebLingoHeap heap) => Reaches(target, WebLingoValueClass.Html, heap);
 
-    /// <summary>The kind <c>parse</c> reads a string as, for <c>Integer</c>, <c>Number</c> and <c>Boolean</c>; null's for any other class.</summary>
+    /// <summary>Whether a class is <c>Json</c>, or extends it, whose <c>parse</c> the runtime gives (section 3.6, "JSON").</summary>
+    private static bool IsJson(WebLingoValue target, WebLingoHeap heap) => Reaches(target, WebLingoValueClass.Json, heap);
+
+    /// <summary>
+    /// The kind <c>parse</c> reads a string as, for <c>Integer</c>, <c>Number</c>, <c>Decimal</c> and <c>Boolean</c>, and a
+    /// class extending one; null's for any other class.
+    /// </summary>
     private static WebLingoValueKind ParsedKind(WebLingoValue target, WebLingoHeap heap)
     {
-        if (heap.ValueClasses is not { } classes) return WebLingoValueKind.Null;
-        if (classes[(int)WebLingoValueClass.Integer] == target) return WebLingoValueKind.Int64;
-        if (classes[(int)WebLingoValueClass.Number] == target) return WebLingoValueKind.Binary64;
-        if (classes.Length > (int)WebLingoValueClass.Decimal && classes[(int)WebLingoValueClass.Decimal] == target) return WebLingoValueKind.Decimal;
-        return classes[(int)WebLingoValueClass.Boolean] == target ? WebLingoValueKind.Boolean : WebLingoValueKind.Null;
+        if (Reaches(target, WebLingoValueClass.Integer, heap)) return WebLingoValueKind.Int64;
+        if (Reaches(target, WebLingoValueClass.Number, heap)) return WebLingoValueKind.Binary64;
+        if (Reaches(target, WebLingoValueClass.Decimal, heap)) return WebLingoValueKind.Decimal;
+        return Reaches(target, WebLingoValueClass.Boolean, heap) ? WebLingoValueKind.Boolean : WebLingoValueKind.Null;
     }
 
     /// <summary>
@@ -966,7 +980,7 @@ public static partial class WebLingoMembers
             {
                 return TryCallBytesClass(member, name, values, first, count, heap, out result, out error);
             }
-            if (IsDateTimeClassMethod(member) && heap.ValueClasses is { } classes && classes[(int)WebLingoValueClass.DateTime] == target)
+            if (IsDateTimeClassMethod(member) && Reaches(target, WebLingoValueClass.DateTime, heap))
             {
                 return TryCallDateTimeClass(member, name, values, first, count, heap, out result, out error);
             }

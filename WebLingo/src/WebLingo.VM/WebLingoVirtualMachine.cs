@@ -2267,8 +2267,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             {
                 if (module.ValueClasses[i] != index) continue;
                 _valueClasses[i] = made;
-                // Array, Map and Set make collections, and classes extend them; Boolean, Integer, Number and String make
-                // plain values, and classes extending them hold one; the others, for now, neither (section 3.7).
+                // Array, Map and Set make collections, and classes extend them; Boolean, Integer, Number, String and the
+                // other kinds of values make plain values, and classes extending them hold one (section 3.7).
                 if (i == (int)WebLingoValueClass.Array) heap.MarkCollectionClass(made, WebLingoValueKind.Array);
                 else if (i == (int)WebLingoValueClass.Map) heap.MarkCollectionClass(made, WebLingoValueKind.Map);
                 else if (i == (int)WebLingoValueClass.Set) heap.MarkCollectionClass(made, WebLingoValueKind.Set);
@@ -2281,13 +2281,13 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 else if (i == (int)WebLingoValueClass.Function) heap.MarkValueClass(made, WebLingoValueKind.Function);
                 else if (i == (int)WebLingoValueClass.Class) heap.MarkClassClass(made);
                 else if (i == (int)WebLingoValueClass.Iterator) heap.IteratorClass = made; // A plain class (section 3.6).
-                else if (i == (int)WebLingoValueClass.BytesBuilder)
-                {
-                    // A kind of value's, its values native, made by new, as bytes are; no class extends it (section 3.2).
-                    heap.MarkValueClass(made, WebLingoValueKind.BytesBuilder);
-                    heap.SealClass(made);
-                }
-                else heap.SealClass(made);
+                // Bytes, a bytes builder and a date: a kind of value's, new making a value, and a class extending one
+                // holding one (section 3.7, "No sealed classes").
+                else if (i == (int)WebLingoValueClass.Bytes) heap.MarkValueClass(made, WebLingoValueKind.Bytes);
+                else if (i == (int)WebLingoValueClass.BytesBuilder) heap.MarkValueClass(made, WebLingoValueKind.BytesBuilder);
+                else if (i == (int)WebLingoValueClass.DateTime) heap.MarkValueClass(made, WebLingoValueKind.DateTime);
+                // Json's and Html's are plain classes, with static members; Task's and Module's sealed, for now.
+                else if (i is (int)WebLingoValueClass.Task or (int)WebLingoValueClass.Module) heap.SealClass(made);
             }
             for (var i = 0; i < module.ErrorClasses.Count; i++)
             {

@@ -284,7 +284,7 @@ public sealed class WebLingoHeap
     }
 
     /// <summary>
-    /// Marks a class as a kind of value's, <c>Boolean</c>'s, <c>Integer</c>'s, <c>Number</c>'s or <c>String</c>'s
+    /// Marks a class as a kind of value's, <c>Boolean</c>'s, <c>Integer</c>'s, <c>String</c>'s, <c>Bytes</c>' or another's
     /// (section 3.7): <c>new</c> on it makes a plain value, and a class that extends it makes instances that hold one.
     /// </summary>
     public void MarkValueClass(WebLingoValue classValue, WebLingoValueKind kind)
@@ -348,6 +348,15 @@ public sealed class WebLingoHeap
         var classObject = Get<ClassObject>(classValue, WebLingoValueKind.Class);
         if (classObject.MakesClasses) return TryNewClass(values, first, count, out result, out error);
         if (classObject.Holds == WebLingoValueKind.Regex) return TryMakeRegex(values, first, count, out result, out error);
+        // new Bytes(…) and new DateTime(…) make what Bytes.from(…) and DateTime.utc(…) make (section 3.7, "No sealed classes").
+        if (classObject.Holds == WebLingoValueKind.Bytes)
+        {
+            return WebLingoMembers.TryNewBytes(classObject.Name, values, first, count, this, out result, out error);
+        }
+        if (classObject.Holds == WebLingoValueKind.DateTime)
+        {
+            return WebLingoMembers.TryNewDateTime(classObject.Name, values, first, count, this, out result, out error);
+        }
         if (classObject.Holds == WebLingoValueKind.BytesBuilder)
         {
             if (count == 0) return TryAllocateBytesBuilder(out result, out error);
@@ -438,6 +447,9 @@ public sealed class WebLingoHeap
         WebLingoValueKind.Decimal => "a decimal",
         WebLingoValueKind.Regex => "a regular expression",
         WebLingoValueKind.Function => "a function",
+        WebLingoValueKind.Bytes => "bytes",
+        WebLingoValueKind.BytesBuilder => "a bytes builder",
+        WebLingoValueKind.DateTime => "a date",
         _ => "a string"
     };
 

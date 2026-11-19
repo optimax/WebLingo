@@ -417,6 +417,7 @@ their members without the import.
 | Member | What it is |
 |---|---|
 | `Bytes.from(value, charset)` | bytes of a string, encoded, UTF-8 unless a charset is named; of an array of integers from 0 to 255; or bytes |
+| `new Bytes(value, charset)` | the same |
 | `Bytes.concat(parts)` | bytes and integers from 0 to 255, joined |
 | `Bytes.fixedTimeEqual(a, b)` | whether two bytes are equal, in a time that does not depend on where they differ |
 | `Bytes.fromHex(text)` | the bytes hexadecimal writes, two digits for each, in either case |
@@ -426,10 +427,32 @@ their members without the import.
 | `b.text(charset)` | the bytes read as text, UTF-8 unless a charset is named |
 | `b.toHex()` | the bytes as hexadecimal, two lower-case digits for each, `"746561"` |
 | `b.toBase64(urlSafe)` | the bytes as Base64, RFC 4648's, padded with `=`; given `true`, its URL-safe alphabet, `-` and `_` for `+` and `/`, unpadded |
-| `new BytesBuilder()` | a builder, its `add(value)` taking bytes, an integer from 0 to 255 or a string, its `length`, and `toBytes()`, which no later `add` changes; written as its bytes so far, `BytesBuilder:[104, 105]`; no class extends it, as none extends `Bytes` |
+| `new BytesBuilder()` | a builder, its `add(value)` taking bytes, an integer from 0 to 255 or a string, its `length`, and `toBytes()`, which no later `add` changes; written as its bytes so far, `BytesBuilder:[104, 105]` |
 
 The charsets are `utf-8`, `utf-16` (or `utf-16le`), `utf-16be`, `us-ascii` and `iso-8859-1` (or `latin1`), named
 without regard to case. Text that is not hexadecimal, or not Base64, is WL3001.
+
+A class may extend `Bytes` or `BytesBuilder`, its instances then holding bytes, or a builder, which `new` makes as
+`Bytes.from(…)` and `new BytesBuilder()` make them, with their members and the class's own:
+
+```javascript
+import { writeLn } from "std:system";
+import { BytesBuilder } from "std:bytes";
+class Lines extends BytesBuilder {
+  line(text) { this.add(text).add(10); return this; }
+}
+var lines = new Lines();
+lines.line("green").line("tea");
+writeLn(lines.toBytes().text());
+writeLn(lines.length);
+```
+
+```text
+green
+tea
+
+10
+```
 
 ```javascript
 import { writeLn } from "std:system";
@@ -464,6 +487,7 @@ method gives keeps its members without the import.
 | `DateTime.utcNow()` | the same instant, in UTC |
 | `DateTime.local(year, month, day, hour, minute, second, millisecond)` | a date in the server's time zone, those after the day optional, 0 when left out |
 | `DateTime.utc(year, month, day, …)` | the same, in UTC |
+| `new DateTime(year, month, day, …)` | the same as `DateTime.utc(…)`; a class extending `DateTime` holds the date it makes so |
 | `DateTime.inZone(name, year, month, day, …)` | the same, in the zone of that IANA name, `"Europe/Warsaw"` |
 | `DateTime.parse(text, format)` | a date read from ISO 8601's text, or from a format of .NET's; a time without a zone the server's |
 | `DateTime.fromUnixMilliseconds(ms)` | the date `ms` milliseconds after 1970-01-01T00:00:00Z, in UTC |

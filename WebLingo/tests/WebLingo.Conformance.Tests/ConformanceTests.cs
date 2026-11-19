@@ -653,6 +653,10 @@ public sealed class ConformanceTests : IDisposable
         "[\"HI!\", \"YO!\"]")]
     [InlineData("import { writeLn } from \"std:system\"; class Name extends String {} try { new Name(\"a\").nope(); } catch (e) { writeLn(e.code + \" \" + e.message); }",
         "WL3006 An instance of Name has no member 'nope'.")]
+    // Json and Html extended, a class extending one reaching their class methods, the runtime's too (section 3.7).
+    [InlineData("import { writeLn } from \"std:system\"; import { Json } from \"std:json\"; import { Html } from \"std:html\"; class J extends Json {} class H extends Html {} writeLn([J.stringify([1]), J.parse(\"[2]\"), new J(), H.escape(\"<b>\"), H.js(\"x\"), new J() is Json]);",
+        "[\"[1]\", [2], J {}, \"&lt;b&gt;\", \"\\\"x\\\"\", true]")]
+    [InlineData("import { writeLn } from \"std:system\"; class I extends Integer {} class B extends Boolean {} writeLn([I.parse(\"10\"), B.parse(\"true\"), new I(3) + 1]);", "[10, true, I:4]")]
     [InlineData("import { writeLn } from \"std:system\"; import { Regex } from \"std:regex\"; var r = new Regex(\"a\"); writeLn([r == r, r == new Regex(r.pattern)]);", "[true, false]")]
     // JSON (the owner's answers, 16 November 2026): a class, Json; integers when integral; instances by their fields or toJson().
     [InlineData("import { writeLn } from \"std:system\"; import { Json } from \"std:json\"; var v = Json.parse(\"{\\\"name\\\": \\\"Ann\\\", \\\"age\\\": 30, \\\"height\\\": 1.7, \\\"tags\\\": [\\\"a\\\", true, null], \\\"e\\\": 1e3, \\\"s\\\": \\\"\\\\u00e9\\\\n\\\\uD83D\\\\uDE00\\\"}\"); writeLn(v);", "{\"name\": \"Ann\", \"age\": 30, \"height\": 1.7, \"tags\": [\"a\", true, null], \"e\": 1000.0, \"s\": \"é\\n😀\"}")]
@@ -728,7 +732,6 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { writeLn } from \"std:system\"; writeLn(new Integer(2.5m));", "WL3001")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn(Decimal.parse(\"1.5m\"));", "WL3001")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1, 1).toZone(\"Nowhere/Atlantis\"));", "WL3001")]
-    [InlineData("import { Html } from \"std:html\"; var h = new Html();", "WL3001")]
     [InlineData("import { Html } from \"std:html\"; Html.url();", "WL2006")]
     [InlineData("import { writeLn } from \"std:system\"; import { Html } from \"std:html\"; writeLn(Html.js(writeLn));", "WL3001")]
     [InlineData("function g(a, ...rest) { return rest; } var h = g; h();", "WL2006")]
@@ -777,7 +780,6 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { Json } from \"std:json\"; var k = {}; k[true] = 1; var t = Json.stringify(k);", "WL3001")]
     [InlineData("import { Json } from \"std:json\"; class Selfish { toJson() { return this; } } var t = Json.stringify(new Selfish());", "WL3001")]
     [InlineData("import { Json } from \"std:json\"; var t = Json.stringify(1, 11);", "WL3001")]
-    [InlineData("import { Json } from \"std:json\"; var j = new Json();", "WL3001")]
     public void CallsAreCheckedAtRunTime(string source, string code)
     {
         var (exit, _, error) = Weblingo("run", source);

@@ -1512,8 +1512,9 @@ true
 true
 ```
 
-A class may extend `Number`, `Integer`, `String` or `Boolean`, its instances then holding such a value, which arithmetic
-and comparisons use; and `Array`, `Map` or `Set`, its instances then being such a collection with methods of their own:
+A class may extend any class, the built-in ones included. One extending a kind of value's class, `Number`, `Integer`,
+`String`, `Boolean`, `Decimal`, `Regex`, `Function`, `Bytes`, `BytesBuilder` or `DateTime`, holds such a value, which
+arithmetic and comparisons use; and one extending `Array`, `Map` or `Set` is such a collection, with methods of its own:
 
 ```javascript
 import { writeLn } from "std:system";

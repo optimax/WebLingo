@@ -65,6 +65,11 @@ public sealed class DateTimeTests
     [InlineData("import { write, writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; var d = DateTime.inZone(\"Test/Kolkata\", 2026, 11, 16); "
                 + "writeLn([d.toUtc(), d == DateTime.utc(2026, 11, 15, 18, 30), d.toZone(\"Test/Summer\"), d.addDays(1).offset]);",
         "[DateTime:2026-11-15T18:30:00Z, true, DateTime:2026-11-15T19:30:00+01:00, 330]\n")]
+    // A class extending DateTime holds a date, made as DateTime.utc(…) makes one, with a date's members and its class's own,
+    // its base's class methods its own; and new DateTime(…) makes a date (section 3.7, "No sealed classes").
+    [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; class Day extends DateTime { isWeekend() { return this.dayOfWeek == 0 || this.dayOfWeek == 6; } } "
+                + "var d = new Day(2026, 11, 21); writeLn([d, d.year, d.isWeekend(), d.addDays(1), d is DateTime, new DateTime(2026, 11, 18, 9), Day.utc(2026, 1, 1), d - new Day(2026, 11, 20), d > new Day(2026, 11, 20)]);",
+        "[Day:DateTime:2026-11-21T00:00:00Z, 2026, true, DateTime:2026-11-22T00:00:00Z, true, DateTime:2026-11-18T09:00:00Z, DateTime:2026-01-01T00:00:00Z, 86400000, true]\n")]
     public void DatesBehaveAlikeOnBothVms(string program, string output)
     {
         foreach (var stack in new[] { false, true })
@@ -76,7 +81,8 @@ public sealed class DateTimeTests
     }
 
     [Theory]
-    [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(new DateTime());", "WL3001", "'new' cannot make a value of the class DateTime.")]
+    [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(new DateTime());", "WL2006", "'DateTime' takes 3 to 7 arguments, not 0.")]
+    [InlineData("import { DateTime } from \"std:datetime\"; class Day extends DateTime {} new Day(2026, \"x\", 1);", "WL3001", "A date's month is an integer, not a string.")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 2, 29));", "WL3001", "A date's day is from 1 to 28, not 29.")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 13, 1));", "WL3001", "A date's month is from 1 to 12, not 13.")]
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.utc(2026, 1));", "WL2006", "'utc' takes 3 to 7 arguments, not 2.")]

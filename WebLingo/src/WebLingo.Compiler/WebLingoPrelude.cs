@@ -81,6 +81,11 @@ internal static class WebLingoPrelude
             }
             """,
         "Regex" => "class Regex { constructor(pattern, flags = \"\") { hold(this, new Regex(pattern, flags)); } }",
+        // Bytes, a bytes builder and a date, each made by its class's own new, as Bytes.from(…), new BytesBuilder() and
+        // DateTime.utc(…) make them, which a class extending one holds (section 3.7, "No sealed classes").
+        "Bytes" => "class Bytes { constructor(...parts) { hold(this, new Bytes(...parts)); } }",
+        "BytesBuilder" => "class BytesBuilder { constructor() { hold(this, new BytesBuilder()); } }",
+        "DateTime" => "class DateTime { constructor(...parts) { hold(this, new DateTime(...parts)); } }",
         "String" => "class String { constructor(value = \"\") { hold(this, value); } }",
         "Function" => "class Function { constructor(f = function () {}) { hold(this, f); } }",
         // A metaclass's super(name, base) names and bases the class it makes (section 3.7).

@@ -162,6 +162,13 @@ public static partial class WebLingoMembers
     }
 
     /// <summary>
+    /// <c>new DateTime(year, month, day, …)</c>, as <c>DateTime.utc(…)</c> makes a date (section 3.7, "No sealed classes"),
+    /// <paramref name="name"/> the class's name, as its errors give it.
+    /// </summary>
+    internal static bool TryNewDateTime(string name, WebLingoValue[] values, int first, int count, WebLingoHeap heap, out WebLingoValue result,
+        out WebLingoRuntimeError? error) => TryCallDateTimeClass(WebLingoMember.Utc, name, values, first, count, heap, out result, out error);
+
+    /// <summary>
     /// <c>DateTime.now()</c>, <c>DateTime.utcNow()</c>, <c>DateTime.local(year, month, day, hour, minute, second,
     /// millisecond)</c>, <c>DateTime.utc(…)</c>, <c>DateTime.inZone(name, year, month, day, …)</c>,
     /// <c>DateTime.parse(text, format)</c> and <c>DateTime.fromUnixMilliseconds(ms)</c>, the methods of the class

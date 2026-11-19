@@ -2120,11 +2120,13 @@ public sealed class WebLingoBinder
         var local = new WebLingoLocalSymbol(name, WebLingoDeclarationKind.Class, _main.Locals.Count, default, _main);
         _main.Locals.Add(local);
         _prelude.Locals.Add(name, local);
-        var (outerScope, outerFunction, outerClass) = (_scope, _function, _class);
+        // What it was binding is restored after, prelude code included, which a built-in class bound while it is bound, as
+        // a spread's is, must not end.
+        var (outerScope, outerFunction, outerClass, outerPrelude) = (_scope, _function, _class, _inPrelude);
         (_scope, _function, _inPrelude) = (_prelude, _main, inPrelude);
         var baseClass = baseLocal is null ? null : Reference(baseLocal, default);
         var declaration = new WebLingoBoundClassDeclaration(local, BindClass(syntax, local, baseClass, []), default);
-        (_scope, _function, _class, _inPrelude) = (outerScope, outerFunction, outerClass, false);
+        (_scope, _function, _class, _inPrelude) = (outerScope, outerFunction, outerClass, outerPrelude);
         _builtinClasses.Add((name, declaration));
         return local;
     }
