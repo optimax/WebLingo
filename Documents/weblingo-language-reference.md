@@ -1261,8 +1261,8 @@ abcd
   false
   ```
 
-- **A `BytesBuilder` builds bytes from many pieces**, each added once and all joined once at the end, so that building costs no more
-  than the bytes built:
+- **A `BytesBuilder` builds bytes from many pieces**, each added at the end of a buffer that grows as it must, so that building
+  costs no more than the bytes built; `toBytes()` gives them, which no later `add` changes:
 
   ```javascript
   import { writeLn } from "std:system";

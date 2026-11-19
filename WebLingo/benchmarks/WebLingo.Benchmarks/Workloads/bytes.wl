@@ -1,0 +1,17 @@
+// Bytes built from many small pieces: 300,000 adds to 100 BytesBuilders, of integers, short strings and three bytes, each
+// builder made into bytes once, and its bytes read.
+import { writeLn } from "std:system";
+import { Bytes, BytesBuilder } from "std:bytes";
+var piece = Bytes.from([1, 2, 3]);
+var total = 0;
+for (var round = 0; round < 100; round = round + 1) {
+    var builder = new BytesBuilder();
+    for (var i = 0; i < 1000; i = i + 1) {
+        builder.add(i % 256);
+        builder.add("ab");
+        builder.add(piece);
+    }
+    var whole = builder.toBytes();
+    total = total + builder.length + whole[whole.length - 1];
+}
+writeLn(total);

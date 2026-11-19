@@ -28,6 +28,7 @@ public static class WebLingoWorkloads
         Load("calls", "recursive calls of a declared function", "75025\n"),
         Load("closures", "closures made and called, sharing captured cells", "3300000\n"),
         Load("strings", "string concatenation and comparison, the heap and its collector", "20000\n"),
+        Load("bytes", "bytes built from many small pieces by BytesBuilders, and read", "600300\n"),
         Load("collections", "arrays and maps: elements and entries read, written and visited with foreach", "200124998\n"),
         Load("objects", "instances made, their fields read and written, their methods called", "1666691666750000\n"),
         Load("async", "async functions suspended at await, and resumed by the scheduler", "49950000\n"),

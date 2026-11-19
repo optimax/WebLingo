@@ -348,6 +348,13 @@ public sealed class WebLingoHeap
         var classObject = Get<ClassObject>(classValue, WebLingoValueKind.Class);
         if (classObject.MakesClasses) return TryNewClass(values, first, count, out result, out error);
         if (classObject.Holds == WebLingoValueKind.Regex) return TryMakeRegex(values, first, count, out result, out error);
+        if (classObject.Holds == WebLingoValueKind.BytesBuilder)
+        {
+            if (count == 0) return TryAllocateBytesBuilder(out result, out error);
+            result = WebLingoValue.Null;
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.WrongArgumentCount, $"'{classObject.Name}' takes 0 arguments, not {count}.");
+            return false;
+        }
         if (count == 1) return TryOfKind(classObject.Holds, classObject.Name, Held(values[first]), out result, out error);
         result = WebLingoValue.Null;
         if (count > 1)
@@ -566,6 +573,53 @@ public sealed class WebLingoHeap
     public bool TryAllocateBytes(byte[] data, out WebLingoValue value, out WebLingoRuntimeError? error) =>
         TryAllocate(data, WebLingoValueKind.Bytes, (data.Length + 7) / 8, out value, out error);
 
+    /// <summary>
+    /// A new <c>BytesBuilder</c> (section 3.2, "Bytes"), empty: a buffer of bytes that grows, doubling, as bytes are added
+    /// to it, charged a unit for every eight bytes of it, as bytes are.
+    /// </summary>
+    public bool TryAllocateBytesBuilder(out WebLingoValue value, out WebLingoRuntimeError? error) =>
+        TryAllocate(new BytesBuilderObject(), WebLingoValueKind.BytesBuilder, (BytesBuilderObject.FirstCapacity + 7) / 8, out value, out error);
+
+    /// <summary>How many bytes a <c>BytesBuilder</c> has.</summary>
+    public int BuilderLength(WebLingoValue builder) => Get<BytesBuilderObject>(builder, WebLingoValueKind.BytesBuilder).Count;
+
+    /// <summary>A <c>BytesBuilder</c>'s bytes so far, which a later add may change: for reading at once, never to keep.</summary>
+    public ReadOnlySpan<byte> BuilderBytes(WebLingoValue builder)
+    {
+        var held = Get<BytesBuilderObject>(builder, WebLingoValueKind.BytesBuilder);
+        return held.Buffer.AsSpan(0, held.Count);
+    }
+
+    /// <summary>
+    /// Adds bytes at a <c>BytesBuilder</c>'s end, its buffer doubled where it must grow, the growth within the budget
+    /// (WL3003), so that a builder of n bytes costs O(n), however many pieces it is built of.
+    /// </summary>
+    public bool TryAddToBuilder(WebLingoValue builder, ReadOnlySpan<byte> bytes, out WebLingoRuntimeError? error)
+    {
+        var held = Get<BytesBuilderObject>(builder, WebLingoValueKind.BytesBuilder);
+        var needed = (long)held.Count + bytes.Length;
+        if (needed > held.Buffer.Length)
+        {
+            var capacity = Math.Max(needed, Math.Min(2L * held.Buffer.Length, Array.MaxLength));
+            var grown = (capacity + 7) / 8 - (held.Buffer.Length + 7) / 8;
+            if (needed > Array.MaxLength || !TryReserve(grown, out error))
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.BudgetExceeded, $"{needed} bytes do not fit in the memory this execution may use.");
+                return false;
+            }
+            Units += grown;
+            Array.Resize(ref held.Buffer, (int)capacity);
+        }
+        bytes.CopyTo(held.Buffer.AsSpan(held.Count));
+        held.Count = (int)needed;
+        error = null;
+        return true;
+    }
+
+    /// <summary>A <c>BytesBuilder</c>'s bytes so far, as new bytes, immutable, which no later add changes.</summary>
+    public bool TryBuilderToBytes(WebLingoValue builder, out WebLingoValue bytes, out WebLingoRuntimeError? error) =>
+        TryAllocateBytes(BuilderBytes(builder).ToArray(), out bytes, out error);
+
     /// <summary>A new decimal (section 3.2), immutable, as a number is, in the heap since it is 128 bits.</summary>
     public bool TryAllocateDecimal(decimal value, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         TryAllocate(new DecimalObject(value), WebLingoValueKind.Decimal, 2, out result, out error);
@@ -654,6 +708,14 @@ public sealed class WebLingoHeap
         public System.Text.RegularExpressions.Regex Regex { get; } = regex;
         public string Pattern { get; } = pattern;
         public string Flags { get; } = flags;
+    }
+
+    /// <summary>A <c>BytesBuilder</c>'s buffer, of which its first <see cref="Count"/> bytes are its own.</summary>
+    private sealed class BytesBuilderObject
+    {
+        public const int FirstCapacity = 64;
+        public byte[] Buffer = new byte[FirstCapacity];
+        public int Count;
     }
 
     /// <summary>A decimal, which the heap holds as an object of its own.</summary>
@@ -1556,6 +1618,7 @@ public sealed class WebLingoHeap
     private static void Mark(WebLingoValue value, bool[] marked, Stack<int> pending)
     {
         if (value.Kind is not (WebLingoValueKind.String or WebLingoValueKind.Bytes or WebLingoValueKind.Decimal or WebLingoValueKind.Regex
+            or WebLingoValueKind.BytesBuilder
             or WebLingoValueKind.Function or WebLingoValueKind.Cell or WebLingoValueKind.Array
             or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Class or WebLingoValueKind.Instance or WebLingoValueKind.BoundMethod
             or WebLingoValueKind.Task or WebLingoValueKind.Module))
@@ -1583,6 +1646,7 @@ public sealed class WebLingoHeap
         byte[] data => (data.Length + 7) / 8,
         DecimalObject => 2,
         RegexObject regex => regex.Pattern.Length + regex.Flags.Length,
+        BytesBuilderObject builder => (builder.Buffer.Length + 7) / 8,
         Closure closure => closure.Cells.Length,
         ArrayObject array => array.Elements.Count + (array.Instance?.Count ?? 0),
         MapObject map => map.Count + (map.Instance?.Count ?? 0),

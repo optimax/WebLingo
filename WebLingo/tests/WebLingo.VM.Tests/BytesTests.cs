@@ -50,6 +50,16 @@ public sealed class BytesTests
         "[Bytes:[251, 255], Bytes:[251, 255], Bytes:[251, 255], Bytes:[251, 255]]\n")]
     [InlineData("import { write, writeLn } from \"std:system\"; import { Bytes, BytesBuilder } from \"std:bytes\"; var b = Bytes.from(\"tea time\"); writeLn([Bytes.fromHex(b.toHex()) == b, Bytes.fromBase64(b.toBase64()) == b, Bytes.fromBase64(b.toBase64(true), true) == b]);",
         "[true, true, true]\n")]
+    // A BytesBuilder, native since 18 November 2026: written as its bytes so far, its toBytes() unchanged by a later add,
+    // growing as it must, and extended as any kind of value is.
+    [InlineData("import { BytesBuilder } from \"std:bytes\"; var b = new BytesBuilder().add(\"hi\"); writeLn([b, b is BytesBuilder, b is Object, b.length]);",
+        "[BytesBuilder:[104, 105], true, true, 2]\n")]
+    [InlineData("import { BytesBuilder } from \"std:bytes\"; var b = new BytesBuilder().add(\"tea\"); var first = b.toBytes(); b.add(33); "
+                + "writeLn([first.text(), b.toBytes().text(), first.length, b.length, b.toBytes() == b.toBytes()]);", "[\"tea\", \"tea!\", 3, 4, true]\n")]
+    [InlineData("import { BytesBuilder } from \"std:bytes\"; var b = new BytesBuilder(); for (var i = 0; i < 100000; i++) b.add(i % 256); "
+                + "var all = b.toBytes(); writeLn([b.length, all[0], all[255], all[256], all[99999]]);", "[100000, 0, 255, 0, 159]\n")]
+    [InlineData("import { Bytes, BytesBuilder } from \"std:bytes\"; extend BytesBuilder { twice(v) { return this.add(v).add(v); } } "
+                + "writeLn(new BytesBuilder().twice(\"ab\").add(Bytes.from([1])).toBytes());", "Bytes:[97, 98, 97, 98, 1]\n")]
     public void BytesBehaveAlikeOnBothVms(string program, string output)
     {
         foreach (var stack in new[] { false, true })
@@ -73,7 +83,10 @@ public sealed class BytesTests
     [InlineData("import { Bytes } from \"std:bytes\"; var m = {}; m[Bytes.from(\"x\")] = 1;", "WL3001", "Bytes cannot be a key: keys are strings, integers, Booleans and null.")]
     [InlineData("import { writeLn } from \"std:system\"; import { Bytes } from \"std:bytes\"; writeLn(Bytes.from(\"a\") + Bytes.from(\"b\"));", "WL3001", "'+' needs two numbers or two strings, not bytes.")]
     [InlineData("import { writeLn } from \"std:system\"; import { Bytes } from \"std:bytes\"; writeLn(new Bytes());", "WL3001", "'new' cannot make a value of the class Bytes.")]
-    [InlineData("import { BytesBuilder } from \"std:bytes\"; new BytesBuilder().add(1.5);", "WL3001", "'concat' takes bytes and integers from 0 to 255, not the number 1.5.")]
+    [InlineData("import { BytesBuilder } from \"std:bytes\"; new BytesBuilder().add(1.5);", "WL3001", "'add' takes bytes, an integer from 0 to 255, or a string, not the number 1.5.")]
+    [InlineData("import { BytesBuilder } from \"std:bytes\"; class Mine extends BytesBuilder {}", "WL3001", "The class BytesBuilder cannot be extended.")]
+    [InlineData("import { BytesBuilder } from \"std:bytes\"; new BytesBuilder(1);", "WL2006", "'BytesBuilder' takes 0 arguments, not 1.")]
+    [InlineData("import { BytesBuilder } from \"std:bytes\"; new BytesBuilder().length();", "WL2005", "'length' of a BytesBuilder is not a method, and cannot be called.")]
     [InlineData("import { Bytes } from \"std:bytes\"; Bytes.fromHex(\"abc\");", "WL3001", "\"abc\" is not hexadecimal: two digits, 0 to 9 and a to f, for each byte.")]
     [InlineData("import { Bytes } from \"std:bytes\"; Bytes.fromHex(\"0g\");", "WL3001", "\"0g\" is not hexadecimal: two digits, 0 to 9 and a to f, for each byte.")]
     [InlineData("import { Bytes } from \"std:bytes\"; Bytes.fromHex(5);", "WL3001", "'fromHex' reads a string, not the integer 5.")]

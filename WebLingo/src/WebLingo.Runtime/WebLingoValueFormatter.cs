@@ -21,6 +21,7 @@ public static class WebLingoValueFormatter
         {
             WebLingoValueKind.String => heap.GetString(value),
             WebLingoValueKind.Bytes => FormatBytes(heap.GetBytes(value)),
+            WebLingoValueKind.BytesBuilder => FormatBytes(heap.BuilderBytes(value), "BytesBuilder:["),
             WebLingoValueKind.Decimal => FormatDecimal(heap.GetDecimal(value)),
             WebLingoValueKind.Regex => "Regex:" + RegexText(value, heap),
             WebLingoValueKind.Instance when heap.IsHolding(value) => Held(value, heap),
@@ -49,6 +50,7 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Bytes => $"bytes#{value.Handle}",
         WebLingoValueKind.Decimal => $"decimal#{value.Handle}",
         WebLingoValueKind.Regex => $"regex#{value.Handle}",
+        WebLingoValueKind.BytesBuilder => $"bytesBuilder#{value.Handle}",
         // A date and time's text (section 3.2, "Dates and times"): its class's name, a colon, and ISO 8601's.
         WebLingoValueKind.DateTime => "DateTime:" + WebLingoMembers.IsoText(value),
         WebLingoValueKind.Boolean => value.AsBoolean ? "true" : "false",
@@ -74,6 +76,7 @@ public static class WebLingoValueFormatter
         WebLingoValueKind.Bytes => "bytes",
         WebLingoValueKind.Decimal => "a decimal",
         WebLingoValueKind.Regex => "a regular expression",
+        WebLingoValueKind.BytesBuilder => "a BytesBuilder",
         WebLingoValueKind.DateTime => $"the date and time {WebLingoMembers.IsoText(value)}",
         _ => $"the number {Format(value)}"
     };
@@ -96,10 +99,13 @@ public static class WebLingoValueFormatter
         return (text == "-0" ? "0" : text) + "m";
     }
 
-    /// <summary>Bytes' text (section 3.2, "Bytes"): their class's name, a colon, and their values, <c>Bytes:[104, 105]</c>.</summary>
-    private static string FormatBytes(byte[] data)
+    /// <summary>
+    /// Bytes' text (section 3.2, "Bytes"): their class's name, a colon, and their values, <c>Bytes:[104, 105]</c>; a
+    /// <c>BytesBuilder</c>'s, its bytes so far, <c>BytesBuilder:[104, 105]</c>.
+    /// </summary>
+    private static string FormatBytes(ReadOnlySpan<byte> data, string opening = "Bytes:[")
     {
-        var text = new StringBuilder("Bytes:[", 8 + 5 * data.Length);
+        var text = new StringBuilder(opening, opening.Length + 1 + 5 * data.Length);
         for (var i = 0; i < data.Length; i++)
         {
             if (i > 0) text.Append(", ");

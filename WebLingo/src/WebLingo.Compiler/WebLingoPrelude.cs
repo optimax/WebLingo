@@ -89,14 +89,6 @@ internal static class WebLingoPrelude
         // past the last item is an index out of range (WL3005).
         "Iterator" => "class Iterator { hasNext() { return this.position < this.items.length; } "
             + "next() { var item = this.items[this.position]; this.position = this.position + 1; return item; } }",
-        // Bytes built from pieces without copying what is built at each one (section 3.2, "Bytes"): the pieces are kept, and
-        // joined once, by Bytes.concat, which also checks each piece where it is added.
-        "BytesBuilder" => "class BytesBuilder { constructor() { this.parts = []; this.count = 0; } "
-            + "add(value) { var part = null; if (value is String) part = Bytes.from(value); else part = Bytes.concat([value]); "
-            + "this.parts.push(part); "
-            + "this.count = this.count + part.length; return this; } "
-            + "property length { get { return this.count; } } "
-            + "toBytes() { var whole = Bytes.concat(this.parts); this.parts = [whole]; return whole; } }",
         _ => $"class {name} {{}}"
     };
 }

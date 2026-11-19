@@ -129,6 +129,25 @@ public sealed class HeapTests
     }
 
     [Fact]
+    public void ABytesBuildersGrowthIsWithinTheBudget()
+    {
+        // Its buffer is charged as it grows, and given back whole when collected (section 3.2, "Bytes").
+        var heap = new WebLingoHeap(maxUnits: 10_000);
+        var roots = new WebLingoValue[1];
+        heap.AddRoots(roots);
+        for (var i = 0; i < 1_000; i++)
+        {
+            Assert.True(heap.TryAllocateBytesBuilder(out roots[0], out var error), error?.Message);
+            for (var j = 0; j < 10; j++) Assert.True(heap.TryAddToBuilder(roots[0], new byte[500], out error), error?.Message);
+        }
+        Assert.InRange(heap.Units, 0, 10_000);
+        Assert.Equal(5_000, heap.BuilderLength(roots[0]));
+        Assert.False(heap.TryAddToBuilder(roots[0], new byte[100_000], out var tooMuch));
+        Assert.Equal((WebLingoDiagnosticCodes.BudgetExceeded, "105000 bytes do not fit in the memory this execution may use."), (tooMuch!.Code, tooMuch.Message));
+        Assert.Equal(5_000, heap.BuilderLength(roots[0]));
+    }
+
+    [Fact]
     public void AClosureKeepsItsCellsAndTheirValuesAlive()
     {
         var heap = new WebLingoHeap();

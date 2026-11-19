@@ -2281,7 +2281,13 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 else if (i == (int)WebLingoValueClass.Function) heap.MarkValueClass(made, WebLingoValueKind.Function);
                 else if (i == (int)WebLingoValueClass.Class) heap.MarkClassClass(made);
                 else if (i == (int)WebLingoValueClass.Iterator) heap.IteratorClass = made; // A plain class (section 3.6).
-                else if (i != (int)WebLingoValueClass.BytesBuilder) heap.SealClass(made); // BytesBuilder is a plain class (section 3.2).
+                else if (i == (int)WebLingoValueClass.BytesBuilder)
+                {
+                    // A kind of value's, its values native, made by new, as bytes are; no class extends it (section 3.2).
+                    heap.MarkValueClass(made, WebLingoValueKind.BytesBuilder);
+                    heap.SealClass(made);
+                }
+                else heap.SealClass(made);
             }
             for (var i = 0; i < module.ErrorClasses.Count; i++)
             {

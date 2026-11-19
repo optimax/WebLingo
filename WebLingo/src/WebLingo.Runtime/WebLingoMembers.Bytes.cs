@@ -259,6 +259,45 @@ public static partial class WebLingoMembers
         return false;
     }
 
+    /// <summary>
+    /// A <c>BytesBuilder</c>'s methods (section 3.2, "Bytes"), native since 18 November 2026, as bytes' own are: <c>add(value)</c>,
+    /// bytes, an integer from 0 to 255, or a string, as UTF-8, at its end, giving the builder, so that adds chain; and
+    /// <c>toBytes()</c>, its bytes so far, as new bytes, which no later add changes.
+    /// </summary>
+    private static bool TryCallBytesBuilder(WebLingoValue target, WebLingoMember member, string name, WebLingoValue[] values, int first,
+        int count, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (member == WebLingoMember.ToBytes)
+        {
+            if (count != 0) return WrongArgumentCount(name, 0, count, out error);
+            return heap.TryBuilderToBytes(target, out result, out error);
+        }
+        if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+        var value = heap.Held(values[first]);
+        bool added;
+        switch (value.Kind)
+        {
+            case WebLingoValueKind.Bytes:
+                added = heap.TryAddToBuilder(target, heap.GetBytes(value), out error);
+                break;
+            case WebLingoValueKind.Int64 when value.AsInt64 is >= 0 and <= 255:
+                added = heap.TryAddToBuilder(target, [(byte)value.AsInt64], out error);
+                break;
+            case WebLingoValueKind.String:
+                if (!TryCharset(WebLingoValue.Null, heap, out var utf8, out error)) return false;
+                added = heap.TryAddToBuilder(target, WebLingoTextCodec.Encode(heap.GetString(value), utf8), out error);
+                break;
+            default:
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
+                    $"'{name}' takes bytes, an integer from 0 to 255, or a string, not {WebLingoValueFormatter.Describe(value, heap)}.");
+                return false;
+        }
+        if (!added) return false;
+        result = target;
+        return true;
+    }
+
     private static bool WrongArgumentCount(string name, int least, int most, int count, out WebLingoRuntimeError? error)
     {
         error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.WrongArgumentCount, $"'{name}' takes {least} to {most} arguments, not {count}.");

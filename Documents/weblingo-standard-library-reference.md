@@ -426,7 +426,7 @@ their members without the import.
 | `b.text(charset)` | the bytes read as text, UTF-8 unless a charset is named |
 | `b.toHex()` | the bytes as hexadecimal, two lower-case digits for each, `"746561"` |
 | `b.toBase64(urlSafe)` | the bytes as Base64, RFC 4648's, padded with `=`; given `true`, its URL-safe alphabet, `-` and `_` for `+` and `/`, unpadded |
-| `new BytesBuilder()` | a builder, its `add(value)` taking bytes, an integer from 0 to 255 or a string, its `length`, and `toBytes()` |
+| `new BytesBuilder()` | a builder, its `add(value)` taking bytes, an integer from 0 to 255 or a string, its `length`, and `toBytes()`, which no later `add` changes; written as its bytes so far, `BytesBuilder:[104, 105]`; no class extends it, as none extends `Bytes` |
 
 The charsets are `utf-8`, `utf-16` (or `utf-16le`), `utf-16be`, `us-ascii` and `iso-8859-1` (or `latin1`), named
 without regard to case. Text that is not hexadecimal, or not Base64, is WL3001.
