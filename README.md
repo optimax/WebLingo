@@ -1,5 +1,7 @@
 # WebLingo
 
+![WebLingo logo](Graphics/weblingo-logo-light.svg)
+
 WebLingo is a JavaScript-inspired scripting language for command-line programs and server-side web applications.
 It aims to be a language with no surprises. Conversions are explicit, conditions require Booleans, and integer
 overflow raises an error. There is no prototype-based inheritance. The language is supposed to be boring and you probably already know how to program in it.
