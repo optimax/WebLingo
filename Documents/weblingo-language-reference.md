@@ -957,6 +957,34 @@ null
   2432902008176640000
   ```
 
+### Checking argument types
+
+Functions and methods take untyped parameters. The compiler can check the number of arguments to a call it can
+resolve. A built-in method or a standard module checks argument values at runtime and reports the method name,
+the argument it expected, and what it received.
+
+In your own function or method, use `is` to check a value and throw a `TypeError` with a message about the
+argument. This check runs when the call reaches the function.
+
+```javascript
+import { writeLn } from "std:system";
+
+function double(count) {
+    if (!(count is Integer)) {
+        throw new TypeError($"The argument of 'double' must be an integer. Received {count.__instanceOf.__className}.");
+    }
+    return count * 2;
+}
+
+writeLn(double(3));
+try { double("3"); } catch (TypeError error) { writeLn(error.message); }
+```
+
+```text
+6
+The argument of 'double' must be an integer. Received String.
+```
+
 ### Rest parameters
 
 A function's last parameter may be written `...name`: an array of the arguments after the others, so that the

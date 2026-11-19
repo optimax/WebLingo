@@ -978,18 +978,20 @@ public static partial class WebLingoMembers
         {
             return TryCallArray(target, member, name, values, first, count, heap, out result, out error);
         }
-        if (target.Kind == WebLingoValueKind.Map && member == WebLingoMember.Has)
+        if (target.Kind == WebLingoValueKind.Map && member is WebLingoMember.Has or WebLingoMember.Remove)
         {
             if (count != 1) return WrongArgumentCount(name, 1, count, out error);
-            if (!heap.TryFindInMap(target, values[first], out _, out var found, out error)) return false;
-            result = WebLingoValue.FromBoolean(found);
-            return true;
-        }
-        if (target.Kind == WebLingoValueKind.Map && member == WebLingoMember.Remove)
-        {
-            if (count != 1) return WrongArgumentCount(name, 1, count, out error);
-            if (!heap.TryRemoveFromMap(target, values[first], out var removed, out error)) return false;
-            result = WebLingoValue.FromBoolean(removed);
+            var key = values[first];
+            bool answer;
+            var succeeded = member == WebLingoMember.Has
+                ? heap.TryFindInMap(target, key, out _, out answer, out error)
+                : heap.TryRemoveFromMap(target, key, out answer, out error);
+            if (!succeeded)
+            {
+                error = new WebLingoArgument(name, 0, 1, "the key", "a string, an integer, a Boolean or null").Wrong(key, heap);
+                return false;
+            }
+            result = WebLingoValue.FromBoolean(answer);
             return true;
         }
         if (IsClassMethod(target, member, heap))
@@ -1120,6 +1122,11 @@ public static partial class WebLingoMembers
                 _ => heap.TryRemoveFromSet(target, values[first], out answer, out error)
             };
             if (succeeded) result = WebLingoValue.FromBoolean(answer);
+            else if (error?.Code == WebLingoDiagnosticCodes.InvalidOperation)
+            {
+                error = new WebLingoArgument(name, 0, 1, "the value", "a string, an integer, a Boolean or null")
+                    .Wrong(values[first], heap);
+            }
             return succeeded;
         }
         error = (target.Kind is WebLingoValueKind.String or WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set
