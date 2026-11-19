@@ -8,6 +8,7 @@
 //
 // folder=<folder> names WebLingo's folder, where it is neither C:\Program Files\WebLingo nor
 // C:\Program Files (x86)\WebLingo; remove=yes takes the file type away again. It may be run again: it writes the same.
+// Registration also removes the old script's WebLingo entries for .wl. Windows keeps the user's explicit default choice.
 // At the first double-click, Windows asks once which program to open .wlg files with, since only the user may choose
 // that, and its list may leave WebLingo out: choose "Choose an app on your PC" (on Windows 10, "More apps", then "Look
 // for another app on this PC"), then C:\Program Files\WebLingo\weblingo.exe, and "Always"; Windows then opens them with
@@ -19,7 +20,8 @@ param remove = "no";
 import { writeLn } from "std:system";
 import com from "windows:com";
 import fs from "std:fs";
-import { programFiles } from "./windows.wlg";
+import process from "std:process";
+import { expand, programFiles } from "./windows.wlg";
 
 const classes = "HKCU\\Software\\Classes\\";
 const type = "WebLingo.Script";
@@ -38,6 +40,33 @@ function removeKey(key, children) {
     }
 }
 
+function removeValue(key) {
+    try {
+        shell.RegDelete($"{classes}{key}");
+    } catch (ComError e) {
+    }
+}
+
+async function migrateOldAssociation() {
+    // WebLingo.Script and Applications\weblingo.exe are shared by the old and new registrations.
+    // Remove only their links to .wl. Leave extension metadata and Explorer's UserChoice alone.
+    var old = $"{classes}.wl";
+    var registered = null;
+    try {
+        registered = shell.RegRead($"{old}\\");
+    } catch (ComError e) {
+    }
+    if (registered is String && registered.toLower() == type.toLower()) {
+        // RegDelete with a trailing backslash would delete the entire key, not its unnamed value.
+        var deleted = await process.run(expand("%SystemRoot%\\System32\\reg.exe"), ["delete", old, "/ve", "/f"]);
+        if (deleted["exitCode"] != 0) {
+            throw new Error($"Could not remove WebLingo's old .wl registration. {deleted["stderr"].trim()}");
+        }
+    }
+    removeValue($".wl\\OpenWithProgids\\{type}");
+    removeValue($"{application}\\SupportedTypes\\.wl");
+}
+
 if (remove == "yes") {
     removeKey($"{type}\\shell\\open", ["command"]);
     removeKey($"{type}\\shell\\edit", ["command"]);
@@ -46,10 +75,7 @@ if (remove == "yes") {
     removeKey($"{application}\\shell\\open", ["command"]);
     removeKey($"{application}\\shell", []);
     removeKey(application, ["SupportedTypes"]);
-    try {
-        shell.RegDelete($"{classes}.wlg\\OpenWithProgids\\{type}");
-    } catch (ComError e) {
-    }
+    removeValue($".wlg\\OpenWithProgids\\{type}");
     removeKey(".wlg", ["OpenWithProgids"]);
     // .wlg itself, where another program keeps keys of its own under it: only its link to this file type.
     try {
@@ -85,5 +111,6 @@ if (remove == "yes") {
     shell.RegWrite($"{classes}{application}\\FriendlyAppName", "WebLingo", "REG_SZ");
     shell.RegWrite($"{classes}{application}\\SupportedTypes\\.wlg", "", "REG_SZ");
     shell.RegWrite($"{classes}{application}\\shell\\open\\command\\", run, "REG_SZ");
+    await migrateOldAssociation();
     writeLn($".wlg files are WebLingo's for this account: double-clicking one runs it with {weblingo}; Edit opens it in Notepad.");
 }

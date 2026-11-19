@@ -24,6 +24,9 @@ otherwise, it stops before changing anything, but for `add-sql-server-login.wlg`
 as one of its administrators, and `add-wlg-file-type.wlg`, which changes only the account's own file types, and runs as
 that account. Each may be run again: it keeps what is there, and adds what is missing.
 
+When registering `.wlg`, `add-wlg-file-type.wlg` also removes WebLingo's old per-account registration for `.wl`.
+Other apps' registrations and the app explicitly chosen in Windows for `.wl` are preserved.
+
 ## Installing WebLingo
 
 On a machine without WebLingo, its installer's zips install it, `weblingo` and the standard modules, each with
