@@ -4015,3 +4015,17 @@ Verified already implemented (Codex, 2026-11-19, `578d5d2`). `AFileIsOpenedToApp
 Python's `items[-1]` reads the last item. WebLingo rejects that index with `WL3005`. Make it work in WebLingo. Also, take into account similar indexing scheme with C#.
 
 Done (Codex, 2026-11-19, `634636a`). Negative array subscripts work for reads, assignments, compound assignments, and optional indexing. `-1` selects the last element. The Language Reference compares this spelling with `^1` in C#. On Windows, the Release build on main had zero errors or warnings. The CLI samples and the indexing example ran. The suite passed 4,165 tests with six integration tests skipped. Linux was not tried.
+
+## [DONE] Argument Errors That Name the Argument
+
+`"tea".trim(1)` is WL3001 with a message saying a string was expected, which reads as if `"tea"` were the problem: the code is right (`trim` now takes an optional set of characters, so one argument is allowed, and an integer is a wrong kind of value, not a wrong number of arguments, WL2006), but the message does not say what should have been a string. A wrong kind of argument's message names the method and the argument, and says what it must be and what it was given: "`trim`'s argument must be a string of characters to trim, not an integer". Go through the built-in classes' methods that take arguments (strings', arrays', maps', `Bytes`', `DateTime`'s, `Regex`'s, and the standard modules' functions) for the same vague wording, and give each such message that form, with a test of the message, not only of its code.
+
+EXPLAIN: How are other methods that expect a certain type of argument handle it? How can a programmer annotate a method to expect a certain type of value so that the compiler could issue a similar error message for user-defined functions?
+
+2026-11-19 (Codex). The shared argument formatter was added in `59a5cab`. Commit `5518785` adds named diagnostics for invalid map and set arguments and documents runtime validation with `is` and `TypeError` for user-defined functions. Those changes passed the Windows checks on main. Array callbacks remain a separate case: `[1].map(1)` raises WL2005 at the attempted call, while an empty array never invokes the callback.
+
+Should higher-order array methods reject non-callable arguments up front with a named WL3001 diagnostic, including when the array is empty?
+
+A: Yes.
+
+Done (Codex, 2026-11-19, `a1d3a83`). Higher-order array methods reject non-callable callbacks with a named WL3001 before visiting any elements. The Windows Release build on main passed with zero warnings or errors. The full suite passed 4,182 tests with six integration tests skipped. CLI samples, register and stack bytecode, and a WASP page with a valid callback were exercised. Linux was not tried.
