@@ -2,12 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## Stop surviving subprocesses when capture times out
-
-A launcher can exit while a descendant still holds an output pipe open. When `std:process.run` reaches its deadline, `DotNetProcessRunner.StopIfRunning` sees that the launcher has exited and skips termination. Track the launched process tree through capture so timeout and output-limit cleanup can terminate descendants even after the launcher exits.
-
-Add a regression test with a short-lived launcher and a descendant that inherits an output pipe. Verify that the caller receives `TimeoutError` on timeout or `IOError` on output overflow, and that the descendant terminates in both cases.
-
 ## Migrate WebLingo's old Windows `.wl` file association
 
 On accounts that registered WebLingo for `.wl`, running `Scripts/add-wlg-file-type.wlg` registers `.wlg` but leaves Explorer offering WebLingo for the old extension. Remove WebLingo's legacy entries, including its `OpenWithProgids` and `SupportedTypes` entries, while preserving other applications' registrations and the user's explicit default-app choice.

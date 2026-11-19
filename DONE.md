@@ -4203,3 +4203,11 @@ A: Use the register VM (the default) and yes to all of your suggestions.
 Verify that both `gunzip` and `unzip` accept output that fits under both limits, including when collection frees the necessary space. Check that exceeding `maxBytes` still reports `WL3001` and exhausting the heap still reports `WL3003`.
 
 2026-11-19 (Codex): Fixed in `dbbee82`. gzip and ZIP use the heap byte-allocation rule and can collect before reporting WL3003. The cumulative caller byte limit still reports WL3001. The Windows Release build and full suite passed on the task branch and main (4,231 passed, six skipped, zero build warnings). The CLI and WASP compression examples and CLI reading of an independently generated ZIP passed. Linux was not run locally.
+
+## [DONE] Stop surviving subprocesses when capture times out
+
+A launcher can exit while a descendant still holds an output pipe open. When `std:process.run` reaches its deadline, `DotNetProcessRunner.StopIfRunning` sees that the launcher has exited and skips termination. Track the launched process tree through capture so timeout and output-limit cleanup can terminate descendants even after the launcher exits.
+
+Add a regression test with a short-lived launcher and a descendant that inherits an output pipe. Verify that the caller receives `TimeoutError` on timeout or `IOError` on output overflow, and that the descendant terminates in both cases.
+
+2026-11-19 (Codex): Fixed in `1877066`. Windows starts the launcher inside a job object. Linux uses a process group and retains its group ID until capture finishes. Regressions verify TimeoutError and IOError and confirm that the descendant exits after the launcher has exited. The Windows Release build and full suite passed on the task branch and main (4,233 passed, six skipped, zero build warnings). The CLI examples ran as source and stack bytecode, and WASP returned its subprocess error. Linux was not run locally.
