@@ -145,7 +145,7 @@ The specification marks each decision **Approved** (explicitly accepted by the p
 - Where the specification is silent and the work needs a decision, do not invent language semantics. Check the specification's stated intent and its open questions, then ask. A choice made only to unblock work is recorded in the specification as Proposed.
 - Do not borrow JavaScript's behavior merely because JavaScript has it. WebLingo's semantics are its own, and where the specification has decided otherwise (mandatory semicolons, `var` and `const` without `let`, int64 overflow as an error), it wins.
 - When the owner approves a decision, update the specification in the same change: the section concerned and the decision register, with the date.
-- When a milestone's state changes, update the documents that report it: the specification's roadmap and status (sections 9 and 14), the solution's `README.md`, and the milestone's status document.
+- When a milestone's state changes, update the documents that report it: the specification's roadmap and status (sections 9 and 14), the solution's `README.md`, and the milestone's status document. When a milestone lands whole, raise the solution's version to it, `Version` in `Directory.Build.props`, `0.N.0-pre-alpha` for M0.N, which every assembly carries and `weblingo --version` and `wasp --version` print (the owner's decision, 18 November 2026; the specification's register, "Versions").
 
 The specification defines the milestones (M0.1 to M0.8, section 9), the increments of M0.6 (M0.6.1 to M0.6.7, section 8.7), and the specification IDs (`WL-…`), so these may be named in tasks, handoffs and commit messages, with that section (`AGENTS.md`, section 14, "Referring to Work").
 

@@ -7,5 +7,10 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- The solution's version, every assembly's, 0.N.0-pre-alpha for M0.N, the last milestone landed whole, which the
+         task that lands a milestone raises; weblingo and wasp print it (the owner's answer, 18 November 2026). -->
+    <Version>0.20.0-pre-alpha</Version>
+    <!-- The version as it is, without the commit .NET would add after a '+', so that a build is the same from any checkout. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 </Project>

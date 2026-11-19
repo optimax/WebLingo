@@ -17,7 +17,8 @@ namespace WebLingo.Wasp.Cli;
 /// </summary>
 public static class WebLingoWaspCommandLine
 {
-    public const string Version = "WASP M0.12 (pre-alpha)";
+    /// <summary>What <c>wasp --version</c> prints, and <c>wasp</c> first without arguments: <c>WASP 0.20.0-pre-alpha</c>, the solution's version.</summary>
+    public static string Version { get; } = "WASP " + WebLingoCommandLine.ProductVersion;
 
     /// <summary><c>wasp</c>: pages, <c>.wasp</c> files, compiled by the template compiler, with the application's root given, or not.</summary>
     public static WebLingoCommandLineProgram Pages(string? root) =>

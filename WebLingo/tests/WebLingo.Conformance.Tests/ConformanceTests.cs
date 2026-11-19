@@ -1184,6 +1184,25 @@ public sealed class ConformanceTests : IDisposable
             Weblingo("run", "import { write, writeLn } from \"std:system\"; var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);\n"));
     }
 
+    [Fact]
+    public void TheVersionIsTheSolutionsAndComesFirstWithoutArguments()
+    {
+        // The solution's version, every assembly's, set once in Directory.Build.props, 0.N.0-pre-alpha for the last milestone
+        // landed whole, printed by --version, and first by weblingo without arguments (the owner's answer, 18 November 2026).
+        var version = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(WebLingoCommandLine).Assembly)!.InformationalVersion;
+        Assert.Matches(@"^0\.\d+\.0-pre-alpha$", version);
+        Assert.Equal(version,
+            System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(WebLingoValue).Assembly)!.InformationalVersion);
+        var output = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["--version"], output, new StringWriter()));
+        Assert.Equal("WebLingo " + version, output.ToString().TrimEnd());
+        output = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run([], output, new StringWriter()));
+        var lines = output.ToString().Split('\n');
+        Assert.Equal("WebLingo " + version, lines[0].TrimEnd('\r'));
+        Assert.StartsWith("Usage: weblingo", lines[1]);
+    }
+
     [Theory]
     [InlineData("run")]
     [InlineData("--unknown")]

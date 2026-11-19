@@ -59,7 +59,7 @@ weblingo run hello.wl
 | `weblingo compile [--register \| --stack] <file.wl>` | compiles the script into bytecode, a `.wlbc` file beside it |
 | `weblingo run <file.wlbc>` | runs compiled bytecode without compiling anything |
 | `weblingo disasm <file.wlbc>` | shows compiled bytecode as text |
-| `weblingo --version` | its version |
+| `weblingo --version` | its version, `WebLingo 0.20.0-pre-alpha`, which `weblingo` alone prints first, before how it is used |
 
 `weblingo run` of a `.wl` compiles it in memory, and writes no file; `weblingo compile` writes one, for the register VM
 by default, or for the stack VM with `--stack`. `weblingo disasm hello.wlbc` shows what the compiler made:

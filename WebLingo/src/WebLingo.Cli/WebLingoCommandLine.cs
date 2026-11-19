@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using WebLingo.Bytecode;
 using WebLingo.Compiler;
@@ -27,7 +28,15 @@ public static class WebLingoCommandLine
     public const int RuntimeFailed = 3;
     public const int FileUnreadable = 4;
 
-    public const string Version = "WebLingo M0.6 (pre-alpha)";
+    /// <summary>
+    /// The solution's version, every assembly's, as <c>Directory.Build.props</c> sets it, <c>0.20.0-pre-alpha</c>: the
+    /// owner's answer, 18 November 2026, in place of the milestone each command line named, <c>WebLingo M0.6 (pre-alpha)</c>.
+    /// </summary>
+    public static string ProductVersion { get; } =
+        typeof(WebLingoCommandLine).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
+
+    /// <summary>What <c>weblingo --version</c> prints, and <c>weblingo</c> first without arguments: <c>WebLingo 0.20.0-pre-alpha</c>.</summary>
+    public static string Version { get; } = "WebLingo " + ProductVersion;
 
     /// <summary>The extension of a WLBC file (section 5.3).</summary>
     public const string BytecodeExtension = ".wlbc";
@@ -113,6 +122,8 @@ public static class WebLingoCommandLine
             if (wrong is not null) error.WriteLine(wrong);
         }
 
+        // Without arguments, its version first, then how it is used (the owner's answer, 18 November 2026).
+        if (args.Length == 0) output.WriteLine(program.Version);
         var file = program.Options + "[--scheme <name>=<folder> …] <file" + program.Extension + ">";
         var bytecodeUsage = program.Bytecode
             ? $" | compile [--register|--stack] [--scheme <name>=<folder> …] <file{program.Extension}> | disasm <file{BytecodeExtension}>"

@@ -76,6 +76,10 @@ public sealed class WaspTests : IDisposable
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoWaspCommandLine.Run(["--version"], output, new StringWriter()));
         Assert.Equal(WebLingoWaspCommandLine.Version, output.ToString().TrimEnd());
+        Assert.Equal("WASP " + WebLingoCommandLine.ProductVersion, WebLingoWaspCommandLine.Version);
+        output = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoWaspCommandLine.Run([], output, new StringWriter()));
+        Assert.StartsWith(WebLingoWaspCommandLine.Version + Environment.NewLine + "Usage: wasp", output.ToString());
 
         output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.UsageError, WebLingoWaspCommandLine.Run(["page.wasp"], output, new StringWriter()));
