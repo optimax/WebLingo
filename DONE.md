@@ -4119,3 +4119,9 @@ The Language Reference is full of examples where this line is present:
 This is unnecessary since `std:system` is supposed to be implicitly imported.
 
 2026-11-19 (Codex). Removed 69 redundant `std:system` imports in `30733a8` and verified five updated diagnostic locations. Compared the original and edited examples on the task branch and main, running 68 and checking the HTTP example without a server. A WASP sample verified implicit `write`. Windows Release built cleanly and the full suite passed 4,204 tests with six skipped on both. Linux was not tested locally.
+
+## [DONE] Explain Argument Types in User-Defined Functions
+
+EXPLAIN: How are other methods that expect a certain type of argument handle it? How can a programmer annotate a method to expect a certain type of value so that the compiler could issue a similar error message for user-defined functions?
+
+2026-11-19 (Codex). The Language Reference section “Checking argument types” was added in `0ecc35e` and clarified in `0c4fd9d`. It explains compiler arity checks, built-in runtime type checks, and using `is` with `TypeError` for user-defined functions. The example now handles `null` and names the received class. Exact sample output matched on source and stack bytecode on both the branch and main. Windows Release built cleanly and the full suite passed 4,204 tests with six skipped on both. Linux was not tested locally.
