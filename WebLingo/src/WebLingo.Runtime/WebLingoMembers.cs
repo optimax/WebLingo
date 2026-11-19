@@ -539,7 +539,9 @@ public static partial class WebLingoMembers
 
     /// <summary>
     /// What <c>x.name(…)</c> calls when <c>x</c> is an instance: a field's value, as any function value is called, or
-    /// a method, which runs on the instance (<paramref name="isMethod"/>); WL3006 if it has neither.
+    /// a method, which runs on the instance (<paramref name="isMethod"/>); WL3006 if it has neither; and
+    /// <see cref="Fallback"/> for a member <see cref="TryCall"/> calls, a native class's fallback's, or the method of the
+    /// value an instance holds (section 3.7, "No sealed classes").
     /// </summary>
     public static bool TryFindCallee(WebLingoValue instance, string name, WebLingoHeap heap, out WebLingoValue callee, out bool isMethod,
         out WebLingoRuntimeError? error)
@@ -556,7 +558,7 @@ public static partial class WebLingoMembers
             error = IsProperty(instance, name, heap);
             return false;
         }
-        error = heap.FallbackOf(instance) is not null ? Fallback : NoSuchMember(instance, name, heap);
+        error = heap.FallbackOf(instance) is not null || heap.IsHolding(instance) ? Fallback : NoSuchMember(instance, name, heap);
         return false;
     }
 
@@ -894,10 +896,23 @@ public static partial class WebLingoMembers
         WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
-        // A native class's member it does not declare, which a VM calls here once TryFindCallee has not found it (section 3.10).
-        if (target.Kind == WebLingoValueKind.Instance && heap.FallbackOf(target) is { } fallback)
+        if (target.Kind == WebLingoValueKind.Instance)
         {
-            return TryFallback(fallback.Call, target, name, values.AsSpan(first, count), heap, out result, out error);
+            // A native class's member it does not declare, which a VM calls here once TryFindCallee has not found it (section
+            // 3.10).
+            if (heap.FallbackOf(target) is { } fallback)
+            {
+                return TryFallback(fallback.Call, target, name, values.AsSpan(first, count), heap, out result, out error);
+            }
+            // An instance holding a value, whose class has no such member: its value's method, giving what the value's gives,
+            // as its value's properties are read (section 3.7, "No sealed classes"); a member its value has not either is the
+            // instance's to report.
+            if (heap.IsHolding(target))
+            {
+                if (TryCall(heap.Held(target), member, name, values, first, count, heap, out result, out error)) return true;
+                if (error?.Code == WebLingoDiagnosticCodes.NoSuchMember) error = NoSuchMember(target, name, heap);
+                return false;
+            }
         }
         if (member == WebLingoMember.Iterate
             && target.Kind is WebLingoValueKind.Array or WebLingoValueKind.Set or WebLingoValueKind.Map or WebLingoValueKind.String)

@@ -1546,6 +1546,26 @@ Arithmetic keeps such a class: a result has its left operand's class, if it has 
 `toFahrenheit()` above gives a `Celsius`; a method that means another unit makes an instance of that unit's class. Such
 an instance is written as its class, a colon and its value.
 
+Such an instance has its value's members too, its properties and its methods, each giving what the value's own gives,
+a string's `toUpper()` a string:
+
+```javascript
+import { writeLn } from "std:system";
+class Name extends String {
+  greet() { return "Hello, " + this.toUpper() + "!"; }
+}
+var n = new Name("ann");
+writeLn(n.length);
+writeLn(n.greet());
+writeLn(n.startsWith("a"));
+```
+
+```text
+3
+Hello, ANN!
+true
+```
+
 ### Iterating an instance
 
 `foreach` visits an instance of a class through its `iterate()` method, which gives an iterator, whose `hasNext()` and

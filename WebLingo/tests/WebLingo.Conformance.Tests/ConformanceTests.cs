@@ -643,6 +643,16 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { writeLn } from \"std:system\"; import { Regex } from \"std:regex\"; var i = new Regex(\"^TEA$\", \"im\"); writeLn([i.test(\"green\\ntea\"), i, $\"{i}\"]);", "[true, Regex:/^TEA$/im, \"Regex:/^TEA$/im\"]")]
     [InlineData("import { writeLn } from \"std:system\"; import { Regex } from \"std:regex\"; writeLn(new Regex(\"(a)|(b)\").match(\"b\"));", "[\"b\", null, \"b\"]")]
     [InlineData("import { writeLn } from \"std:system\"; import { Regex } from \"std:regex\"; class Strict extends Regex {} var s = new Strict(\"x+\"); writeLn([s is Regex, s is Strict]);", "[true, true]")]
+    // A class extending a kind of value's has its value's methods, as it has its properties, each giving what the value's gives;
+    // a member neither its class nor its value has is the instance's error (section 3.7, "No sealed classes").
+    [InlineData("import { writeLn } from \"std:system\"; class Name extends String {} var n = new Name(\"ann\"); writeLn([n.length, n.toUpper(), n.startsWith(\"a\"), n.split(\"n\"), n.toUpper() is Name, n.iterate().next()]);",
+        "[3, \"ANN\", true, [\"a\", \"\", \"\"], false, \"a\"]")]
+    [InlineData("import { writeLn } from \"std:system\"; import { Regex } from \"std:regex\"; class Strict extends Regex { twice(s) { return [this.test(s), this.match(s)]; } } var s = new Strict(\"a+\"); writeLn([s.test(\"caab\"), s.twice(\"x\"), s.replace(\"caab\", \"-\"), s.pattern]);",
+        "[true, [false, null], \"c-b\", \"a+\"]")]
+    [InlineData("import { writeLn } from \"std:system\"; class Name extends String {} extend String { shout() { return this.toUpper() + \"!\"; } } var n = new Name(\"hi\"); writeLn([n.shout(), \"yo\".shout()]);",
+        "[\"HI!\", \"YO!\"]")]
+    [InlineData("import { writeLn } from \"std:system\"; class Name extends String {} try { new Name(\"a\").nope(); } catch (e) { writeLn(e.code + \" \" + e.message); }",
+        "WL3006 An instance of Name has no member 'nope'.")]
     [InlineData("import { writeLn } from \"std:system\"; import { Regex } from \"std:regex\"; var r = new Regex(\"a\"); writeLn([r == r, r == new Regex(r.pattern)]);", "[true, false]")]
     // JSON (the owner's answers, 16 November 2026): a class, Json; integers when integral; instances by their fields or toJson().
     [InlineData("import { writeLn } from \"std:system\"; import { Json } from \"std:json\"; var v = Json.parse(\"{\\\"name\\\": \\\"Ann\\\", \\\"age\\\": 30, \\\"height\\\": 1.7, \\\"tags\\\": [\\\"a\\\", true, null], \\\"e\\\": 1e3, \\\"s\\\": \\\"\\\\u00e9\\\\n\\\\uD83D\\\\uDE00\\\"}\"); writeLn(v);", "{\"name\": \"Ann\", \"age\": 30, \"height\": 1.7, \"tags\": [\"a\", true, null], \"e\": 1000.0, \"s\": \"é\\n😀\"}")]
