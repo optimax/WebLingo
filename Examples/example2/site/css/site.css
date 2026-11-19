@@ -30,6 +30,9 @@ main { max-width: 64rem; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
 .order { display: grid; gap: .5rem; margin: 1rem 0; max-width: 20rem; }
 .order input { width: 100%; padding: .35rem .5rem; font: inherit; }
 .problem { color: var(--reef); font-weight: bold; }
+.cart input[type=number] { width: 5rem; padding: .35rem .5rem; font: inherit; }
+.cart button[formaction] { background: #4f6b75; }
+.cart td { vertical-align: middle; }
 .credit { font-size: .85rem; color: #4f6b75; }
 table { border-collapse: collapse; width: 100%; background: #fff; }
 th, td { padding: .5rem .75rem; border-bottom: 1px solid #d7e3e7; text-align: left; vertical-align: top; }

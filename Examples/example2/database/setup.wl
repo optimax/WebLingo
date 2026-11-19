@@ -1,5 +1,6 @@
 // Makes the fish store's database, fish.db, beside this script, outside the site, as weblingo.config names it:
-// the fish the store sells, and a few orders. Run it again to start afresh: it drops the tables first.
+// the fish the store sells, a few orders, and the shoppers' carts, empty. Run it again to start afresh: it drops the
+// tables first.
 //
 //   weblingo run setup.wl
 
@@ -88,6 +89,7 @@ const orders = [
 
 using (var db = await Database.open("fish")) {
     await db.transaction(async () => {
+        await db.execute("DROP TABLE IF EXISTS CartItems");
         await db.execute("DROP TABLE IF EXISTS Orders");
         await db.execute("DROP TABLE IF EXISTS Fish");
         await db.execute("""
@@ -118,6 +120,16 @@ using (var db = await Database.open("fish")) {
                 Quantity INTEGER NOT NULL CHECK (Quantity > 0),
                 Customer TEXT NOT NULL,
                 Placed DATETIME NOT NULL
+            )
+            """);
+        // Each shopping cart's fish, by the cart's id, which its browser keeps in a cookie; a fish once in a cart.
+        await db.execute("""
+            CREATE TABLE CartItems (
+                Cart TEXT NOT NULL,
+                FishId INTEGER NOT NULL REFERENCES Fish (Id),
+                Quantity INTEGER NOT NULL CHECK (Quantity BETWEEN 1 AND 100),
+                Added DATETIME NOT NULL,
+                PRIMARY KEY (Cart, FishId)
             )
             """);
         foreach (var one in fish) {

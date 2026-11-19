@@ -1,0 +1,44 @@
+<% param request; param response; import { cartOf, checkout } from "/lib/cart.wl"; %>
+<% layout "/layouts/main.wasp", { title: "Your order", section: "cart" }; %>
+<%
+  // The cart checked out, posted by its form: the customer's name checked, then every fish in it ordered in one
+  // transaction, or none, with why, a 400 (Bad Request), the cart left as it was. A page of its own answers the post, as
+  // the single order's does, to show what was ordered; a reload asks the browser to post again.
+  var problem = null;
+  var done = null;
+  var customer = "";
+  var cart = cartOf(request);
+  if (request.method != "POST") {
+    problem = "Fill your cart, and check it out from there.";
+  } else {
+    customer = ((await request.form())?["customer"] ?? "").trim();
+    if (customer == "" || customer.length > 60) {
+      problem = "Please give your name, in 60 letters at most.";
+    } else if (cart == null) {
+      problem = "Your cart is empty.";
+    } else {
+      try {
+        done = await checkout(cart, customer);
+      } catch (e) {
+        problem = e.message;
+      }
+    }
+  }
+  if (problem != null) {
+    response.status = 400;
+  }
+%>
+<% if (problem != null) { %>
+<h1>Not ordered</h1>
+<p class="problem"><%= problem %></p>
+<p><a href="/cart">Back to your cart</a></p>
+<% } else { %>
+<h1>Thank you, <%= customer %></h1>
+<p>You have ordered:</p>
+<ul>
+<%   foreach (var line in done["lines"]) { %>
+  <li><%= line["Quantity"] %> <%= line["Name"] %></li>
+<%   } %>
+</ul>
+<p>It comes to <%= $"€{done['total']:N2}" %>. <a href="/orders">See the orders</a> or <a href="/fish">choose more fish</a>.</p>
+<% } %>

@@ -2,7 +2,8 @@
   <a class="brand" href="/">Lingo Aquatics</a>
   <nav>
 <% foreach (var link in [["/", "Home", "home"], ["/fish?water=freshwater", "Freshwater", "freshwater"], ["/fish?water=marine", "Marine", "marine"],
-                         ["/fish", "All fish", "fish"], ["/orders", "Orders", "orders"], ["/credits", "Photo credits", "credits"]]) { %>
+                         ["/fish", "All fish", "fish"], ["/orders", "Orders", "orders"], ["/credits", "Photo credits", "credits"],
+                         ["/cart", $"Cart ({inCart})", "cart"]]) { %>
 <%   if (link[2] == section) { %>
     <a class="current" href="<%= link[0] %>"><%= link[1] %></a>
 <%   } else { %>

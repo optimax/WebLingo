@@ -150,6 +150,50 @@ public sealed class WaspServeTests : IDisposable
                 Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
                 Assert.Contains("We have only 1 Mandarinfish left.", await refused.Content.ReadAsStringAsync());
                 Assert.Contains("<td>Mia</td>", await client.GetStringAsync("/orders"));
+
+                // A shopping cart, its id in a cookie the client keeps: fish added, by form actions that answer 303 (See
+                // Other), which the client follows to the cart; quantities changed in one form; a fish removed by its own
+                // button's formaction; a checkout refused, the cart as it was, then placed, in one transaction.
+                Assert.Contains("Your cart is empty", await client.GetStringAsync("/cart"));
+                var added = await client.PostAsync("/cart/add", new FormUrlEncodedContent([new("fish", "6"), new("quantity", "2")]));
+                Assert.Equal(HttpStatusCode.OK, added.StatusCode);
+                Assert.Equal("/cart", added.RequestMessage!.RequestUri!.AbsolutePath);
+                using (var stranger = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(address) })
+                {
+                    // Answered by 303 (See Other) to the cart, with a new cart's cookie, which no script on a page reads.
+                    var first = await stranger.PostAsync("/cart/add", new FormUrlEncodedContent([new("fish", "1"), new("quantity", "1")]));
+                    Assert.Equal((HttpStatusCode.SeeOther, "/cart"), (first.StatusCode, first.Headers.Location?.OriginalString));
+                    Assert.Matches("^cart=[0-9a-f]{32}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax$", Assert.Single(first.Headers.GetValues("Set-Cookie")));
+                }
+                await client.PostAsync("/cart/add", new FormUrlEncodedContent([new("fish", "1"), new("quantity", "3")]));
+                await client.PostAsync("/cart/add", new FormUrlEncodedContent([new("fish", "13"), new("quantity", "1")]));
+                var cart = await client.GetStringAsync("/cart");
+                Assert.Contains("Cart (6)", cart);
+                Assert.Contains("name=\"quantity-6\" min=\"0\" max=\"100\" value=\"2\"", cart);
+                Assert.Contains("€98.00", cart);
+                await client.PostAsync("/cart/update", new FormUrlEncodedContent([new("quantity-6", "1"), new("quantity-1", "4")]));
+                await client.PostAsync("/cart/remove", new FormUrlEncodedContent([new("quantity-6", "1"), new("fish", "13")]));
+                cart = await client.GetStringAsync("/cart");
+                Assert.Contains("Cart (5)", cart);
+                Assert.DoesNotContain("Mandarinfish", cart);
+                var wrong = await client.PostAsync("/cart/update", new FormUrlEncodedContent([new("quantity-6", "many")]));
+                Assert.Equal((HttpStatusCode.BadRequest, "A cart takes 0 to 100 of a fish, 0 taking it out."),
+                    (wrong.StatusCode, await wrong.Content.ReadAsStringAsync()));
+                await client.PostAsync("/cart/add", new FormUrlEncodedContent([new("fish", "13"), new("quantity", "2")]));
+                var short1 = await client.PostAsync("/cart/checkout", new FormUrlEncodedContent([new("customer", "Ida")]));
+                Assert.Equal(HttpStatusCode.BadRequest, short1.StatusCode);
+                Assert.Contains("We have only 1 Mandarinfish left.", await short1.Content.ReadAsStringAsync());
+                Assert.Contains("Cart (7)", await client.GetStringAsync("/cart"));
+                await client.PostAsync("/cart/remove", new FormUrlEncodedContent([new("fish", "13")]));
+                var placed = await client.PostAsync("/cart/checkout", new FormUrlEncodedContent([new("customer", "Ida")]));
+                var thanks = await placed.Content.ReadAsStringAsync();
+                Assert.True(placed.StatusCode == HttpStatusCode.OK, thanks);
+                Assert.Contains("<li>1 Discus</li>", thanks);
+                Assert.Contains("<li>4 Neon tetra</li>", thanks);
+                Assert.Contains("It comes to €59.00.", thanks);
+                Assert.Contains("Your cart is empty", await client.GetStringAsync("/cart"));
+                Assert.Contains("<td>Ida</td>", await client.GetStringAsync("/orders"));
+                Assert.Contains("<td>5</td>", await client.GetStringAsync("/fish/item?id=6"));
             }
             finally
             {

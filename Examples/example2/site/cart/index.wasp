@@ -1,0 +1,39 @@
+<% param request; param response; import { cartOf, linesOf } from "/lib/cart.wl"; %>
+<% layout "/layouts/main.wasp", { title: "Your cart", section: "cart" }; %>
+<%
+  // The cart this browser's cookie names. Its fish are in one form: its Update button posts every quantity at once, to
+  // /cart/update; each Remove button posts its own fish's id to /cart/remove instead, by its formaction; and Empty posts
+  // to /cart/empty. Update comes first in the form, so that Enter in a quantity updates, not removes, a browser pressing a
+  // form's first button for it. A second form checks the cart out.
+  var lines = await linesOf(cartOf(request));
+  // Each line's total, its decimal price times how many, a decimal, exact: SQLite's product would be a binary number.
+  var total = 0m;
+  foreach (var line in lines) total += line["Price"] * line["Quantity"];
+%>
+<h1>Your cart</h1>
+<% if (lines.length == 0) { %>
+<p>Your cart is empty: <a href="/fish">choose some fish</a>, and add them from their pages.</p>
+<% } else { %>
+<form class="cart" method="post" action="/cart/update">
+  <p><button>Update the quantities</button> <button formaction="/cart/empty">Empty the cart</button></p>
+  <table>
+    <thead><tr><th>Fish</th><th>Price</th><th>How many</th><th>Total</th><th></th></tr></thead>
+    <tbody>
+<%   foreach (var line in lines) { %>
+      <tr>
+        <td><a href="/fish/item?id=<%= line["Id"] %>"><%= line["Name"] %></a></td>
+        <td><%= $"€{line['Price']:N2}" %></td>
+        <td><input type="number" name="quantity-<%= line["Id"] %>" min="0" max="100" value="<%= line["Quantity"] %>" aria-label="How many <%= line["Name"] %>"></td>
+        <td><%= $"€{line['Price'] * line['Quantity']:N2}" %></td>
+        <td><button formaction="/cart/remove" name="fish" value="<%= line["Id"] %>">Remove</button></td>
+      </tr>
+<%   } %>
+    </tbody>
+    <tfoot><tr><th colspan="3">Total</th><th><%= $"€{total:N2}" %></th><th></th></tr></tfoot>
+  </table>
+</form>
+<form class="order" method="post" action="/cart/checkout">
+  <label>Your name <input type="text" name="customer" maxlength="60" required></label>
+  <button>Place the order</button>
+</form>
+<% } %>

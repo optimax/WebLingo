@@ -1,0 +1,11 @@
+// /cart/empty, posted by the cart's Empty button: every fish taken out, then the browser sent back to the cart.
+
+import { cartOf, empty, toCart } from "/lib/cart.wl";
+
+export async function post(request, response) {
+    var cart = cartOf(request);
+    if (cart != null) {
+        await empty(cart);
+    }
+    toCart(response);
+}

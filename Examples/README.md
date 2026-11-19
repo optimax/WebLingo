@@ -107,14 +107,15 @@ application pools, or IIS (`iisreset /stop`), before copying the new version ove
 
 ## example2: Lingo Aquatics, a fish store with a database
 
-A tropical fish store's site, an example of a site with a database: its fourteen fish, their photos' credits and its
-orders are in a SQLite database, which its pages read and change through `std:db`, WebLingo's module for databases.
+A tropical fish store's site, an example of a site with a database and its forms: its fourteen fish, their photos'
+credits, its orders and its shoppers' carts are in a SQLite database, which its pages read and change through `std:db`,
+WebLingo's module for databases.
 The database is outside the site's folder, so that it is never served, its place named by the site's `wasp.config`.
 
 ```text
 example2/
   database/             outside the site: the database, and the script that makes it
-    setup.wl            makes fish.db: its tables, the fish and a few orders
+    setup.wl            makes fish.db: its tables, the fish, a few orders, and the carts, empty
     weblingo.config     names the database "fish" for setup.wl: { "databases": { "fish": "sqlite:fish.db" } }
     fish.db             made by setup.wl, not in the repository
   site/                 the site, and wasp's root
@@ -122,12 +123,19 @@ example2/
     wasp.config         names the database "fish" for the pages: "sqlite:../database/fish.db"
     index.wasp          /                 the two waters, and this week's favourites
     fish/index.wasp     /fish             the fish, of one water, ?water=marine, up to a price, ?max=10, or by name, ?q=tetra
-    fish/item.wasp      /fish/item?id=6   one fish, and a form to order it
+    fish/item.wasp      /fish/item?id=6   one fish, and forms to add it to the cart or to order it
     order.wasp          /order            an order, posted by that form, placed in a transaction
     orders.wasp         /orders           the latest orders, a join of two tables
+    cart/index.wasp     /cart             the cart: its fish, how many of each and their total, in one form
+    cart/add.wl         /cart/add         a fish added, posted by its page: a route handler, as the next three are
+    cart/update.wl      /cart/update      every quantity set at once, 0 taking a fish out
+    cart/remove.wl      /cart/remove      one fish taken out, by its Remove button
+    cart/empty.wl       /cart/empty       every fish taken out
+    cart/checkout.wasp  /cart/checkout    the cart ordered, every fish or none, in one transaction
     credits.wasp        /credits          each photo's author and licence, from the database
     api/fish.wl         /api/fish         the fish as JSON, a route handler
     lib/store.wl        the module the pages ask the database through
+    lib/cart.wl         the carts: the cookie that names each, and what the cart's pages ask the database
     layouts/, includes/, components/, css/   as example1's
     images/             the fish's photos, 1024 x 768, and their credits, CREDITS.md
 ```
@@ -145,6 +153,22 @@ example2/
   fewer fish are left than ordered.
 - **Values a database holds.** A price is a decimal, `DECIMAL(10, 2)`, read as one, `24.90m`; an order's time a date,
   `DATETIME`, formatted by an interpolation, `{order['Placed']:yyyy-MM-dd HH:mm}`.
+- **A cookie.** A cart is a random id, `crypto.randomBytes(16).toHex()`, which the response gives the browser,
+  `response.headers.add("Set-Cookie", …)`, `HttpOnly`, so that no script on a page reads it, and `SameSite=Lax`, so that
+  a form another site posts does not carry it; the browser's `Cookie` header brings it back, and its fish are in the
+  database, `CartItems`, so that nothing but the id goes to the browser.
+- **Forms that post, then redirect.** Each change to the cart is a form posted to a route handler, `cart/add.wl`'s
+  `post`, which changes the cart and sends the browser back to `/cart` with a 303 (See Other), so that reloading the
+  cart posts nothing again; a form no page of the site would send, a quantity of 0 to add, is refused, a 400.
+- **One form, several actions.** The cart's form posts every quantity to `/cart/update`, each field named for its
+  fish, `quantity-6`; each Remove button posts the same form to `/cart/remove` instead, by its `formaction`, its own
+  `name` and `value` the fish's id, and Empty to `/cart/empty`. Update comes first, so that Enter in a quantity, which
+  presses a form's first button, updates.
+- **An upsert.** Adding a fish a cart holds already adds to how many it holds, in one statement, SQLite's
+  `INSERT … ON CONFLICT (Cart, FishId) DO UPDATE SET Quantity = MIN(100, Quantity + excluded.Quantity)`.
+- **Exact totals.** A column is read as its declared type says, a `DECIMAL` as a decimal, but an expression of SQL has
+  none, `Price * Quantity` coming back as SQLite holds it, an integer or a binary number; so the cart multiplies the
+  decimal price itself, `line["Price"] * line["Quantity"]`, a decimal, since a decimal and a binary number do not mix.
 - **The photos' provenance.** Each photo is from Wikimedia Commons, its author, licence and page in the database, which
   `/credits` lists, and in `images/CREDITS.md`.
 

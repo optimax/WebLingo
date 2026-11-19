@@ -21,11 +21,16 @@
       <tr><th>In the tanks</th><td><%= fish["Stock"] %></td></tr>
     </table>
 <%   if (fish["Stock"] > 0) { %>
+    <form class="order" method="post" action="/cart/add">
+      <input type="hidden" name="fish" value="<%= fish["Id"] %>">
+      <label>How many <input type="number" name="quantity" min="1" max="100" value="1" required></label>
+      <button>Add to the cart</button>
+    </form>
     <form class="order" method="post" action="/order">
       <input type="hidden" name="fish" value="<%= fish["Id"] %>">
       <label>How many <input type="number" name="quantity" min="1" max="<%= fish["Stock"] %>" value="1" required></label>
       <label>Your name <input type="text" name="customer" maxlength="60" required></label>
-      <button>Order</button>
+      <button>Order it now</button>
     </form>
 <%   } else { %>
     <p class="out">Sold out for now.</p>
