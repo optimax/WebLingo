@@ -4183,3 +4183,15 @@ A1: As you list them. Don't ask trivial questions. Act autonomously.
 2026-11-19 (Codex). The owner approved the order. See the architecture specification, §7.16, “Standard-library utilities”. This task waits for its three tasks below.
 
 2026-11-19 (Codex). Completed the three additions defined in the architecture specification, §7.16, “Standard-library utilities”. Gzip and ZIP landed in `37622d1`, seeded random in `0f251ee`, and CLI subprocess execution in `480d4dd`. Each passed its Windows Release checks and complete test suite on main. Linux was not tested locally.
+
+## [DONE] VS Code Debugging
+
+Buiid an extension for VS Code to debug WebLingo.
+
+2026-11-19 (Codex). The VS Code extension currently provides syntax highlighting. The register VM's compiled functions already carry source spans and local names. A debugger needs a VM pause and inspection interface and a host for the Debug Adapter Protocol.
+
+Q1. Should the first VS Code debugger launch local `.wlg` scripts on the register VM with breakpoints, stepping, a call stack and local variables, with WASP, the stack VM and attaching to running processes left for follow-up tasks?
+
+A: Use the register VM (the default) and yes to all of your suggestions.
+
+2026-11-19 (Codex). Implemented in `70b49ad`, following the approved scope in the architecture specification §5.7. The extension launches local .wlg scripts on the register VM. Debug metadata stays in memory and variables show bounded previews. VS Code 1.129.1 on Windows hit a breakpoint and inspected a local. The protocol tests covered stepping, stack frames, shadowing and termination. The Windows Release builds passed with zero warnings or errors and the full suite passed 4,223 tests with six skipped on the branch and main. CLI and WASP samples passed. Linux was not tested locally.

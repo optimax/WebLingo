@@ -2,16 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [WORKING] VS Code Debugging
-
-Buiid an extension for VS Code to debug WebLingo.
-
-2026-11-19 (Codex). The VS Code extension currently provides syntax highlighting. The register VM's compiled functions already carry source spans and local names. A debugger needs a VM pause and inspection interface and a host for the Debug Adapter Protocol.
-
-Q1. Should the first VS Code debugger launch local `.wlg` scripts on the register VM with breakpoints, stepping, a call stack and local variables, with WASP, the stack VM and attaching to running processes left for follow-up tasks?
-
-A: Use the register VM (the default) and yes to all of your suggestions.
-
 ## Use the heap's byte accounting for gzip and ZIP decompression
 
 `gunzip` rejected a 2,048-byte result with `WL3003` when 979 heap units were free. A direct `Bytes` allocation of the same size succeeded. In `WebLingoCompressionModule.TryRead`, use the heap's allocation rule of one unit per eight bytes plus object overhead, and allow collection before reporting exhaustion. Keep the caller's `maxBytes` limit in bytes, cumulative across ZIP entries.
