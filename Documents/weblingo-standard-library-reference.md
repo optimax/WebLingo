@@ -1371,6 +1371,8 @@ A nonzero exit code is returned in the map. `options` may contain either of thes
 | `maxOutputBytes` | 1,048,576 | integers from 0 to 16,777,216, counting both streams together |
 
 A timeout raises `TimeoutError` (WL3010). A launch failure or an exceeded output limit raises `IOError` (WL3011).
+On Windows and Linux, a timeout or exceeded output limit stops the launched program and its descendants in the
+same job or process group, including when the original program has already exited.
 WASP returns `IOError` for subprocess calls.
 
 ```javascript

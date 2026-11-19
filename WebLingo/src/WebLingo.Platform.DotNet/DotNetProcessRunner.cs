@@ -9,6 +9,29 @@ public sealed class DotNetProcessRunner : IWebLingoProcessRunner
 {
     public WebLingoProcessResult Run(string program, IReadOnlyList<string> arguments, int timeoutMs, int maxOutputBytes)
     {
+        try
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                using var child = WindowsProcessCapture.Start(program, arguments);
+                return Capture(child.Output, child.Error, child.WaitForExitAsync, child.Stop, timeoutMs, maxOutputBytes);
+            }
+            if (OperatingSystem.IsLinux())
+            {
+                using var child = LinuxProcessCapture.Start(program, arguments);
+                return Capture(child.Output, child.Error, child.WaitForExitAsync, child.Stop, timeoutMs, maxOutputBytes);
+            }
+            return RunManaged(program, arguments, timeoutMs, maxOutputBytes);
+        }
+        catch (Exception failure) when (failure is Win32Exception or IOException or InvalidOperationException or NotSupportedException)
+        {
+            throw new WebLingoProcessException($"Could not run '{program}': {failure.Message}");
+        }
+    }
+
+    private static WebLingoProcessResult RunManaged(string program, IReadOnlyList<string> arguments,
+        int timeoutMs, int maxOutputBytes)
+    {
         var start = new ProcessStartInfo(program, arguments)
         {
             UseShellExecute = false,
@@ -18,39 +41,44 @@ public sealed class DotNetProcessRunner : IWebLingoProcessRunner
             RedirectStandardError = true
         };
         using var process = new Process { StartInfo = start };
+        if (!process.Start()) throw new WebLingoProcessException($"Could not start '{program}'.");
+        process.StandardInput.Close();
+        return Capture(process.StandardOutput.BaseStream, process.StandardError.BaseStream, async cancellation =>
+        {
+            await process.WaitForExitAsync(cancellation).ConfigureAwait(false);
+            return process.ExitCode;
+        }, () => StopIfRunning(process), timeoutMs, maxOutputBytes);
+    }
+
+    private static WebLingoProcessResult Capture(Stream output, Stream error,
+        Func<CancellationToken, Task<int>> waitForExit, Action stop, int timeoutMs, int maxOutputBytes)
+    {
         try
         {
-            if (!process.Start()) throw new WebLingoProcessException($"Could not start '{program}'.");
-            try
-            {
-                process.StandardInput.Close();
-                return CaptureAsync(process, timeoutMs, maxOutputBytes).GetAwaiter().GetResult();
-            }
-            finally
-            {
-                StopIfRunning(process);
-                process.StandardOutput.Dispose();
-                process.StandardError.Dispose();
-            }
+            return CaptureAsync(output, error, waitForExit, timeoutMs, maxOutputBytes).GetAwaiter().GetResult();
         }
-        catch (Exception failure) when (failure is Win32Exception or IOException or InvalidOperationException or NotSupportedException)
+        catch
         {
-            throw new WebLingoProcessException($"Could not run '{program}': {failure.Message}");
+            stop();
+            throw;
         }
     }
 
-    private static async Task<WebLingoProcessResult> CaptureAsync(Process process, int timeoutMs, int maxOutputBytes)
+    private static async Task<WebLingoProcessResult> CaptureAsync(Stream output, Stream error,
+        Func<CancellationToken, Task<int>> waitForExit, int timeoutMs, int maxOutputBytes)
     {
         using var cancellation = new CancellationTokenSource(timeoutMs);
         var budget = new OutputBudget(maxOutputBytes, cancellation);
-        var stdout = ReadOutputAsync(process.StandardOutput.BaseStream, budget, cancellation.Token);
-        var stderr = ReadOutputAsync(process.StandardError.BaseStream, budget, cancellation.Token);
-        var complete = Task.WhenAll(stdout, stderr, process.WaitForExitAsync(cancellation.Token));
+        var stdout = ReadOutputAsync(output, budget, cancellation.Token);
+        var stderr = ReadOutputAsync(error, budget, cancellation.Token);
+        var complete = Task.WhenAll(stdout, stderr);
         try
         {
             await complete.WaitAsync(cancellation.Token).ConfigureAwait(false);
             cancellation.Token.ThrowIfCancellationRequested();
-            return new WebLingoProcessResult(process.ExitCode, stdout.Result, stderr.Result);
+            // On Linux the unreaped launcher reserves the process group ID until capture is complete.
+            var exitCode = await waitForExit(cancellation.Token).ConfigureAwait(false);
+            return new WebLingoProcessResult(exitCode, stdout.Result, stderr.Result);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {

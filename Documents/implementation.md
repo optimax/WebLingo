@@ -277,6 +277,10 @@ CI is the only place Linux is tried, and it runs on a push or a pull request, wh
 
 The run logs need a signed-in GitHub account; the run's page and its result do not.
 
+### Subprocesses Can Keep Capture Pipes Open After Their Launcher Exits
+
+The .NET subprocess runner establishes containment before the launched program starts. Windows attaches it to a job object at creation. Linux starts it as a process-group leader and waits to reap it until both output pipes close, keeping the group ID reserved until capture finishes. A timeout or output overflow terminates the job or process group even if the launcher already exited. On Linux, processes that explicitly leave the group are outside its reach.
+
 ### The VMs Repeat Part of the Runtime's Arithmetic, and Its Messages
 
 For speed, each VM does the arithmetic and comparisons of two int64s, or of two binary64s, in its dispatch loop, and leaves everything else, and every error, to `WebLingoOperators` (`WebLingo.Runtime`). A change to the semantics of those operators changes all three; `OperatorTests` (`WebLingo.VM.Tests`) runs every operator on pairs of edge values through both VMs and checks that each gives what `WebLingoOperators` gives. The messages of the errors the VMs raise themselves (calls, cells, budgets) are written in each VM; `StackVmTests` (`WebLingo.Conformance.Tests`) checks that both VMs give every conformance program the same output and the same errors, so a change to one VM's message is a change to the other's.
