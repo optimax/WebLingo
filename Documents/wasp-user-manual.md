@@ -44,10 +44,10 @@ lists what is missing.
 
 To serve a site you need `wasp`, WASP's command line, and the .NET 10 runtime it runs on. Until WASP has an installer,
 you build it from the repository, with the .NET 10 SDK: either run it directly, from the repository's root, the folder
-that holds `Examples` and `WebLingo`,
+that holds `Examples.wasp` and `WebLingo`,
 
 ```bash
-dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples/example1
+dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples.wasp/example1
 ```
 
 or publish it once, from the solution's folder, `WebLingo`, the one that holds `WebLingo.slnx`,
@@ -658,7 +658,7 @@ The standard module `std:db` reaches databases: `import { Database } from "std:d
 `using (var db = await Database.open("fish")) { … }`, its `await db.query(sql, { name: value })` the rows, an array
 of maps, `await db.execute(sql, values)` the number of rows changed, and `await db.transaction(async () => { … })`,
 which commits what its function does, or rolls it back where it throws. A site names its databases in its
-`wasp.config` ([section 14](#14-configuration-waspconfig)); `Examples/example2` is a fish store whose pages read and
+`wasp.config` ([section 14](#14-configuration-waspconfig)); `Examples.wasp/example2` is a fish store whose pages read and
 change one.
 
 ---
@@ -938,7 +938,7 @@ the requests to it. If WebLingo is installed elsewhere, change `processPath` to 
   after.
 - **Under IIS, a site runs in production** unless its `wasp.config` says otherwise.
 
-The repository's `Examples/example1` is such a site, and `Examples/README.md` walks through deploying it.
+The repository's `Examples.wasp/example1` is such a site, and `Examples.wasp/README.md` walks through deploying it.
 
 ---
 

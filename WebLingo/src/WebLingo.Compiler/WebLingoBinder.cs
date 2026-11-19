@@ -915,7 +915,7 @@ public sealed class WebLingoBinder
             var span = new WebLingoSourceSpan(declaration.Span.Start, 0);
             members.Insert(0, new WebLingoMethodSyntax("constructor", span, [], new WebLingoBlockSyntax([], span), span));
         }
-        var outerClass = _class;
+        var (outerClass, outerAccessor) = (_class, _accessor);
         var disposer = members.Find(member => member.Name is "dispose" or "destructor");
         foreach (var syntax in members)
         {
@@ -949,7 +949,7 @@ public sealed class WebLingoBinder
             _accessor = IsAccessor(method.Name) ? new Accessor(method.Name[4..], false, local, _scope) : null;
             var function = BindFunction(isConstructor ? declaration.Name : method.Name, method.Parameters, method.Body,
                 method.Span, isMethod: true, isAsync: method.IsAsync);
-            (_class, _accessor) = (outerClass, null);
+            (_class, _accessor) = (outerClass, outerAccessor);
             if (!AddMemberName(names, method.Name))
             {
                 Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{MemberName(method.Name)}' is already declared in this class.",
@@ -973,7 +973,7 @@ public sealed class WebLingoBinder
             _accessor = IsAccessor(method.Name) ? new Accessor(method.Name[4..], true, local, _scope) : null;
             var function = BindFunction(method.Name, method.Parameters, method.Body, method.Span, isStatic: true,
                 isAsync: method.IsAsync);
-            (_class, _accessor) = (outerClass, null);
+            (_class, _accessor) = (outerClass, outerAccessor);
             if (AddMemberName(staticNames, method.Name)) staticMethods.Add((method.Name, function));
             else Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{MemberName(method.Name)}' is already declared in this class.", method.NameSpan);
         }
@@ -1004,7 +1004,7 @@ public sealed class WebLingoBinder
         var names = new HashSet<string>(StringComparer.Ordinal);
         var staticMethods = new List<(string, WebLingoBoundFunction)>();
         var staticNames = new HashSet<string>(StringComparer.Ordinal);
-        var outerClass = _class;
+        var (outerClass, outerAccessor) = (_class, _accessor);
         WebLingoMethodSyntax? disposer = null;
         foreach (var member in extension.Methods)
         {
@@ -1029,7 +1029,7 @@ public sealed class WebLingoBinder
             var function = method.IsStatic
                 ? BindFunction(methodName, method.Parameters, method.Body, method.Span, isStatic: true, isAsync: method.IsAsync)
                 : BindFunction(methodName, method.Parameters, method.Body, method.Span, isMethod: true, isAsync: method.IsAsync);
-            (_class, _accessor) = (outerClass, null);
+            (_class, _accessor) = (outerClass, outerAccessor);
             if (!AddMemberName(method.IsStatic ? staticNames : names, methodName))
             {
                 Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{MemberName(methodName)}' is already declared in this extension.",

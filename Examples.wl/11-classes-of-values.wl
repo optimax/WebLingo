@@ -1,0 +1,57 @@
+// 11-classes-of-values.wl: every value has a class, and every class may be extended.
+//
+// Integers, strings and arrays have classes like any other: a program may give them methods with an extend block, or
+// extend them with classes of its own, whose instances hold such a value and are taken wherever one is. No class is
+// sealed, the standard modules' included.
+
+import { DateTime } from "std:datetime";
+
+// extend gives every value of a class new methods, from when it runs.
+extend Integer {
+  isEven() { return this % 2 == 0; }
+  times(f) { for (var i = 0; i < this; i++) f(i); }
+}
+writeLn([4.isEven(), 7.isEven()]);
+3.times(i => write($"{i} "));
+writeLn("");
+
+// A class extending Number holds a number, which arithmetic and comparisons use; a result keeps the class.
+class Fahrenheit extends Number {}
+class Celsius extends Number {
+  toFahrenheit() { return new Fahrenheit(this * 9 / 5 + 32); }
+}
+var today = new Celsius(21.5);
+var warmer = today + 3;
+writeLn([today, warmer, warmer is Celsius, warmer > today, today.toFahrenheit()]);
+
+// A class extending String holds a string: it has a string's methods, and a built-in takes it as a string.
+class Name extends String {
+  initials() { return "".join(this.split(" ").map(part => part[0])); }
+}
+var ann = new Name("Ann Marie Smith");
+writeLn([ann.initials(), ann.toUpper(), "Ann Marie Smith".startsWith(new Name("Ann")), ann.length]);
+
+// A class extending Array is an array, with methods of its own.
+class Stack extends Array {
+  top() { return this[this.length - 1]; }
+}
+var stack = new Stack();
+stack.push(1);
+stack.push(2);
+writeLn([stack, stack.top(), stack is Array, stack.length]);
+
+// A class extending DateTime holds a date, and new takes what DateTime.utc takes.
+class Deadline extends DateTime {
+  isPast(now) { return this < now; }
+}
+var due = new Deadline(2026, 12, 24);
+writeLn([due.year, due.isPast(DateTime.utc(2027, 1, 1)), due.addDays(7).day]);
+
+/* Output:
+[true, false]
+0 1 2 
+[Celsius:21.5, Celsius:24.5, true, true, Fahrenheit:70.7]
+["AMS", "ANN MARIE SMITH", true, 15]
+[Stack:[1, 2], 2, true, 2]
+[2026, true, 31]
+*/

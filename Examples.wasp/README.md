@@ -1,4 +1,6 @@
-# Examples
+# Examples of WASP's sites
+
+Scripts that show the language itself are in `../Examples.wl`.
 
 Each example is a site's own files, as a server runs them: its pages, its modules, its other files and its
 `web.config`, side by side, as a PHP site's are; example2's and example3's sites are their `site` folders, what makes
@@ -48,7 +50,7 @@ folder.
 
 ### Running it locally
 
-With the .NET 10 SDK, from the repository's root, the folder that holds `Examples` and `WebLingo`:
+With the .NET 10 SDK, from the repository's root, the folder that holds `Examples.wasp` and `WebLingo`:
 
 ```bash
 dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples/example1

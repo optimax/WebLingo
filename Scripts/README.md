@@ -22,7 +22,7 @@ as one of its administrators. Each may be run again: it keeps what is there, and
 
 ## Installing WebLingo
 
-With IIS turned on, and the ASP.NET Core Hosting Bundle for .NET 10 installed after it (`Examples/README.md`, example1,
+With IIS turned on, and the ASP.NET Core Hosting Bundle for .NET 10 installed after it (`Examples.wasp/README.md`, example1,
 "Deploying it to IIS"), publish WebLingo from the solution's folder, `WebLingo`:
 
 ```powershell

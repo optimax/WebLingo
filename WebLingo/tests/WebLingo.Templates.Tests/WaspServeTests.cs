@@ -62,12 +62,12 @@ public sealed class WaspServeTests : IDisposable
     [Fact]
     public async Task TheExampleApplicationServesItsPages()
     {
-        // Examples/example1, at the repository's root: the owner's example of a website built with WASP (M0.14.5), its
+        // Examples.wasp/example1, at the repository's root: the owner's example of a website built with WASP (M0.14.5), its
         // pages beside its web.config, as a PHP site's are.
         var folder = new DirectoryInfo(AppContext.BaseDirectory);
-        while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Examples", "example1", "web.config"))) folder = folder.Parent;
+        while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Examples.wasp", "example1", "web.config"))) folder = folder.Parent;
         Assert.NotNull(folder);
-        var server = WebLingoWaspServer.Create(Path.Combine(folder.FullName, "Examples", "example1"), 0,
+        var server = WebLingoWaspServer.Create(Path.Combine(folder.FullName, "Examples.wasp", "example1"), 0,
             new Dictionary<string, string>(), out var error, out _);
         Assert.True(server is not null, error);
         await server.StartAsync();
@@ -100,15 +100,15 @@ public sealed class WaspServeTests : IDisposable
     [Fact]
     public async Task TheFishStoreServesItsDatabase()
     {
-        // Examples/example2, the owner's example of a site with a database: copied, its database made by its setup.wl, as
+        // Examples.wasp/example2, the owner's example of a site with a database: copied, its database made by its setup.wl, as
         // its README says, outside the site's folder, then served (section 7.11).
         var folder = new DirectoryInfo(AppContext.BaseDirectory);
-        while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Examples", "example2", "site", "web.config"))) folder = folder.Parent;
+        while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Examples.wasp", "example2", "site", "web.config"))) folder = folder.Parent;
         Assert.NotNull(folder);
         var copy = Path.Combine(Path.GetTempPath(), "wasp-example2-" + Guid.NewGuid().ToString("N"));
-        foreach (var file in Directory.GetFiles(Path.Combine(folder.FullName, "Examples", "example2"), "*", SearchOption.AllDirectories))
+        foreach (var file in Directory.GetFiles(Path.Combine(folder.FullName, "Examples.wasp", "example2"), "*", SearchOption.AllDirectories))
         {
-            var relative = Path.GetRelativePath(Path.Combine(folder.FullName, "Examples", "example2"), file);
+            var relative = Path.GetRelativePath(Path.Combine(folder.FullName, "Examples.wasp", "example2"), file);
             if (relative.EndsWith(".db", StringComparison.Ordinal)) continue;
             Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(copy, relative))!);
             File.Copy(file, Path.Combine(copy, relative));
@@ -210,13 +210,13 @@ public sealed class WaspServeTests : IDisposable
     [SqlServerFact]
     public async Task TheToDoListServesItsSqlServerDatabase()
     {
-        // Examples/example3, the owner's example of a site on SQL Server: copied, its database made on the machine's by its
+        // Examples.wasp/example3, the owner's example of a site on SQL Server: copied, its database made on the machine's by its
         // setup.wl running its setup.sql, under a name of the test's own, which the copy's wasp.config names, then served,
         // its items added, changed, marked done and deleted (section 7.11). The database is dropped after it.
         var folder = new DirectoryInfo(AppContext.BaseDirectory);
-        while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Examples", "example3", "site", "web.config"))) folder = folder.Parent;
+        while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Examples.wasp", "example3", "site", "web.config"))) folder = folder.Parent;
         Assert.NotNull(folder);
-        var example = Path.Combine(folder.FullName, "Examples", "example3");
+        var example = Path.Combine(folder.FullName, "Examples.wasp", "example3");
         var copy = Path.Combine(Path.GetTempPath(), "wasp-example3-" + Guid.NewGuid().ToString("N"));
         foreach (var file in Directory.GetFiles(example, "*", SearchOption.AllDirectories))
         {

@@ -1,0 +1,22 @@
+// 23-network.wl: reaching other servers, with std:http and std:net.
+// Run: weblingo check 23-network.wl
+//
+// It reaches the internet, so that the tests only check it. Under weblingo a script may reach any host; a site under
+// wasp reaches only the hosts its wasp.config allows, any other a NetworkPermissionError.
+
+import http from "std:http";
+import { Socket } from "std:net";
+
+// A response is a map: its status, its headers, each name in lower case, and its body, as text and as bytes.
+var response = await http.get("https://example.com/");
+writeLn([response["status"], response["headers"]["content-type"], response["body"].contains("Example Domain")]);
+
+// A plain TCP connection, speaking HTTP by hand: what comes back is bytes.
+using (var socket = await Socket.connect("example.com", 80)) {
+  await socket.write("HEAD / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n");
+  writeLn((await socket.read()).text().startsWith("HTTP/1.1"));
+}
+
+// It writes, where the internet is reached:
+// [200, "text/html", true]
+// true

@@ -93,8 +93,8 @@ $RECYCLE.BIN/
 *.db-shm
 *.db-wal
 
-# The fish store example's database, which its setup.wl makes (Examples/README.md)
-Examples/example2/database/fish.db
+# The fish store example's database, which its setup.wl makes (Examples.wasp/README.md)
+Examples.wasp/example2/database/fish.db
 
 # Local configuration / secrets
 appsettings.Local.json

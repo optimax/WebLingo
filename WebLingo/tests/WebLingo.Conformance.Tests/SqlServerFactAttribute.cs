@@ -5,7 +5,7 @@ namespace WebLingo.Conformance.Tests;
 /// <summary>
 /// A test that needs a SQL Server, the default instance on the machine the tests run on, reached by TCP/IP on its port,
 /// 1433, and skipped where none answers there: on Linux, where there is none, and on a Windows machine without one, or
-/// with TCP/IP off, as SQL Server's installation leaves it (<c>Examples/README.md</c>, example3, says how to set one up).
+/// with TCP/IP off, as SQL Server's installation leaves it (<c>Examples.wasp/README.md</c>, example3, says how to set one up).
 /// <c>WebLingo.Templates.Tests</c> shares this file.
 /// </summary>
 public sealed class SqlServerFactAttribute : FactAttribute

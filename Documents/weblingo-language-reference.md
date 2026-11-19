@@ -11,6 +11,9 @@ in [What is not in the language yet](#17-what-is-not-in-the-language-yet). Pages
 WASP User Manual's (`Documents/wasp-user-manual.md`). Every built-in class's members, and the standard modules, are
 listed in the WebLingo Standard Library Reference (`Documents/weblingo-standard-library-reference.md`).
 
+The repository's `Examples.wl` folder holds scripts that show the language at work, each ending with what it writes,
+and its `does-not-compile` folder scripts that WebLingo refuses on purpose, with the errors it gives them.
+
 An example is a program, followed by what it writes:
 
 ```javascript
@@ -2189,6 +2192,8 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL3016 | a file a site's scripts may not reach |
 | WL3017 | a host a script's configuration does not let it reach |
 | WL3018 | a COM object a script's configuration does not let it make |
+| WL3019 | an environment variable a site's script, under `wasp`, tries to set |
+| WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run |
 | **WL4xxx** | **bytecode** |
 | WL4001 | bytecode that fails verification, such as a damaged `.wlbc` |
 | WL4002 | a program too large for the bytecode |
@@ -2208,4 +2213,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
+- **Mathematics**: no `sqrt`, `floor`, `round`, `abs`, `min`, `max` or power, and no integer division, `/` always
+  dividing exactly; a number becomes an integer only through a decimal, `new Integer(new Decimal(x))`, where it is
+  whole, or through its text, `Integer.parse($"{x:F0}")`.
 - **Library**: a database's rows read one at a time, for results too large to hold whole; databases other than SQLite and SQL Server.

@@ -1,0 +1,20 @@
+// lib/teas.wl: a module, which 16-modules.wl imports. Only what it exports is seen from outside.
+
+param currency = "$";             // a module's parameter, which an importer may give
+
+// A module runs once in a program for each set of values it is given.
+writeLn($"teas.wl runs, its prices in {currency.trim()}");
+
+export var served = 0;            // an importer reads it, but cannot assign it: it is this module's to change
+
+export class Tea {
+  constructor(name, price) { this.name = name; this.price = price; }
+  toString() { return $"{this.name} at {currency}{this.price:F2}"; }
+}
+
+export function serve(tea) {
+  served += 1;
+  return $"Serving {tea}";
+}
+
+var secret = "not exported";      // private to the module

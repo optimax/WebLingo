@@ -278,7 +278,7 @@ public sealed class WebServerFactAttribute : FactAttribute
     public static string Download(string server)
     {
         var folder = new DirectoryInfo(AppContext.BaseDirectory);
-        while (folder is not null && !Directory.Exists(Path.Combine(folder.FullName, "Examples"))) folder = folder.Parent;
+        while (folder is not null && !Directory.Exists(Path.Combine(folder.FullName, "Examples.wasp"))) folder = folder.Parent;
         var downloads = folder is null ? null : Path.Combine(folder.FullName, "WebServers", server);
         return downloads is not null && Directory.Exists(downloads) && Directory.GetFiles(downloads, "*.zip") is [var zip] ? zip : "";
     }

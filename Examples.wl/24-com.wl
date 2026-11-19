@@ -1,0 +1,29 @@
+// 24-com.wl: COM's objects, on Windows, with windows:com, as classic ASP's pages used them.
+// Windows only.
+//
+// A COM object such as WScript.Shell reaches the whole machine, beyond any of WebLingo's own limits, so that COM is
+// allowed only by the configuration beside the script: weblingo.config, in this folder, lists the objects its scripts
+// may make, here Scripting.Dictionary alone. Any other is a ComPermissionError.
+
+import com from "windows:com";
+
+using (var dictionary = com.create("Scripting.Dictionary")) {
+  dictionary.Add("green", "sencha");
+  dictionary.Add("black", "assam");
+  writeLn([dictionary.Count, dictionary.Item("green"), dictionary["black"], dictionary.Exists("white")]);
+  var keys = [];
+  foreach (var key in dictionary) keys.push(key);
+  writeLn(keys.sort());
+}
+
+try {
+  com.create("WScript.Shell");
+} catch (ComPermissionError e) {
+  writeLn([e.code, e.message]);
+}
+
+/* Output:
+[2, "sencha", "assam", false]
+["black", "green"]
+["WL3018", "'WScript.Shell' is not a COM object this application may make: its configuration's \"com\" does not allow it."]
+*/

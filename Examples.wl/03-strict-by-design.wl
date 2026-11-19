@@ -1,0 +1,55 @@
+// 03-strict-by-design.wl: what WebLingo refuses to guess, on purpose.
+//
+// Much of what goes wrong in scripts comes from a language guessing: "1" + 1 becoming "11", an empty string being false,
+// an integer wrapping around, a typo reading undefined. WebLingo guesses none of it. Each mistake below is a runtime error,
+// an exception of a class of its own, which a program may catch; uncaught, it stops the script and names its line.
+
+function attempt(what, action) {
+  try {
+    var result = action();
+    writeLn($"{what,-28} {(result ?? "null")}");
+  } catch (e) {
+    writeLn($"{what,-28} {e.__instanceOf.__className} {e.code}: {e.message}");
+  }
+}
+
+attempt("\"1\" + 1", () => "1" + 1);                            // nothing converts implicitly
+attempt("if (1)", () => if (1) "yes" else "no");               // a condition must be a Boolean
+attempt("!\"\"", () => !"");                                    // no truthiness: "" is not false
+attempt("largest integer + 1", () => 9223372036854775807 + 1); // integers never silently overflow
+attempt("7 % 0", () => 7 % 0);                                  // an integer's remainder by 0
+attempt("[1, 2][2]", () => [1, 2][2]);                          // an index out of range
+attempt("{ a: 1 }[\"b\"]", () => { return { a: 1 }["b"]; });    // a missing key
+attempt("\"tea\".colour", () => "tea".colour);                  // a missing member: an error, never undefined
+attempt("1.5 as a key", () => { var m = {}; m[1.5] = 1; return m; }); // a binary64 key: 1 and 1.0, or NaN, raise no question
+attempt("\"10\" < 9", () => "10" < 9);                          // ordering a string and a number
+
+// What is allowed, and what to write instead:
+attempt("\"1\" + 1.toString()", () => "1" + 1.toString());
+attempt("Integer.parse(\"1\") + 1", () => Integer.parse("1") + 1);
+attempt("7 / 0", () => 7 / 0);                                  // / gives a number, as IEEE 754 says
+attempt("[1, 2]?[2]", () => [1, 2]?[2]);                        // ?[ asks for null where the entry is absent
+attempt("\"tea\"?.colour", () => "tea"?.colour);                // ?. asks for null where the member is absent
+
+// Two collections are equal only when they are the same one: == never compares contents behind your back.
+var a = [1, 2];
+writeLn([a == [1, 2], a == a]);
+
+/* Output:
+"1" + 1                      TypeError WL3001: '+' joins two strings or adds two numbers, not a string and the integer 1.
+if (1)                       TypeError WL3001: A condition needs a Boolean, not the integer 1.
+!""                          TypeError WL3001: '!' needs a Boolean, not a string.
+largest integer + 1          OverflowError WL3002: 9223372036854775807 + 1 does not fit in a 64-bit integer.
+7 % 0                        DivisionByZeroError WL3013: 7 % 0 divides by zero.
+[1, 2][2]                    IndexError WL3005: The index 2 is outside 0 to 1.
+{ a: 1 }["b"]                KeyError WL3007: The map has no key "b".
+"tea".colour                 MemberError WL3006: A string has no member 'colour'.
+1.5 as a key                 TypeError WL3001: The number 1.5 cannot be a key: keys are strings, integers, Booleans and null.
+"10" < 9                     TypeError WL3001: '<' compares two numbers, two decimals, two strings or two dates, not a string and the integer 9.
+"1" + 1.toString()           11
+Integer.parse("1") + 1       2
+7 / 0                        Infinity
+[1, 2]?[2]                   null
+"tea"?.colour                null
+[false, true]
+*/
