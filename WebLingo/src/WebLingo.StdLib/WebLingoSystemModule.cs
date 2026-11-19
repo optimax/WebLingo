@@ -6,7 +6,8 @@ namespace WebLingo.StdLib;
 /// the runtime in the <c>std</c> scheme's folder as <c>system.dll</c>, which another implementation may replace: its
 /// exports, <c>write</c> and <c>writeLn</c>, writing to the execution's output, and <c>delay</c>, which a host gives as its
 /// built-ins, and a program has only by importing them, <c>import { writeLn, delay } from "std:system";</c> (the owner's
-/// decision, 18 November 2026).
+/// decision, 18 November 2026); and, beside writing, reading the console, <c>readLine</c>, <c>readLineSync</c>,
+/// <c>prompt</c> and <c>readPassword</c> (the owner's answers, 19 November 2026, "Console Input").
 /// </summary>
 public sealed class WebLingoSystemModule : IWebLingoNativeModule
 {
@@ -15,5 +16,9 @@ public sealed class WebLingoSystemModule : IWebLingoNativeModule
         registry.TextFunction("write", 1, new WebLingoWriteFunction().TryInvoke);
         registry.TextFunction("writeLn", 1, new WebLingoWriteLnFunction().TryInvoke);
         registry.Function("delay", 1, new WebLingoDelayFunction().TryInvoke);
+        registry.Function("readLine", 0, new WebLingoReadLineFunction(false).TryInvoke);
+        registry.Function("readLineSync", 0, new WebLingoReadLineFunction(true).TryInvoke);
+        registry.Function("prompt", 1, new WebLingoPromptFunction().TryInvoke);
+        registry.Function("readPassword", 0, new WebLingoReadPasswordFunction().TryInvoke);
     }
 }

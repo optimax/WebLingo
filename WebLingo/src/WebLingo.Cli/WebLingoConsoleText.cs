@@ -22,6 +22,9 @@ public static class WebLingoConsoleText
         var error = Console.IsErrorRedirected ? Utf8(Console.OpenStandardError()) : Console.Error;
         Console.SetOut(output);
         Console.SetError(error);
+        // Input, as output: UTF-8 from a file or a pipe, and Unicode from a console, through .NET's ReadConsoleW.
+        if (Console.IsInputRedirected) Console.SetIn(new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false)));
+        else Console.InputEncoding = Encoding.Unicode;
         return (Console.Out, Console.Error);
     }
 

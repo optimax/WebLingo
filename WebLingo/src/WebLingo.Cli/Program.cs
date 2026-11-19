@@ -1,3 +1,4 @@
+using WebLingo.Platform.DotNet;
 namespace WebLingo.Cli;
 
 internal static class Program
@@ -10,7 +11,9 @@ internal static class Program
     {
         // Text written as UTF-8, to a file, a pipe or a console alike (WebLingoConsoleText).
         var (output, error) = WebLingoConsoleText.Open();
-        var exit = WebLingoCommandThread.Run(() => WebLingoCommandLine.Run(args, output, error));
+        // Its scripts read the console's input, typed or piped (WebLingoConsoleText reads it as UTF-8, or as Unicode).
+        var input = new DotNetConsoleInput(Console.In, interactive: !Console.IsInputRedirected);
+        var exit = WebLingoCommandThread.Run(() => WebLingoCommandLine.Run(args, output, error, input));
         // In a window of its own, a script double-clicked, what it wrote stays until a key is pressed (WebLingoConsoleWindow).
         WebLingoConsoleWindow.WaitWhereItsOwn(output);
         return exit;

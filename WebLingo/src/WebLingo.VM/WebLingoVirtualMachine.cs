@@ -83,6 +83,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         heap.Allowed = context.Allowed;
         heap.Crypto = context.Crypto;
         heap.Environment = context.Environment;
+        heap.ConsoleInput = context.ConsoleInput;
         heap.WallClock = context.WallClock;
         heap.TimeZone = context.TimeZone;
         heap.SchedulerHost = context.SchedulerHost;

@@ -38,8 +38,9 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 
 ## 1. Built-in functions
 
-`write`, `writeLn` and `delay` are `std:system`'s, which every program imports implicitly, so that they are in its scope
-without an import; an import of them, `import { write, writeLn, delay } from "std:system";`, is allowed, and means the
+`write`, `writeLn`, `delay` and the console's reading, `readLine`, `readLineSync`, `prompt` and `readPassword`, are
+`std:system`'s, which every program imports implicitly, so that they are in its scope without an import; an import of
+them, `import { write, writeLn, delay } from "std:system";`, is allowed, and means the
 same. Nothing of another standard module is in a program that does not import it: the classes of the kinds of values no
 literal makes are their modules', `Bytes` and `BytesBuilder` `std:bytes`'s, `DateTime` `std:datetime`'s, `Regex`
 `std:regex`'s, `Json` `std:json`'s and `Html` `std:html`'s, imported to name them, `import { DateTime } from
@@ -50,6 +51,10 @@ literal makes are their modules', `Bytes` and `BytesBuilder` `std:bytes`'s, `Dat
 | `write(value)` | writes a value's text, without a line break |
 | `writeLn(value)` | writes a value's text and a line break |
 | `delay(milliseconds)` | a task that completes, with `null`, after that time |
+| `readLine()` | a task of the console's next line, without its line break, `null` at the end of the input |
+| `readLineSync()` | the same, at once, its worker waiting for the line |
+| `prompt(text)` | writes the text, as `write` does, then a task of the next line, as `readLine()` |
+| `readPassword()` | a task of the next line, not shown as it is typed where the input is a console's |
 
 ```javascript
 import { write, writeLn, delay } from "std:system";
@@ -68,6 +73,26 @@ ten milliseconds later
 
 `write` writes where its host says: the console under `weblingo`, the response's body in a page, where it is not
 escaped; a page's text and its `<%= %>` write without an import. A value's text is what its `toString()` gives.
+
+The console's reading reads a script's standard input under `weblingo`, typed, or piped from a file or another
+program, `type data.txt | weblingo filter.wl`, UTF-8; a site's pages and handlers, under `wasp`, have no console, and
+each read is an `IOError`, WL3011, saying so. Given the lines `Ann`, `green tea` and `black tea`, piped:
+
+```javascript
+var name = await prompt("Your name: ");
+writeLn($"Hello, {name}!");
+var line = await readLine();
+while (line != null) {
+  writeLn(line.toUpper());
+  line = await readLine();
+}
+```
+
+```text
+Your name: Hello, Ann!
+GREEN TEA
+BLACK TEA
+```
 
 ---
 

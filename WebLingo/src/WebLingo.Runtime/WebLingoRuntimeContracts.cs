@@ -90,6 +90,12 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     public WebLingo.Platform.Abstractions.IWebLingoEnvironment? Environment { get; init; }
 
     /// <summary>
+    /// The console's input, which <c>std:system</c>'s <c>readLine</c> and the others read through the heap
+    /// (<see cref="WebLingoHeap.ConsoleInput"/>); none for a site's, their reads then an <c>IOError</c>.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoConsoleInput? ConsoleInput { get; init; }
+
+    /// <summary>
     /// The host's side of the execution's scheduler, on which work runs off the worker, its outcome posted back to it
     /// (section 7.8, WL-P007); without one, nothing asynchronous but the execution's own tasks and timers runs.
     /// </summary>

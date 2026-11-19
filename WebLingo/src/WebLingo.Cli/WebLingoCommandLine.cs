@@ -51,7 +51,16 @@ public static class WebLingoCommandLine
 
     public static int Run(string[] args, TextWriter output, TextWriter error) => Run(Scripts, args, output, error);
 
-    public static int Run(WebLingoCommandLineProgram program, string[] args, TextWriter output, TextWriter error)
+    /// <summary>
+    /// <c>weblingo</c> with a console's input, which its scripts read, <c>readLine</c> and the others (the owner's answers,
+    /// 19 November 2026, "Console Input"): its program gives the console's, a test any other; without one, a read is an
+    /// <c>IOError</c>, as a site's is.
+    /// </summary>
+    public static int Run(string[] args, TextWriter output, TextWriter error, IWebLingoConsoleInput? input) =>
+        Run(Scripts, args, output, error, input);
+
+    public static int Run(WebLingoCommandLineProgram program, string[] args, TextWriter output, TextWriter error,
+        IWebLingoConsoleInput? input = null)
     {
         // A file named first is run, weblingo script.wl name=Ann as weblingo run script.wl name=Ann (the owner's answer,
         // 18 November 2026, "Minimal WebLingo Installer: Linux", Q1).
@@ -113,14 +122,14 @@ public static class WebLingoCommandLine
                     {
                         var none = new Dictionary<string, string>();
                         return args[0] == "compile" ? CompileFile(program, path, vm ?? WebLingoBytecodeKind.Register, schemes, error)
-                            : bytecode ? RunBytecode(program, false, path, none, schemes, output, error)
-                            : RunFile(program, false, path, none, schemes, output, error);
+                            : bytecode ? RunBytecode(program, false, path, none, schemes, output, error, input)
+                            : RunFile(program, false, path, none, schemes, output, error, input);
                     }
                 }
                 else if (TryParameters(args, at + 1, out var parameters, out var value))
                 {
-                    return bytecode ? RunBytecode(program, true, path, parameters, schemes, output, error)
-                        : RunFile(program, true, path, parameters, schemes, output, error);
+                    return bytecode ? RunBytecode(program, true, path, parameters, schemes, output, error, input)
+                        : RunFile(program, true, path, parameters, schemes, output, error, input);
                 }
                 else
                 {
@@ -184,11 +193,11 @@ public static class WebLingoCommandLine
     }
 
     private static int RunFile(WebLingoCommandLineProgram program, bool run, string path, IReadOnlyDictionary<string, string> parameters,
-        IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error)
+        IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error, IWebLingoConsoleInput? input)
     {
         if (!TryReadText(path, error, out var source)) return FileUnreadable;
         var text = new WebLingoSourceText(source, path);
-        if (TryHost(program, path, path, givenSchemes, output, error) is not { } host) return FileUnreadable;
+        if (TryHost(program, path, path, givenSchemes, output, error, input) is not { } host) return FileUnreadable;
         var compilation = program.Compile(text, host.Options);
         var compiled = compilation.Result;
         foreach (var diagnostic in compiled.Diagnostics) error.WriteLine(Format(TextOf(diagnostic), diagnostic));
@@ -230,7 +239,7 @@ public static class WebLingoCommandLine
     {
         if (!TryReadText(path, error, out var source)) return FileUnreadable;
         var text = new WebLingoSourceText(source, path);
-        if (TryHost(program, path, path, givenSchemes, TextWriter.Null, error) is not { } host) return FileUnreadable;
+        if (TryHost(program, path, path, givenSchemes, TextWriter.Null, error, null) is not { } host) return FileUnreadable;
         IReadOnlyList<WebLingoDiagnostic> diagnostics;
         WebLingoCompiledModule? register = null;
         WebLingoStackModule? stack = null;
@@ -287,7 +296,7 @@ public static class WebLingoCommandLine
     /// the VM it is for, a runtime error located from the file's source positions.
     /// </summary>
     private static int RunBytecode(WebLingoCommandLineProgram program, bool run, string path, IReadOnlyDictionary<string, string> parameters,
-        IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error)
+        IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error, IWebLingoConsoleInput? input)
     {
         if (!TryRead(path, error, out var bytes, out var register, out var stack, out var positions)) return Failed(bytes);
         var main = register?.Name ?? stack!.Name;
@@ -301,7 +310,7 @@ public static class WebLingoCommandLine
         foreach (var table in positions) located.Add(table with { Source = table.Source is { } source ? FromHere(source) : null });
         if (!run) return Success;
 
-        if (TryHost(program, path, mainName, givenSchemes, output, error) is not { } host) return FileUnreadable;
+        if (TryHost(program, path, mainName, givenSchemes, output, error, input) is not { } host) return FileUnreadable;
         // The native modules it names, which its compiler had loaded, so that their built-ins are the host's (section 3.9).
         foreach (var unit in register?.Units ?? stack!.Units)
         {
@@ -406,7 +415,7 @@ public static class WebLingoCommandLine
     /// <summary>What a command line gives the programs it compiles and runs: its built-ins, its native modules and its files.</summary>
     private sealed record Host(WebLingoBuiltinRegistry Services, WebLingoNativeModuleLoader Native, WebLingoCompilerOptions Options,
         FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoNetwork Network, IWebLingoDatabases Databases, IWebLingoFileSystem Files,
-        IReadOnlyDictionary<string, IReadOnlyList<string>> Allowed, IWebLingoEnvironment Environment);
+        IReadOnlyDictionary<string, IReadOnlyList<string>> Allowed, IWebLingoEnvironment Environment, IWebLingoConsoleInput? ConsoleInput);
 
     /// <summary>
     /// The host for the file <paramref name="path"/>, whose program's own file is named <paramref name="mainName"/>: its
@@ -414,7 +423,7 @@ public static class WebLingoCommandLine
     /// null, the reason written, if they cannot be had.
     /// </summary>
     private static Host? TryHost(WebLingoCommandLineProgram program, string path, string mainName, IReadOnlyDictionary<string, string> givenSchemes,
-        TextWriter output, TextWriter error)
+        TextWriter output, TextWriter error, IWebLingoConsoleInput? input)
     {
         if (!WebLingoSchemes.TryLoad(path, program.Configuration, givenSchemes, out var schemes, out var allowedHosts, out var databases,
             out var folders, out var allowed, out var env, out var wrongConfiguration))
@@ -449,7 +458,8 @@ public static class WebLingoCommandLine
             textOutput, new DotNetNetwork(program.ReachesAnyHost ? null : allowedHosts), new DotNetDatabases(databases, folder) { Files = files },
             new DotNetFileSystem(files), allowed,
             // All of the machine's environment for a script's, what its configuration's "env" allows for a page's (section 7.15).
-            program.ReachesAllEnvironment ? new DotNetEnvironment() : new DotNetEnvironment(env.MachineName, env.Variables, env.Platform));
+            program.ReachesAllEnvironment ? new DotNetEnvironment() : new DotNetEnvironment(env.MachineName, env.Variables, env.Platform),
+            input);
     }
 
     private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters, Func<string?, int, int> lines) =>
@@ -467,6 +477,7 @@ public static class WebLingoCommandLine
             Allowed = host.Allowed,
             Crypto = new DotNetCrypto(),
             Environment = host.Environment,
+            ConsoleInput = host.ConsoleInput,
             Databases = host.Databases,
             SchedulerHost = new DotNetSchedulerHost()
         };

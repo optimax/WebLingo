@@ -802,6 +802,9 @@ With `Integrated Security`, the site reaches the database as the account it runs
 reaches over a network should have one its clients trust instead. WebLingo reaches SQL Server by TCP/IP, which the
 server must have enabled, as SQL Server's Developer and Express editions do not when they are installed.
 
+A site's pages and handlers have no console to read: `std:system`'s `readLine` and the others, which a script that
+`weblingo` runs reads its input with, are an `IOError` in a page; a page reads what its request brings.
+
 A site reads the machine's environment, through `std:env`, only as its `"env"` allows: the machine's name with
 `"machineName": true`, its processor's architecture, the running `wasp`'s and the operating system,
 `Environment.architecture`, `processArchitecture` and `os`, with `"platform": true`, and the environment variables

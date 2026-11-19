@@ -2019,15 +2019,19 @@ program.wl(1,1): error WL2001: 'Writeln' is not defined; did you mean writeLn?
 
 ### `std:system`
 
-Writing, and waiting. Every program imports it implicitly, so that `write`, `writeLn` and `delay` are in its scope
-without an import; an import of them, `import { write, writeLn, delay } from "std:system";`, is allowed, and means the
-same.
+Writing, reading the console, and waiting. Every program imports it implicitly, so that `write`, `writeLn`, `delay`,
+`readLine`, `readLineSync`, `prompt` and `readPassword` are in its scope without an import; an import of them,
+`import { write, writeLn, delay } from "std:system";`, is allowed, and means the same.
 
 | Function | What it does |
 |---|---|
 | `write(value)` | writes a value's text, without a line break |
 | `writeLn(value)` | writes a value's text and a line break |
 | `delay(milliseconds)` | a task that completes after that time |
+| `readLine()` | a task of the console's next line, without its line break, `null` at the end of the input |
+| `readLineSync()` | the same, at once, its worker waiting for the line |
+| `prompt(text)` | writes the text, as `write` does, then a task of the next line, as `readLine()` |
+| `readPassword()` | a task of the next line, not shown as it is typed where the input is a console's |
 
 `write` writes where its host says: the console under `weblingo`, a response's body in a page. A page's text and its
 `<%= %>` write without an import; a block of a page that calls `write` imports it, as any script does.

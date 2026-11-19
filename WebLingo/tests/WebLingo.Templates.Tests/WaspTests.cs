@@ -330,6 +330,17 @@ public sealed class WaspTests : IDisposable
     }
 
     [Fact]
+    public void APageHasNoConsoleToRead()
+    {
+        // std:system's readLine and the others, an IOError where a site's script calls them (the owner's answers,
+        // 19 November 2026, "Console Input"): a site has no user typing at a console.
+        var page = "<% try { readLineSync(); } catch (IOError e) { write(e.code + \" \" + e.message); } %>";
+        Assert.Equal((WebLingoCommandLine.Success,
+            "WL3011 'readLineSync' reads a console, and this application has none: a site's pages and handlers have no user typing at one.", ""),
+            Wasp("run", page));
+    }
+
+    [Fact]
     public void AnUndefinedNameInAPageSuggestsTheImportItNeeds()
     {
         // As in a script (section 3.9): a standard module's export, with the module to import it from.

@@ -33,7 +33,9 @@ public sealed class WebLingoWriteLnFunction(IWebLingoTextOutput? output = null) 
 public static class WebLingoStandardBuiltins
 {
     public static IWebLingoBuiltinFunction[] Create(IWebLingoTextOutput output) =>
-        [new WebLingoWriteFunction(output), new WebLingoWriteLnFunction(output), new WebLingoDelayFunction()];
+        [new WebLingoWriteFunction(output), new WebLingoWriteLnFunction(output), new WebLingoDelayFunction(),
+         new WebLingoReadLineFunction(false), new WebLingoReadLineFunction(true), new WebLingoPromptFunction(output),
+         new WebLingoReadPasswordFunction()];
 
     /// <summary>Text to <paramref name="output"/>, or, given none, to the execution's; an error if it has none.</summary>
     internal static bool TryWrite(IWebLingoTextOutput? output, string text, WebLingoHeap heap, out WebLingoValue result,

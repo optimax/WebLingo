@@ -100,6 +100,9 @@ public sealed class WebLingoHeap
     /// <summary>The machine's environment (<see cref="WebLingoExecutionContext.Environment"/>), for <c>std:env</c>'s members (section 7.15).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoEnvironment? Environment { get; set; }
 
+    /// <summary>The console's input (<see cref="WebLingoExecutionContext.ConsoleInput"/>), for <c>std:system</c>'s <c>readLine</c> and the others.</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoConsoleInput? ConsoleInput { get; set; }
+
     /// <summary>The class values of the native classes whose modules make their instances, each its class's (section 3.10).</summary>
     private Dictionary<object, WebLingoValue>? _nativeClassValues;
 
