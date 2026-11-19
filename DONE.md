@@ -4211,3 +4211,11 @@ A launcher can exit while a descendant still holds an output pipe open. When `st
 Add a regression test with a short-lived launcher and a descendant that inherits an output pipe. Verify that the caller receives `TimeoutError` on timeout or `IOError` on output overflow, and that the descendant terminates in both cases.
 
 2026-11-19 (Codex): Fixed in `1877066`. Windows starts the launcher inside a job object. Linux uses a process group and retains its group ID until capture finishes. Regressions verify TimeoutError and IOError and confirm that the descendant exits after the launcher has exited. The Windows Release build and full suite passed on the task branch and main (4,233 passed, six skipped, zero build warnings). The CLI examples ran as source and stack bytecode, and WASP returned its subprocess error. Linux was not run locally.
+
+## [DONE] Migrate WebLingo's old Windows `.wl` file association
+
+On accounts that registered WebLingo for `.wl`, running `Scripts/add-wlg-file-type.wlg` registers `.wlg` but leaves Explorer offering WebLingo for the old extension. Remove WebLingo's legacy entries, including its `OpenWithProgids` and `SupportedTypes` entries, while preserving other applications' registrations and the user's explicit default-app choice.
+
+Verify an upgrade with both WebLingo and another application's entries already present for `.wl`. Check that `.wlg` opens with WebLingo when selected, that the other application's entries survive, and that running the migration twice produces the same result.
+
+2026-11-19 (Codex): Fixed in `e7028b2`. The migration removes WebLingo's legacy ProgID and supported-type entries, including the unnamed default when it still points to WebLingo. Generic extension metadata and the explicit Windows default choice are preserved. Windows checks on the task branch and main included `weblingo check`, a Release build with zero warnings, and the full suite (4,233 passed, six skipped). In a temporary registry subtree, two runs produced identical contents with either WebLingo or another app's existing ProgID. Windows resolved the new open command by extension and by application, and it ran a .wlg script. The live Explorer defaults were untouched. The migration is Windows-only.
