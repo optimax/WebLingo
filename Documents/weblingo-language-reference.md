@@ -931,29 +931,32 @@ null
 
 ### Checking argument types
 
-Functions and methods take untyped parameters. The compiler can check the number of arguments to a call it can
-resolve. A built-in method or a standard module checks argument values at runtime and reports the method name,
-the argument it expected, and what it received.
+Functions and methods have no parameter type annotations. The compiler can check the number of arguments to a call
+it can resolve. Built-in methods and standard-module functions check argument types at runtime. For example,
+`" tea ".trim(1)` raises a `TypeError` that names `trim`, explains that it expects a string of characters to trim,
+and identifies the integer it received.
 
 In your own function or method, use `is` to check a value and throw a `TypeError` with a message about the
 argument. This check runs when the call reaches the function.
 
 ```javascript
-
 function double(count) {
     if (!(count is Integer)) {
-        throw new TypeError($"The argument of 'double' must be an integer. Received {count.__instanceOf.__className}.");
+        var received = count == null ? "null" : (count.__instanceOf?.__className ?? "an unnamed class");
+        throw new TypeError($"The argument of 'double' must be an integer. Received {received}.");
     }
     return count * 2;
 }
 
 writeLn(double(3));
 try { double("3"); } catch (TypeError error) { writeLn(error.message); }
+try { double(null); } catch (TypeError error) { writeLn(error.message); }
 ```
 
 ```text
 6
 The argument of 'double' must be an integer. Received String.
+The argument of 'double' must be an integer. Received null.
 ```
 
 ### Rest parameters
