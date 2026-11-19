@@ -1578,6 +1578,11 @@ public sealed class WebLingoHeap
     private static long SizeOf(object item) => ObjectOverhead + item switch
     {
         string text => text.Length,
+        // What each was charged when it was made, so that the collector gives it all back (until 18 November 2026, only
+        // the overhead of bytes, decimals and regular expressions was).
+        byte[] data => (data.Length + 7) / 8,
+        DecimalObject => 2,
+        RegexObject regex => regex.Pattern.Length + regex.Flags.Length,
         Closure closure => closure.Cells.Length,
         ArrayObject array => array.Elements.Count + (array.Instance?.Count ?? 0),
         MapObject map => map.Count + (map.Instance?.Count ?? 0),

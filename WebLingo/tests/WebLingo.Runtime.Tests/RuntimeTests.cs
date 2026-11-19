@@ -111,6 +111,24 @@ public sealed class HeapTests
     }
 
     [Fact]
+    public void BytesDecimalsAndRegularExpressionsGiveBackTheirUnitsWhenCollected()
+    {
+        // Until 18 November 2026 the collector gave back only an object's overhead for these, not what they were charged
+        // for their content, so that an execution making many of them, kept or not, ran out of its budget.
+        var heap = new WebLingoHeap(maxUnits: 10_000);
+        var roots = new WebLingoValue[1];
+        heap.AddRoots(roots);
+        for (var i = 0; i < 10_000; i++)
+        {
+            Assert.True(heap.TryAllocateBytes(new byte[800], out roots[0], out var error), error?.Message);
+            Assert.True(heap.TryAllocateDecimal(i, out roots[0], out error), error?.Message);
+            Assert.True(heap.TryAllocateRegex("a+b+c+d+e+f+g+h+i+j+k+l+m+n+o+p", "i", out roots[0], out error), error?.Message);
+        }
+        Assert.True(heap.CollectionCount > 0);
+        Assert.InRange(heap.Units, 0, 10_000);
+    }
+
+    [Fact]
     public void AClosureKeepsItsCellsAndTheirValuesAlive()
     {
         var heap = new WebLingoHeap();
