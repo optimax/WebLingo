@@ -4103,3 +4103,9 @@ This is an example of an error being reported:
         ERROR WL2006 (ArgumentError): 'two' takes 2 arguments, not 1.
 
 2026-11-19 (Codex). In `b283c2d`, `weblingo` and `wasp` report uppercase ERROR on standard error, in bold on supporting terminals, with the diagnostic code and the WebLingo exception class where available. Redirected text uses uppercase without terminal escapes. Windows Release builds passed with zero warnings or errors on the task branch and main. The complete suite passed 4,198 tests with six skipped on both. CLI and WASP samples and Windows pseudoterminal output were checked on main. Linux was not tested locally.
+
+## [DONE] Regex Timeout
+
+The Language Reference says: A pattern that takes more than a second to match, as some do on some text, stops with a `TimeoutError`.  Make it configurable via a command line flag, something like `--timeout 300`, the time being given in milliseconds.
+
+2026-11-19 (Codex). In `8771532`, `weblingo run --timeout <ms>` and `wasp run --timeout <ms>` set the regex match limit before the file argument. The setting reaches scripts and both bytecode VMs. The default is one second. Windows Release built cleanly and the full suite passed 4,204 tests with six skipped on the task branch and main. The CLI and WASP samples verified the default and overrides. Linux was not tested locally.
