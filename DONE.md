@@ -3703,3 +3703,13 @@ A1: (b). Also print this as the first line when weblingo is invoked without para
 2026-11-18 (Claude): done, and landed: one version for the solution, set in `Directory.Build.props`, every assembly's, `0.20.0-pre-alpha`, M0.20 having landed whole; `weblingo --version` prints `WebLingo 0.20.0-pre-alpha` and `wasp --version` `WASP 0.20.0-pre-alpha`, and each prints it first when run without arguments (asked of `weblingo`; `wasp` shares its code). `Documents/implementation.md` now says the task that lands a milestone raises the version.
 
 Done (Claude, 2026-11-18, `149391b`). Main's checks: the Release build, without warnings; the full suite, 3,951 tests, none failed or aborted; and the CLI, `weblingo` on the samples, and both `--version`s. Tried on Windows only; Linux not tried.
+
+## [DONE] Language Reference: Surprises
+
+An explicit goal of WebLingo (WL) is that itis a "language with no surprises." State that goal at the beginning of th eLanguage Reference.
+
+Analyze WL syntax and try to discover anything that would or could be potentially surprising , or unintuitive to a programmer coming from another language. Create a new section of the Language Reference "Comparison with Other Languages". Document any gotchas with examples in that section, identifying the other language.
+
+Cover at the very least the following languages: JavaScript, Python, PHP, Perl, C#, Java.
+
+Done (Codex, 2026-11-19, `c98446d`). The Release build on main had zero warnings and errors. The Windows suite passed 4,151 tests, with six integration tests skipped. Seventeen comparison examples passed on both VMs. Linux was not tried.
