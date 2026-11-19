@@ -26,7 +26,7 @@ Buiid an extension for VS Code to debug WebLingo.
 
 **Q1. Should the first VS Code debugger launch local `.wlg` scripts on the register VM with breakpoints, stepping, a call stack and local variables, with WASP, the stack VM and attaching to running processes left for follow-up tasks?**
 
-## Unnecessary Imports in Language Ref
+## [WORKING] Unnecessary Imports in Language Ref
 
 The Language Reference is full of examples where this line is present:
 
