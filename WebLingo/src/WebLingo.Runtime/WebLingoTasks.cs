@@ -306,7 +306,15 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
     /// a host without a scheduler of its own (<see cref="WebLingoHeap.SchedulerHost"/>).
     /// </summary>
     public bool TryRunOffWorker<T>(Func<T> work, WebLingoOffWorkerFinish<T> finish, Func<Exception, WebLingoRuntimeError?> failed,
-        out WebLingoValue task, out WebLingoRuntimeError? error)
+        out WebLingoValue task, out WebLingoRuntimeError? error) =>
+        TryRunOffWorker(work, finish, failed, WebLingoValue.Null, out task, out error);
+
+    /// <summary>
+    /// Runs blocking work off the worker, as the other overload does, the collector keeping <paramref name="keep"/>, a
+    /// value of the heap <paramref name="finish"/> uses, such as the instance an operation opens, until the work finishes.
+    /// </summary>
+    public bool TryRunOffWorker<T>(Func<T> work, WebLingoOffWorkerFinish<T> finish, Func<Exception, WebLingoRuntimeError?> failed,
+        WebLingoValue keep, out WebLingoValue task, out WebLingoRuntimeError? error)
     {
         task = WebLingoValue.Null;
         if (heap.SchedulerHost is not { } host)
@@ -317,6 +325,8 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         if (!heap.TryAllocateTask(out var made, out error)) return false;
         task = made;
         _operations.Add(made);
+        var kept = keep.Kind != WebLingoValueKind.Null;
+        if (kept) _operations.Add(keep);
         host.RunBlocking(() =>
         {
             T value;
@@ -326,17 +336,26 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
             }
             catch (Exception exception) when (failed(exception) is { } wrong)
             {
-                host.Post(() => Finished(made, wrong));
+                host.Post(() =>
+                {
+                    if (kept) _operations.Remove(keep);
+                    Finished(made, wrong);
+                });
                 return;
             }
             catch (Exception exception) when (exception is not OutOfMemoryException)
             {
                 var unexpected = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"The operation failed: {exception.Message}");
-                host.Post(() => Finished(made, unexpected));
+                host.Post(() =>
+                {
+                    if (kept) _operations.Remove(keep);
+                    Finished(made, unexpected);
+                });
                 return;
             }
             host.Post(() =>
             {
+                if (kept) _operations.Remove(keep);
                 if (finish(value, heap, out var result, out var finishError)) Finished(made, null, result);
                 else Finished(made, finishError);
             });

@@ -123,7 +123,10 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
         var file = registry.Class("File");
         foreach (var (name, sync) in new[] { ("open", false), ("openSync", true) })
         {
-            file.DeclareFactory(name, 3, 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+            // A file made, new File(), then opened, f.open(path, mode), which gives it; and File.open(path, mode), shorthand
+            // for both, making an instance of the class it is called on (section 3.7, "No sealed classes").
+            file.DeclareFactory(name, 3, 1, name, async: !sync);
+            file.DeclareMethod(name, 3, 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
                 Open(file, sync, name, a, heap, out result, out error));
         }
         foreach (var (name, sync) in new[] { ("read", false), ("readSync", true) })
@@ -132,7 +135,7 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
             file.DeclareMethod(name, 1, 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
             {
                 result = WebLingoValue.Null;
-                if (!file.TryGetHostObject<OpenFile>(a[0], heap, out var open, out error)) return false;
+                if (!file.TryGetHostObject<OpenFile>(a[0], heap, NotOpen, out var open, out error)) return false;
                 if (!open.Bytes)
                 {
                     if (a[1].Kind == WebLingoValueKind.Null) return Run(sync, heap, "read", open.Path, () => open.File.ReadLine(), Line, out result, out error);
@@ -156,7 +159,7 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
             file.DeclareMethod(name, 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
             {
                 result = WebLingoValue.Null;
-                if (!file.TryGetHostObject<OpenFile>(a[0], heap, out var open, out error)) return false;
+                if (!file.TryGetHostObject<OpenFile>(a[0], heap, NotOpen, out var open, out error)) return false;
                 if (open.Bytes)
                 {
                     if (!TryBytes(new(name, 0, 1, "the bytes", "bytes, for a file opened for its bytes"), a, 1, heap, out var bytes, out error)) return false;
@@ -229,7 +232,11 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
     /// result completes. A file system's failure is an <c>IOError</c> naming the path as the script gave it.
     /// </summary>
     private static bool Run<T>(bool sync, WebLingoHeap heap, string doing, string path, Func<T> work, WebLingoOffWorkerFinish<T> finish,
-        out WebLingoValue result, out WebLingoRuntimeError? error)
+        out WebLingoValue result, out WebLingoRuntimeError? error) => Run(sync, heap, doing, path, work, finish, out result, out error, WebLingoValue.Null);
+
+    /// <summary>Runs the work as the other overload does, the collector keeping <paramref name="keep"/> until it finishes.</summary>
+    private static bool Run<T>(bool sync, WebLingoHeap heap, string doing, string path, Func<T> work, WebLingoOffWorkerFinish<T> finish,
+        out WebLingoValue result, out WebLingoRuntimeError? error, WebLingoValue keep)
     {
         result = WebLingoValue.Null;
         if (!sync)
@@ -240,7 +247,7 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
                 return false;
             }
             return scheduler.TryRunOffWorker(work, finish, exception => exception is WebLingoFileSystemException failure ? Failed(doing, path, failure) : null,
-                out result, out error);
+                keep, out result, out error);
         }
         T value;
         try
@@ -255,12 +262,19 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
         return finish(value, heap, out result, out error);
     }
 
-    /// <summary><c>File.open(path, mode)</c>: an instance of the class it was called on, holding the file, opened.</summary>
+    /// <summary>What a file made but not yet opened says to a method that needs it open.</summary>
+    private const string NotOpen = "This File is not open: open it first, await f.open(path, mode).";
+
+    /// <summary>
+    /// <c>f.open(path, mode)</c>: the file, made but not yet opened, opened, given the file as its host object, and given,
+    /// at once, or as a task (section 3.7, "No sealed classes").
+    /// </summary>
     private static bool Open(WebLingoNativeClass file, bool sync, string m, ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap,
         out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
-        var classValue = a[0];
+        var instance = a[0];
+        if (!file.TryCheckUnopened<OpenFile>(instance, heap, out error)) return false;
         if (!TryFileSystem(heap, out var fs, out error) || !TryPath(new(m, 0, 3, "the path", "a string"), a, 1, heap, out var path, out error)
             || !TryString(new(m, 1, 3, "the mode", "a mode, a string"), a, 2, heap, out var modeName, out error)
             || !TryEncoding(new(m, 2, 3, "the encoding", Encoding), a, 3, heap, out var encoding, out error))
@@ -290,10 +304,15 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
         return Run(sync, heap, mode is WebLingoFileMode.Read or WebLingoFileMode.ReadBytes ? "read" : "written", path, () => fs.Open(path, mode, encoding),
             (IWebLingoFile opened, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? wrong) =>
             {
-                if (file.TryMake(classValue, h, out made, out wrong) && file.TrySetHostObject(made, new OpenFile(opened, path, bytes), h, out wrong)) return true;
+                // Opened by another call meanwhile, or disposed: that one stands, and this file is closed.
+                made = instance;
+                if (file.TryCheckUnopened<OpenFile>(instance, h, out wrong) && file.TrySetHostObject(instance, new OpenFile(opened, path, bytes), h, out wrong))
+                {
+                    return true;
+                }
                 opened.Dispose();
                 return false;
-            }, out result, out error);
+            }, out result, out error, instance);
     }
 
     /// <summary>

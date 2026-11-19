@@ -552,6 +552,7 @@ public sealed class WebLingoHeap
         var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
         var before = Size(target);
         target.StaticMethods.Remove(name);
+        target.ClassMethods?.Remove(name);
         target.StaticFields.TryAdd(name, value);
         return TryGrow(target, before, out error);
     }
@@ -561,12 +562,16 @@ public sealed class WebLingoHeap
     /// name: a class's declaration of a static method, an <c>extend</c>'s, and <c>setStaticProperty</c>'s getter and
     /// setter, alike (section 3.7).
     /// </summary>
-    public bool TrySetStaticMethod(WebLingoValue classValue, string name, WebLingoValue method, out WebLingoRuntimeError? error)
+    public bool TrySetStaticMethod(WebLingoValue classValue, string name, WebLingoValue method, out WebLingoRuntimeError? error,
+        bool takesClass = false)
     {
         var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
         var before = Size(target);
         if (target.StaticFields.Remove(name)) target.Constants?.Remove(name);
         target.StaticMethods[name] = method;
+        // A static method taking the class it is called on, a function with a receiver (section 3.7, "No sealed classes").
+        if (takesClass) (target.ClassMethods ??= new HashSet<string>(StringComparer.Ordinal)).Add(name);
+        else target.ClassMethods?.Remove(name);
         return TryGrow(target, before, out error);
     }
 
@@ -916,12 +921,24 @@ public sealed class WebLingoHeap
     }
 
     /// <summary>A class's static member, its own, or its base's if it has none of that name (section 3.7).</summary>
-    public bool TryGetStatic(WebLingoValue classValue, string name, out WebLingoValue value)
+    public bool TryGetStatic(WebLingoValue classValue, string name, out WebLingoValue value) => TryGetStatic(classValue, name, out value, out _);
+
+    /// <summary>
+    /// A class's static member, as the other overload finds it, and whether it is a method taking the class it is called
+    /// on, which its reader binds to that class (section 3.7, "No sealed classes").
+    /// </summary>
+    public bool TryGetStatic(WebLingoValue classValue, string name, out WebLingoValue value, out bool takesClass)
     {
+        takesClass = false;
         for (var current = classValue; current.Kind == WebLingoValueKind.Class;)
         {
             var target = Get<ClassObject>(current, WebLingoValueKind.Class);
-            if (target.StaticFields.TryGetValue(name, out value) || target.StaticMethods.TryGetValue(name, out value)) return true;
+            if (target.StaticFields.TryGetValue(name, out value)) return true;
+            if (target.StaticMethods.TryGetValue(name, out value))
+            {
+                takesClass = target.ClassMethods?.Contains(name) == true;
+                return true;
+            }
             current = target.Base;
         }
         value = WebLingoValue.Null;
@@ -1850,6 +1867,11 @@ public sealed class WebLingoHeap
         public WebLingoValue IndexGetter { get; set; }
         public WebLingoValue IndexSetter { get; set; }
         public Dictionary<string, WebLingoValue> StaticMethods { get; init; } = new(StringComparer.Ordinal);
+        /// <summary>
+        /// The names of its static methods that take the class they are called on as their receiver, a native class's
+        /// factories (section 3.7, "No sealed classes"), or null for none.
+        /// </summary>
+        public HashSet<string>? ClassMethods { get; set; }
         public Dictionary<string, WebLingoValue> StaticFields { get; init; } = new(StringComparer.Ordinal);
     }
 

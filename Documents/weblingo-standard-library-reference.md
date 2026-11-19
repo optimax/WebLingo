@@ -617,6 +617,7 @@ synchronous form whose name ends in `Sync`: `readText` and `readTextSync`.
 | `file.read(count)` | a file opened for its bytes: its next bytes, as many as `count`, at most 16 MiB, fewer at its end, or `null` there |
 | `file.write(value)` | writes text to a file opened for its text, or bytes to one opened for its bytes |
 | `file.dispose()` | closes it, as `using` does |
+| `new File()`, `file.open(path, mode, encoding)` | a file made, not yet open, then opened, a task giving the file, `openSync` at once; opened once, and not after its disposal; `File.open(…)` and `File.openSync(…)` are shorthand for both, making an instance of the class they are called on |
 
 Text is UTF-8 unless an encoding is named, as .NET names them: `utf-16`, `utf-16be`, `utf-32`, `us-ascii`,
 `iso-8859-1`. A relative path is from the program's current folder. A file or a folder that cannot be read, written
@@ -678,6 +679,29 @@ await fs.remove("copy.bin");
 Bytes:[137, 80, 78, 71]
 Bytes:[0, 255]
 'missing.bin' cannot be copied to 'copy.bin': there is no such file or folder.
+```
+
+A class may extend `File`, `Socket` or `Database`, its own constructor synchronous, and never blocking on I/O, its
+instances made, then opened; their class's factory, called on it, makes its instance, its constructor given no arguments:
+
+```javascript
+import { writeLn } from "std:system";
+import fs from "std:fs";
+class LogFile extends fs.File {
+  constructor(prefix = "[log]") { super(); this.prefix = prefix; }
+  log(line) { this.writeSync($"{this.prefix} {line}\n"); }
+}
+var log = new LogFile("[app]");
+await log.open("app.log", "w");
+log.log("started");
+log.dispose();
+var again = await LogFile.open("app.log", "r");
+writeLn([again is LogFile, again.prefix, again.readSync()]);
+again.dispose();
+```
+
+```text
+[true, "[log]", "[app] started"]
 ```
 
 ---
@@ -744,6 +768,7 @@ TCP connections to other servers, through the native class `Socket`. Each operat
 | `socket.read()` | the bytes that have come, at least one and at most 64 KB, waiting for them, or `null` once the other end has closed |
 | `socket.write(data)` | sends `data`, a string, as UTF-8, or bytes |
 | `socket.dispose()` | closes it, as `using` does |
+| `new Socket()`, `socket.connect(host, port)` | a socket made, not yet connected, then connected, a task giving the socket; `Socket.connect(…)` is shorthand for both, making an instance of the class it is called on |
 
 A host the script may not reach is a `NetworkPermissionError`, WL3017, as for `std:http`; a host that cannot be reached, and a connection that fails, are a `NetworkError`, WL3014. Given the server above:
 
@@ -781,6 +806,7 @@ Databases, through the platform's: one module for every database, the SQL passed
 | `db.begin(options)`, `db.commit()`, `db.rollback()` | a transaction's steps, each a task; a connection's transactions do not nest |
 | `db.provider`, `db.serverVersion` | the database's kind, `"sqlite"` or `"sqlserver"`, and its version |
 | `db.dispose()` | closes it, as `using` does, rolling back a transaction still open |
+| `new Database(name)`, `db.open()` | a database made, its name kept, not yet open, then opened, a task giving the database; `Database.open(name)` is shorthand for both, making an instance of the class it is called on |
 
 A configuration names a script's or a site's databases, `weblingo.config` beside a script and a site's `wasp.config`, `{ "databases": { "fish": "sqlite:../database/fish.db" } }`, a relative path there being from the configuration's folder, and a script opens one by its name, `Database.open("fish")`, or by a connection string of its own, a relative path then from the current folder. SQLite's connection string is a file's path, the file made when it is not there, `:memory:`, a database in memory, or SQLite's own, which holds an `=`, `"sqlite:Data Source=fish.db;Mode=ReadOnly"`. SQL Server's is SqlClient's own, `"sqlserver:Server=localhost;Database=Todo;Integrated Security=true;TrustServerCertificate=true"`, `TrustServerCertificate` accepting the certificate a server made for itself when it was installed; it reaches SQL Server through SqlClient's managed network layer, on Windows as elsewhere, by TCP/IP, which the server must have enabled, as SQL Server's Developer and Express editions do not when they are installed, and never by its shared memory.
 

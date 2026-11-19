@@ -166,6 +166,48 @@ public sealed class FileSystemTests : IDisposable
 
     [Theory]
     [MemberData(nameof(Vms))]
+    public void AFileIsMadeThenOpened(string vm)
+    {
+        // Made, new File(), then opened, f.open(path, mode); File.open(path, mode) shorthand for both, making an instance of the
+        // class it is called on, its constructor run; a file opened once, and not after its disposal (the owner's answer, 18
+        // November 2026; section 3.7, "No sealed classes").
+        var (output, error) = Run(vm, """
+            import { write } from "std:system";
+            class LogFile extends fs.File {
+                constructor(prefix = "[log]") { super(); this.prefix = prefix; }
+                log(line) { this.writeSync($"{this.prefix} {line}\n"); }
+            }
+            var log = new LogFile("[app]");
+            write([log is fs.File, log is LogFile]);
+            write(await log.open(folder + "/app.log", "w") == log);
+            log.log("started");
+            log.dispose();
+            var again = await LogFile.open(folder + "/app.log", "a");
+            write([again is LogFile, again.prefix]);
+            again.log("more");
+            again.dispose();
+            var sync = LogFile.openSync(folder + "/app.log", "r");
+            write([sync.readSync(), sync.readSync(), sync.readSync()]);
+            sync.dispose();
+            var plain = fs.File.openSync(folder + "/app.log", "r");
+            write([plain is fs.File, plain is LogFile]);
+            plain.dispose();
+            var f = new fs.File();
+            function t(g) { try { g(); } catch (e) { write("|" + e.message); } }
+            t(() => f.readSync());
+            f.openSync(folder + "/app.log", "r");
+            t(() => f.openSync(folder + "/app.log", "r"));
+            f.dispose();
+            t(() => f.openSync(folder + "/app.log", "r"));
+            """);
+        Assert.Equal(("[true, true]true[true, \"[log]\"][\"[app] started\", \"[log] more\", null][true, false]"
+                      + "|This File is not open: open it first, await f.open(path, mode)."
+                      + "|This File is open already: it is opened once."
+                      + "|This File has been disposed, and cannot be opened again.", ""), (output, error));
+    }
+
+    [Theory]
+    [MemberData(nameof(Vms))]
     public void AFileIsOpenedToAppendBytes(string vm)
     {
         // "ab" writes bytes after a file's own, and makes a file that is not there (the owner's request, 18 November 2026).

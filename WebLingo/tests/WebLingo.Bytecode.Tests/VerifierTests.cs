@@ -55,8 +55,10 @@ public sealed class VerifierTests
     }
 
     [Fact]
-    public void AStaticMethodIsAFunctionWithoutThis()
+    public void AStaticMethodIsAFunction()
     {
+        // Without 'this', or taking the class it is called on, as a native class's factory does (section 3.7, "No sealed
+        // classes").
         var method = new WebLingoFunction("m", 1, 1, [I(WebLingoOpCode.Return)]) { HasThis = true, ParameterCount = 1 };
         var function = new WebLingoFunction("f", 0, 0, [I(WebLingoOpCode.Return)]);
         var module = Module(registers: 0, locals: 0, I(WebLingoOpCode.Return)) with
@@ -65,10 +67,14 @@ public sealed class VerifierTests
             Classes = [new WebLingoClassInfo("A", -1, []) { StaticMethods = [new WebLingoClassMethod("s", 1)], StaticFields = ["n"] }]
         };
         Assert.Equal(WebLingoVerificationResult.Valid, Verify(module));
-        AssertRejected(module with
+        Assert.Equal(WebLingoVerificationResult.Valid, Verify(module with
         {
             Classes = [new WebLingoClassInfo("A", -1, []) { StaticMethods = [new WebLingoClassMethod("s", 0)] }]
-        }, -1, "not a function without 'this'");
+        }));
+        AssertRejected(module with
+        {
+            Classes = [new WebLingoClassInfo("A", -1, []) { StaticMethods = [new WebLingoClassMethod("s", 2)] }]
+        }, -1, "is not a function.");
         AssertRejected(module with
         {
             Classes = [new WebLingoClassInfo("A", -1, []) { StaticMethods = [new WebLingoClassMethod("n", 1)], StaticFields = ["n"] }]

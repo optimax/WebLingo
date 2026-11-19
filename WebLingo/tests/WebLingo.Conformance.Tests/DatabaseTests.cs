@@ -17,6 +17,41 @@ public sealed class DatabaseTests : IDisposable
         "await db.execute(\"CREATE TABLE Fish (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, Price DECIMAL(10,2), Marine BOOLEAN, Added DATETIME, Photo BLOB, Length REAL)\"); " +
         "await db.execute(\"INSERT INTO Fish (Name, Price, Marine, Length) VALUES ('Neon tetra', 2.50, 0, 3.5), ('Clownfish', 24.99, 1, 8.0)\"); ";
 
+    [Fact]
+    public void ADatabaseIsMadeThenOpened()
+    {
+        // Made, new Database(name), then opened, db.open(); Database.open(name) shorthand for both, making an instance of
+        // the class it is called on (the owner's answer, 18 November 2026; section 3.7, "No sealed classes").
+        var (exit, output, error) = Weblingo(Setup + """
+            class Shop extends Database {
+                constructor() { super("shop"); }
+                async count() { return (await this.query("SELECT COUNT(*) AS n FROM Fish"))[0]["n"]; }
+            }
+            var shop = new Shop();
+            try { await shop.query("SELECT 1"); } catch (e) { writeLn(e.message); }
+            writeLn(await shop.open() == shop);
+            writeLn([await shop.count(), shop is Database, shop is Shop]);
+            try { await shop.open(); } catch (e) { writeLn(e.message); }
+            shop.dispose();
+            try { await shop.open(); } catch (e) { writeLn(e.message); }
+            class Named extends Database {}
+            var named = await Named.open("shop");
+            writeLn([named is Named, named is Database, db is Named]);
+            named.dispose();
+            try { new Database(); } catch (e) { writeLn(e.code); }
+            """);
+        Assert.Equal((WebLingoCommandLine.Success, """
+            This Database is not open: open it first, await db.open().
+            true
+            [2, true, true]
+            This Database is open already: it is opened once.
+            This Database has been disposed, and cannot be opened again.
+            [true, true, false]
+            WL2006
+
+            """.ReplaceLineEndings("\n"), ""), (exit, output, error));
+    }
+
     public DatabaseTests()
     {
         Directory.CreateDirectory(Path.Combine(_folder, "scripts"));
@@ -83,7 +118,7 @@ public sealed class DatabaseTests : IDisposable
     [InlineData("try { await db.begin({ isolation: \"loose\" }); } catch (e) { writeLn([e.code, e.message]); }",
         "[\"WL3001\", \"The argument of 'begin' must give \\\"isolation\\\" one of \\\"readUncommitted\\\", \\\"readCommitted\\\", \\\"repeatableRead\\\", \\\"serializable\\\", \\\"snapshot\\\", not a string.\"]")]
     [InlineData("try { await Database.open(5); } catch (e) { writeLn([e.code, e.message]); }",
-        "[\"WL3001\", \"The argument of 'open' must be the configuration's name for a database, or a connection string, \\\"sqlite:C:/data/shop.db\\\", not the integer 5.\"]")]
+        "[\"WL3001\", \"The argument of 'Database' must be the configuration's name for a database, or a connection string, \\\"sqlite:C:/data/shop.db\\\", not the integer 5.\"]")]
     [InlineData("try { await Database.open(\"nowhere\"); } catch (e) { writeLn([e.code, e.message]); }",
         "[\"WL3001\", \"'nowhere' is not a database the configuration names.\"]")]
     [InlineData("try { await Database.open(\"postgres:x\"); } catch (e) { writeLn(e.message); }",

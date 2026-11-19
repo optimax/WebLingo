@@ -60,6 +60,22 @@ public sealed class NetworkTests : IDisposable
         Assert.Equal((WebLingoCommandLine.Success, "[true, true, true]\n", ""), (exit, output, error));
     }
 
+    [Fact]
+    public void ASocketIsMadeThenConnected()
+    {
+        // Made, new Socket(), then connected, s.connect(host, port); Socket.connect(host, port) shorthand for both, making an
+        // instance of the class it is called on (the owner's answer, 18 November 2026; section 3.7, "No sealed classes").
+        var source = "import { write, writeLn } from \"std:system\"; import { Socket } from \"std:net\"; "
+                     + "class Client extends Socket { async ask(path) { await this.write($\"GET {path} HTTP/1.1\\r\\nHost: t\\r\\nConnection: close\\r\\n\\r\\n\"); "
+                     + "var all = \"\"; var piece = await this.read(); while (piece != null) { all += piece.text(); piece = await this.read(); } return all; } } "
+                     + "var s = new Socket(); try { await s.read(); } catch (e) { writeLn(e.message); } writeLn(await s.connect(\"127.0.0.1\", PORT) == s); "
+                     + "try { await s.connect(\"127.0.0.1\", PORT); } catch (e) { writeLn(e.message); } s.dispose(); "
+                     + "var c = await Client.connect(\"127.0.0.1\", PORT); writeLn([c is Client, c is Socket, (await c.ask(\"/echo\")).startsWith(\"HTTP/1.1 200\")]); c.dispose();";
+        var (exit, output, error) = Weblingo(source.Replace("PORT", Port.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal));
+        Assert.Equal((WebLingoCommandLine.Success, "This Socket is not connected: connect it first, await s.connect(host, port).\n"
+                     + "true\nThis Socket is open already: it is opened once.\n[true, true, true]\n", ""), (exit, output, error));
+    }
+
     [Theory]
     [InlineData("import { writeLn } from \"std:system\"; import http from \"std:http\"; try { await http.get(\"http://127.0.0.1:CLOSED/\"); } catch (NetworkError e) { writeLn(e.code); }", "WL3014")]
     [InlineData("import { writeLn } from \"std:system\"; import { Socket } from \"std:net\"; try { await Socket.connect(\"127.0.0.1\", CLOSED); } catch (NetworkError e) { writeLn(e.code); }", "WL3014")]
@@ -70,7 +86,7 @@ public sealed class NetworkTests : IDisposable
         "[\"WL3001\", \"The second argument of 'get', the headers, must be a map of names to strings, { \\\"Accept\\\": \\\"text/plain\\\" }, not an array.\"]")]
     [InlineData("import { write, writeLn } from \"std:system\"; import http from \"std:http\"; try { http.post(\"http://x/\", 5); } catch (e) { writeLn([e.code, e.message]); }",
         "[\"WL3001\", \"The second argument of 'post', the body, must be a string or bytes, not the integer 5.\"]")]
-    [InlineData("import { write, writeLn } from \"std:system\"; import { Socket } from \"std:net\"; try { Socket.connect(\"127.0.0.1\", 70000); } catch (e) { writeLn([e.code, e.message]); }",
+    [InlineData("import { write, writeLn } from \"std:system\"; import { Socket } from \"std:net\"; try { await Socket.connect(\"127.0.0.1\", 70000); } catch (e) { writeLn([e.code, e.message]); }",
         "[\"WL3001\", \"The second argument of 'connect', the port, must be an integer from 1 to 65535, not the integer 70000.\"]")]
     public void FailuresAreErrors(string source, string printed)
     {

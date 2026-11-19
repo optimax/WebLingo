@@ -267,9 +267,13 @@ public static partial class WebLingoMembers
         }
         if (target.Kind == WebLingoValueKind.Class)
         {
-            // A static member, the class's own or its base's (section 3.7).
+            // A static member, the class's own or its base's (section 3.7); one taking the class it is called on, a native
+            // class's factory, bound to this class, so that a class extending it makes its own instances.
             error = null;
-            if (heap.TryGetStatic(target, name, out result)) return true;
+            if (heap.TryGetStatic(target, name, out result, out var takesClass))
+            {
+                return !takesClass || heap.TryAllocateBoundMethod(target, result, out result, out error);
+            }
             if (heap.TryGetStatic(target, "get:" + name, out result) && result.Kind == WebLingoValueKind.Function)
             {
                 // A static property's getter, which the VM calls (section 3.7).

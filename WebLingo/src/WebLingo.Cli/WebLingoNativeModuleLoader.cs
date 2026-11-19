@@ -221,7 +221,11 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
             foreach (var method in nativeClass.Methods) methods.Add(Export(method.Name, members[next++]) with { Optional = method.Optional });
             foreach (var method in nativeClass.StaticMethods)
             {
-                statics.Add(Export(method.Name, members[next++]) with { Optional = method.Optional, Factory = method.Factory });
+                statics.Add(Export(method.Name, members[next++]) with
+                {
+                    Optional = method.Optional, Factory = method.Factory, FactoryMethod = method.FactoryMethod, FactoryAsync = method.FactoryAsync,
+                    FactoryToConstructor = method.FactoryToConstructor
+                });
             }
             foreach (var property in nativeClass.Properties)
             {

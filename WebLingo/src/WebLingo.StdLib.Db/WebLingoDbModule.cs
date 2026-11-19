@@ -41,25 +41,43 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
     public void Register(IWebLingoNativeRegistry registry)
     {
         var database = registry.Class("Database");
-        database.DeclareFactory("open", 1, 0, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        // A database made, new Database(name), its name kept, then opened, db.open(), which gives it; and Database.open(name),
+        // shorthand for both, making an instance of the class it is called on (section 3.7, "No sealed classes").
+        database.DeclareConstructor(1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         {
             result = WebLingoValue.Null;
-            var classValue = a[0];
             if (a[1].Kind != WebLingoValueKind.String || heap.GetString(a[1]).Length == 0)
             {
-                error = new WebLingoArgument("open", 0, 1, "the database",
+                error = new WebLingoArgument("Database", 0, 1, "the database",
                     "the configuration's name for a database, or a connection string, \"sqlite:C:/data/shop.db\"").Wrong(a[1], heap);
                 return false;
             }
-            if (!TryServices(heap, out var databases, out var scheduler, out error)) return false;
-            var named = heap.GetString(a[1]);
-            return scheduler.TryRunOffWorker(() => databases.Open(named),
+            return database.TrySetHostObject(a[0], new DatabaseName(heap.GetString(a[1])), heap, out error);
+        });
+        database.DeclareFactory("open", 1, 0, "open", async: true, toConstructor: true);
+        database.DeclareMethod("open", 0, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        {
+            result = WebLingoValue.Null;
+            var instance = a[0];
+            if (!database.TryCheckUnopened<IWebLingoDatabaseConnection>(instance, heap, out error)
+                || !database.TryGetHostObject<DatabaseName>(instance, heap, out var name, out error)
+                || !TryServices(heap, out var databases, out var scheduler, out error))
+            {
+                return false;
+            }
+            return scheduler.TryRunOffWorker(() => databases.Open(name.Name),
                 (IWebLingoDatabaseConnection connection, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? wrong) =>
                 {
-                    if (database.TryMake(classValue, h, out made, out wrong) && database.TrySetHostObject(made, connection, h, out wrong)) return true;
+                    // Opened by another call meanwhile, or disposed: that one stands, and this connection is closed.
+                    made = instance;
+                    if (database.TryCheckUnopened<IWebLingoDatabaseConnection>(instance, h, out wrong)
+                        && database.TrySetHostObject(instance, connection, h, out wrong))
+                    {
+                        return true;
+                    }
                     connection.Dispose();
                     return false;
-                }, Failed, out result, out error);
+                }, Failed, instance, out result, out error);
         });
         database.DeclareMethod("query", 3, 2, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         {
@@ -87,7 +105,7 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
         database.DeclareMethod("begin", 1, 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         {
             result = WebLingoValue.Null;
-            if (!database.TryGetHostObject<IWebLingoDatabaseConnection>(a[0], heap, out var connection, out error)
+            if (!database.TryGetHostObject<IWebLingoDatabaseConnection>(a[0], heap, NotOpen, out var connection, out error)
                 || !TryServices(heap, out _, out var scheduler, out error) || !TryOptions(new("begin", 0, 1, "the options", "a map, { isolation: … }"), a[1], "begin", heap, out _, out var isolation, out error))
             {
                 return false;
@@ -103,7 +121,7 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
             database.DeclareMethod(name, 0, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
             {
                 result = WebLingoValue.Null;
-                if (!database.TryGetHostObject<IWebLingoDatabaseConnection>(a[0], heap, out var connection, out error)
+                if (!database.TryGetHostObject<IWebLingoDatabaseConnection>(a[0], heap, NotOpen, out var connection, out error)
                     || !TryServices(heap, out _, out var scheduler, out error))
                 {
                     return false;
@@ -127,13 +145,13 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
         database.DeclareProperty("provider", (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         {
             result = WebLingoValue.Null;
-            return database.TryGetHostObject<IWebLingoDatabaseConnection>(a[0], heap, out var connection, out error)
+            return database.TryGetHostObject<IWebLingoDatabaseConnection>(a[0], heap, NotOpen, out var connection, out error)
                    && heap.TryAllocateString(connection.Provider, out result, out error);
         });
         database.DeclareProperty("serverVersion", (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         {
             result = WebLingoValue.Null;
-            return database.TryGetHostObject<IWebLingoDatabaseConnection>(a[0], heap, out var connection, out error)
+            return database.TryGetHostObject<IWebLingoDatabaseConnection>(a[0], heap, NotOpen, out var connection, out error)
                    && heap.TryAllocateString(connection.ServerVersion, out result, out error);
         });
         database.DeclareWebLingoMethods(TransactionSource);
@@ -145,7 +163,7 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
         out WebLingoScheduler scheduler, out WebLingoRuntimeError? error)
     {
         (connection, sql, values, timeout, scheduler) = (null!, "", [], null, null!);
-        if (!database.TryGetHostObject<IWebLingoDatabaseConnection>(a[0], heap, out var open, out error)) return false;
+        if (!database.TryGetHostObject<IWebLingoDatabaseConnection>(a[0], heap, NotOpen, out var open, out error)) return false;
         connection = open;
         if (a[1].Kind != WebLingoValueKind.String)
         {
@@ -348,4 +366,10 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
     }
 
     private static WebLingoRuntimeError Wrong(string message) => new(WebLingoDiagnosticCodes.InvalidOperation, message);
+
+    /// <summary>What a database made but not yet opened says to a method that needs it open.</summary>
+    private const string NotOpen = "This Database is not open: open it first, await db.open().";
+
+    /// <summary>A database's name, or its connection string, which <c>new Database(name)</c> keeps until it is opened.</summary>
+    private sealed record DatabaseName(string Name);
 }

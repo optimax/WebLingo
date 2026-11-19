@@ -7,7 +7,8 @@ internal static class WebLingoClassTables
     /// <summary>
     /// The first fault of the classes, or null: each has a name, its methods have names, none twice, and its
     /// constructor and methods are functions that take <c>this</c>; its static fields and methods have names, none
-    /// twice among them, and its static methods are functions that do not. <paramref name="kind"/> tells what a
+    /// twice among them, and its static methods are functions, which may take the class they are called on as their
+    /// receiver, as a native class's factories do (section 3.7, "No sealed classes"). <paramref name="kind"/> tells what a
     /// function is: 1 a method, 0 another function, -1 none.
     /// </summary>
     public static string? Check(IReadOnlyList<WebLingoClassInfo>? classes, Func<int, int> kind)
@@ -46,9 +47,9 @@ internal static class WebLingoClassTables
                 {
                     return $"Class {i} ('{info.Name}'): a static method has no name, or one it shares.";
                 }
-                if (kind(method.Function) != 0)
+                if (kind(method.Function) == -1)
                 {
-                    return $"Class {i} ('{info.Name}'): static '{method.Name}', function {method.Function}, is not a function without 'this'.";
+                    return $"Class {i} ('{info.Name}'): static '{method.Name}', function {method.Function}, is not a function.";
                 }
             }
         }

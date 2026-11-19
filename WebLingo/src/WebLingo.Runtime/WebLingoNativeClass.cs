@@ -9,10 +9,21 @@ public sealed record WebLingoNativeMember(string Name, int Arity, WebLingoNative
     public int Optional { get; init; }
 
     /// <summary>
-    /// For a static method, whether it is a factory, given its class first, with which it makes the class's instances
-    /// (<see cref="WebLingoNativeClass.TryMake"/>), as <c>File.open(path, mode)</c> does.
+    /// For a static method, whether it is a factory, shorthand for making an instance of the class it is called on and
+    /// opening it with one of the instance's methods, <see cref="FactoryMethod"/>, as <c>File.open(path, mode)</c> makes
+    /// <c>new this()</c> and awaits its <c>open(path, mode)</c> (section 3.7, "No sealed classes"). The compiler writes it
+    /// in WebLingo, its function never called.
     /// </summary>
     public bool Factory { get; init; }
+
+    /// <summary>A factory's instance method, which opens the instance it makes, <c>open</c>.</summary>
+    public string? FactoryMethod { get; init; }
+
+    /// <summary>Whether a factory's method gives a task, which the factory awaits, the factory then asynchronous too.</summary>
+    public bool FactoryAsync { get; init; }
+
+    /// <summary>Whether a factory's arguments go to <c>new</c>, as <c>Database.open(name)</c>'s do, rather than to its method.</summary>
+    public bool FactoryToConstructor { get; init; }
 }
 
 /// <summary>
@@ -176,17 +187,32 @@ public sealed class WebLingoNativeClass(string name)
     }
 
     /// <summary>
-    /// A factory, a static method given its class first, then its arguments, the last <paramref name="optional"/> of which
-    /// a call may leave out, which makes the class's instances with <see cref="TryMake"/>, opened, connected or read, as a
-    /// constructor cannot, being synchronous: <c>File.open(path, mode)</c>, a task giving the file.
+    /// A factory, shorthand for both steps of making an instance, created, then opened (the owner's answer, 18 November
+    /// 2026; section 3.7, "No sealed classes"): <c>File.open(path, mode)</c> makes <c>new this()</c>, the class it is
+    /// called on, so that a class extending this one gets its own instance, and awaits its <paramref name="method"/>,
+    /// <c>open(path, mode)</c>, given the factory's arguments, the last <paramref name="optional"/> of which a call may
+    /// leave out, or gives them to <c>new</c> instead, <paramref name="toConstructor"/>, as <c>Database.open(name)</c>
+    /// does; asynchronous, a task giving the instance, where the method is, <paramref name="async"/>. The compiler writes
+    /// it in WebLingo.
     /// </summary>
-    public WebLingoNativeClass DeclareFactory(string name, int arity, int optional, WebLingoNativeFunction factory)
+    public WebLingoNativeClass DeclareFactory(string name, int arity, int optional, string method, bool async, bool toConstructor = false)
     {
         if (CheckMember(name, arity, _staticMethods) && CheckOptional(name, arity, optional))
         {
-            _staticMethods.Add(new(name, arity, factory) { Optional = optional, Factory = true });
+            _staticMethods.Add(new(name, arity, NeverCalled)
+            {
+                Optional = optional, Factory = true, FactoryMethod = method, FactoryAsync = async, FactoryToConstructor = toConstructor
+            });
         }
         return this;
+    }
+
+    /// <summary>A factory's function, which the factory written in WebLingo in its place never calls.</summary>
+    private static bool NeverCalled(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "A native factory is written in WebLingo, and its function is not called.");
+        return false;
     }
 
     /// <summary>
@@ -341,6 +367,14 @@ public sealed class WebLingoNativeClass(string name)
     /// instances, for one whose host object was released, which is disposed, and for one without such an object.
     /// </summary>
     public bool TryGetHostObject<T>(WebLingoValue instance, WebLingoHeap heap, [NotNullWhen(true)] out T? hostObject,
+        out WebLingoRuntimeError? error) where T : class => TryGetHostObject(instance, heap, null, out hostObject, out error);
+
+    /// <summary>
+    /// An instance's host object, as <see cref="TryGetHostObject{T}(WebLingoValue, WebLingoHeap, out T, out WebLingoRuntimeError)"/>
+    /// gives it, <paramref name="notOpen"/> the message for one not yet given its object, made but not opened (section
+    /// 3.7, "No sealed classes").
+    /// </summary>
+    public bool TryGetHostObject<T>(WebLingoValue instance, WebLingoHeap heap, string? notOpen, [NotNullWhen(true)] out T? hostObject,
         out WebLingoRuntimeError? error) where T : class
     {
         hostObject = null;
@@ -353,7 +387,23 @@ public sealed class WebLingoNativeClass(string name)
         }
         error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, released
             ? $"This {Name} has been disposed."
-            : $"This {Name} has nothing of its own to use: its constructor did not give it.");
+            : notOpen ?? $"This {Name} has nothing of its own to use: its constructor did not give it.");
+        return false;
+    }
+
+    /// <summary>
+    /// Whether an instance may be opened, created but not yet opened (section 3.7, "No sealed classes"): one of this
+    /// class's, its host object, if any, not yet <typeparamref name="TOpen"/>, what opening gives it, nor released; WL3001
+    /// otherwise, its message saying which, open already or disposed.
+    /// </summary>
+    public bool TryCheckUnopened<TOpen>(WebLingoValue instance, WebLingoHeap heap, out WebLingoRuntimeError? error) where TOpen : class
+    {
+        if (!CheckInstance(instance, heap, out error)) return false;
+        var held = heap.HostObjectOf(instance, out var released);
+        if (held is not TOpen && !released) return true;
+        error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, released
+            ? $"This {Name} has been disposed, and cannot be opened again."
+            : $"This {Name} is open already: it is opened once.");
         return false;
     }
 
@@ -402,7 +452,7 @@ public sealed class WebLingoNativeClass(string name)
         : IWebLingoBuiltinFunction
     {
         public string Name => name;
-        public int Arity => member.Arity + (kind == MemberKind.Static && !member.Factory ? 0 : 1);
+        public int Arity => member.Arity + (kind == MemberKind.Static ? 0 : 1);
 
         public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
         {

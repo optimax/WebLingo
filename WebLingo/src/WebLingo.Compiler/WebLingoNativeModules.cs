@@ -93,8 +93,20 @@ public sealed record WebLingoNativeExport(string Name, string Builtin, int Arity
     /// </summary>
     public int Optional { get; init; }
 
-    /// <summary>For a native class's static method, whether it is a factory, its built-in given the class first (section 3.9).</summary>
+    /// <summary>
+    /// For a native class's static method, whether it is a factory, written in WebLingo, shorthand for <c>new this(…)</c>
+    /// and its instance's <see cref="FactoryMethod"/> (section 3.7, "No sealed classes").
+    /// </summary>
     public bool Factory { get; init; }
+
+    /// <summary>A factory's instance method, which opens the instance it makes.</summary>
+    public string? FactoryMethod { get; init; }
+
+    /// <summary>Whether a factory awaits its method, and is asynchronous.</summary>
+    public bool FactoryAsync { get; init; }
+
+    /// <summary>Whether a factory's arguments go to <c>new</c>, not to its method.</summary>
+    public bool FactoryToConstructor { get; init; }
 }
 
 /// <summary>

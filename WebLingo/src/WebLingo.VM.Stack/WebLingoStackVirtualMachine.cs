@@ -2711,7 +2711,8 @@ public sealed class WebLingoStackVirtualMachine
                 for (var i = 0; i < info.StaticMethods.Count; i++)
                 {
                     if (!TryMakeClosure(info.StaticMethods[i].Function, slots, cells, out roots[1], out error)
-                        || !heap.TrySetStaticMethod(target, info.StaticMethods[i].Name, roots[1], out error))
+                        || !heap.TrySetStaticMethod(target, info.StaticMethods[i].Name, roots[1], out error,
+                            module.Functions[info.StaticMethods[i].Function].HasThis))
                     {
                         return false;
                     }

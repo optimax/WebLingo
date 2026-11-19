@@ -1072,7 +1072,9 @@ public sealed class WebLingoBinder
         _function = new FunctionContext(outerFunction, name) { IsAsync = isAsync };
         _scope = new Scope(outerScope, _function);
         if (isMethod) Declare("this", WebLingoDeclarationKind.Parameter, span, null);
-        if (isStatic) _scope.Locals.Add("this", _noThis); // An outer method's 'this' is not a static method's (WL2009).
+        // An outer method's 'this' is not a static method's (WL2009), but for one with a receiver, its class, a native
+        // class's factory (section 3.7, "No sealed classes").
+        if (isStatic && !receiver) _scope.Locals.Add("this", _noThis);
         var defaults = new List<WebLingoBoundExpression?>();
         foreach (var parameter in parameters)
         {
@@ -2023,7 +2025,7 @@ public sealed class WebLingoBinder
         var name = module + "." + info.Name;
         var methods = new List<WebLingoMethodSyntax> { NativeMember("constructor", info.Constructor, false, callees, returns: false) };
         foreach (var method in info.Methods) methods.Add(NativeMember(method.Name, method, false, callees));
-        foreach (var method in info.StaticMethods) methods.Add(NativeMember(method.Name, method, true, callees, factoryOf: method.Factory ? name : null));
+        foreach (var method in info.StaticMethods) methods.Add(method.Factory ? NativeFactory(method) : NativeMember(method.Name, method, true, callees));
         foreach (var property in info.Properties)
         {
             methods.Add(NativeMember("get:" + property.Name, property.Getter, false, callees));
@@ -2086,16 +2088,14 @@ public sealed class WebLingoBinder
     /// A native class's member: a method whose body calls its built-in, giving what it gives, or nothing, for a constructor
     /// and a setter, or its last argument, for an indexer's setter, the value assigned.
     /// </summary>
-    /// <remarks>A factory's built-in is given its class first, by the local <paramref name="factoryOf"/> names (section 3.9).</remarks>
     private static WebLingoMethodSyntax NativeMember(string name, WebLingoNativeExport export, bool isStatic,
-        Dictionary<string, WebLingoBuiltinDeclaration> callees, bool returns = true, bool returnsLast = false, string? factoryOf = null)
+        Dictionary<string, WebLingoBuiltinDeclaration> callees, bool returns = true, bool returnsLast = false)
     {
         callees[export.Builtin] = new WebLingoBuiltinDeclaration(export.Builtin, export.Arity);
         var parameters = new List<WebLingoParameterSyntax>();
         var arguments = new List<WebLingoExpressionSyntax>();
         if (!isStatic) arguments.Add(new WebLingoThisSyntax(default));
-        if (factoryOf is not null) arguments.Add(new WebLingoNameSyntax(factoryOf, default));
-        var count = export.Arity - (isStatic && factoryOf is null ? 0 : 1);
+        var count = export.Arity - (isStatic ? 0 : 1);
         for (var i = 0; i < count; i++)
         {
             // Its last parameters optional, each null when a call leaves it out (section 3.9).
@@ -2111,6 +2111,44 @@ public sealed class WebLingoBinder
             : [new WebLingoExpressionStatementSyntax(call, default)];
         if (returnsLast) body.Add(new WebLingoReturnSyntax(new WebLingoNameSyntax(parameters[^1].Name, default), default));
         return new WebLingoMethodSyntax(name, default, parameters, new WebLingoBlockSyntax(body, default), default) { IsStatic = isStatic };
+    }
+
+    /// <summary>
+    /// A native class's factory (section 3.7, "No sealed classes"), shorthand for both steps of making an instance, created,
+    /// then opened: a static method taking the class it is called on, its receiver, <c>this</c>, so that a class extending
+    /// the native one gets its own instance, which makes <c>new this()</c>, or <c>new this(…)</c> given the factory's
+    /// arguments, and calls its method with them, or with none, awaiting it where it is asynchronous, and gives the instance:
+    /// <c>static async open(this, a0, a1, a2 = null) { var made = new this(); await made.open(a0, a1, a2); return made; }</c>.
+    /// </summary>
+    private static WebLingoMethodSyntax NativeFactory(WebLingoNativeExport export)
+    {
+        var parameters = new List<WebLingoParameterSyntax> { new("this", default) };
+        var arguments = new List<WebLingoExpressionSyntax>();
+        for (var i = 0; i < export.Arity; i++)
+        {
+            parameters.Add(new WebLingoParameterSyntax("a" + i.ToString(System.Globalization.CultureInfo.InvariantCulture), default)
+            {
+                Default = i >= export.Arity - export.Optional ? new WebLingoNullLiteralSyntax(default) : null
+            });
+            arguments.Add(new WebLingoNameSyntax(parameters[^1].Name, default));
+        }
+        const string made = "made";
+        var created = new WebLingoNewExpressionSyntax(new WebLingoThisSyntax(default), export.FactoryToConstructor ? arguments : [], default);
+        WebLingoExpressionSyntax opened = new WebLingoCallExpressionSyntax(
+            new WebLingoMemberAccessSyntax(new WebLingoNameSyntax(made, default), export.FactoryMethod!, default, default),
+            export.FactoryToConstructor ? [] : arguments, default);
+        if (export.FactoryAsync) opened = new WebLingoAwaitExpressionSyntax(opened, default);
+        List<WebLingoStatementSyntax> body =
+        [
+            new WebLingoVariableDeclarationSyntax(WebLingoDeclarationKind.Var, made, default, created, default),
+            new WebLingoExpressionStatementSyntax(opened, default),
+            new WebLingoReturnSyntax(new WebLingoNameSyntax(made, default), default)
+        ];
+        return new WebLingoMethodSyntax(export.Name, default, parameters, new WebLingoBlockSyntax(body, default), default)
+        {
+            IsStatic = true,
+            IsAsync = export.FactoryAsync
+        };
     }
 
     /// <summary>Binds a built-in class from its syntax, extending <paramref name="baseLocal"/>, or nothing if null.</summary>

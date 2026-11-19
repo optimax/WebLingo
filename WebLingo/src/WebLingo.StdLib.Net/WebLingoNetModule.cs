@@ -20,10 +20,14 @@ public sealed class WebLingoNetModule : IWebLingoNativeModule
     public void Register(IWebLingoNativeRegistry registry)
     {
         var socket = registry.Class("Socket");
-        socket.DeclareFactory("connect", 2, 0, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        // A socket made, new Socket(), then connected, s.connect(host, port), which gives it; and Socket.connect(host, port),
+        // shorthand for both, making an instance of the class it is called on (section 3.7, "No sealed classes").
+        socket.DeclareFactory("connect", 2, 0, "connect", async: true);
+        socket.DeclareMethod("connect", 2, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         {
             result = WebLingoValue.Null;
-            var classValue = a[0];
+            var instance = a[0];
+            if (!socket.TryCheckUnopened<IWebLingoConnection>(instance, heap, out error)) return false;
             if (a[1].Kind != WebLingoValueKind.String || heap.GetString(a[1]).Length == 0)
             {
                 error = new WebLingoArgument("connect", 0, 2, "the host", "a name or an address, a string").Wrong(a[1], heap);
@@ -39,15 +43,21 @@ public sealed class WebLingoNetModule : IWebLingoNativeModule
             return scheduler.TryRunOffWorker(() => network.Connect(host, port),
                 (IWebLingoConnection connection, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? wrong) =>
                 {
-                    if (socket.TryMake(classValue, h, out made, out wrong) && socket.TrySetHostObject(made, connection, h, out wrong)) return true;
+                    // Connected by another call meanwhile, or disposed: that one stands, and this connection is closed.
+                    made = instance;
+                    if (socket.TryCheckUnopened<IWebLingoConnection>(instance, h, out wrong)
+                        && socket.TrySetHostObject(instance, connection, h, out wrong))
+                    {
+                        return true;
+                    }
                     connection.Dispose();
                     return false;
-                }, Failed, out result, out error);
+                }, Failed, instance, out result, out error);
         });
         socket.DeclareMethod("read", 0, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         {
             result = WebLingoValue.Null;
-            if (!socket.TryGetHostObject<IWebLingoConnection>(a[0], heap, out var connection, out error)
+            if (!socket.TryGetHostObject<IWebLingoConnection>(a[0], heap, NotConnected, out var connection, out error)
                 || !TryServices(heap, out _, out var scheduler, out error))
             {
                 return false;
@@ -66,7 +76,7 @@ public sealed class WebLingoNetModule : IWebLingoNativeModule
         socket.DeclareMethod("write", 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         {
             result = WebLingoValue.Null;
-            if (!socket.TryGetHostObject<IWebLingoConnection>(a[0], heap, out var connection, out error)
+            if (!socket.TryGetHostObject<IWebLingoConnection>(a[0], heap, NotConnected, out var connection, out error)
                 || !TryServices(heap, out _, out var scheduler, out error))
             {
                 return false;
@@ -98,6 +108,9 @@ public sealed class WebLingoNetModule : IWebLingoNativeModule
             return true;
         });
     }
+
+    /// <summary>What a socket made but not yet connected says to a method that needs it connected.</summary>
+    private const string NotConnected = "This Socket is not connected: connect it first, await s.connect(host, port).";
 
     private static bool TryServices(WebLingoHeap heap, out IWebLingoNetwork network, out WebLingoScheduler scheduler, out WebLingoRuntimeError? error)
     {
