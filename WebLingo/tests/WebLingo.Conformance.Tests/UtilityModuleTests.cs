@@ -66,6 +66,37 @@ public sealed class UtilityModuleTests : IDisposable
             + "WL3001 The first argument of 'parse', the text, must be a CSV string, not text with duplicate column headers.\n");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GzipAndZipRoundTripBytesAndEnforceDecompressionLimits(bool stack)
+    {
+        Run(stack, """
+            import compression from "std:compression";
+            import { Bytes } from "std:bytes";
+            var gzip = compression.gzip(Bytes.from("tea"));
+            writeLn(compression.gunzip(gzip, 3).text());
+            writeLn(compression.gunzip(Bytes.concat([gzip, gzip]), 6).text());
+            writeLn(compression.gunzip(compression.gzip(Bytes.from("")), 0).length);
+            var archive = compression.zip({
+                "menu/tea.txt": Bytes.from("tea"),
+                "tea.bin": Bytes.from([0, 255]),
+                "empty": Bytes.from("")
+            });
+            var entries = compression.unzip(archive, 5);
+            writeLn([entries["menu/tea.txt"].text(), entries["tea.bin"].toHex(), entries["empty"].length]);
+            try { compression.gunzip(gzip, 2); } catch (TypeError e) { writeLn(e.code + " " + e.message); }
+            try { compression.unzip(archive, 4); } catch (TypeError e) { writeLn(e.code + " " + e.message); }
+            try { compression.gunzip(gzip.slice(0, gzip.length - 1), 3); } catch (TypeError e) { writeLn(e.code + " " + e.message); }
+            try { compression.unzip(Bytes.from("not zip"), 100); } catch (TypeError e) { writeLn(e.code + " " + e.message); }
+            """,
+            "tea\nteatea\n0\n[\"tea\", \"00ff\", 0]\n"
+            + "WL3001 Decompressed data exceeds the limit of 2 bytes.\n"
+            + "WL3001 Decompressed data exceeds the limit of 4 bytes.\n"
+            + "WL3001 The argument of 'gunzip' contains invalid gzip data.\n"
+            + "WL3001 The argument of 'unzip' is not a valid ZIP archive.\n");
+    }
+
     private void Run(bool stack, string source, string expected)
     {
         Directory.CreateDirectory(_folder);

@@ -24,6 +24,7 @@
     <ProjectReference Include="../../src/WebLingo.StdLib.Path/WebLingo.StdLib.Path.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib.Url/WebLingo.StdLib.Url.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib.Csv/WebLingo.StdLib.Csv.csproj" />
+    <ProjectReference Include="../../src/WebLingo.StdLib.Compression/WebLingo.StdLib.Compression.csproj" />
     <ProjectReference Include="../../src/WebLingo.Platform.Abstractions/WebLingo.Platform.Abstractions.csproj" />
     <ProjectReference Include="../../src/WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />
     <ProjectReference Include="../../src/WebLingo.Hosting/WebLingo.Hosting.csproj" />

@@ -5,8 +5,7 @@ the standard modules, and, in WASP's pages, the request, the response and their 
 statements, is the WebLingo Language Reference's (`Documents/weblingo-language-reference.md`); building sites is the
 WASP User Manual's (`Documents/wasp-user-manual.md`).
 
-This reference describes what is built. Every example here was run with `weblingo`, its output as shown. WebLingo is
-pre-alpha: what is still to come is listed in the Language Reference's last section.
+This reference describes the standard library in the current pre-alpha release and shows what its examples write.
 
 ## Contents
 
@@ -36,6 +35,7 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 24. [`std:path`](#24-stdpath)
 25. [`std:url`](#25-stdurl)
 26. [`std:csv`](#26-stdcsv)
+27. [`std:compression`](#27-stdcompression)
 
 ---
 
@@ -1300,4 +1300,34 @@ writeLn([rows[0]["tea"], rows[0]["note"]]);
 
 ```text
 ["sencha", "warm, please"]
+```
+
+## 27. `std:compression`
+
+| Function | Result |
+|---|---|
+| `gzip(data)` | gzip-compressed `Bytes` |
+| `gunzip(data, maxBytes)` | decompressed `Bytes` |
+| `zip(entries)` | ZIP archive as `Bytes`. Pass a map of file names to `Bytes` |
+| `unzip(data, maxBytes)` | map of file names to decompressed `Bytes` |
+
+`maxBytes` is required and must be a whole number from 0 to 2,147,483,647. For ZIP it caps the sum of the files'
+decompressed byte counts. Exceeding the limit raises `TypeError` (WL3001). The execution's heap budget also applies.
+ZIP entry paths are map keys. The module skips directory records, rejects duplicate file names and uses no filesystem access.
+
+```javascript
+import compression from "std:compression";
+import { Bytes } from "std:bytes";
+
+var data = Bytes.from("Sencha");
+var compressed = compression.gzip(data);
+writeLn(compression.gunzip(compressed, 100).text());
+
+var archive = compression.zip({ "menu/tea.txt": data });
+writeLn(compression.unzip(archive, 100)["menu/tea.txt"].text());
+```
+
+```text
+Sencha
+Sencha
 ```

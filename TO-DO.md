@@ -20,7 +20,7 @@ A1: As you list them. Don't ask trivial questions. Act autonomously.
 
 2026-11-19 (Codex). The owner approved the order. See the architecture specification, §7.16, “Standard-library utilities”. This task waits for its three tasks below.
 
-## Add Gzip and ZIP Compression
+## [WORKING] Add Gzip and ZIP Compression
 
 Add in-memory gzip and ZIP compression and decompression with explicit decompressed output limits.
 

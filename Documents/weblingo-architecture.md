@@ -945,7 +945,10 @@ row conversion as `query`. The existing `query` method continues to return an ar
 
 The owner approved the following order on 19 November 2026 after the path, URL and CSV modules shipped.
 
-- **Add Gzip and ZIP Compression.** Work with bytes in memory. Require an explicit output limit for decompression.
+- **Add Gzip and ZIP Compression.** `std:compression` works with bytes in memory. `gzip(data)` and
+  `gunzip(data, maxBytes)` handle gzip data. `zip(entries)` and `unzip(data, maxBytes)` use a map of file
+  names to bytes. The decompression limit covers the aggregate file content, and the heap budget also applies.
+  Ignore ZIP directory records and reject duplicate file names. Entry paths are treated as map keys.
 - **Add Seeded Random Numbers.** Produce reproducible sequences for tests and simulations. Secure random bytes
   are available through `std:crypto`.
 - **Add CLI Subprocess Execution.** Let `weblingo` scripts run a program with arguments and read its exit status

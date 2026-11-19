@@ -74,6 +74,7 @@ public sealed class DependencyTests
     [Theory]
     [InlineData("WebLingo.StdLib.Path")]
     [InlineData("WebLingo.StdLib.Url")]
+    [InlineData("WebLingo.StdLib.Compression")]
     public void HostUtilityModulesDependOnlyOnCoreAndRuntime(string assembly)
     {
         APortableAssemblyReferencesOnlyTheWebLingoAssembliesItMay(assembly, ["WebLingo.Core", "WebLingo.Runtime"]);
