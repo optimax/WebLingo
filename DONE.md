@@ -4086,3 +4086,20 @@ Q1. May I restore MySqlConnector from the configured NuGet feeds for the MySQL a
 A1: Yes.
 
 2026-11-19 (Codex). Added MySqlConnector 3.0.0 via the existing ADO.NET adapter in `4b45d3b`. The CLI accepts `mysql:` connection strings and WASP requires a configured name. Windows Release builds passed with zero warnings or errors on the task branch and main. The full suite passed 4,196 tests with six skipped on both. The CLI and WASP database samples ran on main, and the CLI publish included MySqlConnector. Live MySQL and Linux were not tested locally.
+
+## [DONE] Error Reporting
+
+```
+function two(a, b) { return a + b; }
+two(1);
+```
+
+This is an example of an error being reported:
+
+    ... : error WL2006: 'two' takes 2 arguments, not 1.
+
+ The error should be loud and bold: `ERROR`, and it should name the exception that occurred, not just give the error code:
+
+        ERROR WL2006 (ArgumentError): 'two' takes 2 arguments, not 1.
+
+2026-11-19 (Codex). In `b283c2d`, `weblingo` and `wasp` report uppercase ERROR on standard error, in bold on supporting terminals, with the diagnostic code and the WebLingo exception class where available. Redirected text uses uppercase without terminal escapes. Windows Release builds passed with zero warnings or errors on the task branch and main. The complete suite passed 4,198 tests with six skipped on both. CLI and WASP samples and Windows pseudoterminal output were checked on main. Linux was not tested locally.
