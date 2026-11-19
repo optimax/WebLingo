@@ -11,10 +11,11 @@ namespace WebLingo.StdLib.Fs;
 /// <c>writeText</c>, <c>appendText</c>, <c>readBytes</c>, <c>writeBytes</c>, <c>appendBytes</c>, <c>exists</c>,
 /// <c>isFolder</c>, <c>copy</c>, <c>remove</c>, <c>list</c>, <c>makeFolder</c> and <c>removeFolder</c>; and the class
 /// <c>File</c>, a file opened as a handle, <c>File.open(path, mode)</c>: for its text, its lines read by <c>read()</c>, its
-/// text written by <c>write(text)</c>; for its bytes, <c>"rb"</c> and <c>"wb"</c>, up to a count of them read by
-/// <c>read(count)</c>, <c>null</c> at its end, bytes written by <c>write(bytes)</c>; closed by <c>dispose()</c> (the owner's
-/// answers, 18 November 2026, for bytes, <c>isFolder</c> and <c>copy</c>). Text is UTF-8 unless an encoding is named. A
-/// failure is an <c>IOError</c> (WL3011) naming the path as the script gave it, never the host's own.
+/// text written by <c>write(text)</c>; for its bytes, <c>"rb"</c>, <c>"wb"</c> and <c>"ab"</c>, up to a count of them read
+/// by <c>read(count)</c>, <c>null</c> at its end, bytes written by <c>write(bytes)</c>, after its own for <c>"ab"</c>; closed
+/// by <c>dispose()</c> (the owner's answers, 18 November 2026, for bytes, <c>isFolder</c> and <c>copy</c>, and the owner's
+/// request, <c>"ab"</c>). Text is UTF-8 unless an encoding is named. A failure is an <c>IOError</c> (WL3011) naming the
+/// path as the script gave it, never the host's own.
 /// </summary>
 public sealed class WebLingoFsModule : IWebLingoNativeModule
 {
@@ -262,12 +263,13 @@ public sealed class WebLingoFsModule : IWebLingoNativeModule
             case "a": mode = WebLingoFileMode.Append; break;
             case "rb": mode = WebLingoFileMode.ReadBytes; break;
             case "wb": mode = WebLingoFileMode.WriteBytes; break;
+            case "ab": mode = WebLingoFileMode.AppendBytes; break;
             default:
                 error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"A file is opened to read it, \"r\", to write it, \"w\", or to append to it, \"a\", or for its bytes, \"rb\" or \"wb\", not \"{modeName}\".");
+                    $"A file is opened to read it, \"r\", to write it, \"w\", or to append to it, \"a\", or for its bytes, \"rb\", \"wb\" or \"ab\", not \"{modeName}\".");
                 return false;
         }
-        var bytes = mode is WebLingoFileMode.ReadBytes or WebLingoFileMode.WriteBytes;
+        var bytes = mode is WebLingoFileMode.ReadBytes or WebLingoFileMode.WriteBytes or WebLingoFileMode.AppendBytes;
         if (bytes && a[3].Kind != WebLingoValueKind.Null)
         {
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "A file opened for its bytes has no encoding.");

@@ -2033,8 +2033,8 @@ false
 | `makeFolder(path)`, `removeFolder(path)` | makes and removes a folder |
 
 A file is also opened as a handle, `fs.File.open(path, mode)`, for its text, `"r"`, `"w"` or `"a"`, read a line at a time,
-or for its bytes, `"rb"` or `"wb"`, read a count of them at a time, `file.read(4096)`, `null` at its end (the Standard
-Library Reference, section 14).
+or for its bytes, `"rb"`, `"wb"` or `"ab"`, read a count of them at a time, `file.read(4096)`, `null` at its end
+(the Standard Library Reference, section 14).
 | `File.open(path, mode)` | a file opened as a handle, with `read`, `write` and `dispose()` |
 
 Each is asynchronous, giving a task, and each has a synchronous form whose name ends in `Sync`: `readTextSync(path)`.

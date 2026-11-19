@@ -69,9 +69,10 @@ public interface IWebLingoFile : IDisposable
 
 /// <summary>
 /// How a file is opened: to read its text; to write text anew, the file made if it is not there; or to write after its
-/// text; to read its bytes; or to write bytes anew, made if it is not there.
+/// text; to read its bytes; to write bytes anew, made if it is not there; or to write bytes after its own, made if it is
+/// not there.
 /// </summary>
-public enum WebLingoFileMode { Read, Write, Append, ReadBytes, WriteBytes }
+public enum WebLingoFileMode { Read, Write, Append, ReadBytes, WriteBytes, AppendBytes }
 
 /// <summary>
 /// What failed, a portable category, not the host's exception (section 7.13, WL-P015); <see cref="NotAllowed"/>, a path a

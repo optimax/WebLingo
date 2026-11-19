@@ -95,6 +95,7 @@ public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = n
         WebLingoFileMode.Read => new DotNetFile(Reader(Reach(path, false), encoding), null, null),
         WebLingoFileMode.ReadBytes => new DotNetFile(null, null, new FileStream(Reach(path, false), FileMode.Open, FileAccess.Read, FileShare.Read)),
         WebLingoFileMode.WriteBytes => new DotNetFile(null, null, new FileStream(Reach(path, true), FileMode.Create, FileAccess.Write, FileShare.Read)),
+        WebLingoFileMode.AppendBytes => new DotNetFile(null, null, new FileStream(Reach(path, true), FileMode.Append, FileAccess.Write, FileShare.Read)),
         _ => new DotNetFile(null, new StreamWriter(Reach(path, true), mode == WebLingoFileMode.Append, EncodingOf(encoding)), null)
     });
 

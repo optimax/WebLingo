@@ -563,7 +563,7 @@ synchronous form whose name ends in `Sync`: `readText` and `readTextSync`.
 | `list(path)` | the names of a folder's files and folders |
 | `makeFolder(path)` | makes a folder, and the folders it is in |
 | `removeFolder(path)` | removes a folder, which must be empty |
-| `File.open(path, mode, encoding)` | a file opened for its text, to read it, `"r"`, to write it, `"w"`, or to append to it, `"a"`; or for its bytes, to read them, `"rb"`, or to write them, `"wb"`, without an encoding |
+| `File.open(path, mode, encoding)` | a file opened for its text, to read it, `"r"`, to write it, `"w"`, or to append to it, `"a"`; or for its bytes, to read them, `"rb"`, to write them, `"wb"`, or to append them, `"ab"`, without an encoding |
 | `file.read()` | a file opened for its text: its next line, without its line break, or `null` at its end |
 | `file.read(count)` | a file opened for its bytes: its next bytes, as many as `count`, at most 16 MiB, fewer at its end, or `null` there |
 | `file.write(value)` | writes text to a file opened for its text, or bytes to one opened for its bytes |

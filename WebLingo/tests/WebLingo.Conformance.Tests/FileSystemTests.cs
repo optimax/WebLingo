@@ -166,6 +166,26 @@ public sealed class FileSystemTests : IDisposable
 
     [Theory]
     [MemberData(nameof(Vms))]
+    public void AFileIsOpenedToAppendBytes(string vm)
+    {
+        // "ab" writes bytes after a file's own, and makes a file that is not there (the owner's request, 18 November 2026).
+        Assert.Equal(($"WL3011 '{_folder}/tea.txt' cannot be read: it was opened to be written, not read.", ""), Run(vm, """
+            import { write } from "std:system";
+            var tea = fs.readBytesSync(folder + "/tea.txt");
+            using (var a = await fs.File.open(folder + "/tea.txt", "ab")) {
+                await a.write(tea.slice(3));
+                a.writeSync(tea.slice(0, 3));
+                try { a.readSync(1); } catch (IOError e) { write(e.code + " " + e.message); }
+            }
+            using (var a = fs.File.openSync(folder + "/new.bin", "ab")) { a.writeSync(tea.slice(4)); }
+            using (var a = fs.File.openSync(folder + "/new.bin", "ab")) { await a.write(tea.slice(4)); }
+            """, ("tea.txt", "tea time"u8.ToArray())));
+        Assert.Equal("tea time timetea"u8.ToArray(), File.ReadAllBytes(Path.Combine(_folder, "tea.txt")));
+        Assert.Equal("timetime"u8.ToArray(), File.ReadAllBytes(Path.Combine(_folder, "new.bin")));
+    }
+
+    [Theory]
+    [MemberData(nameof(Vms))]
     public void AFolderIsToldFromAFileAndAFileIsCopied(string vm)
     {
         // A copy is the file as it is, replacing one there; a folder is not copied (the owner's answers, 18 November 2026).
@@ -264,7 +284,8 @@ public sealed class FileSystemTests : IDisposable
     [InlineData("fs.readTextSync(\"x.txt\", 8);", "WL3001 An encoding's name is a string, not the integer 8.")]
     [InlineData("fs.readTextSync(\"x.txt\", \"klingon\");", "WL3001 'x.txt' cannot be read: there is no encoding 'klingon'.")]
     [InlineData("fs.File.openSync(\"x.txt\", \"rw\");",
-        "WL3001 A file is opened to read it, \"r\", to write it, \"w\", or to append to it, \"a\", or for its bytes, \"rb\" or \"wb\", not \"rw\".")]
+        "WL3001 A file is opened to read it, \"r\", to write it, \"w\", or to append to it, \"a\", or for its bytes, \"rb\", \"wb\" or \"ab\", not \"rw\".")]
+    [InlineData("fs.File.openSync(\"x.bin\", \"ab\", \"utf-8\");", "WL3001 A file opened for its bytes has no encoding.")]
     [InlineData("fs.File.openSync(\"x.txt\", \"rb\", \"utf-8\");", "WL3001 A file opened for its bytes has no encoding.")]
     [InlineData("fs.writeBytesSync(\"x.bin\", \"text\");", "WL3001 'writeBytes' writes bytes, not a string.")]
     [InlineData("fs.appendBytesSync(\"x.bin\", 5);", "WL3001 'appendBytes' writes bytes, not the integer 5.")]
