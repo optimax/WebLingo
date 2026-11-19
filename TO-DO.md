@@ -2,22 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [IDLE] Implement What's Not in the Language
-
-`Documents\weblingo-language-reference.md` has section "17. What is not in the language yet". Implement everything it describes, and remove that section.
-
-2026-11-19 (Codex). The Language Reference lists streaming database rows and providers beyond SQLite and SQL Server. The architecture specification (§10, item 11) still leaves the streaming API open. A disposable async cursor would let callers read one row at a time and release the reader on early exit. PostgreSQL is a candidate for the first additional provider, followed by MySQL or MariaDB.
-
-Q1. Should `await db.rows(sql, values)` return a disposable cursor whose `await cursor.next()` gives a row map or `null` at end of input?
-
-A1: Yes.
-
-Q2. Which additional database provider should ship first?
-
-A2: MySQL, PostgreSQL
-
-2026-11-19 (Codex). The owner approved the cursor and chose MySQL before PostgreSQL. See the architecture specification, §7.11, “Streaming rows and additional providers”. Streaming landed in `a2c3fe0`. MySQL landed in `4b45d3b`. The parent task waits for the PostgreSQL adapter.
-
 ## [QUESTION] VS Code Debugging
 
 Buiid an extension for VS Code to debug WebLingo.
@@ -25,14 +9,6 @@ Buiid an extension for VS Code to debug WebLingo.
 2026-11-19 (Codex). The VS Code extension currently provides syntax highlighting. The register VM's compiled functions already carry source spans and local names. A debugger needs a VM pause and inspection interface and a host for the Debug Adapter Protocol.
 
 **Q1. Should the first VS Code debugger launch local `.wlg` scripts on the register VM with breakpoints, stepping, a call stack and local variables, with WASP, the stack VM and attaching to running processes left for follow-up tasks?**
-
-## [WORKING] Add the PostgreSQL Database Provider
-
-The owner chose PostgreSQL after MySQL. The local NuGet cache has no PostgreSQL provider. Proposed adapter dependency: Npgsql, with the existing ADO.NET connection contract and a `postgresql:` provider prefix.
-
-**Q1. May I restore Npgsql from the configured NuGet feeds for the PostgreSQL adapter?**
-
-A1: Yes.
 
 ## Choose the Next Standard-Library Additions
 

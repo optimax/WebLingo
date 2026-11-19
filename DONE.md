@@ -4125,3 +4125,31 @@ This is unnecessary since `std:system` is supposed to be implicitly imported.
 EXPLAIN: How are other methods that expect a certain type of argument handle it? How can a programmer annotate a method to expect a certain type of value so that the compiler could issue a similar error message for user-defined functions?
 
 2026-11-19 (Codex). The Language Reference section “Checking argument types” was added in `0ecc35e` and clarified in `0c4fd9d`. It explains compiler arity checks, built-in runtime type checks, and using `is` with `TypeError` for user-defined functions. The example now handles `null` and names the received class. Exact sample output matched on source and stack bytecode on both the branch and main. Windows Release built cleanly and the full suite passed 4,204 tests with six skipped on both. Linux was not tested locally.
+
+## [DONE] Add the PostgreSQL Database Provider
+
+The owner chose PostgreSQL after MySQL. The local NuGet cache has no PostgreSQL provider. Proposed adapter dependency: Npgsql, with the existing ADO.NET connection contract and a `postgresql:` provider prefix.
+
+Q1. May I restore Npgsql from the configured NuGet feeds for the PostgreSQL adapter?
+
+A1: Yes.
+
+2026-11-19 (Codex). In `6a89a2b`, added Npgsql 10.0.3 (PostgreSQL License) to WebLingo.Data.DotNet. No existing transitive package versions changed. The CLI accepts `postgresql:` strings. WASP opens configured names. Date parameters bind as UTC instants. On the task branch and main, Windows Release built cleanly and the full suite passed 4,206 tests with six skipped. CLI and WASP samples checked connection validation and SQLite streaming, and the CLI publish included Npgsql. Live PostgreSQL and Linux were not tested locally.
+
+## [DONE] Implement What's Not in the Language
+
+`Documents\weblingo-language-reference.md` has section "17. What is not in the language yet". Implement everything it describes, and remove that section.
+
+2026-11-19 (Codex). The Language Reference lists streaming database rows and providers beyond SQLite and SQL Server. The architecture specification (§10, item 11) still leaves the streaming API open. A disposable async cursor would let callers read one row at a time and release the reader on early exit. PostgreSQL is a candidate for the first additional provider, followed by MySQL or MariaDB.
+
+Q1. Should `await db.rows(sql, values)` return a disposable cursor whose `await cursor.next()` gives a row map or `null` at end of input?
+
+A1: Yes.
+
+Q2. Which additional database provider should ship first?
+
+A2: MySQL, PostgreSQL
+
+2026-11-19 (Codex). The owner approved the cursor and chose MySQL before PostgreSQL. See the architecture specification, §7.11, “Streaming rows and additional providers”. Streaming landed in `a2c3fe0`. MySQL landed in `4b45d3b`. The parent task waits for the PostgreSQL adapter.
+
+2026-11-19 (Codex). Streaming rows shipped in `a2c3fe0`, MySQL in `4b45d3b`, and PostgreSQL in `6a89a2b`. The last provider change removed the obsolete Language Reference section. The Windows Release build and full suite passed on the task branch and main. Live MySQL, live PostgreSQL and Linux were not tested locally.
