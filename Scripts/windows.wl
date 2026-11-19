@@ -62,6 +62,29 @@ export function expand(text) {
     return shell.ExpandEnvironmentStrings(text);
 }
 
+// Puts a folder on the machine's PATH, once, at its end, keeping the other entries as they are, their %names%
+// unexpanded, as WScript.Shell keeps the machine's environment, the registry's: whether it added it, consoles started
+// after then finding its programs by their names. An entry is compared as Windows compares them, its case and a last
+// backslash aside.
+export function addToMachinePath(folder) {
+    var environment = shell.Environment("SYSTEM");
+    var path = environment["Path"];
+    if (path.split(";").any(entry => pathEntry(entry) == pathEntry(folder))) {
+        return false;
+    }
+    while (path.endsWith(";")) {
+        path = path.slice(0, path.length - 1);
+    }
+    environment["Path"] = $"{path};{folder}";
+    return true;
+}
+
+// A PATH entry as Windows compares them.
+function pathEntry(entry) {
+    var text = entry.trim().toLower();
+    return text.endsWith("\\") ? text.slice(0, text.length - 1) : text;
+}
+
 // The paths of the programs running from a folder, through WMI, which shows every process's path to an administrator.
 export function runningFrom(folder) {
     var wmi = com.create("WbemScripting.SWbemLocator").ConnectServer(".", "root\\cimv2");
