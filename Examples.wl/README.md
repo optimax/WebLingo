@@ -25,8 +25,7 @@ dotnet run --project ../WebLingo/src/WebLingo.Cli -- run 01-hello.wl
 ```
 
 `weblingo run` compiles a script in memory and runs it; `weblingo check` compiles it and reports its errors without
-running it. On Windows, `weblingo` writes text in the console's code page, so that a letter outside it, in
-`05-strings.wl` and `19-bytes-json-dates.wl`, may show as another.
+running it.
 
 ## The scripts
 

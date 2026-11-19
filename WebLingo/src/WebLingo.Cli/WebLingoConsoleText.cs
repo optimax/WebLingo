@@ -1,0 +1,31 @@
+using System.Text;
+
+namespace WebLingo.Cli;
+
+/// <summary>
+/// The text <c>weblingo</c> and <c>wasp</c> write, their output and their errors, UTF-8 on every platform, so that no
+/// letter is lost: on Windows, whose consoles and .NET's writers otherwise use the console's code page, UTF-8 without a
+/// byte-order mark to a file or a pipe, and to a console through Windows's own Unicode output, <c>WriteConsoleW</c>,
+/// whatever its code page, which is left as it is (the owner's answer, 18 November 2026, "Text Written on Windows:
+/// UTF-8"); elsewhere, .NET's own writers, which write UTF-8. Every writer of the process, <see cref="Console.Out"/> and
+/// <see cref="Console.Error"/> among them, ASP.NET Core's logging's, writes so once <see cref="Open"/> has run.
+/// </summary>
+public static class WebLingoConsoleText
+{
+    /// <summary>Sets the process's writers as the class says, and gives them: the output's, then the errors'.</summary>
+    public static (TextWriter Output, TextWriter Error) Open()
+    {
+        if (!OperatingSystem.IsWindows()) return (Console.Out, Console.Error);
+        // .NET writes to a console through WriteConsoleW where its output encoding is UTF-16, and then sets no code page.
+        if (!Console.IsOutputRedirected || !Console.IsErrorRedirected) Console.OutputEncoding = Encoding.Unicode;
+        var output = Console.IsOutputRedirected ? Utf8(Console.OpenStandardOutput()) : Console.Out;
+        var error = Console.IsErrorRedirected ? Utf8(Console.OpenStandardError()) : Console.Error;
+        Console.SetOut(output);
+        Console.SetError(error);
+        return (Console.Out, Console.Error);
+    }
+
+    /// <summary>A file's or a pipe's writer, UTF-8 without a byte-order mark, each write sent at once, as .NET's own are.</summary>
+    private static TextWriter Utf8(Stream stream) =>
+        new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)) { AutoFlush = true };
+}

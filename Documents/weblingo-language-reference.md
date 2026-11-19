@@ -74,8 +74,9 @@ function main (0 locals, 1 registers)
 02  Return
 ```
 
-An error is written to the error output as `file(line,column): error CODE: message`, and the exit code says what
-happened:
+What a script writes, and its errors, `weblingo` writes as UTF-8, on Windows too, to a file, a pipe or a console,
+whatever the console's code page, so that no letter is lost. An error is written to the error output as
+`file(line,column): error CODE: message`, and the exit code says what happened:
 
 | Exit code | Meaning |
 |---|---|
