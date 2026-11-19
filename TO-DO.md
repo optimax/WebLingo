@@ -16,15 +16,7 @@ Q2. Which additional database provider should ship first?
 
 A2: MySQL, PostgreSQL
 
-2026-11-19 (Codex). The owner approved the cursor and chose MySQL before PostgreSQL. See the architecture specification, §7.11, “Streaming rows and additional providers”. Streaming landed in `a2c3fe0`. The parent task waits for the MySQL and PostgreSQL adapters.
-
-## [WORKING] Add the MySQL Database Provider
-
-The owner chose MySQL as the first new provider. The local NuGet cache has no MySQL provider. Proposed adapter dependency: MySqlConnector, with the existing ADO.NET connection contract and a `mysql:` provider prefix.
-
-Q1. May I restore MySqlConnector from the configured NuGet feeds for the MySQL adapter?
-
-A1: Yes.
+2026-11-19 (Codex). The owner approved the cursor and chose MySQL before PostgreSQL. See the architecture specification, §7.11, “Streaming rows and additional providers”. Streaming landed in `a2c3fe0`. MySQL landed in `4b45d3b`. The parent task waits for the PostgreSQL adapter.
 
 ## Error Reporting
 

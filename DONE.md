@@ -4076,3 +4076,13 @@ Q6. Approve `std:csv` with `parse(text, headers = false)` and `stringify(rows, h
 A6: Yes.
 
 Done for the three approved modules (Codex, 2026-11-19, `fabe2aa`). The Windows Release build on main passed with zero warnings or errors. 4,195 tests passed and six integration tests were skipped. The CLI and WASP reference examples passed. Linux was not tried. The remaining candidates are in “Choose the Next Standard-Library Additions.”
+
+## [DONE] Add the MySQL Database Provider
+
+The owner chose MySQL as the first new provider. The local NuGet cache has no MySQL provider. Proposed adapter dependency: MySqlConnector, with the existing ADO.NET connection contract and a `mysql:` provider prefix.
+
+Q1. May I restore MySqlConnector from the configured NuGet feeds for the MySQL adapter?
+
+A1: Yes.
+
+2026-11-19 (Codex). Added MySqlConnector 3.0.0 via the existing ADO.NET adapter in `4b45d3b`. The CLI accepts `mysql:` connection strings and WASP requires a configured name. Windows Release builds passed with zero warnings or errors on the task branch and main. The full suite passed 4,196 tests with six skipped on both. The CLI and WASP database samples ran on main, and the CLI publish included MySqlConnector. Live MySQL and Linux were not tested locally.
