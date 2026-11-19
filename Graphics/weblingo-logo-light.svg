@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="376" height="104" viewBox="0 0 376 104"
      role="img" aria-labelledby="title">
   <title id="title">WebLingo</title>
-  <path d="M24 52 39 34l13 30 12-22 12 22 13-30 15 18"
-        fill="none" stroke="#087A5F" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 54 39 35l13 37 12-28 12 28 13-37 15 19"
+        fill="none" stroke="#087A5F" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="124" y="66" fill="#102323" font-family="Segoe UI, Arial, sans-serif"
         font-size="49" font-weight="700" letter-spacing="-1.4"><tspan fill="#087A5F">Web</tspan>Lingo<tspan dx="4" dy="-23" font-size="15" font-weight="600" letter-spacing="0" opacity="0.72">&#8482;</tspan></text>
 </svg>
