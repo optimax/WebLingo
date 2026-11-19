@@ -67,7 +67,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         for (var i = 0; i < builtins.Length; i++)
         {
             var import = module.Imports[i];
-            if (!context.Services.TryGetBuiltin(import.Name, out var builtin) || builtin.Arity != import.Arity)
+            if (!WebLingoIntrinsicBuiltins.TryResolve(context.Services, import.Name, out var builtin) || builtin.Arity != import.Arity)
             {
                 return Failure(WebLingoDiagnosticCodes.UndefinedIdentifier,
                     $"This host has no built-in '{import.Name}' taking {import.Arity} arguments.", new WebLingoSourceSpan(0, 0));
@@ -1838,7 +1838,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             for (var i = 0; i < addedBuiltins.Length; i++)
             {
                 var wanted = import.Imports[i];
-                if (context.Services.TryGetBuiltin(wanted.Name, out var builtin) && builtin.Arity == wanted.Arity)
+                if (WebLingoIntrinsicBuiltins.TryResolve(context.Services, wanted.Name, out var builtin) && builtin.Arity == wanted.Arity)
                 {
                     addedBuiltins[i] = builtin;
                     continue;

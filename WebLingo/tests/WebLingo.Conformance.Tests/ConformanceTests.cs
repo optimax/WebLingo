@@ -728,6 +728,12 @@ public sealed class ConformanceTests : IDisposable
         + "try { a[-3] = 0; } catch (IndexError e) { writeLn(e.code + \" \" + e.message); } "
         + "try { writeLn(a[-3]); } catch (IndexError e) { writeLn(e.code + \" \" + e.message); }",
         "WL3005 The index -3 is outside -2 to -1.\nWL3005 The index -3 is outside -2 to -1.")]
+    [InlineData("try { var sorted = [].sort(1); } catch (TypeError e) { writeLn(e.code + \" \" + e.message); } "
+        + "writeLn([].sort(null));",
+        "WL3001 The argument of 'sort' must be a function, not the integer 1.\n[]")]
+    [InlineData("var map = [].map; try { map(1); } catch (TypeError e) { writeLn(e.code + \" \" + e.message); } "
+        + "class Callback extends Function {} writeLn([2].map(new Callback(x => x + 1)));",
+        "WL3001 The argument of 'map' must be a function, not the integer 1.\n[3]")]
     public void ResultsAreTheSpecifiedOnes(string source, string printed)
     {
         Assert.Equal((WebLingoCommandLine.Success, printed.Length == 0 ? "" : printed + "\n", ""), Weblingo("run", source));
@@ -872,6 +878,17 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("#{}.add(1.5)", "The argument of 'add' must be a string, an integer, a Boolean or null, not the number 1.5.")]
     [InlineData("#{}.has(1.5)", "The argument of 'has' must be a string, an integer, a Boolean or null, not the number 1.5.")]
     [InlineData("#{}.remove(1.5)", "The argument of 'remove' must be a string, an integer, a Boolean or null, not the number 1.5.")]
+    [InlineData("[1].map(1)", "The argument of 'map' must be a function, not the integer 1.")]
+    [InlineData("[].map(1)", "The argument of 'map' must be a function, not the integer 1.")]
+    [InlineData("[].select(null)", "The argument of 'select' must be a function, not null.")]
+    [InlineData("[].filter(1)", "The argument of 'filter' must be a function, not the integer 1.")]
+    [InlineData("[].where(1)", "The argument of 'where' must be a function, not the integer 1.")]
+    [InlineData("[].reduce(\"sum\", 0)", "The first argument of 'reduce', the callback, must be a function, not a string.")]
+    [InlineData("[].find(1)", "The argument of 'find' must be a function, not the integer 1.")]
+    [InlineData("[].any(1)", "The argument of 'any' must be a function, not the integer 1.")]
+    [InlineData("[].some(1)", "The argument of 'some' must be a function, not the integer 1.")]
+    [InlineData("[].all(1)", "The argument of 'all' must be a function, not the integer 1.")]
+    [InlineData("[].every(1)", "The argument of 'every' must be a function, not the integer 1.")]
     [InlineData("Integer.parse(1)", "The argument of 'parse' must be a string, not the integer 1.")]
     [InlineData("Task.all(1)", "The argument of 'all' must be an array of values, not the integer 1.")]
     [InlineData("Task.timeout(null, -1)", "The second argument of 'timeout', the time in milliseconds, must be an integer, 0 or more, not the integer -1.")]

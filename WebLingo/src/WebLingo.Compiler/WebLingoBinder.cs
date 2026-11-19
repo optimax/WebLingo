@@ -2265,7 +2265,10 @@ public sealed class WebLingoBinder
         UseBuiltinClass("Task");
         var (outerScope, outerFunction, outerClass, outerCallees) = (_scope, _function, _class, _nativeCallees);
         (_scope, _function, _class) = (_prelude, _main, null);
-        _nativeCallees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
+        _nativeCallees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal)
+        {
+            ["checkCallback"] = new(WebLingoIntrinsicNames.CheckArrayCallback, 2)
+        };
         var bound = BindExtension(extension, []);
         (_scope, _function, _class, _nativeCallees) = (outerScope, outerFunction, outerClass, outerCallees);
         _arrayMethods = new WebLingoBoundExtension(new WebLingoBoundLocalReference(array, default), bound, default);
@@ -2274,6 +2277,7 @@ public sealed class WebLingoBinder
     private const string ArrayMethodsSource =
         "extend Array {\n" +
         "  map(f) {\n" +
+        "    checkCallback(\"map\", f);\n" +
         "    var items = this;\n" +
         "    var result = [];\n" +
         "    for (var i = 0; i < items.length; i++) {\n" +
@@ -2291,8 +2295,9 @@ public sealed class WebLingoBinder
         "    }\n" +
         "    return result;\n" +
         "  }\n" +
-        "  select(f) { return this.map(f); }\n" +
+        "  select(f) { checkCallback(\"select\", f); return this.map(f); }\n" +
         "  filter(f) {\n" +
+        "    checkCallback(\"filter\", f);\n" +
         "    var items = this;\n" +
         "    var result = [];\n" +
         "    for (var i = 0; i < items.length; i++) {\n" +
@@ -2314,8 +2319,9 @@ public sealed class WebLingoBinder
         "    }\n" +
         "    return result;\n" +
         "  }\n" +
-        "  where(f) { return this.filter(f); }\n" +
+        "  where(f) { checkCallback(\"where\", f); return this.filter(f); }\n" +
         "  reduce(f, initial) {\n" +
+        "    checkCallback(\"reduce\", f);\n" +
         "    var items = this;\n" +
         "    var total = initial;\n" +
         "    for (var i = 0; i < items.length; i++) {\n" +
@@ -2334,6 +2340,7 @@ public sealed class WebLingoBinder
         "    return total;\n" +
         "  }\n" +
         "  find(f) {\n" +
+        "    checkCallback(\"find\", f);\n" +
         "    var items = this;\n" +
         "    for (var i = 0; i < items.length; i++) {\n" +
         "      var item = items[i];\n" +
@@ -2355,6 +2362,7 @@ public sealed class WebLingoBinder
         "    return null;\n" +
         "  }\n" +
         "  any(f) {\n" +
+        "    checkCallback(\"any\", f);\n" +
         "    var items = this;\n" +
         "    for (var i = 0; i < items.length; i++) {\n" +
         "      var found = f(items[i]);\n" +
@@ -2373,8 +2381,9 @@ public sealed class WebLingoBinder
         "    }\n" +
         "    return false;\n" +
         "  }\n" +
-        "  some(f) { return this.any(f); }\n" +
+        "  some(f) { checkCallback(\"some\", f); return this.any(f); }\n" +
         "  all(f) {\n" +
+        "    checkCallback(\"all\", f);\n" +
         "    var items = this;\n" +
         "    for (var i = 0; i < items.length; i++) {\n" +
         "      var kept = f(items[i]);\n" +
@@ -2393,8 +2402,9 @@ public sealed class WebLingoBinder
         "    }\n" +
         "    return true;\n" +
         "  }\n" +
-        "  every(f) { return this.all(f); }\n" +
+        "  every(f) { checkCallback(\"every\", f); return this.all(f); }\n" +
         "  sort(compare = null) {\n" +
+        "    if (compare != null) checkCallback(\"sort\", compare);\n" +
         "    var a = [];\n" +
         "    foreach (var item in this) a.push(item);\n" +
         "    var b = [];\n" +

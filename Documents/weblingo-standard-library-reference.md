@@ -213,6 +213,10 @@ instances holding a value of that kind (the Language Reference, "Classes of valu
 | `x.iterate()` | an `Iterator` of its elements, its values, or its entries, each `[key, value]` |
 | `new Array()`, `new Map()`, `new Set()` | an empty one, as `[]`, `{}` and `#{}` are |
 
+Array methods that take a callback check it before visiting any elements. For example, `[].map(1)` raises
+WL3001 with the message `The argument of 'map' must be a function, not the integer 1.` For `sort`, an
+omitted or `null` comparator selects the default ordering.
+
 ```javascript
 import { writeLn } from "std:system";
 var a = [1, 2];
