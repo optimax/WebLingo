@@ -57,10 +57,11 @@ this folder:
 weblingo add-wl-file-type.wl
 ```
 
-Where another program has opened a `.wl` file before, VS Code say, Windows asks once, at the first double-click, how to
-open it, since no program may choose that for you: choose **WebLingo**, then **Always**. `remove=yes` takes it away
-again. A script double-clicked runs as any program does, one downloaded from the internet included: run only those
-you trust.
+At the first double-click, Windows asks once how to open the file, since only you may choose that, and its list may
+leave WebLingo out: choose **Choose an app on your PC** at its end (on Windows 10, **More apps**, then **Look for
+another app on this PC**), then `weblingo.exe` in WebLingo's folder, `C:\Program Files\WebLingo`, then **Always**.
+`remove=yes` takes it away again. A script double-clicked runs as any program does, one downloaded from the internet
+included: run only those you trust.
 
 ## Updating
 

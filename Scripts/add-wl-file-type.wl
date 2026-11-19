@@ -8,9 +8,11 @@
 //
 // folder=<folder> names WebLingo's folder, where it is neither C:\Program Files\WebLingo nor
 // C:\Program Files (x86)\WebLingo; remove=yes takes the file type away again. It may be run again: it writes the same.
-// Where another program has opened .wl files before, Windows asks once, at the first double-click, which to open them
-// with, since no program may choose for the user: choose WebLingo, and "Always". A script double-clicked runs as any
-// program does, one downloaded from the internet included: run only those you trust.
+// At the first double-click, Windows asks once which program to open .wl files with, since only the user may choose
+// that, and its list may leave WebLingo out: choose "Choose an app on your PC" (on Windows 10, "More apps", then "Look
+// for another app on this PC"), then C:\Program Files\WebLingo\weblingo.exe, and "Always"; Windows then opens them with
+// Applications\weblingo.exe, which this registers with the command above. A script double-clicked runs as any program
+// does, one downloaded from the internet included: run only those you trust.
 param folder = "";
 param remove = "no";
 
