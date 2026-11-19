@@ -26,14 +26,6 @@ Buiid an extension for VS Code to debug WebLingo.
 
 **Q1. Should the first VS Code debugger launch local `.wlg` scripts on the register VM with breakpoints, stepping, a call stack and local variables, with WASP, the stack VM and attaching to running processes left for follow-up tasks?**
 
-## [WORKING] Unnecessary Imports in Language Ref
-
-The Language Reference is full of examples where this line is present:
-
-    import { writeLn } from "std:system";
-
-This is unnecessary since `std:system` is supposed to be implicitly imported.
-
 ## Explain Argument Types in User-Defined Functions
 
 EXPLAIN: How are other methods that expect a certain type of argument handle it? How can a programmer annotate a method to expect a certain type of value so that the compiler could issue a similar error message for user-defined functions?

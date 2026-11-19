@@ -4109,3 +4109,13 @@ This is an example of an error being reported:
 The Language Reference says: A pattern that takes more than a second to match, as some do on some text, stops with a `TimeoutError`.  Make it configurable via a command line flag, something like `--timeout 300`, the time being given in milliseconds.
 
 2026-11-19 (Codex). In `8771532`, `weblingo run --timeout <ms>` and `wasp run --timeout <ms>` set the regex match limit before the file argument. The setting reaches scripts and both bytecode VMs. The default is one second. Windows Release built cleanly and the full suite passed 4,204 tests with six skipped on the task branch and main. The CLI and WASP samples verified the default and overrides. Linux was not tested locally.
+
+## [DONE] Unnecessary Imports in Language Ref
+
+The Language Reference is full of examples where this line is present:
+
+    import { writeLn } from "std:system";
+
+This is unnecessary since `std:system` is supposed to be implicitly imported.
+
+2026-11-19 (Codex). Removed 69 redundant `std:system` imports in `30733a8` and verified five updated diagnostic locations. Compared the original and edited examples on the task branch and main, running 68 and checking the HTTP example without a server. A WASP sample verified implicit `write`. Windows Release built cleanly and the full suite passed 4,204 tests with six skipped on both. Linux was not tested locally.
