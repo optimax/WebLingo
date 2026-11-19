@@ -371,9 +371,9 @@ public static partial class WebLingoMembers
     {
         setter = WebLingoValue.Null;
         if (name.Length > 2 && name[0] == '_' && name[1] == '_' && TrySetName(target, name, value, heap, out error)) return error is null;
-        if (target.Kind == WebLingoValueKind.Module)
+        if (target.Kind == WebLingoValueKind.Module && !target.HasClass)
         {
-            // An export is its module's to change (section 3.9).
+            // An export is its module's to change (section 3.9); a module a class extending Module made has fields, below.
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
                 $"'{name}' of {WebLingoValueFormatter.Describe(target, heap)} cannot be assigned: an export is its module's to change.");
             return false;
@@ -514,10 +514,13 @@ public static partial class WebLingoMembers
         return heap.TryAllocateBoundMethod(self, closure, out bound, out error);
     }
 
-    /// <summary>Whether a value is a collection that a class extending Array, Map or Set made, and its class.</summary>
+    /// <summary>
+    /// Whether a value is a collection, or a module, that a class extending Array, Map, Set or Module made, and its class,
+    /// whose fields and methods its members are, before its own (section 3.7).
+    /// </summary>
     public static bool IsClassedCollection(WebLingoValue value, WebLingoHeap heap, out WebLingoValue classValue)
     {
-        classValue = value.Kind is WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set && value.HasClass
+        classValue = value.Kind is WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Module && value.HasClass
             ? heap.ClassOfValue(value)
             : WebLingoValue.Null;
         return classValue.Kind == WebLingoValueKind.Class;

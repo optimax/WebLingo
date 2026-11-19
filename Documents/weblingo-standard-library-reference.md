@@ -386,6 +386,8 @@ When a program ends, the first fault of a task nothing awaited stops it, unless 
 | Member | What it is |
 |---|---|
 | `Module.import(path, values)` | a task of the module at `path`, compiled and run when it is called, its parameters given `values`, a map |
+| `new Module(name)` | a module defined in code rather than in a file, empty, of that name |
+| `m.exec()` | a module defined in code's body, a task, which a class extending `Module` may override; `Module`'s gives `null` |
 
 ```javascript
 import { writeLn } from "std:system";
@@ -405,6 +407,29 @@ export function scale(x) { return x * factor; }
 ```
 
 A module runs once in an execution for each set of values given it; its instance's members are its exports.
+
+A class may extend `Module`, its instances then being modules defined in code, each named by its constructor's
+`super(name)`, their members their fields and their class's methods:
+
+```javascript
+import { writeLn } from "std:system";
+class Counter extends Module {
+  constructor(name) { super(name); this.count = 0; }
+  next() { this.count += 1; return this.count; }
+  async exec() { return this.next() * 10; }
+}
+var tally = new Counter("tally");
+tally.next();
+writeLn(await tally.exec());
+writeLn([tally, tally is Module]);
+```
+
+```text
+20
+[Counter:module tally, true]
+```
+
+Such a module has no path, so that no `import` finds it.
 
 ---
 

@@ -657,6 +657,14 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { writeLn } from \"std:system\"; import { Json } from \"std:json\"; import { Html } from \"std:html\"; class J extends Json {} class H extends Html {} writeLn([J.stringify([1]), J.parse(\"[2]\"), new J(), H.escape(\"<b>\"), H.js(\"x\"), new J() is Json]);",
         "[\"[1]\", [2], J {}, \"&lt;b&gt;\", \"\\\"x\\\"\", true]")]
     [InlineData("import { writeLn } from \"std:system\"; class I extends Integer {} class B extends Boolean {} writeLn([I.parse(\"10\"), B.parse(\"true\"), new I(3) + 1]);", "[10, true, I:4]")]
+    // A module defined in code: new Module(name), and a class extending Module, whose instances are modules, with fields, their
+    // class's methods, and exec(), which they may override (section 3.7, "No sealed classes").
+    [InlineData("import { writeLn } from \"std:system\"; class Plugin extends Module { constructor(name) { super(name); this.count = 0; } run() { this.count += 1; return this.count; } } var p = new Plugin(\"tools\"); writeLn([p is Module, p is Plugin, p.run(), p.run(), p.count, p]); var m = new Module(\"plain\"); writeLn([m, m is Module, m is Plugin]);",
+        "[true, true, 1, 2, 2, Plugin:module tools]\n[module plain, true, false]")]
+    [InlineData("import { writeLn } from \"std:system\"; class Plugin extends Module { constructor(name, size) { super(name); this.size = size; } async exec() { return this.size * 2; } } class Plain extends Module {} writeLn([await new Plugin(\"x\", 21).exec(), await new Plain(\"q\").exec(), new Plain(\"q\").__instanceOf == Plain]);",
+        "[42, null, true]")]
+    [InlineData("import { writeLn } from \"std:system\"; class Plugin extends Module {} try { new Plugin(5); } catch (e) { writeLn(e.message); } try { new Module(); } catch (e) { writeLn(e.message); } try { new Module(\"m\").y = 2; } catch (e) { writeLn(e.code); } var p = new Plugin(\"p\"); p.y = 2; writeLn(p.y);",
+        "The argument of 'Module' must be a module's name, a string, not the integer 5.\n'Module' takes 1 argument, not 0.\nWL3001\n2")]
     [InlineData("import { writeLn } from \"std:system\"; import { Regex } from \"std:regex\"; var r = new Regex(\"a\"); writeLn([r == r, r == new Regex(r.pattern)]);", "[true, false]")]
     // JSON (the owner's answers, 16 November 2026): a class, Json; integers when integral; instances by their fields or toJson().
     [InlineData("import { writeLn } from \"std:system\"; import { Json } from \"std:json\"; var v = Json.parse(\"{\\\"name\\\": \\\"Ann\\\", \\\"age\\\": 30, \\\"height\\\": 1.7, \\\"tags\\\": [\\\"a\\\", true, null], \\\"e\\\": 1e3, \\\"s\\\": \\\"\\\\u00e9\\\\n\\\\uD83D\\\\uDE00\\\"}\"); writeLn(v);", "{\"name\": \"Ann\", \"age\": 30, \"height\": 1.7, \"tags\": [\"a\", true, null], \"e\": 1000.0, \"s\": \"é\\n😀\"}")]

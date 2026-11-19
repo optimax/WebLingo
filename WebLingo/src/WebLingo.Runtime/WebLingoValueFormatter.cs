@@ -27,6 +27,8 @@ public static class WebLingoValueFormatter
             WebLingoValueKind.Instance when heap.IsHolding(value) => Held(value, heap),
             WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Instance => FormatCollection(value, heap),
             WebLingoValueKind.Class => heap.IsNamed(value) ? "class " + heap.ClassName(value) : "class",
+            WebLingoValueKind.Module when heap.ClassOfValue(value) is { Kind: WebLingoValueKind.Class } moduleClass =>
+                heap.ClassName(moduleClass) + ":module " + heap.ModuleName(value),
             WebLingoValueKind.Module => "module " + heap.ModuleName(value),
             _ => Format(value)
         };

@@ -324,6 +324,17 @@ public sealed class WebLingoHeap
     {
         error = null;
         if (instance.Kind == WebLingoValueKind.Class && value.Kind == WebLingoValueKind.Array) return TryShapeClass(instance, value, out error);
+        if (instance.Kind == WebLingoValueKind.Module && instance.HasClass)
+        {
+            // Module's constructor, super(name), names a module a class extending it made (section 3.7, "No sealed classes").
+            if (value.Kind != WebLingoValueKind.String)
+            {
+                error = ModuleNameArgument("Module").Wrong(value, this);
+                return false;
+            }
+            Get<ModuleObject>(instance, WebLingoValueKind.Module).Name = GetString(value);
+            return true;
+        }
         if (!IsHolding(instance))
         {
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
@@ -347,6 +358,7 @@ public sealed class WebLingoHeap
         // The result may go where the argument is, so the argument is read before the result is written.
         var classObject = Get<ClassObject>(classValue, WebLingoValueKind.Class);
         if (classObject.MakesClasses) return TryNewClass(values, first, count, out result, out error);
+        if (classObject.Makes == WebLingoValueKind.Module) return TryNewModule(classObject.Name, values, first, count, out result, out error);
         if (classObject.Holds == WebLingoValueKind.Regex) return TryMakeRegex(values, first, count, out result, out error);
         // new Bytes(…) and new DateTime(…) make what Bytes.from(…) and DateTime.utc(…) make (section 3.7, "No sealed classes").
         if (classObject.Holds == WebLingoValueKind.Bytes)
@@ -526,6 +538,7 @@ public sealed class WebLingoHeap
         WebLingoValueKind.Array when value.HasClass => Get<ArrayObject>(value, WebLingoValueKind.Array).Instance?.Class ?? WebLingoValue.Null,
         WebLingoValueKind.Map or WebLingoValueKind.Set when value.HasClass =>
             Get<MapObject>(value, value.Kind).Instance?.Class ?? WebLingoValue.Null,
+        WebLingoValueKind.Module when value.HasClass => Get<ModuleObject>(value, WebLingoValueKind.Module).Instance?.Class ?? WebLingoValue.Null,
         _ => WebLingoValue.Null
     };
 
@@ -557,10 +570,14 @@ public sealed class WebLingoHeap
         return TryGrow(target, before, out error);
     }
 
-    /// <summary>The fields of an instance, or of a collection of a class that extends <c>Array</c>, <c>Map</c> or <c>Set</c>.</summary>
+    /// <summary>
+    /// The fields of an instance, or of a collection, or a module, of a class that extends <c>Array</c>, <c>Map</c>,
+    /// <c>Set</c> or <c>Module</c>.
+    /// </summary>
     private InstanceObject Fields(WebLingoValue value) => value.Kind switch
     {
         WebLingoValueKind.Array => Get<ArrayObject>(value, WebLingoValueKind.Array).Instance,
+        WebLingoValueKind.Module => Get<ModuleObject>(value, WebLingoValueKind.Module).Instance,
         WebLingoValueKind.Map or WebLingoValueKind.Set => Get<MapObject>(value, value.Kind).Instance,
         _ => Get<InstanceObject>(value, WebLingoValueKind.Instance)
     } ?? throw new ArgumentException("The collection has no class, and no fields.", nameof(value));
@@ -1042,6 +1059,37 @@ public sealed class WebLingoHeap
     }
 
     /// <summary>
+    /// Marks the built-in class <c>Module</c>, whose <c>new</c> makes a module, empty, defined in code rather than in a
+    /// file, named as it is given (<see cref="TryNewModule"/>), and a class extending which makes modules of its own,
+    /// each also an instance of it, its fields and its class's methods its members (section 3.7, "No sealed classes").
+    /// </summary>
+    public void MarkModuleClass(WebLingoValue classValue)
+    {
+        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        target.IsValueClass = true;
+        target.Makes = WebLingoValueKind.Module;
+    }
+
+    /// <summary><c>new Module(name)</c>: a module, empty, of that name, a string (WL3001 otherwise).</summary>
+    private bool TryNewModule(string className, WebLingoValue[] values, int first, int count, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (count != 1)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.WrongArgumentCount, $"'{className}' takes 1 argument, not {count}.");
+            return false;
+        }
+        if (values[first].Kind != WebLingoValueKind.String)
+        {
+            error = ModuleNameArgument(className).Wrong(values[first], this);
+            return false;
+        }
+        return TryAllocateModule(GetString(values[first]), [], values, first, 0, out result, out error);
+    }
+
+    private static WebLingoArgument ModuleNameArgument(string className) => new(className, 0, 1, "the name", "a module's name, a string");
+
+    /// <summary>
     /// Marks the built-in class <c>Class</c>, whose <c>new</c> makes a class (<see cref="TryNewClass"/>), not an
     /// instance; no class may extend it yet (section 3.7).
     /// </summary>
@@ -1237,6 +1285,8 @@ public sealed class WebLingoHeap
             WebLingoValueKind.Map or WebLingoValueKind.Set =>
                 TryAllocate(new MapObject { Instance = own }, classObject.Makes, 0, out instance, out error, own is not null),
             WebLingoValueKind.Class => TryAllocateMetaclassInstance(classValue, out instance, out error),
+            WebLingoValueKind.Module =>
+                TryAllocate(new ModuleObject("") { Instance = own }, WebLingoValueKind.Module, 0, out instance, out error, own is not null),
             _ => TryAllocate(new InstanceObject(classValue) { Holds = classObject.Holds != WebLingoValueKind.Null },
                 WebLingoValueKind.Instance, 0, out instance, out error)
         };
@@ -1577,6 +1627,7 @@ public sealed class WebLingoHeap
                     break;
                 case ModuleObject module:
                     foreach (var cell in module.Exports.Values) Mark(cell, marked, pending);
+                    MarkFields(module.Instance, marked, pending);
                     break;
                 case InstanceObject instance:
                     Mark(instance.Class, marked, pending);
@@ -1666,7 +1717,7 @@ public sealed class WebLingoHeap
         InstanceObject instance => instance.Count,
         BoundMethodObject => 2,
         WebLingoTask => 2,
-        ModuleObject module => module.Exports.Count,
+        ModuleObject module => module.Exports.Count + (module.Instance?.Count ?? 0),
         _ => 0
     };
 
@@ -1806,11 +1857,15 @@ public sealed class WebLingoHeap
     private static int Size(ClassObject classObject) =>
         classObject.OwnMethods.Count + classObject.StaticMethods.Count + classObject.StaticFields.Count + 1;
 
-    /// <summary>A module's instance: its name, and its exports' cells, by name (section 3.9).</summary>
+    /// <summary>
+    /// A module's instance: its name, and its exports' cells, by name (section 3.9); and, for a module a class extending
+    /// <c>Module</c> made, that class and its fields (section 3.7, "No sealed classes").
+    /// </summary>
     private sealed class ModuleObject(string name)
     {
-        public string Name { get; } = name;
+        public string Name { get; set; } = name;
         public Dictionary<string, WebLingoValue> Exports { get; } = new(StringComparer.Ordinal);
+        public InstanceObject? Instance { get; init; }
     }
 
     private sealed record BoundMethodObject(WebLingoValue Instance, WebLingoValue Closure, bool Disposes);

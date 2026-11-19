@@ -88,6 +88,9 @@ internal static class WebLingoPrelude
         "DateTime" => "class DateTime { constructor(...parts) { hold(this, new DateTime(...parts)); } }",
         "String" => "class String { constructor(value = \"\") { hold(this, value); } }",
         "Function" => "class Function { constructor(f = function () {}) { hold(this, f); } }",
+        // A module defined in code, its name given to new, and its body its exec(), which a class extending Module may
+        // override (section 3.7, "No sealed classes").
+        "Module" => "class Module { constructor(name) { hold(this, name); } async exec() { return null; } }",
         // A metaclass's super(name, base) names and bases the class it makes (section 3.7).
         "Class" => "class Class { constructor(name = null, base = null) { hold(this, [name, base]); } }",
         // The iterator a collection's iterate() gives, its items and its position set by the runtime (section 3.6): next()

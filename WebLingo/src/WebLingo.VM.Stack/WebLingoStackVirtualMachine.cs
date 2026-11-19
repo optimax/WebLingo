@@ -2413,8 +2413,10 @@ public sealed class WebLingoStackVirtualMachine
                 else if (i == (int)WebLingoValueClass.Bytes) heap.MarkValueClass(made, WebLingoValueKind.Bytes);
                 else if (i == (int)WebLingoValueClass.BytesBuilder) heap.MarkValueClass(made, WebLingoValueKind.BytesBuilder);
                 else if (i == (int)WebLingoValueClass.DateTime) heap.MarkValueClass(made, WebLingoValueKind.DateTime);
-                // Json's and Html's are plain classes, with static members; Task's and Module's sealed, for now.
-                else if (i is (int)WebLingoValueClass.Task or (int)WebLingoValueClass.Module) heap.SealClass(made);
+                // A module's: new making a module, a class extending it modules of its own (section 3.7, "No sealed classes").
+                else if (i == (int)WebLingoValueClass.Module) heap.MarkModuleClass(made);
+                // Json's and Html's are plain classes, with static members; Task's sealed, for now.
+                else if (i == (int)WebLingoValueClass.Task) heap.SealClass(made);
             }
             for (var i = 0; i < module.ErrorClasses.Count; i++)
             {
