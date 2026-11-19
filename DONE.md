@@ -3480,3 +3480,226 @@ A1: (a)
 2026-11-17 (Claude): done with A1's (a), and landed: a folder's refusal, WL3016, is a `FilePermissionError`, beside `NetworkPermissionError` and `ComPermissionError`, nothing kept for `PermissionError`, which a script now finds undefined (WL2001); the C# constant followed, `FilePermissionDenied`. The rename is recorded in the specification (section 1.1's "Refusals' errors", and section 7.13); the references, the WASP User Manual, `Documents/implementation.md`, Notepad++'s languages and the tests use the new name.
 
 Done (Claude, 2026-11-17, `033694f`): `PermissionError` renamed `FilePermissionError`. Main's checks: the Release build, without warnings; every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which your uncommitted edits to `Examples/example1` fail; `wasp run` and `wasp serve` catching the renamed class, in `WaspTests` and `WaspServeTests`; Windows only, Linux not tried.
+
+## [DONE] A `toString()` an `extend` Block Gives a Kind of Value
+
+2026-11-17 (Claude): found while making an interpolation check what `toString()` gives (`8a21bd2`). A `toString()` that an `extend` block gives one of the kinds of values built into the VMs, `extend Integer { toString() { return "int"; } }`, is called by one way of writing text and not by the others. `write`, `writeLn` and a page's `<%= %>` never call it, at any depth: `writeLn(5)` writes `5`, and `writeLn([5])` `[5]`, as the specification's section 15.2, "Extensions" (Proposed), has it, such a method called "only" by `x.toString()`; `ConformanceTests` holds that `writeLn("a")` writes `a` under `extend String { toString() … }`. An interpolation calls `x.toString()` for the value it writes, so `$"{5}"` gives `int`, though `$"{[5]}"` gives `[5]`; section 3.5 says an interpolation writes a value as `write` writes it. A class's own instances, and those of a class extending a kind of value, `class S extends Array {}`, have an extension's `toString()` written everywhere: only the kinds of values built into the VMs differ.
+
+Q1: (a) an interpolation writes as `write` does: such a `toString()` is not called there either, only by `x.toString()`, so that `$"{5}"` gives `5`, as section 15.2 has it; (b) every way of writing text calls it, as it calls one a class's instances have, inside arrays and maps too, so that `writeLn(5)` writes `int` and `writeLn([5])` `[int]`, the VMs looking for one only in a program that gives a kind of value a `toString()`; (c) as now, an interpolation calling it for the value it writes, and nothing else.
+
+A1 (the user, in chat, 2026-11-17): (a)
+
+2026-11-17 (Claude): done with A1's (a), and landed: an interpolation builds a value's text as `write` builds it, so that a `toString()` an `extend` block gives a kind of value built into the VMs is called only by `x.toString()`, `$"{5}"` being `5` under `extend Integer { toString() { … } }`; a class's own instances' `toString()`, an extension's included, still called by both. Recorded in the specification, sections 3.5 and 15.2, "Extensions", and the language reference.
+
+Done (Claude, 2026-11-17, `35b6e3a`): an interpolation writes a value as `write` writes it. Main's checks: the Release build, without warnings; every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which `Examples/example1`'s uncommitted footer's `env.machineName()` fails (WL2001); and the CLI, `weblingo` on both VMs and `wasp`. Tried on Windows only.
+
+## [DONE] Write std/Environment
+
+Write a standard Environment class that would provide information about the machine, such as machine name and its environment variables. This needs to be restricted and require explicit permission in the config.
+
+2026-11-17 (Claude): nothing reads the machine or its environment yet: `std:system` has only `write`, `writeLn` and `delay`, and `env.machineName()` in `Examples/example1`'s footer is WL2001. The specification lists the environment among an application's capabilities (section 6.11), with no design. Under `wasp`, a site's environment variables are its process's, those its server gives it, IIS's `web.config` among them (`<environmentVariables>`), which may hold secrets, a connection string or a key; the portable core would read them through the platform layer, as it reads the clock.
+
+Q1, where it is: (a) a standard module of its own, `std:environment`, its class `Environment`, `import { Environment } from "std:environment";`, its members static, as `Database.open` is; (b) the same, its module named `std:env`; (c) a built-in class, `Environment`, in every program without an import, as `Json` is.
+
+A1: (b)
+
+Q2, what it gives: (a) what this task names, the machine's name, `Environment.machineName`, and its environment variables, `Environment.variable("PATH")`, `null` for one that is not set, and `Environment.variables`, a map of those the configuration allows; (b) those, and more of the machine: its operating system's name and version, its number of processors, the process's user, and its current folder; (c) other: say which.
+
+A2: (c): (a) with variable() under the same allowlist and the machine name granted per site.
+
+Q3, reading or writing: (a) reading only; (b) also setting a variable, for the process alone, `Environment.setVariable(name, value)`, which every request of the site would then see.
+
+A3: (a)
+
+Q4, the configuration's permission: (a) `"environment": { "machineName": true, "variables": ["PATH", "APP_*"] }`, the machine's name, and each variable by its name, a name ending in `*` allowing those it begins, `"*"` any, nothing without it; (b) one list, as `"network"`'s and `"com"`'s are, `"environment": { "allow": ["machineName", "PATH", "APP_*"] }`; (c) all or nothing, `"environment": true`.
+
+A4: (a)
+
+Q5, under `weblingo`: (a) a script needs `weblingo.config`'s permission too, as for COM's objects; (b) a script reaches the whole environment without one, as it reaches any file and any host, the permission `wasp`'s alone.
+
+A5: (b) and setting variables is allowed too.
+
+Q6, a refusal: (a) an error of its own, as the other refusals are, `EnvironmentPermissionError`, WL3019, extending `Error`; (b) `null`, as for a variable that is not set, so that a script cannot tell them apart.
+
+A6: (b)
+
+2026-11-18 (Claude): the answers read so: `std:env`, its class `Environment`, `import { Environment } from "std:env";`, its members static: `Environment.machineName`, `Environment.variable(name)`, `null` for one that is not set or not allowed, and `Environment.variables`, a map of those allowed. Under `wasp`, a site reaches the machine's name only with `"machineName": true`, and a variable only by the configuration's list, a name ending in `*` allowing those it begins, `"*"` any; under `weblingo`, a script reaches all of it, and sets a variable too, for the process alone, `Environment.setVariable(name, value)`. Two points need answering before it is built:
+
+Q7, the permission's name: `wasp.config`'s `"environment"` already names the application's environment, `"environment": "production"`, whether errors are shown in their pages (specification, section 6.12, "Errors"; the WASP User Manual's table of settings). (a) the permission named after the module, `"env": { "machineName": true, "variables": ["PATH", "APP_*"] }`; (b) the permission `"environment"`, and the application's environment renamed, `"mode": "production"`, nothing kept for the old name; (c) other: say which.
+
+A7: None of these. The permission named after the module, `"env"`. But also the application's environment renamed, `"mode": "production"`, nothing kept for the old name.
+
+Q8, `setVariable` under `wasp`, whose scripts only read (A3): (a) it sets nothing and gives `null`, as a refusal to read gives `null` (A6); (b) a runtime error, WL3001, a `TypeError`; (c) an error of its own, `EnvironmentPermissionError`, WL3019.
+
+A8: (c).
+
+2026-11-18 (Claude): done with the answers, and landed: `std:env`, its class `Environment`, `machineName`, `variable(name)`, `variables` and `setVariable(name, value)`, static; under `wasp` only what `wasp.config`'s `"env"` allows, anything else `null`, `setVariable` an `EnvironmentPermissionError`, WL3019; under `weblingo` all of it, variables set too. The application's environment is `"mode"` now, `"environment"` no longer a setting. Read through the platform layer, `IWebLingoEnvironment`, `DotNetEnvironment` on .NET; native classes may declare static properties for it. Recorded in the specification (the decision register, sections 6.12, 7.15, 8.4 and 15.2), the Standard Library Reference (section 19), the language reference, the WASP User Manual and implementation.md. Found in passing, not changed: a class's static property, a declared class's or a native one's, is not read through an instance, `new P().x`, WL3006, though section 3.7 has a static member reached through an instance. `Examples/example1`'s footer, the user's uncommitted edit, still calls `env.machineName()`, which would be `<% import { Environment } from "std:env"; %>` and `Environment.machineName`, with `"env": { "machineName": true }` in its `wasp.config`.
+
+Done (Claude, 2026-11-18, `901acfa`): `std:env`. Main's checks: the Release build, without warnings; every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which `Examples/example1`'s uncommitted footer's `env.machineName()` fails (WL2001); and the CLI, `weblingo` on both VMs and `wasp`. Tried on Windows only.
+
+## [DONE] Class References
+
+Explain: Can class references be assigned or passed around? Something like
+
+```
+class MyClass { 
+  doIt() { ... } 
+}
+
+var cf = MyClass;
+
+var cObj = new cf();
+cObj.doIt();
+```
+
+If not, make sure they do.
+
+2026-11-18 (Claude): yes, they can. A class is a value, of the class `Class` (specification, section 3.7): it may be assigned, `var cf = MyClass;`, compared, `cf == MyClass` being `true`, passed to a function and returned from one, and kept in an array or a map; and `new` makes an instance through any of them, `new cf()`, `new c()` in `function make(c) { return new c(); }`, `new (list[0])()`, the instance being `is MyClass` and calling `doIt()` as one `new MyClass()` makes does (tried with `weblingo`, 18 November 2026). Two things in the example are not WebLingo as it stands, both of `new`'s syntax rather than of class references: `new cf;` without parentheses is WL1001, "Expected '('", `new` always taking its arguments in parentheses, as C#'s does (section 3.7, `new Name(a, b)`); and `new` finds its class by a name and its members, `new lib.Point()`, or by any expression in parentheses, so that `new list[0]()` is WL1001 too, written `new (list[0])()`.
+
+Q1, `new cf;` without parentheses: (a) allowed, the same as `new cf()`, as JavaScript allows it; (b) parentheses required, as now and in C#.
+
+A1: (b)
+
+Q2, `new list[0]()`: (a) allowed, `new` finding its class through indexes too, as JavaScript's does; (b) as now, a name and its members, anything else in parentheses.
+
+A2: (b)
+
+2026-11-18 (Claude): answered; with A1's and A2's (b), `new` stays as it is, so nothing changes: class references are assigned and passed around as the note above shows.
+
+Done (Claude, 2026-11-18): explained; nothing to land, `new`'s syntax kept as section 3.7 has it.
+
+## [DONE] Standard Modules, Imported: The Import Taught
+
+The specification's section 9, "M0.20 parts", part 1, of "JSON import": a name a standard module exports, used without importing it, is WL2001, `'Json' is not defined; did you mean Json, from std:json?`, the same for a name it differs from only by case, `JSON`, and for every standard export, so that each name the later parts take out of every program's scope teaches its import from then on.
+
+2026-11-18 (Claude): done, and landed: a name that is not defined, WL2001, ends its message with what it may have been meant as, a name in scope it differs from only by case, `did you mean count?`, else a standard module's export of that name or of one it differs from only by case, `did you mean Database, from std:db?`, the host's resolver loading the standard modules only for a program with such a name. The owner's decision is recorded in the specification (the decision register, sections 3.6 and 3.9), and its parts in section 9, "M0.20 parts".
+
+Done (Claude, 2026-11-18, `8f616a9`): the import taught. Main's checks: the Release build, without warnings; every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which `Examples/example1`'s uncommitted footer's `env.machineName()` fails (WL2001); and the CLI, `weblingo` and `wasp`. Tried on Windows only.
+
+## [DONE] Standard Modules, Imported: `std:json` and `std:html`
+
+The specification's section 9, "M0.20 parts", part 2, of "JSON import": `Json` only by `import { Json } from "std:json";`, and `Html` only by `import { Html } from "std:html";` (A1, A2), every program's no longer; a page's own escaping keeping its use of them without an import; the examples, tests and documents that use them importing them.
+
+2026-11-18 (Claude): done, and landed: `Json` only by `import { Json } from "std:json";` and `Html` only by `import { Html } from "std:html";`, `std:json` and `std:html` standard modules the compiler makes itself, as `std:system` is (`WebLingoStandardModules`); a page's own escaping uses `Html` without an import; the examples' handlers, the tests and the documents import them. Found in passing, not changed: while it was being built, a module the compiler made and the verifier accepted, its import of a module without a function or built-ins, crashed the register VM with a .NET `NullReferenceException` (`WebLingoVirtualMachine.Run`, its failure path given no error), where malformed bytecode should fail verification; a `.wlbc` made so by hand may do the same.
+
+Done (Claude, 2026-11-18, `416853d`): `std:json` and `std:html`. Main's checks: the Release build, without warnings; every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which `Examples/example1`'s uncommitted footer's `env.machineName()` fails (WL2001); and the CLI, `weblingo` and `wasp`. Tried on Windows only.
+
+## [DONE] Standard Modules, Imported: `std:io`
+
+The specification's section 9, "M0.20 parts", part 3, of "JSON import": `write` and `writeLn` only by `import { write, writeLn } from "std:io";` (A1), `std:system`'s implicit import gone; a template's text and its `<%= %>` writing without an import, a block that calls `write` importing it; every script, sample, test, example, benchmark workload and document gaining its import.
+
+2026-11-18 (Claude): done, and landed: `write` and `writeLn` only by `import { write, writeLn } from "std:io";`, `std:io` a standard module the compiler makes; an imported `writeLn` is still one direct call of the built-in, so nothing a script writes is slower, and an import of a module the compiler makes is not awaited, so a script that imports only `std:io` is not made `async` by it; a page's text and `<%= %>` write without an import, a block that calls `write` imports it. The samples, the benchmark's workloads, the examples' scripts, every test that writes and every example in the documents import what they write, the documents' examples run again with the output shown; the compiler's own tests call a test's `print` and `printLn` instead. `std:system` is still imported implicitly, for `delay` alone, until "The Rest" is answered.
+
+Done (Claude, 2026-11-18, `c012cf6`): `std:io`. Main's checks: the Release build, without warnings; every test but `WaspServeTests.TheExampleApplicationServesItsPages`, which `Examples/example1`'s uncommitted footer's `env.machineName()` fails (WL2001); and the CLI, `weblingo` on the samples and `wasp`. Tried on Windows only.
+
+## [DONE] Enhance std:fs
+
+`std:fs` can only read and write text. Extend it with the ability to read and write binary files so that installation scripts could be written in weblingo without the use of COM.
+
+2026-11-18 (Claude): what a script does with files now is text (`readText`, `writeText`, `appendText`, and a `File`'s lines), and `list(path)` gives a folder's names without telling a folder from a file (the standard library reference, section 14), so that a script cannot copy a folder whole without COM's `Scripting.FileSystemObject`, as `Scripts/install-weblingo.wl` does.
+
+Q1, the functions for bytes: (a) `readBytes(path)`, giving `Bytes`, `writeBytes(path, bytes)` and `appendBytes(path, bytes)`, as `readText`, `writeText` and `appendText` are for text, a whole file at a time, each with its `…Sync` form; (b) those, and a `File` opened for bytes, `File.open(path, "rb")` or `"wb"`, its `read(count)` giving up to that many bytes, `null` at the end, and `write(bytes)`, for a file too large to hold whole; (c) other: say which.
+
+A1: (b)
+
+Q2, what else a script needs to copy a folder without COM: (a) `isFolder(path)`, and `copy(source, target)`, a file copied as it is, its bytes never reaching the script, each with its `…Sync` form; (b) `isFolder(path)` only, a script copying a file by `readBytes` and `writeBytes`; (c) neither, for now.
+
+A2: (a)
+
+2026-11-18 (Claude): done, and landed: `readBytes`, `writeBytes` and `appendBytes`, whole files as `Bytes`; a `File` opened for its bytes, `"rb"` or `"wb"`, `read(count)` up to that many, `null` at its end, and `write(bytes)` (A1); `isFolder(path)`, and `copy(source, target)`, a file copied as it is, replacing one at `target`, its errors naming both paths (A2); each with its `Sync` form, a site's capabilities reading a copy's source and writing its target. Guessed, and recorded as Proposed in the specification's section 15.2: one `read(count)` gives at most 16 MiB, a file opened for its bytes takes no encoding, and there is no `"ab"` yet. `Scripts/install-weblingo.wl` now copies WebLingo through `std:fs` (`windows.wl`'s `copyFolder`), tried on the published WebLingo, its 106 files copied identical, twice; it has not been run as administrator since.
+
+Done (Claude, 2026-11-18, `6cc40d5`). Main's checks: the Release build, without warnings; the full suite, 3,922 tests, none failed or aborted; and the CLI, `weblingo` on the samples. Tried on Windows only; Linux not tried.
+
+## [DONE] Enhance String.trimEnd)
+
+`trimEnd` takes no argument in WebLingo. Make it work so this is possible:
+
+        var prefix = folder.toLower().trimEnd("\\") + "\\";
+
+2026-11-18 (Claude): C#'s `TrimEnd` takes the characters to trim, any of them, as many as end the string, and JavaScript's takes nothing; WebLingo's string methods have C#'s names (the specification, section 3.5, "String methods").
+
+Q1, what the argument trims: (a) any of the characters it holds, as C#'s `TrimEnd(chars)` does, each a Unicode scalar value: `"a//".trimEnd("/")` is `"a"`, and `"x;,;".trimEnd(";,")` is `"x"`; (b) the argument as a whole, a suffix removed as often as it ends the string: `"x;,;,".trimEnd(";,")` is `"x"`, but `"x;,;".trimEnd(";,")` is `"x;"`.
+
+A1: (a): the argument is a set of characters, each a Unicode scalar value, and `trim`, `trimStart` and `trimEnd` remove any of them from their end or ends, as C#'s `Trim(chars)` and Python's `strip(chars)` do: `"a//".trimEnd("/")` is `"a"`, and `"x;,;".trimEnd(";,")` is `"x"`. An empty argument trims nothing. To remove a fixed string, there are two methods of their own, `removePrefix(text)` and `removeSuffix(text)`, as Python 3.9 and Kotlin have them: each removes `text` once, only where the string begins or ends with it, and otherwise gives the string unchanged, `"report.txt".removeSuffix(".txt")` being `"report"`. Separate names keep Python's trap out of the language: with `strip(chars)`, people pass a suffix and get `"report.txt".rstrip(".txt")`, which is `"repor"`. The standard library reference warns of it, with that example, where it describes `trim`.
+
+Q2, which methods take it: (a) `trim`, `trimStart` and `trimEnd`, as C#'s three do; (b) `trimEnd` only.
+
+A2: (a)
+
+2026-11-18 (Claude): done, and landed: `trim`, `trimStart` and `trimEnd` take a set of characters, each a Unicode scalar value, a surrogate pair one character, any of them removed from the end or ends, an empty argument trimming nothing, so that `folder.toLower().trimEnd("\\") + "\\"` works (A1, A2); and `removePrefix(text)` and `removeSuffix(text)`, a fixed text removed once, only where the string begins or ends with it; the Standard Library Reference warns of `"report.txt".trimEnd(".txt")` being `"repor"` where it describes `trim`. `"tea".trim(1)` is WL3001 now, a string being wanted, where it was WL2006.
+
+Done (Claude, 2026-11-18, `995ee9c`). Main's checks: the Release build, without warnings; the full suite, 3,940 tests, none failed or aborted; and the CLI, `weblingo` on the samples. Tried on Windows only; Linux not tried.
+
+## [DONE] Standard Modules, Imported: The Rest
+
+The specification's section 9, "M0.20 parts", part 4, of "JSON import": what A1 leaves open.
+
+Q1, the kinds of values no literal makes, `Bytes` and `BytesBuilder`, `DateTime` and `Regex`, whose values modules and methods give too (`crypto.sha256(x)` gives `Bytes`): (a) each in a module of its own, imported, `std:bytes` (`Bytes`, `BytesBuilder`), `std:datetime` (`DateTime`) and `std:regex` (`Regex`), a value of the kind keeping its members without an import, `b.toHex()`, only the class's own name needing one, `Bytes.from(text)`, `DateTime.now()`, `x is Regex`; (b) every program's, as `Integer` and `String` are, being kinds of values the VMs build in; (c) other: say which.
+
+A1: (a): Bytes and BytesBuilder from std:bytes, DateTime from std:datetime, Regex from std:regex. A value of these kinds keeps its members without an import, and only naming the class needs one. The rule, written into the specification: a kind of value is every program’s exactly when the language’s own syntax makes it, as literals make Integer and String. 
+
+Q2, `delay(milliseconds)`, `std:system`'s third function: (a) `std:tasks`'s, `import { delay } from "std:tasks";`, beside `all`, `any` and `timeout`, `std:system` then exporting nothing, and gone; (b) `std:io`'s, beside `write` and `writeLn`, `std:system` gone likewise; (c) `std:system` stays, `delay` its one export, imported.
+
+A2: (c) for now. Let's move write and writeLn back to std:system.  `std:system` implicitly imported.
+
+2026-11-18 (Claude): landed (`284ba05`), main's checks passed, as A1 and A2 read when it was begun: `Bytes` and `BytesBuilder` `std:bytes`'s, `DateTime` `std:datetime`'s, `Regex` `std:regex`'s, and `write`, `writeLn` and `delay` `std:system`'s, `std:io` gone, every one imported, `import { writeLn, delay } from "std:system";`, as (c) has it. A2's last sentence was added while it was being built.
+
+Q3, A2's "`std:system` implicitly imported": (a) `write`, `writeLn` and `delay` in every program without an import, as before part 3 (M0.20.3), an import of them allowed and meaning the same, and the imports parts 3 and 4 gave every script, sample, test, example and document taken out again; (b) the same, those imports left where they are; (c) as landed, each imported, `std:system` being where they are imported from.
+
+A3: (b)
+
+2026-11-18 (Claude): A3 (b) done, and landed (`064a240`): `std:system` imported implicitly by every program again, `write`, `writeLn` and `delay` in its scope without an import, an import of them allowed and meaning the same, the imports parts 3 and 4 gave left where they are; a misspelt `Writeln` suggests the `writeLn` in scope.
+
+Done (Claude, 2026-11-18, `284ba05` and `064a240`). Main's checks: the Release build, without warnings; the full suite, 3,939 tests, none failed or aborted; and the CLI, `weblingo` on the samples. Tried on Windows only; Linux not tried.
+
+## [DONE] JSON import
+
+You said [module is available] "in every program without an import, as `Json` is". JSON should not be treated special. It should require an import of `std:JSON`.
+
+2026-11-18 (Claude): `Json` is a built-in class in every program now, the owner's decision of 16 November 2026 (specification, section 3.6, "JSON", "rather than a standard module"), which this changes: a program that names `Json` without importing it would be WL2001, nothing kept for the old way. It is used by `Examples/example2`'s and `example3`'s handlers, about twenty tests, and the documents, all of which would import it.
+
+Q1, how it is imported: (a) its class, as `std:db`'s and `std:net`'s are, `import { Json } from "std:json";`, then `Json.parse(text)` and `Json.stringify(value)`, as now; (b) its functions, as `std:fs`'s and `std:crypto`'s are, `import json from "std:json";`, then `json.parse(text)` and `json.stringify(value)`.
+
+A1: (a), and further: every standard module is imported, with nothing from a standard module available without an import.
+
+- `Json` too: `import { Json } from "std:json";`.
+- `write` and `writeLn` too: they move to a module of their own, `std:io`, as in `import { write, writeLn } from "std:io";.` A script with no import of them can’t write.
+- Global without import: only what the language itself makes. That means the classes its literals and statements produce or need (`Object`, `Array`, `Map`, `Set`, `Error` and the runtime errors’ classes, `Task`, `Function`, `Class`, `Module`) and its constants (`Infinity`, `NaN`).
+- The reason: a script’s imports list everything it depends on, and everything a host must grant it. No standard name is reserved in a script that doesn’t import it, and an unused standard module costs nothing.
+- Teaching the import: where a script uses a standard module’s name without importing it, the compiler reports the name as undefined. It also suggests the import, e.g. “Json is not defined; did you mean Json, from std:json?”, or for JSON, “did you mean Json?”. It does the same for `write` and `writeLn` (`“from std:io”`), and for every other standard export.
+- Templates: a template’s text and its `<%= %>` keep writing to the page without an import. That’s the template compiler’s own output, not a script’s call of write. A block of code that calls write itself imports it, as any script does.
+- No backward compatibility: existing scripts, samples and tests gain their imports.
+
+Q2, `Html`, the other library class every program has without an import, whose `Html.url(x)`, `Html.js(x)` and the rest a page calls for what its escaping cannot tell (section 13): (a) it stays so; (b) it moves to a module too, `std:html`, imported as Q1 says.
+
+A2: (b), let's stay consistent.
+
+2026-11-18 (Claude): too large to land in one piece, so split into parts, which the specification's section 9, "M0.20 parts", defines, each a task below: the import taught, `std:json` and `std:html`, `std:io`, and the rest. Read so, as the rule says, the classes literals make, `Boolean`, `Integer`, `Number`, `String` and `Decimal`, and the one `foreach` needs, `Iterator`, are every program's too; the runtime errors' classes are, the standard modules' failures' among them (`IOError`, `NetworkError`, `DatabaseError`, `ComError` and the permissions' errors), and `Module` and `Task`; and `std:system`'s third function, `delay`, and the kinds of values no literal makes, `Bytes`, `BytesBuilder`, `DateTime` and `Regex`, wait for the questions under the last part. Idle until its parts are done.
+
+2026-11-18 (Claude): parts 1 to 3 done (`8f616a9`, `416853d`, `c012cf6`); idle, waiting for the answers to "The Rest"'s questions, its part 4.
+
+2026-11-18 (Claude): every part landed, the specification's section 9, "M0.20 parts": the import taught (`8f616a9`), `std:json` and `std:html` (`416853d`), `std:io` (`c012cf6`), and the rest (`284ba05`, `064a240`), `std:io` gone and `std:system` imported implicitly again, as "The Rest"'s A2 and A3 have it.
+
+Done (Claude, 2026-11-18): all its parts done, each with main's checks passed. Tried on Windows only.
+
+## [DONE] Native BytesBuilder
+
+`BytesBuilder` is written in WebLingo now, in the prelude (`WebLingoPrelude.cs`): an array of parts, which `toBytes()` joins with `Bytes.concat` (standard library reference, section 10). Make it native, as `Bytes` is: a growing buffer of .NET bytes, `add(value)` (bytes, an integer from 0 to 255, or a string as UTF-8) appending to it, `length` its count, and `toBytes()` giving immutable `Bytes`, which no later `add` changes. Its members and their errors stay as the reference has them, on both VMs, its growth counted against the heap's budget. Measure it against the prelude's on the benchmark, with a workload that builds bytes in many small pieces, and keep the native one only if it is faster, as A3 of "Native Modules" asks of the built-in classes. 
+
+2026-11-18: waits for "Standard Modules, Imported: The Rest", whose Q1 decides the module `BytesBuilder` is imported from.
+
+2026-11-18 (Claude): done, and landed: `BytesBuilder` a kind of value of its own, as bytes are, a buffer that doubles as it must, its growth within the heap's budget and given back when collected; `add`, `length` and `toBytes()` as the reference has them, on both VMs. Measured on a new workload, `bytes`, 300,000 small pieces, alternately against the class written in WebLingo: about 18 times as fast (11.2–12.7 ms against 216.9–222.4 on the register VM, 12.4–14.4 against 228.0–238.5 on the stack VM), a quarter of the instructions, a twelfth of the allocation; so it was kept, the other workloads within the machine's noise (the specification's section 5.6, "Bytes built from pieces"). Guessed, and recorded as Proposed in section 15.2: its text is its bytes so far, `BytesBuilder:[104, 105]`; `add`'s error names `add`, not `concat`; and its class is sealed, as `Bytes` is, where a class could extend the one written in WebLingo. Found while measuring, and fixed first (`e07f95c`): the collector gave back only an object's overhead for bytes, decimals and regular expressions, not what their content was charged, so that an execution making many of them ran out of its budget with almost nothing alive.
+
+Done (Claude, 2026-11-18, `e07f95c` and `9e10eed`). Main's checks: the Release build, without warnings; the full suite, 3,950 tests, none failed or aborted; and the CLI, `weblingo` on the samples. Tried on Windows only; Linux not tried.
+
+## [DONE] What `--version` Says
+
+`weblingo --version` prints `WebLingo M0.6 (pre-alpha)`, the text approved on 12 November 2026 (specification, section 15.2, "CLI"), and `wasp --version` prints `WASP M0.12 (pre-alpha)`, which no document records (`WebLingoWaspCommandLine.Version`). The roadmap has since reached M0.20 (section 9), so both name milestones long past. Found 18 November 2026, when `weblingo` went on a machine's PATH; added by Claude at the owner's request.
+
+Q1, what both print: (a) the last milestone landed, the same for both, since they are installed together, `WebLingo M0.19 (pre-alpha)` and `WASP M0.19 (pre-alpha)`, from one constant both command lines share (`wasp` references `WebLingo.Cli`), brought up to date by the task that finishes each milestone; (b) a version number, `WebLingo 0.19.0-pre-alpha` and `WASP 0.19.0-pre-alpha`, set once for the whole solution in `Directory.Build.props`, which then versions every assembly too, raised as (a) says; (c) they stay as they are until a first release.
+
+A1: (b). Also print this as the first line when weblingo is invoked without parameters.
+
+2026-11-18 (Claude): done, and landed: one version for the solution, set in `Directory.Build.props`, every assembly's, `0.20.0-pre-alpha`, M0.20 having landed whole; `weblingo --version` prints `WebLingo 0.20.0-pre-alpha` and `wasp --version` `WASP 0.20.0-pre-alpha`, and each prints it first when run without arguments (asked of `weblingo`; `wasp` shares its code). `Documents/implementation.md` now says the task that lands a milestone raises the version.
+
+Done (Claude, 2026-11-18, `149391b`). Main's checks: the Release build, without warnings; the full suite, 3,951 tests, none failed or aborted; and the CLI, `weblingo` on the samples, and both `--version`s. Tried on Windows only; Linux not tried.
