@@ -42,7 +42,7 @@ try {
 }
 
 // An exception in a task nothing awaits still stops the program at its end, unless the task is forgotten on purpose.
-async function failing() { throw new Error("nobody listens"); }
+async function failing() { throw new Error("nobody cares"); }
 failing().forget();
 writeLn("done");
 

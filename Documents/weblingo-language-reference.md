@@ -56,6 +56,12 @@ A WebLingo program is a `.wl` file, a *script*, which `weblingo` runs:
 weblingo run hello.wl
 ```
 
+or simply
+
+```bash
+weblingo hello.wl
+```
+
 | Command | What it does |
 |---|---|
 | `weblingo run <file.wl> [name=value …]` | compiles the script and runs it, giving its parameters the values after it |
@@ -100,7 +106,7 @@ A script's own parameters ([section 14](#script-parameters)) are given after its
 `weblingo.config` file in the script's folder configures where native modules are found
 ([section 15](#native-modules)).
 
-Editors can colour WebLingo's files: the repository's `Editors/` folder has syntax colouring for `.wl` files, and for
+Editors can color WebLingo's files: the repository's `Editors/` folder has syntax coloring for `.wl` files, and for
 WASP's `.wasp` pages, and its `README.md` says how to install it.
 
 ---
@@ -1078,7 +1084,6 @@ block can be called before a variable it reads has been declared; reading that v
 ### Arrays
 
 ```javascript
-import { writeLn } from "std:system";
 var a = [10, 20, 30];
 writeLn(a[0]);
 a[1] = 25;
@@ -1109,7 +1114,6 @@ null
 ### Array methods
 
 ```javascript
-import { writeLn } from "std:system";
 var a = [3, 1, 2];
 writeLn([a.map(x => x * 10), a.filter(x => x > 1), a.reduce((sum, x) => sum + x, 0)]);
 writeLn([a.find(x => x > 1), a.any(x => x > 2), a.all(x => x > 2), a.indexOf(2), a.contains(5)]);
@@ -1141,7 +1145,6 @@ writeLn([a.removeAt(1), a]);
 ### Maps
 
 ```javascript
-import { writeLn } from "std:system";
 var tea = { name: "Sencha", price: 6.5 };
 writeLn(tea["name"]);
 tea["origin"] = "Japan";

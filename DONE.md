@@ -3704,6 +3704,282 @@ A1: (b). Also print this as the first line when weblingo is invoked without para
 
 Done (Claude, 2026-11-18, `149391b`). Main's checks: the Release build, without warnings; the full suite, 3,951 tests, none failed or aborted; and the CLI, `weblingo` on the samples, and both `--version`s. Tried on Windows only; Linux not tried.
 
+## [DONE] Extend Example2
+
+Extend it with a shopping cart and examples of web form actions.
+
+2026-11-18 (Claude): done, and landed: Lingo Aquatics has a shopping cart, `/cart`, kept in the database's new table `CartItems` by a random id that a cookie holds (`HttpOnly`, `SameSite=Lax`). Fish are added from a fish's page. The cart's one form updates every quantity at once, and its Remove and Empty buttons post the same form elsewhere through their `formaction`. Each change is a route handler exporting `post`, which changes the cart and redirects with a 303, so that a reload posts nothing again; a form no page of the site sends is refused, a 400. Checkout orders every fish in the cart in one transaction, or none. Adding a fish the cart holds already is an upsert, `INSERT … ON CONFLICT … DO UPDATE`. A line's total is worked out in WebLingo, the decimal price times how many: SQLite's product of the two has no declared type and comes back as a binary number, which does not mix with a decimal. `Examples/README.md` describes all of it, and `TheFishStoreServesItsDatabase` follows a cart from a new browser's first add to its checkout. Guessed: the cart is kept in the database, the cookie holding only its id; each change goes back to the cart, not to the page it came from; checkout is a page, as the single order's is.
+
+Done (Claude, 2026-11-18, `268f9d3`). Main's checks: the Release build, without warnings; the full suite, 3,951 tests, none failed or aborted; and `wasp serve` on the example in a browser, fish added, one removed by its button, the cart reloaded without posting again. Tried on Windows only; Linux not tried.
+
+## [DONE] Append Mode
+
+`read(count)` returns at most 16 MiB at a time, and there’s no `"ab"` (append bytes) mode yet. Support append mode.
+
+2026-11-18 (Claude): done, and landed: `File.open(path, "ab")` opens a file for its bytes, which it writes after the file's own, making a file that is not there, as `"a"` does for text, and takes no encoding, as `"rb"` and `"wb"` do; recorded as the owner's request in the specification (section 3.9, and its register) and in both references. `read(count)` keeps its 16 MiB: a larger count gives at most that many, and the next `read` the rest.
+
+Done (Claude, 2026-11-18, `578d5d2`). Main's checks: the Release build, without warnings; the full suite, 3,954 tests, none failed or aborted; and `weblingo` on a script that appends bytes to a file there and to one that is not. Tried on Windows only; Linux not tried.
+
+## [DONE] Standard Classes Extended, Part 1: Their Values' Methods
+
+Specification, section 9, "Standard classes extended, parts", part 1: an instance of a class extending `String`, `Integer`, `Number`, `Boolean`, `Decimal`, `Regex` or `Function` has its value's methods, as it has its properties, `new Name("ann").toUpper()` giving `"ANN"`.
+
+2026-11-18 (Claude): done, and landed: an instance of a class extending a kind of value's class has its value's methods, `new Name("ann").toUpper()` giving `"ANN"`, a string, and `new Strict("a+").test("aa")` `true`, an `extend` block's method using them through `this`; a member neither the class nor the value has stays the instance's WL3006, `An instance of Name has no member 'nope'.` A call `TryFindCallee` does not find on such an instance goes to its value's member in `WebLingoMembers.TryCall`, as a native class's fallback does, so neither VM's `Run` changed. The Language Reference shows it.
+
+Done (Claude, 2026-11-18, `dbf6295`). Main's checks: the Release build, without warnings; the full suite, 3,966 tests, none failed or aborted; and the CLI, `weblingo` on the samples and on the Language Reference's new example. Tried on Windows only; Linux not tried.
+
+## [DONE] Standard Classes Extended, Part 2: Bytes, BytesBuilder, DateTime, Json and Html
+
+Specification, section 9, "Standard classes extended, parts", part 2: these five no longer sealed; a class extending one of the first three holding a value of its kind, `new Mine(…)` taking `Bytes.from(…)`'s arguments, nothing, or `DateTime.utc(…)`'s, and `new Bytes(…)` and `new DateTime(…)` making plain values; a class extending `Json` or `Html` reaching their static members.
+
+2026-11-18 (Claude): done, and landed: `Bytes`, `BytesBuilder`, `DateTime`, `Json` and `Html` are no longer sealed. A class extending one of the first three holds a value of its kind, `new Day(2026, 11, 21)` a date as `DateTime.utc(…)` makes it, `new Blob("tea")` bytes as `Bytes.from(…)` makes them, `new Lines()` a builder, with the value's members, through part 1, and its class's own; `new Bytes(…)` and `new DateTime(…)` make plain values, as `new Integer(42)` does. A class extending `Json` or `Html` is a plain class reaching their static members; and the runtime's class methods, `Json.parse`, `Bytes.from`, `DateTime.utc`, `Integer.parse` and the like, are found for a class extending theirs too, `Day.utc(2026, 1, 1)` (`WebLingoMembers.Reaches`). Read so: `new` takes `Bytes.from(…)`'s arguments for a class extending `Bytes`. Found and fixed on the way: the binder lost a built-in class's `hold` when a spread in its source bound the `Spread` class, by resetting, not restoring, that it was binding the prelude. `new Json()` and `new Html()` make plain instances now, where they were WL3001.
+
+Done (Claude, 2026-11-18, `fded9a3`). Main's checks: the Release build, without warnings; the full suite, 3,971 tests, none failed or aborted; and the CLI, `weblingo` on the samples and on the Standard Library Reference's new example. Tried on Windows only; Linux not tried.
+
+## [DONE] Argument Errors That Name the Argument
+
+`"tea".trim(1)` is WL3001 with a message saying a string was expected, which reads as if `"tea"` were the problem: the code is right (`trim` now takes an optional set of characters, so one argument is allowed, and an integer is a wrong kind of value, not a wrong number of arguments, WL2006), but the message does not say what should have been a string. A wrong kind of argument's message names the method and the argument, and says what it must be and what it was given: "`trim`'s argument must be a string of characters to trim, not an integer". Go through the built-in classes' methods that take arguments (strings', arrays', maps', `Bytes`', `DateTime`'s, `Regex`'s, and the standard modules' functions) for the same vague wording, and give each such message that form, with a test of the message, not only of its code.
+
+2026-11-18 (Claude): every message names a member in single quotes now (`'trim' takes 0 to 1 arguments, not 2.`), and gives the value it was given, not only its kind (`not the integer 1`, `not a string`, as `WebLingoValueFormatter.Describe` gives it).
+
+Q1, the message's form: (a) `'trim''s argument must be a string of characters to trim, not the integer 1.`, the name quoted as every message quotes it, its value as messages give it now; (b) `The argument of 'trim' must be a string of characters to trim, not the integer 1.`; (c) as you wrote it, unquoted, its kind only: `trim's argument must be a string of characters to trim, not an integer.`
+
+A1: (b)
+
+Q2, a method or a function of several arguments: (a) the argument named as the references name it, `'padStart''s width must be an integer, not a string.`; (b) by its place and its name, `'padStart''s first argument, the width, must be an integer, not a string.`
+
+A2:  (b)
+
+2026-11-18 (Claude): done, and landed: a wrong argument's message names the member, as the program called it, and, where the member has several parameters, the argument by its place and its name, then says what it must be and what it was given: `The argument of 'trim' must be a string of characters to trim, not the integer 1.`, `The first argument of 'padStart', the width, must be an integer, not a string.` Read so: A1's (b) and A2's (b) together, A2's place and name in A1's form. Every such message is made by one type, `WebLingoArgument`, for strings', arrays', `Bytes`', builders', dates' and regular expressions' methods, the built-in classes' class methods, `delay`, and the functions of `std:fs`, `std:db`, `std:http`, `std:net`, `std:crypto`, `std:env`, `std:tasks` and `windows:com`; an element of an argument is named through it, `The second argument of 'query', the values, must give @x null, a Boolean, …`; an array's own elements, which no argument holds, keep the member's words. Each has a test of its message: a conformance theory of 44 calls, and rows in the network, database, COM, file, crypto, environment, bytes and dates tests. Left as they are, not being arguments of those: a property's assignment, and the host's `Request`, `Response` and `Headers`. The specification records the rule (section 3.7, "Argument errors").
+
+Done (Claude, 2026-11-18, `59a5cab`). Main's checks: the Release build, without warnings; the full suite, 4,017 tests, none failed or aborted; and the CLI, `weblingo` on the samples and on a script that makes each message. Tried on Windows only; Linux not tried.
+
+## [DONE] Standard Classes Extended, Part 4: The Standard Modules' Classes
+
+Specification, section 9, "Standard classes extended, parts", part 4. A standard module's class can be extended now, `class LogFile extends File {}`, but its instances are made by its factories, `File.open(path, mode)`, a task, and `File.openSync(path, mode)`, each of which makes a `File` even when called as `LogFile.open(…)`; `new LogFile()` makes an instance holding no file, its methods then failing.
+
+Q1, how a class extending a standard module's class gets its instances: (a) its base's factories called on it make its own, `await LogFile.open(path, "a")` a `LogFile`, with the file's members and the class's own, `new LogFile(…)` staying as `new File()` is; (b) as (a), and `new LogFile(path, mode)` too, taking the synchronous factory's arguments where the class has one, `File.openSync`'s, and blocking as it does, and WL3001 where its only factory is asynchronous, `Database.open`, `Socket.connect`; (c) only `new`, as (b) has it, the factories making their own class's instances, as now.
+
+A1: (d), other: a `LogFile` **is** a `File`, made in two steps, as .NET makes its connections (`new SqlConnection(cs)`, then `await conn.OpenAsync()`): first created, then opened. Each standard module's class whose instances its factories make gets instance methods that do what the factories did, `f.open(path, mode)`, a task, and `f.openSync(path, mode)` for `File`, `db.open()` for `Database` (its name given to `new Database("fish")`), `s.connect(host, port)` for `Socket`, and so for the others; `new File()` making a file not yet open, its other methods reporting so until it is. Its factories become shorthand for both steps, `File.open(path, mode)` making `new this()` and awaiting its `open(path, mode)`, so that called on a class extending it, `LogFile.open(path, "a")`, they make that class's instance, where its constructor takes no arguments. A class extending one keeps an ordinary constructor, synchronous, with arguments of its own, which never blocks on I/O:
+
+    class LogFile extends File {
+        constructor(prefix) { super(); this.prefix = prefix; }
+        log(line) { this.write($"{this.prefix} {line}\n"); }
+    }
+    var log = new LogFile("[app]");
+    await log.open("app.log", "a");
+
+So there are no WL3001 cases for a class whose only factory is asynchronous, and the subclass's own constructor is provided for, which (a) to (c) did not provide. Opening an instance that is already open, or after its `dispose()`, is an error, its message saying which.
+
+2026-11-18 (Claude): done, and landed, as A1 (d) has it: `new File()`, `new Socket()` and `new Database(name)` make instances not yet open, which `f.open(path, mode)` (a task) or `f.openSync(path, mode)`, `s.connect(host, port)` and `db.open()` open, each giving the instance; each is opened once, and not after its disposal, its other methods saying it is not open until it is, `This File is not open: open it first, await f.open(path, mode).` The factories are shorthand for both steps, written in WebLingo, `new this()` then the instance's method, or `new this(name)` then `open()` for `Database`, so that `LogFile.open(path, "a")` makes a `LogFile`, its constructor run with no arguments. A factory takes the class it is called on as its receiver: a static method's lookup binds it to that class, and the verifiers allow a static method a receiver. Two of the module's errors changed: `Database.open(5)`'s message names `'Database'`, whose constructor checks the name, and `Socket.connect`'s argument errors come through its task. The three are the standard modules' classes made by factories; `windows:com`'s objects are made by its module, and keep their making. Guessed: `open`, `openSync` and `connect` give the instance, so that `var f = await new File().open(path, mode);` reads as one step.
+
+Done (Claude, 2026-11-18, `76a1e84`). Main's checks: the Release build, without warnings; the full suite, 4,030 tests, none failed or aborted; and the CLI, `weblingo` on the samples, on the Standard Library Reference's new example and on a database made, then opened. Tried on Windows only; Linux not tried.
+
+## [DONE] Tasks Completed by Hand
+
+A task that a program completes itself, rather than one an `async` function's call or the host's operation gives, as C#'s `TaskCompletionSource` and the `resolve` and `reject` of JavaScript's `new Promise(executor)` make one: for queues, events, and test doubles, where the code that gives the result is not the code that started the wait. Independent of Q1 of "Standard Classes Extended, Part 3: Task and Module": a class extending `Task` holds such a task as it holds any other. [It IS a Task]
+
+```javascript
+var t = new Task();
+// later, elsewhere:
+t.complete(value);          // or t.fail(error)
+var result = await t;
+```
+
+Q1, its form, given A1 of "Standard Classes Extended, Part 3: Task and Module" (a `Job` is a task, completed by hand): `new Task()` makes a pending task, and `t.complete(value)` and `t.fail(error)` complete it, a class extending `Task` the same through its `super()`, so that no factory (`Task.source()`, `Task.pending()`) is needed; whoever holds such a task may complete it, C#'s split between a source and its task being given up for it; and a task that `new` did not make, an `async` function's call's, `Task.all`'s, `Task.any`'s, `Task.timeout`'s or the host's, cannot be completed by hand, `complete` or `fail` on one being an error, its message saying so. Agreed?
+
+A1: Yes.
+
+Q2, completing it a second time, or failing it once completed: (a) a runtime error, WL3001; (b) nothing happens, `complete` and `fail` giving whether they completed it, as C#'s `TrySetResult` does.
+
+A2: (b)
+
+Q3, a task nothing ever completes, when the execution ends: (a) cancelled with the execution's other running tasks (§3.8, "The end of an execution"), with nothing reported; (b) reported, as an exception nothing awaits is, unless it was forgotten.
+
+A3: (a): a task made by `new Task()` that is still pending when the execution ends is cancelled with its other running tasks (§3.8, "The end of an execution"), and nothing is reported, a pending task not being a failure: a signal that this run did not need, a consumer still waiting at shutdown, a test double the test did not use. And a program stuck waiting for such a task gets an error, not a hang: where nothing is ready to run, no timer is due, no work is out on the host, and the execution waits for a task only a `complete` or a `fail` could finish, a runtime error is raised at the `await` that waits for it, an instance of a class of its own extending `Error`, with a code of its own, its message naming where the task was made and where it is awaited, "The program waits for a task nothing can complete: made at line 12, awaited at line 30.", as Go stops a program whose goroutines are all asleep. It travels outward as any exception does, failing the tasks of the `async` functions it leaves, so that a program may catch it, to log it and go on or to shut down in order, and one that does not stops as for any uncaught exception. A program that is stuck again gets it again, at the `await` it is stuck at then. The class's name and its code, in the WL3xxx range, are to be assigned.
+
+2026-11-18 (Claude): done, and landed: `new Task()` makes a pending task, which `t.complete(value)` and `t.fail(error)` complete, whoever holds it, each giving whether it completed it (A2); `complete` or `fail` on a task `new` did not make is WL3001, its message saying so; a task still pending when the execution ends is cancelled with the others, nothing reported (A3). A program stuck awaiting such a task gets a `DeadlockError`, WL3020, at that `await`, `The program waits for a task nothing can complete: made at line 13, awaited at line 15.`, which it may catch, and again where it is stuck again; its class's name and its code are Proposed, as A3 left them to be assigned. The lines are the host's, which knows the files' texts: the execution context's `Lines`, which the command line gives for a `.wl` and a `.wlbc`, and the web host for a page. Guessed: where several functions wait on such tasks, the error goes to the first waiting on the first such task the heap holds; a task awaited only through `Task.all` or `Task.any` is not found so, and its program still ends with WL3009, a deadlock of tasks no `new` made. `new` on a kind of value's class runs through a helper now, kept out of `Run`; measured against `main`, five rounds alternately, `loops`, `calls`, `closures` and `collections` stayed within the machine's noise.
+
+Done (Claude, 2026-11-18, `3cfb707`). Main's checks: the Release build, without warnings; the full suite, 4,042 tests, none failed or aborted; and the CLI, `weblingo` on the samples, on a program that completes tasks by hand, and on one stuck, run as a `.wl` and as a `.wlbc`. Tried on Windows only; Linux not tried.
+
+## [DONE] Standard Classes Extended, Part 3: Task and Module
+
+Specification, section 9, "Standard classes extended, parts", part 3: `Task` and `Module` no longer sealed. Each is a kind of value whose values no `new` makes: a task comes from calling an `async` function, or from `Task.all`, `Task.any` and `Task.timeout`, and a module from an import.
+
+Q1, what `new Job(…)` takes, for `class Job extends Task {}`: (a) a task, which it holds, `new Job(fetch(url))`, `await job` awaiting that task and `job.forget()` forgetting it; (b) an `async` function, which it calls at once, holding the task the call gives, `new Job(async () => { … })`, as JavaScript's `new Promise(executor)` takes a function; (c) nothing: a class of its own, its instances holding no task, `await job` giving the instance, as it gives any value that is not a task.
+
+A1: (c), but as a task, not merely an instance: a `Job` **is** a task, not a holder of one. `new Job(…)` makes a pending task, its constructor's `super()` taking nothing, and the job is completed by hand, `job.complete(value)` or `job.fail(error)`, as "Tasks Completed by Hand" has it (its Q1 (b), a task that is its own source, which this answer takes). `await job` waits for it, `job.forget()` forgets it, `Task.all([job, …])` and `job is Task` work as for any task, and its class's own members come first, as a subclass's do. A class that only wants to hold a task someone else started holds it in a field, by composition, without extending `Task`.
+
+Q2, what `new Plugin(…)` takes, for `class Plugin extends Module {}`: (a) a module, which it holds, `new Plugin(await Module.import("a.wl"))`, the module's exports read through the instance, `plugin.run()`; (b) nothing: a class of its own, its instances holding no module.
+
+A2: (b), but as a module, not merely an instance: a `Plugin` **is** a module, not a holder of one. `new Plugin(name)` makes a module defined in code rather than in a file, its constructor's `super(name)` taking what `Module`'s own making takes, a name, and `new Module(name)` making a plain, empty one. Its members are its exports, its own and its class's, and its body is its `exec()`, which it may override; `p is Module` is true, and it goes wherever a module goes. A module made so has no path, so `import` cannot find it; registering one under a name an import can find, and a file whose module is of a class it names (`report.wl` importing as a `Plugin`), are questions of their own, for later. A class that only wants to hold a module someone imported holds it in a field, by composition, without extending `Module`.
+
+2026-11-18 (Claude): `Module`'s half done and landed (`656a5f0`): `new Module(name)`, and a class extending `Module`, its instances modules defined in code, with fields, their class's methods and an overridable `exec()`. `Task`'s half waits for "Tasks Completed by Hand", taken up first, since a `Job` is a task completed by hand.
+
+2026-11-18 (Claude): `Task`'s half done, and landed, after "Tasks Completed by Hand": a class extending `Task` makes tasks completed by hand, `new Job(…)` a pending task, `job.complete(value)` and `job.fail(error)`, awaited, forgotten and combined as any task, its class's own members first, `job is Task`, written `Job:task`. Such a task does not record where `new` made it, so that a program stuck on one is told only where it awaits it, `new` on every class not being slowed to record it.
+
+Done (Claude, 2026-11-18, `656a5f0` and `78a3e9d`). Main's checks: the Release build, without warnings; the full suite, 4,042 tests, none failed or aborted; and the CLI, `weblingo` on the samples and on the Standard Library Reference's examples of a module defined in code and of a `Job`. Tried on Windows only; Linux not tried.
+
+## [DONE] Standard Classes Extended, Part 5: Held Values Taken as Their Kind's
+
+Specification, section 9, "Standard classes extended, parts", part 5: wherever a built-in takes a value of a kind, a string, an integer, bytes, a date or a regular expression, it takes an instance holding one, as that value, `"ab".startsWith(new Name("a"))`, `fs.readText(new Path("a.txt"))`, `[1, 2][new Index(1)]`. Comes after "Argument Errors That Name the Argument", whose argument checks it shares.
+
+2026-11-18 (Claude): done, and landed: wherever a built-in takes a value of a kind, it takes an instance holding one as that value, `"ab".startsWith(new Name("a"))`, `fs.readText(new Path("a.txt"))`, `[1, 2][new Index(1)]`, `crypto.sha256(new Blob("x"))`: a string's, bytes', a date's, a regular expression's, a map's and a set's methods, an array's that take a position or a separator, the built-in classes' methods, indices and keys, native modules' functions and native classes' members, given a copy of their arguments with each held value unwrapped where any is held, and the elements `Bytes.concat`, `Bytes.from` and `join` read. What keeps what it is given keeps the instance, `push`, `insert`'s value, a task's `complete`, `setConstant`; and what writes it, `write`, writes the instance, `Name:"printed"`. Measured against `main`, four rounds alternately, `calls`, `strings`, `collections` and `templates` the same or faster.
+
+Done (Claude, 2026-11-18, `c9fcbe9`). Main's checks: the Release build, without warnings; the full suite, 4,047 tests, none failed or aborted; and the CLI, `weblingo` on the samples and on a script that gives held values to strings', maps', bytes', dates', regular expressions' members, `std:fs` and `std:crypto`. Tried on Windows only; Linux not tried.
+
+## [DONE] BytesBuilder Extendability
+
+A builder prints as `BytesBuilder:[104, 105]`, and nothing can extend `BytesBuilder` now, the same as `Bytes`. Previously a class could extend it — make it extensible again.
+
+All standard classes must behave like real classes from the script's perspective.
+
+2026-11-18 (Claude): what a class extending a standard class gets now: one extending `Array`, `Map` or `Set` has all their members; one extending `String`, `Integer`, `Number`, `Boolean`, `Decimal`, `Regex` or `Function` holds a value of that kind and has its properties, but none of its methods, `class Name extends String {}` giving `new Name("ann").toUpper()` WL3006, and `class Strict extends Regex {}` giving `s.test(x)` WL3006, which this task fixes whatever the answer; and `Bytes`, `BytesBuilder`, `DateTime`, `Task`, `Module`, `Iterator`, `Json` and `Html`, and the standard modules' classes (`File`, `Database`, `Socket`, …), cannot be extended at all.
+
+Q1, which classes a class may extend, its instances having all their base's members: (a) every standard class, the standard modules' too, an instance of a class extending one holding its base's value where the base has a kind of value, `new Mine(…)` taking what its base's own making takes (`DateTime.utc(…)`'s arguments for a class extending `DateTime`, which has no `new`); (b) every class of a kind of value, `Bytes`, `BytesBuilder`, `DateTime` and `Regex` among them, but not `Task`, `Module`, `Iterator`, `Json`, `Html` or the standard modules' classes, which stay sealed; (c) `BytesBuilder` again, with the members of every class that may be extended now, the rest staying sealed.
+
+A1: No sealed classes. (a)
+
+2026-11-18 (Claude): too large to land in one piece, so split into parts, which the specification's section 9, "Standard classes extended, parts", defines, each a task below, the decision recorded in its section 3.7, "No sealed classes". Found while looking: `Iterator` and the standard modules' classes can be extended already, but a factory called on a class extending one makes the base's instance, `LogFile.openSync(path, "w")` a `File`; and a held value is not taken where a built-in takes its kind, `"ab".startsWith(new Name("a"))` WL3001. Idle until its parts are done.
+
+Done (Claude, 2026-11-18): every part landed, the specification's section 9, "Standard classes extended, parts": their values' methods (`dbf6295`); `Bytes`, `BytesBuilder`, `DateTime`, `Json` and `Html` (`fded9a3`); `Module` (`656a5f0`) and `Task` (`78a3e9d`), after "Tasks Completed by Hand" (`3cfb707`); the standard modules' classes, made, then opened (`76a1e84`); and held values taken as their kind's (`c9fcbe9`). No standard class is sealed now; `BytesBuilder` may be extended again, a class extending it holding a builder. Main's checks passed after each part. Tried on Windows only; Linux not tried.
+
+## [DONE] WebLingo Examples
+
+Create an extensive set of WebLingo script examples showcasing the capabilities of the language, but also its limitations and deliberate choices for reasons of security, etc.
+
+Put the examples into `Examples.wl`. Rename existing Examples, into `Examples.wasp`.
+
+2026-11-18 (Claude): done, and landed: `Examples.wl`, read as a folder, as "into" has it, holds 25 scripts that show the language at work, values, strictness, variables, strings, regular expressions, collections, functions, control flow, classes, classes of values, classes built while a program runs, errors, disposal, asynchrony, modules, a script's parameters, files, bytes, JSON and dates, cryptography, a database, the environment, the network, COM and the execution's limits, with its choices made on purpose and what it does not have yet in its `README.md`; each ends with what it writes, `/* Output: … */`, and its errors where it fails on purpose, `/* Errors: … */`; and `does-not-compile`, 13 scripts the compiler refuses on purpose, each ending with its errors. `ExamplesTests` runs every one, from its source on the register VM and from its WLBC on the stack VM, against its block, the network's only checked, and COM's on Windows only. `Examples` is `Examples.wasp`, every reference to it changed, the tests', the documents', `Scripts`' and the sites' `web.config`s'. Writing them found a binder bug, fixed: binding a built-in written in WebLingo, `new Error(…)` or an array's `map`, in a property's accessor lost the accessor, so that `field` after it was WL2001. And two questions, asked in tasks of their own: "Text Written on Windows: UTF-8" and "Mathematics".
+
+Done (Claude, 2026-11-18, `37d4e0c`). Main's checks: the Release build, without warnings; the full suite, 4,089 tests, none failed or aborted; and the CLI, `weblingo` on the samples and on the examples, `17-parameters.wl` with its parameters, `10-classes.wl`, and `check` of `does-not-compile/missing-semicolon.wl`. Tried on Windows only; Linux not tried.
+
+## [DONE] Minimal WebLingo Installer: Windows
+
+Create a zip containing the absolute minimum to install WebLingo on a pristine machine, so that a human could easily do it. Provide `readme.md` in it with the steps. Make the process as simple as possible. The end result is supposed to be weblingo.exe functioning as a script execution engine on the PATH capable of running further installation scripts.
+
+2026-11-18 (Claude): WebLingo is published now for a machine that has .NET 10's runtime, which a pristine machine has not. Planned, unless you say otherwise: the readme has the human unzip it anywhere and run, as administrator, `weblingo.exe run install.wl` in that folder, a WebLingo script that copies it into `C:\Program Files\WebLingo` and puts that on the PATH; x64 only, for now.
+
+Q1, .NET on a pristine machine, for this installer, and so for WASP's and Linux's: (a) the zip carries .NET's runtime with WebLingo (self-contained, about 70 MB unzipped), nothing else to install; (b) the readme has the human install .NET 10's runtime first, from Microsoft, and the zip holds WebLingo's own files, a few MB.
+
+A1: Make two versions of the zip: one that assumes .NET is already installed, and one that bundles it inside.
+
+2026-11-18 (Claude): done, and landed, as A1 has it, two zips, for Windows on x64, which `Installers/Windows/package.ps1` makes into `WebLingo/publish/installers`: `WebLingo-0.20.0-pre-alpha-win-x64-self-contained.zip`, 37 MB, .NET's runtime inside, and `…-framework-dependent.zip`, 3 MB, which needs .NET 10's runtime, each `weblingo` and the standard modules, without symbols or SqlClient's resources in other languages, in a folder `WebLingo`, beside `install.wl`, the scripts it shares, `windows.wl` and `weblingo.config`, and `readme.md`, a human's steps: unblock the zip, unzip it, and, in a console run as administrator, in its folder, `WebLingo\weblingo.exe run install.wl`, which copies `WebLingo` into `C:\Program Files\WebLingo` and puts that on the machine's `PATH`, once, then `weblingo --version` in a new console. `install.wl` is in `Scripts`, sharing `windows.wl`, which gains the `PATH`'s function, `add-weblingo-to-path.wl` using it too. Guessed: the packaging script is PowerShell, as `publish.ps1` is, a build step on a machine with the SDK rather than a script that sets a machine up, and WebLingo has no zip of its own to write one with; `wasp` is left to WASP's installer. The zips' `weblingo` ran `check` and `run` of their `install.wl`, which stopped, not being run as administrator, as it should; `install.wl` was not run as administrator, which would have installed over the WebLingo this machine's IIS sites run, nor on a machine without WebLingo or .NET. Not signed: Windows's SmartScreen warns, and Smart App Control, where it is on, blocks it, as the readme says.
+
+Done (Claude, 2026-11-18, `217c916`). Main's checks: the Release build, without warnings; the full suite, 4,089 tests, none failed or aborted; and the CLI, `weblingo` on the samples, and each zip's `weblingo` on its `install.wl`, as above. Tried on Windows only; Linux not tried.
+
+## [DONE] Minimal WASP Installer: Windows
+
+Create a zip containing the minimum needed to install WASP on a computer on which WebLingo is already installed. Include a `readme.md` for a human to follow. Provide a script `iis-install.wl` that does everything needed to make WASP applications run on an IIS.
+
+2026-11-18 (Claude): waits for "Minimal WebLingo Installer: Windows"'s Q1, which decides whether WASP's zip carries .NET's runtime too. Planned: `iis-install.wl` turns IIS on (its features, through DISM), downloads and installs Microsoft's ASP.NET Core Hosting Bundle for .NET 10 where IIS has no ASP.NET Core Module, which IIS needs to run `wasp` whatever the answer, and copies `wasp` in beside `weblingo`.
+
+2026-11-18 (Claude): the Windows installer's Q1 is answered, two zips, one with .NET's runtime and one without; queued behind "Minimal WebLingo Installer: Windows", whose zips this one's builds on.
+
+2026-11-18 (Claude): done, and landed: two zips, as WebLingo's are, which `Installers/Windows/package.ps1` makes with WebLingo's, `WASP-0.20.0-pre-alpha-win-x64-self-contained.zip`, 12 MB, and `…-framework-dependent.zip`, 0.2 MB, for a machine with WebLingo installed from the zip of the same version and kind, each the folder `WASP`, what `wasp` adds, with `wasp-needs.json`, the SHA-256 of each of WebLingo's files it needs, `iis-install.wl`, `add-wasp-site.wl`, the scripts they share and `readme.md`, a human's steps and a site's `web.config` and first page. As administrator, `weblingo run iis-install.wl` refuses a WebLingo of another build or kind, which `wasp` would not run with; turns IIS on, unless it is, through DISM; installs the ASP.NET Core Module, unless IIS has it, from the Hosting Bundle Microsoft's release metadata for .NET 10 names, 10.0.15 today, downloaded with `curl.exe` and checked against the SHA-512 it gives, the module alone for a self-contained `wasp`, repaired where it was installed before IIS, then restarts IIS; and copies `WASP` into `C:\Program Files\WebLingo`, the pools of the sites that run its `wasp` stopped meanwhile, through `iis.wl`'s `copyIntoInstallation`, which `install-weblingo.wl` uses now too, and which restarts the pools it stopped where the copy fails, as `install-weblingo.wl` did not. Guessed: two zips, mirroring WebLingo's, since a self-contained WebLingo and a framework-dependent `wasp` cannot share a folder, .NET's host then finding the runtime the folder holds and not the one installed; the Hosting Bundle's latest 10.0 release, rather than one named in the script; and `add-wasp-site.wl` in the zip, so that a site can be added. Tried: each WASP zip over its WebLingo zip's folder, in a scratch folder, `wasp` serving example1's pages and `weblingo` the examples, and the needs' check passing there and refusing a WASP of the other kind; the metadata read and `certutil`'s hash parsed, by a script of those pieces; `iis-install.wl` and `install.wl`, from their zips, stopping, not run as administrator, as they should. Not run as administrator: neither `iis-install.wl` nor the changed `install-weblingo.wl`, nor on a machine without IIS, which only a run as administrator, on a machine of its own, would try.
+
+Done (Claude, 2026-11-18, `718d2f7`). Main's checks: the Release build, without warnings; the full suite, 4,089 tests, none failed or aborted; and the CLI, `weblingo check` of every script in `Scripts`, and the zips as above. Tried on Windows only; Linux not tried.
+
+## [DONE] Text Written on Windows: UTF-8
+
+2026-11-18 (Claude, found writing "WebLingo Examples"): `weblingo` and `wasp` write their output and their errors in the console's code page on Windows, .NET's default, so that a letter outside it is lost or replaced: run through a pipe, `weblingo run 05-strings.wl` wrote `"ZOLW"` for `"ŻÓŁW"`, and an `€` as `?`, though the strings are right, as `ExamplesTests`, which reads the output in the process, shows; `wasp run page.wasp > page.html` would do the same. Linux writes UTF-8. A served page is not affected: its response is UTF-8.
+
+Q1, the text `weblingo` and `wasp` write on Windows: (a) UTF-8, without a byte-order mark, to a file or a pipe, and to a console through Windows's own Unicode console output, whatever its code page, as Python and Node.js write; (b) UTF-8 wherever it goes, the console's code page set to UTF-8 while they run, and set back after; (c) as now, the console's code page.
+
+A1: (a)
+
+2026-11-18 (Claude): done, and landed, as A1 has it: `weblingo` and `wasp` write UTF-8 without a byte-order mark to a file or a pipe, and to a console through .NET's Unicode console output, `WriteConsoleW`, whatever its code page, which is left as it is (`WebLingoConsoleText`, which both programs open first, `Console.Out` and `Console.Error` set to it, so that ASP.NET Core's logging under `wasp serve` writes so too). Tried: through a pipe and into a file, `weblingo run 05-strings.wl` writing `"ŻÓŁW"` as UTF-8, an error's message too, and `wasp run` a page's `·`; in a console of code page 437, the letters right and the code page still 437 after. `ConsoleTextTests` runs `weblingo` as a program of its own and checks its bytes, and fails without the change. The `wasp` IIS runs is the one installed before, until WebLingo is published and installed again.
+
+Done (Claude, 2026-11-18, `da045c6`). Main's checks: the Release build, without warnings; the full suite, 4,090 tests, none failed or aborted; and the CLI, `weblingo` on the samples and the examples, through a pipe and in a console, and `wasp run` on a page. Tried on Windows only; Linux not tried, where .NET wrote UTF-8 already.
+
+## [DONE] Mathematics
+
+2026-11-18 (Claude, found writing "WebLingo Examples"): WebLingo has no mathematical functions, no `sqrt`, `floor`, `round`, `abs`, `min`, `max` or power, and no integer division, `/` always dividing exactly; a number becomes an integer only through a decimal, `new Integer(new Decimal(x))`, where it is whole, or through its text, `Integer.parse($"{x:F0}")`. The Language Reference's "What is not in the language yet" says so now.
+
+Q1, where they are: (a) a standard module, `std:math`, imported, `import math from "std:math";`, then `math.sqrt(2.0)`, `math.floor(x)`, `math.max(a, b)` and `math.PI`, as the standard modules' rule has every standard name imported; (b) methods of the values, every program's, `x.sqrt()`, `x.floor()`, `a.max(b)`, and constants of `Number`, `Number.PI`; (c) both, the values' methods and the module.
+
+A1: (a)
+
+Q2, a number made an integer: (a) `floor`, `ceiling`, `round` and `truncate` each giving an integer, `2.7.floor()` being `2`, an error where the number is beyond int64, NaN or infinite; (b) each giving a number, `2.0`, as C#'s `Math.Floor` does, and `new Integer(x)` converting a whole number, `new Integer(2.0)` being `2`.
+
+A2: (a)
+
+Q3, integer division: (a) none, `(a - a % b) / b` then made an integer as Q2 has it; (b) a method, `a.div(b)`, rounding towards zero, as `%` pairs with it, `-7.div(2)` being `-3`; (c) an operator of its own, Python's `//`, rounding down.
+
+A3: Could we do `\`?
+
+2026-11-18 (Claude): yes, `\` can be integer division, as Visual Basic's is: outside a string it means nothing yet, a character that begins nothing (WL1003), so no program changes. A few points of it, and of `std:math`, are yours to decide, below; the module waits for them, so that it lands whole.
+
+Q4, `std:math`'s members, its first set: `math.abs(x)`, `math.sign(x)`, `math.min(a, b, …)` and `math.max(a, b, …)`, each keeping its argument's kind, an integer's an integer, a decimal's a decimal; `math.floor(x)`, `math.ceiling(x)`, `math.round(x)` and `math.truncate(x)`, each giving an integer, as A2 has it, an integer itself; `math.sqrt(x)`, `math.pow(x, y)`, `math.exp(x)`, `math.log(x)`, `math.log10(x)`, `math.log2(x)`, `math.sin(x)`, `math.cos(x)`, `math.tan(x)`, `math.asin(x)`, `math.acos(x)`, `math.atan(x)` and `math.atan2(y, x)`, each taking an integer or a number and giving a number, as IEEE 754 has them, `math.sqrt(-1.0)` being `NaN`; and the constants `math.PI` and `math.E`. Yes?
+
+A4: Yes.
+
+Q5, `math.round`'s halfway: (a) away from zero, `2.5` to `3` and `-2.5` to `-3`, as most people round by hand, C#'s `MidpointRounding.AwayFromZero`; (b) to the even integer, `2.5` to `2` and `3.5` to `4`, as C#'s `Math.Round` and Python's `round` do unless told otherwise; (c) up, `2.5` to `3` and `-2.5` to `-2`, as JavaScript's `Math.round`.
+
+A5: (a)
+
+Q6, `a \ b`: (a) rounding towards zero, as C#'s and Java's integer division and Visual Basic's `\` do, pairing with `%`, whose sign is the dividend's, so that `a == (a \ b) * b + a % b`, `-7 \ 2` being `-3`; (b) rounding down, as Python's `//`, `-7 \ 2` being `-4`. Either way: integers only, a number or a decimal WL3001, made an integer first by `math.floor` and the others; by 0 a `DivisionByZeroError`, WL3013, as `%`'s; the smallest integer by -1 an `OverflowError`; as tight as `*`, `/` and `%`; with `\=`, as `%=`; and a class's `static operator \`, as its `%`.
+
+A6: (a)
+
+2026-11-18 (Claude): done, and landed in two parts, as answered. `std:math` (`bb8f667`): a standard module, imported, `import math from "std:math";`, with Q4's members, `math.round` halfway away from zero (A5), `floor`, `ceiling`, `round` and `truncate` giving integers (A2); for it, a native module's function may have a rest parameter, `math.max(a, …)`, and a native module may export constants, `math.PI`, which no importer may assign. Integer division (`c23d952`): `a \ b`, rounding towards zero, pairing with `%` (A6), with `\=` and a class's `static operator \`, an operation of its own on each VM. Guessed, and recorded in the specification as Proposed: a number or a decimal beyond 64 bits, infinity among them, an `OverflowError`, WL3002, and NaN WL3001; `min` and `max` taking one value or more, compared as `<` compares, a number and a decimal not compared, NaN where one is NaN; a decimal WL3001 to the functions giving numbers; and the error of `\` on a string or a number naming what it was given, with how to make a number an integer. Measured against `main` on the benchmark, alternately, for the VMs' dispatch: every workload the same, the stack VM's `loops` and `closures` measured eight rounds, within the machine's noise. `MathTests` checks `std:math`'s results and every error's message on both VMs, `OperatorTests` runs `\` on every pair of edge values through both VMs, and the conformance tests its results and errors. The editors' colouring has `\`, and `%`, which it lacked.
+
+Done (Claude, 2026-11-18, `bb8f667` and `c23d952`). Main's checks, after each: the Release build, without warnings; the full suite, 4,125 tests, then 4,148, none failed or aborted; and the CLI, `weblingo` on the samples and on `Examples.wl/02-values.wl`, which uses both. Tried on Windows only; Linux not tried.
+
+## [DONE] The Machine's Architecture and System: `std:env`
+
+2026-11-19 (Claude, at the owner's question whether WebLingo can tell the machine's bitness): it cannot, directly. `std:env` has only `Environment.machineName`, `variable(name)`, `variables` and `setVariable`. On Windows a script works it out from Windows's variables, `Environment.variable("PROCESSOR_ARCHITECTURE")`, `"AMD64"`, `"x86"` or `"ARM64"`, the running program's, with `PROCESSOR_ARCHITEW6432` for a 32-bit program on 64-bit Windows, or `%ProgramFiles(x86)%`, as the installers' scripts now do, or from WMI through `windows:com`; on Linux from nothing; and a site under `wasp` reads those variables only as its `wasp.config` allows. Proposed: members of `std:env` that say it on every platform, as .NET's `RuntimeInformation` reports it, through the platform layer (`IWebLingoEnvironment`).
+
+Q1, what `std:env` gives: (a) `Environment.architecture`, the machine's, and `Environment.processArchitecture`, the running program's, which differ for a 32-bit program on 64-bit Windows, each `"x64"`, `"x86"`, `"arm64"` or `"arm"`, as .NET's runtime identifiers name them, and `Environment.os`, `"windows"`, `"linux"` or `"macos"`; (b) (a) without `os`; (c) Booleans, `Environment.is64Bit` and `Environment.is64BitProcess`, as .NET's `Environment` names them, which cannot tell ARM from x64.
+
+A1: (a)
+
+Q2, a site under `wasp`: (a) reads them without a permission, since they tell no more than the server's software does; (b) only where its `wasp.config` allows them, `"env": { "platform": true }`, as it allows the machine's name.
+
+A2: (b)
+
+2026-11-19 (Claude): done, and landed, as answered: `Environment.architecture`, `Environment.processArchitecture` and `Environment.os` (A1), a site reading them only where its `wasp.config` says `"env": { "platform": true }`, `null` otherwise (A2). Through the platform's `IWebLingoEnvironment`, as .NET's `RuntimeInformation` reports them. Guessed, and recorded in the specification as Proposed: another architecture's name in small letters, as .NET names it, `"freebsd"` for FreeBSD and `"other"` for another system. A 32-bit `weblingo`, published for the trial outside the repository, said `"x64"` for the machine and `"x86"` for itself. `wasp.config`'s message for a wrong `"env"` names `"platform"` now, and says each setting is optional. `EnvironmentTests` and `WaspTests` check them, and `22-environment.wl` shows them.
+
+Done (Claude, 2026-11-19, `cfae134`). Main's checks: the Release build, without warnings; the full suite, 4,151 tests, none failed or aborted; and the CLI, `weblingo` on `22-environment.wl`, and `wasp run` on a page with and without the permission. Tried on Windows only; Linux not tried.
+
+## [DONE] Console Input: `readLine`
+
+A running script cannot read what its user types: `std:io` has `write` and `writeLn` only, and nothing reads the console's standard input, so that a script's input is its parameters (`weblingo run script.wl name=Ann`), files, environment variables, the network, or, under WASP, a request's form. Add reading to `std:io`, beside writing, for scripts run by `weblingo`, interactive and piped alike (`type data.txt | weblingo run filter.wl`):
+
+```javascript
+import { write, readLine } from "std:io";
+write("Your name: ");
+var name = await readLine();      // null at the end of input
+```
+
+Under WASP there is no user at a console, and under Apache's `mod_fcgid` the standard input is the FastCGI socket itself. Asked by the owner in a chat with Claude, 2026-11-19; added by Claude the same day.
+
+Q1, its form: (a) asynchronous, `await readLine()`, a task, as `std:fs`'s functions are, and `readLineSync()`, which blocks its worker, as `fs.readTextSync` does; (b) synchronous only, `readLine()`, as a console program's usually is.
+
+A1: (a)
+
+Q2, under `wasp`: (a) `readLine` an error where it is called, its message saying that a site has no console; (b) not exported to a site's scripts, so that importing it is WL2001, as for a name `std:io` does not have.
+
+A2: (a)
+
+Q3, the end of the input (the user's Ctrl+Z or Ctrl+D, or a piped file's end): (a) `null`, so that `while ((line = await readLine()) != null) { … }` reads it all; (b) an `IOError`.
+
+A3: (a)
+
+Q4, besides a line: (a) nothing more for now; (b) also `prompt(text)`, which writes `text` and reads a line; (c) also `prompt(text)` and a password's reading, `readPassword()`, which does not echo what is typed.
+
+A4: (c)
+
+2026-11-19 (Claude): one point is open. The task puts reading in `std:io`, "beside writing", but `std:io` is gone: on 18 November 2026 `write` and `writeLn` moved back to `std:system`, which every program imports implicitly, nothing kept of `std:io` (specification, section 3.9, "The standard library", "The rest"). So `import { write, readLine } from "std:io";` would not compile.
+
+Q5, where `readLine`, `readLineSync`, `prompt` and `readPassword` go: (a) `std:system`, beside `write` and `writeLn`, every program having them without an import, as it has `write`; (b) `std:io`, a module of its own again, holding reading only, imported to read, `import { readLine } from "std:io";`, so that a script's imports say it reads its console; (c) `std:io` holding reading, and `write` and `writeLn` too, as well as `std:system`.
+
+A5: (a)
+
+2026-11-19 (Claude): done, and landed, as answered: `readLine()`, a task, its reading off the worker, and `readLineSync()`, blocking it (A1); `null` at the input's end (A3); `prompt(text)` and `readPassword()`, which does not echo where the input is a console's (A4); all four `std:system`'s, every program having them without an import (A5); and, under `wasp`, each an error where it is called, saying that a site has no console (A2). Through the platform's `IWebLingoConsoleInput`, which `weblingo` gives an execution and `wasp` does not; a piped input read as UTF-8, a console's through .NET's Unicode input, as output is written. Guessed, and recorded in the specification as Proposed: the error an `IOError`, WL3011; `prompt` and `readPassword` tasks, without `Sync` forms; a password read key by key, Backspace removing the last, Ctrl+Z or Ctrl+D with nothing typed ending the input. `ConsoleInputTests` run each on both VMs, given piped text, and `WaspTests` a page's read; both references, the specification and the WASP User Manual describe them. Not tried: typing at a console, `readPassword`'s hidden input among it, which no test here can do.
+
+Done (Claude, 2026-11-19, `19fc846`). Main's checks: the Release build, without warnings; the full suite, 4,157 tests, none failed or aborted; and the CLI, `weblingo` given piped lines, UTF-8 text and an empty input, the samples, and `wasp run` on a page that reads. Tried on Windows only; Linux not tried.
+
 ## [DONE] Language Reference: Surprises
 
 An explicit goal of WebLingo (WL) is that itis a "language with no surprises." State that goal at the beginning of th eLanguage Reference.
