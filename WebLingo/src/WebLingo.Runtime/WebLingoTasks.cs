@@ -206,6 +206,7 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
     public bool TryTimeout(WebLingoValue value, WebLingoValue milliseconds, out WebLingoValue combined, out WebLingoRuntimeError? error)
     {
         combined = WebLingoValue.Null;
+        milliseconds = heap.Held(milliseconds); // A held integer as an integer (section 3.7, "No sealed classes").
         if (milliseconds.Kind != WebLingoValueKind.Int64 || milliseconds.AsInt64 < 0)
         {
             error = new WebLingoArgument("timeout", 1, 2, "the time in milliseconds", "an integer, 0 or more").Wrong(milliseconds, heap);

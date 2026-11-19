@@ -286,7 +286,7 @@ public static partial class WebLingoMembers
         var length = (long)separator.Length * Math.Max(0, elements.Count - 1);
         for (var i = 0; i < elements.Count; i++)
         {
-            var element = elements[i];
+            var element = heap.Held(elements[i]); // A held value as its kind's (section 3.7).
             texts[i] = element.Kind switch
             {
                 WebLingoValueKind.String => heap.GetString(element),

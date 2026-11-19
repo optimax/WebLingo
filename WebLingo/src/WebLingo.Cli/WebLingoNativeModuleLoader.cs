@@ -354,6 +354,9 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         public int Optional { get; init; }
 
         public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
-            function(arguments, heap, out result, out error);
+            // A held value as its kind's, but to a function that writes text, write(x), which writes the instance (section 3.7).
+            this is not IWebLingoTextBuiltin && heap.TryUnwrapHeld(arguments, 0, out var unwrapped)
+                ? function(unwrapped, heap, out result, out error)
+                : function(arguments, heap, out result, out error);
     }
 }

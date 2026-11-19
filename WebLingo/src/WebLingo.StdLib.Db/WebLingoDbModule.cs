@@ -192,6 +192,7 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
         for (var i = 0; i < heap.MapCount(given); i++)
         {
             var (key, value) = heap.MapEntryAt(given, i);
+            (key, value) = (heap.Held(key), heap.Held(value)); // A held value as its kind's (section 3.7).
             if (key.Kind != WebLingoValueKind.String || !IsName(heap.GetString(key)))
             {
                 error = Wrong($"{argument.Named} must name each value by a name, letters, digits and _, as @max is, not {WebLingoValueFormatter.Describe(key, heap)}.");

@@ -24,7 +24,10 @@ public static partial class WebLingoMembers
             {
                 // insert(i, v): v at i, from 0 to the length, the elements from i on moved up.
                 if (count != 2) return WrongArgumentCount(name, 2, count, out error);
-                if (!TryArrayPosition(new(name, 0, 2, "the position", "an integer"), values[first], elements.Count, out var at, out error)) return false;
+                if (!TryArrayPosition(new(name, 0, 2, "the position", "an integer"), heap.Held(values[first]), elements.Count, out var at, out error))
+                {
+                    return false;
+                }
                 return heap.TryInsertIntoArray(target, at, values[first + 1], out error);
             }
             case WebLingoMember.RemoveAt:

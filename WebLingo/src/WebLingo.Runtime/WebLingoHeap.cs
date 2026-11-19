@@ -326,6 +326,22 @@ public sealed class WebLingoHeap
     public bool IsCallable(WebLingoValue value) =>
         Held(value).Kind is WebLingoValueKind.Function or WebLingoValueKind.Builtin or WebLingoValueKind.BoundMethod;
 
+    /// <summary>
+    /// The values from <paramref name="from"/> on, each an instance holding a value given as that value, where any is one,
+    /// a copy; false, and nothing copied, where none is: a built-in taking a value of a kind takes an instance holding one,
+    /// as that value (section 3.7, "No sealed classes").
+    /// </summary>
+    public bool TryUnwrapHeld(ReadOnlySpan<WebLingoValue> values, int from, out WebLingoValue[] unwrapped)
+    {
+        unwrapped = [];
+        var any = false;
+        for (var i = from; i < values.Length && !any; i++) any = IsHolding(values[i]);
+        if (!any) return false;
+        unwrapped = values.ToArray();
+        for (var i = from; i < unwrapped.Length; i++) unwrapped[i] = Held(unwrapped[i]);
+        return true;
+    }
+
     /// <summary>Whether a value is an instance of a class extending a kind of value, which holds one (section 3.7).</summary>
     public bool IsHolding(WebLingoValue value) => value.Kind == WebLingoValueKind.Instance && Get<InstanceObject>(value, WebLingoValueKind.Instance).Holds;
 

@@ -1548,7 +1548,8 @@ Arithmetic keeps such a class: a result has its left operand's class, if it has 
 an instance is written as its class, a colon and its value.
 
 Such an instance has its value's members too, its properties and its methods, each giving what the value's own gives,
-a string's `toUpper()` a string:
+a string's `toUpper()` a string; and wherever a built-in takes a value of its kind, it takes the instance as that value,
+`"ann".startsWith(new Name("a"))`, `fs.readText(new Path("a.txt"))`, `[1, 2][new Index(1)]`:
 
 ```javascript
 import { writeLn } from "std:system";

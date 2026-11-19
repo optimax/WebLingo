@@ -477,6 +477,8 @@ public sealed class WebLingoNativeClass(string name)
                     + $"not on {WebLingoValueFormatter.Describe(arguments[0], heap)}.");
                 return false;
             }
+            // Its arguments, after the instance it runs on, a held value as its kind's (section 3.7, "No sealed classes").
+            if (heap.TryUnwrapHeld(arguments, kind == MemberKind.Static ? 0 : 1, out var unwrapped)) return member.Function(unwrapped, heap, out result, out error);
             return member.Function(arguments, heap, out result, out error);
         }
     }

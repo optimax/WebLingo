@@ -66,6 +66,7 @@ public sealed class WebLingoHttpModule : IWebLingoNativeModule
             for (var i = 0; i < heap.MapCount(headers); i++)
             {
                 var (name, value) = heap.MapEntryAt(headers, i);
+                (name, value) = (heap.Held(name), heap.Held(value)); // A held value as its kind's (section 3.7).
                 if (name.Kind != WebLingoValueKind.String || value.Kind != WebLingoValueKind.String || !IsToken(heap.GetString(name)))
                 {
                     error = Wrong($"{headersArgument.Named} must be {Headers}.");

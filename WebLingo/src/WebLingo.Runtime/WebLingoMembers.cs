@@ -459,6 +459,7 @@ public static partial class WebLingoMembers
         var arguments = new WebLingoValue[values.Length + 2];
         (arguments[0], arguments[1]) = (target, nameValue);
         values.CopyTo(arguments.AsSpan(2));
+        for (var i = 2; i < arguments.Length; i++) arguments[i] = heap.Held(arguments[i]); // A held value as its kind's (section 3.7).
         heap.AddRoots(arguments); // While the function runs, which may collect.
         try
         {
@@ -925,6 +926,12 @@ public static partial class WebLingoMembers
         WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
+        // Wherever a built-in takes a value of a kind, it takes an instance holding one, as that value (section 3.7, "No
+        // sealed classes"); a method that keeps what it is given, an array's push, a task's complete, keeps the instance.
+        if (TakesHeldValues(target, member) && heap.TryUnwrapHeld(values.AsSpan(first, count), 0, out var unwrapped))
+        {
+            return TryCall(target, member, name, unwrapped, 0, count, heap, out result, out error);
+        }
         if (target.Kind == WebLingoValueKind.Instance)
         {
             // A native class's member it does not declare, which a VM calls here once TryFindCallee has not found it (section
@@ -1152,6 +1159,21 @@ public static partial class WebLingoMembers
     }
 
     /// <summary>
+    /// Whether a built-in member takes the values it is given as their kinds', an instance holding one as that value: a
+    /// string's, bytes', a date's, a regular expression's, a map's and a set's methods, an array's that take a position or
+    /// a separator, and the built-in classes' methods, but those that keep what they are given as it is (section 3.7).
+    /// </summary>
+    private static bool TakesHeldValues(WebLingoValue target, WebLingoMember member) => target.Kind switch
+    {
+        WebLingoValueKind.String or WebLingoValueKind.Bytes or WebLingoValueKind.DateTime or WebLingoValueKind.Regex
+            or WebLingoValueKind.Map or WebLingoValueKind.Set => true,
+        WebLingoValueKind.Array => member is WebLingoMember.RemoveAt or WebLingoMember.Slice or WebLingoMember.Join,
+        WebLingoValueKind.Class => member is not (WebLingoMember.SetMethod or WebLingoMember.SetProperty or WebLingoMember.SetStaticProperty
+            or WebLingoMember.SetConstant or WebLingoMember.RemoveMethod or WebLingoMember.Format),
+        _ => false
+    };
+
+    /// <summary>
     /// <c>target[index]</c> as the runtime has it for strings, arrays and maps, without a class's indexer: what
     /// <see cref="TryGetIndex"/> does for a value whose class has none (section 3.9).
     /// </summary>
@@ -1161,6 +1183,7 @@ public static partial class WebLingoMembers
         result = WebLingoValue.Null;
         error = null;
         target = heap.Held(target); // An instance holding a string is indexed as its string (section 3.7).
+        index = heap.Held(index); // And an index, or a key, holding a value is that value (section 3.7, "No sealed classes").
         if (optional && target.Kind == WebLingoValueKind.Null) return true;
         if (target.Kind == WebLingoValueKind.Array)
         {
@@ -1249,6 +1272,7 @@ public static partial class WebLingoMembers
     private static bool TrySetElement(WebLingoValue target, WebLingoValue index, WebLingoValue value, WebLingoHeap heap, out WebLingoRuntimeError? error)
     {
         target = heap.Held(target);
+        index = heap.Held(index);
         if (target.Kind == WebLingoValueKind.Array)
         {
             var elements = heap.GetArray(target);

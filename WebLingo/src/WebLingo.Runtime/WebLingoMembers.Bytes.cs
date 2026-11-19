@@ -118,7 +118,7 @@ public static partial class WebLingoMembers
                     var data = new byte[elements.Count];
                     for (var i = 0; i < data.Length; i++)
                     {
-                        if (!TryByte(elements[i], heap, $"{valueArgument.Named} must hold integers from 0 to 255", out data[i], out error)) return false;
+                        if (!TryByte(heap.Held(elements[i]), heap, $"{valueArgument.Named} must hold integers from 0 to 255", out data[i], out error)) return false;
                     }
                     return heap.TryAllocateBytes(data, out result, out error);
                 }
@@ -135,7 +135,10 @@ public static partial class WebLingoMembers
                     error = partsArgument.Wrong(values[first], heap);
                     return false;
                 }
-                var parts = heap.GetArray(values[first]);
+                // Its parts, each held value as its kind's (section 3.7, "No sealed classes").
+                var given = heap.GetArray(values[first]);
+                var parts = new WebLingoValue[given.Count];
+                for (var i = 0; i < parts.Length; i++) parts[i] = heap.Held(given[i]);
                 var length = 0L;
                 foreach (var part in parts)
                 {

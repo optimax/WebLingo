@@ -166,6 +166,19 @@ public sealed class FileSystemTests : IDisposable
 
     [Theory]
     [MemberData(nameof(Vms))]
+    public void APathAndATextHeldAreTakenAsStrings(string vm)
+    {
+        // An instance holding a string, where std:fs takes one, is that string (section 3.7, "No sealed classes").
+        Assert.Equal(("[\"text\", true]", ""), Run(vm, """
+            import { write } from "std:system";
+            class Name extends String {}
+            fs.writeTextSync(new Name(folder + "/held.txt"), new Name("text"));
+            write([fs.readTextSync(new Name(folder + "/held.txt")), fs.existsSync(new Name(folder + "/held.txt"))]);
+            """));
+    }
+
+    [Theory]
+    [MemberData(nameof(Vms))]
     public void AFileIsMadeThenOpened(string vm)
     {
         // Made, new File(), then opened, f.open(path, mode); File.open(path, mode) shorthand for both, making an instance of the
