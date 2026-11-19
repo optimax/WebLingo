@@ -31,7 +31,7 @@ public enum WebLingoMember : byte
     /// (section 3.5, "String methods"), each of the aliases a member's names.
     /// </summary>
     IndexOf, LastIndexOf, Contains, StartsWith, EndsWith, Split, Trim, TrimStart, TrimEnd, ToUpper, ToLower, Replace, Repeat,
-    PadStart, PadEnd, Join,
+    PadStart, PadEnd, Join, RemovePrefix, RemoveSuffix,
     /// <summary>Arrays' methods that take no function, besides those strings have too (section 3.6, "Array methods").</summary>
     Insert, RemoveAt, Reverse,
     /// <summary>Regular expressions' methods and properties, besides <c>replace</c> and <c>split</c> (section 3.6, "Regular expressions").</summary>
@@ -125,6 +125,8 @@ public static partial class WebLingoMembers
         "trim" => WebLingoMember.Trim,
         "trimStart" => WebLingoMember.TrimStart,
         "trimEnd" => WebLingoMember.TrimEnd,
+        "removePrefix" => WebLingoMember.RemovePrefix,
+        "removeSuffix" => WebLingoMember.RemoveSuffix,
         "toUpper" or "toUpperCase" => WebLingoMember.ToUpper,
         "toLower" or "toLowerCase" => WebLingoMember.ToLower,
         "replace" or "replaceAll" => WebLingoMember.Replace,

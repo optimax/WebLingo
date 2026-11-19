@@ -4,7 +4,8 @@ namespace WebLingo.Runtime;
 
 // Strings' methods (specification, section 3.5, "String methods"; the owner's answers, 16 November 2026): s.compare(other);
 // indexOf(search, from), lastIndexOf(search), contains(search) or includes(search), startsWith(prefix) and endsWith(suffix);
-// slice(start, end); split(separator); trim(), trimStart() and trimEnd(); toUpper() or toUpperCase() and toLower() or
+// slice(start, end); split(separator); trim(), trimStart() and trimEnd(), white space, or any of the characters given,
+// trim(chars); removePrefix(text) and removeSuffix(text), text removed once; toUpper() or toUpperCase() and toLower() or
 // toLowerCase(), by the invariant culture; replace(old, new) or replaceAll(old, new), every one replaced; repeat(n);
 // padStart(width, pad) or padLeft(…), padEnd(width, pad) or padRight(…); and separator.join(array). Positions and widths
 // count Unicode scalar values, as indexing and length do; searching compares code units, ordinally, never by culture.
@@ -15,7 +16,46 @@ public static partial class WebLingoMembers
             or WebLingoMember.StartsWith or WebLingoMember.EndsWith or WebLingoMember.Slice or WebLingoMember.Split or WebLingoMember.Trim
             or WebLingoMember.TrimStart or WebLingoMember.TrimEnd or WebLingoMember.ToUpper or WebLingoMember.ToLower
             or WebLingoMember.Replace or WebLingoMember.Repeat or WebLingoMember.PadStart or WebLingoMember.PadEnd or WebLingoMember.Join
-            or WebLingoMember.Match or WebLingoMember.MatchAll;
+            or WebLingoMember.Match or WebLingoMember.MatchAll or WebLingoMember.RemovePrefix or WebLingoMember.RemoveSuffix;
+
+    /// <summary>Where <paramref name="text"/> begins once any of <paramref name="characters"/>' scalar values are trimmed from its start.</summary>
+    private static int TrimmedStart(string text, string characters)
+    {
+        var i = 0;
+        while (i < text.Length)
+        {
+            var length = ScalarLength(text, i);
+            if (!HoldsScalar(characters, text.AsSpan(i, length))) break;
+            i += length;
+        }
+        return i;
+    }
+
+    /// <summary>Where <paramref name="text"/> ends once any of <paramref name="characters"/>' scalar values are trimmed from its end, not before <paramref name="start"/>.</summary>
+    private static int TrimmedEnd(string text, string characters, int start)
+    {
+        var end = text.Length;
+        while (end > start)
+        {
+            var length = end - 2 >= start && char.IsSurrogatePair(text[end - 2], text[end - 1]) ? 2 : 1;
+            if (!HoldsScalar(characters, text.AsSpan(end - length, length))) break;
+            end -= length;
+        }
+        return end;
+    }
+
+    /// <summary>The code units of the scalar value at <paramref name="i"/>: two for a surrogate pair, else one.</summary>
+    private static int ScalarLength(string text, int i) => i + 1 < text.Length && char.IsSurrogatePair(text[i], text[i + 1]) ? 2 : 1;
+
+    /// <summary>Whether <paramref name="characters"/> holds a scalar value whole, a pair's half being no character of its own.</summary>
+    private static bool HoldsScalar(string characters, ReadOnlySpan<char> scalar)
+    {
+        for (var i = 0; i < characters.Length; i += ScalarLength(characters, i))
+        {
+            if (characters.AsSpan(i, ScalarLength(characters, i)).SequenceEqual(scalar)) return true;
+        }
+        return false;
+    }
 
     private static bool TryCallString(WebLingoValue target, WebLingoMember member, string name, WebLingoValue[] values, int first, int count,
         WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
@@ -99,13 +139,39 @@ public static partial class WebLingoMembers
                 return TryStrings(text.Split(separator), heap, out result, out error);
             }
             case WebLingoMember.Trim or WebLingoMember.TrimStart or WebLingoMember.TrimEnd:
-                if (count != 0) return WrongArgumentCount(name, 0, count, out error);
-                return heap.TryAllocateString(member switch
+            {
+                // trim(), trimStart() and trimEnd(): white space; given characters, trim(chars), any of them, each a Unicode
+                // scalar value, as C#'s Trim(chars) and Python's strip(chars) take them, an empty one trimming nothing (the
+                // owner's answers, 18 November 2026).
+                if (count > 1) return WrongArgumentCount(name, 0, 1, count, out error);
+                if (count == 0)
                 {
-                    WebLingoMember.Trim => text.Trim(),
-                    WebLingoMember.TrimStart => text.TrimStart(),
-                    _ => text.TrimEnd()
-                }, out result, out error);
+                    return heap.TryAllocateString(member switch
+                    {
+                        WebLingoMember.Trim => text.Trim(),
+                        WebLingoMember.TrimStart => text.TrimStart(),
+                        _ => text.TrimEnd()
+                    }, out result, out error);
+                }
+                if (!TryText(name, values[first], heap, out var characters, out error)) return false;
+                var start = member == WebLingoMember.TrimEnd ? 0 : TrimmedStart(text, characters);
+                var end = member == WebLingoMember.TrimStart ? text.Length : TrimmedEnd(text, characters, start);
+                return heap.TryAllocateString(text[start..end], out result, out error);
+            }
+            case WebLingoMember.RemovePrefix or WebLingoMember.RemoveSuffix:
+            {
+                // removePrefix(text) and removeSuffix(text): text removed once, only where the string begins, or ends, with it,
+                // else the string as it is, as Python's and Kotlin's (the owner's answer, 18 November 2026).
+                if (count != 1) return WrongArgumentCount(name, 1, count, out error);
+                if (!TryText(name, values[first], heap, out var affix, out error)) return false;
+                var prefix = member == WebLingoMember.RemovePrefix;
+                if (prefix ? !text.StartsWith(affix, StringComparison.Ordinal) : !text.EndsWith(affix, StringComparison.Ordinal))
+                {
+                    result = target;
+                    return true;
+                }
+                return heap.TryAllocateString(prefix ? text[affix.Length..] : text[..^affix.Length], out result, out error);
+            }
             case WebLingoMember.ToUpper or WebLingoMember.ToLower:
                 // By the invariant culture, the same on every server (the owner's answer, 16 November 2026).
                 if (count != 0) return WrongArgumentCount(name, 0, count, out error);

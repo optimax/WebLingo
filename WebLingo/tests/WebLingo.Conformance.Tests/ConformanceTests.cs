@@ -611,6 +611,14 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { writeLn } from \"std:system\"; var s = \"Green tea, black tea\"; writeLn([s.slice(6), s.slice(0, 5), s.slice(5, 5)]);", "[\"tea, black tea\", \"Green\", \"\"]")]
     [InlineData("import { writeLn } from \"std:system\"; var s = \"Green tea, black tea\"; writeLn([s.split(\", \"), \"a,,b\".split(\",\"), \"hé😀\".split(\"\")]);", "[[\"Green tea\", \"black tea\"], [\"a\", \"\", \"b\"], [\"h\", \"é\", \"😀\"]]")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn([\"  x  \".trim(), \"  x  \".trimStart(), \"  x  \".trimEnd()]);", "[\"x\", \"x  \", \"  x\"]")]
+    // Given characters, any of them trimmed, each a Unicode scalar value, an empty one trimming nothing; and a fixed text removed
+    // once, only where the string begins or ends with it (the owner's answers, 18 November 2026).
+    [InlineData("import { writeLn } from \"std:system\"; writeLn([\"a//\".trimEnd(\"/\"), \"x;,;\".trimEnd(\";,\"), \"//a//\".trimStart(\"/\"), \"//a//\".trim(\"/\"), \"aaa\".trim(\"a\"), \"a\".trim(\"\")]);",
+        "[\"a\", \"x\", \"a//\", \"a\", \"\", \"a\"]")]
+    [InlineData("import { writeLn } from \"std:system\"; writeLn([\"--😀a😀--\".trim(\"-😀\"), \"😀b\".trimStart(\"😃\"), \"C:\\\\Tea\\\\\".toLower().trimEnd(\"\\\\\") + \"\\\\\"]);",
+        "[\"a\", \"😀b\", \"c:\\\\tea\\\\\"]")]
+    [InlineData("import { writeLn } from \"std:system\"; writeLn([\"report.txt\".removeSuffix(\".txt\"), \"report.txt\".trimEnd(\".txt\"), \"report.txt\".removePrefix(\"re\"), \"report\".removeSuffix(\".txt\"), \".txt.txt\".removeSuffix(\".txt\"), \"tea\".removePrefix(\"\")]);",
+        "[\"report\", \"repor\", \"port.txt\", \"report\", \".txt\", \"tea\"]")]
     [InlineData("import { writeLn } from \"std:system\"; var s = \"Green tea, black tea\"; writeLn([s.toUpper(), s.toUpperCase(), \"ÉCOLE\".toLower(), \"Straße\".toUpperCase(), \"ABC\".toLowerCase()]);", "[\"GREEN TEA, BLACK TEA\", \"GREEN TEA, BLACK TEA\", \"école\", \"STRAßE\", \"abc\"]")]
     [InlineData("import { writeLn } from \"std:system\"; var s = \"Green tea, black tea\"; writeLn([s.replace(\"tea\", \"coffee\"), s.replaceAll(\"tea\", \"chai\"), \"aaa\".replace(\"aa\", \"b\")]);", "[\"Green coffee, black coffee\", \"Green chai, black chai\", \"ba\"]")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn([\"ab\".repeat(3), \"x\".repeat(0), \"\".repeat(1000000000000)]);", "[\"ababab\", \"\", \"\"]")]
@@ -727,7 +735,10 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { writeLn } from \"std:system\"; writeLn(\",\".join([[1]]));", "WL3001")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn(\",\".join(\"ab\"));", "WL3001")]
     [InlineData("import { writeLn } from \"std:system\"; writeLn(\"tea\".toUpper);", "WL3001")]
-    [InlineData("import { writeLn } from \"std:system\"; writeLn(\"tea\".trim(1));", "WL2006")]
+    [InlineData("import { writeLn } from \"std:system\"; writeLn(\"tea\".trim(1));", "WL3001")]
+    [InlineData("import { writeLn } from \"std:system\"; writeLn(\"tea\".trim(\"a\", \"b\"));", "WL2006")]
+    [InlineData("import { writeLn } from \"std:system\"; writeLn(\"tea\".removeSuffix(5));", "WL3001")]
+    [InlineData("import { writeLn } from \"std:system\"; writeLn(\"tea\".removePrefix());", "WL2006")]
     [InlineData("var b = [1, \"a\"].sort();", "WL3001")]
     [InlineData("var b = [1].filter(x => 1);", "WL3001")]
     [InlineData("var b = [1].removeAt(3);", "WL3005")]

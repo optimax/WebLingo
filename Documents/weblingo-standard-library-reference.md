@@ -126,11 +126,17 @@ binary64, and `"tea"` a `String`.
 | `s.slice(start, end)` | the characters from `start` to before `end`, `end` optional; an error outside the string |
 | `s.split(separator)` | an array of the parts between separators, empty ones included; each character for `""` |
 | `s.trim()`, `s.trimStart()`, `s.trimEnd()` | `s` without the white space at its ends, its start or its end |
+| `s.trim(chars)`, `s.trimStart(chars)`, `s.trimEnd(chars)` | `s` without any of the characters `chars` holds, each a Unicode scalar value, as many as stand at its ends, its start or its end: `"a//".trimEnd("/")` is `"a"`, `"x;,;".trimEnd(";,")` is `"x"`; `""` trims nothing |
+| `s.removePrefix(text)`, `s.removeSuffix(text)` | `s` without `text`, once, where `s` begins, or ends, with it, else `s` as it is: `"report.txt".removeSuffix(".txt")` is `"report"` |
 | `s.toUpper()` or `s.toUpperCase()`, `s.toLower()` or `s.toLowerCase()` | `s` in capitals, or small letters, the same on every server |
 | `s.replace(old, new)` or `s.replaceAll(…)` | `s` with every `old` replaced by `new` |
 | `s.repeat(n)` | `s` `n` times over |
 | `s.padStart(width, pad)` or `s.padLeft(…)`, `s.padEnd(width, pad)` or `s.padRight(…)` | `s` padded to `width` characters, with spaces unless `pad` is given |
 | `separator.join(array)` | the array's strings, numbers, Booleans, decimals and dates, `null` as nothing, with `separator` between them |
+
+`trim`'s argument is a set of characters, not a text: to remove a suffix, use `removeSuffix`. `"report.txt".trimEnd(".txt")`
+is `"repor"`, every `.`, `t` and `x` at the end trimmed, as Python's `"report.txt".rstrip(".txt")` is, a trap that
+`removePrefix` and `removeSuffix`, separate names, keep out.
 
 ```javascript
 import { write, writeLn } from "std:system";

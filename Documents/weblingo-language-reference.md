@@ -628,6 +628,10 @@ tea
   each character.
 - **Case** changes the same way on every server, character by character: `"Straße".toUpper()` is `"STRAßE"`.
 - **`replace(old, new)`** replaces every `old`, not only the first.
+- **`trim()`, `trimStart()` and `trimEnd()`** take white space from the ends; given characters, `trim(chars)`, any of
+  them, as many as stand there: `"a//".trimEnd("/")` is `"a"`. The argument is a set of characters, not a text, so that
+  `"report.txt".trimEnd(".txt")` is `"repor"`; **`removePrefix(text)` and `removeSuffix(text)`** remove a text once, where
+  the string begins or ends with it: `"report.txt".removeSuffix(".txt")` is `"report"`.
 - **`padStart(width, pad)` and `padEnd`** pad to a width in characters, with a space unless a pad is given.
 - **`separator.join(array)`** joins strings, numbers, Booleans, decimals and dates, `null` as nothing; give anything
   else's text first, `x.toString()`.
