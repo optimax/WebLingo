@@ -2301,3 +2301,4 @@ WebLingo is pre-alpha, and some of what other languages have is still to come. T
   so `[1, 2] == [1, 2]` is false. Java's `"Count: " + 2` produces a string. WebLingo raises `WL3001`
   for those operands. Use `$"Count: {2}"`. See [Equality](#equality) and [Interpolation](#interpolation).
   [Java Language Specification, expressions](https://docs.oracle.com/javase/specs/jls/se25/html/jls-15.html)
+

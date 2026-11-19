@@ -2,6 +2,10 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
+## Change the WebLingo Source Extension to `.wlg`
+
+Replace `.wl` with `.wlg` throughout WebLingo. Rename scripts, modules, WASP route handlers, and paths such as `Examples.wl`. Update CLI and WASP file discovery, import resolution, editor grammars and associations, the Windows file-association script, installers, build and CI scripts, examples, tests, and documentation. Wolfram Language already uses `.wl` for package source.
+
 ## BytesBuilder Extendability
 
 A builder prints as `BytesBuilder:[104, 105]`, and nothing can extend `BytesBuilder` now, the same as `Bytes`. Previously a class could extend it — make it extensible again.
@@ -16,6 +20,15 @@ All standard classes must behave like real classes from the script's perspective
 
 `"tea".trim(1)` is WL3001 with a message saying a string was expected, which reads as if `"tea"` were the problem: the code is right (`trim` now takes an optional set of characters, so one argument is allowed, and an integer is a wrong kind of value, not a wrong number of arguments, WL2006), but the message does not say what should have been a string. A wrong kind of argument's message names the method and the argument, and says what it must be and what it was given: "`trim`'s argument must be a string of characters to trim, not an integer". Go through the built-in classes' methods that take arguments (strings', arrays', maps', `Bytes`', `DateTime`'s, `Regex`'s, and the standard modules' functions) for the same vague wording, and give each such message that form, with a test of the message, not only of its code.
 
+EXPLAIN: How are other methods that expect a certain type of argument handle it? How can a programmer annotate a method to expect a certain type of value so that the compiler could issue a similar error message for user-defined functions?
+
+## Indexes and Integers
+
+Python's `items[-1]` reads the last item. WebLingo rejects that index with `WL3005`. Make it work in WebLingo. Also, take into account similar indexing scheme with C#.
+ 
+## Implement What's Not in the Language
+
+`Documents\weblingo-language-reference.md` has section "17. What is not in the language yet". Implement everything it describes, and remove that section.
 
 # END-OF-TO-DO
 
