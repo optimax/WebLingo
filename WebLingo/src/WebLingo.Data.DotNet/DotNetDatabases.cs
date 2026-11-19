@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
+using MySqlConnector;
 using WebLingo.Platform.Abstractions;
 namespace WebLingo.Data.DotNet;
 
@@ -24,7 +25,7 @@ namespace WebLingo.Data.DotNet;
 public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configured, string folder) : IWebLingoDatabases
 {
     /// <summary>The providers this platform has.</summary>
-    public static readonly IReadOnlyList<string> Providers = ["sqlite", "sqlserver"];
+    public static readonly IReadOnlyList<string> Providers = ["sqlite", "sqlserver", "mysql"];
 
     static DotNetDatabases()
     {
@@ -43,11 +44,13 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
         else if (configured.TryGetValue(nameOrConnection, out var found)) (connection, relativeTo) = (found, folder);
         else throw Invalid($"'{nameOrConnection}' is not a database the configuration names");
         var colon = connection.IndexOf(':');
+        if (colon < 0) throw Invalid("a configured database connection string must start with its provider and a colon");
         var (provider, rest) = (connection[..colon], connection[(colon + 1)..]);
         DbConnection opened = provider switch
         {
             "sqlite" => Sqlite(rest, relativeTo, relativeTo is null ? Files : null),
             "sqlserver" => SqlServer(rest),
+            "mysql" => MySql(rest, relativeTo is null && Files is not null),
             _ => throw Invalid($"'{provider}' is not a database's provider WebLingo has, which are \"{string.Join("\", \"", Providers)}\"")
         };
         try
@@ -122,6 +125,26 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
         }
         if (builder.DataSource.Length == 0) throw Invalid("a SQL Server connection string names its server, as Server=name does");
         return new SqlConnection(builder.ConnectionString);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static DbConnection MySql(string rest, bool siteSupplied)
+    {
+        if (siteSupplied)
+        {
+            throw new WebLingoDatabaseException(WebLingoDatabaseErrorKind.NotAllowed,
+                "a site opens MySQL by a name in wasp.config");
+        }
+        try
+        {
+            var builder = new MySqlConnectionStringBuilder(rest);
+            if (builder.Server.Length == 0) throw Invalid("a MySQL connection string names its server, as Server=name does");
+            return new MySqlConnection(builder.ConnectionString);
+        }
+        catch (Exception exception) when (exception is ArgumentException or FormatException or KeyNotFoundException)
+        {
+            throw Invalid($"invalid MySQL connection string: {exception.Message}");
+        }
     }
 
     private static WebLingoDatabaseException Invalid(string message) => new(WebLingoDatabaseErrorKind.Invalid, message);
@@ -351,7 +374,8 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
                 sbyte b => (long)b,
                 ushort u => (long)u,
                 uint u => (long)u,
-                ulong u => u <= long.MaxValue ? (long)u : (decimal)u,
+                ulong u when u <= long.MaxValue => (long)u,
+                ulong u => (decimal)u,
                 double d => d,
                 float f => (double)f,
                 decimal m => m,

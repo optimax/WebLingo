@@ -1,5 +1,8 @@
 using Microsoft.Data.Sqlite;
 using WebLingo.Cli;
+using WebLingo.Data.DotNet;
+using WebLingo.Platform.Abstractions;
+using WebLingo.Platform.DotNet;
 using Xunit;
 namespace WebLingo.Conformance.Tests;
 
@@ -167,7 +170,7 @@ public sealed class DatabaseTests : IDisposable
     [InlineData("try { await Database.open(\"nowhere\"); } catch (e) { writeLn([e.code, e.message]); }",
         "[\"WL3001\", \"'nowhere' is not a database the configuration names.\"]")]
     [InlineData("try { await Database.open(\"postgres:x\"); } catch (e) { writeLn(e.message); }",
-        "'postgres' is not a database's provider WebLingo has, which are \"sqlite\", \"sqlserver\".")]
+        "'postgres' is not a database's provider WebLingo has, which are \"sqlite\", \"sqlserver\", \"mysql\".")]
     [InlineData("try { await Database.open(\"sqlserver:Nonsense=1\"); } catch (e) { writeLn([e.code, e.message]); }",
         "[\"WL3001\", \"'Nonsense=1' is not a SQL Server connection string: Keyword not supported: 'nonsense'.\"]")]
     [InlineData("try { await Database.open(\"sqlserver:Database=Todo\"); } catch (e) { writeLn([e.code, e.message]); }",
@@ -177,6 +180,23 @@ public sealed class DatabaseTests : IDisposable
     {
         var (exit, output, error) = Weblingo(Setup + source);
         Assert.Equal((WebLingoCommandLine.Success, printed + "\n", ""), (exit, output, error));
+    }
+
+    [Fact]
+    public void MySqlRecognizesConfiguredConnectionsAndChecksConnectionStrings()
+    {
+        var databases = new DotNetDatabases(new Dictionary<string, string> { ["mysqlTest"] = "mysql:Nonsense=1" }, _folder);
+        var invalid = Assert.Throws<WebLingoDatabaseException>(() => databases.Open("mysqlTest"));
+        Assert.Equal(WebLingoDatabaseErrorKind.Invalid, invalid.Kind);
+        Assert.StartsWith("invalid MySQL connection string:", invalid.Message);
+
+        var site = new DotNetDatabases(new Dictionary<string, string>(), _folder)
+        {
+            Files = new DotNetFileCapabilities(_folder, [], [])
+        };
+        var refused = Assert.Throws<WebLingoDatabaseException>(() => site.Open("mysql:Server=localhost"));
+        Assert.Equal(WebLingoDatabaseErrorKind.NotAllowed, refused.Kind);
+        Assert.Equal("a site opens MySQL by a name in wasp.config", refused.Message);
     }
 
     [Fact]

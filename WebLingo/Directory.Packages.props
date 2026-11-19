@@ -7,6 +7,8 @@
          on Windows, SNI.runtime, under Microsoft's own terms, is referenced only to be left out (specification, section 7.11). -->
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.2" />
     <PackageVersion Include="Microsoft.Data.SqlClient.SNI.runtime" Version="7.1.2" />
+    <!-- MySQL's ADO.NET provider, MIT: WebLingo.Data.DotNet. It resolves the MIT logging and DI abstractions to 10.0.15. -->
+    <PackageVersion Include="MySqlConnector" Version="3.0.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />

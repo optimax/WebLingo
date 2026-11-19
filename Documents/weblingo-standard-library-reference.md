@@ -860,9 +860,13 @@ Databases, through the platform's: one module for every database, the SQL passed
 | `db.execute(sql, values, options)` | a task of the number of rows the statement changed |
 | `db.transaction(work, options)` | begins a transaction, awaits the function `work`, and commits, or rolls back where `work` throws, throwing on; a task of what `work` gave |
 | `db.begin(options)`, `db.commit()`, `db.rollback()` | a transaction's steps, each a task; a connection's transactions do not nest |
-| `db.provider`, `db.serverVersion` | the database's kind, `"sqlite"` or `"sqlserver"`, and its version |
+| `db.provider`, `db.serverVersion` | the database's kind, `"sqlite"`, `"sqlserver"`, or `"mysql"`, and its version |
 | `db.dispose()` | closes it, as `using` does, rolling back a transaction still open |
 | `new Database(name)`, `db.open()` | a database made, its name kept, not yet open, then opened, a task giving the database; `Database.open(name)` is shorthand for both, making an instance of the class it is called on |
+
+MySQL uses MySqlConnector connection strings such as `mysql:Server=localhost;Database=shop;User ID=app`.
+In WASP, put the connection string in `wasp.config` and open the database by name. For CLI scripts, the
+connection string can also be passed to `Database.open` directly.
 
 Read each row with `await cursor.next()`. It returns a map with the same columns and values as `query`.
 The first `null` marks exhaustion, and later reads also give `null`. Use `using` to close the cursor if you leave

@@ -899,7 +899,9 @@ row conversion as `query`. The existing `query` method continues to return an ar
 - **Stream Database Rows.** Use a forward-only reader on the connection. Exhaustion or disposal releases the reader.
   While the reader is open, other statements and transaction operations on the same connection raise WL3001.
   Existing adapters can implement `IWebLingoStreamingDatabaseConnection` to opt in to streaming.
-- **Add the MySQL Database Provider.** The owner chose MySQL as the first additional provider.
+- **Add the MySQL Database Provider.** The owner chose MySQL as the first additional provider. The .NET adapter uses
+  MySqlConnector with `mysql:` connection strings. WASP sites use a database name from `wasp.config` so the site
+  operator controls driver options that can access local files.
 - **Add the PostgreSQL Database Provider.** The owner chose PostgreSQL after MySQL.
 
 ### 7.12 Resource ownership (WL-P012–P013)
