@@ -20,10 +20,6 @@ A1: As you list them. Don't ask trivial questions. Act autonomously.
 
 2026-11-19 (Codex). The owner approved the order. See the architecture specification, §7.16, “Standard-library utilities”. This task waits for its three tasks below.
 
-## [WORKING] Add Seeded Random Numbers
-
-Add a seeded generator that produces reproducible sequences for tests and simulations.
-
 ## Add CLI Subprocess Execution
 
 Run a local program from a CLI script with an argument array, capturing its exit status and output. Keep WASP subprocess access for a separate decision.
