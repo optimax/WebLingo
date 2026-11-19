@@ -1,12 +1,58 @@
 {
   "name": "weblingo",
   "displayName": "WebLingo",
-  "description": "Syntax highlighting for WebLingo's scripts and modules (.wlg) and WASP's pages (.wasp).",
-  "version": "0.1.0",
+  "description": "Syntax highlighting for WebLingo and WASP, and source debugging for local WebLingo scripts.",
+  "version": "0.2.0",
   "publisher": "weblingo",
   "engines": { "vscode": "^1.80.0" },
-  "categories": [ "Programming Languages" ],
+  "categories": [ "Programming Languages", "Debuggers" ],
+  "main": "./extension.js",
+  "activationEvents": [ "onDebugResolve:weblingo" ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Syntax highlighting is available in restricted mode. Debugging runs local code and requires workspace trust."
+    }
+  },
   "contributes": {
+    "breakpoints": [ { "language": "weblingo" } ],
+    "configuration": {
+      "title": "WebLingo",
+      "properties": {
+        "weblingo.debuggerPath": {
+          "type": "string",
+          "default": "weblingo",
+          "scope": "machine",
+          "description": "Path to a WebLingo executable that supports the debug adapter."
+        }
+      }
+    },
+    "debuggers": [
+      {
+        "type": "weblingo",
+        "label": "WebLingo",
+        "languages": [ "weblingo" ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [ "program" ],
+            "properties": {
+              "program": { "type": "string", "description": "The local .wlg script to launch.", "default": "${file}" },
+              "cwd": { "type": "string", "description": "Working directory for the script. Defaults to the script's folder." },
+              "args": {
+                "type": "array",
+                "items": { "type": "string" },
+                "default": [],
+                "description": "Script parameters as name=value strings."
+              },
+              "stopOnEntry": { "type": "boolean", "default": false, "description": "Pause before the first executable statement." }
+            }
+          }
+        },
+        "initialConfigurations": [
+          { "type": "weblingo", "request": "launch", "name": "Debug WebLingo Script", "program": "${file}" }
+        ]
+      }
+    ],
     "languages": [
       {
         "id": "weblingo",

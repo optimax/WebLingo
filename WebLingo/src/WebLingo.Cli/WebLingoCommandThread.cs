@@ -12,7 +12,9 @@ namespace WebLingo.Cli;
 public static class WebLingoCommandThread
 {
     /// <summary>Runs <paramref name="command"/> on such a thread, waits for it, and gives its exit code, or throws what it threw.</summary>
-    public static int Run(Func<int> command)
+    public static int Run(Func<int> command) => Run(command, background: false);
+
+    internal static int Run(Func<int> command, bool background)
     {
         var exit = 0;
         ExceptionDispatchInfo? failure = null;
@@ -26,7 +28,7 @@ public static class WebLingoCommandThread
             {
                 failure = ExceptionDispatchInfo.Capture(exception);
             }
-        }, WebLingoParser.CompilerStackSize) { Name = "WebLingo command" };
+        }, WebLingoParser.CompilerStackSize) { Name = "WebLingo command", IsBackground = background };
         if (OperatingSystem.IsWindows()) thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();

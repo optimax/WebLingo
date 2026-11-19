@@ -38,6 +38,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
     /// </summary>
     public IWebLingoModuleLoader? Components { get; init; }
 
+    public IWebLingoRegisterDebugger? Debugger { get; init; }
+
     public WebLingoVirtualMachine() : this(new WebLingoBytecodeVerifier()) { }
 
     public WebLingoVirtualMachine(IWebLingoBytecodeVerifier verifier) => _verifier = verifier;
@@ -123,8 +125,10 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         var execution = new Execution(module, ToArray(module.EntryPoint.Code), codes, constants, names, builtins, context, heap)
         {
             Loader = Loader,
-            Components = Components
+            Components = Components,
+            Debugger = Debugger
         };
+        Debugger?.ModuleLoaded(module);
         return Run(execution, heap, resuming: false);
     }
 
@@ -185,6 +189,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         public WebLingoValue[] Cells = [];
         /// <summary>The next instruction, while the frame waits for a call it made to return.</summary>
         public int Pc;
+        public long DebugActivation;
         /// <summary>The caller's register that the call's result goes to.</summary>
         public int ResultRegister;
         /// <summary>For a constructor run by <c>new</c>: the instance, which is the call's result (section 3.7).</summary>
@@ -280,6 +285,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             var pc = 0;
             var budget = context.InstructionBudget;
             var cancellation = context.Cancellation;
+            var debugger = Debugger;
             var maxCallDepth = context.Resources.MaxCallDepth;
             var executed = _executed;
             var dueAt = executed; // The count of instructions at which the budget and the cancellation signal are looked at.
@@ -319,6 +325,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                                 with { Instructions = executed };
                         }
                         dueAt = Math.Min(budget, (executed / CancellationInterval + 1) * CancellationInterval);
+                    }
+                    if (debugger is not null && DebugInstruction(debugger, frames, frame, depth, pc)
+                        && cancellation is { IsCancellationRequested: true })
+                    {
+                        return Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled.", frame.Function, pc)
+                            with { Instructions = executed };
                     }
                     executed++;
 
@@ -1017,6 +1029,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         // The parameters left out are missing, until the function's code gives them their defaults.
                         for (var i = withThis + argumentCount; i < function.ParameterCount; i++) calledRegisters[i] = WebLingoValue.Missing;
                         called.Function = function;
+                        if (debugger is not null) called.DebugActivation = 0;
                         called.Code = codes[index];
                         called.Cells = closureCells;
                         called.Closure[0] = callee;
@@ -1093,6 +1106,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         }
                         registers[0] = frame.Closure[1];
                         frame.Function = nextFunction;
+                        if (debugger is not null) frame.DebugActivation = 0;
                         frame.Code = code = codes[nextIndex];
                         frame.Cells = cells = nextCells;
                         frame.Closure[0] = next;
@@ -1327,6 +1341,113 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 return Failure(WebLingoDiagnosticCodes.BytecodeVerificationFailure, $"The bytecode is invalid: {exception.Message}", frame.Function, pc) with { Instructions = executed };
             }
         }
+
+        private long _debugActivation;
+        public IWebLingoRegisterDebugger? Debugger { get; init; }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool DebugInstruction(IWebLingoRegisterDebugger debugger, Frame[] frames, Frame frame, int depth, int pc)
+        {
+            if (frame.Function.DebugInfo is not { } info || !info.Points.TryGetValue(pc, out var span)) return false;
+            if (frame.DebugActivation == 0) frame.DebugActivation = ++_debugActivation;
+            if (!debugger.ShouldStop(new(info.Source, span, depth, frame.DebugActivation, pc))) return false;
+
+            var stack = new List<WebLingoDebugFrame>();
+            for (var level = depth; level >= 0; level--)
+            {
+                var current = frames[level];
+                if (current.Function.DebugInfo is not { } source) continue;
+                var callerPc = current.Pc - 1;
+                var position = level == depth ? span : SpanOf(current.Function, callerPc);
+                var visibility = level == depth ? span.Start : StatementStart(source, callerPc, position.Start);
+                stack.Add(new(current.Function.Name, source.Source, position, Inspect(current, source, visibility)));
+            }
+            debugger.Stopped(stack);
+            return true;
+        }
+
+        private static int StatementStart(WebLingoFunctionDebugInfo info, int pc, int offset)
+        {
+            var best = -1;
+            var start = offset;
+            foreach (var (instruction, span) in info.Points)
+            {
+                if (instruction <= pc && instruction > best && span.Start <= offset && offset - span.Start < span.Length)
+                    (best, start) = (instruction, span.Start);
+            }
+            return start;
+        }
+
+        private IReadOnlyList<WebLingoDebugVariable> Inspect(Frame frame, WebLingoFunctionDebugInfo info, int offset)
+        {
+            var visible = new Dictionary<string, WebLingoValue>(StringComparer.Ordinal);
+            for (var i = 0; i < info.Captures.Count && i < frame.Cells.Length; i++)
+            {
+                if (info.Captures[i].Length > 0) visible[info.Captures[i]] = frame.Cells[i];
+            }
+            foreach (var local in info.Locals)
+            {
+                if (offset >= local.VisibleFrom && offset < local.VisibleUntil && (uint)local.Register < (uint)frame.Function.LocalCount)
+                    visible[local.Name] = frame.Registers[local.Register];
+            }
+            var variables = new List<WebLingoDebugVariable>();
+            foreach (var (name, value) in visible) variables.Add(DescribeVariable(name, value, expand: true));
+            return variables;
+        }
+
+        private WebLingoDebugVariable DescribeVariable(string name, WebLingoValue value, bool expand)
+        {
+            if (value.Kind == WebLingoValueKind.Cell && !heap.TryReadCell(value, out value))
+                return new(name, "<uninitialized>", "");
+            if (value.Kind == WebLingoValueKind.Missing) return new(name, "<missing>", "");
+
+            var held = heap.Held(value);
+            var kind = held.Kind;
+            var count = kind switch
+            {
+                WebLingoValueKind.Array => heap.GetArray(held).Count,
+                WebLingoValueKind.Map => heap.MapCount(held),
+                WebLingoValueKind.Set => heap.SetCount(held),
+                WebLingoValueKind.Instance => heap.FieldCount(held),
+                WebLingoValueKind.Bytes => heap.GetBytes(held).Length,
+                WebLingoValueKind.BytesBuilder => heap.BuilderBytes(held).Length,
+                _ => -1
+            };
+            var type = value.Kind == WebLingoValueKind.Instance ? heap.ClassName(heap.ClassOf(value)) : kind.ToString();
+            var preview = count >= 0 ? $"{type} ({count})" : kind switch
+            {
+                WebLingoValueKind.String => WebLingoValueFormatter.Quote(Abbreviate(heap.GetString(held))),
+                WebLingoValueKind.Regex => "/" + Abbreviate(heap.GetRegex(held).Pattern) + "/",
+                _ => Abbreviate(WebLingoValueFormatter.Format(held, heap))
+            };
+
+            List<WebLingoDebugVariable> children = [];
+            if (expand && kind is WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Instance or WebLingoValueKind.Set)
+            {
+                for (var i = 0; i < Math.Min(count, 32); i++)
+                {
+                    var (label, child) = kind switch
+                    {
+                        WebLingoValueKind.Map => MapItem(held, i),
+                        WebLingoValueKind.Instance => heap.FieldAt(held, i),
+                        WebLingoValueKind.Set => ($"[{i}]", heap.SetValueAt(held, i)),
+                        _ => ($"[{i}]", heap.GetArray(held)[i])
+                    };
+                    children.Add(DescribeVariable(label, child, expand: false));
+                }
+                if (count > 32) children.Add(new("…", $"{count - 32} more", ""));
+            }
+            return new(name, preview, type) { Children = children };
+        }
+
+        private (string Name, WebLingoValue Value) MapItem(WebLingoValue map, int index)
+        {
+            var (key, value) = heap.MapEntryAt(map, index);
+            return (DescribeVariable("", key, expand: false).Value, value);
+        }
+
+        private static string Abbreviate(string value) =>
+            value.Length <= 160 ? value : value[..(char.IsHighSurrogate(value[159]) ? 159 : 160)] + "…";
 
         /// <summary>A cell's value; WL2004 if it has none yet, which only a hoisted function can meet (section 3.5).</summary>
         private WebLingoRuntimeError? ReadCell(WebLingoValue cell, WebLingoFunction? owner, int register, out WebLingoValue value)
@@ -1727,6 +1848,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     return WebLingoValue.Null;
                 }
                 if (!TryLink(compiled, out var entry, out error)) return WebLingoValue.Null;
+                Debugger?.ModuleLoaded(compiled);
                 if (anew && UnitNamed(name) is var joined and >= 0
                     && !_modules.TryFind(joined, name, module.Units[joined].Parameters, values, out _, out error, anew: true))
                 {
@@ -2486,6 +2608,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// <summary>A frame an exception leaves keeps nothing: its closure, its instance, a disposal, a kept exception.</summary>
         private static void Release(Frame frame)
         {
+            frame.DebugActivation = 0;
             frame.Closure[0] = WebLingoValue.Null;
             frame.Closure[1] = WebLingoValue.Null;
             frame.Closure[2] = WebLingoValue.Null;

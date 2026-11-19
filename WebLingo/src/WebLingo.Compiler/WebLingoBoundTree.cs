@@ -9,6 +9,7 @@ namespace WebLingo.Compiler;
 public sealed record WebLingoBoundProgram(
     IReadOnlyList<WebLingoBoundStatement> Statements, IReadOnlyList<WebLingoLocalSymbol> Locals, IReadOnlyList<WebLingoBuiltinSymbol> Builtins)
 {
+    internal bool Debugging { get; init; }
     /// <summary>The built-in class <c>Error</c>, among the program's classes if it uses it, or null (section 3.7).</summary>
     public WebLingoBoundClass? ErrorClass { get; init; }
     /// <summary>The built-in class <c>Object</c>, among the program's classes if it uses it, or null (section 3.7).</summary>

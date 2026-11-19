@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using WebLingo.Platform.DotNet;
 namespace WebLingo.Cli;
 
@@ -9,6 +10,8 @@ internal static class Program
     /// </summary>
     private static int Main(string[] args)
     {
+        if (args is ["--debug-adapter"]) return RunDebugAdapter();
+
         // Text written as UTF-8, to a file, a pipe or a console alike (WebLingoConsoleText).
         var (output, error) = WebLingoConsoleText.Open();
         // Its scripts read the console's input, typed or piped (WebLingoConsoleText reads it as UTF-8, or as Unicode).
@@ -18,4 +21,8 @@ internal static class Program
         WebLingoConsoleWindow.WaitWhereItsOwn(output);
         return exit;
     }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static int RunDebugAdapter() =>
+        new WebLingoDebugSession(Console.OpenStandardInput(), Console.OpenStandardOutput()).Run();
 }

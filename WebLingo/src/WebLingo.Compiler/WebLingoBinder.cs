@@ -17,6 +17,7 @@ public sealed class WebLingoBinder
     private readonly Dictionary<string, WebLingoBuiltinSymbol> _usedBuiltins = new(StringComparer.Ordinal);
     private readonly List<WebLingoBuiltinSymbol> _builtinsInOrder = [];
     private readonly List<WebLingoDiagnostic> _diagnostics = [];
+    private readonly bool _debugging;
     private FunctionContext _function;
     private Scope _scope;
 
@@ -75,6 +76,7 @@ public sealed class WebLingoBinder
 
     public WebLingoBinder(WebLingoCompilerOptions options)
     {
+        _debugging = options.Debugging;
         _builtinDeclarations = options.Builtins;
         _hostParameters = options.HostParameters;
         _native = options.Native;
@@ -277,6 +279,7 @@ public sealed class WebLingoBinder
         statements.InsertRange(0, builtins);
         return new WebLingoBoundProgram(statements, _function.Locals, _builtinsInOrder)
         {
+            Debugging = _debugging,
             ErrorClass = _error?.Class,
             ObjectClass = _object?.Class,
             BuiltinClasses = builtinClasses,
@@ -717,7 +720,7 @@ public sealed class WebLingoBinder
             case WebLingoForSyntax forLoop:
             {
                 // The loop's own scope holds what its init declares.
-                _scope = new Scope(_scope, _function);
+                _scope = new Scope(_scope, _function, forLoop.Span);
                 var init = forLoop.Init is null ? null : BindStatement(forLoop.Init);
                 var perIteration = new List<WebLingoLocalSymbol>(_scope.Locals.Values);
                 var condition = forLoop.Condition is null ? null : BindExpression(forLoop.Condition);
@@ -732,7 +735,7 @@ public sealed class WebLingoBinder
                 // The collection is bound first: the loop's variables do not exist in it yet. They are the loop's,
                 // with a binding of their own on each iteration (sections 3.5 and 3.6).
                 var collectionValue = BindExpression(forEach.Collection);
-                _scope = new Scope(_scope, _function);
+                _scope = new Scope(_scope, _function, forEach.Body.Span);
                 var collection = DeclareHidden("foreach collection", forEach.Span);
                 var position = DeclareHidden("foreach position", forEach.Span);
                 var item = Declare(forEach.ItemName, WebLingoDeclarationKind.Var, forEach.ItemSpan, null)
@@ -751,7 +754,7 @@ public sealed class WebLingoBinder
                 // resource's async disposal: at the program's top level, which then becomes async (section 3.8).
                 if (_function == _main) _main.Awaits = true;
                 var value = BindExpression(usingStatement.Value);
-                _scope = new Scope(_scope, _function);
+                _scope = new Scope(_scope, _function, usingStatement.Body.Span);
                 var local = Declare(usingStatement.Name, WebLingoDeclarationKind.Var, usingStatement.NameSpan, null)
                     ?? DeclareHidden(usingStatement.Name, usingStatement.NameSpan);
                 var exception = DeclareHidden("using exception", usingStatement.Span);
@@ -821,7 +824,7 @@ public sealed class WebLingoBinder
                 {
                     // Its class is evaluated where the try is, when an exception reaches it (section 3.7).
                     var caught = catchClause.Class is null ? null : BindExpression(catchClause.Class);
-                    _scope = new Scope(_scope, _function);
+                    _scope = new Scope(_scope, _function, catchClause.Body.Span);
                     var variable = Declare(catchClause.Name, WebLingoDeclarationKind.Var, catchClause.NameSpan, null)
                         ?? DeclareHidden(catchClause.Name, catchClause.NameSpan);
                     _function.Catches.Add((caughtValue!, caughtOrigin!));
@@ -856,7 +859,7 @@ public sealed class WebLingoBinder
             }
             case WebLingoBlockSyntax block:
             {
-                _scope = new Scope(_scope, _function);
+                _scope = new Scope(_scope, _function, block.Span);
                 var statements = BindStatements(block.Statements);
                 _scope = _scope.Parent!;
                 return new WebLingoBoundBlock(statements, block.Span);
@@ -888,7 +891,7 @@ public sealed class WebLingoBinder
     /// <summary>A branch or a loop's body: a declaration in it, without braces, is in scope only there.</summary>
     private WebLingoBoundStatement BindInOwnScope(WebLingoStatementSyntax statement)
     {
-        _scope = new Scope(_scope, _function);
+        _scope = new Scope(_scope, _function, statement.Span);
         var bound = BindStatements([statement]);
         _scope = _scope.Parent!;
         return new WebLingoBoundBlock(bound, statement.Span);
@@ -1072,7 +1075,7 @@ public sealed class WebLingoBinder
             (_class, _accessor) = (null, null);
         }
         _function = new FunctionContext(outerFunction, name) { IsAsync = isAsync };
-        _scope = new Scope(outerScope, _function);
+        _scope = new Scope(outerScope, _function, span);
         if (isMethod) Declare("this", WebLingoDeclarationKind.Parameter, span, null);
         // An outer method's 'this' is not a static method's (WL2009), but for one with a receiver, its class, a native
         // class's factory (section 3.7, "No sealed classes").
@@ -1084,7 +1087,7 @@ public sealed class WebLingoBinder
             defaults.Add(parameter.Default is { } value ? BindExpression(value) : null);
             Declare(parameter.Name, WebLingoDeclarationKind.Parameter, parameter.Span, null);
         }
-        _scope = new Scope(_scope, _function); // The body may declare a name its parameters have, shadowing it.
+        _scope = new Scope(_scope, _function, body.Span); // The body may declare a name its parameters have, shadowing it.
         // A setter gives the value assigned, which the assignment's value is, whatever its body does with its parameter.
         var setterParameter = name.StartsWith("set:", StringComparison.Ordinal) && parameters.Count == 1
             ? _function.Locals[^1]
@@ -1134,7 +1137,15 @@ public sealed class WebLingoBinder
             Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{name}' is already declared in this scope.", span);
             return null;
         }
-        var local = new WebLingoLocalSymbol(name, kind, _function.Locals.Count, span, _function) { FunctionArity = arity };
+        var local = new WebLingoLocalSymbol(name, kind, _function.Locals.Count, span, _function)
+        {
+            FunctionArity = arity,
+            DebugVisibility = _debugging && _nativeCallees is null && !name.StartsWith('<') && span.Length > 0
+                ? (kind is WebLingoDeclarationKind.Function or WebLingoDeclarationKind.Parameter
+                    ? _scope.Span?.Start ?? 0 : span.Start + span.Length,
+                    _scope.Span is { } scope ? scope.Start + scope.Length : int.MaxValue)
+                : null
+        };
         _function.Locals.Add(local);
         _scope.Locals.Add(name, local);
         return local;
@@ -1246,7 +1257,7 @@ public sealed class WebLingoBinder
             WebLingoBoundExpression result;
             if (arm.Patterns is [{ Binding: { } binding } pattern])
             {
-                _scope = new Scope(_scope, _function);
+                _scope = new Scope(_scope, _function, arm.Value.Span);
                 Declare(binding, WebLingoDeclarationKind.Var, pattern.Span, null);
                 var named = BindExpression(new WebLingoAssignmentExpressionSyntax(new WebLingoNameSyntax(binding, pattern.Span), subject, pattern.Span));
                 result = new WebLingoBoundSequence(named, BindExpression(arm.Value), arm.Value.Span);
@@ -2439,10 +2450,11 @@ public sealed class WebLingoBinder
         _diagnostics.Add(new WebLingoDiagnostic(code, WebLingoDiagnosticSeverity.Error, message, span) { Source = _source });
 
     /// <summary>A block's scope, chained through Parent; <see cref="Function"/> owns the locals declared in it.</summary>
-    private sealed class Scope(Scope? parent, FunctionContext function)
+    private sealed class Scope(Scope? parent, FunctionContext function, WebLingoSourceSpan? span = null)
     {
         public Scope? Parent { get; } = parent;
         public FunctionContext Function { get; } = function;
+        public WebLingoSourceSpan? Span { get; } = span;
         /// <summary>The names declared so far in this block, each from its declaration on.</summary>
         public Dictionary<string, WebLingoLocalSymbol> Locals { get; } = new(StringComparer.Ordinal);
     }

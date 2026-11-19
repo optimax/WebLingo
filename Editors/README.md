@@ -66,3 +66,36 @@ adds its `%>`. Emmet's abbreviations for HTML work in pages once `"emmet.include
 VS Code's settings.
 
 Its colouring was tried with VS Code 1.146, on Windows.
+
+### Debug a WebLingo script
+
+Use a build of `weblingo` that includes the debug adapter. Put it on PATH or set **WebLingo: Debugger Path**
+(`weblingo.debuggerPath`) in VS Code's user settings to the executable's full path. A Release build from this
+repository puts the executable in `WebLingo/src/WebLingo.Cli/bin/Release/net10.0/`.
+
+In a trusted workspace, open a local `.wlg` file, click the gutter next to a statement to set a breakpoint,
+and press **F5**. Choose **WebLingo** if VS Code asks for a debugger. Use the debug toolbar to step or continue.
+The **Variables** and **Call Stack** views show the current state, and the **Debug Console** shows script output.
+
+Use a `.vscode/launch.json` configuration to pass script parameters or choose a working directory.
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "weblingo",
+      "request": "launch",
+      "name": "Debug WebLingo Script",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "args": ["name=Ann"],
+      "stopOnEntry": true
+    }
+  ]
+}
+```
+
+With no `cwd`, the debugger uses the script's folder. Breakpoints are verified when the source is compiled.
+The debugger shows the active frames of asynchronous code and previews the first 32 entries of a collection.
+Debug Console input does not supply standard input to the script.

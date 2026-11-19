@@ -45,6 +45,8 @@ public sealed record WebLingoModuleSource(string Name, WebLingoCompilationUnitSy
 
 public sealed record WebLingoCompilerOptions(IReadOnlyList<WebLingoBuiltinDeclaration> Builtins)
 {
+    /// <summary>Whether to keep source-level stepping and local variable information in memory.</summary>
+    public bool Debugging { get; init; }
     public static WebLingoCompilerOptions Empty { get; } = new([]);
 
     /// <summary>How the host finds the files a program imports, or null for a host that finds none (section 3.9).</summary>
@@ -88,6 +90,7 @@ public abstract class WebLingoSymbol(string name)
 public sealed class WebLingoLocalSymbol(string name, WebLingoDeclarationKind kind, int index, WebLingoSourceSpan declarationSpan, object owner)
     : WebLingoSymbol(name)
 {
+    internal (int From, int Until)? DebugVisibility { get; init; }
     public WebLingoDeclarationKind Kind { get; } = kind;
     public int Index { get; } = index;
     public WebLingoSourceSpan DeclarationSpan { get; } = declarationSpan;

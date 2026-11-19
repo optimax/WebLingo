@@ -219,39 +219,79 @@ public static class WebLingoCommandLine
         return true;
     }
 
+    internal static int RunDebugFile(string path, string[] args, TextWriter output, TextWriter error, WebLingoDebugSession debugger)
+    {
+        if (!TryParameters(args, 0, out var parameters, out var wrong))
+        {
+            error.WriteLine($"'{wrong}' is not a parameter's value, name=value, or is given twice.");
+            return UsageError;
+        }
+        var source = PrepareSource(Scripts, path, new Dictionary<string, string>(), output, error, null, true, out var exit);
+        if (source is null) return exit;
+        debugger.SetSources(source.Text, source.Host.Resolver.Texts, () => { output.Flush(); error.Flush(); });
+        var context = Context(source.Host, parameters, source.LineOf, WebLingoHeap.DefaultRegexTimeoutMilliseconds) with
+        {
+            Cancellation = debugger.Cancellation,
+            SchedulerHost = debugger.Scheduler
+        };
+        var vm = new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(source.Options), Debugger = debugger };
+        var result = vm.Execute(source.Compilation.Result.Module!, context);
+        output.Flush();
+        return debugger.Cancellation.IsCancellationRequested ? Success : source.Report(result, error);
+    }
+
     private static int RunFile(WebLingoCommandLineProgram program, bool run, string path, IReadOnlyDictionary<string, string> parameters,
         IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error, IWebLingoConsoleInput? input,
         int regexTimeout = WebLingoHeap.DefaultRegexTimeoutMilliseconds)
     {
-        if (!TryReadText(path, error, out var source)) return FileUnreadable;
-        var text = new WebLingoSourceText(source, path);
-        if (TryHost(program, path, path, givenSchemes, output, error, input) is not { } host) return FileUnreadable;
-        var compilation = program.Compile(text, host.Options);
-        var compiled = compilation.Result;
-        foreach (var diagnostic in compiled.Diagnostics) WriteDiagnostic(error, TextOf(diagnostic), diagnostic);
-        if (compiled.Module is null) return CompilationFailed;
-        if (!run) return Success;
-
-        // The VM imports modules while the program runs as the compiler imports them, with the same resolver (section 3.9).
-        var context = Context(host, parameters, LineOf, regexTimeout);
-        var result = OnRegisterVm(compiled.Module, new WebLingoModuleLoader(host.Options), compilation.Components, context);
+        var source = PrepareSource(program, path, givenSchemes, output, error, input, false, out var exit);
+        if (source is null || !run) return exit;
+        // The VM imports modules with the same resolver the compiler used (section 3.9).
+        var context = Context(source.Host, parameters, source.LineOf, regexTimeout);
+        var result = OnRegisterVm(source.Compilation.Result.Module!, new WebLingoModuleLoader(source.Options),
+            source.Compilation.Components, context);
         output.Flush();
-        if (result.Succeeded) return Success;
-        var located = compilation.Locate(result.Error!);
-        WriteDiagnostic(error, TextOf(located), located);
-        return RuntimeFailed;
+        return source.Report(result, error);
+    }
+
+    private static SourceRun? PrepareSource(WebLingoCommandLineProgram program, string path,
+        IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error, IWebLingoConsoleInput? input,
+        bool debugging, out int exit)
+    {
+        exit = FileUnreadable;
+        if (!TryReadText(path, error, out var source)) return null;
+        var text = new WebLingoSourceText(source, path);
+        if (TryHost(program, path, path, givenSchemes, output, error, input) is not { } host) return null;
+        var options = debugging ? host.Options with { Debugging = true } : host.Options;
+        var compilation = program.Compile(text, options);
+        var prepared = new SourceRun(text, host, options, compilation);
+        foreach (var diagnostic in compilation.Result.Diagnostics) WriteDiagnostic(error, prepared.TextOf(diagnostic), diagnostic);
+        exit = compilation.Result.Module is null ? CompilationFailed : Success;
+        return exit == Success ? prepared : null;
+    }
+
+    private sealed record SourceRun(WebLingoSourceText Text, Host Host, WebLingoCompilerOptions Options,
+        WebLingoCommandLineCompilation Compilation)
+    {
+        public int Report(WebLingoExecutionResult result, TextWriter error)
+        {
+            if (result.Succeeded) return Success;
+            var located = Compilation.Locate(result.Error!);
+            WriteDiagnostic(error, TextOf(located), located);
+            return RuntimeFailed;
+        }
 
         // A diagnostic's file: a module the program imports, a file the program's compiler read itself (a page's include,
         // section 13), or the program's own (section 3.9).
-        WebLingoSourceText TextOf(WebLingoDiagnostic diagnostic) =>
-            diagnostic.Source is not { } name ? text
-            : host.Resolver.Texts.TryGetValue(name, out var imported) ? imported
-            : compilation.TextOf(name) ?? text;
+        public WebLingoSourceText TextOf(WebLingoDiagnostic diagnostic) =>
+            diagnostic.Source is not { } name ? Text
+            : Host.Resolver.Texts.TryGetValue(name, out var imported) ? imported
+            : Compilation.TextOf(name) ?? Text;
 
         // A position's line, in the file it is in, located as an error is, for a message that names it (section 3.8).
-        int LineOf(string? source, int offset)
+        public int LineOf(string? source, int offset)
         {
-            var at = compilation.Locate(new WebLingoDiagnostic("", WebLingoDiagnosticSeverity.Error, "", new WebLingoSourceSpan(offset, 0))
+            var at = Compilation.Locate(new WebLingoDiagnostic("", WebLingoDiagnosticSeverity.Error, "", new WebLingoSourceSpan(offset, 0))
             {
                 Source = source
             });

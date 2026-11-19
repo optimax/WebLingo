@@ -269,6 +269,8 @@ public sealed record WebLingoFunction(
     string Name, int RegisterCount, int LocalCount, IReadOnlyList<WebLingoInstruction> Code,
     IReadOnlyList<WebLingoSourceSpan>? Spans = null, IReadOnlyList<string>? LocalNames = null)
 {
+    /// <summary>Source debugger metadata. The bytecode file format does not serialize it.</summary>
+    public WebLingoFunctionDebugInfo? DebugInfo { get; init; }
     /// <summary>The most registers a function may have (specification, section 5.3, proposed).</summary>
     public const int MaxRegisters = 65535;
 

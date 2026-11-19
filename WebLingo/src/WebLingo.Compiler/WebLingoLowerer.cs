@@ -1,3 +1,4 @@
+using WebLingo.Bytecode;
 using WebLingo.Core;
 using WebLingo.Language;
 namespace WebLingo.Compiler;
@@ -24,11 +25,13 @@ public sealed class WebLingoLowerer
     /// <summary>The units of the standard modules the compiler makes, whose imports give their instances at once (section 3.9).</summary>
     private readonly HashSet<int> _standardUnits = [];
 
-    private WebLingoLowerer() { }
+    private readonly bool _debugging;
+
+    private WebLingoLowerer(bool debugging) => _debugging = debugging;
 
     public static WebLingoIrProgram Lower(WebLingoBoundProgram program)
     {
-        var lowerer = new WebLingoLowerer
+        var lowerer = new WebLingoLowerer(program.Debugging)
         {
             _errorBound = program.ErrorClass,
             _objectBound = program.ObjectClass,
@@ -61,6 +64,7 @@ public sealed class WebLingoLowerer
         var statements = lowerer.LowerBlock(program.Statements, prologue, program.MadeFirst);
         return new WebLingoIrProgram(statements, Names(program.Locals), program.Builtins)
         {
+            DebugLocals = lowerer.DebugLocals(program.Locals),
             Functions = lowerer._functions!,
             Units = units,
             Classes = lowerer._classes,
@@ -100,6 +104,8 @@ public sealed class WebLingoLowerer
             function.Span)
         {
             IsAsync = true,
+            DebugLocals = function.IsNative ? null : DebugLocals(function.Locals),
+            DebugCaptures = CaptureNames(function.Captures),
             Source = function.Source,
             IsNative = function.IsNative
         };
@@ -110,6 +116,26 @@ public sealed class WebLingoLowerer
     {
         var names = new string[locals.Count];
         foreach (var local in locals) names[local.Index] = local.Name;
+        return names;
+    }
+
+    private IReadOnlyList<WebLingoDebugLocal>? DebugLocals(IReadOnlyList<WebLingoLocalSymbol> locals)
+    {
+        if (!_debugging) return null;
+        var visible = new List<WebLingoDebugLocal>();
+        foreach (var local in locals)
+        {
+            if (local.DebugVisibility is { } range) visible.Add(new(local.Name, local.Index, range.From, range.Until));
+        }
+        return visible;
+    }
+
+    private IReadOnlyList<string> CaptureNames(IReadOnlyList<WebLingoBoundCapture> captures)
+    {
+        if (!_debugging || captures.Count == 0) return [];
+        var names = new string[captures.Count];
+        for (var i = 0; i < names.Length; i++)
+            names[i] = captures[i].Local.DebugVisibility is null ? "" : captures[i].Local.Name;
         return names;
     }
 
@@ -348,6 +374,8 @@ public sealed class WebLingoLowerer
         _functions[index] = new WebLingoIrFunction(function.Name, parameterCount, Names(function.Locals), captures, body,
             function.Span)
         {
+            DebugLocals = function.IsNative ? null : DebugLocals(function.Locals),
+            DebugCaptures = CaptureNames(function.Captures),
             HasThis = function.HasThis,
             OptionalCount = optional,
             IsAsync = function.IsAsync,

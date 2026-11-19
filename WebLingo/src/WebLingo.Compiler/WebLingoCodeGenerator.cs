@@ -16,16 +16,18 @@ public sealed class WebLingoCodeGenerator
     private readonly int _locals;
     private readonly List<WebLingoInstruction> _code = [];
     private readonly List<WebLingoSourceSpan> _spans = [];
+    private readonly Dictionary<int, WebLingoSourceSpan>? _debugPoints;
     private readonly Stack<LoopJumps> _loops = new();
     private int _nextRegister;
     private int _registerCount;
 
-    private WebLingoCodeGenerator(ModuleState module, int locals)
+    private WebLingoCodeGenerator(ModuleState module, int locals, bool debugging)
     {
         _module = module;
         _locals = locals;
         _nextRegister = _locals;
         _registerCount = _locals;
+        if (debugging) _debugPoints = [];
     }
 
     private List<WebLingoConstant> _constants => _module.Constants;
@@ -40,7 +42,9 @@ public sealed class WebLingoCodeGenerator
     public static WebLingoCompiledModule? Generate(WebLingoIrProgram program, string moduleName, List<WebLingoDiagnostic> diagnostics)
     {
         var module = new ModuleState();
-        var main = GenerateFunction(module, "main", program.IsImport || program.Parameters.Count > 0 ? 1 : 0, program.LocalNames, [], program.Statements, diagnostics);
+        var source = program.IsImport && moduleName.StartsWith("import ", StringComparison.Ordinal) ? moduleName[7..] : moduleName;
+        var main = GenerateFunction(module, "main", program.IsImport || program.Parameters.Count > 0 ? 1 : 0,
+            program.LocalNames, [], program.Statements, diagnostics, source, program.DebugLocals, []);
         var functions = new List<WebLingoFunction>();
         foreach (var function in program.Functions)
         {
@@ -48,7 +52,7 @@ public sealed class WebLingoCodeGenerator
             foreach (var capture in function.Captures) captures.Add(new WebLingoCapture(capture.FromLocal, capture.Index));
             var name = function.Name.Length == 0 ? "function" : function.Name;
             var generated = GenerateFunction(module, name, function.ParameterCount, function.LocalNames, captures, function.Body,
-                diagnostics);
+                diagnostics, function.Source ?? source, function.DebugLocals, function.DebugCaptures);
             if (generated is not null) functions.Add(generated with
             {
                 HasThis = function.HasThis,
@@ -89,9 +93,10 @@ public sealed class WebLingoCodeGenerator
 
     private static WebLingoFunction? GenerateFunction(ModuleState module, string name, int parameterCount,
         IReadOnlyList<string> localNames, IReadOnlyList<WebLingoCapture> captures, IReadOnlyList<WebLingoIrStatement> body,
-        List<WebLingoDiagnostic> diagnostics)
+        List<WebLingoDiagnostic> diagnostics, string source, IReadOnlyList<WebLingoDebugLocal>? debugLocals,
+        IReadOnlyList<string> debugCaptures)
     {
-        var generator = new WebLingoCodeGenerator(module, localNames.Count);
+        var generator = new WebLingoCodeGenerator(module, localNames.Count, debugLocals is not null);
         foreach (var statement in body) generator.EmitStatement(statement);
         generator.Emit(new WebLingoInstruction(WebLingoOpCode.Return), new WebLingoSourceSpan(0, 0));
         if (generator._registerCount > WebLingoFunction.MaxRegisters)
@@ -105,7 +110,8 @@ public sealed class WebLingoCodeGenerator
         {
             ParameterCount = parameterCount,
             Captures = captures,
-            Handlers = generator._handlers
+            Handlers = generator._handlers,
+            DebugInfo = generator._debugPoints is { } points ? new(source, points, debugLocals!, debugCaptures) : null
         };
     }
 
@@ -127,6 +133,7 @@ public sealed class WebLingoCodeGenerator
 
     private void EmitStatement(WebLingoIrStatement statement)
     {
+        var first = _code.Count;
         switch (statement)
         {
             case WebLingoIrInitializeLocal initialize:
@@ -261,6 +268,12 @@ public sealed class WebLingoCodeGenerator
             }
             default:
                 throw new InvalidOperationException($"Unknown statement {statement.GetType().Name}.");
+        }
+        if (_debugPoints is not null && _code.Count > first && statement.Span.Length != 0
+            && statement is not (WebLingoIrBlock or WebLingoIrRegisterUnit or WebLingoIrNewCell or WebLingoIrBoxLocal
+                or WebLingoIrCopyCells or WebLingoIrTakeRest or WebLingoIrDefaultParameter or WebLingoIrRethrow))
+        {
+            _debugPoints.TryAdd(first, statement.Span);
         }
         _nextRegister = _locals; // Temporaries live within a statement.
     }

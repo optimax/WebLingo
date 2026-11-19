@@ -582,6 +582,17 @@ Both ways, each call copies its arguments into an array of its own (8.1 MB alloc
 
 ---
 
+### 5.7 Local source debugging
+
+On 19 November 2026, the owner approved local `.wlg` launches on the default register VM in VS Code.
+The first release covers line breakpoints, stepping, the active call stack, and local variables. Debugging WASP,
+the stack VM, and attaching to running processes require separate work.
+
+The VS Code extension starts `weblingo --debug-adapter` and communicates over the Debug Adapter Protocol on
+standard streams. Debug compilation records statement points and lexical local ranges in memory. The adapter
+verifies breakpoints against those points after compilation, and the VM snapshots the active frames and their
+values on its execution worker. Inspection reads values without calling script methods.
+
 ## 6. Hosting architecture (WL-H001–WL-H014)
 
 ### 6.1 Approved hosting decisions

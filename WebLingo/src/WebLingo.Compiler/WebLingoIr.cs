@@ -1,3 +1,4 @@
+using WebLingo.Bytecode;
 using WebLingo.Core;
 using WebLingo.Language;
 namespace WebLingo.Compiler;
@@ -15,6 +16,7 @@ namespace WebLingo.Compiler;
 public sealed record WebLingoIrProgram(
     IReadOnlyList<WebLingoIrStatement> Statements, IReadOnlyList<string> LocalNames, IReadOnlyList<WebLingoBuiltinSymbol> Builtins)
 {
+    internal IReadOnlyList<WebLingoDebugLocal>? DebugLocals { get; init; }
     public IReadOnlyList<WebLingoIrFunction> Functions { get; init; } = [];
     /// <summary>Its files, if it imports others, its own first (section 3.9).</summary>
     public IReadOnlyList<WebLingoIrUnit> Units { get; init; } = [];
@@ -57,6 +59,8 @@ public sealed record WebLingoIrFunction(
     string Name, int ParameterCount, IReadOnlyList<string> LocalNames, IReadOnlyList<WebLingoIrCapture> Captures,
     IReadOnlyList<WebLingoIrStatement> Body, WebLingoSourceSpan Span)
 {
+    internal IReadOnlyList<WebLingoDebugLocal>? DebugLocals { get; init; }
+    internal IReadOnlyList<string> DebugCaptures { get; init; } = [];
     /// <summary>The file it is in, when it is not the program's own (section 3.9).</summary>
     public string? Source { get; init; }
     /// <summary>Whether it is a native class's member, which only calls its built-in, an error in it reported where it was called (section 3.9).</summary>
