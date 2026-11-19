@@ -24,6 +24,7 @@
     <ProjectReference Include="../WebLingo.StdLib.Url/WebLingo.StdLib.Url.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Csv/WebLingo.StdLib.Csv.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Compression/WebLingo.StdLib.Compression.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../WebLingo.StdLib.Random/WebLingo.StdLib.Random.csproj" ReferenceOutputAssembly="false" />
     <!-- Windows's own native module, windows:com, in windows/ beside the program, which only Windows loads (section 3.10). -->
     <ProjectReference Include="../WebLingo.Windows.Com/WebLingo.Windows.Com.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
@@ -56,6 +57,8 @@
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.StdLib.Compression/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Compression.dll"
           Link="std/compression.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="../WebLingo.StdLib.Random/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Random.dll" Link="std/random.dll"
+          CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.Windows.Com/bin/$(Configuration)/$(TargetFramework)/WebLingo.Windows.Com.dll" Link="windows/com.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>

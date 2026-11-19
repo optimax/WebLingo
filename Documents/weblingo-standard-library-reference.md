@@ -36,6 +36,7 @@ This reference describes the standard library in the current pre-alpha release a
 25. [`std:url`](#25-stdurl)
 26. [`std:csv`](#26-stdcsv)
 27. [`std:compression`](#27-stdcompression)
+28. [`std:random`](#28-stdrandom)
 
 ---
 
@@ -1330,4 +1331,26 @@ writeLn(compression.unzip(archive, 100)["menu/tea.txt"].text());
 ```text
 Sencha
 Sencha
+```
+
+## 28. `std:random`
+
+`new Random(seed)` creates a generator for reproducible tests and simulations. The seed is a signed 64-bit
+integer. Each instance has its own state. Equal seeds give identical sequences for identical calls.
+
+- `rng.next()` returns a number from 0 inclusive to 1 exclusive.
+- `rng.nextInt(min, max)` returns an integer in the range from `min` inclusive to `max` exclusive, without
+  bias from fitting the random bits to the range. Both bounds must be integers and `min` must be less than `max`.
+
+Use `std:crypto` for secure randomness.
+
+```javascript
+import { Random } from "std:random";
+
+var rng = new Random(42);
+writeLn([rng.nextInt(0, 100), rng.nextInt(0, 100), rng.nextInt(0, 100)]);
+```
+
+```text
+[13, 91, 58]
 ```

@@ -97,6 +97,31 @@ public sealed class UtilityModuleTests : IDisposable
             + "WL3001 The argument of 'unzip' is not a valid ZIP archive.\n");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SeededRandomNumbersHaveAStableSequenceAndValidBounds(bool stack)
+    {
+        Run(stack, """
+            import { Random } from "std:random";
+            var first = new Random(42);
+            var second = new Random(42);
+            writeLn([first.nextInt(0, 100), first.nextInt(0, 100), first.nextInt(0, 100)]);
+            writeLn([second.nextInt(0, 100), second.nextInt(0, 100), second.nextInt(0, 100)]);
+            var fraction = new Random(42).next();
+            writeLn([fraction == 0.7415648787718233, fraction >= 0.0, fraction < 1.0]);
+            var low = -9223372036854775807 - 1;
+            var high = 9223372036854775807;
+            var wide = new Random(-1).nextInt(low, high);
+            writeLn([wide >= low, wide < high, first.nextInt(-5, -4)]);
+            try { first.nextInt(1, 1); } catch (TypeError e) { writeLn(e.code + " " + e.message); }
+            try { new Random(1.5); } catch (TypeError e) { writeLn(e.code + " " + e.message); }
+            """,
+            "[13, 91, 58]\n[13, 91, 58]\n[true, true, true]\n[true, true, -5]\n"
+            + "WL3001 The inclusive lower bound of 'nextInt' must be less than its exclusive upper bound.\n"
+            + "WL3001 The argument of 'Random' must be an integer, not the number 1.5.\n");
+    }
+
     private void Run(bool stack, string source, string expected)
     {
         Directory.CreateDirectory(_folder);

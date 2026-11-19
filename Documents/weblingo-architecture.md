@@ -949,8 +949,10 @@ The owner approved the following order on 19 November 2026 after the path, URL a
   `gunzip(data, maxBytes)` handle gzip data. `zip(entries)` and `unzip(data, maxBytes)` use a map of file
   names to bytes. The decompression limit covers the aggregate file content, and the heap budget also applies.
   Ignore ZIP directory records and reject duplicate file names. Entry paths are treated as map keys.
-- **Add Seeded Random Numbers.** Produce reproducible sequences for tests and simulations. Secure random bytes
-  are available through `std:crypto`.
+- **Add Seeded Random Numbers.** `std:random` exports `Random(seed)`, an independent SplitMix64 generator
+  per instance. `next()` uses 53 bits for a number in `[0, 1)`. `nextInt(min, max)` uses rejection sampling
+  to give each integer in `[min, max)` equal probability. A seed and the same calls give the same sequence on
+  every host. Secure random bytes are available through `std:crypto`.
 - **Add CLI Subprocess Execution.** Let `weblingo` scripts run a program with arguments and read its exit status
   and output. WASP subprocess access remains a separate decision.
 

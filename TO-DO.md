@@ -20,7 +20,7 @@ A1: As you list them. Don't ask trivial questions. Act autonomously.
 
 2026-11-19 (Codex). The owner approved the order. See the architecture specification, §7.16, “Standard-library utilities”. This task waits for its three tasks below.
 
-## Add Seeded Random Numbers
+## [WORKING] Add Seeded Random Numbers
 
 Add a seeded generator that produces reproducible sequences for tests and simulations.
 
