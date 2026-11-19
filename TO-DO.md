@@ -26,7 +26,7 @@ Buiid an extension for VS Code to debug WebLingo.
 
 **Q1. Should the first VS Code debugger launch local `.wlg` scripts on the register VM with breakpoints, stepping, a call stack and local variables, with WASP, the stack VM and attaching to running processes left for follow-up tasks?**
 
-## Add the PostgreSQL Database Provider
+## [WORKING] Add the PostgreSQL Database Provider
 
 The owner chose PostgreSQL after MySQL. The local NuGet cache has no PostgreSQL provider. Proposed adapter dependency: Npgsql, with the existing ADO.NET connection contract and a `postgresql:` provider prefix.
 

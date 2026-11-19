@@ -802,6 +802,9 @@ With `Integrated Security`, the site reaches the database as the account it runs
 reaches over a network should have one its clients trust instead. WebLingo reaches SQL Server by TCP/IP, which the
 server must have enabled, as SQL Server's Developer and Express editions do not when they are installed.
 
+For MySQL or PostgreSQL, add the connection to `"databases"` in `wasp.config` and pass its name to `Database.open`.
+Use a MySqlConnector string with the `mysql:` prefix or an Npgsql string with the `postgresql:` prefix.
+
 A site's pages and handlers have no console to read: `std:system`'s `readLine` and the others, which a script that
 `weblingo` runs reads its input with, are an `IOError` in a page; a page reads what its request brings.
 

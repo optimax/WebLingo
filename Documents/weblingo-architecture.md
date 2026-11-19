@@ -902,7 +902,10 @@ row conversion as `query`. The existing `query` method continues to return an ar
 - **Add the MySQL Database Provider.** The owner chose MySQL as the first additional provider. The .NET adapter uses
   MySqlConnector with `mysql:` connection strings. WASP sites use a database name from `wasp.config` so the site
   operator controls driver options that can access local files.
-- **Add the PostgreSQL Database Provider.** The owner chose PostgreSQL after MySQL.
+- **Add the PostgreSQL Database Provider.** The owner chose PostgreSQL after MySQL. The .NET adapter uses Npgsql
+  with `postgresql:` connection strings. A WASP site opens a name from `wasp.config` so the site operator controls
+  driver options that can read local files, including password and certificate files. The adapter binds WebLingo
+  dates as UTC instants for PostgreSQL's `timestamptz`.
 
 ### 7.12 Resource ownership (WL-P012–P013)
 

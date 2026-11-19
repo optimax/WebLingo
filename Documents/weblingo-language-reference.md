@@ -5,11 +5,9 @@ programs, and the language of WASP, WebLingo's server pages. Its syntax will loo
 programmers. Conversions are explicit, conditions require Booleans, variables always have a value, and integer
 overflow raises an error.
 
-This reference describes the language as it is built today, which is pre-alpha: what it says works, and every example
-in it was run with `weblingo`, its output shown as it came. See
-[What is not in the language yet](#17-what-is-not-in-the-language-yet) for current limits. Pages, which put WebLingo into HTML, are the
-WASP User Manual's (`Documents/wasp-user-manual.md`). Every built-in class's members, and the standard modules, are
-listed in the WebLingo Standard Library Reference (`Documents/weblingo-standard-library-reference.md`).
+This reference describes the pre-alpha language and shows what its examples write. The WASP User Manual
+(`Documents/wasp-user-manual.md`) covers pages that put WebLingo into HTML. The WebLingo Standard Library Reference
+(`Documents/weblingo-standard-library-reference.md`) lists the standard modules and the members of each built-in class.
 
 The repository's `Examples.wlg` folder holds scripts that show the language at work, each ending with what it writes,
 and its `does-not-compile` folder scripts that WebLingo refuses on purpose, with the errors it gives them.
@@ -42,8 +40,7 @@ Hello, WebLingo!
 14. [Modules](#14-modules)
 15. [The standard library](#15-the-standard-library)
 16. [Diagnostic codes](#16-diagnostic-codes)
-17. [What is not in the language yet](#17-what-is-not-in-the-language-yet)
-18. [Comparison with Other Languages](#18-comparison-with-other-languages)
+17. [Comparison with Other Languages](#17-comparison-with-other-languages)
 
 ---
 
@@ -2093,7 +2090,9 @@ using (var db = await Database.open("sqlite::memory:")) {
 {"Name": "Guppy", "Price": 3.9m}
 ```
 
-A database's own failure, a statement it refuses, is a `DatabaseError`, WL3015. SQLite and SQL Server are the databases there are for now; the Standard Library Reference describes the module.
+A database failure, such as a refused statement, raises `DatabaseError` (WL3015). The .NET adapter supports SQLite,
+SQL Server, MySQL and PostgreSQL. Use `await db.rows(sql, values)` with a disposable cursor to read the rows
+one at a time. The Standard Library Reference describes connection strings and cursor usage.
 
 ### `std:crypto`
 
@@ -2206,13 +2205,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 ---
 
-## 17. What is not in the language yet
-
-WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
-
-- **Library**. Database providers beyond SQLite and SQL Server.
-
-## 18. Comparison with Other Languages
+## 17. Comparison with Other Languages
 
 ### JavaScript
 

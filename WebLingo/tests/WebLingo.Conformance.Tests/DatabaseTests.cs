@@ -170,7 +170,9 @@ public sealed class DatabaseTests : IDisposable
     [InlineData("try { await Database.open(\"nowhere\"); } catch (e) { writeLn([e.code, e.message]); }",
         "[\"WL3001\", \"'nowhere' is not a database the configuration names.\"]")]
     [InlineData("try { await Database.open(\"postgres:x\"); } catch (e) { writeLn(e.message); }",
-        "'postgres' is not a database's provider WebLingo has, which are \"sqlite\", \"sqlserver\", \"mysql\".")]
+        "'postgres' is not a database's provider WebLingo has, which are \"sqlite\", \"sqlserver\", \"mysql\", \"postgresql\".")]
+    [InlineData("try { await Database.open(\"postgresql:Database=shop\"); } catch (e) { writeLn([e.code, e.message]); }",
+        "[\"WL3001\", \"A PostgreSQL connection string names its server, as Host=name does.\"]")]
     [InlineData("try { await Database.open(\"sqlserver:Nonsense=1\"); } catch (e) { writeLn([e.code, e.message]); }",
         "[\"WL3001\", \"'Nonsense=1' is not a SQL Server connection string: Keyword not supported: 'nonsense'.\"]")]
     [InlineData("try { await Database.open(\"sqlserver:Database=Todo\"); } catch (e) { writeLn([e.code, e.message]); }",
@@ -197,6 +199,22 @@ public sealed class DatabaseTests : IDisposable
         var refused = Assert.Throws<WebLingoDatabaseException>(() => site.Open("mysql:Server=localhost"));
         Assert.Equal(WebLingoDatabaseErrorKind.NotAllowed, refused.Kind);
         Assert.Equal("a site opens MySQL by a name in wasp.config", refused.Message);
+    }
+
+    [Fact]
+    public void PostgreSqlRecognizesConfiguredConnectionsAndChecksConnectionStrings()
+    {
+        var site = new DotNetDatabases(new Dictionary<string, string> { ["shop"] = "postgresql:Nonsense=1" }, _folder)
+        {
+            Files = new DotNetFileCapabilities(_folder, [], [])
+        };
+        var invalid = Assert.Throws<WebLingoDatabaseException>(() => site.Open("shop"));
+        Assert.Equal(WebLingoDatabaseErrorKind.Invalid, invalid.Kind);
+        Assert.StartsWith("invalid PostgreSQL connection string:", invalid.Message);
+
+        var refused = Assert.Throws<WebLingoDatabaseException>(() => site.Open("postgresql:Host=localhost"));
+        Assert.Equal(WebLingoDatabaseErrorKind.NotAllowed, refused.Kind);
+        Assert.Equal("a site opens PostgreSQL by a name in wasp.config", refused.Message);
     }
 
     [Fact]

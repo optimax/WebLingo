@@ -6,8 +6,9 @@
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="MySqlConnector" />
-    <!-- SqlClient's native network layer on Windows, under Microsoft's own terms, left out: SqlClient uses its managed one
-         there too, as on Linux (DotNetDatabases), so that everything WebLingo ships is MIT. -->
+    <PackageReference Include="Npgsql" />
+    <!-- Leave out SqlClient's native network layer on Windows, which has separate Microsoft terms.
+         SqlClient uses its managed layer on Windows and Linux (DotNetDatabases). -->
     <PackageReference Include="Microsoft.Data.SqlClient.SNI.runtime" ExcludeAssets="all" PrivateAssets="all" />
   </ItemGroup>
 </Project>

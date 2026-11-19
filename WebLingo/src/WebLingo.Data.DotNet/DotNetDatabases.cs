@@ -5,12 +5,14 @@ using System.Runtime.CompilerServices;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using MySqlConnector;
+using Npgsql;
 using WebLingo.Platform.Abstractions;
 namespace WebLingo.Data.DotNet;
 
 /// <summary>
 /// The platform's databases on .NET (specification, section 7.11), through ADO.NET's providers: SQLite's,
-/// Microsoft.Data.Sqlite, <c>sqlite</c>, and SQL Server's, Microsoft.Data.SqlClient, <c>sqlserver</c>. A connection
+/// Microsoft.Data.Sqlite, <c>sqlite</c>, SQL Server's, Microsoft.Data.SqlClient, <c>sqlserver</c>, MySqlConnector,
+/// <c>mysql</c>, and Npgsql, <c>postgresql</c>. A connection
 /// string is its provider's name, a colon, and, for SQLite, a file's path, or the provider's own connection string, which
 /// holds an <c>=</c>, <c>"sqlite:Data Source=shop.db;Mode=ReadOnly"</c>, <c>:memory:</c> being a database in memory; for
 /// SQL Server, SqlClient's own, <c>"sqlserver:Server=localhost;Database=Todo;Integrated Security=true"</c>. A name the
@@ -19,13 +21,14 @@ namespace WebLingo.Data.DotNet;
 /// (<see cref="Files"/>, section 7.13, "File capabilities"), checked as <c>std:fs</c>'s paths are, from the site's root, a
 /// database opened to be written in a folder the site may write, one opened read-only (<c>Mode=ReadOnly</c>) in one it may
 /// read, a <c>file:</c> URI refused, those the configuration names being trusted. SQLite makes a file that is not
-/// there; both providers pool connections. SqlClient uses its managed network layer on Windows too, as it does elsewhere,
+/// there. A site's MySQL and PostgreSQL databases must be named in its configuration.
+/// SqlClient uses its managed network layer on Windows too, as it does elsewhere,
 /// its native one, under Microsoft's own terms, not shipped: it reaches a server by TCP/IP, never by its shared memory.
 /// </summary>
 public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configured, string folder) : IWebLingoDatabases
 {
     /// <summary>The providers this platform has.</summary>
-    public static readonly IReadOnlyList<string> Providers = ["sqlite", "sqlserver", "mysql"];
+    public static readonly IReadOnlyList<string> Providers = ["sqlite", "sqlserver", "mysql", "postgresql"];
 
     static DotNetDatabases()
     {
@@ -51,6 +54,7 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
             "sqlite" => Sqlite(rest, relativeTo, relativeTo is null ? Files : null),
             "sqlserver" => SqlServer(rest),
             "mysql" => MySql(rest, relativeTo is null && Files is not null),
+            "postgresql" => PostgreSql(rest, relativeTo is null && Files is not null),
             _ => throw Invalid($"'{provider}' is not a database's provider WebLingo has, which are \"{string.Join("\", \"", Providers)}\"")
         };
         try
@@ -144,6 +148,26 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
         catch (Exception exception) when (exception is ArgumentException or FormatException or KeyNotFoundException)
         {
             throw Invalid($"invalid MySQL connection string: {exception.Message}");
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static DbConnection PostgreSql(string rest, bool siteSupplied)
+    {
+        if (siteSupplied)
+        {
+            throw new WebLingoDatabaseException(WebLingoDatabaseErrorKind.NotAllowed,
+                "a site opens PostgreSQL by a name in wasp.config");
+        }
+        try
+        {
+            var builder = new NpgsqlConnectionStringBuilder(rest);
+            if (string.IsNullOrWhiteSpace(builder.Host)) throw Invalid("a PostgreSQL connection string names its server, as Host=name does");
+            return new NpgsqlConnection(builder.ConnectionString);
+        }
+        catch (Exception exception) when (exception is ArgumentException or FormatException or KeyNotFoundException)
+        {
+            throw Invalid($"invalid PostgreSQL connection string: {exception.Message}");
         }
     }
 
@@ -326,7 +350,10 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
             {
                 var parameter = command.CreateParameter();
                 parameter.ParameterName = "@" + name;
-                parameter.Value = value ?? DBNull.Value;
+                // Npgsql sends a date with an offset as timestamptz, which accepts DateTimeOffset values in UTC.
+                parameter.Value = provider == "postgresql" && value is DateTimeOffset date
+                    ? date.ToUniversalTime()
+                    : value ?? DBNull.Value;
                 command.Parameters.Add(parameter);
             }
             return command;
@@ -383,6 +410,7 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
                 byte[] bytes => bytes,
                 DateTimeOffset date => date,
                 DateTime date => new DateTimeOffset(DateTime.SpecifyKind(date, date.Kind == DateTimeKind.Unspecified ? DateTimeKind.Local : date.Kind)),
+                DateOnly date => new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Local)),
                 var other => Convert.ToString(other, CultureInfo.InvariantCulture)
             };
         }
