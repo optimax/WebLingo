@@ -45,13 +45,21 @@ public static class WebLingoCommandLine
     public static WebLingoCommandLineProgram Scripts { get; } = new("weblingo", Version, ".wl", _ => [],
         (file, options) => new WebLingoCommandLineCompilation(new WebLingoCompiler(options).Compile(file.Text, file.Name)))
     {
-        Bytecode = true
+        Bytecode = true,
+        RunsFileNamedFirst = true
     };
 
     public static int Run(string[] args, TextWriter output, TextWriter error) => Run(Scripts, args, output, error);
 
     public static int Run(WebLingoCommandLineProgram program, string[] args, TextWriter output, TextWriter error)
     {
+        // A file named first is run, weblingo script.wl name=Ann as weblingo run script.wl name=Ann (the owner's answer,
+        // 18 November 2026, "Minimal WebLingo Installer: Linux", Q1).
+        if (program.RunsFileNamedFirst && args.Length >= 1 && (args[0].EndsWith(program.Extension, StringComparison.OrdinalIgnoreCase)
+            || program.Bytecode && args[0].EndsWith(BytecodeExtension, StringComparison.OrdinalIgnoreCase)))
+        {
+            args = ["run", .. args];
+        }
         if (args.Length == 1 && args[0] is "--version" or "version")
         {
             output.WriteLine(program.Version);
@@ -130,6 +138,7 @@ public static class WebLingoCommandLine
             : "";
         output.WriteLine($"Usage: {program.Name} --version | run {file} [name=value …] | check {file}{bytecodeUsage}");
         output.WriteLine("  run       compiles the file and runs it, giving its parameters the values after it, each a string");
+        if (program.RunsFileNamedFirst) output.WriteLine($"            {program.Name} <file{program.Extension}> [name=value …] is the same as run");
         output.WriteLine("  check     compiles the file and reports its errors, without running it");
         if (program.Bytecode)
         {

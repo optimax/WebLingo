@@ -143,6 +143,24 @@ public sealed class BytecodeCommandLineTests : IDisposable
     }
 
     [Fact]
+    public void AFileNamedFirstIsRun()
+    {
+        // weblingo script.wl as weblingo run script.wl, its parameters after it, and a .wlbc so too (the owner's answer,
+        // 18 November 2026, "Minimal WebLingo Installer: Linux", Q1); anything else still a usage error.
+        var main = Write("Main.WL", "param name;\nimport { writeLn } from \"std:system\";\nwriteLn($\"Hello, {name}\");\n");
+        Assert.Equal((WebLingoCommandLine.Success, "Hello, Ann\n", ""), Weblingo(main, "name=Ann"));
+        Assert.Equal(Weblingo("run", main, "name=Bo"), Weblingo(main, "name=Bo"));
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
+        Assert.Equal((WebLingoCommandLine.Success, "Hello, Cy\n", ""), Weblingo(Path.ChangeExtension(main, ".wlbc"), "name=Cy"));
+        Assert.Equal(WebLingoCommandLine.FileUnreadable, Weblingo(Path.Combine(_folder, "none.wl")).Exit);
+        Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("rnu", main).Exit);
+        Assert.Equal(WebLingoCommandLine.UsageError, Weblingo(Write("notes.txt", "")).Exit);
+        var usage = new StringWriter();
+        WebLingoCommandLine.Run([], usage, new StringWriter());
+        Assert.Contains("weblingo <file.wl> [name=value …] is the same as run", usage.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheUsageNamesTheBytecodesCommands()
     {
         var output = new StringWriter();

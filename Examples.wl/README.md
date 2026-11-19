@@ -13,6 +13,7 @@ from its source and from its compiled bytecode, and check that it writes exactly
 With WebLingo installed, `weblingo` on the `PATH`, from this folder:
 
 ```bash
+weblingo 01-hello.wl
 weblingo run 01-hello.wl
 weblingo run 17-parameters.wl name=Ann cups=3
 weblingo check does-not-compile/missing-semicolon.wl

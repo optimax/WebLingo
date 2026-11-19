@@ -30,6 +30,12 @@ public sealed record WebLingoCommandLineProgram(
     public bool Bytecode { get; init; }
 
     /// <summary>
+    /// Whether a file named first, without a command, is run, <c>weblingo script.wl</c> as <c>weblingo run script.wl</c>, as
+    /// a scripting language's runner runs one: a file of its <see cref="Extension"/>, or a <c>.wlbc</c> where it has them.
+    /// </summary>
+    public bool RunsFileNamedFirst { get; init; }
+
+    /// <summary>
     /// The configuration's file in a file's folder (specification, sections 3.9 and 6.12): <c>weblingo.config</c>, a
     /// script's, unless the program has another, as <c>wasp</c> has <c>wasp.config</c>, a site's.
     /// </summary>

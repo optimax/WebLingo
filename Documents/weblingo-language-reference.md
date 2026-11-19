@@ -58,6 +58,7 @@ weblingo run hello.wl
 | Command | What it does |
 |---|---|
 | `weblingo run <file.wl> [name=value …]` | compiles the script and runs it, giving its parameters the values after it |
+| `weblingo <file.wl> [name=value …]` | the same, the file named first, as a scripting language's runner takes it; a `.wlbc` too |
 | `weblingo check <file.wl>` | compiles the script and reports its errors, without running it |
 | `weblingo compile [--register \| --stack] <file.wl>` | compiles the script into bytecode, a `.wlbc` file beside it |
 | `weblingo run <file.wlbc>` | runs compiled bytecode without compiling anything |
