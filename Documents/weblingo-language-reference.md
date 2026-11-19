@@ -2274,7 +2274,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Library**: a database's rows read one at a time, for results too large to hold whole; databases other than SQLite and SQL Server.
+- **Library**. Database providers beyond SQLite and SQL Server.
 
 ## 18. Comparison with Other Languages
 

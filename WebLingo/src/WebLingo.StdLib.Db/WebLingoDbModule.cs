@@ -41,6 +41,8 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
     public void Register(IWebLingoNativeRegistry registry)
     {
         var database = registry.Class("Database");
+        var rowCursor = registry.Class("DatabaseCursor").DeclareMadeByModule();
+        RegisterCursor(rowCursor);
         // A database made, new Database(name), its name kept, then opened, db.open(), which gives it; and Database.open(name),
         // shorthand for both, making an instance of the class it is called on (section 3.7, "No sealed classes").
         database.DeclareConstructor(1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
@@ -87,6 +89,40 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
                 return false;
             }
             return scheduler.TryRunOffWorker(() => connection.Query(sql, values, timeout), Rows, Failed, out result, out error);
+        });
+        database.DeclareMethod("rows", 2, 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result,
+            out WebLingoRuntimeError? error) =>
+        {
+            result = WebLingoValue.Null;
+            if (!TryStatement(database, "rows", a, heap, out var connection, out var sql, out var values, out _,
+                    out var scheduler, out error))
+            {
+                return false;
+            }
+            if (connection is not IWebLingoStreamingDatabaseConnection streaming)
+            {
+                error = Wrong("This database adapter does not support row streaming.");
+                return false;
+            }
+            if (!rowCursor.TryMakeOwn(heap, out var instance, out error)) return false;
+            var roots = new[] { instance };
+            heap.AddRoots(roots);
+            try
+            {
+                if (!heap.TrySetField(instance, "#database", a[0], out error)) return false;
+                return scheduler.TryRunOffWorker(() => streaming.OpenRows(sql, values, null),
+                    (IWebLingoDatabaseCursor cursor, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? wrong) =>
+                    {
+                        made = instance;
+                        if (rowCursor.TrySetHostObject(instance, cursor, h, out wrong)) return true;
+                        cursor.Dispose();
+                        return false;
+                    }, Failed, instance, out result, out error);
+            }
+            finally
+            {
+                heap.RemoveLastRoots(roots);
+            }
         });
         database.DeclareMethod("execute", 3, 2, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         {
@@ -157,6 +193,32 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
         database.DeclareWebLingoMethods(TransactionSource);
     }
 
+    private static void RegisterCursor(WebLingoNativeClass rowCursor)
+    {
+        rowCursor.DeclareMethod("next", 0, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result,
+            out WebLingoRuntimeError? error) =>
+        {
+            result = WebLingoValue.Null;
+            if (!rowCursor.TryGetHostObject<IWebLingoDatabaseCursor>(a[0], heap, out var cursor, out error)
+                || !TryServices(heap, out _, out var scheduler, out error))
+            {
+                return false;
+            }
+            return scheduler.TryRunOffWorker(cursor.Next,
+                (object?[]? row, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? wrong) =>
+                    CursorRow(cursor.Columns, row, h, out made, out wrong),
+                Failed, a[0], out result, out error);
+        });
+        rowCursor.DeclareMethod("dispose", 0, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result,
+            out WebLingoRuntimeError? error) =>
+        {
+            result = WebLingoValue.Null;
+            if (!rowCursor.TryReleaseHostObject(a[0], heap, out var held, out error)) return false;
+            (held as IDisposable)?.Dispose();
+            return true;
+        });
+    }
+
     /// <summary>A statement's connection, text, values and timeout, and the scheduler to run it with.</summary>
     private static bool TryStatement(WebLingoNativeClass database, string method, ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap,
         out IWebLingoDatabaseConnection connection, out string sql, out IReadOnlyList<KeyValuePair<string, object?>> values, out int? timeout,
@@ -165,14 +227,17 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
         (connection, sql, values, timeout, scheduler) = (null!, "", [], null, null!);
         if (!database.TryGetHostObject<IWebLingoDatabaseConnection>(a[0], heap, NotOpen, out var open, out error)) return false;
         connection = open;
+        var parameters = a.Length - 1;
         if (a[1].Kind != WebLingoValueKind.String)
         {
-            error = new WebLingoArgument(method, 0, 3, "the statement", "SQL, a string").Wrong(a[1], heap);
+            error = new WebLingoArgument(method, 0, parameters, "the statement", "SQL, a string").Wrong(a[1], heap);
             return false;
         }
         sql = heap.GetString(a[1]);
-        return TryValues(new(method, 1, 3, "the values", "a map of names to values, { max: 10 }"), a[2], heap, out values, out error)
-               && TryOptions(new(method, 2, 3, "the options", "a map, { timeout: … }"), a[3], method, heap, out timeout, out _, out error)
+        return TryValues(new(method, 1, parameters, "the values", "a map of names to values, { max: 10 }"),
+                   a[2], heap, out values, out error)
+               && (parameters == 2 || TryOptions(new(method, 2, 3, "the options", "a map, { timeout: … }"),
+                   a[3], method, heap, out timeout, out _, out error))
                && TryServices(heap, out _, out scheduler, out error);
     }
 
@@ -288,14 +353,7 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
             var entries = new WebLingoValue[2 * columns.Length];
             for (var r = 0; r < maps.Length; r++)
             {
-                var row = rows.Rows[r];
-                for (var c = 0; c < columns.Length; c++)
-                {
-                    if (!TryValue(row[c], heap, out var value, out error)) return false;
-                    made.Add(value);
-                    (entries[2 * c], entries[2 * c + 1]) = (columns[c], value);
-                }
-                if (!heap.TryAllocateMap(entries, 0, columns.Length, out maps[r], out error)) return false;
+                if (!TryRow(rows.Rows[r], columns, entries, made, heap, out maps[r], out error)) return false;
                 made.Add(maps[r]);
             }
             return heap.TryAllocateArray(maps, 0, maps.Length, out result, out error);
@@ -304,6 +362,42 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
         {
             heap.RemoveLastRoots(made);
         }
+    }
+
+    private static bool CursorRow(IReadOnlyList<string> names, object?[]? row, WebLingoHeap heap,
+        out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        (result, error) = (WebLingoValue.Null, null);
+        if (row is null) return true;
+        var roots = new List<WebLingoValue>();
+        heap.AddRoots(roots);
+        try
+        {
+            var columns = new WebLingoValue[names.Count];
+            for (var i = 0; i < columns.Length; i++)
+            {
+                if (!heap.TryAllocateString(names[i], out columns[i], out error)) return false;
+                roots.Add(columns[i]);
+            }
+            return TryRow(row, columns, new WebLingoValue[2 * columns.Length], roots, heap, out result, out error);
+        }
+        finally
+        {
+            heap.RemoveLastRoots(roots);
+        }
+    }
+
+    private static bool TryRow(object?[] row, WebLingoValue[] columns, WebLingoValue[] entries,
+        List<WebLingoValue> roots, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        for (var c = 0; c < columns.Length; c++)
+        {
+            if (!TryValue(row[c], heap, out var value, out error)) return false;
+            roots.Add(value);
+            (entries[2 * c], entries[2 * c + 1]) = (columns[c], value);
+        }
+        return heap.TryAllocateMap(entries, 0, columns.Length, out result, out error);
     }
 
     /// <summary>A database's value as WebLingo's: null, a Boolean, an integer, a number, a decimal, a string, bytes or a date.</summary>

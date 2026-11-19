@@ -50,6 +50,20 @@ public interface IWebLingoDatabaseConnection : IDisposable
     void Rollback();
 }
 
+/// <summary>A database adapter that supports forward-only result sets.</summary>
+public interface IWebLingoStreamingDatabaseConnection : IWebLingoDatabaseConnection
+{
+    /// <summary>Opens a cursor. Dispose or exhaust it before issuing another operation on this connection.</summary>
+    IWebLingoDatabaseCursor OpenRows(string sql, IReadOnlyList<KeyValuePair<string, object?>> values, int? timeoutSeconds);
+}
+
+/// <summary>Reads one row at a time. A null result marks exhaustion and releases the active reader.</summary>
+public interface IWebLingoDatabaseCursor : IDisposable
+{
+    IReadOnlyList<string> Columns { get; }
+    object?[]? Next();
+}
+
 /// <summary>A query's result: its columns' names, and its rows, each a value for each column.</summary>
 public sealed record WebLingoDatabaseRows(IReadOnlyList<string> Columns, IReadOnlyList<object?[]> Rows);
 

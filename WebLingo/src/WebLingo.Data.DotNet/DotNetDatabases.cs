@@ -127,10 +127,11 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
     private static WebLingoDatabaseException Invalid(string message) => new(WebLingoDatabaseErrorKind.Invalid, message);
 
     /// <summary>An open connection: one operation at a time, a transaction at most, each command given it.</summary>
-    private sealed class Connection(string provider, DbConnection connection) : IWebLingoDatabaseConnection
+    private sealed class Connection(string provider, DbConnection connection) : IWebLingoStreamingDatabaseConnection
     {
         private readonly object _gate = new();
         private DbTransaction? _transaction;
+        private Cursor? _cursor;
         private bool _closed;
 
         public string Provider => provider;
@@ -140,17 +141,32 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
         {
             using var command = Command(sql, values, timeoutSeconds);
             using var reader = command.ExecuteReader();
-            var columns = new string[reader.FieldCount];
-            for (var i = 0; i < columns.Length; i++) columns[i] = reader.GetName(i);
+            var columns = Columns(reader);
             var rows = new List<object?[]>();
             while (reader.Read())
             {
-                var row = new object?[columns.Length];
-                for (var i = 0; i < row.Length; i++) row[i] = Value(reader, i);
-                rows.Add(row);
+                rows.Add(ReadRow(reader, columns.Length));
             }
             return new WebLingoDatabaseRows(columns, rows);
         });
+
+        public IWebLingoDatabaseCursor OpenRows(string sql, IReadOnlyList<KeyValuePair<string, object?>> values, int? timeoutSeconds)
+            => Run(() =>
+            {
+                var command = Command(sql, values, timeoutSeconds);
+                DbDataReader? reader = null;
+                try
+                {
+                    reader = command.ExecuteReader();
+                    return _cursor = new Cursor(this, command, reader, Columns(reader));
+                }
+                catch
+                {
+                    try { reader?.Dispose(); }
+                    finally { command.Dispose(); }
+                    throw;
+                }
+            });
 
         public long Execute(string sql, IReadOnlyList<KeyValuePair<string, object?>> values, int? timeoutSeconds) => Run(() =>
         {
@@ -194,18 +210,26 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
             {
                 if (_closed) return;
                 _closed = true;
-                _transaction?.Dispose(); // An open transaction is rolled back.
-                _transaction = null;
-                connection.Dispose();
+                try { _cursor?.Dispose(); }
+                finally
+                {
+                    try { _transaction?.Dispose(); }
+                    finally
+                    {
+                        _transaction = null;
+                        connection.Dispose();
+                    }
+                }
             }
         }
 
         /// <summary>An operation, one at a time, its provider's failures the database's, its script's mistakes WL3001's.</summary>
-        private T Run<T>(Func<T> operation)
+        private T Run<T>(Func<T> operation, bool readingCursor = false)
         {
             lock (_gate)
             {
                 if (_closed) throw Invalid("the database is closed");
+                if (!readingCursor && _cursor is not null) throw Invalid("a row cursor is open: finish or dispose it first");
                 try
                 {
                     return operation();
@@ -218,6 +242,53 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
                                                   or InvalidCastException or OverflowException)
                 {
                     throw Invalid(exception.Message);
+                }
+            }
+        }
+
+        private static string[] Columns(DbDataReader reader)
+        {
+            var columns = new string[reader.FieldCount];
+            for (var i = 0; i < columns.Length; i++) columns[i] = reader.GetName(i);
+            return columns;
+        }
+
+        private static object?[] ReadRow(DbDataReader reader, int count)
+        {
+            var row = new object?[count];
+            for (var i = 0; i < row.Length; i++) row[i] = Value(reader, i);
+            return row;
+        }
+
+        private sealed class Cursor(Connection owner, DbCommand command, DbDataReader reader, string[] columns)
+            : IWebLingoDatabaseCursor
+        {
+            public IReadOnlyList<string> Columns => columns;
+
+            public object?[]? Next() => owner.Run<object?[]?>(() =>
+            {
+                if (owner._cursor != this) return null;
+                try
+                {
+                    if (reader.Read()) return ReadRow(reader, columns.Length);
+                }
+                catch
+                {
+                    Dispose();
+                    throw;
+                }
+                Dispose();
+                return null;
+            }, readingCursor: true);
+
+            public void Dispose()
+            {
+                lock (owner._gate)
+                {
+                    if (owner._cursor != this) return;
+                    owner._cursor = null;
+                    try { reader.Dispose(); }
+                    finally { command.Dispose(); }
                 }
             }
         }

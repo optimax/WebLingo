@@ -90,6 +90,51 @@ public sealed class DatabaseTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RowCursorsStreamAndReleaseTheConnection(bool stack)
+    {
+        var (exit, output, error) = Weblingo(Setup + """
+            using (var rows = await db.rows("SELECT Name, Price FROM Fish WHERE Id >= @id ORDER BY Id", { id: 1 })) {
+                writeLn(await rows.next());
+                try { await db.query("SELECT 1"); } catch (TypeError e) { writeLn(e.code + " " + e.message); }
+                writeLn(await rows.next());
+                writeLn(await rows.next());
+                writeLn(await rows.next());
+                writeLn((await db.query("SELECT 3 AS n"))[0]["n"]);
+            }
+            using (var rows = await db.rows("SELECT Name FROM Fish ORDER BY Id")) {
+                writeLn((await rows.next())["Name"]);
+            }
+            writeLn((await db.query("SELECT COUNT(*) AS n FROM Fish"))[0]["n"]);
+            using (var rows = await db.rows("SELECT Name FROM Fish WHERE Id = 0")) {
+                writeLn(await rows.next());
+            }
+            using (var rows = await db.rows(
+                    "SELECT CASE Id WHEN 2 THEN abs(-9223372036854775808) ELSE Id END AS n FROM Fish ORDER BY Id")) {
+                writeLn((await rows.next())["n"]);
+                try { await rows.next(); } catch (DatabaseError e) { writeLn(e.code); }
+                writeLn((await db.query("SELECT 4 AS n"))[0]["n"]);
+            }
+            """, stack);
+        Assert.Equal((WebLingoCommandLine.Success, """
+            {"Name": "Neon tetra", "Price": 2.5m}
+            WL3001 A row cursor is open: finish or dispose it first.
+            {"Name": "Clownfish", "Price": 24.99m}
+            null
+            null
+            3
+            Neon tetra
+            2
+            null
+            1
+            WL3015
+            4
+
+            """.ReplaceLineEndings("\n"), ""), (exit, output, error));
+    }
+
+    [Theory]
     [InlineData("var n = await db.transaction(async () => { await db.execute(\"DELETE FROM Fish WHERE Id = 1\"); " +
                 "return (await db.query(\"SELECT COUNT(*) AS n FROM Fish\"))[0][\"n\"]; }); writeLn(n);", "1\n1")]
     [InlineData("try { await db.transaction(async () => { await db.execute(\"DELETE FROM Fish\"); throw new Error(\"no\"); }); } " +
@@ -209,11 +254,18 @@ public sealed class DatabaseTests : IDisposable
         return path;
     }
 
-    private (int Exit, string Output, string Error) Weblingo(string source)
+    private (int Exit, string Output, string Error) Weblingo(string source, bool stack = false)
     {
         var path = Write(source);
         var output = new StringWriter();
         var error = new StringWriter();
+        if (stack)
+        {
+            var compile = WebLingoCommandLine.Run(["compile", "--stack", path], output, error);
+            if (compile != WebLingoCommandLine.Success) return (compile, output.ToString(), error.ToString());
+            path = Path.ChangeExtension(path, ".wlbc");
+            output.GetStringBuilder().Clear();
+        }
         var exit = WebLingoCommandLine.Run(["run", path], output, error);
         return (exit, output.ToString(), error.ToString().Replace(path, "program.wlg", StringComparison.Ordinal));
     }

@@ -853,12 +853,40 @@ Databases, through the platform's: one module for every database, the SQL passed
 |---|---|
 | `Database.open(name)` | a task of a connection to the database the configuration names, or to the one a connection string describes, `"sqlite:C:/data/fish.db"` |
 | `db.query(sql, values, options)` | a task of its rows, an array of maps, each from a column's name to its value |
+| `db.rows(sql, values)` | a task returning a disposable cursor for reading one row at a time. The values map is optional |
 | `db.execute(sql, values, options)` | a task of the number of rows the statement changed |
 | `db.transaction(work, options)` | begins a transaction, awaits the function `work`, and commits, or rolls back where `work` throws, throwing on; a task of what `work` gave |
 | `db.begin(options)`, `db.commit()`, `db.rollback()` | a transaction's steps, each a task; a connection's transactions do not nest |
 | `db.provider`, `db.serverVersion` | the database's kind, `"sqlite"` or `"sqlserver"`, and its version |
 | `db.dispose()` | closes it, as `using` does, rolling back a transaction still open |
 | `new Database(name)`, `db.open()` | a database made, its name kept, not yet open, then opened, a task giving the database; `Database.open(name)` is shorthand for both, making an instance of the class it is called on |
+
+Read each row with `await cursor.next()`. It returns a map with the same columns and values as `query`.
+The first `null` marks exhaustion, and later reads also give `null`. Use `using` to close the cursor if you leave
+the loop early. Exhaust or dispose the cursor before issuing another statement or changing the transaction on
+the same connection. Read the cursor in order by awaiting each call to `next()` before starting another.
+
+```javascript
+import { writeLn } from "std:system";
+import { Database } from "std:db";
+
+using (var db = await Database.open("sqlite::memory:")) {
+    await db.execute("CREATE TABLE Fish (Id INTEGER PRIMARY KEY, Name TEXT, Price INTEGER)");
+    await db.execute("INSERT INTO Fish VALUES (1, 'Neon tetra', 3), (2, 'Guppy', 5), (3, 'Clownfish', 25)");
+    using (var cursor = await db.rows("SELECT Name FROM Fish WHERE Price < @max ORDER BY Id", { max: 10 })) {
+        var row = await cursor.next();
+        while (row != null) {
+            writeLn(row["Name"]);
+            row = await cursor.next();
+        }
+    }
+}
+```
+
+```text
+Neon tetra
+Guppy
+```
 
 A configuration names a script's or a site's databases, `weblingo.config` beside a script and a site's `wasp.config`, `{ "databases": { "fish": "sqlite:../database/fish.db" } }`, a relative path there being from the configuration's folder, and a script opens one by its name, `Database.open("fish")`, or by a connection string of its own, a relative path then from the current folder. SQLite's connection string is a file's path, the file made when it is not there, `:memory:`, a database in memory, or SQLite's own, which holds an `=`, `"sqlite:Data Source=fish.db;Mode=ReadOnly"`. SQL Server's is SqlClient's own, `"sqlserver:Server=localhost;Database=Todo;Integrated Security=true;TrustServerCertificate=true"`, `TrustServerCertificate` accepting the certificate a server made for itself when it was installed; it reaches SQL Server through SqlClient's managed network layer, on Windows as elsewhere, by TCP/IP, which the server must have enabled, as SQL Server's Developer and Express editions do not when they are installed, and never by its shared memory.
 
