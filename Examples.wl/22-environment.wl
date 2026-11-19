@@ -11,8 +11,13 @@ Environment.setVariable("TEA_OF_THE_DAY", null);
 writeLn([Environment.variable("TEA_OF_THE_DAY"), Environment.variable("NO_SUCH_VARIABLE_HERE")]);
 writeLn([Environment.machineName is String, Environment.machineName.length > 0]);
 
+// The machine's processor, the running program's, which a 32-bit program on 64-bit Windows tells apart, and the system.
+writeLn([Environment.architecture is String, ["x64", "x86", "arm64", "arm"].contains(Environment.processArchitecture),
+  ["windows", "linux", "macos"].contains(Environment.os)]);
+
 /* Output:
 ["genmaicha", "genmaicha"]
 [null, null]
 [true, true]
+[true, true, true]
 */

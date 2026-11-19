@@ -11,6 +11,24 @@ public interface IWebLingoEnvironment
     /// <summary>The machine's name, or null where the application may not read it.</summary>
     string? MachineName { get; }
 
+    /// <summary>
+    /// The machine's architecture, <c>"x64"</c>, <c>"x86"</c>, <c>"arm64"</c> or <c>"arm"</c>, as .NET's runtime identifiers
+    /// name them, another's its name in small letters; null where the application may not read it.
+    /// </summary>
+    string? Architecture { get; }
+
+    /// <summary>
+    /// The running program's architecture, as <see cref="Architecture"/> names it, <c>"x86"</c> for a 32-bit program on
+    /// 64-bit Windows; null where the application may not read it.
+    /// </summary>
+    string? ProcessArchitecture { get; }
+
+    /// <summary>
+    /// The operating system, <c>"windows"</c>, <c>"linux"</c> or <c>"macos"</c>, <c>"freebsd"</c> too, <c>"other"</c> for any
+    /// other; null where the application may not read it.
+    /// </summary>
+    string? OperatingSystemName { get; }
+
     /// <summary>A variable's value, or null where it is not set, or the application may not read it.</summary>
     string? GetVariable(string name);
 

@@ -803,7 +803,9 @@ reaches over a network should have one its clients trust instead. WebLingo reach
 server must have enabled, as SQL Server's Developer and Express editions do not when they are installed.
 
 A site reads the machine's environment, through `std:env`, only as its `"env"` allows: the machine's name with
-`"machineName": true`, and the environment variables `"variables"` lists, a name ending in `*` allowing those it
+`"machineName": true`, its processor's architecture, the running `wasp`'s and the operating system,
+`Environment.architecture`, `processArchitecture` and `os`, with `"platform": true`, and the environment variables
+`"variables"` lists, a name ending in `*` allowing those it
 begins, `"*"` any, their names compared as the platform compares them, ignoring case on Windows:
 
 ```json

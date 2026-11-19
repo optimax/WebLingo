@@ -7,7 +7,9 @@ namespace WebLingo.StdLib.Env;
 /// <c>std:env</c>, a standard module (specification, section 7.15), a native module installed with the runtime in the
 /// <c>std</c> scheme's folder as <c>env.dll</c>, through the platform's environment (<see cref="WebLingoHeap.Environment"/>),
 /// so that the portable core reads no machine's of its own (the owner's answers, 18 November 2026): its class
-/// <c>Environment</c>, whose members are static: <c>machineName</c>, the machine's name; <c>variable(name)</c>, an
+/// <c>Environment</c>, whose members are static: <c>machineName</c>, the machine's name; <c>architecture</c>,
+/// <c>processArchitecture</c> and <c>os</c>, the machine's architecture, the running program's, and the operating system
+/// (the owner's answers, 19 November 2026, "The Machine's Architecture and System"); <c>variable(name)</c>, an
 /// environment variable's value; <c>variables</c>, a map of the variables, each its name and its value; and
 /// <c>setVariable(name, value)</c>, which sets one, for the process alone, or removes it, given <c>null</c>. Under
 /// <c>weblingo</c> a script reaches all of it; under <c>wasp</c> a site's scripts reach what its <c>wasp.config</c>'s
@@ -20,6 +22,12 @@ public sealed class WebLingoEnvModule : IWebLingoNativeModule
     {
         registry.Class("Environment")
             .DeclareStaticProperty("machineName", MachineName)
+            .DeclareStaticProperty("architecture", (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result,
+                out WebLingoRuntimeError? error) => Text(heap, environment => environment.Architecture, out result, out error))
+            .DeclareStaticProperty("processArchitecture", (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result,
+                out WebLingoRuntimeError? error) => Text(heap, environment => environment.ProcessArchitecture, out result, out error))
+            .DeclareStaticProperty("os", (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result,
+                out WebLingoRuntimeError? error) => Text(heap, environment => environment.OperatingSystemName, out result, out error))
             .DeclareStaticProperty("variables", Variables)
             .DeclareStaticMethod("variable", 1, Variable)
             .DeclareStaticMethod("setVariable", 2, SetVariable);
@@ -30,6 +38,14 @@ public sealed class WebLingoEnvModule : IWebLingoNativeModule
         result = WebLingoValue.Null;
         if (!TryEnvironment(heap, out var environment, out error)) return false;
         return environment.MachineName is not { } name || heap.TryAllocateString(name, out result, out error);
+    }
+
+    /// <summary>A string the environment gives, or <c>null</c> where the application may not read it.</summary>
+    private static bool Text(WebLingoHeap heap, Func<IWebLingoEnvironment, string?> read, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!TryEnvironment(heap, out var environment, out error)) return false;
+        return read(environment) is not { } text || heap.TryAllocateString(text, out result, out error);
     }
 
     private static bool Variable(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)

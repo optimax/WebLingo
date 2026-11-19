@@ -910,13 +910,16 @@ whose members are static.
 | Member | What it is |
 |---|---|
 | `Environment.machineName` | the machine's name |
+| `Environment.architecture` | the machine's processor, `"x64"`, `"x86"`, `"arm64"` or `"arm"` |
+| `Environment.processArchitecture` | the running program's, as `architecture` names it: `"x86"` for a 32-bit program on 64-bit Windows |
+| `Environment.os` | the operating system, `"windows"`, `"linux"` or `"macos"`, `"freebsd"` too, `"other"` for any other |
 | `Environment.variable(name)` | a variable's value, a string, or `null` when it is not set |
 | `Environment.variables` | a map of the variables, each its name and its value |
 | `Environment.setVariable(name, value)` | sets a variable, for the process alone, or removes it, given `null` |
 
 A script under `weblingo` reads all of it, and sets variables. A site's pages and handlers, under `wasp`, read only what
-the site's `wasp.config` allows, `{ "env": { "machineName": true, "variables": ["PATH", "APP_*"] } }`: the machine's name
-with `"machineName": true`, and the variables it lists, a name ending in `*` allowing those it begins, `"*"` any. Anything
+the site's `wasp.config` allows, `{ "env": { "machineName": true, "platform": true, "variables": ["PATH", "APP_*"] } }`:
+the machine's name with `"machineName": true`, its architectures and its system with `"platform": true`, and the variables it lists, a name ending in `*` allowing those it begins, `"*"` any. Anything
 else is `null`, as if it were not there, and missing from `variables`. A site sets no variable: `setVariable` is an
 `EnvironmentPermissionError`, WL3019. A variable's name is compared as the platform compares it, ignoring case on
 Windows; the map's names are as the platform gives them.

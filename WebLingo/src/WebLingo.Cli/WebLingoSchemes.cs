@@ -133,20 +133,26 @@ public static class WebLingoSchemes
     }
 
     /// <summary>
-    /// <c>"env": { "machineName": true, "variables": ["PATH", "APP_*"] }</c>, either optional: whether its scripts may read
-    /// the machine's name, and the variables they may read, each a name, or a name ending in <c>*</c>, or <c>"*"</c>.
+    /// <c>"env": { "machineName": true, "platform": true, "variables": ["PATH", "APP_*"] }</c>, each optional: whether its
+    /// scripts may read the machine's name, and its architectures and operating system, and the variables they may read,
+    /// each a name, or a name ending in <c>*</c>, or <c>"*"</c>.
     /// </summary>
     private static bool TryReadEnv(string file, JsonElement setting, out WebLingoEnvSettings env, out string? error)
     {
         env = WebLingoEnvSettings.None;
-        error = $"{file}: \"env\" is an object, {{ \"machineName\": true, \"variables\": [\"PATH\", \"APP_*\"] }}, either optional.";
+        error = $"{file}: \"env\" is an object, {{ \"machineName\": true, \"platform\": true, \"variables\": [\"PATH\", \"APP_*\"] }}, each optional.";
         if (setting.ValueKind != JsonValueKind.Object) return false;
-        var (machineName, variables) = (false, new List<string>());
+        var (machineName, platform, variables) = (false, false, new List<string>());
         foreach (var entry in setting.EnumerateObject())
         {
             if (entry.Name == "machineName" && entry.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
             {
                 machineName = entry.Value.ValueKind == JsonValueKind.True;
+                continue;
+            }
+            if (entry.Name == "platform" && entry.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                platform = entry.Value.ValueKind == JsonValueKind.True;
                 continue;
             }
             if (entry.Name != "variables" || entry.Value.ValueKind != JsonValueKind.Array) return false;
@@ -163,7 +169,7 @@ public static class WebLingoSchemes
                 variables.Add(name);
             }
         }
-        (env, error) = (new WebLingoEnvSettings(machineName, variables), null);
+        (env, error) = (new WebLingoEnvSettings(machineName, variables, platform), null);
         return true;
     }
 
@@ -332,7 +338,7 @@ public sealed record WebLingoFileFolders(IReadOnlyList<string> Read, IReadOnlyLi
 /// What a configuration lets its scripts read of the machine's environment (specification, section 7.15): the machine's
 /// name, or not, and the variables it lists, each a name, a name ending in <c>*</c> for those it begins, or <c>"*"</c>.
 /// </summary>
-public sealed record WebLingoEnvSettings(bool MachineName, IReadOnlyList<string> Variables)
+public sealed record WebLingoEnvSettings(bool MachineName, IReadOnlyList<string> Variables, bool Platform = false)
 {
     /// <summary>Nothing of it, as a configuration without <c>"env"</c> allows.</summary>
     public static WebLingoEnvSettings None { get; } = new(false, []);

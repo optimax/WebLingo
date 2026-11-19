@@ -289,12 +289,13 @@ public sealed class WaspTests : IDisposable
             var expected = OperatingSystem.IsWindows() ? "[null, &quot;first&quot;, null]true,false" : "[null, null, null]false,false";
             Assert.Equal((WebLingoCommandLine.Success, expected + refused, ""), Wasp("run", page));
 
-            foreach (var wrong in new[] { "{ \"env\": true }", "{ \"env\": { \"machineName\": 1 } }", "{ \"env\": { \"names\": [] } }" })
+            foreach (var wrong in new[] { "{ \"env\": true }", "{ \"env\": { \"machineName\": 1 } }", "{ \"env\": { \"names\": [] } }",
+                "{ \"env\": { \"platform\": \"yes\" } }" })
             {
                 File.WriteAllText(Path.Combine(_folder, "wasp.config"), wrong);
                 var (exit, _, error) = Wasp("run", page);
                 Assert.Equal(WebLingoCommandLine.FileUnreadable, exit);
-                Assert.EndsWith("wasp.config: \"env\" is an object, { \"machineName\": true, \"variables\": [\"PATH\", \"APP_*\"] }, either optional.\n",
+                Assert.EndsWith("wasp.config: \"env\" is an object, { \"machineName\": true, \"platform\": true, \"variables\": [\"PATH\", \"APP_*\"] }, each optional.\n",
                     error.ReplaceLineEndings("\n"), StringComparison.Ordinal);
             }
             File.WriteAllText(Path.Combine(_folder, "wasp.config"), "{ \"env\": { \"variables\": [\"A*B\"] } }");
@@ -307,6 +308,25 @@ public sealed class WaspTests : IDisposable
             Environment.SetEnvironmentVariable(name + "_B", null);
             Environment.SetEnvironmentVariable(name + "_C", null);
         }
+    }
+
+    /// <summary>
+    /// A page reads the machine's architectures and its system only where its <c>wasp.config</c>'s <c>"env"</c> allows
+    /// them, <c>"platform": true</c>, <c>null</c> otherwise, as if they were not there (the owner's answers, 19 November
+    /// 2026, "The Machine's Architecture and System").
+    /// </summary>
+    [Fact]
+    public void APageReadsThePlatformOnlyWhereWaspConfigAllowsIt()
+    {
+        var page = "<% import { Environment } from \"std:env\"; %><%= [Environment.architecture, Environment.processArchitecture, Environment.os] %>";
+        Assert.Equal((WebLingoCommandLine.Success, "[null, null, null]", ""), Wasp("run", page));
+        File.WriteAllText(Path.Combine(_folder, "wasp.config"), "{ \"env\": { \"platform\": true } }");
+        var (exit, output, error) = Wasp("run", page);
+        Assert.Equal((WebLingoCommandLine.Success, ""), (exit, error));
+        Assert.DoesNotContain("null", output, StringComparison.Ordinal);
+        Assert.StartsWith("[&quot;", output, StringComparison.Ordinal);
+        File.WriteAllText(Path.Combine(_folder, "wasp.config"), "{ \"env\": { \"platform\": false, \"machineName\": true } }");
+        Assert.Equal((WebLingoCommandLine.Success, "[null, null, null]", ""), Wasp("run", page));
     }
 
     [Fact]

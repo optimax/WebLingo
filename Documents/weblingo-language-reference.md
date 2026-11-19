@@ -2125,7 +2125,9 @@ run off the worker, since a password's hash takes a large part of a second by de
 ### `std:env`
 
 The machine's environment, through the platform's, as a class, `import { Environment } from "std:env";`, whose members
-are static: `Environment.machineName`, `Environment.variable(name)`, a variable's value or `null`,
+are static: `Environment.machineName`; `Environment.architecture`, `processArchitecture` and `os`, the machine's
+processor, the running program's and the operating system, such as `"x64"`, `"x86"` and `"windows"`;
+`Environment.variable(name)`, a variable's value or `null`,
 `Environment.variables`, a map of them, and `Environment.setVariable(name, value)`, which sets one for the process
 alone, or removes it, given `null`. A script that `weblingo` runs reaches all of it; a site's, under `wasp`, only what
 its `wasp.config` allows, anything else `null`, and sets nothing, an `EnvironmentPermissionError`, WL3019. The Standard

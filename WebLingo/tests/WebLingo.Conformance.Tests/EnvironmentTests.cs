@@ -34,6 +34,19 @@ public sealed class EnvironmentTests : IDisposable
     }
 
     [Fact]
+    public void AScriptReadsTheMachinesArchitecturesAndItsSystem()
+    {
+        // As .NET's RuntimeInformation reports them, the architectures as runtime identifiers name them (the owner's
+        // answers, 19 November 2026, "The Machine's Architecture and System").
+        var machine = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant();
+        var process = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
+        var os = OperatingSystem.IsWindows() ? "windows" : OperatingSystem.IsMacOS() ? "macos" : OperatingSystem.IsLinux() ? "linux" : "other";
+        var program = Import + "writeLn([Environment.architecture, Environment.processArchitecture, Environment.os]); "
+                      + "writeLn([Environment.architecture is String, [\"x64\", \"x86\", \"arm64\", \"arm\"].contains(Environment.processArchitecture)]);";
+        Assert.Equal(($"[\"{machine}\", \"{process}\", \"{os}\"]\n[true, true]\n", ""), Run(program));
+    }
+
+    [Fact]
     public void AScriptSetsAVariableForTheProcessAlone()
     {
         // Set, read back, and removed, given null; and set again, which the process then has.
@@ -54,6 +67,7 @@ public sealed class EnvironmentTests : IDisposable
         "'setVariable' cannot set '': a variable's name is not empty, and holds neither '=' nor U+0000.")]
     [InlineData("Environment.setVariable(\"WL_ENV_TEST\", \"a\\0b\");", "'setVariable' cannot set 'WL_ENV_TEST' to a value holding U+0000.")]
     [InlineData("Environment.machineName = \"x\";", "'machineName' of the class Environment cannot be assigned: its property has no setter.")]
+    [InlineData("Environment.os = \"x\";", "'os' of the class Environment cannot be assigned: its property has no setter.")]
     public void WrongArgumentsAreTypeErrors(string call, string message)
     {
         Assert.Equal(("WL3001 " + message + "\n", ""), Run(Import + "try { " + call + " } catch (TypeError e) { writeLn(e.code + \" \" + e.message); }"));

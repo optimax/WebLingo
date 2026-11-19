@@ -52,7 +52,7 @@ running it.
 | `19-bytes-json-dates.wl` | `std:bytes`, `std:json` and `std:datetime` |
 | `20-crypto.wl` | `std:crypto`: hashes, HMAC, secure random bytes, passwords' hashes, comparison in constant time |
 | `21-database.wl` | `std:db` on SQLite in memory: values apart from the SQL, a hostile value stored harmlessly, transactions, `DatabaseError` |
-| `22-environment.wl` | `std:env`: the machine's name and its environment variables |
+| `22-environment.wl` | `std:env`: the machine's name, its processor and system, and its environment variables |
 | `23-network.wl` | `std:http` and `std:net`; it reaches the internet, so the tests only check it |
 | `24-com.wl` | `windows:com`, on Windows only: COM's objects, allowed one by one by `weblingo.config`, any other refused |
 | `25-limits.wl` | the limits every execution runs within, which no `catch` can catch |

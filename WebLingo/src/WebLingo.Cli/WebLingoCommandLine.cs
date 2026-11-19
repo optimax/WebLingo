@@ -440,7 +440,7 @@ public static class WebLingoCommandLine
             textOutput, new DotNetNetwork(program.ReachesAnyHost ? null : allowedHosts), new DotNetDatabases(databases, folder) { Files = files },
             new DotNetFileSystem(files), allowed,
             // All of the machine's environment for a script's, what its configuration's "env" allows for a page's (section 7.15).
-            program.ReachesAllEnvironment ? new DotNetEnvironment() : new DotNetEnvironment(env.MachineName, env.Variables));
+            program.ReachesAllEnvironment ? new DotNetEnvironment() : new DotNetEnvironment(env.MachineName, env.Variables, env.Platform));
     }
 
     private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters, Func<string?, int, int> lines) =>
