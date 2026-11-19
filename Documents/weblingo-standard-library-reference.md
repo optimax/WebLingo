@@ -29,9 +29,10 @@ pre-alpha: what is still to come is listed in the Language Reference's last sect
 17. [`std:db`](#17-stddb)
 18. [`std:crypto`](#18-stdcrypto)
 19. [`std:env`](#19-stdenv)
-20. [Native modules](#20-native-modules)
-21. [In WASP's pages](#21-in-wasps-pages)
-22. [`windows:com`](#22-windowscom)
+20. [`std:math`](#20-stdmath)
+21. [Native modules](#21-native-modules)
+22. [In WASP's pages](#22-in-wasps-pages)
+23. [`windows:com`](#23-windowscom)
 
 ---
 
@@ -312,9 +313,9 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `NetworkError` | WL3014 | a host that cannot be reached, a connection that fails, a request that takes too long |
 | `DatabaseError` | WL3015 | a statement a database refuses, a database that cannot be opened |
 | `FilePermissionError` | WL3016 | a file or a folder a site's scripts may not reach, outside the folders its `wasp.config` allows |
-| `ComError` | WL3012 | a COM object's failure, with its `number`, `source` and `description` (section 22) |
+| `ComError` | WL3012 | a COM object's failure, with its `number`, `source` and `description` (section 23) |
 | `NetworkPermissionError` | WL3017 | a host the configuration's `"network"` does not let a script reach |
-| `ComPermissionError` | WL3018 | a COM object the configuration's `"com"` does not let a script make (section 22) |
+| `ComPermissionError` | WL3018 | a COM object the configuration's `"com"` does not let a script make (section 23) |
 | `EnvironmentPermissionError` | WL3019 | a variable a site's scripts try to set, under `wasp`, which lets them read only (section 19) |
 | `DeadlockError` | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run, thrown at that `await`, naming where the task was made and where it is awaited |
 
@@ -943,18 +944,56 @@ are each WL3001.
 
 ---
 
-## 20. Native modules
+## 20. `std:math`
+
+Mathematics, imported as a module, `import math from "std:math";`: its functions and its constants are its members.
+
+| Member | What it gives |
+|---|---|
+| `math.abs(x)`, `math.sign(x)` | `x`'s absolute value; -1, 0 or 1 as `x` is negative, zero or positive, `NaN` for `NaN`; of `x`'s kind, an integer, a number or a decimal |
+| `math.min(a, …)`, `math.max(a, …)` | the least, or the greatest, of one value or more, as it was given, its kind kept, compared as `<` compares them; `NaN` where one is `NaN` |
+| `math.floor(x)`, `math.ceiling(x)`, `math.truncate(x)` | an integer: the greatest not above `x`, the least not below it, `x` without its fraction |
+| `math.round(x)` | the nearest integer, halfway away from zero, `2.5` to `3` and `-2.5` to `-3` |
+| `math.sqrt(x)`, `math.pow(x, y)`, `math.exp(x)` | a number: the square root, `x` to the power `y`, e to the power `x` |
+| `math.log(x)`, `math.log10(x)`, `math.log2(x)` | a number: the natural logarithm, and those of bases 10 and 2 |
+| `math.sin(x)`, `math.cos(x)`, `math.tan(x)`, `math.asin(x)`, `math.acos(x)`, `math.atan(x)`, `math.atan2(y, x)` | a number: the trigonometric functions, of radians, and their inverses, `atan2` the angle of the point `(x, y)` |
+| `math.PI`, `math.E` | the numbers π and e |
+
+`floor`, `ceiling`, `round` and `truncate` take an integer, which they give as it is, a number or a decimal, and give an
+integer; one beyond 64 bits, infinity among them, is an `OverflowError`, WL3002, and `NaN` WL3001. The functions that
+give a number take an integer or a number, as IEEE 754 has them, `math.sqrt(-1.0)` being `NaN` and `math.log(0)`
+`-Infinity`; a decimal is WL3001, as nothing converts by itself. A number and a decimal are not compared, `math.max(1.5,
+2m)` WL3001, as `1.5 < 2m` is.
+
+```javascript
+import { writeLn } from "std:system";
+import math from "std:math";
+writeLn([math.floor(2.7), math.round(2.5), math.round(-2.5), math.truncate(-2.7), math.floor(2.7) is Integer]);
+writeLn([math.abs(-3), math.abs(-1.50m), math.min(3, 1, 2), math.max(...[4.5, 9, 2])]);
+writeLn([math.sqrt(2), math.pow(2, 10), math.PI]);
+```
+
+```text
+[2, 3, -3, -2, true]
+[3, 1.5m, 1, 9]
+[1.4142135623730951, 1024.0, 3.141592653589793]
+```
+
+---
+
+## 21. Native modules
 
 A native module is code compiled for .NET that extends what scripts can use: functions and classes, imported as any
 module's are, by a scheme naming a folder of them, `import db from "native:sqlite";`. The folders are named by the
 configuration, `weblingo.config` beside a script and `wasp.config` in a site, `{ "schemes": { "native":
 "C:/WebLingo/native" } }`, and by the command line's `--scheme native=folder`. The standard modules, `std:system`,
-`std:tasks`, `std:fs`, `std:http`, `std:net`, `std:db`, `std:crypto` and `std:env`, are native modules themselves, in the `std`
-folder beside `weblingo` and `wasp`.
+`std:tasks`, `std:fs`, `std:http`, `std:net`, `std:db`, `std:crypto`, `std:env` and `std:math`, are native modules themselves, in the `std`
+folder beside `weblingo` and `wasp`. A native module's function may have optional parameters, or a rest parameter, as
+`math.max(a, …)` has, and a module may export constants, as `math.PI` is, which no importer may assign.
 
 ---
 
-## 21. In WASP's pages
+## 22. In WASP's pages
 
 A page, a layout and a component that declare `param request;` and `param response;` are given the request they
 answer and the response they make, instances of the built-in classes `Request` and `Response`, their headers instances
@@ -1051,7 +1090,7 @@ zWebLingoz
 
 ---
 
-## 22. `windows:com`
+## 23. `windows:com`
 
 COM's objects, on Windows only, as classic ASP's pages used them, `Server.CreateObject("ADODB.Connection")`: a native
 module installed with the runtime in `windows/`, beside `std/`. Elsewhere, importing it is WL2015.

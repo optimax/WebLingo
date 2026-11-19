@@ -11,7 +11,16 @@ public sealed record WebLingoNativeModuleInfo(string Name, IReadOnlyList<WebLing
 {
     /// <summary>Its exported classes (section 3.9).</summary>
     public IReadOnlyList<WebLingoNativeClassInfo> Classes { get; init; } = [];
+
+    /// <summary>Its exported constants (section 3.9).</summary>
+    public IReadOnlyList<WebLingoNativeConstant> Constants { get; init; } = [];
 }
+
+/// <summary>
+/// A native module's constant as the compiler sees it: its name, and its value, <c>null</c>, a <see cref="bool"/>, a
+/// <see cref="long"/> or a <see cref="double"/>, which the program's top level gives the module's member as its literal.
+/// </summary>
+public sealed record WebLingoNativeConstant(string Name, object? Value);
 
 /// <summary>
 /// A native module's class as the compiler sees it: its name, and the built-ins that are its constructor, its methods and
@@ -92,6 +101,12 @@ public sealed record WebLingoNativeExport(string Name, string Builtin, int Arity
     /// in WebLingo, with those defaults, calls in its place (section 3.9).
     /// </summary>
     public int Optional { get; init; }
+
+    /// <summary>
+    /// Whether its last parameter is a rest parameter, an array of the arguments after the others, which a function written
+    /// in WebLingo, with that rest parameter, gives its built-in (section 3.9).
+    /// </summary>
+    public bool Rest { get; init; }
 
     /// <summary>
     /// For a native class's static method, whether it is a factory, written in WebLingo, shorthand for <c>new this(…)</c>

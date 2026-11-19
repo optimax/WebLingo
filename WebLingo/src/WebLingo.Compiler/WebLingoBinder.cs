@@ -212,9 +212,10 @@ public sealed class WebLingoBinder
                 var classes = new List<(string, WebLingoLocalSymbol)>();
                 foreach (var export in native.Exports)
                 {
-                    if (export.Optional > 0)
+                    if (export.Optional > 0 || export.Rest)
                     {
-                        // One whose last parameters a call may leave out: a function written in WebLingo, which calls it.
+                        // One whose last parameters a call may leave out, or whose last is a rest parameter: a function
+                        // written in WebLingo, which calls it.
                         classes.Add((export.Name, BindNativeFunction(module.Name, export)));
                         continue;
                     }
@@ -222,6 +223,7 @@ public sealed class WebLingoBinder
                     names.Add(export.Name);
                 }
                 foreach (var nativeClass in native.Classes) classes.Add((nativeClass.Name, BindNativeClass(module.Name, nativeClass)));
+                foreach (var constant in native.Constants) classes.Add((constant.Name, BindNativeConstant(module.Name, constant)));
                 var nativeInstance = DeclareHidden(module.Name, default);
                 units.Add(new WebLingoBoundUnit(module.Name, null, classes, nativeInstance) { Builtins = functions, BuiltinNames = names });
                 continue;
@@ -1550,6 +1552,7 @@ public sealed class WebLingoBinder
             var exports = new List<string>();
             foreach (var export in module.Exports) exports.Add(export.Name);
             foreach (var nativeClass in module.Classes) exports.Add(nativeClass.Name);
+            foreach (var constant in module.Constants) exports.Add(constant.Name);
             modules.Add((module.Name, exports));
         }
         foreach (var (module, exports) in modules)
@@ -2081,6 +2084,28 @@ public sealed class WebLingoBinder
         return local;
     }
 
+    /// <summary>
+    /// A native module's constant (section 3.9): a cell, as an export's is, given its value, as a literal gives it, where the
+    /// program begins, with the module's functions written in WebLingo; its local, which the module's instance exports.
+    /// </summary>
+    private WebLingoLocalSymbol BindNativeConstant(string module, WebLingoNativeConstant constant)
+    {
+        var local = new WebLingoLocalSymbol(module + "." + constant.Name, WebLingoDeclarationKind.Const, _main.Locals.Count, default, _main)
+        {
+            IsCaptured = true
+        };
+        _main.Locals.Add(local);
+        WebLingoBoundExpression value = constant.Value switch
+        {
+            bool b => new WebLingoBoundBooleanLiteral(b, default),
+            long l => new WebLingoBoundIntegerLiteral(l, default),
+            double d => new WebLingoBoundBinary64Literal(d, default),
+            _ => new WebLingoBoundNullLiteral(default)
+        };
+        _nativeFunctions.Add(new WebLingoBoundVariableDeclaration(local, value, default));
+        return local;
+    }
+
     /// <summary>The native modules' functions with optional parameters, made after the built-in classes (section 3.9).</summary>
     private readonly List<WebLingoBoundStatement> _nativeFunctions = [];
 
@@ -2098,10 +2123,11 @@ public sealed class WebLingoBinder
         var count = export.Arity - (isStatic ? 0 : 1);
         for (var i = 0; i < count; i++)
         {
-            // Its last parameters optional, each null when a call leaves it out (section 3.9).
+            // Its last parameters optional, each null when a call leaves it out, or its last a rest parameter (section 3.9).
             parameters.Add(new WebLingoParameterSyntax("a" + i.ToString(System.Globalization.CultureInfo.InvariantCulture), default)
             {
-                Default = i >= count - export.Optional ? new WebLingoNullLiteralSyntax(default) : null
+                Default = i >= count - export.Optional ? new WebLingoNullLiteralSyntax(default) : null,
+                IsRest = export.Rest && i == count - 1
             });
             arguments.Add(new WebLingoNameSyntax(parameters[^1].Name, default));
         }

@@ -1,7 +1,7 @@
 # Scripts
 
 Scripts that set up WebLingo, and WASP's sites, on a Windows machine with IIS, written in WebLingo and run by `weblingo`.
-They reach Windows through its COM objects, `windows:com` (the Standard Library Reference, section 22): IIS's
+They reach Windows through its COM objects, `windows:com` (the Standard Library Reference, section 23): IIS's
 configuration through IIS's own, `Microsoft.ApplicationHost.WritableAdminManager`; IIS's `appcmd`, `netsh`, `certutil`
 and `icacls` through `WScript.Shell`; a relative path made full through `Scripting.FileSystemObject`; the processes
 running through WMI; and certificates through CertEnroll's `X509Enrollment` objects. `weblingo.config`, beside them,

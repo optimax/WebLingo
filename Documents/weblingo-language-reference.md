@@ -2126,6 +2126,14 @@ alone, or removes it, given `null`. A script that `weblingo` runs reaches all of
 its `wasp.config` allows, anything else `null`, and sets nothing, an `EnvironmentPermissionError`, WL3019. The Standard
 Library Reference describes the module.
 
+### `std:math`
+
+Mathematics, `import math from "std:math";`: `math.abs(x)`, `math.sign(x)`, `math.min(a, …)` and `math.max(a, …)`,
+keeping their arguments' kind; `math.floor(x)`, `math.ceiling(x)`, `math.round(x)`, halfway away from zero, and
+`math.truncate(x)`, each giving an integer, so that a number becomes one, `math.round(2.5)` being `3`; `math.sqrt`,
+`pow`, `exp`, `log`, `log10`, `log2`, the trigonometric functions and `atan2`, each giving a number; and `math.PI` and
+`math.E`. The Standard Library Reference describes the module.
+
 ### Native modules
 
 A native module is code compiled for .NET, an assembly that extends what scripts can use, as Python's C extensions do.
@@ -2214,7 +2222,6 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 
 WebLingo is pre-alpha, and some of what other languages have is still to come. These are not in the language yet:
 
-- **Mathematics**: no `sqrt`, `floor`, `round`, `abs`, `min`, `max` or power, and no integer division, `/` always
-  dividing exactly; a number becomes an integer only through a decimal, `new Integer(new Decimal(x))`, where it is
-  whole, or through its text, `Integer.parse($"{x:F0}")`.
+- **Integer division**: `/` always divides exactly, `7 / 2` being `3.5`; an integer's quotient is
+  `math.truncate(a / b)`, from `std:math`, for integers that a number holds exactly.
 - **Library**: a database's rows read one at a time, for results too large to hold whole; databases other than SQLite and SQL Server.

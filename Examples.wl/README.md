@@ -32,7 +32,7 @@ running it.
 | Script | What it shows |
 |---|---|
 | `01-hello.wl` | a first script: `write` and `writeLn`, comments, semicolons |
-| `02-values.wl` | integers, numbers, decimals, strings, Booleans and `null`; literals; classes of values; conversions, always explicit |
+| `02-values.wl` | integers, numbers, decimals, strings, Booleans and `null`; literals; classes of values; conversions, always explicit; `std:math` |
 | `03-strict-by-design.wl` | what WebLingo refuses to guess: no implicit conversions, no truthiness, no silent overflow, no `undefined`; each mistake an exception of a class of its own |
 | `04-variables.wl` | `var` and `const`, block scope, shadowing, closures, a binding for each turn of a loop, hoisted functions |
 | `05-strings.wl` | Unicode strings, their methods and aliases, interpolation with formats and alignments, multi-line raw strings |
@@ -109,9 +109,8 @@ through, each ending with the errors `weblingo check` gives it:
 
 WebLingo is pre-alpha. These scripts show it as it is today, and these are among what it does not have yet:
 
-- **Mathematics.** There is no `sqrt`, `floor`, `round`, `abs`, `min`, `max` or power, and no integer division: `/`
-  always divides exactly, `7 / 2` being `3.5`. A number becomes an integer only through a decimal,
-  `new Integer(new Decimal(x))`, when it is whole, or through its text, `Integer.parse($"{x:F0}")`.
+- **Integer division.** `/` always divides exactly, `7 / 2` being `3.5`; a quotient is `math.truncate(7 / 2)`, from
+  `std:math`.
 - **A database's rows one at a time**, for results too large to hold whole, and databases other than SQLite and SQL
   Server.
 - **A module defined in code that `import` can find**: `new Module(name)` makes one, which no path names

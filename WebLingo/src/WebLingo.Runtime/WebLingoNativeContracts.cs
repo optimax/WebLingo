@@ -31,6 +31,19 @@ public interface IWebLingoNativeRegistry
     void TextFunction(string name, int arity, WebLingoNativeFunction function);
 
     /// <summary>
+    /// An exported function whose last parameter is a rest parameter, as a function written in WebLingo has one,
+    /// <c>function f(a, ...rest)</c> (section 3.5): a call gives it at least <paramref name="arity"/> - 1 arguments, and the
+    /// function is given those, then an array of the others, <c>[]</c> where there are none, its last argument.
+    /// </summary>
+    void RestFunction(string name, int arity, WebLingoNativeFunction function);
+
+    /// <summary>
+    /// An exported constant, read as its module's member, <c>math.PI</c>, which no importer may assign (section 3.9): a
+    /// value that needs no heap, <c>null</c>, a Boolean, an integer or a number.
+    /// </summary>
+    void Constant(string name, WebLingoValue value);
+
+    /// <summary>
     /// An exported class, by a name a script can write, given once, and not a function's too: its members are declared on
     /// what this gives (<see cref="WebLingoNativeClass"/>), whose host objects its functions reach through it.
     /// </summary>

@@ -201,7 +201,11 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         foreach (var function in registry.Functions)
         {
             if (!builtins.TryGetBuiltin(function.Name, out _)) builtins.Register(function);
-            exports.Add(new WebLingoNativeExport(function.Export, function.Name, function.Arity) { Optional = function.Optional });
+            exports.Add(new WebLingoNativeExport(function.Export, function.Name, function.Arity)
+            {
+                Optional = function.Optional,
+                Rest = function.Rest
+            });
         }
         var classes = new List<WebLingoNativeClassInfo>();
         foreach (var nativeClass in registry.Classes)
@@ -271,7 +275,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
                 IndexOptional = indexOptional
             });
         }
-        module = new WebLingoNativeModuleInfo(name, exports) { Classes = classes };
+        module = new WebLingoNativeModuleInfo(name, exports) { Classes = classes, Constants = registry.Constants };
         error = null;
         return true;
     }
@@ -283,6 +287,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
     {
         public List<NativeFunction> Functions { get; } = [];
         public List<WebLingoNativeClass> Classes { get; } = [];
+        public List<WebLingoNativeConstant> Constants { get; } = [];
         private string? _error;
 
         /// <summary>The first fault in what the module registered, its classes' included.</summary>
@@ -309,7 +314,31 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
             return made;
         }
 
-        private bool Taken(string name) => Functions.Exists(f => f.Export == name) || Classes.Exists(c => c.Name == name);
+        private bool Taken(string name) =>
+            Functions.Exists(f => f.Export == name) || Classes.Exists(c => c.Name == name) || Constants.Exists(c => c.Name == name);
+
+        public void RestFunction(string name, int arity, WebLingoNativeFunction function)
+        {
+            if (_error is null && arity < 1) _error = $"it registers '{name}' with a rest parameter, and an arity of {arity}";
+            else Add(name, arity, 0, function, false, rest: true);
+        }
+
+        public void Constant(string name, WebLingoValue value)
+        {
+            if (_error is not null) return;
+            object? given = value.Kind switch
+            {
+                WebLingoValueKind.Null => null,
+                WebLingoValueKind.Boolean => value.AsBoolean,
+                WebLingoValueKind.Int64 => value.AsInt64,
+                WebLingoValueKind.Binary64 => value.AsBinary64,
+                _ => this
+            };
+            if (!IsName(name)) _error = $"it registers a constant named '{name}', which is not a name";
+            else if (Taken(name)) _error = $"it registers '{name}' twice";
+            else if (given == this) _error = $"it registers '{name}', a constant that is not null, a Boolean, an integer or a number";
+            else Constants.Add(new WebLingoNativeConstant(name, given));
+        }
 
         public void Function(string name, int arity, WebLingoNativeFunction function) => Add(name, arity, 0, function, false);
 
@@ -317,7 +346,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
 
         public void TextFunction(string name, int arity, WebLingoNativeFunction function) => Add(name, arity, 0, function, true);
 
-        private void Add(string name, int arity, int optional, WebLingoNativeFunction function, bool writesText)
+        private void Add(string name, int arity, int optional, WebLingoNativeFunction function, bool writesText, bool rest = false)
         {
             if (_error is not null) return;
             if (!IsName(name)) _error = $"it registers a function named '{name}', which is not a name";
@@ -325,7 +354,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
             else if (optional < 0 || optional > arity) _error = $"it registers '{name}' with {optional} of its {arity} parameters optional";
             else if (Taken(name)) _error = $"it registers '{name}' twice";
             else if (writesText) Functions.Add(new NativeTextFunction(module + "." + name, name, arity, function));
-            else Functions.Add(new NativeFunction(module + "." + name, name, arity, function) { Optional = optional });
+            else Functions.Add(new NativeFunction(module + "." + name, name, arity, function) { Optional = optional, Rest = rest });
         }
 
         private static bool IsName(string name)
@@ -352,6 +381,8 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         public int Arity => arity;
         /// <summary>How many of its last parameters a call may leave out (section 3.9).</summary>
         public int Optional { get; init; }
+        /// <summary>Whether its last parameter is a rest parameter, an array of the arguments after the others (section 3.9).</summary>
+        public bool Rest { get; init; }
 
         public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
             // A held value as its kind's, but to a function that writes text, write(x), which writes the instance (section 3.7).
