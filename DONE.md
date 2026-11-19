@@ -4035,3 +4035,44 @@ Done (Codex, 2026-11-19, `a1d3a83`). Higher-order array methods reject non-calla
 Implement `db.rows(sql, values)` and the disposable async cursor approved in the parent task. Exercise row conversion, exhaustion, early disposal, and both VMs.
 
 Done (Codex, 2026-11-19, `474e237`). On Windows, the Release build on main passed with zero warnings or errors. 4,184 tests passed and six integration tests were skipped. SQLite cursor tests covered both VMs, early disposal, exhaustion, and a later row failing after the first row was read. CLI and WASP samples passed. Live SQL Server and Linux were not tried.
+
+## [DONE] Identify Standard Library Gaps
+
+Identify everything that's not in the standard library but should be either because it would be very useful, or because other languages predominantly offer it. Implement it as new std: modules.
+
+2026-11-19 (Codex). Reviewed the Standard Library Reference and the shipped modules. Proposed additions for scripts and WASP applications:
+
+- Path manipulation for joining and splitting paths without touching the filesystem, path-delimiter agnostic, i.e. it works both on Windows and Linux.
+- URL parsing, resolution, and query encoding for HTTP clients and server-side applications.
+- CSV parsing and writing for exchanging tabular data.
+- Gzip and ZIP support for compressed data and archives, with explicit output limits.
+- Seeded random numbers for reproducible tests and simulations. Secure random bytes are already in `std:crypto`.
+- Subprocess execution for CLI scripts, with a separate decision about what WASP sites may launch.
+
+Q1. Should path manipulation, URL handling, and CSV be the first standard-library additions?
+
+A1: Yes.
+
+Q2. Path helpers should accept either separator. Should they emit the host separator or always emit `/`?
+
+A2: Emit host, but accept either.
+
+Q3. Should the first CSV API handle arrays of strings only or also support maps keyed by the header row?
+
+A3: Both.
+
+2026-11-19 (Codex). Your answers set the priority, separator policy, and CSV row types. The names, signatures, and data formats below are proposed public APIs.
+
+Q4. Approve `std:path` with `join(...parts)`, `dirname(path)`, `basename(path)`, and `extension(path)`, recognizing both separators, drive prefixes, and UNC roots on both platforms?
+
+A4: Yes.
+
+Q5. Approve `std:url` with `parse(url)` returning named components, `resolve(base, relative)`, and query parsing and writing that use ordered name/value pairs so duplicate keys round-trip?
+
+A5: Yes.
+
+Q6. Approve `std:csv` with `parse(text, headers = false)` and `stringify(rows, headers = null)`, where parsing with headers returns row maps and writing row maps takes an explicit ordered header array?
+
+A6: Yes.
+
+Done for the three approved modules (Codex, 2026-11-19, `55c64a4`). The Windows Release build on main passed with zero warnings or errors. 4,195 tests passed and six integration tests were skipped. The CLI and WASP reference examples passed. Linux was not tried. The remaining candidates are in “Choose the Next Standard-Library Additions.”

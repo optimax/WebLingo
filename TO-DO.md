@@ -2,45 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [WORKING] Identify Standard Library Gaps
-
-Identify everything that's not in the standard library but should be either because it would be very useful, or because other languages predominantly offer it. Implement it as new std: modules.
-
-2026-11-19 (Codex). Reviewed the Standard Library Reference and the shipped modules. Proposed additions for scripts and WASP applications:
-
-- Path manipulation for joining and splitting paths without touching the filesystem, path-delimiter agnostic, i.e. it works both on Windows and Linux.
-- URL parsing, resolution, and query encoding for HTTP clients and server-side applications.
-- CSV parsing and writing for exchanging tabular data.
-- Gzip and ZIP support for compressed data and archives, with explicit output limits.
-- Seeded random numbers for reproducible tests and simulations. Secure random bytes are already in `std:crypto`.
-- Subprocess execution for CLI scripts, with a separate decision about what WASP sites may launch.
-
-Q1. Should path manipulation, URL handling, and CSV be the first standard-library additions?
-
-A1: Yes.
-
-Q2. Path helpers should accept either separator. Should they emit the host separator or always emit `/`?
-
-A2: Emit host, but accept either.
-
-Q3. Should the first CSV API handle arrays of strings only or also support maps keyed by the header row?
-
-A3: Both.
-
-2026-11-19 (Codex). Your answers set the priority, separator policy, and CSV row types. The names, signatures, and data formats below are proposed public APIs.
-
-Q4. Approve `std:path` with `join(...parts)`, `dirname(path)`, `basename(path)`, and `extension(path)`, recognizing both separators, drive prefixes, and UNC roots on both platforms?
-
-A4: Yes.
-
-Q5. Approve `std:url` with `parse(url)` returning named components, `resolve(base, relative)`, and query parsing and writing that use ordered name/value pairs so duplicate keys round-trip?
-
-A5: Yes.
-
-Q6. Approve `std:csv` with `parse(text, headers = false)` and `stringify(rows, headers = null)`, where parsing with headers returns row maps and writing row maps takes an explicit ordered header array?
-
-A6: Yes.
-
 ## [IDLE] Implement What's Not in the Language
 
 `Documents\weblingo-language-reference.md` has section "17. What is not in the language yet". Implement everything it describes, and remove that section.
@@ -57,11 +18,11 @@ A2: MySQL, PostgreSQL
 
 2026-11-19 (Codex). The owner approved the cursor and chose MySQL before PostgreSQL. See the architecture specification, §7.11, “Streaming rows and additional providers”. Streaming landed in `474e237`. The parent task waits for the MySQL and PostgreSQL adapters.
 
-## Add the MySQL Database Provider
+## [WORKING] Add the MySQL Database Provider
 
 The owner chose MySQL as the first new provider. The local NuGet cache has no MySQL provider. Proposed adapter dependency: MySqlConnector, with the existing ADO.NET connection contract and a `mysql:` provider prefix.
 
-**Q1. May I restore MySqlConnector from the configured NuGet feeds for the MySQL adapter?**
+Q1. May I restore MySqlConnector from the configured NuGet feeds for the MySQL adapter?
 
 A1: Yes.
 
@@ -72,6 +33,12 @@ The owner chose PostgreSQL after MySQL. The local NuGet cache has no PostgreSQL 
 **Q1. May I restore Npgsql from the configured NuGet feeds for the PostgreSQL adapter?**
 
 A1: Yes.
+
+## [QUESTION] Choose the Next Standard-Library Additions
+
+Path, URL, and CSV have shipped on local main. The remaining candidates are compression, seeded random numbers, and subprocess execution.
+
+**Q1. Which of these should be the next standard-library addition?**
 
 # END-OF-TO-DO
 
