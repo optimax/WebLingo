@@ -8,10 +8,6 @@ The `implementation.md` seems to imply that the WebLingo CLI is only capable of 
 
 **Approve "vm": "register" or "stack" in weblingo.config and wasp.config, using the register VM for source when no setting is given? The proposal applies to weblingo run/check/compile and wasp run/check/serve/fastcgi. The existing explicit compile flag would override the setting. With no setting, compiled files would still select the VM from their verified header. With a setting, a compiled file for the other VM would be refused. The VS Code debugger would keep its approved register-only behavior.**
 
-## Bytecode File Extensions
-
-Depending on whether bytecode is intended for register of stack VM, use the extension `.wlbr` for register, and `.wlbs` for stack. Regardless of the extension, check which VM a particular bytecode model is intended for and refuse to run on the wrong one.
-
 ## Testing Framework
 
 Write a standard testing framework for WebLingo code, so that test classes can easily be written in WebLingo and run via a built-in test harness.

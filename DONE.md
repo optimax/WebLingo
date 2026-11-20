@@ -4227,3 +4227,9 @@ When the first field starts with U+FEFF, `WebLingoCsvModule.WriteRow` can emit t
 Add round-trip tests for a leading U+FEFF in the first data field and in the first header. Also check that parsing an input file with a genuine byte-order mark still removes the mark.
 
 2026-11-19 (Codex): Fixed in `08e97c7`. The writer quotes an initial field or header beginning with a literal U+FEFF. Regressions on both VMs confirmed data and header round-trips and consumption of a leading BOM in the input. The Windows Release build and full suite passed on the task branch and main (4,237 passed, six skipped, zero build warnings). The round-trips worked in the CLI and WASP, and the CLI parsed a real UTF-8 CSV file decoded with its BOM intact. Linux was not run locally.
+
+## [DONE] Bytecode File Extensions
+
+Depending on whether bytecode is intended for register of stack VM, use the extension `.wlbr` for register, and `.wlbs` for stack. Regardless of the extension, check which VM a particular bytecode model is intended for and refuse to run on the wrong one.
+
+2026-11-20 (Codex). Implemented in `b2d260e`. Register and stack outputs are written beside each other as `.wlbr` and `.wlbs`. The CLI verifies the header and bytecode and reports WL4001 for an extension/VM mismatch. Existing `.wlbc` inputs remain readable, and WASP does not serve any of the three extensions. Windows Release built without warnings on the branch and main, and the full suite passed (4,242 passed, six skipped). The CLI samples ran as source and on both bytecode targets, and the WASP sample rendered. Linux was not tested locally.
