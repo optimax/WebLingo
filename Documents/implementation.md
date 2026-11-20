@@ -202,8 +202,10 @@ Where the specification is silent, the choices M0.6 made are listed, as Proposed
 
 # 8. Building and Testing
 
-On Windows, double-click `build.bat` in the repository root to build the CLI and its VS Code debug adapter in Release.
-It runs from the solution folder so `dotnet` uses `global.json`, then prints the executable's path for VS Code.
+On Windows, double-click `build.bat` in the repository root to publish and install the current checkout, including
+the CLI's VS Code debug adapter. It runs `publish.ps1` from the solution folder, then requests administrator rights
+for the installer. With IIS it uses `Scripts/install-weblingo.wlg` to update the shared WebLingo and WASP files
+and restart affected application pools. Without IIS it passes the same published folder to `Scripts/install.wlg`.
 
 Tests use xUnit v2 (2.9.3) with `Microsoft.NET.Test.Sdk`, run by `dotnet test` through VSTest. Do not use xUnit v3 or Microsoft.Testing.Platform APIs and command-line conventions here; changing the test framework needs approval (section 12).
 
