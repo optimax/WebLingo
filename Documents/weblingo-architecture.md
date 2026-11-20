@@ -613,6 +613,9 @@ On 20 November 2026, the owner approved a double-click Windows setup. Each WebLi
 requests elevation through Windows PowerShell. Setup offers Explorer's `.wlg` registration and the VS Code debugger
 to the account that opened the launcher. The installed `VSCode\WebLingo.vsix` also supports offline installation later.
 
+On 20 November 2026, the owner requested a matching uninstall script. The installed runtime and release ZIP provide
+`Uninstall WebLingo.bat` to undo setup's machine installation and the initiating account's optional integrations.
+
 ## 6. Hosting architecture (WL-H001–WL-H014)
 
 ### 6.1 Approved hosting decisions

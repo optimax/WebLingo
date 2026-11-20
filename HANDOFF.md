@@ -14,7 +14,7 @@ The installed debugger stopped on line 10 of `Examples.wlg/16-modules.wlg` and r
 
 Users installing a release double-click `Install WebLingo.bat` in the extracted ZIP. Its source is
 `Installers/Windows/Install WebLingo.bat`, the setup logic is in `Scripts/setup.wlg`, and
-`Installers/Windows/package.ps1` builds the VSIX from the shipped editor sources. Only `install.wlg` crosses UAC.
+`Installers/Windows/package.ps1` builds the VSIX from the shipped editor sources. Setup elevates `install.wlg`.
 The launcher applies the two optional integrations in the original account. The installed `VSCode/WebLingo.vsix`
 can also be used after installing VS Code later. See `Installers/Windows/readme.md`, `Editors/README.md`,
 `Scripts/README.md` and the root `README.md`. The approved design is in `Documents/weblingo-architecture.md`
@@ -26,6 +26,17 @@ The temporary install ran the hello example and answered debugger initialization
 the bundled extension in an isolated profile. The checks substituted the UAC boundary, machine PATH and account
 registration. A first install from a standard account using a different administrator's credentials remains a manual
 check on a disposable Windows machine.
+
+Both the ZIP and the installed runtime include `Installers/Windows/Uninstall WebLingo.bat`. Its PowerShell helper,
+`Installers/Windows/uninstall.ps1`, runs outside the runtime, elevates machine cleanup and restores the current
+account's integrations. `Scripts/install.wlg` keeps the original PATH and merges package inventories on updates.
+`Scripts/setup.wlg` records optional integrations before applying them. The root README and both Windows package
+readmes describe removal, including the WASP dependency.
+
+`Installers/Windows/tests/uninstall.ps1` checks registry restoration, side-by-side installations, file ownership,
+WASP sharing, locks and retry. The x64 Windows round trip also exercised setup and update, cancellation, both uninstall
+launchers, the previous release ZIP and the real VS Code CLI in an isolated profile. Machine elevation was simulated
+and registry writes were confined to a disposable test key. Direct UAC consent using another account remains a manual check.
 
 The repository-root `build.bat` publishes WebLingo and WASP together and updates the local installation.
 The publish runs with the caller's permissions. The installer requests administrator access when needed.

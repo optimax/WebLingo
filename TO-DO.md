@@ -2,6 +2,11 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
+## [WORKING] Uninstall WebLingo on Windows
+
+Provide a double-click uninstaller for the Windows ZIP and the installed runtime. Undo the runtime installation,
+machine PATH entry, file association and VS Code integration. Preserve other applications, accounts and user files.
+
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value

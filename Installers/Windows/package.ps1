@@ -122,8 +122,10 @@ try {
                 Copy-Item (Join-Path $repository "Scripts/$script") $root
             }
             Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Install WebLingo.bat') -Destination $root
+            Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Uninstall WebLingo.bat') -Destination $root
+            Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Uninstall WebLingo.bat') -Destination $runtime
+            Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'uninstall.ps1') -Destination $runtime
             Copy-Item (Join-Path $PSScriptRoot 'readme.md') $root
-            New-Zip $root (Join-Path $Destination "$name.zip")
 
             # WASP's: what wasp's own publish has that WebLingo's has not, or has otherwise, such as ASP.NET Core's
             # libraries, newer than the packages weblingo takes; and the hashes of the files of WebLingo's it shares.
@@ -133,6 +135,16 @@ try {
             Publish-Project 'src/WebLingo.Wasp.Cli/WebLingo.Wasp.Cli.csproj' $architecture $kind $published
             $weblingo = Get-Hashes $runtime
             $wasp = Get-Hashes $published
+            [ordered]@{
+                architecture = $architecture
+                kind = $kind
+                files = $weblingo
+                # WASP loads weblingo.dll in process. Its own apphost uses wasp's deps and runtimeconfig files.
+                shared = @($wasp.Keys | Where-Object {
+                    $weblingo.ContainsKey($_) -and $_ -notin 'weblingo.exe', 'weblingo.deps.json', 'weblingo.runtimeconfig.json'
+                } | Sort-Object)
+            } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $runtime 'uninstall-files.json') -Encoding UTF8
+            New-Zip $root (Join-Path $Destination "$name.zip")
             $needs = [ordered]@{}
             foreach ($path in $wasp.Keys | Sort-Object) {
                 if ($weblingo[$path] -eq $wasp[$path]) {

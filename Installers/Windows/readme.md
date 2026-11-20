@@ -73,9 +73,17 @@ may use, through `windows:com`.
 
 ## Removing it
 
-If you enabled the debugger, uninstall **WebLingo** from VS Code's Extensions view. To remove the file association,
-run `weblingo add-wlg-file-type.wlg remove=yes` from the extracted folder before deleting the runtime.
+Close any running WebLingo scripts and debugging sessions. In your usual account, double-click **Uninstall WebLingo.bat**
+in the installed WebLingo folder or in the extracted ZIP. Type **Y** to confirm and approve the administrator prompt.
+If a file is in use, close the program named by the error and retry. You can always rerun the launcher from the ZIP.
 
-Delete WebLingo's folder, `C:\Program Files\WebLingo` or `C:\Program Files (x86)\WebLingo`, and remove it from the
-machine's `PATH`: **Settings**, **System**, **About**, **Advanced system settings**, **Environment Variables…**,
-**Path** under **System variables**, **Edit…**.
+Uninstall removes the packaged runtime and offline debugger, and the machine PATH entry that setup added. It restores
+the file-association values setup changed if they still match its registration, and removes the VS Code extension
+if setup added it for this account. Windows controls your explicit default-app choice. An installation of VS Code's
+extension that predates setup stays installed. WASP keeps its shared runtime files and PATH. A second WebLingo
+architecture keeps its editor integration. Files you added or edited in the installation folder are preserved.
+
+For an older installation without uninstall records, use the new ZIP for the same runtime version, processor and kind.
+The uninstaller removes matching runtime files, its PATH entry and the current account's WebLingo registrations.
+It recognizes older builds of WebLingo's own DLLs by assembly identity and product version.
+Earlier settings cannot be reconstructed for those installations.

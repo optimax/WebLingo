@@ -84,5 +84,5 @@ it, such as a SQLite database's. The WASP User Manual says how to write a site.
 ## Removing it
 
 Remove the sites in IIS's manager, then delete `wasp.exe`, `wasp.dll`, `wasp.deps.json`, `wasp.runtimeconfig.json`
-and the other files the folder `WASP` holds from `C:\Program Files\WebLingo`, or remove WebLingo whole, as its
-`readme.md` says.
+and the other files the folder `WASP` holds from `C:\Program Files\WebLingo`. To remove WebLingo too, remove WASP
+first, then run **Uninstall WebLingo.bat** as described in WebLingo's `readme.md`.

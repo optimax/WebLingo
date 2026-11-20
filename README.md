@@ -15,6 +15,8 @@ they appear in the page. WebLingo is currently pre-alpha.
 On Windows, extract the self-contained WebLingo ZIP for your processor and double-click **Install WebLingo.bat**.
 Setup can register `.wlg` files and install the debugger for VS Code. [Windows installation guide](Installers/Windows/readme.md)
 
+To remove WebLingo, double-click **Uninstall WebLingo.bat** in its installation folder or the extracted ZIP.
+
 With the .NET 10 SDK installed, run the included hello-world script from the repository root.
 
 ```sh

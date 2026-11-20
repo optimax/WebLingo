@@ -16,6 +16,7 @@ param target = "";
 import { writeLn } from "std:system";
 import com from "windows:com";
 import fs from "std:fs";
+import { Json } from "std:json";
 import { requireAdministrator, runningFrom, copyFolder, addToMachinePath, architectureOf, programFiles } from "./windows.wlg";
 
 await requireAdministrator();
@@ -38,7 +39,36 @@ if (running.length > 0) {
     throw new Error($"Programs run from {installed}, {running}: stop them, then run this again.");
 }
 
-await copyFolder(zipped, installed);
+// Keep records only for release packages which carry the uninstaller. Updates retain the original PATH and
+// ownership of files from earlier packages that the copier leaves in place.
+var inventory = $"{installed}\\uninstall-files.json";
+var originalPath = $"{installed}\\uninstall-path.json";
+var packaged = await fs.exists($"{zipped}\\uninstall-files.json");
+var inventoryText = null;
+if (packaged) {
+    inventoryText = await fs.readText($"{zipped}\\uninstall-files.json");
+    if (await fs.exists(inventory)) {
+        var current = Json.parse(inventoryText);
+        var previous = Json.parse(await fs.readText(inventory));
+        foreach (var (name, hash) in previous["files"]) {
+            if (!current["files"].has(name)) current["files"][name] = hash;
+        }
+        foreach (var name in previous["shared"]) {
+            if (!current["shared"].contains(name)) current["shared"].push(name);
+        }
+        inventoryText = Json.stringify(current);
+    }
+    if (!(await fs.exists(originalPath))) {
+        await fs.makeFolder(installed);
+        var environment = com.create("WScript.Shell").Environment("SYSTEM");
+        await fs.writeText(originalPath, Json.stringify({"path": environment["Path"]}));
+    }
+}
+try {
+    await copyFolder(zipped, installed);
+} finally {
+    if (packaged) await fs.writeText(inventory, inventoryText);
+}
 writeLn($"WebLingo installed in {installed}");
 if (addToMachinePath(installed)) {
     writeLn($"{installed} added to the machine's PATH");

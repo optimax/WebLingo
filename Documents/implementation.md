@@ -208,6 +208,12 @@ directory. PowerShell elevates only `install.wlg`. The original process handles 
 current user's VS Code CLI to install the offline `VSCode/WebLingo.vsix` from the runtime installation.
 The packager builds this VSIX once from `Editors/VSCode/package.json` and the assets it names.
 
+`Installers/Windows/Uninstall WebLingo.bat` and `uninstall.ps1` ship in the runtime so uninstall works after the
+download is deleted. PowerShell runs independently of the executable it removes. The package inventory names the
+runtime files with SHA-256 hashes and identifies files WASP also uses. Installation retains the original raw machine
+PATH and records the user's association values and whether VS Code already had the extension. Uninstall uses those
+records under the original user and elevates only the machine cleanup.
+
 On Windows, double-click `build.bat` in the repository root to publish and install the current checkout, including
 the CLI's VS Code debug adapter. It runs `publish.ps1` from the solution folder, then requests administrator rights
 for the installer. With IIS it uses `Scripts/install-weblingo.wlg` to update the shared WebLingo and WASP files

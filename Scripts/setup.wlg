@@ -82,6 +82,15 @@ async function setup() {
 
     await installRuntime();
     writeLn($"WebLingo is installed in {installed}.");
+    if (registerFiles || installDebugger) {
+        var options = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $"{installed}\\uninstall.ps1", "-Remember"];
+        if (registerFiles) options.push("-Association");
+        if (installDebugger) {
+            options.push("-Code");
+            options.push(code);
+        }
+        await runSetupProgram(expand("%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"), options);
+    }
     if (registerFiles) {
         await runSetupProgram("WebLingo\\weblingo.exe", ["run", "add-wlg-file-type.wlg", $"folder={installed}"]);
         writeLn("If Windows asks how to open a .wlg file, choose WebLingo and Always.");
