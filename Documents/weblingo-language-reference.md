@@ -73,7 +73,10 @@ On Windows, `weblingo` started in a console window of its own, as Explorer start
 it wrote stays to be read; started from a console already open, it does not.
 
 `weblingo run` of a `.wlg` compiles it in memory, and writes no file; `weblingo compile` writes one, for the register VM
-by default (`.wlbr`), or for the stack VM with `--stack` (`.wlbs`). The header must agree with the extension. A legacy `.wlbc` file selects its VM from its header. `weblingo disasm hello.wlbr` shows what the compiler made.
+by default (`.wlbr`). Set `"vm": "stack"` in the script's `weblingo.config` to use the stack VM for
+`run`, `check`, and `compile`. For `compile`, `--register` or `--stack` overrides that setting.
+Compiled files name their VM in the header. The CLI rejects a header that disagrees with a VM-specific extension or an
+explicit configuration setting. `weblingo disasm hello.wlbr` shows what the compiler made.
 
 ```text
 function main (0 locals, 1 registers)

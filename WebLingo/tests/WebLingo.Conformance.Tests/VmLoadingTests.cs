@@ -30,13 +30,18 @@ public sealed class VmLoadingTests : IDisposable
         Assert.Equal([assembly], VmsLoadedBy(0, "42\n", "run", compiled));
     }
 
-    [Fact]
-    public void AScriptLoadsOnlyTheRegisterVm()
+    [Theory]
+    [InlineData(null, "WebLingo.VM")]
+    [InlineData("register", "WebLingo.VM")]
+    [InlineData("stack", "WebLingo.VM.Stack")]
+    public void SourceLoadsOnlyItsConfiguredVm(string? vm, string assembly)
     {
         var main = Path.Combine(_folder, "main.wlg");
-        File.WriteAllText(main, "import { write, writeLn } from \"std:system\"; writeLn(6 * 7);\n");
+        File.WriteAllText(Path.Combine(_folder, "lib.wlg"), "export const answer = 42;");
+        File.WriteAllText(main, "var unit = await Module.import(\"./lib.wlg\"); writeLn(unit.answer);\n");
+        if (vm is not null) File.WriteAllText(Path.Combine(_folder, "weblingo.config"), "{\"vm\":\"" + vm + "\"}");
         Assert.Empty(VmsLoadedBy(0, "", "check", main));
-        Assert.Equal(["WebLingo.VM"], VmsLoadedBy(0, "42\n", "run", main));
+        Assert.Equal([assembly], VmsLoadedBy(0, "42\n", "run", main));
     }
 
     /// <summary>

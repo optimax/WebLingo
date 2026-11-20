@@ -253,6 +253,50 @@ public sealed class BytecodeCommandLineTests : IDisposable
 
     private static string Extension(string vm) => vm == "register" ? ".wlbr" : ".wlbs";
 
+    [Fact]
+    public void TheConfiguredVmControlsCompileRunAndCheck()
+    {
+        var main = Write("main.wlg", "writeLn(42);");
+        var config = Write("weblingo.config", """{ "vm": "stack" }""");
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--vm", "register", main).Exit);
+        var stack = Path.ChangeExtension(main, ".wlbs");
+        var register = Path.ChangeExtension(main, ".wlbr");
+        Assert.Equal((WebLingoCommandLine.Success, "42\n", ""), Weblingo(stack));
+        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo("check", stack));
+        foreach (var command in new[] { "run", "check" })
+        {
+            var (exit, text, error) = Weblingo(command, register);
+            Assert.Equal((WebLingoCommandLine.CompilationFailed, ""), (exit, text));
+            Assert.Equal(register + ": ERROR WL4001: The configuration selects the stack VM, but the header names the register VM.",
+                error.TrimEnd());
+        }
+        var legacy = Path.ChangeExtension(main, ".wlbc");
+        File.Copy(register, legacy);
+        Assert.Equal(WebLingoCommandLine.CompilationFailed, Weblingo(legacy).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("disasm", register).Exit);
+
+        File.WriteAllText(config, """{ "vm": "register" }""");
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", main).Exit);
+        Assert.Contains("the configuration selects", Weblingo("run", stack).Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal((WebLingoCommandLine.Success, "42\n", ""), Weblingo(legacy));
+        File.Delete(config);
+        Assert.Equal((WebLingoCommandLine.Success, "42\n", ""), Weblingo(stack));
+    }
+
+    [Theory]
+    [InlineData("\"other\"")]
+    [InlineData("null")]
+    [InlineData("1")]
+    public void InvalidVmSettingsAreReported(string value)
+    {
+        var program = Write("main.wlg", "writeLn(42);");
+        var config = Write("weblingo.config", "{\"vm\":" + value + "}");
+        var (exit, output, error) = Weblingo("check", program);
+        Assert.Equal((WebLingoCommandLine.FileUnreadable, "", config + ": \"vm\" is \"register\" or \"stack\"."),
+            (exit, output, error.TrimEnd()));
+    }
+
     private string Write(string relative, string text)
     {
         var path = Path.Combine(_folder, relative);

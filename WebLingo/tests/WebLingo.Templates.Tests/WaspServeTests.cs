@@ -27,9 +27,15 @@ public sealed class WaspServeTests : IDisposable
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
-    [Fact]
-    public async Task AnApplicationIsServedOverHttp()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("stack")]
+    public async Task AnApplicationIsServedOverHttp(string? vm)
     {
+        if (vm is not null) Write("wasp.config", "{\"vm\":\"" + vm + "\"}");
+        Write("api/answer.wlg", "export async function get(request, response) { await delay(10); write(42); }");
+        Write("components/value.wasp", "<% param n; await delay(10); %><%= n %>");
+        Write("component.wasp", "<% await renderComponent(\"/components/value.wasp\", {n: 42}); %>");
         var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out var environment);
         Assert.True(server is not null, error);
         Assert.Equal(WebLingoMode.Development, environment);
@@ -43,6 +49,9 @@ public sealed class WaspServeTests : IDisposable
             Assert.Equal(HttpStatusCode.OK, page.StatusCode);
             Assert.Equal("text/html; charset=utf-8", page.Content.Headers.ContentType?.ToString());
             Assert.Equal("<html><title>Home</title><body><h1>Hello</h1>from std:system\n</body></html>", await page.Content.ReadAsStringAsync());
+            Assert.Equal("42", await client.GetStringAsync("/api/answer"));
+            Assert.Equal("42", await client.GetStringAsync("/component"));
+            Assert.Equal("42", await client.GetStringAsync("/component"));
 
             var css = await client.GetAsync("/css/site.css");
             Assert.Equal((HttpStatusCode.OK, "text/css"), (css.StatusCode, css.Content.Headers.ContentType?.MediaType));
@@ -355,8 +364,8 @@ public sealed class WaspServeTests : IDisposable
         // "environment", its name until the owner renamed it "mode" (18 November 2026), nothing kept for it.
         Write("wasp.config", "{ \"environment\": \"production\" }");
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
-        Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"mode\", \"sendTimeout\", "
-                        + "\"network\", \"databases\", \"files\", \"com\" and \"env\".", error);
+        Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"vm\", \"mode\", "
+                        + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\" and \"env\".", error);
 
         Write("wasp.config", "{ \"sendTimeout\": 5 }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));

@@ -147,9 +147,12 @@ public sealed class WaspTests : IDisposable
         Assert.Contains("ERROR WL3005", error);
     }
 
-    [Fact]
-    public void AComponentIsFoundAndCompiledWhenItIsRendered()
+    [Theory]
+    [InlineData("register")]
+    [InlineData("stack")]
+    public void AComponentIsFoundAndCompiledWhenItIsRendered(string vm)
     {
+        Write("site/wasp.config", "{\"vm\":\"" + vm + "\"}");
         Write("site/components/card.wasp", "<% param product; param size = \"small\"; %>\n<article class=\"<%= size %>\"><%= product %></article>\n");
         var page = Write("site/index.wasp",
             "<% foreach (var p in [\"Tea\", \"<Cake>\"]) { %>\n<% await renderComponent(\"/components/card.wasp\", { product: p }); %>\n<% } %>\n");
@@ -166,6 +169,20 @@ public sealed class WaspTests : IDisposable
         (exit, _, error) = Run(["run", page]);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Contains("index.wasp(1,10): ERROR WL5005: The component '/components/none.wasp' cannot be rendered: there is no such file.", error);
+    }
+
+    [Fact]
+    public void APageSelectsTheVmFromItsExplicitSiteRoot()
+    {
+        Write("site/wasp.config", """{ "vm": "stack" }""");
+        var page = Write("site/nested/page.wasp", "<% await delay(0); %><%= 42 %>");
+        var root = Path.Combine(_folder, "site");
+        Assert.Equal((WebLingoCommandLine.Success, "42", ""), Run(["run", "--root", root, page]));
+        Assert.Equal((WebLingoCommandLine.Success, "", ""), Run(["check", "--root", root, page]));
+        var config = Write("site/wasp.config", """{ "vm": true }""");
+        var (exit, output, error) = Run(["check", "--root", root, page]);
+        Assert.Equal((WebLingoCommandLine.FileUnreadable, ""), (exit, output));
+        Assert.Equal(Path.GetFullPath(config) + ": \"vm\" is \"register\" or \"stack\".", error.TrimEnd());
     }
 
     [Fact]

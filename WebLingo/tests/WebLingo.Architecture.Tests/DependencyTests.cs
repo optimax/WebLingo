@@ -34,11 +34,11 @@ public sealed class DependencyTests
         { "WebLingo.StdLib.Process", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.Platform.Abstractions", ["WebLingo.Core"] },
         { "WebLingo.Hosting.Abstractions", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
-        // The host's core composes the engine for every adapter (section 6.12), the register VM its pages' only.
+        // The host's core composes the engine for every adapter (section 6.12), using the site's configured VM.
         {
             "WebLingo.Hosting",
             ["WebLingo.Core", "WebLingo.Language", "WebLingo.Bytecode", "WebLingo.Compiler", "WebLingo.Templates", "WebLingo.Runtime",
-             "WebLingo.VM", "WebLingo.StdLib", "WebLingo.Platform.Abstractions", "WebLingo.Hosting.Abstractions"]
+             "WebLingo.VM", "WebLingo.VM.Stack", "WebLingo.StdLib", "WebLingo.Platform.Abstractions", "WebLingo.Hosting.Abstractions"]
         },
     };
 

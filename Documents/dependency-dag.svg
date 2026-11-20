@@ -44,6 +44,7 @@
     <path class="edge" data-from="Cli" data-to="Data.DotNet" d="M439 158 H480 Q501 158 517 174 L536 192 Q549 202 570 202 H650 Q674 202 674 226 V242 Q674 264 698 264 H977 Q994 264 994 283 V337 Q994 355 1031 367"/>
     <path class="edge package" data-from="Cli" data-to="BundledModules" d="M318 171 C278 203 176 220 142 275"/>
     <path class="edge" data-from="Hosting" data-to="Templates" d="M803 320 C796 350 324 313 322 385"/>
+    <path class="edge" data-from="Hosting" data-to="VM.Stack" d="M812 320 C799 355 463 332 455 385"/>
     <path class="edge" data-from="Hosting" data-to="VM" d="M822 320 C800 353 606 334 605 385"/>
     <path class="edge" data-from="Hosting" data-to="StdLib" d="M841 320 C838 363 752 341 751 385"/>
     <path class="edge" data-from="Hosting" data-to="Hosting.Abstractions" d="M862 320 C875 348 907 350 912 385"/>

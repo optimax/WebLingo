@@ -1,3 +1,4 @@
+using WebLingo.Bytecode;
 using WebLingo.Compiler;
 using WebLingo.Platform.Abstractions;
 using WebLingo.Runtime;
@@ -31,6 +32,9 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     public Func<WebLingoWorkerId, WebLingoWorkerServices> WorkerServices { get; init; } = _ => new WebLingoWorkerServices(new());
 
     public WebLingoMode Mode { get; init; } = WebLingoMode.Production;
+
+    /// <summary>The VM that compiles and runs the site's pages and route handlers.</summary>
+    public WebLingoBytecodeKind Vm { get; init; } = WebLingoBytecodeKind.Register;
 
     /// <summary>The clock an execution's timers wait on, or none, for virtual time.</summary>
     public IWebLingoExecutionClock? Clock { get; init; }

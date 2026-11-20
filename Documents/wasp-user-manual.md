@@ -746,6 +746,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 
 | Setting | What it says | Default |
 |---|---|---|
+| `"vm"` | `"register"` or `"stack"` for page and route handler compilation and execution | `"register"` |
 | `"mode"` | `"development"`, errors shown in their pages, or `"production"`, not shown | development under `wasp serve`, production under IIS |
 | `"sendTimeout"` | how many seconds a page waits for a client that has taken nothing of its output, more than 0 | 30 |
 | `"schemes"` | folders of native modules, each a name and a folder: `{ "native": "C:/WebLingo/native" }` | `std`, WebLingo's own |
@@ -756,7 +757,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"env"` | what the site's pages and handlers may read of the machine's environment, through `std:env`: `{ "machineName": true, "variables": ["PATH", "APP_*"] }` | nothing |
 
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
-which. `wasp serve` reads the file when it starts; after changing it, start `wasp serve`, or the IIS site, again.
+which. `wasp serve` and `wasp fastcgi` read the site's configuration when they start. Restart the host after changing it.
 
 A site reaches other servers only as its `"network"` allows, each host named as an address names it, a name or an
 address, `api.example.com` or `127.0.0.1`, at any of its ports, its letters' case aside:
@@ -831,7 +832,8 @@ its pages need. A script that `weblingo` runs reads all of it, and sets variable
 
 Its name is `wasp.config`, in lower case: Linux tells `WASP.config` from it. A `weblingo.config` configures a folder of
 scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run` and `wasp check` read the
-`wasp.config` in the page's folder, for its `"schemes"`.
+`wasp.config` in the page's folder for its `"schemes"`. For `run` and `check`, the VM comes from that file unless
+`--root` is given, in which case it comes from the site's root configuration.
 
 ---
 
