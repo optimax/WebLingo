@@ -4245,3 +4245,9 @@ Create an SVG illustration of the DAG of dependencies and insert into "Dependenc
 `Documents/NativeCompatibility.md` was renamed `native-compatibility.md`, yet documents still refer to the old name. Fix that.
 
 2026-11-20 (Codex). Fixed eight current document and source-comment references in `321df38`. The exact tracked path is `Documents/native-compatibility.md`. Historical task records retain the name they describe. Windows Release built without warnings on the branch and main, and the full suite passed (4,242 passed, six skipped). Linux was not tested locally.
+
+## [DONE] Example Person's Name
+
+Whenever the name `Ann` is mentioned, in the example code, in the documentation, etc., change it to `Anna`.
+
+2026-11-20 (Codex). Renamed the example person throughout examples, documentation, code comments and test fixtures in `3670810`. Updated the expected padding, length, case and split results. The Windows Release build had zero warnings on the branch and main, and the full suite passed (4,242 passed, six skipped). Three standalone examples, six reference examples and the WASP greeting passed. Linux was not tested locally.
