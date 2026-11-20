@@ -4401,3 +4401,15 @@ runtime archives. On x64 Windows, isolated launcher checks covered the prompts, 
 optional steps, reruns and failures. VS Code installed the packaged debugger and the installed runtime answered
 protocol requests. The x86 self-contained launcher also ran on x64 Windows. UAC, machine PATH and the real user's
 file association were simulated. Native ARM64 and 32-bit Windows were not exercised.
+
+## [DONE] Uninstall WebLingo on Windows
+
+Provide a double-click uninstaller for the Windows ZIP and the installed runtime. Undo the runtime installation,
+machine PATH entry, file association and VS Code integration. Preserve other applications, accounts and user files.
+
+2026-11-20 (Codex). Implemented in `73f19eb`. Windows Release built without warnings or errors. The six WebLingo
+ZIP inventories and their paired WASP hashes passed verification. Targeted Windows checks covered registration
+restoration, side-by-side runtimes, WASP, changed files, locks and retry. The x64 round trip covered install,
+update, cancellation, self-removal from the installed folder, an extracted ZIP rerun, older-package removal and
+VS Code extension ownership. It used the actual VS Code CLI and disposable registry keys, with UAC simulated.
+Native ARM64 and 32-bit Windows were not exercised.
