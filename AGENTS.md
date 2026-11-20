@@ -148,7 +148,8 @@ Be especially careful when translating between different measures of a position 
 
 Run tests as `Documents/implementation.md` describes. Do not assume a test framework's or runner's older behavior, adapters, or command-line conventions without checking the current project configuration.
 
-- After a change, build and run the tests of what the change affects. Run targeted test classes during active development, and the complete test suite (every test project in the solution, not only the one nearest the change) before a task is done, when a change touches shared code, and at milestones.
+- Run only tests whose results the change could affect. Include indirect effects through callers, shared dependencies, build settings, fixtures, and test inputs. Use the full suite only when the possible impact extends across the suite.
+- If no test result could change, skip automated tests. For example, verify a new batch file that invokes an existing build by running the batch file and checking its output and exit code.
 - Report failures accurately.
 - Do not change tests merely to make a regression appear to pass. When a test fails because the intended behavior has deliberately changed, update the test only after confirming that the new behavior is correct.
 - When fixing a bug, consider whether an automated test is practical. Tests are particularly valuable for calculations, parsing of input, serialization, formats, and anything independent of a UI.
@@ -290,7 +291,7 @@ Exclude generated, build and repository directories unless explicitly required:
 
 After modifying source, build the relevant project whenever the environment permits. Prefer building the complete solution when changes could affect shared code or several components.
 
-Run tests appropriate to the affected behavior (section 7).
+Apply section 7 when selecting tests before delivery and after landing on the target branch. A fast-forward to an already verified tree can reuse its test results.
 
 Do not suppress a compiler or analyzer warning (`#pragma warning disable`, `NoWarn`, and the like) to get a build through without saying so and why.
 

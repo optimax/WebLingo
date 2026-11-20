@@ -9,3 +9,6 @@ and disconnect requests. With `dotnet` absent from `PATH`, the batch file report
 The Release solution build had zero errors and zero warnings. All 4,243 tests passed.
 
 To use the build, set **WebLingo: Debugger Path** in VS Code's user settings to the path the batch file prints.
+
+For future changes, `AGENTS.md` section 7, `Documents/implementation.md` section 8, and `TO-DO-INSTRUCTIONS.md`
+require only tests whose results could be affected. Changes limited to this batch wrapper can be verified directly.

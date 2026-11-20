@@ -222,7 +222,7 @@ dotnet run --project benchmarks/WebLingo.Benchmarks -c Release --no-build
 
 The benchmark (section 3) writes a Markdown table: each workload's median and fastest time on each VM, the instructions a run executes, what it allocates, and its code's size. Its times are only comparable when they come from one run of it, in Release, on an otherwise idle machine; `--runs`, `--warm-ups` and `--workload` change what it runs. It turns .NET's tiered compilation off (`TieredCompilation` in its project), so that every method is fully optimized from its first call and no VM is timed while .NET still compiles it.
 
-- The solution is small: build all of it rather than one project, and run the complete test suite after a change, which today takes seconds. When the suite grows, run targeted test classes during active development and the complete suite before a task is done.
+- For a solution build, build all projects. Select tests by the change's possible effects as described in `AGENTS.md`, section 7. For example, changes to a script under `Examples.wlg` can affect `ExamplesTests`. Adding a batch file that invokes the existing CLI build calls for exercising that file directly.
 - Each behavior in the specification's conformance table (section 8.6) has a test in `WebLingo.Conformance.Tests`, which runs programs through the CLI as files; a new conformance case goes there too. Template tests go into `WebLingo.Templates.Tests` (specification, section 13), which runs each page on both VMs and `wasp` end to end.
 - A new portable project gets its row of allowed references in `DependencyTests` (`WebLingo.Architecture.Tests`), from the specification's section 8.3.
 - A test of malformed input checks the diagnostic's code and span, not only that compilation failed.
@@ -243,10 +243,10 @@ Apache Lounge's build needs Microsoft's Visual C++ Redistributable for Visual St
 
 ## A Finished Task's Checks
 
-These are the checks that `TO-DO-INSTRUCTIONS.md` runs after each task and calls main's checks when they are run again on `main`, after the task has landed:
+These checks apply at task completion and on `main` after landing. Test selection and reuse follow `AGENTS.md`, sections 7 and 11.
 
 - the Release build of the whole solution, with no warnings (warnings are errors here);
-- the complete test suite;
+- any tests whose results the change could affect, including tests in dependent projects.
 - when the task changes what the `weblingo` CLI or `wasp` does, the CLI run on the samples and the programs the task affects, and `wasp` on the pages it affects.
 
 Only Windows is tried locally. Linux is tried by CI, on a push, which needs the user's go-ahead (and see section 11), so a task's notes say that Linux was not tried.

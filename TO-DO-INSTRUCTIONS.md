@@ -34,7 +34,7 @@ Have at most four subagents at work at the same time. Every build and check shar
 
 When you are truly done and complete with each task, commit that task's work, pull `main`, merge your branch into the main as a fast-forward (`git merge --ff-only`; if `main` has moved on in the meantime, first rebase your branch onto it with `git rebase main`, reconciling any conflicts), so that the history stays a straight line with no merge commits; then delete your working git branch, and mark that task [DONE] in the TO-DO itself. DO NOT mark the task [DONE] while you are still working on it — only when you are completely done with it! Pulling `main` updates the local `main` only: push nothing unless the user tells you to (`AGENTS.md`, section 16).
 
-A task is done when its work has landed in `main` and main's checks have passed on it: the checks `Documents/implementation.md` names for a finished task, run again on `main`. Do not keep a landed task open for anything that comes up later, a follow-on from an answer to one of its questions included: make that a new task of its own, and mark the landed one [DONE].
+A task is done when its work has landed in `main` and passed the applicable checks in `Documents/implementation.md` under "A Finished Task's Checks". Reuse test results when `main` fast-forwards to the verified tree. If integration changes the tree, run any tests whose results those changes could affect. Do not keep a landed task open for anything that comes up later, a follow-on from an answer to one of its questions included: make that a new task of its own, and mark the landed one [DONE].
 
 Do not mark tasks that have active/unanswered questions on them as [DONE] — mark them as [QUESTION]. As long as the heading is marked a [QUESTION], do not try to ingest the answers or act on them — leave that task alone. The user is still actively editing it and the answer may still change. Once the user removes [QUESTION] from the task, it is considered answered. Make sure answered questions are not formatted bold any more.
 
@@ -44,7 +44,7 @@ TO-DO list is a live document. Be careful to verify that `TO-DO.md` hasn't chang
 
 Monitor for TO-DO changes as you are working through a task. When you detect changes, re-read the TO-DO **from the beginning**, as some tasks previously marked as [DONE] may have been rejected, instructions may have changed, etc., and the highest priority tasks are always at the top.
 
-After completing each task, run the checks `Documents/implementation.md` names for a finished task; where it names none, build the solution in Release mode and run its complete test suite. Say in the task's notes which checks could not be run, and on which platforms the work was not tried (`AGENTS.md`, section 11).
+After completing each task, run the applicable checks `Documents/implementation.md` names for a finished task. Where it names none, build the solution in Release mode and select tests according to `AGENTS.md`, section 7. Say in the task's notes which checks could not be run, and on which platforms the work was not tried (`AGENTS.md`, section 11).
 
 Proceed until the end, or until you encounter the line `# END-OF-TO-DO`, or `# STOP` whichever comes first. Do NOT work on TO-DO items beyond one of these markers.
 
