@@ -8,9 +8,11 @@ The `implementation.md` seems to imply that the WebLingo CLI is only capable of 
 
 **Approve "vm": "register" or "stack" in weblingo.config and wasp.config, using the register VM for source when no setting is given? The proposal applies to weblingo run/check/compile and wasp run/check/serve/fastcgi. The existing explicit compile flag would override the setting. With no setting, compiled files would still select the VM from their verified header. With a setting, a compiled file for the other VM would be refused. The VS Code debugger would keep its approved register-only behavior.**
 
-## Testing Framework
+## [QUESTION] Testing Framework
 
 Write a standard testing framework for WebLingo code, so that test classes can easily be written in WebLingo and run via a built-in test harness.
+
+**Approve weblingo test <file.wlg> [more files], with each module exporting a tests map from case names to zero-argument functions? A test class can register a case with a function such as () => new ArithmeticTests().adds(), giving that case a fresh instance. The harness would await both synchronous and asynchronous cases, report each failure and a summary, and exit nonzero on failure. Start std:test with assert(condition, message = null), equal(actual, expected, message = null) and async throws(action, expectedClass = Error). If you prefer automatic discovery of exported classes and test methods, please specify the discovery convention.**
 
 ## DAG of Dependencies
 
