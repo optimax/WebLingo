@@ -4233,3 +4233,9 @@ Add round-trip tests for a leading U+FEFF in the first data field and in the fir
 Depending on whether bytecode is intended for register of stack VM, use the extension `.wlbr` for register, and `.wlbs` for stack. Regardless of the extension, check which VM a particular bytecode model is intended for and refuse to run on the wrong one.
 
 2026-11-20 (Codex). Implemented in `b2d260e`. Register and stack outputs are written beside each other as `.wlbr` and `.wlbs`. The CLI verifies the header and bytecode and reports WL4001 for an extension/VM mismatch. Existing `.wlbc` inputs remain readable, and WASP does not serve any of the three extensions. Windows Release built without warnings on the branch and main, and the full suite passed (4,242 passed, six skipped). The CLI samples ran as source and on both bytecode targets, and the WASP sample rendered. Linux was not tested locally.
+
+## [DONE] DAG of Dependencies
+
+Create an SVG illustration of the DAG of dependencies and insert into "Dependency Direction" section of the `implementation.md`.
+
+2026-11-20 (Codex). Added the diagram in `9c9383c` and embedded it in Dependency Direction. It covers all 33 product projects, groups the native modules the CLI builds and ships, and omits redundant arrows. Compared every illustrated dependency path with the project references and checked the render in Edge. On the branch and main, Windows Release built with zero warnings and the suite passed (4,242 passed, six skipped). Linux was not tested locally.
