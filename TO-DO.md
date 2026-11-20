@@ -2,9 +2,11 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## CLI's VM
+## [QUESTION] CLI's VM
 
 The `implementation.md` seems to imply that the WebLingo CLI is only capable of running the register VM, while WASP is running both, as a choice. The intent was to make it possible for either exe to run either VM, based on configuration. If the choice of VM is not implemented that way, implement it.
+
+**Approve "vm": "register" or "stack" in weblingo.config and wasp.config, using the register VM for source when no setting is given? The proposal applies to weblingo run/check/compile and wasp run/check/serve/fastcgi. The existing explicit compile flag would override the setting. With no setting, compiled files would still select the VM from their verified header. With a setting, a compiled file for the other VM would be refused. The VS Code debugger would keep its approved register-only behavior.**
 
 ## Bytecode File Extensions
 
