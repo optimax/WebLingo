@@ -5,7 +5,7 @@ namespace WebLingo.Conformance.Tests;
 
 /// <summary>
 /// WLBC on <c>weblingo</c>'s command line (specification, section 9, "M0.13 parts", part 2): <c>compile</c>, <c>run</c>
-/// and <c>check</c> of a <c>.wlbc</c>, and <c>disasm</c>, end to end, with files, as a user would run them.
+/// and <c>check</c> of a bytecode file, and <c>disasm</c>, end to end, with files, as a user would run them.
 /// </summary>
 public sealed class BytecodeCommandLineTests : IDisposable
 {
@@ -25,7 +25,8 @@ public sealed class BytecodeCommandLineTests : IDisposable
     {
         var main = Write("main.wlg", "import { write, writeLn } from \"std:system\"; writeLn(42);\n");
         Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo(["compile", .. options, main]));
-        Assert.Equal(header, File.ReadAllBytes(Path.Combine(_folder, "main.wlbc"))[8]);
+        Assert.Equal(header, File.ReadAllBytes(Path.ChangeExtension(main, header == 1 ? ".wlbr" : ".wlbs"))[8]);
+        Assert.Equal(2, Files().Length);
     }
 
     [Theory]
@@ -39,9 +40,9 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.Equal((WebLingoCommandLine.Success, "Hello, WLBC!\n", ""), fromSource);
 
         Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo("compile", "--" + vm, main));
-        var compiled = Path.Combine(_folder, "main.wlbc");
+        var compiled = Path.ChangeExtension(main, Extension(vm));
         Assert.Equal((ulong)header, (ulong)File.ReadAllBytes(compiled)[8]);
-        // The program and the file it imports are in the .wlbc: it runs without them.
+        // The program and the file it imports are in the compiled file: it runs without them.
         File.Delete(main);
         File.Delete(Path.Combine(_folder, "lib", "greet.wlg"));
         Assert.Equal(fromSource, Weblingo("run", compiled, "who=WLBC"));
@@ -61,12 +62,12 @@ public sealed class BytecodeCommandLineTests : IDisposable
 
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
         File.Delete(Path.Combine(_folder, "lib", "util.wlg"));
-        Assert.Equal(fromSource, Weblingo("run", Path.Combine(_folder, "main.wlbc")));
+        Assert.Equal(fromSource, Weblingo("run", Path.ChangeExtension(main, Extension(vm))));
 
-        // An error in the program's own file names it as the file beside the .wlbc.
+        // An error in the program's own file names it as the file beside the bytecode.
         main = Write("main.wlg", "var a = 1;\nvar b = a / 0 + null;\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
-        var (exit, _, error) = Weblingo("run", Path.Combine(_folder, "main.wlbc"));
+        var (exit, _, error) = Weblingo("run", Path.ChangeExtension(main, Extension(vm)));
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Equal(Weblingo("run", main).Error, error);
         Assert.StartsWith(main + "(2,", error);
@@ -83,7 +84,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.Equal(main + "(2,1): ERROR WL3008 (MyError): An error was thrown and not caught: broken", fromSource.Error.TrimEnd());
 
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
-        Assert.Equal(fromSource, Weblingo("run", Path.ChangeExtension(main, ".wlbc")));
+        Assert.Equal(fromSource, Weblingo("run", Path.ChangeExtension(main, Extension(vm))));
     }
 
     [Fact]
@@ -95,10 +96,10 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, expected.Exit);
         Assert.Contains("ERROR WL3010 (TimeoutError): The regular expression /^(a+)+$/ took longer than 10 milliseconds to match.",
             expected.Error);
-        foreach (var vm in new[] { "--register", "--stack" })
+        foreach (var vm in new[] { "register", "stack" })
         {
-            Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", vm, main).Exit);
-            Assert.Equal(expected, Weblingo("run", "--timeout", "10", Path.ChangeExtension(main, ".wlbc")));
+            Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+            Assert.Equal(expected, Weblingo("run", "--timeout", "10", Path.ChangeExtension(main, Extension(vm))));
         }
     }
 
@@ -122,7 +123,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Write("lib/util.wlg", "export function twice(x) { return x * 2; }");
         var main = Write("main.wlg", "import { write, writeLn } from \"std:system\"; import { twice } from \"lib/util.wlg\";\nwriteLn(twice(21));\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
-        var text = System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(_folder, "main.wlbc")));
+        var text = System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(_folder, "main.wlbr")));
         Assert.DoesNotContain(Path.GetFileName(_folder), text);
         Assert.Contains("lib/util.wlg", text);
     }
@@ -134,7 +135,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     {
         var main = Write("main.wlg", "import { write, writeLn } from \"std:system\"; var x = 40;\nwriteLn(x + 2);\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
-        var (exit, output, error) = Weblingo("disasm", Path.Combine(_folder, "main.wlbc"));
+        var (exit, output, error) = Weblingo("disasm", Path.ChangeExtension(main, Extension(vm)));
         Assert.Equal((WebLingoCommandLine.Success, ""), (exit, error));
         Assert.StartsWith(start, output);
         Assert.Contains(kind, output.Split('\n')[0]);
@@ -146,7 +147,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     {
         var main = Write("main.wlg", "import { write, writeLn } from \"std:system\"; writeLn(\"never\");\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
-        var compiled = Path.Combine(_folder, "main.wlbc");
+        var compiled = Path.Combine(_folder, "main.wlbr");
         var bytes = File.ReadAllBytes(compiled);
         bytes[^1] ^= 0xFF;
         File.WriteAllBytes(compiled, bytes);
@@ -156,7 +157,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
             Assert.Equal((WebLingoCommandLine.CompilationFailed, ""), (exit, output));
             Assert.StartsWith(compiled + ": ERROR WL4001: The file is damaged: its source positions section does not match its CRC-32.", error);
         }
-        Assert.Equal(WebLingoCommandLine.FileUnreadable, Weblingo("run", Path.Combine(_folder, "none.wlbc")).Exit);
+        Assert.Equal(WebLingoCommandLine.FileUnreadable, Weblingo("run", Path.Combine(_folder, "none.wlbs")).Exit);
     }
 
     [Fact]
@@ -166,7 +167,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         var (exit, _, error) = Weblingo("compile", main);
         Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
         Assert.StartsWith(main + "(1,9): ERROR WL1001:", error);
-        Assert.False(File.Exists(Path.Combine(_folder, "main.wlbc")));
+        Assert.Equal([main], Files());
         Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("compile", "--fast", main).Exit);
         var (usage, _, why) = Weblingo("compile", "--stack", "--vm", "register", main);
         Assert.Equal((WebLingoCommandLine.UsageError, "Only one VM may be given: --register or --stack."), (usage, why.TrimEnd()));
@@ -177,7 +178,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     [Fact]
     public void RunningAScriptWritesNothingToDisk()
     {
-        // A1 of M0.13's questions: weblingo run script.wlg compiles in memory, and saves no .wlbc.
+        // A1 of M0.13's questions: weblingo run script.wlg compiles in memory.
         Write("lib/util.wlg", "export function twice(x) { return x * 2; }");
         var main = Write("main.wlg", "import { write, writeLn } from \"std:system\"; import { twice } from \"lib/util.wlg\";\nwriteLn(twice(21));\n");
         var before = Files();
@@ -189,13 +190,13 @@ public sealed class BytecodeCommandLineTests : IDisposable
     [Fact]
     public void AFileNamedFirstIsRun()
     {
-        // weblingo script.wlg as weblingo run script.wlg, its parameters after it, and a .wlbc so too (the owner's answer,
+        // weblingo script.wlg as weblingo run script.wlg, its parameters after it, and bytecode too (the owner's answer,
         // 18 November 2026, "Minimal WebLingo Installer: Linux", Q1); anything else still a usage error.
         var main = Write("Main.WLG", "param name;\nimport { writeLn } from \"std:system\";\nwriteLn($\"Hello, {name}\");\n");
         Assert.Equal((WebLingoCommandLine.Success, "Hello, Ann\n", ""), Weblingo(main, "name=Ann"));
         Assert.Equal(Weblingo("run", main, "name=Bo"), Weblingo(main, "name=Bo"));
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
-        Assert.Equal((WebLingoCommandLine.Success, "Hello, Cy\n", ""), Weblingo(Path.ChangeExtension(main, ".wlbc"), "name=Cy"));
+        Assert.Equal((WebLingoCommandLine.Success, "Hello, Cy\n", ""), Weblingo(Path.ChangeExtension(main, ".wlbr"), "name=Cy"));
         Assert.Equal(WebLingoCommandLine.FileUnreadable, Weblingo(Path.Combine(_folder, "none.wlg")).Exit);
         Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("rnu", main).Exit);
         Assert.Equal(WebLingoCommandLine.UsageError, Weblingo(Write("notes.txt", "")).Exit);
@@ -209,8 +210,48 @@ public sealed class BytecodeCommandLineTests : IDisposable
     {
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run([], output, new StringWriter()));
-        Assert.Contains("| compile [--register|--stack] [--scheme <name>=<folder> …] <file.wlg> | disasm <file.wlbc>", output.ToString());
+        Assert.Contains("| compile [--register|--stack] [--scheme <name>=<folder> …] <file.wlg> | disasm <bytecode-file>", output.ToString());
+        Assert.Contains("run, check and disasm accept .wlbr, .wlbs and legacy .wlbc files", output.ToString());
     }
+
+    [Theory]
+    [InlineData("register", "stack", ".WLBS")]
+    [InlineData("stack", "register", ".WLBR")]
+    public void TheVmNamedByTheExtensionMustMatchTheHeader(string actualVm, string expectedVm, string wrongExtension)
+    {
+        var main = Write("main.wlg", "writeLn(42);");
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + actualVm, main).Exit);
+        var compiled = Path.ChangeExtension(main, Extension(actualVm));
+        var wrong = Path.ChangeExtension(main, wrongExtension);
+        File.Copy(compiled, wrong);
+        var diagnostic = $"{wrong}: ERROR WL4001: The file extension is for the {expectedVm} VM, but its header names the {actualVm} VM.";
+        foreach (var command in new[] { "run", "check", "disasm" })
+        {
+            var (exit, output, error) = Weblingo(command, wrong);
+            Assert.Equal((WebLingoCommandLine.CompilationFailed, "", diagnostic), (exit, output, error.TrimEnd()));
+        }
+        Assert.Equal(Weblingo("run", wrong), Weblingo(wrong));
+    }
+
+    [Fact]
+    public void BothBytecodeTargetsCanCoexistAndStillRunWithALegacyName()
+    {
+        var main = Write("main.wlg", "writeLn(42);");
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", main).Exit);
+        Assert.Equal(3, Files().Length);
+        foreach (var extension in new[] { ".wlbr", ".wlbs" })
+        {
+            var compiled = Path.ChangeExtension(main, extension);
+            var legacy = Path.ChangeExtension(main, ".wlbc");
+            File.Copy(compiled, legacy, overwrite: true);
+            Assert.Equal((WebLingoCommandLine.Success, "42\n", ""), Weblingo(compiled));
+            Assert.Equal(Weblingo(compiled), Weblingo(legacy));
+            Assert.Equal(Weblingo("disasm", compiled), Weblingo("disasm", legacy));
+        }
+    }
+
+    private static string Extension(string vm) => vm == "register" ? ".wlbr" : ".wlbs";
 
     private string Write(string relative, string text)
     {

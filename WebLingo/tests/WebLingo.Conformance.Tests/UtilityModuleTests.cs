@@ -215,7 +215,7 @@ public sealed class UtilityModuleTests : IDisposable
         if (stack)
         {
             Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", path], output, error));
-            path = Path.ChangeExtension(path, ".wlbc");
+            path = Path.ChangeExtension(path, ".wlbs");
             output.GetStringBuilder().Clear();
         }
         var exit = WebLingoCommandLine.Run(["run", path], output, error);

@@ -25,13 +25,13 @@ public sealed record WebLingoCommandLineProgram(
 
     /// <summary>
     /// Whether it has WLBC files (specification, section 5.3): <c>compile</c> and <c>disasm</c>, and <c>run</c> and
-    /// <c>check</c> of a <c>.wlbc</c>, as <c>weblingo</c> has; WASP never writes one (section 5.1).
+    /// <c>check</c> of a bytecode file, as <c>weblingo</c> has; WASP never writes one (section 5.1).
     /// </summary>
     public bool Bytecode { get; init; }
 
     /// <summary>
     /// Whether a file named first, without a command, is run, <c>weblingo script.wlg</c> as <c>weblingo run script.wlg</c>, as
-    /// a scripting language's runner runs one: a file of its <see cref="Extension"/>, or a <c>.wlbc</c> where it has them.
+    /// a scripting language's runner runs one: a file of its <see cref="Extension"/>, or a bytecode file where it has them.
     /// </summary>
     public bool RunsFileNamedFirst { get; init; }
 

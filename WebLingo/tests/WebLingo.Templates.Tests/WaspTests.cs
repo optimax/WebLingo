@@ -198,7 +198,7 @@ public sealed class WaspTests : IDisposable
     [Fact]
     public void RunAndCheckWriteNothingToDisk()
     {
-        // WASP compiles pages in memory only and never writes a .wlbc file (specification, section 5.1): a page with a
+        // WASP compiles pages in memory only and never writes a bytecode file (specification, section 5.1): a page with a
         // layout, an include, and a component that imports a module leaves the application's folder as it found it.
         Write("site/layouts/main.wasp", "<html><% renderBody(); %></html>");
         Write("site/includes/nav.wasp", "<nav></nav>");

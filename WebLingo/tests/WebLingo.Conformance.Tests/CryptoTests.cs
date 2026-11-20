@@ -4,7 +4,7 @@ namespace WebLingo.Conformance.Tests;
 
 /// <summary>
 /// <c>std:crypto</c> (specification, section 7.10; section 9, M0.18), through <c>weblingo</c>, each program run as a script,
-/// on the register VM, and as a <c>.wlbc</c> compiled for the stack VM, which must give the same: published test vectors for
+/// on the register VM, and as a <c>.wlbs</c> compiled for the stack VM, which must give the same: published test vectors for
 /// SHA-256, SHA-512, HMAC (RFC 4231) and PBKDF2 with HMAC-SHA-256, which <c>verifyPassword</c> reads; random bytes; a
 /// comparison in constant time; passwords' hashes, synchronously and as tasks; and the errors.
 /// </summary>
@@ -66,7 +66,7 @@ public sealed class CryptoTests : IDisposable
     }
 
     /// <summary>
-    /// The program run as a script, on the register VM, then compiled for the stack VM and run from its <c>.wlbc</c>: what
+    /// The program run as a script, on the register VM, then compiled for the stack VM and run from its <c>.wlbs</c>: what
     /// both write, which must be the same, and their errors.
     /// </summary>
     private (string Output, string Error) Run(string program)
@@ -75,7 +75,7 @@ public sealed class CryptoTests : IDisposable
         File.WriteAllText(path, program);
         var register = Weblingo("run", path);
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", path).Exit);
-        var stack = Weblingo("run", Path.ChangeExtension(path, ".wlbc"));
+        var stack = Weblingo("run", Path.ChangeExtension(path, ".wlbs"));
         Assert.Equal((register.Output, register.Error), (stack.Output, stack.Error));
         return (register.Output, register.Error);
     }

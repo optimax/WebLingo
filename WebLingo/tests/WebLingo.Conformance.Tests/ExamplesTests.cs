@@ -79,7 +79,7 @@ public sealed class ExamplesTests : IDisposable
 
         // The same from its WLBC, on the stack VM.
         Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo(["compile", "--stack", path], path));
-        Assert.Equal(expected, Weblingo(["run", Path.ChangeExtension(path, ".wlbc"), .. parameters], path));
+        Assert.Equal(expected, Weblingo(["run", Path.ChangeExtension(path, ".wlbs"), .. parameters], path));
     }
 
     /// <summary>

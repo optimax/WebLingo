@@ -17,13 +17,13 @@ public sealed class VmLoadingTests : IDisposable
     public void Dispose() => Directory.Delete(_folder, recursive: true);
 
     [Theory]
-    [InlineData("register", "WebLingo.VM")]
-    [InlineData("stack", "WebLingo.VM.Stack")]
-    public void AWlbcLoadsOnlyItsVm(string vm, string assembly)
+    [InlineData("register", "WebLingo.VM", ".wlbr")]
+    [InlineData("stack", "WebLingo.VM.Stack", ".wlbs")]
+    public void ABytecodeFileLoadsOnlyItsVm(string vm, string assembly, string extension)
     {
         var main = Path.Combine(_folder, "main.wlg");
         File.WriteAllText(main, "import { write, writeLn } from \"std:system\"; writeLn(6 * 7);\n");
-        var compiled = Path.Combine(_folder, "main.wlbc");
+        var compiled = Path.ChangeExtension(main, extension);
         Assert.Empty(VmsLoadedBy(0, "", "compile", "--" + vm, main));
         Assert.Empty(VmsLoadedBy(0, "", "check", compiled));
         Assert.Empty(VmsLoadedBy(0, null, "disasm", compiled));

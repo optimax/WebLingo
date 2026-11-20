@@ -4,7 +4,7 @@ namespace WebLingo.Conformance.Tests;
 
 /// <summary>
 /// <c>std:math</c> (the owner's answers, 18 November 2026, "Mathematics"), through <c>weblingo</c>, each program run as a
-/// script, on the register VM, and as a <c>.wlbc</c> compiled for the stack VM, which must give the same: its functions,
+/// script, on the register VM, and as a <c>.wlbs</c> compiled for the stack VM, which must give the same: its functions,
 /// each keeping its argument's kind or giving an integer or a number, as it says; its constants, which a native module
 /// exports, and its rest parameters, <c>min(a, …)</c>; and its errors, each message tested.
 /// </summary>
@@ -87,7 +87,7 @@ public sealed class MathTests : IDisposable
     }
 
     /// <summary>
-    /// The program run as a script, on the register VM, then compiled for the stack VM and run from its <c>.wlbc</c>: what
+    /// The program run as a script, on the register VM, then compiled for the stack VM and run from its <c>.wlbs</c>: what
     /// both write, which must be the same, and their errors.
     /// </summary>
     private (string Output, string Error) Run(string program)
@@ -96,7 +96,7 @@ public sealed class MathTests : IDisposable
         File.WriteAllText(path, program);
         var register = Weblingo("run", path);
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", path).Exit);
-        var stack = Weblingo("run", Path.ChangeExtension(path, ".wlbc"));
+        var stack = Weblingo("run", Path.ChangeExtension(path, ".wlbs"));
         Assert.Equal((register.Output, register.Error), (stack.Output, stack.Error));
         return (register.Output, register.Error);
     }

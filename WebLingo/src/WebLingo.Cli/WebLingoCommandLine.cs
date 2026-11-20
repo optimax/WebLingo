@@ -16,11 +16,11 @@ namespace WebLingo.Cli;
 /// <summary>
 /// The <c>weblingo</c> command line (specification, section 8.4, "CLI"): <c>run</c>, <c>check</c>, <c>compile</c>,
 /// <c>disasm</c> and <c>--version</c>. It is the host: it registers <c>write</c> and <c>writeLn</c>, writing to standard
-/// output, compiles a file, and runs it in the VM; or it writes the compiled file as WLBC, a <c>.wlbc</c> (section 5.3),
+/// output, compiles a file, and runs it in the VM; or it writes a WLBC file, <c>.wlbr</c> or <c>.wlbs</c> (section 5.3),
 /// which <c>run</c> runs on the VM it is for, without compiling anything. Diagnostics go to standard error as
 /// <c>file(line,column): ERROR CODE (ExceptionClass): message</c>, with the class if available.
 /// Exit codes (section 15.2): 0 success, 1 compilation errors or a
-/// <c>.wlbc</c> that cannot be used, 2 a usage error, 3 a runtime error, 4 a file that cannot be read or written.
+/// WLBC file that cannot be used, 2 a usage error, 3 a runtime error, 4 a file that cannot be read or written.
 /// </summary>
 public static class WebLingoCommandLine
 {
@@ -40,10 +40,10 @@ public static class WebLingoCommandLine
     /// <summary>What <c>weblingo --version</c> prints, and <c>weblingo</c> first without arguments: <c>WebLingo 0.20.0-pre-alpha</c>.</summary>
     public static string Version { get; } = "WebLingo " + ProductVersion;
 
-    /// <summary>The extension of a WLBC file (section 5.3).</summary>
-    public const string BytecodeExtension = ".wlbc";
+    /// <summary>The legacy extension of a WLBC file (section 5.3).</summary>
+    public const string BytecodeExtension = WebLingoBytecodeFile.LegacyExtension;
 
-    /// <summary><c>weblingo</c>: scripts, <c>.wlg</c> files, compiled by the WebLingo compiler, and their <c>.wlbc</c> files.</summary>
+    /// <summary><c>weblingo</c>: scripts, <c>.wlg</c> files, compiled by the WebLingo compiler, and their WLBC files.</summary>
     public static WebLingoCommandLineProgram Scripts { get; } = new("weblingo", Version, ".wlg", _ => [],
         (file, options) => new WebLingoCommandLineCompilation(new WebLingoCompiler(options).Compile(file.Text, file.Name)))
     {
@@ -68,7 +68,7 @@ public static class WebLingoCommandLine
         // A file named first is run, weblingo script.wlg name=Ann as weblingo run script.wlg name=Ann (the owner's answer,
         // 18 November 2026, "Minimal WebLingo Installer: Linux", Q1).
         if (program.RunsFileNamedFirst && args.Length >= 1 && (args[0].EndsWith(program.Extension, StringComparison.OrdinalIgnoreCase)
-            || program.Bytecode && args[0].EndsWith(BytecodeExtension, StringComparison.OrdinalIgnoreCase)))
+            || program.Bytecode && WebLingoBytecodeFile.IsBytecodeExtension(Path.GetExtension(args[0]))))
         {
             args = ["run", .. args];
         }
@@ -138,7 +138,7 @@ public static class WebLingoCommandLine
             if (wrong is null && at < args.Length)
             {
                 var path = args[at];
-                var bytecode = program.Bytecode && path.EndsWith(BytecodeExtension, StringComparison.OrdinalIgnoreCase);
+                var bytecode = program.Bytecode && WebLingoBytecodeFile.IsBytecodeExtension(Path.GetExtension(path));
                 if (args[0] is "check" or "compile")
                 {
                     if (at + 1 == args.Length)
@@ -168,7 +168,7 @@ public static class WebLingoCommandLine
         var file = $"<file{program.Extension}>";
         var options = program.Options + "[--scheme <name>=<folder> …]";
         var bytecodeUsage = program.Bytecode
-            ? $" | compile [--register|--stack] [--scheme <name>=<folder> …] <file{program.Extension}> | disasm <file{BytecodeExtension}>"
+            ? $" | compile [--register|--stack] [--scheme <name>=<folder> …] <file{program.Extension}> | disasm <bytecode-file>"
             : "";
         output.WriteLine($"Usage: {program.Name} --version | run {options} [--timeout <ms>] {file} [name=value …]"
             + $" | check {options} {file}{bytecodeUsage}");
@@ -177,10 +177,10 @@ public static class WebLingoCommandLine
         output.WriteLine("  check     compiles the file and reports its errors, without running it");
         if (program.Bytecode)
         {
-            output.WriteLine($"  compile   compiles the file into a {BytecodeExtension} beside it, the register VM's bytecode (--register, the default) or the stack VM's (--stack)");
+            output.WriteLine("  compile   writes a .wlbr file for the register VM (--register, default) or a .wlbs for the stack VM (--stack)");
             output.WriteLine("            --vm register and --vm stack are the same as --register and --stack");
-            output.WriteLine($"  disasm    shows a {BytecodeExtension}'s bytecode as text");
-            output.WriteLine($"            run and check take a {BytecodeExtension} too, which run runs on the VM it is for");
+            output.WriteLine("  disasm    shows compiled bytecode as text");
+            output.WriteLine("            run, check and disasm accept .wlbr, .wlbs and legacy .wlbc files");
         }
         output.WriteLine($"  --scheme  names a folder of native modules, over {program.Configuration}'s, in the file's folder");
         output.WriteLine("  --timeout sets the regular expression match timeout for run, in milliseconds (default 1000)");
@@ -300,7 +300,7 @@ public static class WebLingoCommandLine
     }
 
     /// <summary>
-    /// <c>compile</c>: the file compiled for <paramref name="vm"/>, written as a <c>.wlbc</c> beside it (section 5.3), its files
+    /// <c>compile</c>: the file compiled for <paramref name="vm"/>, written beside it (section 5.3), its files
     /// named from its folder, the program's own by its name alone, so that the file holds none of the host's paths.
     /// </summary>
     private static int CompileFile(WebLingoCommandLineProgram program, string path, WebLingoBytecodeKind vm,
@@ -345,7 +345,8 @@ public static class WebLingoCommandLine
             ? WebLingoBytecodeFile.Write(Renamed(register, FromFolder), TextOf)
             : WebLingoBytecodeFile.Write(Renamed(stack!, FromFolder), TextOf);
 
-        var target = Path.ChangeExtension(path, BytecodeExtension);
+        var target = Path.ChangeExtension(path, vm == WebLingoBytecodeKind.Register
+            ? WebLingoBytecodeFile.RegisterExtension : WebLingoBytecodeFile.StackExtension);
         try
         {
             File.WriteAllBytes(target, bytes);
@@ -360,7 +361,7 @@ public static class WebLingoCommandLine
     }
 
     /// <summary>
-    /// <c>run</c> or <c>check</c> of a <c>.wlbc</c>: the file read and verified (section 5.3), its files named again from its
+    /// <c>run</c> or <c>check</c> of WLBC: the file read and verified (section 5.3), its files named again from its
     /// folder, the program's own as the file beside it, and, for <c>run</c>, the native modules it names loaded and it run on
     /// the VM it is for, a runtime error located from the file's source positions.
     /// </summary>
@@ -430,7 +431,7 @@ public static class WebLingoCommandLine
         WebLingoExecutionContext context) =>
         new WebLingoStackVirtualMachine { Loader = loader }.Execute(module, context);
 
-    /// <summary><c>disasm</c>: a <c>.wlbc</c>'s bytecode as text, the register VM's or the stack VM's.</summary>
+    /// <summary><c>disasm</c>: compiled bytecode as text, the register VM's or the stack VM's.</summary>
     private static int DisassembleFile(string path, TextWriter output, TextWriter error)
     {
         if (!TryRead(path, error, out var bytes, out var register, out var stack, out _)) return bytes is null ? FileUnreadable : CompilationFailed;
@@ -439,7 +440,7 @@ public static class WebLingoCommandLine
     }
 
     /// <summary>
-    /// A <c>.wlbc</c> read and verified, the module of the VM it is for; false, the reason written, and
+    /// A WLBC file read and verified, the module of the VM it is for; false, the reason written, and
     /// <paramref name="bytes"/> null if the file cannot be read.
     /// </summary>
     private static bool TryRead(string path, TextWriter error, out byte[]? bytes, out WebLingoCompiledModule? register,
@@ -457,13 +458,20 @@ public static class WebLingoCommandLine
             bytes = null;
             return false;
         }
-        string? why;
-        var read = WebLingoBytecodeFile.TryReadKind(bytes, out var kind, out why) && (kind == WebLingoBytecodeKind.Register
-            ? WebLingoBytecodeFile.TryReadRegister(bytes, out register, out positions, out why)
-            : WebLingoBytecodeFile.TryReadStack(bytes, out stack, out positions, out why));
-        if (!read) WebLingoConsoleText.WriteErrorLine(error, path, $"{WebLingoDiagnosticCodes.BytecodeVerificationFailure}: {why}");
-        return read;
+        if (WebLingoBytecodeFile.TryReadKind(bytes, out var kind, out var why))
+        {
+            if (WebLingoBytecodeFile.KindForExtension(Path.GetExtension(path)) is { } expected && kind != expected)
+                why = $"The file extension is for the {VmName(expected)} VM, but its header names the {VmName(kind)} VM.";
+            else if (kind == WebLingoBytecodeKind.Register
+                ? WebLingoBytecodeFile.TryReadRegister(bytes, out register, out positions, out why)
+                : WebLingoBytecodeFile.TryReadStack(bytes, out stack, out positions, out why))
+                return true;
+        }
+        WebLingoConsoleText.WriteErrorLine(error, path, $"{WebLingoDiagnosticCodes.BytecodeVerificationFailure}: {why}");
+        return false;
     }
+
+    private static string VmName(WebLingoBytecodeKind kind) => kind == WebLingoBytecodeKind.Register ? "register" : "stack";
 
     private static bool TryReadText(string path, TextWriter error, out string source)
     {

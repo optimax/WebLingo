@@ -8,7 +8,7 @@ namespace WebLingo.Conformance.Tests;
 /// given its input as piped text is given: <c>readLine()</c>, a task, and <c>readLineSync()</c>, each a line without its
 /// line break, <c>null</c> at the input's end; <c>prompt(text)</c>, writing the text, then reading; <c>readPassword()</c>,
 /// a line where the input is not a console's; the errors; and no console at all, an <c>IOError</c>. Each program runs as
-/// a script, on the register VM, and as a <c>.wlbc</c> for the stack VM, given the same input, which must give the same.
+/// a script, on the register VM, and as a <c>.wlbs</c> for the stack VM, given the same input, which must give the same.
 /// </summary>
 public sealed class ConsoleInputTests : IDisposable
 {
@@ -56,7 +56,7 @@ public sealed class ConsoleInputTests : IDisposable
 
     /// <summary>
     /// The program run as a script, given <paramref name="input"/> as its console's, on the register VM, then compiled for
-    /// the stack VM and run from its <c>.wlbc</c>, given it again: what both write, which must be the same, and their errors.
+    /// the stack VM and run from its <c>.wlbs</c>, given it again: what both write, which must be the same, and their errors.
     /// </summary>
     private (string Output, string Error) Run(string program, string input)
     {
@@ -64,7 +64,7 @@ public sealed class ConsoleInputTests : IDisposable
         File.WriteAllText(path, program);
         var register = Weblingo(["run", path], input);
         Assert.Equal(WebLingoCommandLine.Success, Weblingo(["compile", "--stack", path], "").Exit);
-        var stack = Weblingo(["run", Path.ChangeExtension(path, ".wlbc")], input);
+        var stack = Weblingo(["run", Path.ChangeExtension(path, ".wlbs")], input);
         Assert.Equal((register.Output, register.Error), (stack.Output, stack.Error));
         return (register.Output, register.Error);
     }

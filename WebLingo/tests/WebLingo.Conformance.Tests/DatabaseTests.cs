@@ -272,7 +272,7 @@ public sealed class DatabaseTests : IDisposable
         var (compiled, error) = (new StringWriter(), new StringWriter());
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", path], compiled, error));
         var output = new StringWriter();
-        var exit = WebLingoCommandLine.Run(["run", Path.ChangeExtension(path, ".wlbc")], output, error);
+        var exit = WebLingoCommandLine.Run(["run", Path.ChangeExtension(path, ".wlbs")], output, error);
         Assert.Equal((WebLingoCommandLine.Success, "[{\"Name\": \"Clownfish\"}]\n", ""), (exit, output.ToString(), error.ToString()));
     }
 
@@ -301,7 +301,7 @@ public sealed class DatabaseTests : IDisposable
         {
             var compile = WebLingoCommandLine.Run(["compile", "--stack", path], output, error);
             if (compile != WebLingoCommandLine.Success) return (compile, output.ToString(), error.ToString());
-            path = Path.ChangeExtension(path, ".wlbc");
+            path = Path.ChangeExtension(path, ".wlbs");
             output.GetStringBuilder().Clear();
         }
         var exit = WebLingoCommandLine.Run(["run", path], output, error);

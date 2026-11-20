@@ -4,7 +4,7 @@ namespace WebLingo.Conformance.Tests;
 
 /// <summary>
 /// <c>std:env</c> (specification, section 7.15) through <c>weblingo</c>, whose scripts read all of the machine's
-/// environment and set its variables, each program run as a script, on the register VM, and as a <c>.wlbc</c> compiled for
+/// environment and set its variables, each program run as a script, on the register VM, and as a <c>.wlbs</c> compiled for
 /// the stack VM, which must give the same: the machine's name, a variable, the map of them, a variable set and removed,
 /// and the errors. Each test's variables have names of their own, the process's environment being every test's.
 /// </summary>
@@ -74,7 +74,7 @@ public sealed class EnvironmentTests : IDisposable
     }
 
     /// <summary>
-    /// The program run as a script, on the register VM, then compiled for the stack VM and run from its <c>.wlbc</c>: what
+    /// The program run as a script, on the register VM, then compiled for the stack VM and run from its <c>.wlbs</c>: what
     /// both write, which must be the same, and their errors.
     /// </summary>
     private (string Output, string Error) Run(string program)
@@ -83,7 +83,7 @@ public sealed class EnvironmentTests : IDisposable
         File.WriteAllText(path, program);
         var register = Weblingo("run", path);
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", path).Exit);
-        var stack = Weblingo("run", Path.ChangeExtension(path, ".wlbc"));
+        var stack = Weblingo("run", Path.ChangeExtension(path, ".wlbs"));
         Assert.Equal((register.Output, register.Error), (stack.Output, stack.Error));
         return (register.Output, register.Error);
     }

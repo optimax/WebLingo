@@ -1167,12 +1167,12 @@ public sealed class ConformanceTests : IDisposable
         var (exit, _, error) = Weblingo("run", source);
         Assert.Equal((WebLingoCommandLine.RuntimeFailed, $"program.wlg(13,{column}): ERROR {code}:"), (exit, FirstLineStart(error)));
 
-        // On the stack VM, from a .wlbc, where the file's own positions locate it.
+        // On the stack VM, from a .wlbs, where the file's own positions locate it.
         var program = Path.Combine(_folder, "program.wlg");
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
         var stackError = new StringWriter();
         Assert.Equal(WebLingoCommandLine.RuntimeFailed,
-            WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], new StringWriter(), stackError));
+            WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbs")], new StringWriter(), stackError));
         Assert.Equal($"program.wlg(13,{column}): ERROR {code}:", FirstLineStart(stackError.ToString().Replace(program, "program.wlg", StringComparison.Ordinal)));
     }
 
@@ -1193,12 +1193,12 @@ public sealed class ConformanceTests : IDisposable
         var (exit, output, error) = Weblingo("run", source);
         Assert.Equal((WebLingoCommandLine.RuntimeFailed, "", expected), (exit, output, error.Split('\n')[0].TrimEnd('\r')));
 
-        // On the stack VM, from a .wlbc.
+        // On the stack VM, from a .wlbs.
         var program = Path.Combine(_folder, "program.wlg");
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
         var stackError = new StringWriter();
         Assert.Equal(WebLingoCommandLine.RuntimeFailed,
-            WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], new StringWriter(), stackError));
+            WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbs")], new StringWriter(), stackError));
         Assert.Equal(expected, stackError.ToString().Replace(program, "program.wlg", StringComparison.Ordinal).Split('\n')[0].TrimEnd('\r'));
     }
 
@@ -1216,11 +1216,11 @@ public sealed class ConformanceTests : IDisposable
     {
         Assert.Equal((WebLingoCommandLine.Success, printed + "\n", ""), Weblingo("run", source));
 
-        // On the stack VM, from a .wlbc.
+        // On the stack VM, from a .wlbs.
         var program = Path.Combine(_folder, "program.wlg");
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
         var output = new StringWriter();
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], output, new StringWriter()));
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbs")], output, new StringWriter()));
         Assert.Equal(printed + "\n", output.ToString());
     }
 
@@ -1248,11 +1248,11 @@ public sealed class ConformanceTests : IDisposable
     {
         Assert.Equal((WebLingoCommandLine.Success, printed + "\n", ""), Weblingo("run", source));
 
-        // On the stack VM, from a .wlbc.
+        // On the stack VM, from a .wlbs.
         var program = Path.Combine(_folder, "program.wlg");
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
         var output = new StringWriter();
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], output, new StringWriter()));
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbs")], output, new StringWriter()));
         Assert.Equal(printed + "\n", output.ToString());
     }
 
@@ -1494,7 +1494,7 @@ public sealed class ConformanceTests : IDisposable
         var program = Path.Combine(_folder, "program.wlg");
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
         var output = new StringWriter();
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbc")], output, new StringWriter()));
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbs")], output, new StringWriter()));
         Assert.Equal("[\"WL3011\", 2, [2, 4]]\n", output.ToString());
     }
 

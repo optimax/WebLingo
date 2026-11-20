@@ -126,7 +126,7 @@ A site is a folder, its *root*, and everything in it. A request's path finds the
 Some files are never sent, whatever their path:
 
 - a page's source, and a module's, a `.wlg` that exports no handler (`/lib/catalog.wlg` is a 404);
-- compiled WebLingo, `.wlbc` files;
+- compiled WebLingo (`.wlbr`, `.wlbs` and legacy `.wlbc` files);
 - the site's configuration, `wasp.config`, and IIS's, `web.config`;
 - a page or a route handler whose name holds `\`, `:` or a control character, which a file's name on Windows cannot have, and whose includes and imports could not be found;
 - every file and folder whose name starts with `.`, such as `.git`.

@@ -4,7 +4,7 @@ namespace WebLingo.Conformance.Tests;
 
 /// <summary>
 /// <c>windows:com</c>, COM's objects on Windows (specification, section 3.10; section 9, M0.17), through <c>weblingo</c>, each
-/// program run as a script, on the register VM, and as a <c>.wlbc</c> compiled for the stack VM, which must give the same,
+/// program run as a script, on the register VM, and as a <c>.wlbs</c> compiled for the stack VM, which must give the same,
 /// on a single-threaded apartment's thread, as a Windows host's worker is. Its objects are Windows's own, which every
 /// Windows has: <c>Scripting.Dictionary</c> and ADO's <c>Recordset</c>, in memory. Skipped elsewhere.
 /// </summary>
@@ -170,7 +170,7 @@ public sealed class ComTests : IDisposable
     }
 
     /// <summary>
-    /// The program run as a script, on the register VM, then compiled for the stack VM and run from its <c>.wlbc</c>, each on
+    /// The program run as a script, on the register VM, then compiled for the stack VM and run from its <c>.wlbs</c>, each on
     /// a single-threaded apartment's thread: what both write, which must be the same, and the first's errors.
     /// </summary>
     private (string Output, string Error) Run(string program)
@@ -179,7 +179,7 @@ public sealed class ComTests : IDisposable
         File.WriteAllText(path, program);
         var register = OnApartment(() => Weblingo("run", path));
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", path).Exit);
-        var stack = OnApartment(() => Weblingo("run", Path.ChangeExtension(path, ".wlbc")));
+        var stack = OnApartment(() => Weblingo("run", Path.ChangeExtension(path, ".wlbs")));
         Assert.Equal((register.Output, register.Error.Replace("program.wlg", "program", StringComparison.Ordinal)),
             (stack.Output, stack.Error.Replace("program.wlg", "program", StringComparison.Ordinal)));
         return (register.Output, register.Error);

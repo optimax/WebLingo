@@ -61,11 +61,11 @@ weblingo hello.wlg
 | Command | What it does |
 |---|---|
 | `weblingo run <file.wlg> [name=value …]` | compiles the script and runs it, giving its parameters the values after it |
-| `weblingo <file.wlg> [name=value …]` | the same, the file named first, as a scripting language's runner takes it; a `.wlbc` too |
+| `weblingo <file.wlg> [name=value …]` | the same, the file named first, as a scripting language's runner takes it; a bytecode file works too |
 | `weblingo check <file.wlg>` | compiles the script and reports its errors, without running it |
-| `weblingo compile [--register \| --stack] <file.wlg>` | compiles the script into bytecode, a `.wlbc` file beside it |
-| `weblingo run <file.wlbc>` | runs compiled bytecode without compiling anything |
-| `weblingo disasm <file.wlbc>` | shows compiled bytecode as text |
+| `weblingo compile [--register \| --stack] <file.wlg>` | compiles the script into `.wlbr` (register) or `.wlbs` (stack) beside it |
+| `weblingo run <bytecode-file>` | runs compiled bytecode without compiling anything |
+| `weblingo disasm <bytecode-file>` | shows compiled bytecode as text |
 | `weblingo --version` | its version, `WebLingo 0.20.0-pre-alpha`, which `weblingo` alone prints first, before how it is used |
 
 On Windows, `weblingo` started in a console window of its own, as Explorer starts it for a script double-clicked
@@ -73,7 +73,7 @@ On Windows, `weblingo` started in a console window of its own, as Explorer start
 it wrote stays to be read; started from a console already open, it does not.
 
 `weblingo run` of a `.wlg` compiles it in memory, and writes no file; `weblingo compile` writes one, for the register VM
-by default, or for the stack VM with `--stack`. `weblingo disasm hello.wlbc` shows what the compiler made:
+by default (`.wlbr`), or for the stack VM with `--stack` (`.wlbs`). The header must agree with the extension. A legacy `.wlbc` file selects its VM from its header. `weblingo disasm hello.wlbr` shows what the compiler made.
 
 ```text
 function main (0 locals, 1 registers)
@@ -2191,7 +2191,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL3019 | an environment variable a site's script, under `wasp`, tries to set |
 | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run |
 | **WL4xxx** | **bytecode** |
-| WL4001 | bytecode that fails verification, such as a damaged `.wlbc` |
+| WL4001 | bytecode that fails verification, such as a damaged file or a VM mismatch |
 | WL4002 | a program too large for the bytecode |
 | **WL5xxx** | **templates (WASP)** |
 | WL5001 | a `<%` without its `%>` |

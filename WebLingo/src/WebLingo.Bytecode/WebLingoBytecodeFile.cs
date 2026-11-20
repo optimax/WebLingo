@@ -14,6 +14,20 @@ public static class WebLingoBytecodeFile
 {
     public const int MajorVersion = 0;
     public const int MinorVersion = 1;
+    public const string RegisterExtension = ".wlbr";
+    public const string StackExtension = ".wlbs";
+    public const string LegacyExtension = ".wlbc";
+
+    /// <summary>The VM named by a filename extension, if it names one. The file's header must still be checked.</summary>
+    public static WebLingoBytecodeKind? KindForExtension(string extension)
+    {
+        if (extension.Equals(RegisterExtension, StringComparison.OrdinalIgnoreCase)) return WebLingoBytecodeKind.Register;
+        if (extension.Equals(StackExtension, StringComparison.OrdinalIgnoreCase)) return WebLingoBytecodeKind.Stack;
+        return null;
+    }
+
+    public static bool IsBytecodeExtension(string extension) =>
+        KindForExtension(extension).HasValue || extension.Equals(LegacyExtension, StringComparison.OrdinalIgnoreCase);
 
     private const int HeaderSize = 32;
     private const int EntrySize = 32;

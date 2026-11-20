@@ -1,3 +1,4 @@
+using WebLingo.Bytecode;
 using WebLingo.Platform.Abstractions;
 namespace WebLingo.Hosting;
 
@@ -12,7 +13,7 @@ public sealed record WebLingoRoute(WebLingoRouteKind Kind, string File);
 /// root: a page or a <c>.wlg</c> by its path without its extension, <c>/products</c> for <c>products.wasp</c>, a folder's
 /// <c>index</c> by the folder's path, <c>/</c> and <c>/docs/</c> (and <c>/docs</c>, when nothing else is that), and any
 /// other file by its own path. A path is compared as it is, its case included, on every platform. Never routed: files
-/// and folders whose names start with <c>.</c>, <c>.wlbc</c> files, and, in the root, whatever their names' case, since
+/// and folders whose names start with <c>.</c>, WLBC files, and, in the root, whatever their names' case, since
 /// Windows finds them so, the site's configuration (<c>wasp.config</c>), a script's (<c>weblingo.config</c>), and IIS's
 /// <c>web.config</c>; nor, as files served as they are, a page or a <c>.wlg</c> by its own name.
 /// </summary>
@@ -86,7 +87,7 @@ public sealed class WebLingoRouteTable
             if (folder.Length == 0 && IsUnrouted(name)) continue;
             var dot = name.LastIndexOf('.');
             var extension = dot > 0 ? name[dot..] : "";
-            if (extension == ".wlbc") continue;
+            if (WebLingoBytecodeFile.IsBytecodeExtension(extension)) continue;
             if (extension is not (".wasp" or ".wlg"))
             {
                 // A page or a handler of the same path is the route, whichever is listed first.
