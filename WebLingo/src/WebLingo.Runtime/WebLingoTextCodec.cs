@@ -5,7 +5,7 @@ public enum WebLingoCharset { Utf8, Utf16LittleEndian, Utf16BigEndian, Ascii, La
 
 /// <summary>
 /// The text encodings the portable core reads and writes itself, rather than with .NET's <c>System.Text.Encoding</c>,
-/// which is adapter-only (<c>Documents/NativeCompatibility.md</c>): UTF-8, UTF-16, little-endian or big-endian, US-ASCII
+/// which is adapter-only (<c>Documents/native-compatibility.md</c>): UTF-8, UTF-16, little-endian or big-endian, US-ASCII
 /// and ISO-8859-1. A charset is found by the names the web gives it, without regard to case: <c>utf-8</c> and
 /// <c>utf8</c>; <c>utf-16</c>, <c>utf-16le</c> and <c>utf16</c>; <c>utf-16be</c>; <c>us-ascii</c> and <c>ascii</c>;
 /// <c>iso-8859-1</c>, <c>latin1</c> and <c>l1</c>. Decoding never fails: what is no character, a byte that UTF-8 or
