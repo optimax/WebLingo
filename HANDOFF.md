@@ -1,4 +1,16 @@
-# Windows local installation
+# WebLingo debugger
+
+Named imports in the Variables view resolve through the same module exports that the script reads.
+The in-memory debug metadata is in `WebLingo/src/WebLingo.Bytecode/WebLingoFunctionDebugInfo.cs`, produced by
+`WebLingo/src/WebLingo.Compiler/WebLingoLowerer.cs` and read by `WebLingo/src/WebLingo.VM/WebLingoVirtualMachine.cs`.
+`WebLingo/tests/WebLingo.Conformance.Tests/DebugAdapterTests.cs` covers imported classes, functions, mutable exports,
+null exports, and a standard module's built-in function. `Documents/implementation.md` records how inspection works.
+
+The Windows Release solution built with zero warnings and zero errors. All three debugger protocol tests passed.
+The installed debugger stopped on line 10 of `Examples.wlg/16-modules.wlg` and reported `Tea` as `class Tea`
+(type `Class`) and `serve` as `function` (type `Function`). The example continued to completion.
+
+## Windows local installation
 
 The repository-root `build.bat` publishes WebLingo and WASP together and updates the local installation.
 The publish runs with the caller's permissions. The installer requests administrator access when needed.

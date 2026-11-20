@@ -8,4 +8,8 @@ public sealed record WebLingoFunctionDebugInfo(
     IReadOnlyList<WebLingoDebugLocal> Locals,
     IReadOnlyList<string> Captures);
 
-public readonly record struct WebLingoDebugLocal(string Name, int Register, int VisibleFrom, int VisibleUntil);
+public readonly record struct WebLingoDebugLocal(string Name, int Register, int VisibleFrom, int VisibleUntil)
+{
+    /// <summary>For a named import, the export to read from the module in <see cref="Register"/>.</summary>
+    public string? ExportName { get; init; }
+}

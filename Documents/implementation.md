@@ -358,6 +358,12 @@ A class's `toString()` is the program's own method, and may give anything. Whate
 
 A program may give a class its `toString()` at any time, by `setMethod` as by a declaration or an `extend`, so nothing that writes may decide from the source alone that no `toString()` will run. The VMs build a value's text with the text builder once the heap says a class has been given one (`WebLingoHeap.ToStringGiven`, set by `TrySetMethod`, never unset, `Object`'s own aside), and leave it to the formatter until then. Until 18 November 2026 each VM decided it when it began, from the classes declared in the source, so that `write`, `writeLn` and `<%= %>` ignored a `toString()` given by `setMethod`, or to a class `new Class` made, unless a class declared in the source had one, while an interpolation, which always builds its text, called it (`ConformanceTests.AToStringGivenWhileTheProgramRunsIsCalledByWrite`).
 
+### Inspecting named imports in the debugger
+
+A named import reads the export from its module each time the script uses the name (specification, section 3.9).
+Its own local slot is unused. Debug metadata records the module's register and the export name so the VM can inspect
+the current binding, including when a closure captures the module register in a cell.
+
 ### Warnings Are Errors
 
 `TreatWarningsAsErrors` is on for every project, so a nullable or analyzer warning fails the build, locally and in CI.

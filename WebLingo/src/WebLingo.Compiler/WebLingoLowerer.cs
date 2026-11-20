@@ -125,7 +125,9 @@ public sealed class WebLingoLowerer
         var visible = new List<WebLingoDebugLocal>();
         foreach (var local in locals)
         {
-            if (local.DebugVisibility is { } range) visible.Add(new(local.Name, local.Index, range.From, range.Until));
+            if (local.DebugVisibility is not { } range) continue;
+            var register = (local.ImportOf ?? local).Index;
+            visible.Add(new(local.Name, register, range.From, range.Until) { ExportName = local.ImportName });
         }
         return visible;
     }

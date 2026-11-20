@@ -1388,11 +1388,24 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             foreach (var local in info.Locals)
             {
                 if (offset >= local.VisibleFrom && offset < local.VisibleUntil && (uint)local.Register < (uint)frame.Function.LocalCount)
-                    visible[local.Name] = frame.Registers[local.Register];
+                    visible[local.Name] = DebugLocalValue(frame.Registers[local.Register], local.ExportName);
             }
             var variables = new List<WebLingoDebugVariable>();
             foreach (var (name, value) in visible) variables.Add(DescribeVariable(name, value, expand: true));
             return variables;
+        }
+
+        private WebLingoValue DebugLocalValue(WebLingoValue value, string? exportName)
+        {
+            if (exportName is null) return value;
+            // A function using this import captures the module in a cell. Inspect the live export without running script code.
+            if (value.Kind == WebLingoValueKind.Cell)
+            {
+                if (!heap.TryReadCell(value, out var module)) return value;
+                value = module;
+            }
+            return value.Kind == WebLingoValueKind.Module && heap.TryGetExport(value, exportName, out var export)
+                ? export : WebLingoValue.Missing;
         }
 
         private WebLingoDebugVariable DescribeVariable(string name, WebLingoValue value, bool expand)

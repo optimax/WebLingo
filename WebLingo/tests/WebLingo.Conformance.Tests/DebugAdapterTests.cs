@@ -53,6 +53,7 @@ public sealed class DebugAdapterTests : IDisposable
         AssertFrame(frames[0], "main", program, 4);
         var local = await dap.Locals(frames[0]);
         Assert.Equal("2", local["count"]);
+        Assert.Equal("function", local["twice"]);
         Assert.Equal("\"ś\"", local["label"]);
         Assert.DoesNotContain("result", local.Keys);
         await dap.Request("stepIn", new { threadId = 1 });
@@ -117,6 +118,52 @@ public sealed class DebugAdapterTests : IDisposable
         await dap.Request("terminate");
         Assert.Equal(0, (await dap.Event("exited")).GetProperty("exitCode").GetInt32());
         await dap.Event("terminated");
+        await dap.Request("disconnect");
+    }
+
+    [Fact]
+    public async Task NamedImportsShowTheirLiveExports()
+    {
+        Write("teas.wlg", """
+            export class Tea {}
+            export var served = 0;
+            export var optional = null;
+            export function serve() { served += 1; }
+            """);
+        var program = Write("example.wlg", """
+            import { Tea, serve, served, optional } from "./teas.wlg";
+            import { writeLn } from "std:system";
+            function pour() { serve(); }
+            var sencha = new Tea();
+            pour();
+            writeLn(served);
+            """);
+
+        await using var dap = new Session();
+        await dap.Start(program);
+        await dap.Request("setBreakpoints", new
+        {
+            source = new { path = program },
+            breakpoints = new[] { new { line = 5 }, new { line = 6 } }
+        });
+        await dap.Request("configurationDone");
+        await dap.Event("stopped");
+        var frame = (await dap.Frames())[0];
+        AssertFrame(frame, "main", program, 5);
+        var locals = await dap.Locals(frame);
+        Assert.Equal("class Tea", locals["Tea"]);
+        Assert.Equal("function", locals["serve"]);
+        Assert.Equal("0", locals["served"]);
+        Assert.Equal("null", locals["optional"]);
+        Assert.Equal("function", locals["writeLn"]);
+
+        await dap.Request("continue", new { threadId = 1 });
+        await dap.Event("stopped");
+        frame = (await dap.Frames())[0];
+        AssertFrame(frame, "main", program, 6);
+        Assert.Equal("1", (await dap.Locals(frame))["served"]);
+        await dap.Request("continue", new { threadId = 1 });
+        Assert.Equal(0, (await dap.Event("exited")).GetProperty("exitCode").GetInt32());
         await dap.Request("disconnect");
     }
 
