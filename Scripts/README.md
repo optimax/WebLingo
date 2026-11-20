@@ -10,6 +10,7 @@ they copy through `std:fs`, without COM.
 
 | Script | What it does |
 |---|---|
+| `setup.wlg` | Runs in the user's account from the ZIP's **Install WebLingo.bat**. Elevates `install.wlg` for the runtime and PATH and offers the file association and VS Code extension to the original user. |
 | `install.wlg` | Installs WebLingo from its installer's zip, which holds it beside the folder it installs, `WebLingo`: copies that folder into WebLingo's folder for the zip's architecture, `C:\Program Files\WebLingo`, or `C:\Program Files (x86)\WebLingo` for x86 on 64-bit Windows, and puts it on the machine's `PATH` (`../Installers/Windows/readme.md`) |
 | `iis-install.wlg` | Makes this machine's IIS run WASP's sites, from WASP's installer's zip: turns IIS on, unless it is; installs the ASP.NET Core Module, unless IIS has it, from Microsoft's Hosting Bundle, checked against the SHA-512 Microsoft's release metadata gives; and copies `wasp`, the zip's folder `WASP`, into WebLingo's folder for the zip's architecture, once the WebLingo there is found to be the one it was made with (`../Installers/Windows/wasp-readme.md`) |
 | `add-wlg-file-type.wlg` | Makes Explorer run a `.wlg` file when it is double-clicked, for this Windows account, `weblingo script.wlg`, whose window waits for a key at the end, with **Edit** in its right-click menu opening Notepad, and WebLingo named in Windows's "open with" choice; no administrator needed; `remove=yes` undoes it |
@@ -19,10 +20,9 @@ they copy through `std:fs`, without COM.
 | `add-sql-server-login.wlg` | Gives a site's application pool its database on SQL Server: a login for the pool's account, and a user of the database that reads and changes its rows |
 | `windows.wlg`, `iis.wlg` | What the scripts share: running a program, the processes running, a folder copied, the machine's `PATH`, a certificate made and trusted; and IIS's configuration, its modules, its pools, and the installation copied into with the sites that run it stopped |
 
-Each changes the machine, and so runs as administrator, in a console run as administrator, from this folder; run
-otherwise, it stops before changing anything, but for `add-sql-server-login.wlg`, which changes a SQL Server, and runs
-as one of its administrators, and `add-wlg-file-type.wlg`, which changes only the account's own file types, and runs as
-that account. Each may be run again: it keeps what is there, and adds what is missing.
+Double-click the ZIP's launcher in your usual account to run `setup.wlg`. To run a machine script directly, use an
+administrator console in this folder. `add-sql-server-login.wlg` needs a SQL Server administrator, and
+`add-wlg-file-type.wlg` runs as the account whose file association it registers.
 
 When registering `.wlg`, `add-wlg-file-type.wlg` also removes WebLingo's old per-account registration for `.wl`.
 Other apps' registrations and the app explicitly chosen in Windows for `.wl` are preserved.

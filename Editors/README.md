@@ -46,7 +46,11 @@ They were tried with Notepad++ 8.9.8, on Windows.
 `.wasp` files, each with its TextMate grammar (`weblingo.tmLanguage.json` and `wasp.tmLanguage.json`) and its language
 configuration (comments, brackets, and the pairs VS Code closes as you type).
 
-To install it, in VS Code, open the Command Palette (**Ctrl+Shift+P**), run **Developer: Install Extension from
+On Windows, use **Install WebLingo.bat** in the extracted WebLingo ZIP and choose to enable debugging in VS Code.
+For an existing WebLingo installation made from that ZIP, you can also choose **Extensions → … → Install from VSIX…**
+and select `VSCode\WebLingo.vsix` in WebLingo's installation folder.
+
+To work on the extension from source, in VS Code, open the Command Palette (**Ctrl+Shift+P**), run **Developer: Install Extension from
 Location…**, and choose the `VSCode` folder. VS Code uses the folder where it is, so keep it there; a change to it, a
 `git pull` for one, is used once VS Code reloads its window. To remove it, uninstall **WebLingo** in the Extensions view.
 

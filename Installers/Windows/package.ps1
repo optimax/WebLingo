@@ -5,7 +5,8 @@
 #   WASP-<version>-win-<architecture>-self-contained.zip and WASP-<version>-win-<architecture>-framework-dependent.zip,
 #   for a machine with WebLingo installed from the zip of the same version, architecture and kind, made by the same run
 #   of this script.
-# WebLingo's hold the folder WebLingo, weblingo and the standard modules, which install.wlg installs in WebLingo's
+# WebLingo's include Install WebLingo.bat and setup.wlg for interactive setup. Their WebLingo folder holds weblingo,
+# the standard modules and VSCode/WebLingo.vsix, which install.wlg installs together in WebLingo's
 # folder, C:\Program Files\WebLingo, or for x86 on 64-bit Windows C:\Program Files (x86)\WebLingo, and puts on the
 # machine's PATH; WASP's the folder WASP, what wasp adds to them, which iis-install.wlg installs there, once IIS has what
 # it needs to run wasp, with wasp-needs.json, the SHA-256 of each file of WebLingo's that wasp needs, as this run made
@@ -48,8 +49,7 @@ function Get-Hashes([string] $folder) {
 
 # The folder's files zipped, not the folder, so that Explorer's Extract All makes one folder, not two; each entry named
 # with forward slashes, as the zip format has them, which Windows PowerShell's ZipFile.CreateFromDirectory does not.
-function New-Zip([string] $folder, [string] $name) {
-    $zip = Join-Path $Destination "$name.zip"
+function New-Zip([string] $folder, [string] $zip) {
     if (Test-Path $zip) { Remove-Item $zip }
     $archive = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
     try {
@@ -65,7 +65,50 @@ function New-Zip([string] $folder, [string] $name) {
     Write-Host ("Made {0}, {1:N1} MB" -f $zip, ((Get-Item $zip).Length / 1MB))
 }
 
+function New-VSCodePackage {
+    $source = Join-Path $repository 'Editors/VSCode'
+    $manifest = Get-Content -Raw -LiteralPath (Join-Path $source 'package.json') | ConvertFrom-Json
+    $folder = Join-Path $staging 'vsix'
+    $payload = New-Item -ItemType Directory -Path (Join-Path $folder 'extension') -Force
+    $assets = @('package.json', $manifest.main) + @($manifest.contributes.languages.configuration) +
+        @($manifest.contributes.grammars.path)
+    foreach ($asset in $assets | Sort-Object -Unique) {
+        $target = Join-Path $payload.FullName $asset
+        New-Item -ItemType Directory -Path (Split-Path $target) -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $source $asset) -Destination $target
+    }
+    # The VSIX identity and compatibility range follow the extension's own manifest.
+    $xml = [xml]@'
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
+  <Metadata>
+    <Identity Language="en-US"/><DisplayName/><Description xml:space="preserve"/>
+    <Properties><Property Id="Microsoft.VisualStudio.Code.Engine"/></Properties>
+  </Metadata>
+  <Installation><InstallationTarget Id="Microsoft.VisualStudio.Code"/></Installation>
+  <Dependencies/>
+  <Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true"/></Assets>
+</PackageManifest>
+'@
+    $metadata = $xml.PackageManifest.Metadata
+    $metadata.Identity.SetAttribute('Id', $manifest.name)
+    $metadata.Identity.SetAttribute('Publisher', $manifest.publisher)
+    $metadata.Identity.SetAttribute('Version', $manifest.version)
+    $metadata.DisplayName = $manifest.displayName
+    $metadata.Description.InnerText = $manifest.description
+    $metadata.Properties.Property.SetAttribute('Value', $manifest.engines.vscode)
+    $xml.Save((Join-Path $folder 'extension.vsixmanifest'))
+    @'
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="vsixmanifest" ContentType="text/xml"/>
+  <Default Extension="json" ContentType="application/json"/>
+  <Default Extension="js" ContentType="application/javascript"/>
+</Types>
+'@ | Set-Content -LiteralPath (Join-Path $folder '[Content_Types].xml') -Encoding UTF8
+    New-Zip $folder (Join-Path $staging 'WebLingo.vsix')
+}
+
 try {
+    New-VSCodePackage
     foreach ($architecture in 'x64', 'x86', 'arm64') {
         foreach ($kind in 'self-contained', 'framework-dependent') {
             # WebLingo's: weblingo, the standard modules, and the scripts that install them.
@@ -73,11 +116,14 @@ try {
             $root = Join-Path $staging $name
             $runtime = Join-Path $root 'WebLingo'
             Publish-Project 'src/WebLingo.Cli/WebLingo.Cli.csproj' $architecture $kind $runtime
-            foreach ($script in 'install.wlg', 'add-wlg-file-type.wlg', 'windows.wlg', 'weblingo.config') {
+            $editor = New-Item -ItemType Directory -Path (Join-Path $runtime 'VSCode') -Force
+            Copy-Item -LiteralPath (Join-Path $staging 'WebLingo.vsix') -Destination $editor.FullName
+            foreach ($script in 'setup.wlg', 'install.wlg', 'add-wlg-file-type.wlg', 'windows.wlg', 'weblingo.config') {
                 Copy-Item (Join-Path $repository "Scripts/$script") $root
             }
+            Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Install WebLingo.bat') -Destination $root
             Copy-Item (Join-Path $PSScriptRoot 'readme.md') $root
-            New-Zip $root $name
+            New-Zip $root (Join-Path $Destination "$name.zip")
 
             # WASP's: what wasp's own publish has that WebLingo's has not, or has otherwise, such as ASP.NET Core's
             # libraries, newer than the packages weblingo takes; and the hashes of the files of WebLingo's it shares.
@@ -102,7 +148,7 @@ try {
                 Copy-Item (Join-Path $repository "Scripts/$script") $waspRoot
             }
             Copy-Item (Join-Path $PSScriptRoot 'wasp-readme.md') (Join-Path $waspRoot 'readme.md')
-            New-Zip $waspRoot $waspName
+            New-Zip $waspRoot (Join-Path $Destination "$waspName.zip")
         }
     }
 }

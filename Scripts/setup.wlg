@@ -1,0 +1,97 @@
+// Run by Install WebLingo.bat from the extracted ZIP, in the account that opened it.
+import fs from "std:fs";
+import process from "std:process";
+import { Environment } from "std:env";
+import { architectureOf, expand, programFiles, run } from "./windows.wlg";
+
+async function choose(question) {
+    while (true) {
+        var answer = await prompt($"{question} [Y/n/q to cancel] ");
+        if (answer == null) return null;
+        var choice = answer.trim().toLower();
+        if (choice == "" || choice == "y" || choice == "yes") return true;
+        if (choice == "n" || choice == "no") return false;
+        if (choice == "q") return null;
+        writeLn("Enter Y, N or Q.");
+    }
+}
+
+// VS Code's installer can leave its bin folder off PATH. Also support a custom installation on PATH.
+async function findCode() {
+    var folders = [
+        expand("%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\bin"),
+        $"{programFiles("x64")}\\Microsoft VS Code\\bin",
+        $"{programFiles("x86")}\\Microsoft VS Code\\bin"
+    ];
+    foreach (var folder in expand("%PATH%").split(";")) {
+        if (folder.trim() != "") folders.push(folder.trim().replace("\"", ""));
+    }
+    foreach (var folder in folders) {
+        var cli = $"{folder}\\code.cmd";
+        if (await fs.exists(cli)) return cli;
+    }
+    return null;
+}
+
+async function runSetupProgram(executable, args) {
+    var result = await process.run(executable, args, {"timeoutMs": 1800000});
+    write(result["stdout"]);
+    write(result["stderr"]);
+    if (result["exitCode"] != 0) throw new Error($"Setup step failed (exit code {result["exitCode"]}).");
+}
+
+async function installRuntime() {
+    // Only the bundled machine installer crosses UAC. Pass paths as data through Start-Process.
+    var powershell = expand("%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+    var elevate = "$ErrorActionPreference = 'Stop'; "
+        + "$root = (Get-Location).ProviderPath; "
+        + "$exe = Join-Path $root 'WebLingo\\weblingo.exe'; "
+        + "try { $p = Start-Process -FilePath $exe -WorkingDirectory $root "
+        + "-ArgumentList 'run install.wlg' -Verb RunAs -Wait -PassThru; exit $p.ExitCode } "
+        + "catch { Write-Output $_.Exception.Message; exit 1 }";
+    writeLn("Approve the Windows administrator prompt. When the installer finishes, close its window by pressing a key.");
+    await runSetupProgram(powershell, ["-NoProfile", "-NonInteractive", "-Command", elevate]);
+}
+
+async function installExtension(code, extension) {
+    // Expand both paths once inside quotes in cmd. The .cmd CLI runs as the original user.
+    Environment.setVariable("WebLingoSetupCode", code);
+    Environment.setVariable("WebLingoSetupVsix", extension);
+    var result = await run("\"%WebLingoSetupCode%\" --install-extension \"%WebLingoSetupVsix%\" --force");
+    write(result.output);
+    if (result.code != 0) {
+        throw new Error($"VS Code installation failed. In VS Code, choose Install from VSIX and select {extension}.");
+    }
+    writeLn("Reopen VS Code, open a .wlg file in a trusted folder, and press F5 to debug.");
+}
+
+async function setup() {
+    var installed = $"{programFiles(await architectureOf("WebLingo", "weblingo"))}\\WebLingo";
+    var extension = $"{installed}\\VSCode\\WebLingo.vsix";
+    writeLn($"Install WebLingo in {installed} and add it to the machine PATH.");
+    var registerFiles = await choose("Run .wlg files with WebLingo when you double-click them?");
+    if (registerFiles == null) return false;
+    var code = await findCode();
+    var installDebugger = false;
+    if (code != null) {
+        installDebugger = await choose("Enable WebLingo debugging in VS Code for your account?");
+        if (installDebugger == null) return false;
+    } else {
+        writeLn("VS Code was not found. You can add the extension after installing VS Code.");
+    }
+
+    await installRuntime();
+    writeLn($"WebLingo is installed in {installed}.");
+    if (registerFiles) {
+        await runSetupProgram("WebLingo\\weblingo.exe", ["run", "add-wlg-file-type.wlg", $"folder={installed}"]);
+        writeLn("If Windows asks how to open a .wlg file, choose WebLingo and Always.");
+    }
+    if (installDebugger) {
+        await installExtension(code, extension);
+    } else {
+        writeLn($"To add the debugger later, use Install from VSIX in VS Code and choose {extension}.");
+    }
+    return true;
+}
+
+writeLn((await setup()) ? "Setup complete." : "Setup canceled.");

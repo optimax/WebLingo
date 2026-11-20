@@ -1,8 +1,8 @@
 # WebLingo for Windows
 
 WebLingo is a scripting language. This zip holds `weblingo`, which runs WebLingo's scripts, `.wlg` files, and its
-standard modules, and `install.wlg`, a script that installs them for the whole machine, in WebLingo's folder,
-`C:\Program Files\WebLingo`, and puts that folder on the machine's `PATH`.
+standard modules. **Install WebLingo.bat** installs the runtime for the whole machine and offers file associations
+and the VS Code debugger for your Windows account.
 
 It comes in six zips, named for the processors they run on and for whether they carry .NET:
 
@@ -21,26 +21,19 @@ It comes in six zips, named for the processors they run on and for whether they 
 1. If the zip was downloaded, unblock it first, so that Windows does not mark every file in it as from the internet:
    right-click it, **Properties**, tick **Unblock**, **OK**.
 2. Unzip it anywhere: right-click it, **Extract All…**, **Extract**.
-3. Open a console as administrator: press the Windows key, type `cmd`, then choose **Run as administrator**.
-4. In that console, go to the unzipped folder, the one that holds this `readme.md`, and run the installer with the
-   `weblingo` the zip holds:
+3. In the extracted folder, double-click **Install WebLingo.bat** from your usual Windows account.
+4. Press **Enter** to enable running a `.wlg` file by double-clicking it. If setup finds VS Code, press **Enter** to
+   enable debugging there too. Answer **N** to skip either choice or **Q** to cancel before installation.
+5. Approve the Windows administrator prompt. The machine installer copies WebLingo and adds it to PATH. Once it
+   finishes, setup applies the choices to the account that started it.
 
-   ```bat
-   cd /d "%USERPROFILE%\Downloads\WebLingo-0.20.0-pre-alpha-win-x64-self-contained"
-   WebLingo\weblingo.exe run install.wlg
-   ```
+Once setup reports **Setup complete**, you can delete the extracted folder. To debug, reopen VS Code, open a trusted
+folder containing your script, open the `.wlg` file, and press **F5**. Choose **WebLingo** if asked for a debugger.
+If you install VS Code later, open its Extensions view, choose **… → Install from VSIX…**, and select
+`VSCode\WebLingo.vsix` in the installed WebLingo folder.
 
-   with the folder's own name, which is the zip's. It writes where it installed WebLingo, and that it added the folder
-   to the `PATH`.
-5. Open a new console, not as administrator, and check that it runs:
-
-   ```bat
-   weblingo --version
-   ```
-
-The unzipped folder may then be deleted, once `add-wlg-file-type.wlg`, below, has run, if you want it. `weblingo
-script.wlg` runs a script, as `weblingo run script.wlg` does, and `weblingo check script.wlg` reports its errors without
-running it. WebLingo is not signed yet: Windows may warn that `weblingo.exe` comes from an
+From a new console, `weblingo --version` shows the installed version, `weblingo script.wlg` runs a script,
+and `weblingo check script.wlg` checks it. Windows may warn that the unsigned `weblingo.exe` comes from an
 unknown publisher (**More info**, then **Run anyway**), and Smart App Control, where it is on, blocks it.
 
 To serve WASP's sites, WebLingo's web pages, on IIS, install WASP's zip of the same version, processor and kind after
@@ -48,7 +41,7 @@ this one, as its `readme.md` says.
 
 ## Running a script by a double-click
 
-Once WebLingo is installed, `add-wlg-file-type.wlg`, beside this `readme.md`, makes Explorer run a `.wlg` file when it is
+Setup offers this registration. To add it manually later, `add-wlg-file-type.wlg` makes Explorer run a `.wlg` file when it is
 double-clicked, for your Windows account, in a console that waits for a key once the script has ended, so that what it
 wrote stays to be read; **Edit** on its right-click menu opens it in Notepad. It needs no administrator. In a console in
 this folder:
@@ -65,9 +58,9 @@ included: run only those you trust.
 
 ## Updating
 
-Run a newer zip's `install.wlg` the same way: it copies its files over the old ones, then WASP's, where it is
-installed. A program running from WebLingo's folder, an IIS site's `wasp` among them, keeps its files in use: stop it
-first, or the installer says which programs to stop.
+Extract the newer ZIP and double-click **Install WebLingo.bat** again. Select the VS Code option to update your
+extension too. Close programs running from the installed WebLingo folder first, including running debugger sessions.
+If WASP is installed, stop the sites using it and follow the matching WASP ZIP's instructions after updating WebLingo.
 
 ## What `install.wlg` does
 
@@ -79,6 +72,9 @@ beside it, is what it shares with WebLingo's other setup scripts, and `weblingo.
 may use, through `windows:com`.
 
 ## Removing it
+
+If you enabled the debugger, uninstall **WebLingo** from VS Code's Extensions view. To remove the file association,
+run `weblingo add-wlg-file-type.wlg remove=yes` from the extracted folder before deleting the runtime.
 
 Delete WebLingo's folder, `C:\Program Files\WebLingo` or `C:\Program Files (x86)\WebLingo`, and remove it from the
 machine's `PATH`: **Settings**, **System**, **About**, **Advanced system settings**, **Environment Variables…**,

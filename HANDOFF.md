@@ -12,6 +12,21 @@ The installed debugger stopped on line 10 of `Examples.wlg/16-modules.wlg` and r
 
 ## Windows local installation
 
+Users installing a release double-click `Install WebLingo.bat` in the extracted ZIP. Its source is
+`Installers/Windows/Install WebLingo.bat`, the setup logic is in `Scripts/setup.wlg`, and
+`Installers/Windows/package.ps1` builds the VSIX from the shipped editor sources. Only `install.wlg` crosses UAC.
+The launcher applies the two optional integrations in the original account. The installed `VSCode/WebLingo.vsix`
+can also be used after installing VS Code later. See `Installers/Windows/readme.md`, `Editors/README.md`,
+`Scripts/README.md` and the root `README.md`. The approved design is in `Documents/weblingo-architecture.md`
+under “Local source debugging” and packaging is described in `Documents/implementation.md`.
+
+On x64 Windows the isolated launcher checks covered cancellation, invalid input, both defaults, each integration
+individually, skipping both, missing VS Code, rerunning setup and failures in the machine and editor steps.
+The temporary install ran the hello example and answered debugger initialization and disconnect. VS Code installed
+the bundled extension in an isolated profile. The checks substituted the UAC boundary, machine PATH and account
+registration. A first install from a standard account using a different administrator's credentials remains a manual
+check on a disposable Windows machine.
+
 The repository-root `build.bat` publishes WebLingo and WASP together and updates the local installation.
 The publish runs with the caller's permissions. The installer requests administrator access when needed.
 The build and editor instructions are in `Documents/implementation.md` and `Editors/README.md`.

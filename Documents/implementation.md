@@ -202,6 +202,12 @@ Where the specification is silent, the choices M0.6 made are listed, as Proposed
 
 # 8. Building and Testing
 
+For a Windows release, run `Installers/Windows/package.bat`. Each WebLingo ZIP contains `Install WebLingo.bat`
+and `setup.wlg` at its root. The launcher starts the bundled runtime from the extracted
+directory. PowerShell elevates only `install.wlg`. The original process handles file registration and calls the
+current user's VS Code CLI to install the offline `VSCode/WebLingo.vsix` from the runtime installation.
+The packager builds this VSIX once from `Editors/VSCode/package.json` and the assets it names.
+
 On Windows, double-click `build.bat` in the repository root to publish and install the current checkout, including
 the CLI's VS Code debug adapter. It runs `publish.ps1` from the solution folder, then requests administrator rights
 for the installer. With IIS it uses `Scripts/install-weblingo.wlg` to update the shared WebLingo and WASP files

@@ -608,6 +608,11 @@ standard streams. Debug compilation records statement points and lexical local r
 verifies breakpoints against those points after compilation, and the VM snapshots the active frames and their
 values on its execution worker. Inspection reads values without calling script methods.
 
+On 20 November 2026, the owner approved a double-click Windows setup. Each WebLingo ZIP includes
+`Install WebLingo.bat`, which starts a setup script with the bundled WebLingo runtime. Only the machine installer
+requests elevation through Windows PowerShell. Setup offers Explorer's `.wlg` registration and the VS Code debugger
+to the account that opened the launcher. The installed `VSCode\WebLingo.vsix` also supports offline installation later.
+
 ## 6. Hosting architecture (WL-H001–WL-H014)
 
 ### 6.1 Approved hosting decisions
