@@ -4251,3 +4251,13 @@ Create an SVG illustration of the DAG of dependencies and insert into "Dependenc
 Whenever the name `Ann` is mentioned, in the example code, in the documentation, etc., change it to `Anna`.
 
 2026-11-20 (Codex). Renamed the example person throughout examples, documentation, code comments and test fixtures in `3670810`. Updated the expected padding, length, case and split results. The Windows Release build had zero warnings on the branch and main, and the full suite passed (4,242 passed, six skipped). Three standalone examples, six reference examples and the WASP greeting passed. Linux was not tested locally.
+
+## [DONE] CLI's VM
+
+The `implementation.md` seems to imply that the WebLingo CLI is only capable of running the register VM, while WASP is running both, as a choice. The intent was to make it possible for either exe to run either VM, based on configuration. If the choice of VM is not implemented that way, implement it.
+
+Approve "vm": "register" or "stack" in weblingo.config and wasp.config, using the register VM for source when no setting is given? The proposal applies to weblingo run/check/compile and wasp run/check/serve/fastcgi. The existing explicit compile flag would override the setting. With no setting, compiled files would still select the VM from their verified header. With a setting, a compiled file for the other VM would be refused. The VS Code debugger would keep its approved register-only behavior.
+
+A: Approved.
+
+2026-11-20 (Codex). Implemented in `e68932c`. Both executables compile and run source on the configured VM, with register as the default. An explicit compile flag overrides the file setting, and run and check validate compiled bytecode against it. WASP uses the site root to select the VM when given --root and selects it at host startup for serving. The debugger still uses register. Windows Release built with zero warnings on the branch and main, and the full suite passed (4,252 passed, six skipped). Both executables ran their samples on both VMs. Hosted checks covered FastCGI, HTTP handlers, async component rendering and runtime diagnostics. Linux was not tested locally.
