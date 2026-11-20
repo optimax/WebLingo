@@ -65,7 +65,7 @@ public static class WebLingoCommandLine
     public static int Run(WebLingoCommandLineProgram program, string[] args, TextWriter output, TextWriter error,
         IWebLingoConsoleInput? input = null)
     {
-        // A file named first is run, weblingo script.wlg name=Ann as weblingo run script.wlg name=Ann (the owner's answer,
+        // A file named first is run, weblingo script.wlg name=Anna as weblingo run script.wlg name=Anna (the owner's answer,
         // 18 November 2026, "Minimal WebLingo Installer: Linux", Q1).
         if (program.RunsFileNamedFirst && args.Length >= 1 && (args[0].EndsWith(program.Extension, StringComparison.OrdinalIgnoreCase)
             || program.Bytecode && WebLingoBytecodeFile.IsBytecodeExtension(Path.GetExtension(args[0]))))

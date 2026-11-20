@@ -15,7 +15,7 @@ With WebLingo installed, `weblingo` on the `PATH`, from this folder:
 ```bash
 weblingo 01-hello.wlg
 weblingo run 01-hello.wlg
-weblingo run 17-parameters.wlg name=Ann cups=3
+weblingo run 17-parameters.wlg name=Anna cups=3
 weblingo check does-not-compile/missing-semicolon.wlg
 ```
 

@@ -259,7 +259,7 @@ public static class WebLingoValueFormatter
 
     /// <summary>
     /// An instance of a class extending a kind of value: its class's name, a colon, and the value it held, as a
-    /// collection writes it, <c>Celsius:21.5</c>, <c>Name:"Ann"</c> (section 3.7).
+    /// collection writes it, <c>Celsius:21.5</c>, <c>Name:"Anna"</c> (section 3.7).
     /// </summary>
     internal static string Held(WebLingoValue value, WebLingoHeap heap) =>
         heap.ClassName(heap.ClassOf(value)) + ":" + Scalar(heap.Held(value), heap);

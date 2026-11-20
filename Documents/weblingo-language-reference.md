@@ -209,7 +209,7 @@ writeLn(limit);
 | Number, binary64 | `3.5`, `1e21`, `2.5E-3`, `Infinity`, `NaN` | `Number` |
 | String | `"tea"`, `'tea'` | `String` |
 | Array | `[1, "two", null]` | `Array` |
-| Map | `{ name: "Ann", age: 30 }` | `Map` |
+| Map | `{ name: "Anna", age: 30 }` | `Map` |
 | Set | `#{1, 2, 3}` | `Set` |
 | Bytes | `Bytes.from("hi")`, `Bytes.from([104, 105])` | `Bytes` |
 | Decimal | `1.5m`, `0.1m` | `Decimal` |
@@ -231,7 +231,7 @@ writeLn(1e21);
 writeLn(5.0);
 writeLn("text");
 writeLn([1, "two", null]);
-writeLn({ name: "Ann", age: 30 });
+writeLn({ name: "Anna", age: 30 });
 writeLn(#{1, 2, 3});
 ```
 
@@ -244,7 +244,7 @@ true
 5.0
 text
 [1, "two", null]
-{"name": "Ann", "age": 30}
+{"name": "Anna", "age": 30}
 #{1, 2, 3}
 ```
 
@@ -644,7 +644,7 @@ from "std:regex";`, from a pattern in .NET's syntax and flags:
 ```javascript
 import { Regex } from "std:regex";
 var email = new Regex("(\\w+)@(\\w+)\\.com");
-var text = "ann@tea.com, bob@cake.com";
+var text = "anna@tea.com, bob@cake.com";
 writeLn(email.test(text));
 writeLn(email.match(text));
 writeLn(email.matchAll(text).length);
@@ -655,10 +655,10 @@ writeLn(new Regex("^tea$", "im").test("Green\nTEA"));
 
 ```text
 true
-["ann@tea.com", "ann", "tea"]
+["anna@tea.com", "anna", "tea"]
 2
-tea:ann, cake:bob
-["ann@tea.com", "bob@cake.com"]
+tea:anna, cake:bob
+["anna@tea.com", "bob@cake.com"]
 true
 ```
 
@@ -735,7 +735,7 @@ A string marked with `$` puts the values of the expressions in braces into its t
 nothing:
 
 ```javascript
-var name = "Ann";
+var name = "Anna";
 var price = 6.5;
 writeLn($"Hello, {name}! Tea is {price} today.");
 writeLn($"{price:N2} {price:0.000} {255:X4} {1234567:N0}");
@@ -745,9 +745,9 @@ writeLn($"{1 + 2} {null}|");
 ```
 
 ```text
-Hello, Ann! Tea is 6.5 today.
+Hello, Anna! Tea is 6.5 today.
 6.50 6.500 00FF 1,234,567
-[   Ann] [Ann   ]
+[  Anna] [Anna  ]
 Braces: { and }
 3 |
 ```
@@ -886,16 +886,16 @@ sencha: 6.5
 writeLn(add(2, 3));
 function add(a, b) { return a + b; }
 function greet(name, greeting = "Hello") { return $"{greeting}, {name}!"; }
-writeLn(greet("Ann"));
-writeLn(greet("Ann", "Hi"));
+writeLn(greet("Anna"));
+writeLn(greet("Anna", "Hi"));
 function nothing() { }
 writeLn(nothing());
 ```
 
 ```text
 5
-Hello, Ann!
-Hi, Ann!
+Hello, Anna!
+Hi, Anna!
 null
 ```
 
@@ -1298,7 +1298,7 @@ abcd
 `null`, so that a chain of them stops at the first `null`:
 
 ```javascript
-var rows = [{ name: "Ann" }];
+var rows = [{ name: "Anna" }];
 writeLn(rows?[0]?["name"]);
 writeLn(rows?[1]?["name"]);
 var none = null;
@@ -1306,7 +1306,7 @@ writeLn(none?[0]);
 ```
 
 ```text
-Ann
+Anna
 null
 null
 ```
@@ -1551,21 +1551,21 @@ an instance is written as its class, a colon and its value.
 
 Such an instance has its value's members too, its properties and its methods, each giving what the value's own gives,
 a string's `toUpper()` a string; and wherever a built-in takes a value of its kind, it takes the instance as that value,
-`"ann".startsWith(new Name("a"))`, `fs.readText(new Path("a.txt"))`, `[1, 2][new Index(1)]`:
+`"anna".startsWith(new Name("a"))`, `fs.readText(new Path("a.txt"))`, `[1, 2][new Index(1)]`:
 
 ```javascript
 class Name extends String {
   greet() { return "Hello, " + this.toUpper() + "!"; }
 }
-var n = new Name("ann");
+var n = new Name("anna");
 writeLn(n.length);
 writeLn(n.greet());
 writeLn(n.startsWith("a"));
 ```
 
 ```text
-3
-Hello, ANN!
+4
+Hello, ANNA!
 true
 ```
 
@@ -1961,11 +1961,11 @@ var n = Integer.parse(times);
 for (var i = 0; i < n; i = i + 1) writeLn($"Hello, {name}!");
 ```
 
-`weblingo run script-params.wlg name=Ann times=2` writes:
+`weblingo run script-params.wlg name=Anna times=2` writes:
 
 ```text
-Hello, Ann!
-Hello, Ann!
+Hello, Anna!
+Hello, Anna!
 ```
 
 ---

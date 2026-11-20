@@ -24,8 +24,8 @@ public sealed class ConsoleInputTests : IDisposable
         var program = "var name = await prompt(\"Your name: \"); writeLn($\"Hello, {name}!\"); var count = 0; var line = await readLine(); "
                       + "while (line != null) { count++; writeLn($\"{count}: {line}\"); line = readLineSync(); } "
                       + "writeLn([await readLine(), readLineSync(), await readPassword(), readLine() is Task]);";
-        Assert.Equal(("Your name: Hello, Ann!\n1: żółw\n2: \n3: last\n[null, null, null, true]\n", ""),
-            Run(program, "Ann\r\nżółw\n\nlast"));
+        Assert.Equal(("Your name: Hello, Anna!\n1: żółw\n2: \n3: last\n[null, null, null, true]\n", ""),
+            Run(program, "Anna\r\nżółw\n\nlast"));
     }
 
     [Fact]

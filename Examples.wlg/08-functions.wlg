@@ -3,7 +3,7 @@
 function greet(name, greeting = "Hello") {
   return $"{greeting}, {name}!";
 }
-writeLn([greet("Ann"), greet("Bo", "Hi")]);
+writeLn([greet("Anna"), greet("Bo", "Hi")]);
 
 // A rest parameter gathers the arguments after the others into an array, [] when there are none.
 function log(level, ...parts) { return $"[{level}] " + " ".join(parts); }
@@ -30,7 +30,7 @@ try {
 }
 
 /* Output:
-["Hello, Ann!", "Hi, Bo!"]
+["Hello, Anna!", "Hi, Bo!"]
 ["[info] server started", "[warn] "]
 16
 [5, 6]

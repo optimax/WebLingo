@@ -89,7 +89,7 @@ public sealed class PageTests
     }
 
     [Theory]
-    [InlineData("<% var who = \"Ann\"; %><%= $\"<b>{who}</b>\" %>", "&lt;b&gt;Ann&lt;/b&gt;")]
+    [InlineData("<% var who = \"Anna\"; %><%= $\"<b>{who}</b>\" %>", "&lt;b&gt;Anna&lt;/b&gt;")]
     [InlineData("<% var price = 1234.5; %><td><%= $\"{price,10:N2}\" %></td>", "<td>  1,234.50</td>")]
     [InlineData("<%- \"\"\"\n  <ul>\n    <li>%></li>\n  </ul>\n  \"\"\" %>", "<ul>\n  <li>%></li>\n</ul>")]
     public void APagesBlocksTakeMultiLineAndInterpolatedStrings(string page, string written)
@@ -127,7 +127,7 @@ public sealed class PageTests
     [Theory]
     // An include is textual: the template is read in its place, and sees the variables there, as its text would.
     [InlineData("a<% include \"/h.wasp\"; %>c", "h.wasp=b", "abc")]
-    [InlineData("<% var name = \"Ann\"; %><% include \"/greet.wasp\"; %>", "greet.wasp=Hello, <%= name %>!", "Hello, Ann!")]
+    [InlineData("<% var name = \"Anna\"; %><% include \"/greet.wasp\"; %>", "greet.wasp=Hello, <%= name %>!", "Hello, Anna!")]
     [InlineData("<% include \"/h.wasp\"; %><%= x * 3 %>", "h.wasp=<% var x = 2; %>", "6")]
     [InlineData("<% foreach (var i in [1, 2]) { include \"/item.wasp\"; } %>", "item.wasp=<li><%= i %></li>", "<li>1</li><li>2</li>")]
     [InlineData("<% include \"/h.wasp\"; include \"h\"; %>", "h.wasp=x", "xx")]
@@ -192,7 +192,7 @@ public sealed class PageTests
 
     [Theory]
     // A component renders where it is called, anew each time, given its parameters' values; its scope is its own.
-    [InlineData("<% await renderComponent(\"/card.wasp\", { name: \"Ann\" }); %>", "card.wasp=<% param name; %>\n<b><%= name %></b>", "<b>Ann</b>")]
+    [InlineData("<% await renderComponent(\"/card.wasp\", { name: \"Anna\" }); %>", "card.wasp=<% param name; %>\n<b><%= name %></b>", "<b>Anna</b>")]
     [InlineData("<% await renderComponent(\"/c.wasp\"); await renderComponent(\"/c\"); %>", "c.wasp=x", "xx")]
     [InlineData("<% foreach (var n in [\"a\", \"b\"]) { await renderComponent(\"/item.wasp\", { n: n }); } %>",
         "item.wasp=<% param n; %><li><%= n %></li>", "<li>a</li><li>b</li>")]

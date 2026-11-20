@@ -35,7 +35,7 @@ public sealed class NativeModuleTests : IDisposable
     }
 
     [Theory]
-    [InlineData("import { writeLn } from \"std:system\"; import t from \"native:test\"; writeLn([t.twice(21), t.greet(\"Ann\")]);", "[42, \"Hello, Ann!\"]")]
+    [InlineData("import { writeLn } from \"std:system\"; import t from \"native:test\"; writeLn([t.twice(21), t.greet(\"Anna\")]);", "[42, \"Hello, Anna!\"]")]
     [InlineData("import { writeLn } from \"std:system\"; import { twice, greet } from \"native:test\"; writeLn([twice(2), greet(1)]);", "[4, \"Hello, 1!\"]")]
     [InlineData("import { writeLn } from \"std:system\"; import t from \"native/test.dll\"; writeLn(t.twice(5));", "10")]
     [InlineData("import { writeLn } from \"std:system\"; var t = await Module.import(\"native:test\"); writeLn(t.twice(3));", "6")]

@@ -81,7 +81,7 @@ escaped; a page's text and its `<%= %>` write without an import. A value's text 
 
 The console's reading reads a script's standard input under `weblingo`, typed, or piped from a file or another
 program, `type data.txt | weblingo filter.wlg`, UTF-8; a site's pages and handlers, under `wasp`, have no console, and
-each read is an `IOError`, WL3011, saying so. Given the lines `Ann`, `green tea` and `black tea`, piped:
+each read is an `IOError`, WL3011, saying so. Given the lines `Anna`, `green tea` and `black tea`, piped:
 
 ```javascript
 var name = await prompt("Your name: ");
@@ -94,7 +94,7 @@ while (line != null) {
 ```
 
 ```text
-Your name: Hello, Ann!
+Your name: Hello, Anna!
 GREEN TEA
 BLACK TEA
 ```
@@ -302,7 +302,7 @@ Greeter.setMethod("constructor", function (this, name) { this.name = name; });
 Greeter.setMethod("greet", function (this) { return "Hello, " + this.name; });
 Greeter.setProperty("shout", function (this) { return this.name + "!"; }, null);
 Greeter.setConstant("language", "English");
-var g = new Greeter("Ann");
+var g = new Greeter("Anna");
 writeLn([g.greet(), g.shout, Greeter.language, Greeter.__className]);
 Greeter.removeMethod("greet");
 writeLn(g?.greet);
@@ -311,7 +311,7 @@ writeLn(double(21));
 ```
 
 ```text
-["Hello, Ann", "Ann!", "English", "Greeter"]
+["Hello, Anna", "Anna!", "English", "Greeter"]
 null
 42
 ```

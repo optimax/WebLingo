@@ -28,8 +28,8 @@ writeLn([today, warmer, warmer is Celsius, warmer > today, today.toFahrenheit()]
 class Name extends String {
   initials() { return "".join(this.split(" ").map(part => part[0])); }
 }
-var ann = new Name("Ann Marie Smith");
-writeLn([ann.initials(), ann.toUpper(), "Ann Marie Smith".startsWith(new Name("Ann")), ann.length]);
+var anna = new Name("Anna Marie Smith");
+writeLn([anna.initials(), anna.toUpper(), "Anna Marie Smith".startsWith(new Name("Anna")), anna.length]);
 
 // A class extending Array is an array, with methods of its own.
 class Stack extends Array {
@@ -51,7 +51,7 @@ writeLn([due.year, due.isPast(DateTime.utc(2027, 1, 1)), due.addDays(7).day]);
 [true, false]
 0 1 2 
 [Celsius:21.5, Celsius:24.5, true, true, Fahrenheit:70.7]
-["AMS", "ANN MARIE SMITH", true, 15]
+["AMS", "ANNA MARIE SMITH", true, 16]
 [Stack:[1, 2], 2, true, 2]
 [2026, true, 31]
 */

@@ -207,7 +207,7 @@ A few rules make pages come out as you would expect:
   implicitly; an import of them, `<% import { write, writeLn } from "std:system"; %>`, is allowed, and means the same.
 
 Everything else inside the blocks is the WebLingo language: variables (`var`, `const`), functions, classes, arrays
-(`[1, 2]`), maps (`{ name: "Ann" }`), `if`, `while`, `for`, `foreach`, `try`, and the rest. An interpolated string,
+(`[1, 2]`), maps (`{ name: "Anna" }`), `if`, `while`, `for`, `foreach`, `try`, and the rest. An interpolated string,
 `$"…"`, puts values in text, with a format for numbers when you want one: `$"€{price:N2}"` writes `€6.50` for 6.5.
 
 `DateTime.now()` is the server's date and time, its class `std:datetime`'s, which a page imports to name it. `<%= %>`
@@ -502,7 +502,7 @@ page's, or its layout's, as it sees any of their variables.
 <p>Your browser accepts: <%= request.headers?["Accept"] %></p>
 ```
 
-`/greet?name=Ann` gives `Hello, Ann!`, and `/greet`, `Hello, stranger!`.
+`/greet?name=Anna` gives `Hello, Anna!`, and `/greet`, `Hello, stranger!`.
 
 - A query's name that is not there is an error when read with `[…]`, as a map's missing key is; `?[…]` gives `null`
   instead. `request.query.has("name")` says whether it is there.
@@ -876,7 +876,7 @@ wasp --version
   <p>Hello, <%= name %>!</p>
   ```
 
-  `wasp run cli.wasp` writes `<p>Hello, World!</p>`, and `wasp run cli.wasp name=Ann`, `<p>Hello, Ann!</p>`.
+  `wasp run cli.wasp` writes `<p>Hello, World!</p>`, and `wasp run cli.wasp name=Anna`, `<p>Hello, Anna!</p>`.
   `wasp run --timeout 300 cli.wasp` sets the regular expression match limit for this run to 300 milliseconds.
   The default is one second.
 - **`wasp check`** compiles a page and reports its errors, without running it: `wasp check broken.wasp` writes

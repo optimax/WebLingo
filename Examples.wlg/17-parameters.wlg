@@ -1,5 +1,5 @@
 // 17-parameters.wlg: a script's parameters, given on the command line.
-// Run: weblingo run 17-parameters.wlg name=Ann cups=3
+// Run: weblingo run 17-parameters.wlg name=Anna cups=3
 //
 // A script declares its parameters with param, before its other statements, a default making one optional. Each is
 // given after the script's name as name=value, always a string: the script converts it, since nothing converts
@@ -14,6 +14,6 @@ writeLn($"{greeting}, {name}: {count} {(count == 1 ? "cup" : "cups")} of tea.");
 writeLn([name is String, cups is String, count is Integer]);
 
 /* Output:
-Hello, Ann: 3 cups of tea.
+Hello, Anna: 3 cups of tea.
 [true, true, true]
 */

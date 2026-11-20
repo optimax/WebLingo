@@ -34,7 +34,7 @@ public sealed class RequestBodyTests
     [Fact]
     public void AHandlerReadsAForm()
     {
-        Assert.Equal((200, "Ann"), Post(Load(), "/api/names", Encoding.UTF8.GetBytes("name=Ann"), "application/x-www-form-urlencoded; charset=utf-8"));
+        Assert.Equal((200, "Anna"), Post(Load(), "/api/names", Encoding.UTF8.GetBytes("name=Anna"), "application/x-www-form-urlencoded; charset=utf-8"));
     }
 
     [Fact]

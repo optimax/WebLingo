@@ -141,7 +141,7 @@ public sealed class ModuleTests
         {
             ["main.wlg"] = "import { write, writeLn } from \"std:system\"; import { twice } from \"lib/util\"; writeLn(\"main \" + twice(2).toString()); " +
                           "var g = await Module.import(\"lib/greet\"); writeLn([g.hello(), g.n, new g.Point(3), new g.Point(3) is Object, g]); " +
-                          "var h = await Module.import(\"lib/greet\", { who: \"Ann\" }); var g2 = await Module.import(\"lib/greet\"); " +
+                          "var h = await Module.import(\"lib/greet\", { who: \"Anna\" }); var g2 = await Module.import(\"lib/greet\"); " +
                           "writeLn([h.hello(), g2 == g, h == g, (await Module.import(\"lib/util\")).twice(5), (await g.later()).n]); " +
                           "var s = await Module.import(\"std:system\"); s.writeLn(\"via std:system\");",
             ["lib/greet.wlg"] = "param who = \"world\"; import { write, writeLn } from \"std:system\"; import { twice } from \"util\"; writeLn(\"greet runs for \" + who); " +
@@ -151,7 +151,7 @@ public sealed class ModuleTests
             ["lib/late.wlg"] = "export var n = 7;",
         };
         AssertBoth(files, "util runs\nmain 4\ngreet runs for world\n[\"hello, world\", 42, Point {x: 3}, true, module lib/greet.wlg]\n" +
-                          "greet runs for Ann\n[\"hello, Ann\", true, false, 10, 7]\nvia std:system\n");
+                          "greet runs for Anna\n[\"hello, Anna\", true, false, 10, 7]\nvia std:system\n");
     }
 
     [Theory]

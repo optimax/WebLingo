@@ -1270,7 +1270,7 @@ Q7, a parameter without a default that is not given: (a) an error, where the mod
 
 A7: (a).
 
-Q8, a script's parameters from the command line: `weblingo run script.ws size=10 name=Ann`, each value read as a WebLingo literal if it is one (`10`, `true`), as a string otherwise. Agreed?
+Q8, a script's parameters from the command line: `weblingo run script.ws size=10 name=Anna`, each value read as a WebLingo literal if it is one (`10`, `true`), as a string otherwise. Agreed?
 
 A8: Yes. But, `weblingo run script.ws value="10"` reads as `String(value)`.
 
@@ -3722,9 +3722,9 @@ Done (Claude, 2026-11-18, `578d5d2`). Main's checks: the Release build, without 
 
 ## [DONE] Standard Classes Extended, Part 1: Their Values' Methods
 
-Specification, section 9, "Standard classes extended, parts", part 1: an instance of a class extending `String`, `Integer`, `Number`, `Boolean`, `Decimal`, `Regex` or `Function` has its value's methods, as it has its properties, `new Name("ann").toUpper()` giving `"ANN"`.
+Specification, section 9, "Standard classes extended, parts", part 1: an instance of a class extending `String`, `Integer`, `Number`, `Boolean`, `Decimal`, `Regex` or `Function` has its value's methods, as it has its properties, `new Name("anna").toUpper()` giving `"ANNA"`.
 
-2026-11-18 (Claude): done, and landed: an instance of a class extending a kind of value's class has its value's methods, `new Name("ann").toUpper()` giving `"ANN"`, a string, and `new Strict("a+").test("aa")` `true`, an `extend` block's method using them through `this`; a member neither the class nor the value has stays the instance's WL3006, `An instance of Name has no member 'nope'.` A call `TryFindCallee` does not find on such an instance goes to its value's member in `WebLingoMembers.TryCall`, as a native class's fallback does, so neither VM's `Run` changed. The Language Reference shows it.
+2026-11-18 (Claude): done, and landed: an instance of a class extending a kind of value's class has its value's methods, `new Name("anna").toUpper()` giving `"ANNA"`, a string, and `new Strict("a+").test("aa")` `true`, an `extend` block's method using them through `this`; a member neither the class nor the value has stays the instance's WL3006, `An instance of Name has no member 'nope'.` A call `TryFindCallee` does not find on such an instance goes to its value's member in `WebLingoMembers.TryCall`, as a native class's fallback does, so neither VM's `Run` changed. The Language Reference shows it.
 
 Done (Claude, 2026-11-18, `dbf6295`). Main's checks: the Release build, without warnings; the full suite, 3,966 tests, none failed or aborted; and the CLI, `weblingo` on the samples and on the Language Reference's new example. Tried on Windows only; Linux not tried.
 
@@ -3834,7 +3834,7 @@ A builder prints as `BytesBuilder:[104, 105]`, and nothing can extend `BytesBuil
 
 All standard classes must behave like real classes from the script's perspective.
 
-2026-11-18 (Claude): what a class extending a standard class gets now: one extending `Array`, `Map` or `Set` has all their members; one extending `String`, `Integer`, `Number`, `Boolean`, `Decimal`, `Regex` or `Function` holds a value of that kind and has its properties, but none of its methods, `class Name extends String {}` giving `new Name("ann").toUpper()` WL3006, and `class Strict extends Regex {}` giving `s.test(x)` WL3006, which this task fixes whatever the answer; and `Bytes`, `BytesBuilder`, `DateTime`, `Task`, `Module`, `Iterator`, `Json` and `Html`, and the standard modules' classes (`File`, `Database`, `Socket`, …), cannot be extended at all.
+2026-11-18 (Claude): what a class extending a standard class gets now: one extending `Array`, `Map` or `Set` has all their members; one extending `String`, `Integer`, `Number`, `Boolean`, `Decimal`, `Regex` or `Function` holds a value of that kind and has its properties, but none of its methods, `class Name extends String {}` giving `new Name("anna").toUpper()` WL3006, and `class Strict extends Regex {}` giving `s.test(x)` WL3006, which this task fixes whatever the answer; and `Bytes`, `BytesBuilder`, `DateTime`, `Task`, `Module`, `Iterator`, `Json` and `Html`, and the standard modules' classes (`File`, `Database`, `Socket`, …), cannot be extended at all.
 
 Q1, which classes a class may extend, its instances having all their base's members: (a) every standard class, the standard modules' too, an instance of a class extending one holding its base's value where the base has a kind of value, `new Mine(…)` taking what its base's own making takes (`DateTime.utc(…)`'s arguments for a class extending `DateTime`, which has no `new`); (b) every class of a kind of value, `Bytes`, `BytesBuilder`, `DateTime` and `Regex` among them, but not `Task`, `Module`, `Iterator`, `Json`, `Html` or the standard modules' classes, which stay sealed; (c) `BytesBuilder` again, with the members of every class that may be extended now, the rest staying sealed.
 
@@ -3944,7 +3944,7 @@ Done (Claude, 2026-11-19, `cfae134`). Main's checks: the Release build, without 
 
 ## [DONE] Console Input: `readLine`
 
-A running script cannot read what its user types: `std:io` has `write` and `writeLn` only, and nothing reads the console's standard input, so that a script's input is its parameters (`weblingo run script.wl name=Ann`), files, environment variables, the network, or, under WASP, a request's form. Add reading to `std:io`, beside writing, for scripts run by `weblingo`, interactive and piped alike (`type data.txt | weblingo run filter.wl`):
+A running script cannot read what its user types: `std:io` has `write` and `writeLn` only, and nothing reads the console's standard input, so that a script's input is its parameters (`weblingo run script.wl name=Anna`), files, environment variables, the network, or, under WASP, a request's form. Add reading to `std:io`, beside writing, for scripts run by `weblingo`, interactive and piped alike (`type data.txt | weblingo run filter.wl`):
 
 ```javascript
 import { write, readLine } from "std:io";

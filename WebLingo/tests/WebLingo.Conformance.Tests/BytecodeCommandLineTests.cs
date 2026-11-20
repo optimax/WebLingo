@@ -193,7 +193,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         // weblingo script.wlg as weblingo run script.wlg, its parameters after it, and bytecode too (the owner's answer,
         // 18 November 2026, "Minimal WebLingo Installer: Linux", Q1); anything else still a usage error.
         var main = Write("Main.WLG", "param name;\nimport { writeLn } from \"std:system\";\nwriteLn($\"Hello, {name}\");\n");
-        Assert.Equal((WebLingoCommandLine.Success, "Hello, Ann\n", ""), Weblingo(main, "name=Ann"));
+        Assert.Equal((WebLingoCommandLine.Success, "Hello, Anna\n", ""), Weblingo(main, "name=Anna"));
         Assert.Equal(Weblingo("run", main, "name=Bo"), Weblingo(main, "name=Bo"));
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         Assert.Equal((WebLingoCommandLine.Success, "Hello, Cy\n", ""), Weblingo(Path.ChangeExtension(main, ".wlbr"), "name=Cy"));

@@ -89,7 +89,7 @@ Use a `.vscode/launch.json` configuration to pass script parameters or choose a 
       "name": "Debug WebLingo Script",
       "program": "${file}",
       "cwd": "${workspaceFolder}",
-      "args": ["name=Ann"],
+      "args": ["name=Anna"],
       "stopOnEntry": true
     }
   ]
