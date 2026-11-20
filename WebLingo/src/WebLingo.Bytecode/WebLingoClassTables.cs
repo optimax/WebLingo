@@ -63,7 +63,7 @@ internal static class WebLingoClassTables
     /// <summary>
     /// A program's files (section 3.9): the program's first, without a function of its own, nor parameters; each other's
     /// an <c>async</c> function taking one parameter, its parameters' values, if it has some, else none; every export
-    /// and parameter named.
+    /// and parameter named. Standard modules may be preinitialized or supply a compiled initializer.
     /// </summary>
     public static string? CheckUnits(IReadOnlyList<WebLingoUnitInfo>? units, Func<int, int, bool> isUnitFunction)
     {
@@ -81,7 +81,9 @@ internal static class WebLingoClassTables
             {
                 if (parameter is null || string.IsNullOrEmpty(parameter.Name)) return $"File {i} ('{unit.Name}') has a parameter without a name.";
             }
-            if (i == 0 || standard ? unit.Function != -1 : !isUnitFunction(unit.Function, unit.Parameters.Count > 0 ? 1 : 0))
+            var hasInitializer = unit.Function != -1;
+            if (i == 0 || unit.IsNative ? hasInitializer
+                : hasInitializer ? !isUnitFunction(unit.Function, unit.Parameters.Count > 0 ? 1 : 0) : !standard)
             {
                 return $"File {i} ('{unit.Name}'): its function, {unit.Function}, is not one that runs a file.";
             }

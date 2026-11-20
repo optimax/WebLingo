@@ -38,7 +38,8 @@ public static class WebLingoStandardModules
         };
 
     /// <summary>Whether <paramref name="path"/> names a standard module the compiler makes itself.</summary>
-    public static bool IsCompilerMade(string path) => Classes.ContainsKey(path) || Functions.ContainsKey(path);
+    public static bool IsCompilerMade(string path) =>
+        path == WebLingoTestSource.Name || Classes.ContainsKey(path) || Functions.ContainsKey(path);
 
     /// <summary>Whether a built-in class is a standard module's export, which a program has only by importing it.</summary>
     public static bool IsImported(string className) => Exports(Classes, className);

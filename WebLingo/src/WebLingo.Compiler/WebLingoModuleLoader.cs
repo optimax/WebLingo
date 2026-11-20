@@ -30,6 +30,7 @@ public sealed class WebLingoModuleLoader(WebLingoCompilerOptions options) : IWeb
         {
             name = path;
             error = WebLingoStandardModules.IsCompilerMade(path) ? null : "there is no such standard module";
+            if (path == WebLingoTestSource.Name) _sources[name] = WebLingoTestSource.Text;
             return error is null;
         }
         if (Resolver is null && options.Native is { } native && native.Names(path))

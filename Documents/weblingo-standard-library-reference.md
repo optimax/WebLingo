@@ -38,6 +38,7 @@ This reference describes the standard library in the current pre-alpha release a
 27. [`std:compression`](#27-stdcompression)
 28. [`std:random`](#28-stdrandom)
 29. [`std:process`](#29-stdprocess)
+30. [`std:test`](#30-stdtest)
 
 ---
 
@@ -1388,3 +1389,66 @@ writeLn([child["exitCode"], child["stdout"].startsWith("WebLingo ")]);
 ```text
 [0, true]
 ```
+
+## 30. `std:test`
+
+Import assertions by name. Save this example as `arithmetic.wlg` and run `weblingo test arithmetic.wlg`.
+
+```javascript
+import { assertEqual, assertClose, checkAll } from "std:test";
+
+export class ArithmeticTests {
+    beforeEach() {
+        this.values = [2, 3, 4];
+    }
+
+    testSum() {
+        assertEqual(this.values[0] + this.values[1], 5, "The first two values sum to five.");
+    }
+
+    async testIndependentResults() {
+        await checkAll(check => {
+            check.assertEqual(this.values.length, 3);
+            check.assertClose(0.1 + 0.2, 0.3, {absolute: 0.000001});
+        });
+    }
+}
+```
+
+`weblingo test` takes one or more `.wlg` files in the order given on the command line. It discovers classes
+declared at the top level with `export class` and a name ending in `Tests`. A case is a directly declared
+instance method with a name starting with `test` followed by an uppercase letter. Cases run in declaration
+order and must declare zero parameters. The runner initializes the file once, creates a fresh instance per case,
+and awaits each case. Optional zero-argument `beforeEach` and `afterEach` instance methods may be synchronous
+or asynchronous. Cleanup runs even when setup or the case throws, provided construction succeeded. If cleanup
+also fails, both failures are reported. The file's `weblingo.config` selects the VM.
+
+- `weblingo test --list arithmetic.wlg` prints discovered case labels without running the module.
+- `weblingo test --filter testSum arithmetic.wlg` selects cases with a case-sensitive substring of the
+  `file::Class.method` label. The two options can be combined.
+
+Failures include the case label and assertion location. The runner continues with the remaining cases and
+exits nonzero if a case fails, discovery fails, or the filter selects no cases.
+
+| Function | Checks |
+| --- | --- |
+| `assert(condition, message = null)` | A Boolean condition is true. |
+| `assertEqual(actual, expected, message = null)` | The values are equal by WebLingo's `==` operator. |
+| `assertNotEqual(actual, expected, message = null)` | The values are unequal by the same operator. |
+| `assertDeepEqual(actual, expected, message = null)` | Array elements in order, maps by keys and values regardless of insertion order, sets by membership, and bytes by content. Handles cycles and reports the first differing path. |
+| `assertContains(actual, item, message = null)` | An array or set contains the item, or a string contains a case-sensitive substring. |
+| `assertHasKey(map, key, message = null)` | A map contains the key, including when its value is `null`. |
+| `assertMatches(text, regex, message = null)` | A `Regex` from `std:regex` matches the text. |
+| `assertClose(actual, expected, tolerance, message = null)` | The numeric difference is within an absolute or relative tolerance. |
+| `assertThrows(action, expectedClass = Error)` | The zero-argument action throws the expected error class or a subclass synchronously. Returns the error. |
+| `await assertRejects(action, expectedClass = Error)` | The zero-argument action returns a task that rejects with the expected error class or a subclass. Returns the error. |
+| `await checkAll(action)` | Passes the callback a checker with the same assertion methods and reports the failures together. |
+
+For `assertClose`, pass a map with `absolute`, `relative`, or both. The tolerances must be finite, nonnegative
+numbers. Relative tolerance is multiplied by the larger magnitude of the actual and expected values. If you
+provide both tolerances, the larger allowed difference applies.
+
+Ordinary assertions throw `Error` with code `WL3021` when they fail. A comparison failure shows the expected
+value, the actual value, and any supplied message. In a `checkAll` callback, call the assertions on the supplied
+checker to record failures and continue. An unexpected exception stops the callback and is reported with the
+failures collected so far. Await `checkAll` to observe the result.

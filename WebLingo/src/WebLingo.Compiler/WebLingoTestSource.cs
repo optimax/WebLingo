@@ -1,0 +1,126 @@
+namespace WebLingo.Compiler;
+
+/// <summary>Standard assertions that call WebLingo functions and await their tasks on the program's VM.</summary>
+internal static class WebLingoTestSource
+{
+    public const string Name = "std:test";
+
+    public const string Text = """
+        import support from "std:test-support";
+
+        export const assert = support.assert;
+        export const assertDeepEqual = support.assertDeepEqual;
+        export const assertContains = support.assertContains;
+        export const assertHasKey = support.assertHasKey;
+        export const assertMatches = support.assertMatches;
+        export const assertClose = support.assertClose;
+
+        export function assertEqual(actual, expected, message = null) {
+            support.requireEqual(actual, expected, actual == expected, message);
+        }
+
+        export function assertNotEqual(actual, expected, message = null) {
+            support.requireNotEqual(actual, expected, actual == expected, message);
+        }
+
+        export function assertThrows(action, expectedClass = Error) {
+            support.checkAction(action, expectedClass);
+            var result = null;
+            try {
+                result = action();
+            } catch (error) {
+                return support.matchError(error, expectedClass);
+            }
+            if (result is Task) result.forget();
+            support.fail("Expected a synchronous throw, but the action returned.");
+        }
+
+        export async function assertRejects(action, expectedClass = Error) {
+            support.checkAction(action, expectedClass);
+            var task = null;
+            try {
+                task = action();
+            } catch (error) {
+                support.fail("Expected a rejected task, but the action threw synchronously: " + support.describeError(error));
+            }
+            if (!(task is Task)) support.fail("Expected the action to return a Task.");
+            try {
+                await task;
+            } catch (error) {
+                return support.matchError(error, expectedClass);
+            }
+            support.fail("Expected a rejected task, but the task succeeded.");
+        }
+
+        class Checker {
+            constructor(failures, pending) {
+                this.failures = failures;
+                this.pending = pending;
+            }
+
+            capture(action) {
+                try {
+                    return action();
+                } catch (error) {
+                    if (!support.isAssertion(error)) throw;
+                    this.failures.push(error);
+                }
+            }
+
+            async captureRejection(action, expectedClass) {
+                try {
+                    return await assertRejects(action, expectedClass);
+                } catch (error) {
+                    if (!support.isAssertion(error)) throw;
+                    this.failures.push(error);
+                }
+            }
+
+            assert(condition, message = null) { return this.capture(() => assert(condition, message)); }
+            assertEqual(actual, expected, message = null) { return this.capture(() => assertEqual(actual, expected, message)); }
+            assertNotEqual(actual, expected, message = null) { return this.capture(() => assertNotEqual(actual, expected, message)); }
+            assertDeepEqual(actual, expected, message = null) { return this.capture(() => assertDeepEqual(actual, expected, message)); }
+            assertContains(actual, item, message = null) { return this.capture(() => assertContains(actual, item, message)); }
+            assertHasKey(map, key, message = null) { return this.capture(() => assertHasKey(map, key, message)); }
+            assertMatches(text, regex, message = null) { return this.capture(() => assertMatches(text, regex, message)); }
+            assertClose(actual, expected, tolerance, message = null) {
+                return this.capture(() => assertClose(actual, expected, tolerance, message));
+            }
+            assertThrows(action, expectedClass = Error) {
+                return this.capture(() => assertThrows(action, expectedClass));
+            }
+            assertRejects(action, expectedClass = Error) {
+                const task = this.captureRejection(action, expectedClass);
+                this.pending.push(task);
+                return task;
+            }
+        }
+
+        export async function checkAll(action) {
+            const failures = [];
+            const pending = [];
+            var interrupted = false;
+            var unexpected = null;
+            try {
+                const result = action(new Checker(failures, pending));
+                if (result is Task) await result;
+            } catch (error) {
+                interrupted = true;
+                unexpected = error;
+            }
+            foreach (var task in pending) {
+                if (interrupted) {
+                    task.forget();
+                    continue;
+                }
+                try {
+                    await task;
+                } catch (error) {
+                    interrupted = true;
+                    unexpected = error;
+                }
+            }
+            if (interrupted || failures.length != 0) support.failAll(failures, interrupted, unexpected);
+        }
+        """;
+}

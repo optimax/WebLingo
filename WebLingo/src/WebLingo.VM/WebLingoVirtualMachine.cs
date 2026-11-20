@@ -2553,7 +2553,14 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 exception = _thrown;
                 return true;
             }
-            if (!WebLingoExceptions.TryMakeError(heap, ErrorClassFor(_thrownError.Code), _thrownError, out exception)) return false;
+            var error = _thrownError;
+            if (error.Code == WebLingoDiagnosticCodes.TestAssertionFailed)
+            {
+                var source = OwnerOfOrigin(_origin)?.Source;
+                var offset = SpanOfOrigin(_origin).Start;
+                error = WebLingoExceptions.AtAssertion(error, source ?? module.Name, offset, context.Lines?.Invoke(source, offset));
+            }
+            if (!WebLingoExceptions.TryMakeError(heap, ErrorClassFor(error.Code), error, out exception)) return false;
             _thrown = exception;
             _thrownError = null;
             return true;

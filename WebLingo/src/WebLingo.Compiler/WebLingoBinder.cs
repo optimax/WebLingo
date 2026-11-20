@@ -1106,7 +1106,7 @@ public sealed class WebLingoBinder
             Defaults = defaults,
             IsAsync = isAsync,
             Source = _source,
-            IsNative = _nativeCallees is not null,
+            IsNative = _nativeCallees is not null || _source == WebLingoTestSource.Name,
             HasRest = parameters.Count > 0 && parameters[^1].IsRest
         };
         _function = outerFunction;

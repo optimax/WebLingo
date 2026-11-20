@@ -21,6 +21,10 @@ public static class WebLingoExceptions
         code is not (WebLingoDiagnosticCodes.BudgetExceeded or WebLingoDiagnosticCodes.Cancelled
             or WebLingoDiagnosticCodes.BytecodeVerificationFailure);
 
+    /// <summary>Preserves where a caught test assertion was raised for a runner or a group of checks.</summary>
+    public static WebLingoRuntimeError AtAssertion(WebLingoRuntimeError error, string source, int offset, int? line) =>
+        error with { Fields = [new("sourceFile", source), new("sourceOffset", (long)offset), new("sourceLine", (long?)line)] };
+
     /// <summary>
     /// A runtime error as an instance of <paramref name="errorClass"/>, <c>Error</c>, with its <c>message</c> and its
     /// <c>code</c>; false if there is no such class, or no room for it in the heap.

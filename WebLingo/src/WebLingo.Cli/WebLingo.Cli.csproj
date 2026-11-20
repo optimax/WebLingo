@@ -23,6 +23,7 @@
     <ProjectReference Include="../WebLingo.StdLib.Path/WebLingo.StdLib.Path.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Url/WebLingo.StdLib.Url.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Csv/WebLingo.StdLib.Csv.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../WebLingo.StdLib.Test/WebLingo.StdLib.Test.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Compression/WebLingo.StdLib.Compression.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Random/WebLingo.StdLib.Random.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Process/WebLingo.StdLib.Process.csproj" ReferenceOutputAssembly="false" />
@@ -56,6 +57,8 @@
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.StdLib.Csv/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Csv.dll" Link="std/csv.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="../WebLingo.StdLib.Test/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Test.dll"
+          Link="std/test-support.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.StdLib.Compression/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Compression.dll"
           Link="std/compression.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.StdLib.Random/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Random.dll" Link="std/random.dll"

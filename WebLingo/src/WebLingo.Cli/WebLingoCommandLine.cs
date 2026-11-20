@@ -22,7 +22,7 @@ namespace WebLingo.Cli;
 /// Exit codes (section 15.2): 0 success, 1 compilation errors or a
 /// WLBC file that cannot be used, 2 a usage error, 3 a runtime error, 4 a file that cannot be read or written.
 /// </summary>
-public static class WebLingoCommandLine
+public static partial class WebLingoCommandLine
 {
     public const int Success = 0;
     public const int CompilationFailed = 1;
@@ -79,6 +79,8 @@ public static class WebLingoCommandLine
             output.WriteLine(program.Version);
             return Success;
         }
+        if (args.Length >= 1 && args[0] == "test" && ReferenceEquals(program, Scripts))
+            return RunTests(args, output, error, input);
         if (args.Length == 2 && args[0] == "disasm" && program.Bytecode) return DisassembleFile(args[1], output, error);
         if (args.Length >= 2 && (args[0] is "run" or "check" || (args[0] == "compile" && program.Bytecode)))
         {
@@ -173,10 +175,12 @@ public static class WebLingoCommandLine
             ? $" | compile [--register|--stack] [--scheme <name>=<folder> …] <file{program.Extension}> | disasm <bytecode-file>"
             : "";
         output.WriteLine($"Usage: {program.Name} --version | run {options} [--timeout <ms>] {file} [name=value …]"
-            + $" | check {options} {file}{bytecodeUsage}");
+            + $" | check {options} {file}{bytecodeUsage}" + (ReferenceEquals(program, Scripts) ? $" | {TestUsage}" : ""));
         output.WriteLine("  run       compiles the file and runs it, giving its parameters the values after it, each a string");
         if (program.RunsFileNamedFirst) output.WriteLine($"            {program.Name} <file{program.Extension}> [name=value …] is the same as run");
         output.WriteLine("  check     compiles the file and reports its errors, without running it");
+        if (ReferenceEquals(program, Scripts))
+            output.WriteLine("  test      runs or lists tests discovered in exported test classes");
         if (program.Bytecode)
         {
             output.WriteLine("  compile   writes a .wlbr file for the register VM (--register) or a .wlbs for the stack VM (--stack)");

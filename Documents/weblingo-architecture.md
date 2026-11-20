@@ -386,6 +386,19 @@ styles and Windows roots on both platforms and emitting the host separator. `std
 resolves references, and reads and writes queries as ordered pairs. `std:csv` parses and writes arrays of string
 rows or maps keyed by headers. The .NET path and URL modules are adapter-side native modules. CSV is portable.
 
+**Testing framework approved 20 November 2026.** `weblingo test` discovers directly declared, zero-parameter
+instance methods with names beginning with `test` and an uppercase letter in top-level exported classes whose
+names end in `Tests`. It runs files in command order and cases in declaration order, with a fresh instance for
+each case. The runner awaits cases and optional `beforeEach` and `afterEach` hooks, keeps cleanup errors alongside
+case errors, and supports listing and filtering by case label. The explicit `std:test` import provides Boolean,
+equality, structural, membership, regular expression, approximate number and exception assertions, plus `checkAll`
+for reporting multiple failures. The [standard library reference](weblingo-standard-library-reference.md#30-stdtest)
+specifies the user-facing contract.
+
+The CLI compiles an in-memory driver with the test file as an import, leaving execution of methods and tasks
+to the selected VM. The compiler supplies `std:test` as a WebLingo module with a compiled initializer. It uses
+bundled native comparison and reporting routines. Both VMs attach assertion locations to caught `WL3021` errors.
+
 ### 3.10 COM objects on Windows — built 17 November 2026
 
 The owner asked on 15 November 2026 for a native extension for Windows through which scripts use COM objects, as classic ASP's pages did (`Server.CreateObject("ADODB.Connection")`), designed, not built. The owner approved its name, how its objects' members are written, the threads it runs on, the permission it needs and how its C# calls COM on 15 November 2026, each marked so below; the rest of this section was Proposed until the owner approved it, as written, on 17 November 2026 (A1 of "COM Objects on Windows: `windows:com`"), with three changes for the values WebLingo has had since it was written (A2 to A4, below, "Values"). Built on 17 November 2026 (M0.17; as built, §15.2, "COM objects").

@@ -117,7 +117,14 @@ public sealed class WebLingoCompilation
                         {
                             standard = roots.Count;
                             indexes.Add(import.Path, standard);
-                            roots.Add((import.Path, new WebLingoCompilationUnitSyntax([], default), new Dictionary<WebLingoImportSyntax, int>()));
+                            var rootOfStandard = new WebLingoCompilationUnitSyntax([], default);
+                            if (import.Path == WebLingoTestSource.Name)
+                            {
+                                var tree = new WebLingoParser(WebLingoTestSource.Text, import.Path).ParseCompilationUnit();
+                                foreach (var diagnostic in tree.Diagnostics) diagnostics.Add(diagnostic with { Source = import.Path });
+                                rootOfStandard = tree.Root;
+                            }
+                            roots.Add((import.Path, rootOfStandard, new Dictionary<WebLingoImportSyntax, int>()));
                         }
                         imports[import] = standard;
                         continue;
@@ -167,7 +174,8 @@ public sealed class WebLingoCompilation
         {
             modules.Add(new WebLingoModuleSource(name, root, imports)
             {
-                IsStandard = WebLingoStandardModules.IsCompilerMade(name), Native = natives.GetValueOrDefault(name)
+                IsStandard = name != WebLingoTestSource.Name && WebLingoStandardModules.IsCompilerMade(name),
+                Native = natives.GetValueOrDefault(name)
             });
         }
     }

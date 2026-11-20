@@ -2193,6 +2193,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL3018 | a COM object a script's configuration does not let it make |
 | WL3019 | an environment variable a site's script, under `wasp`, tries to set |
 | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run |
+| WL3021 | an assertion from [`std:test`](weblingo-standard-library-reference.md#30-stdtest) failed |
 | **WL4xxx** | **bytecode** |
 | WL4001 | bytecode that fails verification, such as a damaged file or a VM mismatch |
 | WL4002 | a program too large for the bytecode |

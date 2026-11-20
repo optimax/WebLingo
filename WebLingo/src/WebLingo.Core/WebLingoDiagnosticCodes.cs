@@ -127,6 +127,8 @@ public static class WebLingoDiagnosticCodes
     /// completed by hand"); its name and code Proposed.
     /// </summary>
     public const string WaitsForever = "WL3020";
+    /// <summary>A failed assertion from the standard testing module.</summary>
+    public const string TestAssertionFailed = "WL3021";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";

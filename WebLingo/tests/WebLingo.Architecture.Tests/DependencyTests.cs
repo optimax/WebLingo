@@ -30,6 +30,7 @@ public sealed class DependencyTests
         { "WebLingo.StdLib.Env", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.StdLib.Math", ["WebLingo.Core", "WebLingo.Runtime"] },
         { "WebLingo.StdLib.Csv", ["WebLingo.Core", "WebLingo.Runtime"] },
+        { "WebLingo.StdLib.Test", ["WebLingo.Core", "WebLingo.Runtime"] },
         { "WebLingo.StdLib.Random", ["WebLingo.Core", "WebLingo.Runtime"] },
         { "WebLingo.StdLib.Process", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.Platform.Abstractions", ["WebLingo.Core"] },
@@ -70,7 +71,7 @@ public sealed class DependencyTests
     [Fact]
     public void TheRulesCoverEveryPortableAssembly()
     {
-        Assert.Equal(23, PortableCore.Count); // Section 3 of Documents/implementation.md lists the portable assemblies.
+        Assert.Equal(24, PortableCore.Count); // Section 3 of Documents/implementation.md lists the portable assemblies.
     }
 
     [Theory]
