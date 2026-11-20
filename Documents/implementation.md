@@ -13,7 +13,7 @@ WebLingo is a JavaScript-inspired, native-oriented, cross-platform **server-side
 - Scripts and modules are `.wlg` files; HTML pages with server-side WebLingo templates are `.wasp` files.
 - Source is compiled to WLBC, a verified portable bytecode, and executed by the WebLingo VM.
 - The language is JavaScript-inspired but does **not** promise ECMAScript compatibility.
-- The compiler, VM, runtime and hosting are written first in C# on .NET 10. The long-term goal is to compile that same C# code with the project's independent Native C# compiler, so that WebLingo runs without .NET and without a rewrite in C++. Native C# and WebLingo are separate languages and runtime systems.
+- The compiler, VM, runtime and hosting are written first in C# on .NET 10. The long-term goal is to compile that same C# code with a Native C# compiler being developed separately, so that WebLingo runs without .NET and without a rewrite in C/C++. Native C# and WebLingo are separate languages and runtime systems.
 - The engine and the platform services are independent of IIS, ASP.NET Core, FastCGI, Kestrel, Windows and Linux. IIS, through an ASP.NET Core adapter, is the first deployment target; a FastCGI host, for nginx and Apache, is built too (M0.19), and a standalone HTTP host is an architectural target.
 
 The current state (specification, sections 9 and 15): a compiler and two VMs, a register VM and a stack VM, for M0.6's subset and the language of the specification's sections 3.5 to 3.8 (statements, collections, classes and exceptions, and asynchrony), whose register VM the `weblingo` CLI runs, and either VM a WLBC file, a `.wlbc`, which `weblingo compile` writes (M0.13); and pages (`.wasp`, section 13, M0.12.1), their includes (M0.12.2), components (M0.12.3) and layouts (M0.12.4), which `wasp`, WASP's command line, runs; hosting is being built (M0.14, the specification's section 9): WLHI's HTTP contracts (`WebLingo.Hosting.Abstractions`) and the host's core (`WebLingo.Hosting`), which serves an application's pages, and the platform layer is in part. `samples/HelloWorld`, `samples/Arithmetic` and `samples/Modules` run through `weblingo`, and `samples/SimpleWebsite` through `wasp`.
@@ -256,6 +256,7 @@ A small change in one stage of the pipeline can change the behavior of every lat
 - bytecode verification, and the VM's behavior on bad input,
 - the CLI's commands, output, and exit codes,
 - the project dependency graph and the portability inventory.
+- the documentation that describes it all.
 
 ------
 

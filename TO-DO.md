@@ -2,6 +2,30 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
+## CLI's VM
+
+The `implementation.md` seems to imply that the WebLingo CLI is only capable of running the register VM, while WASP is running both, as a choice. The intent was to make it possible for either exe to run either VM, based on configuration. If the choice of VM is not implemented that way, implement it.
+
+## Bytecode File Extensions
+
+Depending on whether bytecode is intended for register of stack VM, use the extension `.wlbr` for register, and `.wlbs` for stack. Regardless of the extension, check which VM a particular bytecode model is intended for and refuse to run on the wrong one.
+
+## Testing Framework
+
+Write a standard testing framework for WebLingo code, so that test classes can easily be written in WebLingo and run via a built-in test harness.
+
+## DAG of Dependencies
+
+Create an SVG illustration of the DAG of dependencies and insert into "Dependency Direction" section of the `implementation.md`.
+
+## Native Compatibility Document
+
+`Documents/NativeCompatibility.md` was renamed `native-compatibility.md`, yet documents still refer to the old name. Fix that.
+
+## Example Person's Name
+
+Whenever the name `Ann` is mentioned, in the example code, in the documentation, etc., change it to `Anna`.
+
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value
