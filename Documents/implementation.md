@@ -207,6 +207,11 @@ the CLI's VS Code debug adapter. It runs `publish.ps1` from the solution folder,
 for the installer. With IIS it uses `Scripts/install-weblingo.wlg` to update the shared WebLingo and WASP files
 and restart affected application pools. Without IIS it passes the same published folder to `Scripts/install.wlg`.
 
+`WebLingo/publish.ps1` and `Installers/Windows/package.ps1` share `WebLingo/Runtime.pubxml`, which excludes debug
+symbols and satellite resource assemblies from the published files. A local publish also removes earlier copies
+of those files from its publish folder and drops the language directories when empty. The Windows installer
+continues to preserve files already installed that are absent from its source.
+
 Tests use xUnit v2 (2.9.3) with `Microsoft.NET.Test.Sdk`, run by `dotnet test` through VSTest. Do not use xUnit v3 or Microsoft.Testing.Platform APIs and command-line conventions here; changing the test framework needs approval (section 12).
 
 These commands are known to work (2026-11-12, Windows, .NET SDK 10.0.404), from the solution folder; the third runs one test class:

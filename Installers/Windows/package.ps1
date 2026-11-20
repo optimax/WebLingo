@@ -19,6 +19,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $solution = Join-Path $repository 'WebLingo'
+$profile = Join-Path $solution 'Runtime.pubxml'
 # The solution's one version, which every assembly carries (Directory.Build.props).
 $props = [xml](Get-Content (Join-Path $solution 'Directory.Build.props'))
 $version = @($props.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ })[0]
@@ -30,12 +31,9 @@ $staging = Join-Path ([IO.Path]::GetTempPath()) ('weblingo-installers-' + [Guid]
 # other languages, each a folder of resources alone.
 function Publish-Project([string] $project, [string] $architecture, [string] $kind, [string] $folder) {
     $selfContained = if ($kind -eq 'self-contained') { 'true' } else { 'false' }
-    dotnet publish (Join-Path $solution $project) -c Release -r "win-$architecture" --self-contained $selfContained -o $folder
+    dotnet publish (Join-Path $solution $project) -c Release -r "win-$architecture" --self-contained $selfContained `
+        -o $folder "-p:PublishProfileFullPath=$profile"
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    Get-ChildItem $folder -Filter *.pdb -Recurse | Remove-Item
-    Get-ChildItem $folder -Directory |
-        Where-Object { -not (Get-ChildItem $_.FullName -File -Recurse | Where-Object { $_.Name -notlike '*.resources.dll' }) } |
-        Remove-Item -Recurse
 }
 
 # A folder's files, each by its path within it, with forward slashes, and its SHA-256, in lower case.
