@@ -14,10 +14,6 @@ Write a standard testing framework for WebLingo code, so that test classes can e
 
 **Approve weblingo test <file.wlg> [more files], with each module exporting a tests map from case names to zero-argument functions? A test class can register a case with a function such as () => new ArithmeticTests().adds(), giving that case a fresh instance. The harness would await both synchronous and asynchronous cases, report each failure and a summary, and exit nonzero on failure. Start std:test with assert(condition, message = null), equal(actual, expected, message = null) and async throws(action, expectedClass = Error). If you prefer automatic discovery of exported classes and test methods, please specify the discovery convention.**
 
-## Native Compatibility Document
-
-`Documents/NativeCompatibility.md` was renamed `native-compatibility.md`, yet documents still refer to the old name. Fix that.
-
 ## Example Person's Name
 
 Whenever the name `Ann` is mentioned, in the example code, in the documentation, etc., change it to `Anna`.

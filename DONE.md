@@ -4239,3 +4239,9 @@ Depending on whether bytecode is intended for register of stack VM, use the exte
 Create an SVG illustration of the DAG of dependencies and insert into "Dependency Direction" section of the `implementation.md`.
 
 2026-11-20 (Codex). Added the diagram in `9c9383c` and embedded it in Dependency Direction. It covers all 33 product projects, groups the native modules the CLI builds and ships, and omits redundant arrows. Compared every illustrated dependency path with the project references and checked the render in Edge. On the branch and main, Windows Release built with zero warnings and the suite passed (4,242 passed, six skipped). Linux was not tested locally.
+
+## [DONE] Native Compatibility Document
+
+`Documents/NativeCompatibility.md` was renamed `native-compatibility.md`, yet documents still refer to the old name. Fix that.
+
+2026-11-20 (Codex). Fixed eight current document and source-comment references in `321df38`. The exact tracked path is `Documents/native-compatibility.md`. Historical task records retain the name they describe. Windows Release built without warnings on the branch and main, and the full suite passed (4,242 passed, six skipped). Linux was not tested locally.
