@@ -113,6 +113,11 @@ Project references follow the specification, section 8.3:
 - Hosting and the CLI compose the engine; framework-specific types do not leak into the core.
 - All references form a directed acyclic graph.
 
+![Dependency graph of WebLingo's product projects](dependency-dag.svg)
+
+Arrows point from a project to a dependency. The diagram omits direct references already implied by another path.
+The dashed arrow shows the native modules that the CLI builds and ships without referencing their assemblies at compile time.
+
 Add projects (FastCGI, database providers, native adapters, `WebLingo.Hosting.Standalone`, the further test projects the specification lists) when their milestone begins, not before (specification, sections 8.2 and 13, WL-T008).
 
 ------

@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 816" role="img" aria-labelledby="title desc">
+  <title id="title">WebLingo product project dependencies</title>
+  <desc id="desc">Arrows point from each product project to a project it depends on. The WASP executable uses the WebLingo CLI and the FastCGI host. The register and stack VMs both use Bytecode and Runtime. The CLI builds and ships the grouped native modules, which depend on Runtime. Core has no project dependencies. Redundant arrows are omitted.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="6.5" markerHeight="6.5" refX="6" refY="3.25" orient="auto">
+      <path d="M0 0 6.5 3.25 0 6.5Z" fill="#627780"/>
+    </marker>
+    <marker id="package-arrow" markerWidth="6.5" markerHeight="6.5" refX="6" refY="3.25" orient="auto">
+      <path d="M0 0 6.5 3.25 0 6.5Z" fill="#8a591d"/>
+    </marker>
+    <style>
+      text { font-family: system-ui, sans-serif; fill: #153039; }
+      .node text { font-size: 17px; font-weight: 650; }
+      .host rect { fill: #164c52; stroke: #164c52; }
+      .host text { fill: #fff; }
+      .core rect { fill: #edf7f5; stroke: #86aaa9; }
+      .adapter rect { fill: #eff3fa; stroke: #8d9fbd; }
+      .edge { fill: none; stroke: #627780; stroke-width: 1.55; marker-end: url(#arrow); }
+      .package { stroke: #8a591d; stroke-dasharray: 5 4; marker-end: url(#package-arrow); }
+      .small { font-size: 13px; }
+    </style>
+  </defs>
+
+  <rect x="1" y="1" width="1198" height="814" rx="16" fill="#fff" stroke="#d5e0e2"/>
+  <text x="28" y="33" font-size="20" font-weight="700">WebLingo project dependencies</text>
+  <g class="small" aria-label="Arrow legend">
+    <path class="edge" d="M702 27 H738"/>
+    <text x="749" y="32">Project depends on</text>
+    <path class="edge package" d="M934 27 H970"/>
+    <text x="981" y="32">CLI builds and ships</text>
+  </g>
+
+  <g aria-hidden="true">
+    <path class="edge" data-from="Wasp.Cli" data-to="Cli" d="M520 98 L408 131"/>
+    <path class="edge" data-from="Wasp.Cli" data-to="Hosting.FastCgi" d="M620 98 L730 131"/>
+    <path class="edge" data-from="Hosting.FastCgi" data-to="Hosting.AspNetCore" d="M779 171 L795 201"/>
+    <path class="edge" data-from="Hosting.AspNetCore" data-to="Hosting" d="M814 241 L826 280"/>
+    <path class="edge" data-from="Hosting.AspNetCore" data-to="Platform.DotNet" d="M890 241 L1035 276"/>
+    <path class="edge" data-from="Cli" data-to="Templates" d="M346 171 C346 245 300 313 300 385"/>
+    <path class="edge" data-from="Cli" data-to="VM.Stack" d="M362 171 C362 246 425 316 425 385"/>
+    <path class="edge" data-from="Cli" data-to="VM" d="M380 171 C384 257 555 303 575 385"/>
+    <path class="edge" data-from="Cli" data-to="StdLib" d="M396 171 C427 249 713 264 727 385"/>
+    <path class="edge" data-from="Cli" data-to="Platform.DotNet" d="M439 151 H487 Q510 151 526 168 L542 181 Q552 190 570 190 H925 Q949 190 967 207 L986 230 Q1000 249 1030 258 L1062 276"/>
+    <path class="edge" data-from="Cli" data-to="Data.DotNet" d="M439 158 H480 Q501 158 517 174 L536 192 Q549 202 570 202 H650 Q674 202 674 226 V242 Q674 264 698 264 H977 Q994 264 994 283 V337 Q994 355 1031 367"/>
+    <path class="edge package" data-from="Cli" data-to="BundledModules" d="M318 171 C278 203 176 220 142 275"/>
+    <path class="edge" data-from="Hosting" data-to="Templates" d="M803 320 C796 350 324 313 322 385"/>
+    <path class="edge" data-from="Hosting" data-to="VM" d="M822 320 C800 353 606 334 605 385"/>
+    <path class="edge" data-from="Hosting" data-to="StdLib" d="M841 320 C838 363 752 341 751 385"/>
+    <path class="edge" data-from="Hosting" data-to="Hosting.Abstractions" d="M862 320 C875 348 907 350 912 385"/>
+    <path class="edge" data-from="Templates" data-to="Compiler" d="M306 425 V480"/>
+    <path class="edge" data-from="Compiler" data-to="Language" d="M306 520 V575"/>
+    <path class="edge" data-from="Compiler" data-to="Bytecode" d="M324 520 L425 575"/>
+    <path class="edge" data-from="VM" data-to="Bytecode" d="M577 425 L486 575"/>
+    <path class="edge" data-from="VM" data-to="Runtime" d="M605 425 L713 575"/>
+    <path class="edge" data-from="VM.Stack" data-to="Bytecode" d="M426 425 L460 575"/>
+    <path class="edge" data-from="VM.Stack" data-to="Runtime" d="M450 425 C475 464 674 480 696 575"/>
+    <path class="edge" data-from="StdLib" data-to="Runtime" d="M742 425 V575"/>
+    <path class="edge" data-from="Hosting.Abstractions" data-to="Runtime" d="M902 425 L768 575"/>
+    <path class="edge" data-from="Platform.DotNet" data-to="Platform.Abstractions" d="M1123 316 V606 Q1123 631 1090 639 L994 664"/>
+    <path class="edge" data-from="Data.DotNet" data-to="Platform.Abstractions" d="M1071 396 V594 Q1071 617 1045 630 L975 664"/>
+    <path class="edge" data-from="Runtime" data-to="Platform.Abstractions" d="M776 615 L887 664"/>
+    <path class="edge" data-from="BundledModules" data-to="Runtime" d="M190 508 V647 Q190 655 199 655 H659 Q686 655 692 637 L699 615"/>
+    <path class="edge" data-from="Platform.Abstractions" data-to="Core" d="M881 704 L616 751"/>
+    <path class="edge" data-from="Bytecode" data-to="Core" d="M482 615 L539 740"/>
+    <path class="edge" data-from="Language" data-to="Core" d="M304 615 L514 740"/>
+  </g>
+
+  <g role="group" aria-label="Bundled native modules">
+    <rect x="24" y="275" width="211" height="233" rx="12" fill="#fffbf1" stroke="#b9a47c"/>
+    <text x="42" y="302" font-size="16" font-weight="700">Bundled native modules</text>
+    <text x="42" y="326" font-size="14" font-weight="650">StdLib.*</text>
+    <g font-size="13">
+      <text x="42" y="347">Compression</text>
+      <text x="42" y="365">Crypto</text>
+      <text x="42" y="383">Csv</text>
+      <text x="42" y="401">Db</text>
+      <text x="42" y="419">Env</text>
+      <text x="42" y="437">Fs</text>
+      <text x="42" y="455">Http</text>
+      <text x="137" y="347">Math</text>
+      <text x="137" y="365">Net</text>
+      <text x="137" y="383">Path</text>
+      <text x="137" y="401">Process</text>
+      <text x="137" y="419">Random</text>
+      <text x="137" y="437">Tasks</text>
+      <text x="137" y="455">Url</text>
+    </g>
+    <path d="M42 468 H217" fill="none" stroke="#d8c8aa"/>
+    <text x="42" y="490" font-size="14" font-weight="650">Windows.Com</text>
+  </g>
+
+  <g class="node host" role="group" aria-label="WebLingo.Wasp.Cli">
+    <rect x="490" y="58" width="152" height="40" rx="8"/>
+    <text x="566" y="84" text-anchor="middle">Wasp.Cli</text>
+  </g>
+  <g class="node host" role="group" aria-label="WebLingo.Cli">
+    <rect x="301" y="131" width="138" height="40" rx="8"/>
+    <text x="370" y="157" text-anchor="middle">Cli</text>
+  </g>
+  <g class="node host" role="group" aria-label="WebLingo.Hosting.FastCgi">
+    <rect x="679" y="131" width="182" height="40" rx="8"/>
+    <text x="770" y="157" text-anchor="middle">Hosting.FastCgi</text>
+  </g>
+  <g class="node host" role="group" aria-label="WebLingo.Hosting.AspNetCore">
+    <rect x="701" y="201" width="212" height="40" rx="8"/>
+    <text x="807" y="227" text-anchor="middle">Hosting.AspNetCore</text>
+  </g>
+  <g class="node core" role="group" aria-label="WebLingo.Hosting">
+    <rect x="763" y="280" width="136" height="40" rx="8"/>
+    <text x="831" y="306" text-anchor="middle">Hosting</text>
+  </g>
+  <g class="node adapter" role="group" aria-label="WebLingo.Platform.DotNet">
+    <rect x="1010" y="276" width="168" height="40" rx="8"/>
+    <text x="1094" y="302" text-anchor="middle">Platform.DotNet</text>
+  </g>
+  <g class="node adapter" role="group" aria-label="WebLingo.Data.DotNet">
+    <rect x="1031" y="356" width="146" height="40" rx="8"/>
+    <text x="1104" y="382" text-anchor="middle">Data.DotNet</text>
+  </g>
+  <g class="node core" role="group" aria-label="WebLingo.Templates">
+    <rect x="249" y="385" width="114" height="40" rx="8"/>
+    <text x="306" y="411" text-anchor="middle">Templates</text>
+  </g>
+  <g class="node core" role="group" aria-label="WebLingo.VM.Stack">
+    <rect x="367.5" y="385" width="137" height="40" rx="8"/>
+    <text x="436" y="411" text-anchor="middle">VM.Stack</text>
+  </g>
+  <g class="node core" role="group" aria-label="WebLingo.VM">
+    <rect x="531.5" y="385" width="117" height="40" rx="8"/>
+    <text x="590" y="411" text-anchor="middle">VM</text>
+  </g>
+  <g class="node core" role="group" aria-label="WebLingo.StdLib">
+    <rect x="678.5" y="385" width="123" height="40" rx="8"/>
+    <text x="740" y="411" text-anchor="middle">StdLib</text>
+  </g>
+  <g class="node core" role="group" aria-label="WebLingo.Hosting.Abstractions">
+    <rect x="816.5" y="385" width="199" height="40" rx="8"/>
+    <text x="916" y="411" text-anchor="middle">Hosting.Abstractions</text>
+  </g>
+  <g class="node core" role="group" aria-label="WebLingo.Compiler">
+    <rect x="249" y="480" width="114" height="40" rx="8"/>
+    <text x="306" y="506" text-anchor="middle">Compiler</text>
+  </g>
+  <g class="node core" role="group" aria-label="WebLingo.Language">
+    <rect x="249" y="575" width="114" height="40" rx="8"/>
+    <text x="306" y="601" text-anchor="middle">Language</text>
+  </g>
+  <g class="node core" role="group" aria-label="WebLingo.Bytecode">
+    <rect x="401.5" y="575" width="137" height="40" rx="8"/>
+    <text x="470" y="601" text-anchor="middle">Bytecode</text>
+  </g>
+  <g class="node core" role="group" aria-label="WebLingo.Runtime">
+    <rect x="676.5" y="575" width="127" height="40" rx="8"/>
+    <text x="740" y="601" text-anchor="middle">Runtime</text>
+  </g>
+  <g class="node core" role="group" aria-label="WebLingo.Platform.Abstractions">
+    <rect x="833" y="664" width="216" height="40" rx="8"/>
+    <text x="941" y="690" text-anchor="middle">Platform.Abstractions</text>
+  </g>
+  <g class="node core" role="group" aria-label="WebLingo.Core">
+    <rect x="494.5" y="740" width="125" height="40" rx="8"/>
+    <text x="557" y="766" text-anchor="middle">Core</text>
+  </g>
+</svg>
