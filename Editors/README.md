@@ -69,6 +69,9 @@ Its colouring was tried with VS Code 1.146, on Windows.
 
 ### Debug a WebLingo script
 
+On Windows with the .NET 10 SDK installed, double-click [build.bat](../build.bat) in the repository root.
+It builds `weblingo.exe` with the debug adapter and displays its full path.
+
 Use a build of `weblingo` that includes the debug adapter. Put it on PATH or set **WebLingo: Debugger Path**
 (`weblingo.debuggerPath`) in VS Code's user settings to the executable's full path. A Release build from this
 repository puts the executable in `WebLingo/src/WebLingo.Cli/bin/Release/net10.0/`.

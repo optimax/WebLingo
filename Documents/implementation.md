@@ -202,6 +202,9 @@ Where the specification is silent, the choices M0.6 made are listed, as Proposed
 
 # 8. Building and Testing
 
+On Windows, double-click `build.bat` in the repository root to build the CLI and its VS Code debug adapter in Release.
+It runs from the solution folder so `dotnet` uses `global.json`, then prints the executable's path for VS Code.
+
 Tests use xUnit v2 (2.9.3) with `Microsoft.NET.Test.Sdk`, run by `dotnet test` through VSTest. Do not use xUnit v3 or Microsoft.Testing.Platform APIs and command-line conventions here; changing the test framework needs approval (section 12).
 
 These commands are known to work (2026-11-12, Windows, .NET SDK 10.0.404), from the solution folder; the third runs one test class:
