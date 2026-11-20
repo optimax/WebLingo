@@ -4387,3 +4387,17 @@ Approve this `std:test` design and the proposed first-release scope?
 A: Approved.
 
 2026-11-20 (Codex). Implemented in `d93f9d7`. The runner discovers exported test classes, supports `--list` and a case-sensitive substring `--filter`, and runs each case on a fresh instance with setup and cleanup hooks. `std:test` supplies the approved assertions and `checkAll`. The tolerance argument to `assertClose` is a map with `absolute`, `relative`, or both. The Windows Release build had zero warnings. The full suite on `main` passed 4,265 tests, with six integration tests skipped because their SQL Server, nginx, or Apache prerequisites were unavailable. CLI samples and passing and failing test files ran on both VMs. A temporary publish included the native testing support and ran a test. Linux was not tested locally.
+
+## [DONE] Double-click Windows setup for WebLingo and its VS Code debugger
+
+Ship `Install WebLingo.bat` in each WebLingo ZIP. Have the bundled runtime run setup in WebLingo. Request elevation
+for the machine installation and PATH, then offer `.wlg` file registration and the bundled VS Code debugger for the
+original Windows user. Keep the extension package in the installed `VSCode` folder for later use. Verify the ZIPs
+and the installer's success, cancellation and optional integration paths on Windows.
+
+2026-11-20 (Codex). Implemented in `ca533ec`. The Windows Release build passed with zero errors and warnings.
+All six WebLingo ZIPs carried the launcher and the same offline VSIX. The six WASP manifests matched their paired
+runtime archives. On x64 Windows, isolated launcher checks covered the prompts, cancellation, missing VS Code,
+optional steps, reruns and failures. VS Code installed the packaged debugger and the installed runtime answered
+protocol requests. The x86 self-contained launcher also ran on x64 Windows. UAC, machine PATH and the real user's
+file association were simulated. Native ARM64 and 32-bit Windows were not exercised.

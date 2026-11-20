@@ -2,13 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [WORKING] Double-click Windows setup for WebLingo and its VS Code debugger
-
-Ship `Install WebLingo.bat` in each WebLingo ZIP. Have the bundled runtime run setup in WebLingo. Request elevation
-for the machine installation and PATH, then offer `.wlg` file registration and the bundled VS Code debugger for the
-original Windows user. Keep the extension package in the installed `VSCode` folder for later use. Verify the ZIPs
-and the installer's success, cancellation and optional integration paths on Windows.
-
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value
