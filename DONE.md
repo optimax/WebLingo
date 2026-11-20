@@ -4261,3 +4261,129 @@ Approve "vm": "register" or "stack" in weblingo.config and wasp.config, using th
 A: Approved.
 
 2026-11-20 (Codex). Implemented in `e68932c`. Both executables compile and run source on the configured VM, with register as the default. An explicit compile flag overrides the file setting, and run and check validate compiled bytecode against it. WASP uses the site root to select the VM when given --root and selects it at host startup for serving. The debugger still uses register. Windows Release built with zero warnings on the branch and main, and the full suite passed (4,252 passed, six skipped). Both executables ran their samples on both VMs. Hosted checks covered FastCGI, HTTP handlers, async component rendering and runtime diagnostics. Linux was not tested locally.
+
+## [DONE] Testing Framework
+
+Write a standard testing framework for WebLingo code, so that test classes can easily be written in WebLingo and run via a built-in test harness.
+
+Approve weblingo test <file.wlg> [more files], with each module exporting a tests map from case names to zero-argument functions? A test class can register a case with a function such as () => new ArithmeticTests().adds(), giving that case a fresh instance. The harness would await both synchronous and asynchronous cases, report each failure and a summary, and exit nonzero on failure. Start std:test with assert(condition, message = null), equal(actual, expected, message = null) and async throws(action, expectedClass = Error). If you prefer automatic discovery of exported classes and test methods, please specify the discovery convention.
+
+A: Design the discovery convention and present here.
+
+Proposed discovery for `weblingo test <file.wlg> [more files]`
+
+- Discover top-level classes declared with `export class` whose names end in `Tests`. Within each class, discover
+  directly declared instance methods named `testName`, with an uppercase letter after `test`. Both matches are
+  case-sensitive. Static methods, inherited methods, and imported classes do not become tests.
+- A test method must declare zero parameters and may be synchronous or asynchronous. The harness initializes each
+  file's module once and constructs a fresh class instance with no arguments before each case. Run files in command
+  order and classes and methods in declaration order.
+- Report cases using `file::Class.method`. Await each case, record uncaught errors as failures, continue with the
+  remaining cases, and exit nonzero when a test or discovery fails. A file with no matching cases or a test method
+  with parameters gets a discovery diagnostic. No registration map or annotation is needed.
+
+```javascript
+export class ArithmeticTests {
+    testAddition() {
+        if (2 + 2 != 4) throw new Error("Expected four");
+    }
+
+    async testAfterDelay() {
+        await delay(1);
+        if (3 * 4 != 12) throw new Error("Expected twelve");
+    }
+}
+```
+
+Approve this discovery convention for the built-in harness, along with the proposed `std:test` assertions?
+
+Explain: What about multiple assertions in a single test case? How do we make assertions easier? Instead of `throw...` I'd rather say `assertEqual(2 + 2, 4, "Expected four.");`.
+
+Proposed assertion behavior
+
+Import `assertEqual` from `std:test` and call it as `assertEqual(actual, expected, message = null)`.
+The message is optional. On failure the harness reports the assertion's file and line, the expected and actual values,
+and any message supplied.
+
+A test method can make several assertions. They run in order. The first failure ends that case, and the harness
+continues with the next case. Put independent checks in separate methods when you want a result for each one even
+if another fails.
+
+```javascript
+import { assertEqual } from "std:test";
+
+export class ArithmeticTests {
+    testAddition() {
+        assertEqual(2 + 2, 4, "Expected four.");
+        assertEqual(4 + 0, 4);
+    }
+}
+```
+
+Approve the discovery convention with `assertEqual` and this failure behavior?
+
+There is more to it. Investigate what JavaScript and Python frameworks define for their most popular test frameworks and propose a more comprehensive design for std:test.
+
+### Proposed `std:test` design
+
+Use explicit imports from `std:test`. Ordinary assertions stop the current case at the first failure. Use
+`checkAll` when several independent checks in the same case should report their failures together.
+
+#### Framework references
+
+- Jest separates ordinary equality from strict structural comparison, offers matchers for collections and exceptions,
+  and supports parameterized tests. Vitest provides soft assertions that keep running and still fail the case.
+  [Jest matchers](https://jestjs.io/docs/expect) · [Jest parameterization](https://jestjs.io/docs/api#testeachtablename-fn-timeout) · [Vitest soft assertions](https://vitest.dev/api/expect#soft)
+- Node provides an explicit assertion module alongside a separate runner with lifecycle hooks, filtering, and
+  reporting. [Node assertions](https://nodejs.org/api/assert.html) · [Node test runner](https://nodejs.org/api/test.html)
+- Python's `unittest` provides named assertions, class-based setup and cleanup, and subtests. pytest provides
+  detailed comparison failures, fixtures with teardown, and one result per parameter row.
+  [Python unittest](https://docs.python.org/3/library/unittest.html) · [pytest assertions](https://docs.pytest.org/en/stable/how-to/assert.html) · [pytest fixtures](https://docs.pytest.org/en/stable/how-to/fixtures.html) · [pytest parameterization](https://docs.pytest.org/en/stable/how-to/parametrize.html)
+
+#### Assertions
+
+| API | Proposed behavior |
+| --- | --- |
+| `assert(condition, message = null)` | Checks a Boolean condition. |
+| `assertEqual(actual, expected, message = null)` and `assertNotEqual(actual, expected, message = null)` | Use WebLingo's `==` semantics, including identity for collections. |
+| `assertDeepEqual(actual, expected, message = null)` | Compares array elements in order, maps by key and value regardless of insertion order, sets by membership, and bytes by content. Handles cycles and reports the first differing path. |
+| `assertContains(actual, item, message = null)`, `assertHasKey(map, key, message = null)`, and `assertMatches(text, regex, message = null)` | Check membership, key existence, or a regular-expression match. |
+| `assertClose(actual, expected, tolerance, message = null)` | Checks numeric results using an explicit absolute or relative tolerance. |
+| `assertThrows(action, expectedClass = Error)` and `await assertRejects(action, expectedClass = Error)` | Check for a synchronous throw or a rejected task, respectively. Return the matching error so the caller can inspect its code or message. |
+| `await checkAll(action)` | Gives the callback a `check` object with the same assertion methods and reports their failures together. An unexpected exception stops the block and is reported alongside the failures collected so far. |
+
+```javascript
+import { assertEqual, checkAll } from "std:test";
+
+export class ArithmeticTests {
+    testAddition() {
+        assertEqual(2 + 2, 4, "Expected four.");
+    }
+
+    async testIndependentResults() {
+        await checkAll(check => {
+            check.assertEqual(2 + 2, 4);
+            check.assertEqual(3 * 4, 12);
+        });
+    }
+}
+```
+
+#### Runner and release scope
+
+Keep the class discovery convention above. The runner selects exported classes ending in `Tests` and their directly
+declared, zero-argument instance methods named `testSomething`. Each case gets a fresh instance and may use optional
+sync or async `beforeEach` and `afterEach` hooks. Run cleanup even when a test fails, and report a cleanup failure
+alongside the original failure. An assertion failure includes the case name, source location, expected and actual
+values when applicable, and any supplied message. The runner continues with the remaining cases.
+
+Include discovery, the assertions above, `checkAll`, per-case hooks, and the runner's `--list` and `--filter` in
+the first release. Add named parameter rows next, with their own result and fresh instance for each row. Follow with
+temporary-directory fixtures and explicit spies. Design snapshots, module mocking, fake timers, and coverage
+separately because they affect file updates, imports, scheduling, or compiler instrumentation.
+
+Approve this `std:test` design and the proposed first-release scope?
+
+A: Approved.
+
+2026-11-20 (Codex). Implemented in `d93f9d7`. The runner discovers exported test classes, supports `--list` and a case-sensitive substring `--filter`, and runs each case on a fresh instance with setup and cleanup hooks. `std:test` supplies the approved assertions and `checkAll`. The tolerance argument to `assertClose` is a map with `absolute`, `relative`, or both. The Windows Release build had zero warnings. The full suite on `main` passed 4,265 tests, with six integration tests skipped because their SQL Server, nginx, or Apache prerequisites were unavailable. CLI samples and passing and failing test files ran on both VMs. A temporary publish included the native testing support and ran a test. Linux was not tested locally.

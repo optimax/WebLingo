@@ -2,41 +2,6 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
-## [QUESTION] Testing Framework
-
-Write a standard testing framework for WebLingo code, so that test classes can easily be written in WebLingo and run via a built-in test harness.
-
-Approve weblingo test <file.wlg> [more files], with each module exporting a tests map from case names to zero-argument functions? A test class can register a case with a function such as () => new ArithmeticTests().adds(), giving that case a fresh instance. The harness would await both synchronous and asynchronous cases, report each failure and a summary, and exit nonzero on failure. Start std:test with assert(condition, message = null), equal(actual, expected, message = null) and async throws(action, expectedClass = Error). If you prefer automatic discovery of exported classes and test methods, please specify the discovery convention.
-
-A: Design the discovery convention and present here.
-
-Proposed discovery for `weblingo test <file.wlg> [more files]`
-
-- Discover top-level classes declared with `export class` whose names end in `Tests`. Within each class, discover
-  directly declared instance methods named `testName`, with an uppercase letter after `test`. Both matches are
-  case-sensitive. Static methods, inherited methods, and imported classes do not become tests.
-- A test method must declare zero parameters and may be synchronous or asynchronous. The harness initializes each
-  file's module once and constructs a fresh class instance with no arguments before each case. Run files in command
-  order and classes and methods in declaration order.
-- Report cases using `file::Class.method`. Await each case, record uncaught errors as failures, continue with the
-  remaining cases, and exit nonzero when a test or discovery fails. A file with no matching cases or a test method
-  with parameters gets a discovery diagnostic. No registration map or annotation is needed.
-
-```javascript
-export class ArithmeticTests {
-    testAddition() {
-        if (2 + 2 != 4) throw new Error("Expected four");
-    }
-
-    async testAfterDelay() {
-        await delay(1);
-        if (3 * 4 != 12) throw new Error("Expected twelve");
-    }
-}
-```
-
-**Approve this discovery convention for the built-in harness, along with the proposed `std:test` assertions?**
-
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value
