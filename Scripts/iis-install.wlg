@@ -18,7 +18,7 @@ param source = "WASP";
 param needs = "wasp-needs.json";
 param target = "";
 
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 import com from "windows:com";
 import fs from "std:fs";
 import http from "std:http";

@@ -25,7 +25,7 @@ public sealed class ComTests : IDisposable
     public void AnObjectsMembersAreReachedAsAnyMemberIs()
     {
         const string program = """
-            import { writeLn } from "std:system";
+            import { writeLn } from "std:console";
             import com from "windows:com";
             var d = com.create("Scripting.Dictionary");
             d.Add("tea", "Sencha");
@@ -66,7 +66,7 @@ public sealed class ComTests : IDisposable
         // ADO's own types, in a recordset in memory: currency (6), decimal (14), date (7), bytes (204), and a big integer (20),
         // which ADO gives back as a decimal.
         const string program = """
-            import { writeLn } from "std:system"; import { Bytes } from "std:bytes"; import { DateTime } from "std:datetime";
+            import { writeLn } from "std:console"; import { Bytes } from "std:bytes"; import { DateTime } from "std:datetime";
             import com from "windows:com";
             var rs = com.create("ADODB.Recordset");
             rs.Fields.Append("Name", 202, 50);
@@ -110,7 +110,7 @@ public sealed class ComTests : IDisposable
     public void AFailureIsAComErrorAndAMissingMemberAMemberError()
     {
         const string program = """
-            import { writeLn } from "std:system";
+            import { writeLn } from "std:console";
             import com from "windows:com";
             var d = com.create("Scripting.Dictionary");
             d.Add("a", 1);
@@ -141,7 +141,7 @@ public sealed class ComTests : IDisposable
     public void OnlyWhatTheConfigurationAllowsIsMade()
     {
         const string program = """
-            import { writeLn } from "std:system";
+            import { writeLn } from "std:console";
             import com from "windows:com";
             try { com.create("WScript.Shell"); } catch (ComPermissionError e) { writeLn(e.code + " " + e.message); }
             try { com.get("winmgmts:"); } catch (ComPermissionError e) { writeLn(e.code + " " + e.message); }
@@ -163,7 +163,7 @@ public sealed class ComTests : IDisposable
     public void ComIsAllowedByAListOfNames()
     {
         File.WriteAllText(Path.Combine(_folder, "weblingo.config"), "{ \"com\": [\"Scripting.Dictionary\"] }");
-        File.WriteAllText(Path.Combine(_folder, "program.wlg"), "import { write, writeLn } from \"std:system\"; writeLn(1);");
+        File.WriteAllText(Path.Combine(_folder, "program.wlg"), "import { write, writeLn } from \"std:console\"; writeLn(1);");
         var (exit, _, error) = Weblingo("run", Path.Combine(_folder, "program.wlg"));
         Assert.Equal(WebLingoCommandLine.FileUnreadable, exit);
         Assert.Contains("\"com\" is an object, { \"allow\": [\"ADODB.Connection\"] }.", error, StringComparison.Ordinal);

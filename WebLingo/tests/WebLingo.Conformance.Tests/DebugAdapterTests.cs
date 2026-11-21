@@ -24,7 +24,7 @@ public sealed class DebugAdapterTests : IDisposable
             """);
         var program = Write("example.wlg", """
             param label = "default";
-            import { twice } from "./math.wlg";
+            import { twice } from "./math.wlg"; import { writeLn } from "std:console";
             var count = 2;
             var result = twice(count);
             writeLn($"{label}: {result}");
@@ -86,7 +86,7 @@ public sealed class DebugAdapterTests : IDisposable
     public async Task EntryStopAndScopesRespectShadowing()
     {
         var program = Write("scopes.wlg", """
-            var item = 1;
+            import { writeLn } from "std:console"; var item = 1;
             {
                 var item = [2, 3];
                 writeLn(item);
@@ -132,7 +132,7 @@ public sealed class DebugAdapterTests : IDisposable
             """);
         var program = Write("example.wlg", """
             import { Tea, serve, served, optional } from "./teas.wlg";
-            import { writeLn } from "std:system";
+            import { writeLn } from "std:console";
             function pour() { serve(); }
             var sencha = new Tea();
             pour();

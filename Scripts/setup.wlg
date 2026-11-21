@@ -1,4 +1,5 @@
 // Run by Install WebLingo.bat from the extracted ZIP, in the account that opened it.
+import { write, writeLn, prompt } from "std:console";
 import fs from "std:fs";
 import process from "std:process";
 import { Environment } from "std:env";

@@ -3,6 +3,7 @@
 // The defaults are the safe ones: random bytes from the platform's secure generator, passwords hashed slowly with a
 // salt, and secrets compared in a time that does not tell where they differ.
 
+import { writeLn } from "std:console";
 import crypto from "std:crypto";
 
 writeLn(crypto.sha256("abc").toHex());

@@ -21,6 +21,14 @@ public sealed record WebLingoBuiltinDeclaration(string Name, int Arity)
     /// <c>write</c> and <c>writeLn</c> so.
     /// </summary>
     public bool Writes { get; init; }
+
+    /// <summary>
+    /// Whether only a template's own code sees it (<see cref="WebLingoCompilerOptions.IsTemplate"/>), a page's, a layout's
+    /// or a component's, never a module it imports: a template compiler declares a page's own <c>write</c> and
+    /// <c>writeLn</c> so, which write its response without an import (section 13; the owner's answer, 20 November 2026,
+    /// "Console Module", A2), and which no standard module exports.
+    /// </summary>
+    public bool InTemplates { get; init; }
 }
 
 /// <summary>What the compiler needs from its host: the built-in functions scripts may call.</summary>
@@ -66,6 +74,12 @@ public sealed record WebLingoCompilerOptions(IReadOnlyList<WebLingoBuiltinDeclar
     /// (section 6.12); none by default. Only the program's own file's parameters are given so, never an import's.
     /// </summary>
     public IReadOnlyList<WebLingoHostParameter> HostParameters { get; init; } = [];
+
+    /// <summary>
+    /// Which of the program's files, by name, are templates (section 13), read by a template compiler, whose code sees the
+    /// built-ins declared for templates alone (<see cref="WebLingoBuiltinDeclaration.InTemplates"/>); none if null.
+    /// </summary>
+    public Func<string, bool>? IsTemplate { get; init; }
 }
 
 /// <summary>

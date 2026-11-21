@@ -24,7 +24,7 @@ public sealed class TestingCommandLineTests : IDisposable
             """);
         var file = Write("cases.wlg", """
             import { ImportedTests } from "./base";
-            import { assert, assertEqual } from "std:test";
+            import { assert, assertEqual } from "std:test"; import { writeLn } from "std:console";
             writeLn("initializing");
             var order = [];
             class UnexportedTests { testHidden() { throw new Error("unexported method ran"); } }
@@ -40,7 +40,7 @@ public sealed class TestingCommandLineTests : IDisposable
                 testOrder() { assertEqual(order.join(""), "za"); }
             }
             """);
-        var second = Write("second.wlg", """export class OtherTests { testLast() { writeLn("ran second"); } }""");
+        var second = Write("second.wlg", """import { writeLn } from "std:console"; export class OtherTests { testLast() { writeLn("ran second"); } }""");
         var list = Run("test", "--list", file, second);
         Assert.Equal(WebLingoCommandLine.Success, list.Exit);
         Assert.Equal("", list.Error);
@@ -65,7 +65,7 @@ public sealed class TestingCommandLineTests : IDisposable
             """);
         var file = Write("failures.wlg", """
             import { check } from "./assertions";
-            import { assert, assertEqual } from "std:test";
+            import { assert, assertEqual } from "std:test"; import { writeLn } from "std:console";
             export class ExampleTests {
                 async beforeEach() { await delay(1); this.cleanupFails = true; }
                 testFails() {

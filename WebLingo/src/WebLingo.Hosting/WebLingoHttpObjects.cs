@@ -27,6 +27,16 @@ internal sealed class WebLingoHttpObjects
 {
     private const string Prefix = "http";
 
+    /// <summary>
+    /// <c>response.write(value)</c> and <c>response.writeLn(value)</c>, written in WebLingo, so that a value's text is the
+    /// text <c>write</c> writes, an instance's <c>toString()</c> run, as an interpolation runs it, <c>null</c> as
+    /// <c>null</c>; the text then given to the response's own <c>__write</c>, a name a program's members are unlikely to
+    /// take (the owner's answer, 20 November 2026, "Console Module", A2).
+    /// </summary>
+    private const string WritingSource =
+        "write(value) { this.__write(value == null ? \"null\" : $\"{value}\"); }\n" +
+        "writeLn(value) { this.__write((value == null ? \"null\" : $\"{value}\") + \"\\n\"); }\n";
+
     private readonly WebLingoNativeClass _request = new("Request");
     private readonly WebLingoNativeClass _response = new("Response");
     private readonly WebLingoNativeClass _headers = new("Headers");
@@ -45,7 +55,9 @@ internal sealed class WebLingoHttpObjects
             .DeclareMethod("read", 0, BodyRead);
         _response
             .DeclareProperty("status", Status, SetStatus)
-            .DeclareProperty("headers", (a, heap, out r, out e) => ResponseHeaders(a, heap, out r, out e));
+            .DeclareProperty("headers", (a, heap, out r, out e) => ResponseHeaders(a, heap, out r, out e))
+            .DeclareMethod("__write", 1, WriteText)
+            .DeclareWebLingoMethods(WritingSource);
         _headers
             .DeclareIndexer(GetHeader, SetHeader)
             .DeclareMethod("has", 1, HasHeader)
@@ -70,11 +82,14 @@ internal sealed class WebLingoHttpObjects
     /// <summary>What the compiler gives a page's <c>param request;</c> and <c>param response;</c>, and a handler's caller's.</summary>
     public IReadOnlyList<WebLingoHostParameter> Parameters { get; }
 
-    /// <summary>The built-ins that make a request's instances, given their classes, each made once, kept for the execution.</summary>
-    public IWebLingoBuiltinFunction[] For(IWebLingoHttpRequest request, IWebLingoHttpResponse response)
+    /// <summary>
+    /// The built-ins that make a request's instances, given their classes, each made once, kept for the execution, the
+    /// response's writing to <paramref name="output"/>, where the page's text goes.
+    /// </summary>
+    public IWebLingoBuiltinFunction[] For(IWebLingoHttpRequest request, IWebLingoHttpResponse response, IWebLingoTextOutput output)
     {
         var requestState = new RequestState(request);
-        var responseState = new ResponseState(response);
+        var responseState = new ResponseState(response, output);
         return
         [
             new Maker(Prefix + ".request", (classes, heap, out made, out error) =>
@@ -324,6 +339,20 @@ internal sealed class WebLingoHttpObjects
         return true;
     }
 
+    /// <summary>The response's <c>__write(text)</c>: a string, as it stands, where the page's text goes, giving <c>null</c>.</summary>
+    private bool WriteText(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_response.TryGetHostObject<ResponseState>(a[0], heap, out var state, out error)) return false;
+        if (a[1].Kind != WebLingoValueKind.String)
+        {
+            error = Invalid($"A response writes a string, not {WebLingoValueFormatter.Describe(a[1], heap)}.");
+            return false;
+        }
+        state.Output.Write(heap.GetString(a[1]));
+        return true;
+    }
+
     private bool SetStatus(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         result = WebLingoValue.Null;
@@ -448,8 +477,22 @@ internal sealed class WebLingoHttpObjects
             if (indexer.Setter is not null) indexSetter = Export("[]=", builtins[next++]);
             indexOptional = Export("?[]", builtins[next++]);
         }
+        // Its methods written in WebLingo, read as a native module's are; a source of the host's own that does not parse is its fault.
+        var written = new List<WebLingo.Language.WebLingoMethodSyntax>();
+        var taken = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var method in methods) taken.Add(method.Name);
+        foreach (var property in properties) taken.Add(property.Name);
+        foreach (var source in owner.WebLingoMethods)
+        {
+            if (!WebLingoNativeClassInfo.TryParseMethods(source, taken, out var parsed, out var wrong))
+            {
+                throw new InvalidOperationException($"The class '{owner.Name}': {wrong}");
+            }
+            written.AddRange(parsed);
+        }
         return new WebLingoNativeClassInfo(owner.Name, constructor, methods, [])
         {
+            WebLingoMethods = written,
             Properties = properties,
             IndexGetter = indexGetter,
             IndexSetter = indexSetter,
@@ -555,9 +598,10 @@ internal sealed class WebLingoHttpObjects
     }
 
     /// <summary>A response as its instance holds it: the response, and the heap's roots of its instance and its headers.</summary>
-    private sealed class ResponseState(IWebLingoHttpResponse response)
+    private sealed class ResponseState(IWebLingoHttpResponse response, IWebLingoTextOutput output)
     {
         public IWebLingoHttpResponse Response { get; } = response;
+        public IWebLingoTextOutput Output { get; } = output;
         public WebLingoValue[] Roots { get; } = new WebLingoValue[2];
     }
 

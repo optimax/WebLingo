@@ -4,6 +4,7 @@
 // It reaches the internet, so that the tests only check it. Under weblingo a script may reach any host; a site under
 // wasp reaches only the hosts its wasp.config allows, any other a NetworkPermissionError.
 
+import { writeLn } from "std:console";
 import http from "std:http";
 import { Socket } from "std:net";
 

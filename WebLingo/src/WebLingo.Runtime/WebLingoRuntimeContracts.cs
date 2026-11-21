@@ -46,9 +46,16 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
 
     /// <summary>
     /// Where the execution's text goes, which a native module's functions reach through the heap
-    /// (<see cref="WebLingoHeap.Output"/>), as <c>std:system</c>'s <c>write</c> does (section 3.9); none by default.
+    /// (<see cref="WebLingoHeap.Output"/>), as <c>std:console</c>'s <c>write</c> does (section 3.9); none by default.
     /// </summary>
     public IWebLingoTextOutput? Output { get; init; }
+
+    /// <summary>
+    /// Where the execution's errors go, a script's standard error under <c>weblingo</c>, which <c>std:console</c>'s
+    /// <c>writeError</c> and <c>writeErrorLn</c> reach through the heap (<see cref="WebLingoHeap.ErrorOutput"/>, section
+    /// 3.9); none by default.
+    /// </summary>
+    public IWebLingoTextOutput? ErrorOutput { get; init; }
 
     /// <summary>
     /// The values its host gives the program's parameters (<c>param name;</c>, section 3.9), each a string, as
@@ -97,8 +104,8 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     public WebLingo.Platform.Abstractions.IWebLingoEnvironment? Environment { get; init; }
 
     /// <summary>
-    /// The console's input, which <c>std:system</c>'s <c>readLine</c> and the others read through the heap
-    /// (<see cref="WebLingoHeap.ConsoleInput"/>); none for a site's, their reads then an <c>IOError</c>.
+    /// The console's input, which <c>std:console</c>'s <c>readLine</c> and the others read through the heap
+    /// (<see cref="WebLingoHeap.ConsoleInput"/>); none by default, their reads then an <c>IOError</c>.
     /// </summary>
     public WebLingo.Platform.Abstractions.IWebLingoConsoleInput? ConsoleInput { get; init; }
 

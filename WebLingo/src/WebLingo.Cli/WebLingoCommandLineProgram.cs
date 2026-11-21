@@ -66,6 +66,13 @@ public sealed record WebLingoCommandLineProgram(
     /// <summary>Whether this command line gives scripts the subprocess runner.</summary>
     public bool AllowsProcesses { get; init; }
 
+    /// <summary>
+    /// Whether its scripts may import <c>std:console</c> (specification, section 3.9, "The console: <c>std:console</c>"):
+    /// <c>weblingo</c>'s; not <c>wasp</c>'s, a site having no console, its import WL2015 (the owner's answer, 20 November
+    /// 2026, "Console Module", A3).
+    /// </summary>
+    public bool HasConsole { get; init; } = true;
+
     /// <summary>The application's root, from which a script's relative path is where it reaches only some files; the file's folder if null.</summary>
     public string? Root { get; init; }
 }

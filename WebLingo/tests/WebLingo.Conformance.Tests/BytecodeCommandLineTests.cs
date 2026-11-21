@@ -23,7 +23,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     [InlineData(2, "--vm", "stack")]
     public void CompileWritesTheRegisterVmsBytecodeUnlessAskedForTheStackVms(int header, params string[] options)
     {
-        var main = Write("main.wlg", "import { write, writeLn } from \"std:system\"; writeLn(42);\n");
+        var main = Write("main.wlg", "import { write, writeLn } from \"std:console\"; writeLn(42);\n");
         Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo(["compile", .. options, main]));
         Assert.Equal(header, File.ReadAllBytes(Path.ChangeExtension(main, header == 1 ? ".wlbr" : ".wlbs"))[8]);
         Assert.Equal(2, Files().Length);
@@ -35,7 +35,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     public void ACompiledProgramRunsFromItsFileAsFromItsSource(string vm, int header)
     {
         Write("lib/greet.wlg", "export function greet(name) { return \"Hello, \" + name + \"!\"; }");
-        var main = Write("main.wlg", "param who;import { write, writeLn } from \"std:system\"; \nimport { greet } from \"lib/greet.wlg\";\nwriteLn(greet(who));\n");
+        var main = Write("main.wlg", "param who;import { write, writeLn } from \"std:console\"; \nimport { greet } from \"lib/greet.wlg\";\nwriteLn(greet(who));\n");
         var fromSource = Weblingo("run", main, "who=WLBC");
         Assert.Equal((WebLingoCommandLine.Success, "Hello, WLBC!\n", ""), fromSource);
 
@@ -55,7 +55,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     public void ARuntimeErrorIsLocatedFromTheFileAlone(string vm)
     {
         Write("lib/util.wlg", "export function f(n) {\n  return [1][n];\n}\n");
-        var main = Write("main.wlg", "import { write, writeLn } from \"std:system\"; import { f } from \"lib/util.wlg\";\nwriteLn(\"before\");\nf(2);\n");
+        var main = Write("main.wlg", "import { write, writeLn } from \"std:console\"; import { f } from \"lib/util.wlg\";\nwriteLn(\"before\");\nf(2);\n");
         var fromSource = Weblingo("run", main);
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, fromSource.Exit);
         Assert.EndsWith("lib/util.wlg(2,10): ERROR WL3005 (IndexError): The index 2 is outside 0 to 0.", fromSource.Error.TrimEnd());
@@ -121,7 +121,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     public void TheFileHoldsNoneOfTheHostsPaths()
     {
         Write("lib/util.wlg", "export function twice(x) { return x * 2; }");
-        var main = Write("main.wlg", "import { write, writeLn } from \"std:system\"; import { twice } from \"lib/util.wlg\";\nwriteLn(twice(21));\n");
+        var main = Write("main.wlg", "import { write, writeLn } from \"std:console\"; import { twice } from \"lib/util.wlg\";\nwriteLn(twice(21));\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         var text = System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(_folder, "main.wlbr")));
         Assert.DoesNotContain(Path.GetFileName(_folder), text);
@@ -133,7 +133,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     [InlineData("stack", "function main (", " stack)")]
     public void DisasmShowsTheBytecode(string vm, string start, string kind)
     {
-        var main = Write("main.wlg", "import { write, writeLn } from \"std:system\"; var x = 40;\nwriteLn(x + 2);\n");
+        var main = Write("main.wlg", "import { write, writeLn } from \"std:console\"; var x = 40;\nwriteLn(x + 2);\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
         var (exit, output, error) = Weblingo("disasm", Path.ChangeExtension(main, Extension(vm)));
         Assert.Equal((WebLingoCommandLine.Success, ""), (exit, error));
@@ -145,7 +145,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     [Fact]
     public void ADamagedFileIsReportedAndNothingRuns()
     {
-        var main = Write("main.wlg", "import { write, writeLn } from \"std:system\"; writeLn(\"never\");\n");
+        var main = Write("main.wlg", "import { write, writeLn } from \"std:console\"; writeLn(\"never\");\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         var compiled = Path.Combine(_folder, "main.wlbr");
         var bytes = File.ReadAllBytes(compiled);
@@ -180,7 +180,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     {
         // A1 of M0.13's questions: weblingo run script.wlg compiles in memory.
         Write("lib/util.wlg", "export function twice(x) { return x * 2; }");
-        var main = Write("main.wlg", "import { write, writeLn } from \"std:system\"; import { twice } from \"lib/util.wlg\";\nwriteLn(twice(21));\n");
+        var main = Write("main.wlg", "import { write, writeLn } from \"std:console\"; import { twice } from \"lib/util.wlg\";\nwriteLn(twice(21));\n");
         var before = Files();
         Assert.Equal((WebLingoCommandLine.Success, "42\n", ""), Weblingo("run", main));
         Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo("check", main));
@@ -192,7 +192,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     {
         // weblingo script.wlg as weblingo run script.wlg, its parameters after it, and bytecode too (the owner's answer,
         // 18 November 2026, "Minimal WebLingo Installer: Linux", Q1); anything else still a usage error.
-        var main = Write("Main.WLG", "param name;\nimport { writeLn } from \"std:system\";\nwriteLn($\"Hello, {name}\");\n");
+        var main = Write("Main.WLG", "param name;\nimport { writeLn } from \"std:console\";\nwriteLn($\"Hello, {name}\");\n");
         Assert.Equal((WebLingoCommandLine.Success, "Hello, Anna\n", ""), Weblingo(main, "name=Anna"));
         Assert.Equal(Weblingo("run", main, "name=Bo"), Weblingo(main, "name=Bo"));
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
@@ -219,7 +219,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     [InlineData("stack", "register", ".WLBR")]
     public void TheVmNamedByTheExtensionMustMatchTheHeader(string actualVm, string expectedVm, string wrongExtension)
     {
-        var main = Write("main.wlg", "writeLn(42);");
+        var main = Write("main.wlg", "import { writeLn } from \"std:console\"; writeLn(42);");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + actualVm, main).Exit);
         var compiled = Path.ChangeExtension(main, Extension(actualVm));
         var wrong = Path.ChangeExtension(main, wrongExtension);
@@ -236,7 +236,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     [Fact]
     public void BothBytecodeTargetsCanCoexistAndStillRunWithALegacyName()
     {
-        var main = Write("main.wlg", "writeLn(42);");
+        var main = Write("main.wlg", "import { writeLn } from \"std:console\"; writeLn(42);");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", main).Exit);
         Assert.Equal(3, Files().Length);
@@ -256,7 +256,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     [Fact]
     public void TheConfiguredVmControlsCompileRunAndCheck()
     {
-        var main = Write("main.wlg", "writeLn(42);");
+        var main = Write("main.wlg", "import { writeLn } from \"std:console\"; writeLn(42);");
         var config = Write("weblingo.config", """{ "vm": "stack" }""");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--vm", "register", main).Exit);
@@ -290,7 +290,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     [InlineData("1")]
     public void InvalidVmSettingsAreReported(string value)
     {
-        var program = Write("main.wlg", "writeLn(42);");
+        var program = Write("main.wlg", "import { writeLn } from \"std:console\"; writeLn(42);");
         var config = Write("weblingo.config", "{\"vm\":" + value + "}");
         var (exit, output, error) = Weblingo("check", program);
         Assert.Equal((WebLingoCommandLine.FileUnreadable, "", config + ": \"vm\" is \"register\" or \"stack\"."),

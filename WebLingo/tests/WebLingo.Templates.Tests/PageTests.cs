@@ -28,13 +28,13 @@ public sealed class PageTests
     [InlineData("<%- \"<b>bold</b>\" %>", "<b>bold</b>")]
     // null writes nothing, so that an optional read that finds nothing is blank; write(null) writes null.
     [InlineData("[<%= null %>][<%- null %>]", "[][]")]
-    [InlineData("<% import { write } from \"std:system\"; var p = null; %>[<%= p?.name %>]<% write(null); %>", "[]null")]
+    [InlineData("<% var p = null; %>[<%= p?.name %>]<% write(null); %>", "[]null")]
     // <%# %> is nothing, and ends at the first %>.
     [InlineData("a<%# a \"note %>b", "ab")]
     // A statement may span several blocks, the text between them in its body.
     [InlineData("<% foreach (var p in [\"a\", \"b\"]) { %><li><%= p %></li><% } %>", "<li>a</li><li>b</li>")]
     [InlineData("<% if (1 > 2) { %>yes<% } else { %>no<% } %>", "no")]
-    [InlineData("a<% import { write } from \"std:system\"; write(\"b\"); %>c", "abc")]
+    [InlineData("a<% write(\"b\"); %>c", "abc")]
     // A block's code is WebLingo's tokens: %> in a string or a comment does not end it.
     [InlineData("<% var end = \"%>\"; %><%= end %>", "%&gt;")]
     [InlineData("<% /* %> */ var x = 1; %><%= x %>", "1")]
@@ -207,7 +207,7 @@ public sealed class PageTests
     [InlineData("<% await renderComponent(\"/tree.wasp\", { n: 3 }); %>",
         "tree.wasp=<% param n; %><%= n %><% if (n > 0) { await renderComponent(\"tree.wasp\", { n: n - 1 }); } %>", "3210")]
     // A missing one is a runtime error, which a catch may catch.
-    [InlineData("<% import { write } from \"std:system\"; try { await renderComponent(\"/nope.wasp\"); } catch (e) { write(e.code); } %>", "", "WL5005")]
+    [InlineData("<% try { await renderComponent(\"/nope.wasp\"); } catch (e) { write(e.code); } %>", "", "WL5005")]
     public void AComponentRendersWhereItIsCalled(string page, string templates, string written)
     {
         Assert.Equal(("", written, ""), Render(page, Templates(templates)));
@@ -363,7 +363,7 @@ public sealed class PageTests
 
     private static WebLingoExecutionContext Context(IWebLingoTextOutput output)
     {
-        var services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output));
+        var services = new WebLingoBuiltinRegistry(new WebLingoDelayFunction());
         foreach (var builtin in WebLingoTemplateBuiltins.Create(output)) services.Register(builtin);
         return new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services, InstructionBudget = 1_000_000 };
     }

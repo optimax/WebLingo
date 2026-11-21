@@ -2,8 +2,9 @@
 // A script's imports list everything it depends on, and everything its host must grant it; the error says where
 // the name is found.
 
+import { writeLn } from "std:console";
 writeLn(Json.stringify([1, 2]));
 
 /* Errors:
-missing-import.wlg(5,9): ERROR WL2001: 'Json' is not defined; did you mean Json, from std:json?
+missing-import.wlg(6,9): ERROR WL2001: 'Json' is not defined; did you mean Json, from std:json?
 */

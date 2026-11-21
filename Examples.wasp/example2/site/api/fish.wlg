@@ -1,10 +1,9 @@
 // /api/fish: the catalogue as JSON, ?water=marine for one water's fish.
 
-import { write } from "std:system";
 import { Json } from "std:json";
 import { catalogue, waterOf } from "/lib/store.wlg";
 
 export async function get(request, response) {
     response.headers["Content-Type"] = "application/json";
-    write(Json.stringify(await catalogue(waterOf(request.query?["water"]), null, null)));
+    response.write(Json.stringify(await catalogue(waterOf(request.query?["water"]), null, null)));
 }

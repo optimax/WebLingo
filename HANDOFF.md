@@ -53,3 +53,16 @@ A publish into a populated folder removed the obsolete generated files and prese
 An open WebLingo script window can keep the old executable in use after its script has finished. Close it and
 double-click `build.bat` again. The VS Code extension uses the installed CLI when its debugger setting is `weblingo`
 and the installation folder is on PATH.
+
+## The console module
+
+`std:console` holds the console's writing and reading, `write`, `writeLn`, `writeError`, `writeErrorLn`, `readLine`,
+`readLineSync`, `prompt` and `readPassword`; `std:system` keeps `delay`. It is `WebLingo/src/WebLingo.StdLib.Console`,
+installed as `std/console.dll`, which `wasp`'s loaders refuse (WL2015). A page's blocks have their own `write` and
+`writeLn`, which only a template's code sees, and a handler writes with `response.write`. This is part 1 of the
+specification's section 9, "Console module, parts"; part 2, the `Console` class and `ConsoleColor`, and part 3, console
+programs on Windows (`detached`, `weblingow.exe`, a message box), are the next tasks in `TO-DO.md`.
+
+In-process test hosts give `write` and `writeLn` as their own built-ins (`WebLingoStandardBuiltins`), which `std:system`
+exports to them, so the VM tests still import them from there. The conformance tests that compile programs in process
+use `ConformanceHost`, which loads the real `std:console` from the `std` folder beside the tests.

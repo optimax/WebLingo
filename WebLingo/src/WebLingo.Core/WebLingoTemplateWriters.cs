@@ -19,6 +19,16 @@ public static class WebLingoTemplateWriters
     public const string Full = "<%full>";
     public const string Drained = "<%drained>";
 
+    /// <summary>
+    /// A page's own <c>write</c> and <c>writeLn</c>, which its templates' code calls without an import, writing where its
+    /// text goes, as <c>std:console</c>'s write a script's console (the owner's answer, 20 November 2026, "Console Module",
+    /// A2); names a program writes, which only a template's code sees.
+    /// </summary>
+    public const string Write = "write";
+
+    /// <inheritdoc cref="Write"/>
+    public const string WriteLine = "writeLn";
+
     private const string EscapedStart = "<%=";
 
     /// <summary>

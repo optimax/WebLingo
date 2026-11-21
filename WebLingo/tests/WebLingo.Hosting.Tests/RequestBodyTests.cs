@@ -80,7 +80,7 @@ public sealed class RequestBodyTests
             .Add("/site/text.wasp", "<% param request; var t = await request.text(); %><%= t %>|<%= await request.text() == t %>")
             .Add("/site/form.wasp", "<% param request; var f = await request.form(); %><%= f[\"a\"] %>|<%= f[\"b\"] %>|<%= f[\"c\"] %>|"
                                     + "<%= await request.text() %>")
-            .Add("/site/api/names.wlg", "import { write, writeLn } from \"std:system\"; export async function post(request, response) { var f = await request.form(); write(f[\"name\"]); }")
+            .Add("/site/api/names.wlg", "export async function post(request, response) { var f = await request.form(); response.write(f[\"name\"]); }")
             .Add("/site/pieces.wasp", "<% param request; var pieces = 0; var bytes = 0; var first = null; var piece = await request.read(); "
                                       + "while (piece != null) { if (first == null) first = piece[0]; pieces = pieces + 1; bytes = bytes + piece.length; "
                                       + "piece = await request.read(); } %><%= pieces %> pieces, <%= bytes %> bytes, first <%= first %>")
@@ -89,7 +89,7 @@ public sealed class RequestBodyTests
             .Add("/site/read-then-text.wasp", "<% param request; var p = await request.read(); var t = await request.text(); %>")
             .Add("/site/read-twice.wasp", "<% param request; var a = request.read(); var b = request.read(); %>"))
         {
-            WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction())),
+            WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry()),
             Scheduler = () => new DotNetSchedulerHost(),
             Mode = WebLingoMode.Development
         }, out var error);

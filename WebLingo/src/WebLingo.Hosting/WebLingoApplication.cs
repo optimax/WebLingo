@@ -200,7 +200,7 @@ public sealed class WebLingoApplication
         var output = new WebLingoResponseText(response, _options.SendTimeout, cancellation.Cancel);
         var context = new WebLingoExecutionContext(worker)
         {
-            Services = new RequestServices([.. WebLingoTemplateBuiltins.Common(output), .. _http.For(request, response)], _http.Members,
+            Services = new RequestServices([.. WebLingoTemplateBuiltins.Common(output), .. _http.For(request, response, output)], _http.Members,
                 _services[worker.Value].Builtins, output),
             Output = output,
             FileSystem = _options.ScriptFileSystem ?? _options.FileSystem,

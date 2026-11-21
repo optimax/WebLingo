@@ -2,9 +2,10 @@
 // Too few or too many is an error, found before the script runs where the function is known, and when it runs
 // otherwise (see 08-functions.wlg): never a missing argument read as undefined.
 
+import { writeLn } from "std:console";
 function brew(tea, minutes) { return $"{tea} for {minutes} min"; }
 writeLn(brew("sencha"));
 
 /* Errors:
-wrong-argument-count.wlg(6,9): ERROR WL2006 (ArgumentError): 'brew' takes 2 arguments, not 1.
+wrong-argument-count.wlg(7,9): ERROR WL2006 (ArgumentError): 'brew' takes 2 arguments, not 1.
 */

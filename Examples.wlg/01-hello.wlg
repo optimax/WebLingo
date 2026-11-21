@@ -3,10 +3,11 @@
 // A script is a .wlg file, which weblingo compiles and runs. Every statement ends with a semicolon: WebLingo never
 // inserts one for you, so a line break never changes what a program means.
 
+// write and writeLn are std:console's: a script that writes to its console imports them, and is a console program.
+import { write, writeLn } from "std:console";
+
 writeLn("Hello, WebLingo!");
 
-// write and writeLn are std:system's, which every script has without an import. Importing them is allowed, and means
-// the same: import { write, writeLn } from "std:system";
 write("write leaves the line open, ");
 writeLn("writeLn ends it.");
 

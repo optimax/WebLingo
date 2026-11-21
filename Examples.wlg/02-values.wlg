@@ -3,6 +3,7 @@
 // Integers are 64 bits and never silently overflow; numbers are IEEE 754 binary64; decimals, written with an m, are
 // exact, for money. Every value but null has a class, which `is` tests.
 
+import { writeLn } from "std:console";
 import math from "std:math";
 
 writeLn([42, 0x2A, 0b101010, 1_000_000]);          // the same integer three ways, and digits grouped

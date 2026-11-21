@@ -2,9 +2,10 @@
 // Before it, the name means what it means outside the block, here nothing, so that the mistake is found before the
 // script runs, not by reading an undefined value.
 
+import { writeLn } from "std:console";
 writeLn(cups);
 var cups = 2;
 
 /* Errors:
-used-before-declared.wlg(5,9): ERROR WL2001: 'cups' is not defined.
+used-before-declared.wlg(6,9): ERROR WL2001: 'cups' is not defined.
 */

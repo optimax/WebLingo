@@ -2,6 +2,7 @@
 //
 // A regular expression is made by its class, std:regex's Regex, in .NET's syntax; there is no /literal/ form.
 
+import { writeLn } from "std:console";
 import { Regex } from "std:regex";
 
 var date = new Regex("(?<year>\\d{4})-(?<month>\\d{2})-(?<day>\\d{2})");

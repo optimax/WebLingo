@@ -90,7 +90,7 @@ public sealed class ApplicationTests
             .Add("/site/includes/nav.wasp", "<nav><%= title %></nav>")
             .Add("/site/components/card.wasp", "<% param n; import { twice } from \"/lib/util.wlg\"; %><b><%= twice(n) %></b>")
             .Add("/site/shop/index.wasp",
-                "<% import { twice } from \"../lib/util.wlg\"; import { writeLn } from \"std:system\"; %><% layout \"/layouts/main.wasp\", { title: \"Shop\" }; %>"
+                "<% import { twice } from \"../lib/util.wlg\"; %><% layout \"/layouts/main.wasp\", { title: \"Shop\" }; %>"
                 + "<% var title = \"Menu\"; %><% include \"/includes/nav.wasp\"; %><% writeLn(twice(2)); %>"
                 + "<% foreach (var n in [1, 2]) { await renderComponent(\"/components/card.wasp\", { n: n }); } %>");
         var app = Load(files, WebLingoMode.Development);
@@ -182,7 +182,7 @@ public sealed class ApplicationTests
         {
             Workers = 2,
             WorkerServices = _ => new WebLingoWorkerServices(
-                new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction(), new WebLingoDelayFunction())),
+                new WebLingoBuiltinRegistry(new WebLingoDelayFunction())),
             Mode = environment
         }, out var error);
         Assert.True(app is not null, error);

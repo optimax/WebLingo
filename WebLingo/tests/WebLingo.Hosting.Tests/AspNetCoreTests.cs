@@ -293,7 +293,7 @@ public sealed class AspNetCoreTests : IDisposable
         {
             Workers = workers > 0 ? workers : _workers.Count,
             WorkerServices = _ => new WebLingoWorkerServices(
-                new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction(), new WebLingoDelayFunction())),
+                new WebLingoBuiltinRegistry(new WebLingoDelayFunction())),
             Clock = new WebLingoExecutionClock(new DotNetClock()),
             Scheduler = () => new DotNetSchedulerHost()
         }, out var error);
@@ -317,7 +317,7 @@ public sealed class AspNetCoreTests : IDisposable
         {
             Workers = _workers.Count,
             WorkerServices = _ => new WebLingoWorkerServices(
-                new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction(), new WebLingoDelayFunction())),
+                new WebLingoBuiltinRegistry(new WebLingoDelayFunction())),
             Clock = new WebLingoExecutionClock(new DotNetClock()),
             Scheduler = () => new DotNetSchedulerHost()
         }, out var error);

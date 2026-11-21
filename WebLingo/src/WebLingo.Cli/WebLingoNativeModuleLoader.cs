@@ -22,6 +22,22 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
 
     private readonly Dictionary<string, WebLingoNativeModuleInfo> _loaded = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// <c>std:console</c>, which a site's scripts may not import, a site having no console (the owner's answer, 20 November
+    /// 2026, "Console Module", A3), and why: what <c>wasp</c>'s loaders refuse.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> WithoutConsole { get; } = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["std:console"] = "a site has no console: a page writes with its own write and writeLn, a handler with "
+                          + "response.write and response.writeLn"
+    };
+
+    /// <summary>
+    /// The modules this host does not have, though their assemblies are there, by name, each with why: an import of one
+    /// WL2015, as for a module that is not installed, and none suggested for a name that is not defined; none by default.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Refused { get; init; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
     /// <summary>A native module's functions, as the host's built-ins, by the names it exports them by.</summary>
     public IReadOnlyList<IWebLingoBuiltinFunction> FunctionsOf(WebLingoNativeModuleInfo module)
     {
@@ -94,6 +110,11 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
                 return false;
             }
             name = found + ":" + Path.GetFileNameWithoutExtension(file);
+        }
+        if (Refused.TryGetValue(name, out var refused))
+        {
+            error = refused;
+            return false;
         }
         if (_loaded.TryGetValue(name, out module)) return true;
         if (!File.Exists(file))

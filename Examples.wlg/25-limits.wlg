@@ -4,6 +4,7 @@
 // instructions it runs are bounded, and running past a limit stops it, with WL3003, which no catch can catch, so that
 // a script cannot swallow it and go on. A host stops an execution the same way when it cancels it, WL3004.
 
+import { writeLn } from "std:console";
 function deeper(n) {
   return deeper(n + 1) + 1;   // never ends on its own
 }
@@ -21,5 +22,5 @@ try {
 Going deeper...
 */
 /* Errors:
-25-limits.wlg(8,10): ERROR WL3003: The calls nest more than 10000 deep, which this execution allows.
+25-limits.wlg(9,10): ERROR WL3003: The calls nest more than 10000 deep, which this execution allows.
 */

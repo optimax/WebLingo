@@ -4,7 +4,7 @@
 //
 //   weblingo run setup.wlg
 
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 import { Database } from "std:db";
 import { DateTime } from "std:datetime";
 

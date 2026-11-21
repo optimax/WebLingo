@@ -3,6 +3,7 @@
 // Any value may be thrown, but errors are instances of Error, or of a class extending it, with a message and a code.
 // A runtime error is one of them, of a class of its own, so that a catch may name the kind it handles.
 
+import { writeLn } from "std:console";
 class NotFoundError extends Error {
   constructor(what) { super($"{what} was not found."); this.what = what; }
 }

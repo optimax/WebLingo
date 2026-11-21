@@ -18,10 +18,13 @@ public sealed class ConsoleInputTests : IDisposable
 
     public void Dispose() => Directory.Delete(_folder, recursive: true);
 
+    /// <summary>The console's writing and reading, std:console's, which a script imports (section 3.9, "The console: std:console").</summary>
+    private const string Reading = "import { writeLn, prompt, readLine, readLineSync, readPassword } from \"std:console\"; ";
+
     [Fact]
     public void AScriptReadsItsInputToItsEnd()
     {
-        var program = "var name = await prompt(\"Your name: \"); writeLn($\"Hello, {name}!\"); var count = 0; var line = await readLine(); "
+        var program = Reading + "var name = await prompt(\"Your name: \"); writeLn($\"Hello, {name}!\"); var count = 0; var line = await readLine(); "
                       + "while (line != null) { count++; writeLn($\"{count}: {line}\"); line = readLineSync(); } "
                       + "writeLn([await readLine(), readLineSync(), await readPassword(), readLine() is Task]);";
         Assert.Equal(("Your name: Hello, Anna!\n1: żółw\n2: \n3: last\n[null, null, null, true]\n", ""),
@@ -31,26 +34,26 @@ public sealed class ConsoleInputTests : IDisposable
     [Fact]
     public void APasswordIsALineWhereTheInputIsNotAConsole()
     {
-        Assert.Equal(("[\"s3cret\", \"next\"]\n", ""), Run("writeLn([await readPassword(), readLineSync()]);", "s3cret\nnext\n"));
+        Assert.Equal(("[\"s3cret\", \"next\"]\n", ""), Run(Reading + "writeLn([await readPassword(), readLineSync()]);", "s3cret\nnext\n"));
     }
 
     [Fact]
     public void WrongArgumentsAreTypeErrors()
     {
         Assert.Equal(("WL3001 The argument of 'prompt' must be a string, not the integer 5.\n", ""),
-            Run("try { await prompt(5); } catch (TypeError e) { writeLn(e.code + \" \" + e.message); }", ""));
+            Run(Reading + "try { await prompt(5); } catch (TypeError e) { writeLn(e.code + \" \" + e.message); }", ""));
     }
 
     [Fact]
     public void WithoutAConsoleAReadIsAnIOError()
     {
-        // As a site's script, under wasp, reads: weblingo given no input, nor any host.
+        // As a script reads where its host gives it no console: weblingo given no input.
         var path = Path.Combine(_folder, "noconsole.wlg");
-        File.WriteAllText(path, "foreach (var read in [() => readLineSync(), () => readLine(), () => prompt(\"x\"), () => readPassword()]) "
+        File.WriteAllText(path, Reading + "foreach (var read in [() => readLineSync(), () => readLine(), () => prompt(\"x\"), () => readPassword()]) "
                                 + "{ try { read(); } catch (IOError e) { writeLn(e.message); } }");
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", path], output, new StringWriter()));
-        var message = "reads a console, and this application has none: a site's pages and handlers have no user typing at one.";
+        var message = "reads a console, and this program has none.";
         Assert.Equal($"'readLineSync' {message}\n'readLine' {message}\n'prompt' {message}\n'readPassword' {message}\n", output.ToString());
     }
 

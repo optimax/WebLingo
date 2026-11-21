@@ -4,6 +4,7 @@
 // JavaScript's let and const are; let itself is reserved and declares nothing. A declaration always has a value, so
 // that no variable is ever uninitialized, and no assignment creates a global by accident (see does-not-compile/).
 
+import { writeLn } from "std:console";
 var count = 1;
 const limit = 3;
 {

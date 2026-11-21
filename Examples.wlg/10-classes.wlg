@@ -3,6 +3,7 @@
 // Single inheritance, no prototypes to tamper with, and every member public. An instance is equal only to itself
 // unless its class says otherwise, by overriding equal().
 
+import { writeLn } from "std:console";
 class Shape {
   constructor(name) { this.name = name; }
   area() { return 0.0; }

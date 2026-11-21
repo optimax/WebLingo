@@ -44,6 +44,21 @@ public sealed class WaspTests : IDisposable
     }
 
     [Fact]
+    public void APagesOwnWriteIsNoModulesItImports()
+    {
+        // A page's blocks write with write and writeLn of their own, without an import, which a module the page imports
+        // does not have: it writes its response with response.write (the owner's answer, 20 November 2026, "Console
+        // Module", A2), and std:system exports neither.
+        File.WriteAllText(Path.Combine(_folder, "lib.wlg"), "export function say(x) { write(x); }");
+        var (exit, _, error) = Wasp("check", "<% import { say } from \"lib.wlg\"; write(1); writeLn(2); %>");
+        Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
+        Assert.Contains("lib.wlg(1,26): ERROR WL2001: 'write' is not defined.", error);
+        Assert.DoesNotContain("page.wasp", error);
+        File.WriteAllText(Path.Combine(_folder, "lib.wlg"), "export function next(x) { return x + 1; }");
+        Assert.Equal((WebLingoCommandLine.Success, "12\n", ""), Wasp("run", "<% import { next } from \"lib.wlg\"; write(1); writeLn(next(1)); %>"));
+    }
+
+    [Fact]
     public void AnImportFromSlashIsFromTheRoot_AsWaspServeHasIt()
     {
         Write("site/lib/util.wlg", "export function twice(x) { return x * 2; }");
@@ -266,10 +281,10 @@ public sealed class WaspTests : IDisposable
     [Fact]
     public void APageReachesOnlyTheHostsWaspConfigAllows()
     {
-        const string page = "<% import http from \"std:http\"; import { write } from \"std:system\"; try { await http.get(\"http://127.0.0.1:1/\"); } "
+        const string page = "<% import http from \"std:http\"; try { await http.get(\"http://127.0.0.1:1/\"); } "
                             + "catch (NetworkPermissionError e) { write(e.code + \" \" + e.message); } catch (e) { write(e.code); } %>";
         Assert.Equal((WebLingoCommandLine.Success, "WL3017 '127.0.0.1' is not a host this application may reach.", ""), Wasp("run", page));
-        const string socket = "<% import { Socket } from \"std:net\"; import { write } from \"std:system\"; try { await Socket.connect(\"127.0.0.1\", 1); } "
+        const string socket = "<% import { Socket } from \"std:net\"; try { await Socket.connect(\"127.0.0.1\", 1); } "
                               + "catch (NetworkPermissionError e) { write(e.code); } %>";
         Assert.Equal((WebLingoCommandLine.Success, "WL3017", ""), Wasp("run", socket));
         File.WriteAllText(Path.Combine(_folder, "wasp.config"), "{ \"network\": { \"allow\": [\"127.0.0.1\"] } }");
@@ -294,7 +309,7 @@ public sealed class WaspTests : IDisposable
         Environment.SetEnvironmentVariable(name + "_B", "second");
         try
         {
-            var page = "<% import { Environment } from \"std:env\"; import { write } from \"std:system\"; %>"
+            var page = "<% import { Environment } from \"std:env\"; %>"
                        + $"<%= [Environment.machineName, Environment.variable(\"{name}_A\"), Environment.variable(\"{name}_B\")] %>"
                        + $"<%= Environment.variables.has(\"{name}_A\") %>,<%= Environment.variables.has(\"{name}_B\") %>"
                        + $"<% try {{ Environment.setVariable(\"{name}_C\", \"x\"); }} "
@@ -355,14 +370,17 @@ public sealed class WaspTests : IDisposable
     }
 
     [Fact]
-    public void APageHasNoConsoleToRead()
+    public void ASiteHasNoConsole()
     {
-        // std:system's readLine and the others, an IOError where a site's script calls them (the owner's answers,
-        // 19 November 2026, "Console Input"): a site has no user typing at a console.
-        var page = "<% try { readLineSync(); } catch (IOError e) { write(e.code + \" \" + e.message); } %>";
-        Assert.Equal((WebLingoCommandLine.Success,
-            "WL3011 'readLineSync' reads a console, and this application has none: a site's pages and handlers have no user typing at one.", ""),
-            Wasp("run", page));
+        // std:console is no site's, a site having no console: its import WL2015, as for a module that is not installed
+        // (the owner's answer, 20 November 2026, "Console Module", A3); a page writes with its own write and writeLn,
+        // without an import (A2).
+        var (exit, _, error) = Wasp("check", "<% import { readLineSync } from \"std:console\"; %>");
+        Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
+        Assert.EndsWith("page.wasp(1,33): ERROR WL2015: The module 'std:console' cannot be imported: a site has no console: a page "
+                        + "writes with its own write and writeLn, a handler with response.write and response.writeLn.", error.TrimEnd(),
+            StringComparison.Ordinal);
+        Assert.Equal((WebLingoCommandLine.Success, "tea\nfor two", ""), Wasp("run", "<% writeLn(\"tea\"); write(\"for two\"); %>"));
     }
 
     [Fact]

@@ -4,6 +4,7 @@
 // extend them with classes of its own, whose instances hold such a value and are taken wherever one is. No class is
 // sealed, the standard modules' included.
 
+import { write, writeLn } from "std:console";
 import { DateTime } from "std:datetime";
 
 // extend gives every value of a class new methods, from when it runs.

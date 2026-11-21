@@ -3,6 +3,7 @@
 // A module is a .wlg file whose exports are its instance's members. Its path is from the importing file's folder.
 // A static import is compiled with the program; Module.import compiles one while the program runs.
 
+import { writeLn } from "std:console";
 import teas from "lib/teas.wlg";                 // the module's instance
 import { Tea, serve } from "lib/teas.wlg";       // and names from it: the same module, run once
 

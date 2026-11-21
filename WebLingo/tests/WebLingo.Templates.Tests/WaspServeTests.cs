@@ -20,7 +20,7 @@ public sealed class WaspServeTests : IDisposable
     public WaspServeTests()
     {
         Write("layouts/main.wasp", "<% param title; %><html><title><%= title %></title><body><% renderBody(); %></body></html>");
-        Write("index.wasp", "<% import { write, writeLn } from \"std:system\"; layout \"/layouts/main.wasp\", { title: \"Home\" }; %><h1>Hello</h1><% writeLn(\"from std:system\"); %>");
+        Write("index.wasp", "<% layout \"/layouts/main.wasp\", { title: \"Home\" }; %><h1>Hello</h1><% writeLn(\"from the page\"); %>");
         Write("broken.wasp", "<%= [1][2] %>");
         Write("css/site.css", "h1 { }");
     }
@@ -33,7 +33,7 @@ public sealed class WaspServeTests : IDisposable
     public async Task AnApplicationIsServedOverHttp(string? vm)
     {
         if (vm is not null) Write("wasp.config", "{\"vm\":\"" + vm + "\"}");
-        Write("api/answer.wlg", "export async function get(request, response) { await delay(10); write(42); }");
+        Write("api/answer.wlg", "export async function get(request, response) { await delay(10); response.write(42); }");
         Write("components/value.wasp", "<% param n; await delay(10); %><%= n %>");
         Write("component.wasp", "<% await renderComponent(\"/components/value.wasp\", {n: 42}); %>");
         var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out var environment);
@@ -48,7 +48,7 @@ public sealed class WaspServeTests : IDisposable
             var page = await client.GetAsync("/");
             Assert.Equal(HttpStatusCode.OK, page.StatusCode);
             Assert.Equal("text/html; charset=utf-8", page.Content.Headers.ContentType?.ToString());
-            Assert.Equal("<html><title>Home</title><body><h1>Hello</h1>from std:system\n</body></html>", await page.Content.ReadAsStringAsync());
+            Assert.Equal("<html><title>Home</title><body><h1>Hello</h1>from the page\n</body></html>", await page.Content.ReadAsStringAsync());
             Assert.Equal("42", await client.GetStringAsync("/api/answer"));
             Assert.Equal("42", await client.GetStringAsync("/component"));
             Assert.Equal("42", await client.GetStringAsync("/component"));

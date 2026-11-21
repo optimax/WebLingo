@@ -71,6 +71,12 @@ public sealed class WebLingoBinder
     /// <summary>The host's native modules, which name the standard modules an undefined name's import is suggested from.</summary>
     private readonly IWebLingoNativeResolver? _native;
 
+    /// <summary>Which of the program's files are templates, whose code sees the built-ins declared for templates alone.</summary>
+    private readonly Func<string, bool>? _isTemplate;
+
+    /// <summary>The program's own file's name, its first's, which the file being bound is when it is no other.</summary>
+    private string _mainName = "program";
+
     /// <summary>The standard modules the host has, asked for once, by the first undefined name (section 3.9).</summary>
     private IReadOnlyList<WebLingoNativeModuleInfo>? _standardModules;
 
@@ -80,6 +86,7 @@ public sealed class WebLingoBinder
         _builtinDeclarations = options.Builtins;
         _hostParameters = options.HostParameters;
         _native = options.Native;
+        _isTemplate = options.IsTemplate;
         foreach (var builtin in options.Builtins) _hostBuiltins[builtin.Name] = builtin;
         _function = _main = new FunctionContext(null, "main");
         _prelude = new Scope(null, _function);
@@ -144,6 +151,7 @@ public sealed class WebLingoBinder
         _unitScope = _scope;
         _importTargets = modules[0].Imports;
         _moduleSources = modules;
+        _mainName = modules[0].Name;
         var units = new List<WebLingoBoundUnit>();
         // An import's top level, or a program's with parameters: the values given, its one parameter, first (section 3.9).
         var mainParameters = ParametersOf(modules[0].Root);
@@ -189,7 +197,7 @@ public sealed class WebLingoBinder
                 {
                     foreach (var declaration in _builtinDeclarations)
                     {
-                        if (!declaration.RendersComponent) functionsExported.Add(UseBuiltin(declaration));
+                        if (!declaration.RendersComponent && !declaration.InTemplates) functionsExported.Add(UseBuiltin(declaration));
                     }
                 }
                 else
@@ -359,9 +367,22 @@ public sealed class WebLingoBinder
     /// where the program can <c>await</c>, by a wait for its output, if it holds more than its reader has taken (section
     /// 6.12, "Streaming"): <c>if (full()) await drained();</c>, each a host's built-in no program can name.
     /// </summary>
-    private WebLingoBoundStatement AfterWrite(WebLingoBoundExpressionStatement call, string written)
+    private WebLingoBoundStatement AfterWrite(WebLingoBoundExpressionStatement call, string written) =>
+        _hostBuiltins.TryGetValue(written, out var declaration) && declaration.Writes
+            ? WaitAfter(call, WebLingoTemplateWriters.IsWriter(written))
+            : call;
+
+    /// <summary>
+    /// A statement followed, where the program can <c>await</c> and its host's output can wait, by a wait for the output:
+    /// <c>if (full()) await drained();</c>, or, for a template's own writer, <paramref name="says"/>, which gives whether
+    /// it is full, <c>if (writer(value)) await drained();</c>. A call of a member named <c>write</c> or <c>writeLn</c>, a
+    /// response's (the owner's answer, 20 November 2026, "Console Module", A2), is followed so too, so that a handler's
+    /// writes wait for a slow client as a page's do (section 6.12, "Streaming"); its host's output can wait only where it
+    /// declares the wait's built-ins, as a template compiler does, so that a script's own <c>write</c> methods are as before.
+    /// </summary>
+    private WebLingoBoundStatement WaitAfter(WebLingoBoundExpressionStatement call, bool says)
     {
-        if (!_hostBuiltins.TryGetValue(written, out var declaration) || !declaration.Writes || (_function != _main && !_function.IsAsync)
+        if ((_function != _main && !_function.IsAsync)
             || !_hostBuiltins.TryGetValue(WebLingoTemplateWriters.Full, out var full)
             || !_hostBuiltins.TryGetValue(WebLingoTemplateWriters.Drained, out var drained))
         {
@@ -371,7 +392,7 @@ public sealed class WebLingoBinder
         var span = call.Span;
         var wait = new WebLingoBoundExpressionStatement(new WebLingoBoundAwait(new WebLingoBoundBuiltinCall(UseBuiltin(drained), [], span), span), span);
         // A template's own writer says itself whether the output is full, which saves a call for each of a page's writes.
-        if (WebLingoTemplateWriters.IsWriter(written)) return new WebLingoBoundIf(call.Expression, wait, null, span);
+        if (says) return new WebLingoBoundIf(call.Expression, wait, null, span);
         var check = new WebLingoBoundIf(new WebLingoBoundBuiltinCall(UseBuiltin(full), [], span), wait, null, span);
         return new WebLingoBoundBlock([call, check], span);
     }
@@ -590,7 +611,7 @@ public sealed class WebLingoBinder
                     var standard = _moduleSources[unit];
                     if (standard.IsStandard && (standard.Name == WebLingoStandardModules.System
                             || WebLingoStandardModules.ExportsFunction(standard.Name, imported.Name))
-                        && _hostBuiltins.TryGetValue(imported.Name, out var hosted) && !hosted.RendersComponent)
+                        && _hostBuiltins.TryGetValue(imported.Name, out var hosted) && !hosted.RendersComponent && !hosted.InTemplates)
                     {
                         alias.ImportedBuiltin = hosted;
                     }
@@ -698,7 +719,12 @@ public sealed class WebLingoBinder
                         discarded.NameSpan) { Source = _source });
                 }
                 var bound = new WebLingoBoundExpressionStatement(BindExpression(expressionStatement.Expression), statement.Span);
-                return bound.Expression is WebLingoBoundBuiltinCall { Builtin.Name: var written } ? AfterWrite(bound, written) : bound;
+                return bound.Expression switch
+                {
+                    WebLingoBoundBuiltinCall { Builtin.Name: var written } => AfterWrite(bound, written),
+                    WebLingoBoundMethodCall { Name: "write" or "writeLn", Arguments.Count: 1 } => WaitAfter(bound, says: false),
+                    _ => bound
+                };
             }
             case WebLingoIfSyntax conditional:
             {
@@ -1521,7 +1547,7 @@ public sealed class WebLingoBinder
                 ? new WebLingoBoundMember(Reference(module, name.Span), local.ImportName!, name.Span)
                 : Reference(local, name.Span);
         }
-        if (_hostBuiltins.TryGetValue(name.Name, out var builtin) && !WebLingoStandardModules.IsImportedFunction(name.Name))
+        if (_hostBuiltins.TryGetValue(name.Name, out var builtin) && !WebLingoStandardModules.IsImportedFunction(name.Name) && Sees(builtin))
         {
             if (!builtin.RendersComponent) return new WebLingoBoundBuiltinReference(UseBuiltin(builtin), name.Span);
             Report(WebLingoDiagnosticCodes.InvalidOperation, $"'{name.Name}' renders a component, and can only be called.",
@@ -1590,9 +1616,9 @@ public sealed class WebLingoBinder
             if (!WebLingoStandardModules.IsImported(valueClass)) names.Add(valueClass);
         }
         foreach (var (errorClass, _) in WebLingoPrelude.ErrorClasses) names.Add(errorClass);
-        foreach (var builtin in _hostBuiltins.Keys)
+        foreach (var (builtin, declaration) in _hostBuiltins)
         {
-            if (!WebLingoStandardModules.IsImportedFunction(builtin)) names.Add(builtin);
+            if (!WebLingoStandardModules.IsImportedFunction(builtin) && Sees(declaration)) names.Add(builtin);
         }
         return names;
     }
@@ -1604,8 +1630,18 @@ public sealed class WebLingoBinder
     private WebLingoBuiltinDeclaration? HostBuiltinNamed(string name)
     {
         if (LookupLocal(name) is { } local) return local.ImportedBuiltin;
-        return _hostBuiltins.TryGetValue(name, out var declaration) && !WebLingoStandardModules.IsImportedFunction(name) ? declaration : null;
+        return _hostBuiltins.TryGetValue(name, out var declaration) && !WebLingoStandardModules.IsImportedFunction(name) && Sees(declaration)
+            ? declaration
+            : null;
     }
+
+    /// <summary>
+    /// Whether the file being bound sees the host's built-in <paramref name="declaration"/>: every file sees the host's
+    /// built-ins, but those declared for templates alone, a page's own <c>write</c> and <c>writeLn</c>, which only a
+    /// template's code sees, a page's, a layout's or a component's, never a module it imports (section 13).
+    /// </summary>
+    private bool Sees(WebLingoBuiltinDeclaration declaration) =>
+        !declaration.InTemplates || (_isTemplate?.Invoke(_source ?? _mainName) ?? false);
 
     /// <summary>Whether <paramref name="known"/>, a name a program can write, differs from <paramref name="name"/> only by case.</summary>
     private static bool IsCaseOf(string known, string name)

@@ -13,7 +13,7 @@
 param source = "WebLingo";
 param target = "";
 
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 import com from "windows:com";
 import fs from "std:fs";
 import { Json } from "std:json";

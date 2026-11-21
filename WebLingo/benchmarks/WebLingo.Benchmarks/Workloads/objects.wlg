@@ -1,5 +1,5 @@
 // Property access: instances made, their fields read and written, their methods called.
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 class Vector {
     constructor(x, y) {
         this.x = x;

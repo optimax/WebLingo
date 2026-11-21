@@ -8,12 +8,14 @@ gives you a file to save, an output to compare, and something to try on your own
 Create a folder for the lessons. Save this as `hello.wlg` in that folder. WebLingo source files currently use `.wlg`.
 
 ```javascript
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 
 writeLn("Hello, WebLingo!");
 ```
 
-From your lesson folder, run `weblingo run hello.wlg`. It prints:
+Its first line imports `writeLn` from `std:console`, the module of the console's writing and reading: a script imports
+what it uses, and a script that writes to its console imports `std:console`. From your lesson folder, run
+`weblingo run hello.wlg`. It prints:
 
 ```text
 Hello, WebLingo!
@@ -38,7 +40,7 @@ Save as `order.wlg`. Use `const` for a name you won’t assign again and `var` f
 value. A string starting with `$"` can insert the result of an expression inside braces.
 
 ```javascript
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 
 const tea = "sencha";
 const centsPerCup = 250;
@@ -60,7 +62,7 @@ Save as `steeping.wlg`. A condition takes a Boolean, so test `minutes > 3` expli
 each item in the array in order. The name `minutes` belongs to the loop.
 
 ```javascript
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 
 var times = [2, 4, 3];
 foreach (var minutes in times) {
@@ -87,7 +89,7 @@ indexing, `prices?[name]`, gives `null` for a missing key. The `??` operator giv
 side is `null`.
 
 ```javascript
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 
 var prices = { sencha: 250, assam: 300 };
 writeLn(prices["sencha"]);
@@ -108,7 +110,7 @@ Save as `receipts.wlg`. A function can take arguments and return a value. Give a
 omit it.
 
 ```javascript
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 
 function receipt(tea, centsPerCup, cups = 1) {
     return $"{tea} x{cups}: {centsPerCup * cups} cents";
@@ -133,7 +135,7 @@ cannot be parsed as an integer.
 
 ```javascript
 param cups = "2";
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 
 try {
     var count = Integer.parse(cups);
@@ -161,7 +163,7 @@ Enter a whole number of cups.
 Save as `tea.wlg`. The constructor sets the fields of a new object. Its methods use `this` to access those fields.
 
 ```javascript
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 
 class Tea {
     constructor(name, minutes) {
@@ -190,7 +192,7 @@ Save as `timer.wlg`. An `async` function gives the caller a task. Use `await` to
 You can use `await` at the top level of a script as well as inside an `async` function.
 
 ```javascript
-import { delay, writeLn } from "std:system";
+import { writeLn } from "std:console"; import { delay } from "std:system";
 
 async function brew(name) {
     await delay(100);
@@ -226,7 +228,7 @@ import is relative to `menu.wlg`. Run the main script, which loads the module.
 
 ```javascript
 param tea = "sencha";
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 import { priceFor } from "./menu-data.wlg";
 
 var cents = priceFor(tea);

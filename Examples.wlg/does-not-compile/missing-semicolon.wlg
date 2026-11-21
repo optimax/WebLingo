@@ -2,9 +2,10 @@
 // A statement ends with a semicolon, always: WebLingo never inserts one, so that where a line breaks never changes
 // what the code means, as it can in JavaScript (return, then a value on the next line, returning nothing).
 
+import { writeLn } from "std:console";
 var tea = "sencha"
 writeLn(tea);
 
 /* Errors:
-missing-semicolon.wlg(5,19): ERROR WL1002: A ';' is missing here.
+missing-semicolon.wlg(6,19): ERROR WL1002: A ';' is missing here.
 */

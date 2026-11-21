@@ -130,7 +130,7 @@ export async function checkout(id, customer) {
 export function refuse(response, why) {
     response.status = 400;
     response.headers["Content-Type"] = "text/plain; charset=utf-8";
-    write(why);
+    response.write(why);
 }
 
 // The browser sent on to the cart, 303 (See Other), its next request a GET, so that reloading the cart posts nothing again.

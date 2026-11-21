@@ -1,6 +1,7 @@
 // 07-collections.wlg: arrays, maps and sets.
 
 // Arrays: indexed from 0, of any values, mixed.
+import { writeLn } from "std:console";
 var teas = ["sencha", "assam", "oolong"];
 teas.push("rooibos");
 writeLn([teas.length, teas[0], teas.pop(), teas]);

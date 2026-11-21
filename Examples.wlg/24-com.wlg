@@ -5,6 +5,7 @@
 // allowed only by the configuration beside the script: weblingo.config, in this folder, lists the objects its scripts
 // may make, here Scripting.Dictionary alone. Any other is a ComPermissionError.
 
+import { writeLn } from "std:console";
 import com from "windows:com";
 
 using (var dictionary = com.create("Scripting.Dictionary")) {

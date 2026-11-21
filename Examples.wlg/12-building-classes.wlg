@@ -3,6 +3,7 @@
 // A program can make a class, name it, and give it a constructor, methods, properties and constants, then use it as
 // any declared class. There is no eval: code comes only from source files, and a class is built from functions.
 
+import { writeLn } from "std:console";
 var Point = new Class("Point");
 Point.setMethod("constructor", function (this, x, y) { this.x = x; this.y = y; });
 Point.setMethod("scaled", function (this, k) { return new Point(this.x * k, this.y * k); });

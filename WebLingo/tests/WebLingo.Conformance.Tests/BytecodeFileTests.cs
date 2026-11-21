@@ -54,7 +54,7 @@ public sealed class BytecodeFileTests
     public void AChangedFileIsRefusedOrRunsWithoutCrashing()
     {
         const string source = """
-            import { write, writeLn } from "std:system";
+            import { write, writeLn } from "std:console";
             class Shape { constructor(n) { this.n = n; } area() { return this.n * 2; } }
             class Square extends Shape { area() { return super.area() + 1; } }
             function make(k) { var total = 0; return function(x) { total = total + x * k; return total; }; }
@@ -99,8 +99,10 @@ public sealed class BytecodeFileTests
         Assert.InRange(ran, 1, 4_000);
     }
 
-    private static readonly WebLingoCompilerOptions Options =
-        new([new WebLingoBuiltinDeclaration("write", 1), new WebLingoBuiltinDeclaration("writeLn", 1), new WebLingoBuiltinDeclaration("delay", 1)]);
+    /// <summary>The host: write, writeLn and delay its own, and the standard modules, std:console's among them.</summary>
+    private static readonly ConformanceHost Host = new();
+
+    private static WebLingoCompilerOptions Options => Host.Options;
 
     /// <summary>What a module gives: its output, and its runtime error with its line and column, from the file's positions if it has them.</summary>
     private static string Run(WebLingoCompiledModule module, WebLingoSourceText text, IReadOnlyList<WebLingoSourcePositions>? positions)
@@ -126,12 +128,7 @@ public sealed class BytecodeFileTests
                + $"in {error.Source}: {error.Message}";
     }
 
-    private static WebLingoExecutionContext Context(IWebLingoTextOutput output, long budget) =>
-        new(new WebLingoWorkerId(0))
-        {
-            Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output)),
-            InstructionBudget = budget,
-        };
+    private static WebLingoExecutionContext Context(IWebLingoTextOutput output, long budget) => Host.Context(output, budget);
 
     private static ulong Fixed(byte[] file, int at, int size)
     {

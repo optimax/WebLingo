@@ -3,6 +3,7 @@
 // A string is immutable Unicode text. Its length and its indices count Unicode scalar values, not bytes or UTF-16 code
 // units, so that "żółw" has 4, and an emoji 1. Case is changed by the invariant culture: the same on every server.
 
+import { writeLn } from "std:console";
 var word = "żółw";
 writeLn([word.length, word[0], "😀".length, word.toUpper()]);
 

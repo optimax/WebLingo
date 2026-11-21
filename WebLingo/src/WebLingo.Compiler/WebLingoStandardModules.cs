@@ -6,9 +6,10 @@ namespace WebLingo.Compiler;
 /// <c>std:bytes</c>'s <c>Bytes</c> and <c>BytesBuilder</c>, <c>std:datetime</c>'s <c>DateTime</c> and <c>std:regex</c>'s
 /// <c>Regex</c>, a value of those kinds keeping its members without an import, each of which a program has only by
 /// importing it; and <c>std:system</c>, which exports the host's built-ins, those its implementation gives, another
-/// implementation being free to give others, <c>write</c>, <c>writeLn</c> and <c>delay</c> among them, which every program
-/// imports implicitly, an import of them allowed and meaning the same (the owner's decisions, 18 November 2026; section 9,
-/// "M0.20 parts", parts 2 to 4).
+/// implementation being free to give others, <c>delay</c> among them, which every program imports implicitly, an import of
+/// them allowed and meaning the same (the owner's decisions, 18 November 2026; section 9, "M0.20 parts", parts 2 to 4).
+/// The console's writing and reading are <c>std:console</c>'s, a native module, which a program imports (the owner's
+/// answers, 20 November 2026, "Console Module").
 /// </summary>
 public static class WebLingoStandardModules
 {
@@ -34,7 +35,7 @@ public static class WebLingoStandardModules
     public static IReadOnlyDictionary<string, IReadOnlyList<string>> Functions { get; } =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
-            [System] = ["write", "writeLn", "delay"],
+            [System] = ["delay"],
         };
 
     /// <summary>Whether <paramref name="path"/> names a standard module the compiler makes itself.</summary>

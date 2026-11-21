@@ -4,9 +4,9 @@ using WebLingo.Runtime;
 namespace WebLingo.StdLib;
 
 /// <summary>
-/// <c>readLine()</c> and <c>readLineSync()</c>, <c>std:system</c>'s, beside <c>write</c> (the owner's answers, 19 November
-/// 2026, "Console Input"): the console's next line, without its line break, <c>null</c> at the end of the input, as a
-/// task, its reading off the worker, or at once, blocking it.
+/// <c>readLine()</c> and <c>readLineSync()</c>, <c>std:console</c>'s, beside <c>write</c> (the owner's answers, 19 November
+/// 2026, "Console Input", and 20 November 2026, "Console Module", A1): the console's next line, without its line break,
+/// <c>null</c> at the end of the input, as a task, its reading off the worker, or at once, blocking it.
 /// </summary>
 public sealed class WebLingoReadLineFunction(bool synchronous) : IWebLingoBuiltinFunction
 {
@@ -52,7 +52,7 @@ internal static class WebLingoConsoleFunctions
 {
     /// <summary>
     /// A line the console gives, a string, or <c>null</c> at the end of the input: at once, or as a task, read off the
-    /// worker. Without a console, a site's script's under <c>wasp</c>, an <c>IOError</c>, WL3011, saying so.
+    /// worker. Without a console, an execution its host gives none, an <c>IOError</c>, WL3011, saying so.
     /// </summary>
     internal static bool TryRead(string name, Func<IWebLingoConsoleInput, string?> read, bool synchronous, WebLingoHeap heap,
         out WebLingoValue result, out WebLingoRuntimeError? error)
@@ -61,7 +61,7 @@ internal static class WebLingoConsoleFunctions
         if (heap.ConsoleInput is not { } input)
         {
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.IOFailure,
-                $"'{name}' reads a console, and this application has none: a site's pages and handlers have no user typing at one.");
+                $"'{name}' reads a console, and this program has none.");
             return false;
         }
         if (synchronous)

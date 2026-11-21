@@ -4,6 +4,7 @@
 // an integer wrapping around, a typo reading undefined. WebLingo guesses none of it. Each mistake below is a runtime error,
 // an exception of a class of its own, which a program may catch; uncaught, it stops the script and names its line.
 
+import { writeLn } from "std:console";
 function attempt(what, action) {
   try {
     var result = action();

@@ -86,6 +86,26 @@ public sealed class WebLingoOutputWaitFunction(bool drained, IWebLingoTextOutput
     }
 }
 
+/// <summary>
+/// A page's own <c>write(value)</c> and <c>writeLn(value)</c> (<see cref="WebLingoTemplateWriters.Write"/>), which its
+/// templates' code calls without an import (the owner's answer, 20 November 2026, "Console Module", A2): the value's text
+/// as <c>std:console</c>'s <c>write</c> writes it, <c>null</c> as <c>null</c>, where the page's text goes, giving
+/// <c>null</c>; a call of either as a statement waits for the output as the page's text does (specification, section
+/// 6.12, "Streaming").
+/// </summary>
+public sealed class WebLingoPageWriteFunction(bool line, IWebLingoTextOutput output) : IWebLingoTextBuiltin
+{
+    public string Name => line ? WebLingoTemplateWriters.WriteLine : WebLingoTemplateWriters.Write;
+    public int Arity => 1;
+
+    public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        output.Write(line ? WebLingoValueFormatter.Format(arguments[0], heap) + "\n" : WebLingoValueFormatter.Format(arguments[0], heap));
+        (result, error) = (WebLingoValue.Null, null);
+        return true;
+    }
+}
+
 /// <summary>The built-ins a host that runs pages registers besides the standard library's, each writing to the one output.</summary>
 public static class WebLingoTemplateBuiltins
 {
@@ -102,12 +122,14 @@ public static class WebLingoTemplateBuiltins
     }
 
     /// <summary>
-    /// Those most pages call: the raw writer, <c>&lt;%= … %&gt;</c>'s for HTML's text, and the wait for the output; a host
-    /// that makes the others when a page names them (<see cref="TryCreateWriter"/>) makes fewer for each request.
+    /// Those most pages call: the raw writer, <c>&lt;%= … %&gt;</c>'s for HTML's text, the page's own <c>write</c> and
+    /// <c>writeLn</c>, and the wait for the output; a host that makes the others when a page names them
+    /// (<see cref="TryCreateWriter"/>) makes fewer for each request.
     /// </summary>
     public static IWebLingoBuiltinFunction[] Common(IWebLingoTextOutput output) =>
     [
         new WebLingoTemplateWriteFunction(true, output), new WebLingoTemplateWriteFunction(false, output),
+        new WebLingoPageWriteFunction(false, output), new WebLingoPageWriteFunction(true, output),
         new WebLingoOutputWaitFunction(false, output), new WebLingoOutputWaitFunction(true, output)
     ];
 

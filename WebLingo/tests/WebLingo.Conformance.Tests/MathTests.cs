@@ -12,7 +12,7 @@ public sealed class MathTests : IDisposable
 {
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "weblingo-math-" + Guid.NewGuid().ToString("N"));
 
-    private const string Math = "import math from \"std:math\"; import { writeLn } from \"std:system\"; ";
+    private const string Math = "import math from \"std:math\"; import { writeLn } from \"std:console\"; ";
 
     public MathTests() => Directory.CreateDirectory(_folder);
 

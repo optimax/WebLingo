@@ -3,6 +3,7 @@
 // A statement's values are given apart from its text, each named @name, and never written into the SQL: a value
 // cannot change what a statement does, so that SQL injection has nowhere to start.
 
+import { writeLn } from "std:console";
 import { Database } from "std:db";
 
 using (var db = await Database.open("sqlite::memory:")) {

@@ -1,5 +1,6 @@
 // 08-functions.wlg: functions, as declarations, expressions and arrows; defaults, rest parameters, and receivers.
 
+import { writeLn } from "std:console";
 function greet(name, greeting = "Hello") {
   return $"{greeting}, {name}!";
 }

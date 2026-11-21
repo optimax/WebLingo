@@ -68,7 +68,7 @@ public sealed class RequestAndResponseTests
     [InlineData("response.headers[\"X-Count\"] = 5;", "WL3001: A header&#39;s value is a string, not the integer 5.")]
     [InlineData("response.headers[5] = \"x\";", "WL3001: A header&#39;s name is a string, not the integer 5.")]
     [InlineData("request.headers[\"Accept\"] = \"x\";", "WL3001: These headers cannot be changed: a request&#39;s never can")]
-    [InlineData("import { write } from \"std:system\"; write(request.headers[\"X-None\"]);", "WL3007: There is no header &#39;X-None&#39;.")]
+    [InlineData("write(request.headers[\"X-None\"]);", "WL3007: There is no header &#39;X-None&#39;.")]
     [InlineData("request.method = \"PUT\";", "WL3001:")]
     public void AWrongStatusOrHeaderIsAnErrorWhereItIsSet(string statement, string error)
     {
@@ -124,9 +124,9 @@ public sealed class RequestAndResponseTests
     {
         var app = Load(new MemoryFileSystem()
             .Add("/site/api/teas.wlg",
-                "import { write, writeLn } from \"std:system\"; export function get(request, response) {\n  response.headers[\"Content-Type\"] = \"application/json\";\n"
-                + "  write(\"[\\\"\" + request.query[\"kind\"] + \"\\\"]\");\n}\n"
-                + "export async function post(request, response) { response.status = 201; write(\"made \" + request.method); }\n"
+                "export function get(request, response) {\n  response.headers[\"Content-Type\"] = \"application/json\";\n"
+                + "  response.write(\"[\\\"\" + request.query[\"kind\"] + \"\\\"]\");\n}\n"
+                + "export async function post(request, response) { response.status = 201; response.write(\"made \" + request.method); }\n"
                 + "export function twice(x) { return x * 2; }")
             .Add("/site/lib/util.wlg", "export function twice(x) { return x * 2; }"));
         var response = new WebLingoBufferedResponse();
@@ -155,11 +155,11 @@ public sealed class RequestAndResponseTests
         // a 500. A name with " and %> is one, the handler's page naming it in a string literal as it is; any other file
         // named so is sent as it is.
         var app = Load(new MemoryFileSystem()
-            .Add("/site/api/tea\\notes.wlg", "import { write, writeLn } from \"std:system\"; export function get(request, response) { write(\"notes\"); }")
-            .Add("/site/api/two\nlines.wlg", "import { write, writeLn } from \"std:system\"; export function get(request, response) { write(\"lines\"); }")
+            .Add("/site/api/tea\\notes.wlg", "export function get(request, response) { response.write(\"notes\"); }")
+            .Add("/site/api/two\nlines.wlg", "export function get(request, response) { response.write(\"lines\"); }")
             .Add("/site/tea:time.wasp", "<p>tea</p>")
             .Add("/site/back\\slash/index.wasp", "<p>index</p>")
-            .Add("/site/api/say \"hi\" %>.wlg", "import { write, writeLn } from \"std:system\"; export function get(request, response) { write(\"quoted\"); }")
+            .Add("/site/api/say \"hi\" %>.wlg", "export function get(request, response) { response.write(\"quoted\"); }")
             .Add("/site/css/odd\\name.css", "p { }"));
         Assert.Equal(404, Get(app, "GET", "/api/tea\\notes").Status);
         Assert.Equal(404, Get(app, "GET", "/api/two\nlines").Status);
@@ -171,17 +171,30 @@ public sealed class RequestAndResponseTests
     }
 
     [Fact]
+    public void AHandlerWritesItsResponseWithResponseWrite()
+    {
+        // response.write and response.writeLn write a value's text as write does, an instance's toString() run, null as
+        // null (the owner's answer, 20 November 2026, "Console Module", A2); a page writes so too, beside its own write.
+        var app = Load(new MemoryFileSystem()
+            .Add("/site/api/text.wlg", "class P { toString() { return \"P!\"; } } export function get(request, response) { "
+                                       + "response.write(new P()); response.writeLn(null); response.write([1, \"a\"]); response.writeLn(2.5); }")
+            .Add("/site/index.wasp", "<% param response; response.write(\"a\"); write(\"b\"); response.writeLn(\"c\"); writeLn(\"d\"); %>e"));
+        Assert.Equal((200, "P!null\n[1, \"a\"]2.5\n"), Get(app, "GET", "/api/text"));
+        Assert.Equal((200, "abc\nd\ne"), Get(app, "GET", "/"));
+    }
+
+    [Fact]
     public void AHandlerThatFailsIsA500_ItsErrorsInItsFile()
     {
         var app = Load(new MemoryFileSystem()
-            .Add("/site/api/fails.wlg", "import { write, writeLn } from \"std:system\"; export function get(request, response) {\n  write([1][5]);\n}")
-            .Add("/site/api/bad.wlg", "import { write, writeLn } from \"std:system\"; export function get(request, response) {\n  write(nope);\n}")
+            .Add("/site/api/fails.wlg", "export function get(request, response) {\n  response.write([1][5]);\n}")
+            .Add("/site/api/bad.wlg", "export function get(request, response) {\n  response.write(nope);\n}")
             .Add("/site/api/broken.wlg", "export function get(request, response) {"), WebLingoMode.Development);
         var (status, body) = Get(app, "GET", "/api/fails");
         Assert.Equal(500, status);
         Assert.True(body.Contains("<pre>api/fails.wlg(2,", StringComparison.Ordinal), body);
         Assert.Contains("error WL3005:", body);
-        Assert.Contains("<pre>api/bad.wlg(2,9): error WL2001: &#39;nope&#39; is not defined.", Get(app, "GET", "/api/bad").Body);
+        Assert.Contains("<pre>api/bad.wlg(2,18): error WL2001: &#39;nope&#39; is not defined.", Get(app, "GET", "/api/bad").Body);
         (status, body) = Get(app, "GET", "/api/broken");
         Assert.Equal(500, status);
         Assert.Contains("<pre>api/broken.wlg(1,", body);
@@ -192,7 +205,7 @@ public sealed class RequestAndResponseTests
         var app = WebLingoApplication.Load(new WebLingoApplicationOptions(Root, files)
         {
             Workers = 2,
-            WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry(new WebLingoWriteFunction(), new WebLingoWriteLnFunction())),
+            WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry()),
             Mode = environment
         }, out var error);
         Assert.True(app is not null, error);

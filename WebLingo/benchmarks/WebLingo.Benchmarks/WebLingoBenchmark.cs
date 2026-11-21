@@ -30,11 +30,11 @@ public static class WebLingoBenchmark
     private static readonly WebLingoBuiltinRegistry NativeBuiltins = new();
 
     /// <summary>
-    /// The workloads' built-ins, and the standard modules installed beside the benchmark in std/, as beside the command
-    /// lines, <c>std:fs</c> among them (section 3.9).
+    /// The standard modules installed beside the benchmark in std/, as beside the command lines, <c>std:console</c>, whose
+    /// <c>writeLn</c> the workloads write with, and <c>std:fs</c> among them (section 3.9).
     /// </summary>
     private static readonly WebLingoCompilerOptions Options =
-        new([new WebLingoBuiltinDeclaration("write", 1), new WebLingoBuiltinDeclaration("writeLn", 1)])
+        new([])
         {
             Native = new WebLingoNativeModuleLoader(new Dictionary<string, string> { ["std"] = Path.Combine(AppContext.BaseDirectory, "std") },
                 NativeBuiltins)
@@ -83,11 +83,11 @@ public static class WebLingoBenchmark
     private static long Run(IWebLingoBenchmarkEngine engine, WebLingoWorkload workload, IWebLingoBenchmarkProgram program, string? folder)
     {
         var output = new WebLingoCollectedOutput();
-        // The built-ins a page calls besides (section 13), which a script does not.
-        var services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output));
-        foreach (var builtin in WebLingoTemplateBuiltins.Create(output)) services.Register(builtin);
+        // The built-ins a page calls (section 13), which a script does not, and the standard modules' functions, writing
+        // to the execution's output.
+        var services = new WebLingoBuiltinRegistry(WebLingoTemplateBuiltins.Create(output));
         foreach (var builtin in NativeBuiltins.Builtins) services.Register(builtin);
-        var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services };
+        var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services, Output = output };
         if (folder is not null)
         {
             context = context with

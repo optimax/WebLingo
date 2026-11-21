@@ -1,6 +1,7 @@
 // 09-control-flow.wlg: choosing and repeating.
 
 // if is a statement, and an expression too, its else required there; c ? a : b is the same, as in C#.
+import { writeLn } from "std:console";
 var temperature = 85;
 var advice = if (temperature > 90) "too hot for green tea" else "fine";
 writeLn([advice, temperature >= 80 ? "warm" : "cool"]);

@@ -4,6 +4,7 @@
 // or by using, which disposes on every way out of its block, an exception's included. A class may write its
 // disposal as dispose() or as destructor(), the same method; callers always call dispose().
 
+import { writeLn } from "std:console";
 class Resource {
   constructor(name) { this.name = name; writeLn($"open {name}"); }
   dispose() { writeLn($"close {this.name}"); }

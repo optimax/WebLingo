@@ -40,7 +40,7 @@ public sealed class FileSystemTests : IDisposable
     public void TextIsWrittenAppendedAndReadBothWays(string vm)
     {
         Assert.Equal(("héllo\nworld\n|12|true|false|done", ""), Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             await fs.writeText(folder + "/a.txt", "héllo\n");
             fs.appendTextSync(folder + "/a.txt", "world\n");
             write(await fs.readText(folder + "/a.txt"));
@@ -57,7 +57,7 @@ public sealed class FileSystemTests : IDisposable
     public void FoldersAreMadeListedAndRemoved(string vm)
     {
         Assert.Equal(("[\"a.txt\", \"b\", \"c.txt\"] [] false", ""), Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             await fs.makeFolder(folder + "/x/b");
             fs.makeFolderSync(folder + "/x/b");
             await fs.writeText(folder + "/x/c.txt", "c");
@@ -78,7 +78,7 @@ public sealed class FileSystemTests : IDisposable
     {
         File.WriteAllText(Path.Combine(_folder, "bom.txt"), "marked", new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
         Assert.Equal(("ü 6 6 4", ""), Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             fs.writeTextSync(folder + "/u.txt", "ü", "utf-16");
             write(fs.readTextSync(folder + "/u.txt", "utf-16") + " ");
             write(fs.readTextSync(folder + "/bom.txt").length.toString() + " ");
@@ -100,7 +100,7 @@ public sealed class FileSystemTests : IDisposable
     public void AFileIsOpenedReadWrittenAndDisposed(string vm)
     {
         Assert.Equal(("[one][two][three]|WL3001 This File has been disposed.", ""), Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             using (var w = await fs.File.open(folder + "/f.txt", "w")) {
                 await w.write("one\ntwo");
                 w.writeSync("\n");
@@ -126,7 +126,7 @@ public sealed class FileSystemTests : IDisposable
     {
         // Every byte as it is, 0, 255 and line breaks among them, never read as text (the owner's answers, 18 November 2026).
         Assert.Equal(("Bytes:[0, 255, 10, 13, 200]|Bytes:[0, 255, 10, 13, 200, 7]|true", ""), Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             var data = fs.readBytesSync(folder + "/given.bin");
             await fs.writeBytes(folder + "/b.bin", data);
             write(await fs.readBytes(folder + "/b.bin"));
@@ -143,7 +143,7 @@ public sealed class FileSystemTests : IDisposable
     {
         // "wb" writes bytes anew; "rb" reads them, up to a count at a time, null at the end, however large the count.
         Assert.Equal(("[tea][ ti][me]|[tea time]|null", ""), Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             var tea = fs.readBytesSync(folder + "/tea.txt");
             using (var w = await fs.File.open(folder + "/f.bin", "wb")) {
                 await w.write(tea.slice(0, 4));
@@ -170,7 +170,7 @@ public sealed class FileSystemTests : IDisposable
     {
         // An instance holding a string, where std:fs takes one, is that string (section 3.7, "No sealed classes").
         Assert.Equal(("[\"text\", true]", ""), Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             class Name extends String {}
             fs.writeTextSync(new Name(folder + "/held.txt"), new Name("text"));
             write([fs.readTextSync(new Name(folder + "/held.txt")), fs.existsSync(new Name(folder + "/held.txt"))]);
@@ -185,7 +185,7 @@ public sealed class FileSystemTests : IDisposable
         // class it is called on, its constructor run; a file opened once, and not after its disposal (the owner's answer, 18
         // November 2026; section 3.7, "No sealed classes").
         var (output, error) = Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             class LogFile extends fs.File {
                 constructor(prefix = "[log]") { super(); this.prefix = prefix; }
                 log(line) { this.writeSync($"{this.prefix} {line}\n"); }
@@ -225,7 +225,7 @@ public sealed class FileSystemTests : IDisposable
     {
         // "ab" writes bytes after a file's own, and makes a file that is not there (the owner's request, 18 November 2026).
         Assert.Equal(($"WL3011 '{_folder}/tea.txt' cannot be read: it was opened to be written, not read.", ""), Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             var tea = fs.readBytesSync(folder + "/tea.txt");
             using (var a = await fs.File.open(folder + "/tea.txt", "ab")) {
                 await a.write(tea.slice(3));
@@ -245,7 +245,7 @@ public sealed class FileSystemTests : IDisposable
     {
         // A copy is the file as it is, replacing one there; a folder is not copied (the owner's answers, 18 November 2026).
         var (output, error) = Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             fs.makeFolderSync(folder + "/sub");
             write([fs.isFolderSync(folder + "/sub"), await fs.isFolder(folder + "/given.bin"), fs.isFolderSync(folder + "/missing")]);
             fs.writeTextSync(folder + "/copy.bin", "old, and longer than the copy");
@@ -268,7 +268,7 @@ public sealed class FileSystemTests : IDisposable
     {
         // Text by a line, read(), and text written; bytes by a count, read(count), and bytes written.
         var (output, _) = Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             fs.writeTextSync(folder + "/t.txt", "tea\n");
             function t(f) { try { f(); } catch (e) { write(e.code + " " + e.message + "|"); } }
             using (var text = fs.File.openSync(folder + "/t.txt", "r")) { t(() => text.readSync(4)); }
@@ -292,7 +292,7 @@ public sealed class FileSystemTests : IDisposable
     public void ManyOperationsRunAtOnce(string vm)
     {
         Assert.Equal(("4950", ""), Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             var writes = [];
             for (var i = 0; i < 100; i = i + 1) writes.push(fs.writeText(folder + "/n" + i.toString() + ".txt", i.toString()));
             await Task.all(writes);
@@ -309,7 +309,7 @@ public sealed class FileSystemTests : IDisposable
     public void AFailureIsAnIOErrorNamingTheScriptsPath(string vm)
     {
         var (output, error) = Run(vm, """
-            import { write } from "std:system";
+            import { write } from "std:console";
             try { await fs.readText(folder + "/missing.txt"); } catch (IOError e) { write(e.code + " " + e.message + "|"); }
             try { fs.removeSync("missing.txt"); } catch (IOError e) { write(e.message + "|"); }
             fs.makeFolderSync(folder + "/full");

@@ -13,7 +13,7 @@ param name;
 param database;
 param server = "localhost";
 
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 import { Database } from "std:db";
 import { Regex } from "std:regex";
 

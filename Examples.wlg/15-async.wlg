@@ -3,6 +3,7 @@
 // A program's tasks take turns on one worker, switching only at await, so that no two run at once and nothing needs a
 // lock. A script's top level may await, as an async function's body may.
 
+import { writeLn } from "std:console";
 import { all } from "std:tasks";
 
 async function brew(tea, minutes) {

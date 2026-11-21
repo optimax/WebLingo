@@ -12,7 +12,7 @@ public sealed class CryptoTests : IDisposable
 {
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "weblingo-crypto-" + Guid.NewGuid().ToString("N"));
 
-    private const string Hex = "import crypto from \"std:crypto\"; import { writeLn } from \"std:system\"; import { Bytes } from \"std:bytes\"; function hex(b) { var s = \"\"; for (var i = 0; i < b.length; i++) s += $\"{b[i]:x2}\"; return s; } ";
+    private const string Hex = "import crypto from \"std:crypto\"; import { writeLn } from \"std:console\"; import { Bytes } from \"std:bytes\"; function hex(b) { var s = \"\"; for (var i = 0; i < b.length; i++) s += $\"{b[i]:x2}\"; return s; } ";
 
     public CryptoTests() => Directory.CreateDirectory(_folder);
 
@@ -62,7 +62,7 @@ public sealed class CryptoTests : IDisposable
     [InlineData("crypto.verifyPassword(\"p\", 5);", "The second argument of 'verifyPassword', the hash, must be a hash 'hashPassword' made, \"pbkdf2-sha256$iterations$salt$hash\", not the integer 5.")]
     public void WrongArgumentsAreTypeErrors(string call, string message)
     {
-        Assert.Equal(("WL3001 " + message + "\n", ""), Run("import { write, writeLn } from \"std:system\"; import crypto from \"std:crypto\"; try { " + call + " } catch (TypeError e) { writeLn(e.code + \" \" + e.message); }"));
+        Assert.Equal(("WL3001 " + message + "\n", ""), Run("import { write, writeLn } from \"std:console\"; import crypto from \"std:crypto\"; try { " + call + " } catch (TypeError e) { writeLn(e.code + \" \" + e.message); }"));
     }
 
     /// <summary>

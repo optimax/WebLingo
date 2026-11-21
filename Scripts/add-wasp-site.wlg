@@ -14,7 +14,7 @@ param folder;
 param host;
 param writable = "";
 
-import { writeLn } from "std:system";
+import { writeLn } from "std:console";
 import fs from "std:fs";
 import { Regex } from "std:regex";
 import { requireAdministrator, runOrStop, expand, makeCertificate, trust, boundCertificate } from "./windows.wlg";

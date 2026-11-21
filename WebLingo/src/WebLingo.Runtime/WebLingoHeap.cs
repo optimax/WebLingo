@@ -91,6 +91,9 @@ public sealed class WebLingoHeap
     /// <summary>Where the execution's text goes (<see cref="WebLingoExecutionContext.Output"/>), for native functions (section 3.9).</summary>
     public IWebLingoTextOutput? Output { get; set; }
 
+    /// <summary>Where the execution's errors go (<see cref="WebLingoExecutionContext.ErrorOutput"/>), for <c>std:console</c>'s <c>writeError</c>.</summary>
+    public IWebLingoTextOutput? ErrorOutput { get; set; }
+
     /// <summary>The platform's files (<see cref="WebLingoExecutionContext.FileSystem"/>), for native functions, <c>std:fs</c>'s (section 7.4).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoFileSystem? FileSystem { get; set; }
 
@@ -111,7 +114,7 @@ public sealed class WebLingoHeap
     /// <summary>The machine's environment (<see cref="WebLingoExecutionContext.Environment"/>), for <c>std:env</c>'s members (section 7.15).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoEnvironment? Environment { get; set; }
 
-    /// <summary>The console's input (<see cref="WebLingoExecutionContext.ConsoleInput"/>), for <c>std:system</c>'s <c>readLine</c> and the others.</summary>
+    /// <summary>The console's input (<see cref="WebLingoExecutionContext.ConsoleInput"/>), for <c>std:console</c>'s <c>readLine</c> and the others.</summary>
     public WebLingo.Platform.Abstractions.IWebLingoConsoleInput? ConsoleInput { get; set; }
 
     /// <summary>The class values of the native classes whose modules make their instances, each its class's (section 3.10).</summary>

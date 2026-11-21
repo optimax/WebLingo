@@ -22,10 +22,16 @@ public sealed class WebLingoTemplateCompiler
     private readonly WebLingoCompilerOptions _options;
     private readonly HashSet<string> _layouts = new(StringComparer.Ordinal);
 
+    /// <summary>The files it read as templates, a page's, its layouts' and its components', whose code has the page's own writers.</summary>
+    private readonly HashSet<string> _templateFiles = new(StringComparer.Ordinal);
+
     public WebLingoTemplateCompiler(WebLingoCompilerOptions options, IWebLingoSourceResolver? templates = null)
     {
         _templates = templates;
-        _options = WithBuiltins(options) with { Resolver = new Imports(options.Resolver, templates, _layouts), Parse = ParseImport };
+        _options = WithBuiltins(options) with
+        {
+            Resolver = new Imports(options.Resolver, templates, _layouts), Parse = ParseImport, IsTemplate = _templateFiles.Contains
+        };
     }
 
     /// <summary>The files of what it compiled, the page's, its layouts' and its components', which say where a diagnostic is.</summary>
@@ -57,6 +63,7 @@ public sealed class WebLingoTemplateCompiler
         foreach (var parameter in _options.HostParameters) hosted.Add(parameter.Name);
         var tree = WebLingoTemplateParser.Parse(page, _templates, out var files, kind, hosted);
         Sources.Add(files);
+        _templateFiles.Add(page.Name);
         return tree;
     }
 
@@ -74,16 +81,22 @@ public sealed class WebLingoTemplateCompiler
     }
 
     /// <summary>
-    /// The host's built-ins, <c>write</c> and <c>writeLn</c> marked as writing output, and the page's: its writers, one
-    /// for each escaping of <c>&lt;%= … %&gt;</c> (section 13, "Context-aware escaping"), the wait for its output (section
-    /// 6.12, "Streaming"), and <c>renderComponent</c>.
+    /// The host's built-ins, and the page's: its own <c>write</c> and <c>writeLn</c>, which its templates' code calls
+    /// without an import, writing where its text goes (the owner's answer, 20 November 2026, "Console Module", A2), in place
+    /// of any the host gives; its writers, one for each escaping of <c>&lt;%= … %&gt;</c> (section 13, "Context-aware
+    /// escaping"), the wait for its output (section 6.12, "Streaming"), and <c>renderComponent</c>.
     /// </summary>
     private static WebLingoCompilerOptions WithBuiltins(WebLingoCompilerOptions options)
     {
         var builtins = new List<WebLingoBuiltinDeclaration>(options.Builtins.Count + 5 + WebLingoTemplateWriters.Escapings.Count);
-        foreach (var builtin in options.Builtins) builtins.Add(builtin.Name is "write" or "writeLn" ? builtin with { Writes = true } : builtin);
+        foreach (var builtin in options.Builtins)
+        {
+            if (builtin.Name is not (WebLingoTemplateWriters.Write or WebLingoTemplateWriters.WriteLine)) builtins.Add(builtin);
+        }
         var declarations = new List<WebLingoBuiltinDeclaration>
         {
+            new(WebLingoTemplateWriters.Write, 1) { Writes = true, InTemplates = true },
+            new(WebLingoTemplateWriters.WriteLine, 1) { Writes = true, InTemplates = true },
             new(WebLingoTemplateWriters.Raw, 1) { Writes = true }, new(WebLingoTemplateWriters.Full, 0), new(WebLingoTemplateWriters.Drained, 0),
             new(RenderComponent, 2) { RendersComponent = true }
         };

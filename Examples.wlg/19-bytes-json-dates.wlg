@@ -2,6 +2,7 @@
 //
 // Each class is a standard module's, imported to be named; a value keeps its members without the import.
 
+import { writeLn } from "std:console";
 import { Bytes, BytesBuilder } from "std:bytes";
 import { Json } from "std:json";
 import { DateTime } from "std:datetime";

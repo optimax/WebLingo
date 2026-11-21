@@ -41,7 +41,7 @@ public sealed class StackVmTests
                     foreach (var row in attribute.GetData(method)) programs.Add((string)row[0]);
                 }
             }
-            programs.Add("import { write, writeLn } from \"std:system\"; var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);\n");
+            programs.Add("import { write, writeLn } from \"std:console\"; var a = 10;\nvar b = 20;\nvar result = a + b;\nwriteLn(result);\n");
             programs.Add("var x = 9223372036854775807 + 1;");
             return programs;
         }
@@ -90,7 +90,7 @@ public sealed class StackVmTests
     public void MalformedStackBytecodeFailsVerificationNotACrash()
     {
         var module = new WebLingoStackCompiler(Options)
-            .Compile("import { write, writeLn } from \"std:system\"; var a = 10; var b = a * 2 - 3; function f(n) { return n + b; } var c = 0; c = -f(b) / a; writeLn(c);",
+            .Compile("import { write, writeLn } from \"std:console\"; var a = 10; var b = a * 2 - 3; function f(n) { return n + b; } var c = 0; c = -f(b) / a; writeLn(c);",
                 "base.wlg").Module!;
         var random = new Random(8_6);
         var opCodes = Enum.GetValues<WebLingoStackOpCode>();
@@ -113,11 +113,7 @@ public sealed class StackVmTests
                 };
             }
             var mutated = module with { EntryPoint = module.EntryPoint with { Code = code } };
-            var context = new WebLingoExecutionContext(new WebLingoWorkerId(0))
-            {
-                Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(new WebLingoCollectedOutput())),
-                InstructionBudget = 10_000,
-            };
+            var context = Context(new WebLingoCollectedOutput(), 10_000);
             var result = vm.Execute(mutated, context);
             Assert.True(result.Succeeded || result.Error is not null);
             if (result.Error?.Code == WebLingoDiagnosticCodes.BytecodeVerificationFailure) rejected++;
@@ -125,8 +121,10 @@ public sealed class StackVmTests
         Assert.InRange(rejected, 1, 5_000);
     }
 
-    private static readonly WebLingoCompilerOptions Options =
-        new([new WebLingoBuiltinDeclaration("write", 1), new WebLingoBuiltinDeclaration("writeLn", 1), new WebLingoBuiltinDeclaration("delay", 1)]);
+    /// <summary>The host: write, writeLn and delay its own, and the standard modules, std:console's among them.</summary>
+    private static readonly ConformanceHost Host = new();
+
+    private static WebLingoCompilerOptions Options => Host.Options;
 
     /// <summary>What a program gives: its diagnostics, its output, and its runtime error, each as text.</summary>
     private sealed record Outcome(string[] Diagnostics, string Output, string Error)
@@ -155,12 +153,7 @@ public sealed class StackVmTests
         return OutcomeOf(compiled.Diagnostics, output, result);
     }
 
-    private static WebLingoExecutionContext Context(IWebLingoTextOutput output, long budget) =>
-        new(new WebLingoWorkerId(0))
-        {
-            Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output)),
-            InstructionBudget = budget,
-        };
+    private static WebLingoExecutionContext Context(IWebLingoTextOutput output, long budget) => Host.Context(output, budget);
 
     private static Outcome OutcomeOf(IReadOnlyList<WebLingoDiagnostic> diagnostics, WebLingoCollectedOutput output, WebLingoExecutionResult? result) =>
         new([.. diagnostics.Select(Describe)], output.Text, result?.Error is { } error ? Describe(error) : "");

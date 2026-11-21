@@ -29,6 +29,7 @@ public static class WebLingoWaspCommandLine
             ReachesAnyHost = false,
             ReachesAnyFile = false,
             ReachesAllEnvironment = false,
+            HasConsole = false,
             Root = root,
             Options = "[--root <folder>] ",
             OptionsHelp =

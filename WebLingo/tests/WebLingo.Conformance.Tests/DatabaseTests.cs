@@ -16,7 +16,7 @@ public sealed class DatabaseTests : IDisposable
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "weblingo-db-" + Guid.NewGuid().ToString("N"));
 
     private const string Setup =
-        "import { Database } from \"std:db\"; import { write, writeLn } from \"std:system\"; import { Bytes } from \"std:bytes\"; import { DateTime } from \"std:datetime\"; var db = await Database.open(\"shop\"); " +
+        "import { Database } from \"std:db\"; import { write, writeLn } from \"std:console\"; import { Bytes } from \"std:bytes\"; import { DateTime } from \"std:datetime\"; var db = await Database.open(\"shop\"); " +
         "await db.execute(\"CREATE TABLE Fish (Id INTEGER PRIMARY KEY, Name TEXT NOT NULL, Price DECIMAL(10,2), Marine BOOLEAN, Added DATETIME, Photo BLOB, Length REAL)\"); " +
         "await db.execute(\"INSERT INTO Fish (Name, Price, Marine, Length) VALUES ('Neon tetra', 2.50, 0, 3.5), ('Clownfish', 24.99, 1, 8.0)\"); ";
 
@@ -234,7 +234,7 @@ public sealed class DatabaseTests : IDisposable
         // folder, which a relative path is from, is not changed here, the tests running at once.
         var file = Path.Combine(_folder, "data", "shop.db").Replace('\\', '/');
         File.WriteAllBytes(file, []);
-        var source = "import { write, writeLn } from \"std:system\"; import { Database } from \"std:db\"; " +
+        var source = "import { write, writeLn } from \"std:console\"; import { Database } from \"std:db\"; " +
                      "using (var db = await Database.open(\"sqlite::memory:\")) { writeLn(await db.query(\"SELECT 1 + 1 AS two\")); } " +
                      $"using (var db = await Database.open(\"sqlite:Data Source={file};Mode=ReadOnly\")) {{ " +
                      "try { await db.execute(\"CREATE TABLE T (x INTEGER)\"); } catch (DatabaseError e) { writeLn(e.code); } }";
@@ -247,7 +247,7 @@ public sealed class DatabaseTests : IDisposable
     {
         // Nothing listens on port 1, so SqlClient's managed network layer, the one WebLingo ships, fails to connect,
         // where its native one, left out, would fail to load.
-        var source = "import { write, writeLn } from \"std:system\"; import { Database } from \"std:db\"; " +
+        var source = "import { write, writeLn } from \"std:console\"; import { Database } from \"std:db\"; " +
                      "try { await Database.open(\"sqlserver:Server=tcp:127.0.0.1,1;Connect Timeout=1;Encrypt=false\"); } " +
                      "catch (DatabaseError e) { writeLn([e.code, e.message.startsWith(\"The database cannot be opened: \")]); }";
         var (exit, output, error) = Weblingo(source);
@@ -280,7 +280,7 @@ public sealed class DatabaseTests : IDisposable
     public void AConfigurationsDatabasesAreChecked()
     {
         File.WriteAllText(Path.Combine(_folder, "scripts", WebLingoSchemes.ConfigurationFile), "{ \"databases\": { \"shop\": \"shop.db\" } }");
-        var (exit, _, error) = Weblingo("import { write, writeLn } from \"std:system\"; writeLn(1);");
+        var (exit, _, error) = Weblingo("import { write, writeLn } from \"std:console\"; writeLn(1);");
         Assert.Equal(WebLingoCommandLine.FileUnreadable, exit);
         Assert.Contains("\"databases\" names each database, without a colon, and gives its connection string", error, StringComparison.Ordinal);
     }

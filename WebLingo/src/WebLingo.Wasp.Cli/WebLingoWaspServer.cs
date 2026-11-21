@@ -122,11 +122,14 @@ public static class WebLingoWaspServer
         return application;
     }
 
-    /// <summary>A worker's built-ins and native modules, its own: std:system's functions, and a loader of the others.</summary>
+    /// <summary>
+    /// A worker's built-ins and native modules, its own: std:system's functions, and a loader of the others, but std:console,
+    /// a site having no console (section 3.9).
+    /// </summary>
     private static WebLingoWorkerServices Services(IReadOnlyDictionary<string, string> schemes, string importer)
     {
         var builtins = new WebLingoBuiltinRegistry();
-        var native = new WebLingoNativeModuleLoader(schemes, builtins);
+        var native = new WebLingoNativeModuleLoader(schemes, builtins) { Refused = WebLingoNativeModuleLoader.WithoutConsole };
         native.TryResolve(importer, "std:system", out var system, out _);
         foreach (var function in native.FunctionsOf(system!)) builtins.Register(function);
         return new WebLingoWorkerServices(builtins, native);

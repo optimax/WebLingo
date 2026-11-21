@@ -22,7 +22,7 @@ public sealed class ConsoleTextTests : IDisposable
     public async Task TextIsWrittenAsUtf8()
     {
         var script = Path.Combine(_folder, "letters.wlg");
-        File.WriteAllText(script, "writeLn(\"żółw € 😀\");\nthrow new Error(\"ŻÓŁW\");\n");
+        File.WriteAllText(script, "import { writeLn } from \"std:console\"; writeLn(\"żółw € 😀\");\nthrow new Error(\"ŻÓŁW\");\n");
         var start = new ProcessStartInfo(Program(), ["run", script])
         {
             RedirectStandardOutput = true,
@@ -46,11 +46,12 @@ public sealed class ConsoleTextTests : IDisposable
     [InlineData(true)]
     public void ASubprocessReceivesLiteralArgumentsAndReturnsItsOutputAndExitCode(bool stack)
     {
-        var child = Write("child.wlg", "param message; writeLn(message); throw new Error(\"from the child\");");
+        var child = Write("child.wlg", "param message; import { writeLn } from \"std:console\"; writeLn(message); throw new Error(\"from the child\");");
         var script = Write("run.wlg", """
             param executable;
             param child;
             import process from "std:process";
+            import { writeLn } from "std:console";
             var result = await process.run(executable, ["run", child, "message= spaces & \"quoted\" żółw"]);
             writeLn([result["exitCode"], result["stdout"] == " spaces & \"quoted\" żółw\n",
                 result["stderr"].contains("ERROR WL3008 (Error): An error was thrown and not caught: from the child")]);
@@ -70,11 +71,12 @@ public sealed class ConsoleTextTests : IDisposable
     [Fact]
     public void ASubprocessReportsOutputLimitsAndTimeouts()
     {
-        var child = Write("child.wlg", "param slow = \"no\"; if (slow == \"yes\") await delay(60000); writeLn(\"tea\");");
+        var child = Write("child.wlg", "param slow = \"no\"; import { writeLn } from \"std:console\"; if (slow == \"yes\") await delay(60000); writeLn(\"tea\");");
         var script = Write("run.wlg", """
             param executable;
             param child;
             import process from "std:process";
+            import { writeLn } from "std:console";
             try { await process.run(executable, ["run", child], { maxOutputBytes: 3 }); }
             catch (IOError e) { writeLn(e.code + " " + e.message); }
             try { await process.run(executable, ["run", child, "slow=yes"], { timeoutMs: 100 }); }
@@ -104,6 +106,7 @@ public sealed class ConsoleTextTests : IDisposable
             param launchArgs;
             import { Json } from "std:json";
             import process from "std:process";
+            import { writeLn } from "std:console";
             try {
                 var result = await process.run(executable, Json.parse(launchArgs), {
                     timeoutMs: 6000, maxOutputBytes: 4096

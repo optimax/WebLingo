@@ -22,7 +22,7 @@ public sealed class VmLoadingTests : IDisposable
     public void ABytecodeFileLoadsOnlyItsVm(string vm, string assembly, string extension)
     {
         var main = Path.Combine(_folder, "main.wlg");
-        File.WriteAllText(main, "import { write, writeLn } from \"std:system\"; writeLn(6 * 7);\n");
+        File.WriteAllText(main, "import { write, writeLn } from \"std:console\"; writeLn(6 * 7);\n");
         var compiled = Path.ChangeExtension(main, extension);
         Assert.Empty(VmsLoadedBy(0, "", "compile", "--" + vm, main));
         Assert.Empty(VmsLoadedBy(0, "", "check", compiled));
@@ -38,7 +38,7 @@ public sealed class VmLoadingTests : IDisposable
     {
         var main = Path.Combine(_folder, "main.wlg");
         File.WriteAllText(Path.Combine(_folder, "lib.wlg"), "export const answer = 42;");
-        File.WriteAllText(main, "var unit = await Module.import(\"./lib.wlg\"); writeLn(unit.answer);\n");
+        File.WriteAllText(main, "import { writeLn } from \"std:console\"; var unit = await Module.import(\"./lib.wlg\"); writeLn(unit.answer);\n");
         if (vm is not null) File.WriteAllText(Path.Combine(_folder, "weblingo.config"), "{\"vm\":\"" + vm + "\"}");
         Assert.Empty(VmsLoadedBy(0, "", "check", main));
         Assert.Equal([assembly], VmsLoadedBy(0, "42\n", "run", main));

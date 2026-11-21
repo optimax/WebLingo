@@ -8,6 +8,7 @@
 param name;
 param cups = "1";
 param greeting = "Hello";
+import { writeLn } from "std:console";
 
 var count = Integer.parse(cups);
 writeLn($"{greeting}, {name}: {count} {(count == 1 ? "cup" : "cups")} of tea.");

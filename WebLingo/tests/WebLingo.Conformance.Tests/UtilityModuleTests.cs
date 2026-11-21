@@ -16,6 +16,7 @@ public sealed class UtilityModuleTests : IDisposable
     {
         var separator = Path.DirectorySeparatorChar;
         Run(stack, """
+            import { writeLn } from "std:console";
             import path from "std:path";
             writeLn(path.join("base\\dir", "sub/file.txt"));
             writeLn(path.join("ignored", "C:\\folder", "file"));
@@ -36,6 +37,7 @@ public sealed class UtilityModuleTests : IDisposable
     public void UrlsPreserveDuplicateQueryKeysAndResolveRelativeReferences(bool stack)
     {
         Run(stack, """
+            import { writeLn } from "std:console";
             import url from "std:url";
             var parts = url.parse("https://example.test:8443/a?q=tea#top");
             writeLn([parts["scheme"], parts["host"], parts["port"], parts["path"], parts["query"], parts["fragment"]]);
@@ -56,6 +58,7 @@ public sealed class UtilityModuleTests : IDisposable
     public void CsvRoundTripsArraysAndHeaderKeyedMaps(bool stack)
     {
         Run(stack, """
+            import { writeLn } from "std:console";
             import csv from "std:csv";
             var rows = [["tea, hot", "say \"hi\""], ["line\nline", ""]];
             var decoded = csv.parse(csv.stringify(rows));
@@ -75,6 +78,7 @@ public sealed class UtilityModuleTests : IDisposable
     public void CsvPreservesALiteralLeadingBomInDataAndHeaders(bool stack)
     {
         Run(stack, """
+            import { writeLn } from "std:console";
             import csv from "std:csv";
             var literal = "\u{FEFF}Tea";
             var text = csv.stringify([[literal, "green"], [literal, "black"]]);
@@ -94,6 +98,7 @@ public sealed class UtilityModuleTests : IDisposable
     public void CsvConsumesOnlyTheBomAtTheStartOfTheText(bool stack)
     {
         Run(stack, """
+            import { writeLn } from "std:console";
             import csv from "std:csv";
             var raw = "\u{FEFF}Tea,\u{FEFF}green\r\n";
             var quoted = "\u{FEFF}\"\u{FEFF}Tea\",green\r\n";
@@ -108,6 +113,7 @@ public sealed class UtilityModuleTests : IDisposable
     public void GzipAndZipRoundTripBytesAndEnforceDecompressionLimits(bool stack)
     {
         Run(stack, """
+            import { writeLn } from "std:console";
             import compression from "std:compression";
             import { Bytes } from "std:bytes";
             var gzip = compression.gzip(Bytes.from("tea"));
@@ -186,6 +192,7 @@ public sealed class UtilityModuleTests : IDisposable
     public void SeededRandomNumbersHaveAStableSequenceAndValidBounds(bool stack)
     {
         Run(stack, """
+            import { writeLn } from "std:console";
             import { Random } from "std:random";
             var first = new Random(42);
             var second = new Random(42);

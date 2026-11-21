@@ -29,7 +29,7 @@ public sealed class PageFuzzTests
         "x", "var x = 1;", "include \"/h.wasp\";", "include \"/i.wasp\";", "await renderComponent(\"/c.wasp\", {});",
         "renderComponent(\"/c.wasp\");", "if (true) {", "}", "{", "foreach (var i in [1, 2]) {", "[1][5]", "y", "\"s\"", "'%>'", "\"%>\"",
         "// c", "/* c */", "1 +", ";", "(", ")", "x?[0]", "{ a: 1 }", "#{1}", "=> 1", "class C {}", "new C()", "layout \"/l.wasp\", {};",
-        "renderBody();", "param p = 1;", "1", "null", "import { write, writeLn } from \"std:system\"; write(1);", "else {", "} else {", "while (false) {", "switch (1) { case 1 { } }",
+        "renderBody();", "param p = 1;", "1", "null", "write(1);", "else {", "} else {", "while (false) {", "switch (1) { case 1 { } }",
         "try {", "} catch (e) {", "throw 1;", "async function f() {", "await 1;", "return;", "x = 2;", "...[1]", "f(", "%", "?", ":",
         "\\", "@", "\"\\u{110000}\"", "0x", "1_", "1.5m", "Infinity", "-", "!", "&&", "[", "]", ",", ".", "?.", "??", "=",
         "[].iterate().next()", "new BytesBuilder().add(true)", "class Q extends Integer {} new Q(\"x\")", "[1, 2].map((v) => [v][3])",
@@ -107,7 +107,7 @@ public sealed class PageFuzzTests
         foreach (var diagnostic in result.Diagnostics) WithinItsFile(compiler.Sources, page, diagnostic);
         if (result.Module is null) return false;
         var output = new WebLingoCollectedOutput();
-        var services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output));
+        var services = new WebLingoBuiltinRegistry(new WebLingoDelayFunction());
         foreach (var builtin in WebLingoTemplateBuiltins.Create(output)) services.Register(builtin);
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services, InstructionBudget = 100_000 };
         var run = new WebLingoVirtualMachine { Components = compiler.Components }.Execute(result.Module, context);

@@ -13,7 +13,7 @@ public sealed class EnvironmentTests : IDisposable
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "weblingo-env-" + Guid.NewGuid().ToString("N"));
     private readonly string _name = "WL_ENV_TEST_" + Guid.NewGuid().ToString("N").ToUpperInvariant();
 
-    private const string Import = "import { Environment } from \"std:env\"; import { writeLn } from \"std:system\"; ";
+    private const string Import = "import { Environment } from \"std:env\"; import { writeLn } from \"std:console\"; ";
 
     public EnvironmentTests() => Directory.CreateDirectory(_folder);
 

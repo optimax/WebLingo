@@ -522,7 +522,7 @@ public static partial class WebLingoCommandLine
 
     /// <summary>What a command line gives the programs it compiles and runs: its built-ins, its native modules and its files.</summary>
     private sealed record Host(WebLingoBuiltinRegistry Services, WebLingoNativeModuleLoader Native, WebLingoCompilerOptions Options,
-        FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoNetwork Network, IWebLingoDatabases Databases, IWebLingoFileSystem Files,
+        FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoTextOutput ErrorOutput, IWebLingoNetwork Network, IWebLingoDatabases Databases, IWebLingoFileSystem Files,
         IReadOnlyDictionary<string, IReadOnlyList<string>> Allowed, IWebLingoEnvironment Environment, IWebLingoConsoleInput? ConsoleInput,
         IWebLingoProcessRunner? Processes, WebLingoBytecodeKind? Vm);
 
@@ -550,7 +550,11 @@ public static partial class WebLingoCommandLine
         }
         var textOutput = new TextWriterOutput(output);
         var services = new WebLingoBuiltinRegistry();
-        var native = new WebLingoNativeModuleLoader(schemes, services);
+        // std:console a script's, but not a site's, which has no console (section 3.9, "The console: std:console").
+        var native = new WebLingoNativeModuleLoader(schemes, services)
+        {
+            Refused = program.HasConsole ? new Dictionary<string, string>() : WebLingoNativeModuleLoader.WithoutConsole
+        };
         // std:system, a native module installed with the runtime, in the std scheme's folder: its functions the host's
         // built-ins, which every module sees, and which std:system exports (section 3.9).
         if (!native.TryResolve(path, "std:system", out var system, out var why))
@@ -571,7 +575,7 @@ public static partial class WebLingoCommandLine
         // databases it names, their files from its folder (section 7.11), a script's own checked as its files are.
         var files = program.ReachesAnyFile ? null : new DotNetFileCapabilities(program.Root ?? folder, folders.Read, folders.Write);
         return new Host(services, native, new WebLingoCompilerOptions(declarations) { Resolver = resolver, Native = native }, resolver,
-            textOutput, new DotNetNetwork(program.ReachesAnyHost ? null : allowedHosts), new DotNetDatabases(databases, folder) { Files = files },
+            textOutput, new TextWriterOutput(error), new DotNetNetwork(program.ReachesAnyHost ? null : allowedHosts), new DotNetDatabases(databases, folder) { Files = files },
             new DotNetFileSystem(files), allowed,
             // All of the machine's environment for a script's, what its configuration's "env" allows for a page's (section 7.15).
             program.ReachesAllEnvironment ? new DotNetEnvironment() : new DotNetEnvironment(env.MachineName, env.Variables, env.Platform),
@@ -589,6 +593,7 @@ public static partial class WebLingoCommandLine
             WallClock = new DotNetClock(),
             TimeZone = new DotNetTimeZone(),
             Output = host.Output,
+            ErrorOutput = host.ErrorOutput,
             Parameters = parameters,
             FileSystem = host.Files,
             Network = host.Network,

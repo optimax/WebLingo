@@ -5,6 +5,7 @@
 // folders its wasp.config lists (see ../Examples.wasp). A relative path is from the current folder.
 
 param folder = "18-files-scratch";   // where it works, made here and removed at the end: a parameter comes first
+import { writeLn } from "std:console";
 
 import fs from "std:fs";
 import { Bytes } from "std:bytes";

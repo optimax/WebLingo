@@ -203,8 +203,10 @@ A few rules make pages come out as you would expect:
 - **`%>` inside a string or a comment does not end a block**: `<% var end = "%>"; %>` is one block. A `//` comment runs
   to the end of its line, so a block whose last line is a `//` comment must close on the next line.
 - **`write(value)` and `writeLn(value)`**, inside a block, write a value as `<%-` does, not escaped, `writeLn` with a
-  line break after it. A page has them without an import, as any script does, every program importing `std:system`
-  implicitly; an import of them, `<% import { write, writeLn } from "std:system"; %>`, is allowed, and means the same.
+  line break after it, `null` as `null`. A page has them without an import, its own, as its layout and its components
+  have theirs; a module the page imports has neither, and writes the response with `response.write`
+  ([section 10](#10-route-handlers)). A site has no console, so that `std:console`, which a script that `weblingo` runs
+  imports to write, cannot be imported here.
 
 Everything else inside the blocks is the WebLingo language: variables (`var`, `const`), functions, classes, arrays
 (`[1, 2]`), maps (`{ name: "Anna" }`), `if`, `while`, `for`, `foreach`, `try`, and the rest. An interpolated string,
@@ -538,7 +540,6 @@ and give the same; read in pieces, with `read()`, it cannot then be read whole t
 (`multipart/form-data`) cannot be read yet.
 
 ```javascript
-import { write } from "std:system";
 export async function post(request, response) {
   var bytes = 0;
   var piece = await request.read();
@@ -546,7 +547,7 @@ export async function post(request, response) {
     bytes = bytes + piece.length;
     piece = await request.read();
   }
-  write($"{bytes} bytes");
+  response.write($"{bytes} bytes");
 }
 ```
 
@@ -558,6 +559,8 @@ Bytes, their members, and how to read them as text, are in the WebLingo Language
 |---|---|
 | `response.status` | the status, 200 until set: `response.status = 404;` |
 | `response.headers` | the response's headers: `response.headers["Content-Type"] = "text/plain";` |
+| `response.write(value)` | writes a value's text to the response's body, as `write` writes it: `response.write("done");` |
+| `response.writeLn(value)` | the same, then a line break |
 
 ```html
 <% param response; %>
@@ -583,23 +586,23 @@ A page run by `wasp run` has no request: there, a page's parameters are values g
 
 A `.wlg` file that exports a function named after an HTTP method answers its path with code alone, without a page's
 text: an API, a redirect, a download. The function is given the request and the response, as a page's parameters are,
-and what it writes, with `write`, is the response's body.
+and what it writes, with `response.write` and `response.writeLn`, is the response's body, as classic ASP's
+`Response.Write` writes it; a handler has no `write` of its own, as a page has, and no console.
 
 ```javascript
-import { write } from "std:system";
 import { Json } from "std:json";
 import { teas } from "/lib/catalog.wlg";
 
 export function get(request, response) {
   response.headers["Content-Type"] = "application/json";
-  write(Json.stringify(teas));
+  response.write(Json.stringify(teas));
 }
 
 export async function post(request, response) {
   var text = await request.text();
   response.status = 201;
   response.headers["Content-Type"] = "text/plain";
-  write($"Received {text.length} characters.");
+  response.write($"Received {text.length} characters.");
 }
 ```
 
@@ -806,8 +809,9 @@ server must have enabled, as SQL Server's Developer and Express editions do not 
 For MySQL or PostgreSQL, add the connection to `"databases"` in `wasp.config` and pass its name to `Database.open`.
 Use a MySqlConnector string with the `mysql:` prefix or an Npgsql string with the `postgresql:` prefix.
 
-A site's pages and handlers have no console to read: `std:system`'s `readLine` and the others, which a script that
-`weblingo` runs reads its input with, are an `IOError` in a page; a page reads what its request brings.
+A site's pages and handlers have no console: `std:console`, whose `writeLn`, `readLine` and the others a script that
+`weblingo` runs writes and reads its console with, cannot be imported, WL2015; a page writes its response, and reads
+what its request brings.
 
 A site reads the machine's environment, through `std:env`, only as its `"env"` allows: the machine's name with
 `"machineName": true`, its processor's architecture, the running `wasp`'s and the operating system,

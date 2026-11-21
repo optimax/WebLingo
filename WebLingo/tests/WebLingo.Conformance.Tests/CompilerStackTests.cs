@@ -24,14 +24,14 @@ public sealed class CompilerStackTests : IDisposable
         const int terms = WebLingoParser.MaxExpressionDepth - 10;
         var nested = new string('(', depth) + "1" + new string(')', depth);
         var chain = "1" + string.Concat(Enumerable.Repeat(" + 1", terms - 1));
-        var file = Write("deep.wlg", $"import {{ write, writeLn }} from \"std:system\"; writeLn({nested});\nwriteLn({chain});\n");
+        var file = Write("deep.wlg", $"import {{ write, writeLn }} from \"std:console\"; writeLn({nested});\nwriteLn({chain});\n");
         Assert.Equal((WebLingoCommandLine.Success, $"1\n{terms}\n", ""), Weblingo("run", file));
     }
 
     [Fact]
     public void DeeperSourceIsADiagnosticNotACrash()
     {
-        var file = Write("deeper.wlg", "import { write, writeLn } from \"std:system\"; writeLn(" + new string('(', 100_000) + "1" + new string(')', 100_000) + ");\n");
+        var file = Write("deeper.wlg", "import { write, writeLn } from \"std:console\"; writeLn(" + new string('(', 100_000) + "1" + new string(')', 100_000) + ");\n");
         var (exit, output, error) = Weblingo("check", file);
         Assert.Equal((WebLingoCommandLine.CompilationFailed, ""), (exit, output));
         Assert.Contains("ERROR WL1008: The expression nests more than 256 levels deep.", error, StringComparison.Ordinal);
