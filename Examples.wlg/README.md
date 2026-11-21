@@ -32,7 +32,7 @@ running it.
 
 | Script | What it shows |
 |---|---|
-| `01-hello.wlg` | a first script: `write` and `writeLn`, comments, semicolons |
+| `01-hello.wlg` | a first script: `write` and `writeLn`, imported from `std:console`, comments, semicolons |
 | `02-values.wlg` | integers, numbers, decimals, strings, Booleans and `null`; literals; classes of values; conversions, always explicit; `std:math` |
 | `03-strict-by-design.wlg` | what WebLingo refuses to guess: no implicit conversions, no truthiness, no silent overflow, no `undefined`; each mistake an exception of a class of its own |
 | `04-variables.wlg` | `var` and `const`, block scope, shadowing, closures, a binding for each turn of a loop, hoisted functions |

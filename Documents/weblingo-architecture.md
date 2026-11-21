@@ -1160,13 +1160,14 @@ Codes added while implementing M0.6 (§15.2):
 Example:
 
 ```javascript
+import { writeLn } from "std:console";
 var a = 10;
 var b = 20;
 var result = a + b;
 writeLn(result);
 ```
 
-Expected output: `30`. `write` and `writeLn` are built-ins the CLI host registers (§15.2).
+Expected output: `30`. `write` and `writeLn` are built-ins the CLI host registers (§15.2), `std:console`'s, which a script imports, since 20 November 2026 (§3.9, "The console: `std:console`").
 
 ### 8.5 Build conventions (WL-S013–WL-S014)
 
