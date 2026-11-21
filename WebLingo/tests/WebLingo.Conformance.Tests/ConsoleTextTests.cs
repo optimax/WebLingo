@@ -101,6 +101,8 @@ public sealed class ConsoleTextTests : IDisposable
         var (launcher, arguments) = OperatingSystem.IsWindows()
             ? MakeWindowsLauncher(marker, overflow)
             : MakeLinuxLauncher(marker, overflow);
+        // The timeout covers the launcher's start and the descendant's, on Windows two PowerShells and Add-Type's
+        // compilation, which took more than 6 s on GitHub's windows-latest runner; without an overflow, the test lasts it.
         var script = Write("run.wlg", """
             param executable;
             param launchArgs;
@@ -109,7 +111,7 @@ public sealed class ConsoleTextTests : IDisposable
             import { writeLn } from "std:console";
             try {
                 var result = await process.run(executable, Json.parse(launchArgs), {
-                    timeoutMs: 6000, maxOutputBytes: 4096
+                    timeoutMs: 20000, maxOutputBytes: 4096
                 });
                 writeLn(result);
             }
@@ -127,7 +129,7 @@ public sealed class ConsoleTextTests : IDisposable
         try
         {
             var expected = overflow ? "WL3011 Process output exceeded 4096 bytes.\n"
-                : "WL3010 The process exceeded its 6000 ms timeout.\n";
+                : "WL3010 The process exceeded its 20000 ms timeout.\n";
             var observed = File.Exists(marker + ".output") ? File.ReadAllText(marker + ".output") : "no output log";
             Assert.True((WebLingoCommandLine.Success, expected, "") == (exit, output.ToString(), error.ToString()),
                 $"Expected {expected.TrimEnd()}, got {exit}: {output}{error}. Descendant: {observed}.");
