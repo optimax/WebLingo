@@ -5,7 +5,8 @@ import { writeLn } from "std:console";
 import { delay } from "std:system";
 import com from "windows:com";
 import fs from "std:fs";
-import { run, runOrStop, expand, runningFrom, copyFolder } from "./windows.wlg";
+import { Regex } from "std:regex";
+import { run, runOrStop, expand, runningFrom, copyFolder, makeCertificate, trust, boundCertificate } from "./windows.wlg";
 
 const appcmd = "%SystemRoot%\\System32\\inetsrv\\appcmd";
 const admin = com.create("Microsoft.ApplicationHost.WritableAdminManager");
@@ -153,4 +154,123 @@ export async function startSite(name) {
     if ((await runOrStop($"{appcmd} list site \"{name}\" /text:state")).trim() != "Started") {
         await runOrStop($"{appcmd} start site \"{name}\"");
     }
+}
+
+// Adds a site the ASP.NET Core Module runs, a WASP site or any other, keeping what is there and adding what is missing:
+// an application pool and a website, both named name, the website's folder folder, served on https://<host>/, HTTPS's
+// standard port, 443, for that name alone (SNI), with a self-signed certificate this machine trusts, the name in the
+// hosts file; the pool given write access to the folders outside the site that writables lists; and, where profile is
+// true, the pool's account's profile loaded, where ASP.NET Core keeps the keys that protect its forms' tokens.
+export async function addSite(name, folder, host, writables, profile = false) {
+    // The application pool: no managed code, the ASP.NET Core Module running the site's program.
+    var pools = section("system.applicationHost/applicationPools").Collection;
+    var pool = find(pools, "name", name);
+    if (pool == null) {
+        pool = pools.CreateNewElement("add");
+        pool.GetPropertyByName("name").Value = name;
+        pool.GetPropertyByName("managedRuntimeVersion").Value = "";
+        pools.AddElement(pool, -1);
+        writeLn($"Application pool {name} added");
+    } else if (pool.GetPropertyByName("managedRuntimeVersion").Value != "") {
+        pool.GetPropertyByName("managedRuntimeVersion").Value = "";
+        writeLn($"Application pool {name} set to no managed code");
+    }
+    if (profile) {
+        var loads = pool.GetElementByName("processModel").GetPropertyByName("loadUserProfile");
+        if (loads.Value != true) {
+            loads.Value = true;
+            writeLn($"Application pool {name} set to load its account's profile");
+        }
+    }
+    commit();
+
+    // The folders outside the site that the pool's account, IIS AppPool\<name>, changes: SQLite writes its journal beside
+    // its database while it changes it.
+    foreach (var other in writables) {
+        await runOrStop($"icacls \"{other}\" /grant \"IIS AppPool\\{name}:(OI)(CI)M\"");
+        writeLn($"IIS AppPool\\{name} may write to {other}");
+    }
+
+    // The site's certificate: the one http.sys gives its name already, or a new one; trusted by this machine.
+    var thumbprint = await boundCertificate(host);
+    if (thumbprint == null) {
+        thumbprint = makeCertificate(host, true).thumbprint;
+        writeLn($"Certificate made for {host}, {thumbprint}");
+    }
+    if (await trust(thumbprint)) {
+        writeLn("Certificate trusted by this machine");
+    }
+
+    // The website, its folder the site's own files, beside its web.config, with HTTPS on port 443 for its name alone.
+    var bindingInformation = $"*:443:{host}";
+    var all = section("system.applicationHost/sites").Collection;
+    var site = find(all, "name", name);
+    var adding = site == null;
+    if (adding) {
+        var id = 1;
+        for (var i = 0; i < all.Count; i++) {
+            var taken = all.Item(i).GetPropertyByName("id").Value;
+            if (taken >= id) {
+                id = taken + 1;
+            }
+        }
+        site = all.CreateNewElement("site");
+        site.GetPropertyByName("name").Value = name;
+        site.GetPropertyByName("id").Value = id;
+        var application = site.Collection.CreateNewElement("application");
+        application.GetPropertyByName("path").Value = "/";
+        application.GetPropertyByName("applicationPool").Value = name;
+        var root = application.Collection.CreateNewElement("virtualDirectory");
+        root.GetPropertyByName("path").Value = "/";
+        root.GetPropertyByName("physicalPath").Value = folder;
+        application.Collection.AddElement(root, -1);
+        site.Collection.AddElement(application, -1);
+    }
+    var bindings = site.GetElementByName("bindings").Collection;
+    var bound = false;
+    for (var i = 0; i < bindings.Count; i++) {
+        var binding = bindings.Item(i);
+        if (binding.GetPropertyByName("protocol").Value == "https"
+            && binding.GetPropertyByName("bindingInformation").Value.toLower() == bindingInformation.toLower()) {
+            bound = true;
+        }
+    }
+    if (!bound) {
+        var binding = bindings.CreateNewElement("binding");
+        binding.GetPropertyByName("protocol").Value = "https";
+        binding.GetPropertyByName("bindingInformation").Value = bindingInformation;
+        binding.GetPropertyByName("sslFlags").Value = 1; // by its name, SNI
+        bindings.AddElement(binding, -1);
+    }
+    if (adding) {
+        all.AddElement(site, -1);
+        writeLn($"Website {name} added, from {folder}");
+    } else if (!bound) {
+        writeLn($"Website {name} bound to https://{host}/");
+    }
+    commit();
+
+    // The certificate, in http.sys, for the name on port 443: IIS's own application id, as IIS gives it.
+    if ((await boundCertificate(host)) == null) {
+        await runOrStop($"netsh http add sslcert hostnameport={host}:443 certhash={thumbprint} appid={{4dc3e181-e14b-4a21-b022-59fc669b0914}} certstorename=MY");
+        writeLn($"https://{host}/ given its certificate");
+    }
+
+    // The name, for this machine's own resolver too: browsers take every *.localhost name for this machine on their own, but
+    // Windows does not, so that other programs, curl and PowerShell among them, find it here.
+    var hosts = expand("%SystemRoot%\\System32\\drivers\\etc\\hosts");
+    var text = await fs.readText(hosts);
+    var entry = new Regex($"^\\s*127\\.0\\.0\\.1\\s+{host.replace(".", "\\.")}\\s*(#.*)?$", "i");
+    if (!text.split("\n").any(line => entry.test(line.trim()))) {
+        var line = $"127.0.0.1 {host}\r\n";
+        if (text.length > 0 && !text.endsWith("\n")) {
+            line = "\r\n" + line;
+        }
+        await fs.appendText(hosts, line, "us-ascii");
+        writeLn($"{host} added to {hosts}");
+    }
+
+    await startPool(name);
+    await startSite(name);
+    writeLn($"{name} is served on https://{host}/");
 }

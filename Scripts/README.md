@@ -1,6 +1,7 @@
 # Scripts
 
-Scripts that set up WebLingo, and WASP's sites, on a Windows machine with IIS, written in WebLingo and run by `weblingo`.
+Scripts that set up WebLingo, and WASP's sites and other ASP.NET Core sites, on a Windows machine with IIS, written in
+WebLingo and run by `weblingo`.
 They reach Windows through its COM objects, `windows:com` (the Standard Library Reference, section 23): IIS's
 configuration through IIS's own, `Microsoft.ApplicationHost.WritableAdminManager`; IIS's `appcmd`, `netsh`, `certutil`
 and `icacls` through `WScript.Shell`; a relative path made full through `Scripting.FileSystemObject`; the processes
@@ -17,8 +18,9 @@ they copy through `std:fs`, without COM.
 | `install-weblingo.wlg` | Installs WebLingo in `C:\Program Files\WebLingo`, or updates it, from the folder `WebLingo/publish.ps1` publishes it to, `WebLingo\publish\WebLingo`; the application pools of the sites whose `wasp` runs from there are stopped while their files are replaced, and started again |
 | `add-weblingo-to-path.wlg` | Puts `C:\Program Files\WebLingo` on the machine's `PATH`, once, so that consoles started after run `weblingo` and `wasp` by their names |
 | `add-wasp-site.wlg` | Adds a WASP site to IIS: its application pool, with no managed code, and its website, served by HTTPS on port 443 under a name of its own, with a certificate this machine trusts |
+| `add-aspnetcore-site.wlg` | Adds any other ASP.NET Core site to IIS, one published with its `web.config` for the ASP.NET Core Module, as `add-wasp-site.wlg` adds a WASP site, its pool also loading its account's profile, where ASP.NET Core keeps the keys that protect its forms' tokens |
 | `add-sql-server-login.wlg` | Gives a site's application pool its database on SQL Server: a login for the pool's account, and a user of the database that reads and changes its rows |
-| `windows.wlg`, `iis.wlg` | What the scripts share: running a program, the processes running, a folder copied, the machine's `PATH`, a certificate made and trusted; and IIS's configuration, its modules, its pools, and the installation copied into with the sites that run it stopped |
+| `windows.wlg`, `iis.wlg` | What the scripts share: running a program, the processes running, a folder copied, the machine's `PATH`, a certificate made and trusted; and IIS's configuration, its modules, its pools, a site added, and the installation copied into with the sites that run it stopped |
 
 Double-click the ZIP's launcher in your usual account to run `setup.wlg`. To run a machine script directly, use an
 administrator console in this folder. `add-sql-server-login.wlg` needs a SQL Server administrator, and
@@ -70,6 +72,17 @@ self-signed, for that name only, not a certificate authority, its private key no
 trusted by this machine, a copy of it without its key among the machine's trusted roots (`Cert:\LocalMachine\Root`,
 where it is removed to undo that). And it puts the name in the machine's `hosts` file, for `127.0.0.1`: browsers take
 every `*.localhost` name for the machine itself, but Windows does not, so that other programs find it there.
+
+A site built with ASP.NET Core, not WASP, is added the same way by `add-aspnetcore-site.wlg`, with the folder it was
+published to (`dotnet publish -o <folder>`), which holds its `web.config` for the ASP.NET Core Module:
+
+```bat
+weblingo run add-aspnetcore-site.wlg name=example.site folder=C:\WWW\example.site\site host=example.localhost writable=C:\WWW\example.site\data
+```
+
+It checks that IIS has the ASP.NET Core Module, which the ASP.NET Core Hosting Bundle installs, and sets the pool to load
+its account's profile, where ASP.NET Core keeps the keys that protect its forms' anti-forgery tokens, so that a form
+opened before the pool recycles still works when it is sent.
 
 ## Giving a site its database on SQL Server
 

@@ -1,0 +1,38 @@
+// Adds an ASP.NET Core site to IIS, one published with its web.config for the ASP.NET Core Module, which the ASP.NET
+// Core Hosting Bundle installs: an application pool and a website, both named name, whose folder holds the published
+// site, served on https://<host>/, HTTPS's standard port, 443, for that name alone (SNI), with a self-signed certificate
+// this machine trusts, the name in the hosts file; the pool given write access to the folders outside the site that
+// writable lists, separated by semicolons, and its account's profile loaded, where ASP.NET Core keeps the keys that
+// protect its forms' tokens. Run it as administrator:
+//
+//   weblingo run add-aspnetcore-site.wlg name=example.site folder=C:\WWW\example.site\site host=example.localhost
+//       writable=C:\WWW\example.site\data
+//
+// It may be run again: it keeps what is there, and adds what is missing.
+param name;
+param folder;
+param host;
+param writable = "";
+
+import fs from "std:fs";
+import { requireAdministrator } from "./windows.wlg";
+import { hasGlobalModule, addSite } from "./iis.wlg";
+
+await requireAdministrator();
+if (!hasGlobalModule("AspNetCoreModuleV2")) {
+    throw new Error("IIS has no ASP.NET Core Module: install the ASP.NET Core Hosting Bundle, then run this again.");
+}
+if (!(await fs.exists($"{folder}\\web.config"))) {
+    throw new Error($"{folder} has no web.config: give the folder the site was published to.");
+}
+if (!(await fs.readText($"{folder}\\web.config")).contains("<aspNetCore ")) {
+    throw new Error($"{folder}\\web.config does not run the site through the ASP.NET Core Module: publish the site there.");
+}
+var writables = writable == "" ? [] : writable.split(";");
+foreach (var other in writables) {
+    if (!(await fs.exists(other))) {
+        throw new Error($"{other} is not there.");
+    }
+}
+
+await addSite(name, folder, host, writables, true);

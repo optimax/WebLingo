@@ -71,3 +71,12 @@ program; this machine's own registration and installation change only once its o
 In-process test hosts give `write` and `writeLn` as their own built-ins (`WebLingoStandardBuiltins`), which `std:system`
 exports to them, so the VM tests still import them from there. The conformance tests that compile programs in process
 use `ConformanceHost`, which loads the real `std:console` from the `std` folder beside the tests.
+
+## Adding ASP.NET Core sites to IIS
+
+`Scripts/add-aspnetcore-site.wlg` adds an ASP.NET Core site that is not WASP's to IIS, as `add-wasp-site.wlg` adds a
+WASP site: both now call `iis.wlg`'s `addSite`, which holds what `add-wasp-site.wlg` did, unchanged but for the new
+script's option to load the pool's profile. All of the scripts compile (`weblingo check`) with the WebLingo the
+repository publishes; the WebLingo installed on this machine, from 20 November 2026, predates `std:console`, which
+`iis.wlg` imports, so they run with `WebLingo\publish\WebLingo\weblingo.exe` until `build.bat` installs it again.
+Neither has been run as administrator since the move.
