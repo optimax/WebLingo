@@ -4,6 +4,8 @@ $ErrorActionPreference = 'Stop'
 
 function Assert([bool] $condition, [string] $message) { if (!$condition) { throw $message } }
 function Remove-PathEntry([string] $folder, $original) { $script:pathCalls++ }
+# This account's own VS Code is never the tests': an uninstall that would remove WebLingo's extension finds none.
+function Find-Code { }
 $id = 'WebLingoUninstallTest-' + [guid]::NewGuid().ToString('N')
 $scratch = [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetTempPath()) $id))
 $scope = 'Software\' + $id
@@ -44,6 +46,17 @@ try {
     Assert ((Read-ClassValue $classes '.wlg\OpenWithProgids\Other.App').data[1] -eq 3) 'Preserve foreign registrations'
     Assert (!(Read-ClassValue $classes 'Applications\weblingo.exe\shell\open\command\')) 'Remove owned app registration'
     Remove-UserIntegrations $classes $sibling '' $false
+    Assert ((Get-AssociationValues $folder)['WebLingo.Script\shell\open\command\'].Contains('weblingow.exe')) 'Run weblingow'
+
+    # A registration an earlier version made, which ran weblingo.exe, is removed as this version's is.
+    $earlier = Get-AssociationValues $folder 'weblingo.exe'
+    foreach ($address in $earlier.Keys) {
+        if ($null -ne $earlier[$address]) { Restore-ClassValue $classes $address @{kind='String';data=$earlier[$address]} }
+    }
+    Remove-UserIntegrations $classes $folder '' $true
+    Assert (!(Read-ClassValue $classes 'WebLingo.Script\shell\open\command\')) 'Remove an earlier registration'
+    Assert (!(Read-ClassValue $classes 'Applications\weblingo.exe\shell\open\command\')) 'Remove its app registration'
+    Assert ((Read-ClassValue $classes '.wlg\').data -cne 'WebLingo.Script') 'Leave .wlg to no WebLingo'
 
     [IO.Directory]::CreateDirectory((Join-Path $folder 'VSCode')) | Out-Null
     $files = @{}

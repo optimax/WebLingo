@@ -24,7 +24,7 @@ await requireAdministrator();
 var files = com.create("Scripting.FileSystemObject");
 var published = files.GetAbsolutePathName(source);
 var installed = files.GetAbsolutePathName(target);
-foreach (var program in ["wasp.exe", "weblingo.exe"]) {
+foreach (var program in ["wasp.exe", "weblingo.exe", "weblingow.exe"]) {
     if (!(await fs.exists($"{published}\\{program}"))) {
         throw new Error($"{published} has no {program}: publish WebLingo there first, with WebLingo/publish.ps1.");
     }

@@ -42,8 +42,10 @@ this one, as its `readme.md` says.
 ## Running a script by a double-click
 
 Setup offers this registration. To add it manually later, `add-wlg-file-type.wlg` makes Explorer run a `.wlg` file when it is
-double-clicked, for your Windows account, in a console that waits for a key once the script has ended, so that what it
-wrote stays to be read; **Edit** on its right-click menu opens it in Notepad. It needs no administrator. In a console in
+double-clicked, for your Windows account, with `weblingow.exe`, WebLingo as a Windows application: a script that
+imports `std:console` gets a console that waits for a key once the script has ended, so that what it wrote stays to be
+read; one that does not opens no window; and a script that fails shows why in a message box. **Edit** on its
+right-click menu opens it in Notepad. It needs no administrator. In a console in
 this folder:
 
 ```bat
@@ -52,7 +54,8 @@ weblingo add-wlg-file-type.wlg
 
 At the first double-click, Windows asks once how to open the file, since only you may choose that, and its list may
 leave WebLingo out: choose **Choose an app on your PC** at its end (on Windows 10, **More apps**, then **Look for
-another app on this PC**), then `weblingo.exe` in WebLingo's folder, `C:\Program Files\WebLingo`, then **Always**.
+another app on this PC**), then `weblingo.exe` in WebLingo's folder, `C:\Program Files\WebLingo`, then **Always**:
+the registration runs `weblingow.exe` for it.
 `remove=yes` takes it away again. A script double-clicked runs as any program does, one downloaded from the internet
 included: run only those you trust.
 

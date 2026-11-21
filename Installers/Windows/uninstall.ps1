@@ -36,9 +36,10 @@ function Test-Extension([string] $cli) {
 }
 
 # Each address ends in the registry value name. A trailing slash denotes the unnamed value.
-# These are the individual writes in Scripts/add-wlg-file-type.wlg, including the old .wl migration.
-function Get-AssociationValues([string] $folder) {
-    $exe = Join-Path $folder 'weblingo.exe'
+# These are the individual writes in Scripts/add-wlg-file-type.wlg, including the old .wl migration. Its command runs
+# weblingow.exe, a registration made before weblingow.exe ran weblingo.exe, under the same keys.
+function Get-AssociationValues([string] $folder, [string] $program = 'weblingow.exe') {
+    $exe = Join-Path $folder $program
     $command = '"{0}" "%1" %*' -f $exe
     return [ordered]@{
         '.wlg\' = 'WebLingo.Script'; '.wlg\OpenWithProgids\WebLingo.Script' = ''
@@ -130,14 +131,20 @@ function Remove-UserIntegrations($classes, [string] $folder, [string] $other, [b
     $values = Get-AssociationValues $folder
     $command = 'WebLingo.Script\shell\open\command\'
     $registered = Read-ClassValue $classes $command
+    # A registration an earlier version made, which ran weblingo.exe, is this installation's too.
+    $earlier = Get-AssociationValues $folder 'weblingo.exe'
+    if ($registered -and $registered.data -eq $earlier[$command]) { $values = $earlier }
     if (($hasRecord -and !$registered) -or (($hasRecord -or $legacy) -and $registered.data -eq $values[$command])) {
         $before = if ($hasRecord) { Import-Clixml -LiteralPath $assocFile } else { @{} }
-        $replacement = if ($other) { Get-AssociationValues $other }
+        # The surviving installation's own program: weblingow.exe, or weblingo.exe where it is an earlier version.
+        $replacement = if ($other) {
+            Get-AssociationValues $other $(if (Test-Path -LiteralPath (Join-Path $other 'weblingow.exe') -PathType Leaf) { 'weblingow.exe' } else { 'weblingo.exe' })
+        }
         $oldValues = $null
-        if ($before[$command].data -match '^"([^"]+\\weblingo\.exe)" "%1" %\*$') {
+        if ($before[$command].data -match '^"([^"]+\\weblingow?\.exe)" "%1" %\*$') {
             $oldExe = $Matches[1]
-            if ($oldExe -eq (Join-Path $folder 'weblingo.exe') -or !(Test-Path -LiteralPath $oldExe -PathType Leaf)) {
-                $oldValues = Get-AssociationValues (Split-Path $oldExe)
+            if ((Split-Path $oldExe) -eq $folder -or !(Test-Path -LiteralPath $oldExe -PathType Leaf)) {
+                $oldValues = Get-AssociationValues (Split-Path $oldExe) (Split-Path $oldExe -Leaf)
             }
         }
         foreach ($address in $values.Keys) {
@@ -312,8 +319,9 @@ function Remove-Runtime([string] $folder, $inventory, [bool] $legacy) {
         $files.Add($file)
     }
     $exe = Join-Path $folder 'weblingo.exe'
-    if (Get-Process -Name weblingo -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }) {
-        throw "Close scripts or debugger sessions running $exe, then run uninstall again."
+    $windowed = Join-Path $folder 'weblingow.exe'
+    if (Get-Process -Name weblingo, weblingow -ErrorAction SilentlyContinue | Where-Object { $_.Path -in $exe, $windowed }) {
+        throw "Close scripts or debugger sessions running $exe or $windowed, then run uninstall again."
     }
     # Keep the inventory and launcher available for retry if a file is locked.
     $receipt = Join-Path $folder $inventoryName
