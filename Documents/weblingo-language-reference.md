@@ -1460,6 +1460,26 @@ writeLn(Counter.describe());
 `static` declares a member of the class itself, a method or a field, reached as `Counter.describe()`, and through an
 instance too. `static const` declares one that cannot be assigned. A class's static members are inherited.
 
+In a static method, `this` is the class it is called on, as in JavaScript, so that a class extending another gets its
+own instances from its base's static methods:
+
+```javascript
+import { writeLn } from "std:console";
+class Tea {
+  static make() { return new this(); }
+  static describe() { return $"{this.__className} tea"; }
+}
+class Green extends Tea {}
+writeLn([Green.make() is Green, Green.describe(), Tea.describe()]);
+```
+
+```text
+[true, "Green tea", "Tea tea"]
+```
+
+A static method taken without a call, `var make = Green.make;`, keeps its class, and one called through an instance,
+`new Green().make()`, has the instance's class. `this` in an operator, and in a static field's value, is an error.
+
 ### Properties
 
 ```javascript

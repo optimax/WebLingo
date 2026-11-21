@@ -592,11 +592,10 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             var name = names[ins.B];
                             var target = registers[ins.C];
                             if (target.HasClass && target.Kind is WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set
-                                && WebLingoMembers.TryFindCollectionCallee(target, name.Text, heap, out callee, out var collectionMethod))
+                                && WebLingoMembers.TryFindCollectionCallee(target, name.Text, heap, out callee, out self))
                             {
                                 // A collection of a class extending Array, Map or Set: its field's function, or its class's
                                 // method, before its own members (section 3.7).
-                                self = collectionMethod ? target : WebLingoValue.Missing;
                                 arguments = registers;
                                 firstArgument = ins.C + 1;
                                 argumentCount = ins.D;

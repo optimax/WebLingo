@@ -1003,7 +1003,7 @@ public sealed class WebLingoBinder
             _class = null; // No 'super' in a static method.
             _accessor = IsAccessor(method.Name) ? new Accessor(method.Name[4..], true, local, _scope) : null;
             var function = BindFunction(method.Name, method.Parameters, method.Body, method.Span, isStatic: true,
-                isAsync: method.IsAsync);
+                isAsync: method.IsAsync, takesClass: method.UsesThis);
             (_class, _accessor) = (outerClass, outerAccessor);
             if (AddMemberName(staticNames, method.Name)) staticMethods.Add((method.Name, function));
             else Report(WebLingoDiagnosticCodes.DuplicateDeclaration, $"'{MemberName(method.Name)}' is already declared in this class.", method.NameSpan);
@@ -1058,7 +1058,8 @@ public sealed class WebLingoBinder
             _class = method.IsStatic ? null : new ClassContext(null, false, false) { InExtension = true };
             _accessor = IsAccessor(methodName) ? new Accessor(methodName[4..], method.IsStatic, null, _scope) : null;
             var function = method.IsStatic
-                ? BindFunction(methodName, method.Parameters, method.Body, method.Span, isStatic: true, isAsync: method.IsAsync)
+                ? BindFunction(methodName, method.Parameters, method.Body, method.Span, isStatic: true, isAsync: method.IsAsync,
+                    takesClass: method.UsesThis)
                 : BindFunction(methodName, method.Parameters, method.Body, method.Span, isMethod: true, isAsync: method.IsAsync);
             (_class, _accessor) = (outerClass, outerAccessor);
             if (!AddMemberName(method.IsStatic ? staticNames : names, methodName))
@@ -1080,10 +1081,11 @@ public sealed class WebLingoBinder
 
     /// <summary>
     /// A function's body, in a function context of its own, its parameters its first locals; a method's first is
-    /// <c>this</c>, which only a method declares (section 3.7).
+    /// <c>this</c>, which only a method declares (section 3.7), and a static method's that names <c>this</c>
+    /// (<paramref name="takesClass"/>), the class it is called on, its receiver (section 3.7, "Static members").
     /// </summary>
     private WebLingoBoundFunction BindFunction(string name, IReadOnlyList<WebLingoParameterSyntax> parameters, WebLingoBlockSyntax body,
-        WebLingoSourceSpan span, bool isMethod = false, bool isStatic = false, bool isAsync = false)
+        WebLingoSourceSpan span, bool isMethod = false, bool isStatic = false, bool isAsync = false, bool takesClass = false)
     {
         var outerFunction = _function;
         var outerScope = _scope;
@@ -1100,12 +1102,14 @@ public sealed class WebLingoBinder
             isMethod = true;
             (_class, _accessor) = (null, null);
         }
+        // A static method that names `this` is given the class it is called on as its receiver, which a static member's
+        // lookup binds to that class (WebLingoHeap.TryGetStatic's takesClass; the owner's decision, 20 November 2026).
+        else if (isStatic && takesClass) isMethod = true;
         _function = new FunctionContext(outerFunction, name) { IsAsync = isAsync };
         _scope = new Scope(outerScope, _function, span);
         if (isMethod) Declare("this", WebLingoDeclarationKind.Parameter, span, null);
-        // An outer method's 'this' is not a static method's (WL2009), but for one with a receiver, its class, a native
-        // class's factory (section 3.7, "No sealed classes").
-        if (isStatic && !receiver) _scope.Locals.Add("this", _noThis);
+        // A static method without a receiver has no `this`, an outer method's neither (WL2009; section 3.7).
+        if (isStatic && !isMethod) _scope.Locals.Add("this", _noThis);
         var defaults = new List<WebLingoBoundExpression?>();
         foreach (var parameter in parameters)
         {
@@ -1519,7 +1523,7 @@ public sealed class WebLingoBinder
                 if (local is not null && !ReferenceEquals(local, _noThis)) return Reference(local, self.Span);
                 Report(WebLingoDiagnosticCodes.ThisOutsideMethod, local is null
                     ? "'this' is only allowed in a method or a constructor."
-                    : "'this' is not allowed in a static method or a static field's value.", self.Span);
+                    : "'this' is not allowed in an operator or a static field's value.", self.Span);
                 return new WebLingoBoundError(self.Span);
             }
             case WebLingoFunctionExpressionSyntax function:
@@ -2188,14 +2192,14 @@ public sealed class WebLingoBinder
 
     /// <summary>
     /// A native class's factory (section 3.7, "No sealed classes"), shorthand for both steps of making an instance, created,
-    /// then opened: a static method taking the class it is called on, its receiver, <c>this</c>, so that a class extending
-    /// the native one gets its own instance, which makes <c>new this()</c>, or <c>new this(…)</c> given the factory's
-    /// arguments, and calls its method with them, or with none, awaiting it where it is asynchronous, and gives the instance:
-    /// <c>static async open(this, a0, a1, a2 = null) { var made = new this(); await made.open(a0, a1, a2); return made; }</c>.
+    /// then opened: a static method, its <c>this</c> the class it is called on, so that a class extending the native one gets
+    /// its own instance, which makes <c>new this()</c>, or <c>new this(…)</c> given the factory's arguments, and calls its
+    /// method with them, or with none, awaiting it where it is asynchronous, and gives the instance:
+    /// <c>static async open(a0, a1, a2 = null) { var made = new this(); await made.open(a0, a1, a2); return made; }</c>.
     /// </summary>
     private static WebLingoMethodSyntax NativeFactory(WebLingoNativeExport export)
     {
-        var parameters = new List<WebLingoParameterSyntax> { new("this", default) };
+        var parameters = new List<WebLingoParameterSyntax>();
         var arguments = new List<WebLingoExpressionSyntax>();
         for (var i = 0; i < export.Arity; i++)
         {
@@ -2220,6 +2224,7 @@ public sealed class WebLingoBinder
         return new WebLingoMethodSyntax(export.Name, default, parameters, new WebLingoBlockSyntax(body, default), default)
         {
             IsStatic = true,
+            UsesThis = true,
             IsAsync = export.FactoryAsync
         };
     }

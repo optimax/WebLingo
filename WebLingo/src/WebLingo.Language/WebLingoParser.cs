@@ -37,6 +37,7 @@ public sealed class WebLingoParser : IWebLingoParser
     private int _recursionDepth;
     private bool _statementHasError;
     private int _superCalls; // How many super(…) calls have been parsed: whether a constructor calls its base's.
+    private int _thisUses; // How many `this` have been parsed: whether a static method takes the class it is called on.
 
     public WebLingoParser(string source, string name = "") : this(new WebLingoSourceText(source, name)) { }
 
@@ -59,13 +60,6 @@ public sealed class WebLingoParser : IWebLingoParser
     }
 
     private WebLingoToken Current => _tokens[_index];
-
-    /// <summary>
-    /// Whether a static method may take a receiver, the class it is called on, <c>static m(this, …)</c>, as the compiler's
-    /// factories do (section 3.7, "No sealed classes"): a native class's methods written in WebLingo, which a host writes,
-    /// never a script's own class.
-    /// </summary>
-    public bool StaticReceivers { get; init; }
 
     public WebLingoSyntaxTree ParseCompilationUnit()
     {
@@ -337,6 +331,7 @@ public sealed class WebLingoParser : IWebLingoParser
                     {
                         IReadOnlyList<WebLingoParameterSyntax> accessorParameters = [];
                         WebLingoBlockSyntax? accessorBody;
+                        var thisUses = _thisUses;
                         if (accessor.Text == "set")
                         {
                             (accessorParameters, accessorBody) = ParseFunctionRest();
@@ -352,7 +347,7 @@ public sealed class WebLingoParser : IWebLingoParser
                         }
                         if (accessorBody is null) return Made();
                         methods.Add(new WebLingoMethodSyntax(accessor.Text + ":" + property.Text, property.Span, accessorParameters,
-                            accessorBody, SpanFrom(memberStart)) { IsStatic = isStatic });
+                            accessorBody, SpanFrom(memberStart)) { IsStatic = isStatic, UsesThis = _thisUses != thisUses });
                     }
                     finally
                     {
@@ -412,11 +407,12 @@ public sealed class WebLingoParser : IWebLingoParser
             if (!EnterRecursion()) return Made();
             try
             {
-                var superCalls = _superCalls;
-                var (parameters, body) = ParseFunctionRest(receiver: isStatic && StaticReceivers);
+                var (superCalls, thisUses) = (_superCalls, _thisUses);
+                var (parameters, body) = ParseFunctionRest();
                 methods.Add(new WebLingoMethodSyntax(methodName.Text, methodName.Span, parameters, body, SpanFrom(memberStart))
                 {
                     CallsSuper = _superCalls != superCalls,
+                    UsesThis = _thisUses != thisUses,
                     IsStatic = isStatic,
                     IsAsync = isAsync
                 });
@@ -1527,6 +1523,7 @@ public sealed class WebLingoParser : IWebLingoParser
             }
             case WebLingoTokenKind.This:
                 Advance();
+                _thisUses++;
                 return new WebLingoThisSyntax(token.Span);
             case WebLingoTokenKind.Super:
                 Advance();
@@ -1907,6 +1904,7 @@ public sealed class WebLingoParser : IWebLingoParser
             parser.ReportUnexpected(width is null ? "',', an alignment, or '}', which ends the interpolation" : "'}', which ends the interpolation");
         }
         _diagnostics.AddRange(parser._diagnostics);
+        _thisUses += parser._thisUses;
         return (value, width);
     }
 

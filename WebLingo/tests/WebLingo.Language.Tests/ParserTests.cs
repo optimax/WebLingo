@@ -149,6 +149,18 @@ public sealed class ParserTests
     }
 
     [Fact]
+    public void AMethodSaysWhetherItsBodyNamesThis()
+    {
+        // A static method that does takes the class it is called on (section 3.7), in an interpolation or a closure too.
+        var tree = Parse("class A { static a() { return 1; } static b() { return () => this; } static c() { return $\"{this}\"; } "
+            + "static property d { get { return this; } } static operator +(x, y) { return x; } e() { return this; } }");
+        Assert.Empty(tree.Diagnostics);
+        var declaration = Assert.IsType<WebLingoClassDeclarationSyntax>(Assert.Single(tree.Root.Statements));
+        Assert.Equal(new[] { ("a", false), ("b", true), ("c", true), ("get:d", true), ("operator+", false), ("e", true) },
+            declaration.Methods.Select(method => (method.Name, method.UsesThis)));
+    }
+
+    [Fact]
     public void AUsingStatementDeclaresItsResource()
     {
         var tree = Parse("using (var r = open()) { r.write(1); }");

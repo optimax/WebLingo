@@ -65,8 +65,7 @@ public sealed record WebLingoNativeClassInfo(string Name, WebLingoNativeExport C
     public static bool TryParseMethods(string source, ISet<string> taken, out IReadOnlyList<WebLingoMethodSyntax> methods, out string? error)
     {
         methods = [];
-        // A static method may take its class as a receiver, static m(this, …), as a factory does.
-        var tree = new WebLingoParser("class Native {\n" + source + "\n}", "native") { StaticReceivers = true }.ParseCompilationUnit();
+        var tree = new WebLingoParser("class Native {\n" + source + "\n}", "native").ParseCompilationUnit();
         foreach (var diagnostic in tree.Diagnostics)
         {
             if (diagnostic.Severity != WebLingoDiagnosticSeverity.Error) continue;

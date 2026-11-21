@@ -36,7 +36,7 @@ class Circle extends Shape {
   const PI = 3.14159;                     // a constant, read through the class or an instance
   constructor(radius) { super("circle"); this.radius = radius; Circle.made += 1; }
   area() { return Circle.PI * this.radius * this.radius; }
-  static unit() { return new Circle(1.0); }
+  static unit() { return new this(1.0); } // this, in a static method, the class it is called on
 }
 
 var shapes = [new Rectangle(2.0, 3.0), new Circle(1.0), Circle.unit()];

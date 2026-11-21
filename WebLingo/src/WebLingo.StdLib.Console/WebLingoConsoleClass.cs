@@ -29,17 +29,17 @@ public static class WebLingoConsoleClass
     /// anything but <c>true</c> ending the program as the press would have.
     /// </summary>
     private const string WebLingoMethods = """
-        static write(this, value) { this.__write(value == null ? "null" : $"{value}"); }
-        static writeLn(this, value) { this.__write((value == null ? "null" : $"{value}") + "\n"); }
-        static print(this, value) { this.__write(value == null ? "null" : $"{value}"); }
-        static printLn(this, value) { this.__write((value == null ? "null" : $"{value}") + "\n"); }
-        static writeError(this, value) { this.__writeError(value == null ? "null" : $"{value}"); }
-        static writeErrorLn(this, value) { this.__writeError((value == null ? "null" : $"{value}") + "\n"); }
-        static onCancelKeyPress(this, handler) {
+        static write(value) { this.__write(value == null ? "null" : $"{value}"); }
+        static writeLn(value) { this.__write((value == null ? "null" : $"{value}") + "\n"); }
+        static print(value) { this.__write(value == null ? "null" : $"{value}"); }
+        static printLn(value) { this.__write((value == null ? "null" : $"{value}") + "\n"); }
+        static writeError(value) { this.__writeError(value == null ? "null" : $"{value}"); }
+        static writeErrorLn(value) { this.__writeError((value == null ? "null" : $"{value}") + "\n"); }
+        static onCancelKeyPress(handler) {
           var generation = this.__watchCancelKeyPress(handler);
           if (handler != null) this.__handleCancelKeyPress(handler, generation);
         }
-        static async __handleCancelKeyPress(this, handler, generation) {
+        static async __handleCancelKeyPress(handler, generation) {
           var key = await this.__nextCancelKeyPress(generation);
           while (key != null) {
             var kept = handler(key);

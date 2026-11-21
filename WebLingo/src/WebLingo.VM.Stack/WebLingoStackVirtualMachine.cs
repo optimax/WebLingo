@@ -614,11 +614,10 @@ public sealed class WebLingoStackVirtualMachine
                             var first = sp - ins.B;
                             var target = slots[first - 1];
                             if (target.HasClass && target.Kind is WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set
-                                && WebLingoMembers.TryFindCollectionCallee(target, name.Text, heap, out callee, out var collectionMethod))
+                                && WebLingoMembers.TryFindCollectionCallee(target, name.Text, heap, out callee, out self))
                             {
                                 // A collection of a class extending Array, Map or Set: its field's function, or its class's
                                 // method, before its own members (section 3.7).
-                                self = collectionMethod ? target : WebLingoValue.Missing;
                                 firstArgument = first;
                                 argumentCount = ins.B;
                                 constructed = WebLingoValue.Null;

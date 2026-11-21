@@ -137,8 +137,14 @@ public sealed record WebLingoMethodSyntax(
     /// <summary>Whether its body calls <c>super(…)</c> anywhere, a function inside it included.</summary>
     public bool CallsSuper { get; init; }
 
-    /// <summary>Whether it is <c>static</c>: a method of the class itself, without <c>this</c> (section 3.7).</summary>
+    /// <summary>Whether it is <c>static</c>: a method of the class itself, its <c>this</c> that class (section 3.7).</summary>
     public bool IsStatic { get; init; }
+
+    /// <summary>
+    /// Whether its body names <c>this</c> anywhere, a function inside it included: a static method that does takes the
+    /// class it is called on, its <c>this</c>, as a receiver (section 3.7, "Static members").
+    /// </summary>
+    public bool UsesThis { get; init; }
 
     /// <summary>Whether it is <c>async</c> (section 3.8).</summary>
     public bool IsAsync { get; init; }

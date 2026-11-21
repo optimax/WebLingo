@@ -222,7 +222,10 @@ public static partial class WebLingoMembers
             {
                 return heap.TryAllocateBoundMethod(target, classMethod, out result, out error);
             }
-            if (heap.TryGetStatic(collectionClass, name, out result)) return true;
+            if (heap.TryGetStatic(collectionClass, name, out result, out var takesClass))
+            {
+                return !takesClass || heap.TryAllocateBoundMethod(collectionClass, result, out result, out error);
+            }
             if (TryGetProperty(target, collectionClass, name, heap, out result, out error)) return false;
         }
         if (target.Kind == WebLingoValueKind.Instance)
@@ -233,8 +236,12 @@ public static partial class WebLingoMembers
             {
                 return heap.TryAllocateBoundMethod(target, method, out result, out error, member == WebLingoMember.Dispose);
             }
-            // Its class's static member, which its own members shadow (section 3.7).
-            if (heap.TryGetStatic(heap.ClassOf(target), name, out result)) return true;
+            // Its class's static member, which its own members shadow, one that names `this` bound to the instance's class
+            // (section 3.7).
+            if (heap.TryGetStatic(heap.ClassOf(target), name, out result, out var takesClass))
+            {
+                return !takesClass || heap.TryAllocateBoundMethod(heap.ClassOf(target), result, out result, out error);
+            }
             if (TryGetProperty(target, heap.ClassOf(target), name, heap, out result, out error)) return false;
             // An instance holding a value has that value's members too, its string's length (section 3.7).
             if (heap.IsHolding(target)) return TryGet(heap.Held(target), member, name, heap, optional, out result, out error);
@@ -271,8 +278,8 @@ public static partial class WebLingoMembers
         }
         if (target.Kind == WebLingoValueKind.Class)
         {
-            // A static member, the class's own or its base's (section 3.7); one taking the class it is called on, a native
-            // class's factory, bound to this class, so that a class extending it makes its own instances.
+            // A static member, the class's own or its base's (section 3.7); one that names `this`, the class it is called on,
+            // a native class's factory among them, bound to this class, so that a class extending it makes its own instances.
             error = null;
             if (heap.TryGetStatic(target, name, out result, out var takesClass))
             {
@@ -537,17 +544,26 @@ public static partial class WebLingoMembers
     }
 
     /// <summary>
-    /// What <c>x.name(…)</c> calls when <c>x</c> is a collection of a class extending Array, Map or Set: a field's
-    /// value, or a method of its class (<paramref name="isMethod"/>); false for anything else, its own members included.
+    /// What <c>x.name(…)</c> calls when <c>x</c> is a collection of a class extending Array, Map or Set, and what it runs
+    /// on (<paramref name="self"/>, <see cref="WebLingoValue.Missing"/> for nothing): a field's value, on nothing; a method
+    /// of its class, on the collection; or its class's static member, on nothing, or on its class where it names
+    /// <c>this</c> (section 3.7); false for anything else, its own members included.
     /// </summary>
-    public static bool TryFindCollectionCallee(WebLingoValue target, string name, WebLingoHeap heap, out WebLingoValue callee, out bool isMethod)
+    public static bool TryFindCollectionCallee(WebLingoValue target, string name, WebLingoHeap heap, out WebLingoValue callee,
+        out WebLingoValue self)
     {
         callee = WebLingoValue.Null;
-        isMethod = false;
+        self = WebLingoValue.Missing;
         if (!IsClassedCollection(target, heap, out var classValue)) return false;
         if (heap.TryGetField(target, name, out callee)) return true;
-        isMethod = heap.TryGetMethod(classValue, name, out callee);
-        return isMethod || heap.TryGetStatic(classValue, name, out callee);
+        if (heap.TryGetMethod(classValue, name, out callee))
+        {
+            self = target;
+            return true;
+        }
+        if (!heap.TryGetStatic(classValue, name, out callee, out var takesClass)) return false;
+        if (takesClass) self = classValue;
+        return true;
     }
 
     /// <summary>
@@ -564,8 +580,12 @@ public static partial class WebLingoMembers
         if (heap.TryGetField(instance, name, out callee)) return true;
         isMethod = heap.TryGetMethod(heap.ClassOf(instance), name, out callee);
         if (isMethod) return true;
-        // Its class's static member, called as any function is, which its own members shadow (section 3.7).
-        if (heap.TryGetStatic(heap.ClassOf(instance), name, out callee)) return true;
+        // Its class's static member, called as any function is, which its own members shadow, one that names `this` bound to
+        // the instance's class (section 3.7).
+        if (heap.TryGetStatic(heap.ClassOf(instance), name, out callee, out var takesClass))
+        {
+            return !takesClass || heap.TryAllocateBoundMethod(heap.ClassOf(instance), callee, out callee, out error);
+        }
         if (heap.TryGetAccessor(heap.ClassOf(instance), false, name, out _))
         {
             error = IsProperty(instance, name, heap);
