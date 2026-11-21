@@ -38,6 +38,12 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
     /// </summary>
     public IReadOnlyDictionary<string, string> Refused { get; init; } = new Dictionary<string, string>(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Called with a module's name when it is first loaded, while the program compiles or runs: <c>weblingo</c> gives a
+    /// script that imports <c>std:console</c> a console where it has none so (<see cref="WebLingoConsoleSession"/>).
+    /// </summary>
+    public Action<string>? Loaded { get; init; }
+
     /// <summary>A native module's functions, as the host's built-ins, by the names it exports them by.</summary>
     public IReadOnlyList<IWebLingoBuiltinFunction> FunctionsOf(WebLingoNativeModuleInfo module)
     {
@@ -124,6 +130,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         }
         if (!TryLoad(name, file, out module, out error)) return false;
         _loaded.Add(name, module);
+        Loaded?.Invoke(name);
         return true;
     }
 

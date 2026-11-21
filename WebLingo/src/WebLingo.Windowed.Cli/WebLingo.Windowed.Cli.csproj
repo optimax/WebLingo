@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- weblingow, weblingo as a Windows application, as Python's pythonw.exe (specification, section 3.9, "The console:
+       std:console"): no console of its own, a script that imports std:console given one (WebLingoConsoleSession). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>weblingow</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../WebLingo.Cli/WebLingo.Cli.csproj" />
+  </ItemGroup>
+</Project>

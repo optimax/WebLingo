@@ -2,6 +2,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AssemblyName>weblingo</AssemblyName>
+    <!-- Its console allocation policy, detached (app.manifest; specification, section 3.9). -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../WebLingo.Compiler/WebLingo.Compiler.csproj" />

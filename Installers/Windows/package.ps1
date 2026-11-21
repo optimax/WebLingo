@@ -111,11 +111,12 @@ try {
     New-VSCodePackage
     foreach ($architecture in 'x64', 'x86', 'arm64') {
         foreach ($kind in 'self-contained', 'framework-dependent') {
-            # WebLingo's: weblingo, the standard modules, and the scripts that install them.
+            # WebLingo's: weblingo, weblingow, the standard modules, and the scripts that install them; weblingow's project
+            # references weblingo's, so that its output holds both programs.
             $name = "WebLingo-$version-win-$architecture-$kind"
             $root = Join-Path $staging $name
             $runtime = Join-Path $root 'WebLingo'
-            Publish-Project 'src/WebLingo.Cli/WebLingo.Cli.csproj' $architecture $kind $runtime
+            Publish-Project 'src/WebLingo.Windowed.Cli/WebLingo.Windowed.Cli.csproj' $architecture $kind $runtime
             $editor = New-Item -ItemType Directory -Path (Join-Path $runtime 'VSCode') -Force
             Copy-Item -LiteralPath (Join-Path $staging 'WebLingo.vsix') -Destination $editor.FullName
             foreach ($script in 'setup.wlg', 'install.wlg', 'add-wlg-file-type.wlg', 'windows.wlg', 'weblingo.config') {
@@ -139,9 +140,11 @@ try {
                 architecture = $architecture
                 kind = $kind
                 files = $weblingo
-                # WASP loads weblingo.dll in process. Its own apphost uses wasp's deps and runtimeconfig files.
+                # WASP loads weblingo.dll in process. Its own apphost uses wasp's deps and runtimeconfig files; weblingow is
+                # WebLingo's alone.
                 shared = @($wasp.Keys | Where-Object {
-                    $weblingo.ContainsKey($_) -and $_ -notin 'weblingo.exe', 'weblingo.deps.json', 'weblingo.runtimeconfig.json'
+                    $weblingo.ContainsKey($_) -and $_ -notin 'weblingo.exe', 'weblingo.deps.json', 'weblingo.runtimeconfig.json' -and
+                    $_ -notlike 'weblingow.*'
                 } | Sort-Object)
             } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $runtime 'uninstall-files.json') -Encoding UTF8
             New-Zip $root (Join-Path $Destination "$name.zip")

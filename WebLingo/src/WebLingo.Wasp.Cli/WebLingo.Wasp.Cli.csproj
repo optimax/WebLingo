@@ -5,6 +5,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../WebLingo.Cli/WebLingo.Cli.csproj" />
+    <!-- weblingow too, weblingo as a Windows application, so that this output holds the three programs (section 3.9). -->
+    <ProjectReference Include="../WebLingo.Windowed.Cli/WebLingo.Windowed.Cli.csproj" />
     <ProjectReference Include="../WebLingo.Templates/WebLingo.Templates.csproj" />
     <ProjectReference Include="../WebLingo.StdLib/WebLingo.StdLib.csproj" />
     <ProjectReference Include="../WebLingo.Hosting/WebLingo.Hosting.csproj" />

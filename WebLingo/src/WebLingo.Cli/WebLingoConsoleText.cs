@@ -35,6 +35,8 @@ public static class WebLingoConsoleText
 
     internal static void WriteErrorLine(TextWriter error, string location, string description)
     {
+        // A console a session made for a script, once it has one, as the console it was started with.
+        error = WebLingoConsoleSession.Unwrapped(error);
         const string bold = "\u001b[1mERROR\u001b[22m";
         if (!ReferenceEquals(error, Console.Error) || Console.IsErrorRedirected
             || Environment.GetEnvironmentVariable("TERM") == "dumb")

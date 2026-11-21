@@ -5,6 +5,8 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <ProjectReference Include="../../src/WebLingo.Cli/WebLingo.Cli.csproj" />
+    <!-- weblingow, built beside the tests, whose program ConsoleProgramTests reads. -->
+    <ProjectReference Include="../../src/WebLingo.Windowed.Cli/WebLingo.Windowed.Cli.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../src/WebLingo.Compiler/WebLingo.Compiler.csproj" />
     <ProjectReference Include="../../src/WebLingo.VM/WebLingo.VM.csproj" />
     <ProjectReference Include="../../src/WebLingo.VM.Stack/WebLingo.VM.Stack.csproj" />

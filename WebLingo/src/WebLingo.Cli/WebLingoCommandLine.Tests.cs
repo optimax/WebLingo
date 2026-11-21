@@ -21,7 +21,7 @@ public static partial class WebLingoCommandLine
         public string Label(string file) => $"{file}::{Class}.{Method.Name}";
     }
 
-    private static int RunTests(string[] args, TextWriter output, TextWriter error, IWebLingoConsoleInput? input)
+    private static int RunTests(string[] args, TextWriter output, TextWriter error, IWebLingoConsoleInput? input, Action? console = null)
     {
         var listOnly = false;
         string? filter = null;
@@ -74,7 +74,7 @@ public static partial class WebLingoCommandLine
             }
             else if (matches.Length > 0)
             {
-                exit = Math.Max(exit, RunTestFile(text, matches, output, error, input, ref passed, ref failed));
+                exit = Math.Max(exit, RunTestFile(text, matches, output, error, input, console, ref passed, ref failed));
             }
         }
         if (selected == 0 && exit == Success)
@@ -119,7 +119,7 @@ public static partial class WebLingoCommandLine
     }
 
     private static int RunTestFile(WebLingoSourceText text, TestCase[] cases, TextWriter output, TextWriter error,
-        IWebLingoConsoleInput? input, ref int passed, ref int failed)
+        IWebLingoConsoleInput? input, Action? console, ref int passed, ref int failed)
     {
         // The wrapper is compiled in memory. Placing it beside the test file preserves the file's import paths.
         var path = text.Name;
@@ -127,7 +127,7 @@ public static partial class WebLingoCommandLine
         var driver = Path.Combine(Path.GetDirectoryName(fullPath)!, $".weblingo-test-{Guid.NewGuid():N}.wlg");
         var mainName = Relative(Directory.GetCurrentDirectory(), driver);
         var none = new Dictionary<string, string>();
-        if (TryHost(Scripts, path, mainName, none, output, error, input) is not { } host) return FileUnreadable;
+        if (TryHost(Scripts, path, mainName, none, output, error, input, console) is not { } host) return FileUnreadable;
         var resolved = Relative(Directory.GetCurrentDirectory(), fullPath);
         host.Resolver.Texts.Add(resolved, new WebLingoSourceText(text.Text, path));
         var reporter = new TestReporter(cases, text, host.Resolver, error);

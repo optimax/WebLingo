@@ -64,8 +64,16 @@ public static partial class WebLingoCommandLine
     public static int Run(string[] args, TextWriter output, TextWriter error, IWebLingoConsoleInput? input) =>
         Run(Scripts, args, output, error, input);
 
+    /// <summary>
+    /// <c>weblingo</c>, given what makes a console for a script that imports <c>std:console</c> where the process has none,
+    /// which it calls when it first loads the module to run a script (<see cref="WebLingoConsoleSession.Ensure"/>; the
+    /// owner's answers, 20 November 2026, "Console Module", A7), never to check or compile one.
+    /// </summary>
+    public static int Run(string[] args, TextWriter output, TextWriter error, IWebLingoConsoleInput? input, Action? console) =>
+        Run(Scripts, args, output, error, input, console);
+
     public static int Run(WebLingoCommandLineProgram program, string[] args, TextWriter output, TextWriter error,
-        IWebLingoConsoleInput? input = null)
+        IWebLingoConsoleInput? input = null, Action? console = null)
     {
         // A file named first is run, weblingo script.wlg name=Anna as weblingo run script.wlg name=Anna (the owner's answer,
         // 18 November 2026, "Minimal WebLingo Installer: Linux", Q1).
@@ -80,7 +88,7 @@ public static partial class WebLingoCommandLine
             return Success;
         }
         if (args.Length >= 1 && args[0] == "test" && ReferenceEquals(program, Scripts))
-            return RunTests(args, output, error, input);
+            return RunTests(args, output, error, input, console);
         if (args.Length == 2 && args[0] == "disasm" && program.Bytecode) return DisassembleFile(args[1], output, error);
         if (args.Length >= 2 && (args[0] is "run" or "check" || (args[0] == "compile" && program.Bytecode)))
         {
@@ -156,8 +164,8 @@ public static partial class WebLingoCommandLine
                 else if (TryParameters(args, at + 1, out var parameters, out var value))
                 {
                     var timeout = regexTimeout ?? WebLingoHeap.DefaultRegexTimeoutMilliseconds;
-                    return bytecode ? RunBytecode(program, true, path, parameters, schemes, output, error, input, timeout)
-                        : RunFile(program, true, path, parameters, schemes, output, error, input, timeout);
+                    return bytecode ? RunBytecode(program, true, path, parameters, schemes, output, error, input, timeout, console)
+                        : RunFile(program, true, path, parameters, schemes, output, error, input, timeout, console);
                 }
                 else
                 {
@@ -250,9 +258,9 @@ public static partial class WebLingoCommandLine
 
     private static int RunFile(WebLingoCommandLineProgram program, bool run, string path, IReadOnlyDictionary<string, string> parameters,
         IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error, IWebLingoConsoleInput? input,
-        int regexTimeout = WebLingoHeap.DefaultRegexTimeoutMilliseconds)
+        int regexTimeout = WebLingoHeap.DefaultRegexTimeoutMilliseconds, Action? console = null)
     {
-        var source = PrepareSource(program, path, givenSchemes, output, error, input, false, out var exit);
+        var source = PrepareSource(program, path, givenSchemes, output, error, input, false, out var exit, run ? console : null);
         if (source is null || !run) return exit;
         // The VM imports modules with the same resolver the compiler used (section 3.9).
         var context = Context(source.Host, parameters, source.LineOf, regexTimeout);
@@ -266,12 +274,12 @@ public static partial class WebLingoCommandLine
 
     private static SourceRun? PrepareSource(WebLingoCommandLineProgram program, string path,
         IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error, IWebLingoConsoleInput? input,
-        bool debugging, out int exit)
+        bool debugging, out int exit, Action? console = null)
     {
         exit = FileUnreadable;
         if (!TryReadText(path, error, out var source)) return null;
         var text = new WebLingoSourceText(source, path);
-        if (TryHost(program, path, path, givenSchemes, output, error, input) is not { } host) return null;
+        if (TryHost(program, path, path, givenSchemes, output, error, input, console) is not { } host) return null;
         var options = debugging ? host.Options with { Debugging = true } : host.Options;
         var compile = !debugging && host.Vm == WebLingoBytecodeKind.Stack && program.CompileForStack is { } stack
             ? stack : program.Compile;
@@ -380,7 +388,7 @@ public static partial class WebLingoCommandLine
     /// </summary>
     private static int RunBytecode(WebLingoCommandLineProgram program, bool run, string path, IReadOnlyDictionary<string, string> parameters,
         IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error, IWebLingoConsoleInput? input,
-        int regexTimeout = WebLingoHeap.DefaultRegexTimeoutMilliseconds)
+        int regexTimeout = WebLingoHeap.DefaultRegexTimeoutMilliseconds, Action? console = null)
     {
         if (!TryRead(path, error, out var bytes, out var register, out var stack, out var positions)) return Failed(bytes);
         var kind = register is not null ? WebLingoBytecodeKind.Register : WebLingoBytecodeKind.Stack;
@@ -396,7 +404,7 @@ public static partial class WebLingoCommandLine
         }
         var main = register?.Name ?? stack!.Name;
         var mainName = path[..^Path.GetFileName(path).Length] + main;
-        if (TryHost(program, path, mainName, givenSchemes, output, error, input) is not { } host) return FileUnreadable;
+        if (TryHost(program, path, mainName, givenSchemes, output, error, input, console) is not { } host) return FileUnreadable;
         if (!MatchesConfiguredVm(path, kind, host.Vm, error)) return CompilationFailed;
         var folder = Path.GetDirectoryName(Path.GetFullPath(path)) ?? "";
         string FromHere(string name) =>
@@ -532,7 +540,7 @@ public static partial class WebLingoCommandLine
     /// null, the reason written, if they cannot be had.
     /// </summary>
     private static Host? TryHost(WebLingoCommandLineProgram program, string path, string mainName, IReadOnlyDictionary<string, string> givenSchemes,
-        TextWriter output, TextWriter error, IWebLingoConsoleInput? input)
+        TextWriter output, TextWriter error, IWebLingoConsoleInput? input, Action? console = null)
     {
         if (!WebLingoSchemes.TryLoad(path, program.Configuration, givenSchemes, out var schemes, out var allowedHosts, out var databases,
             out var folders, out var allowed, out var env, out var vm, out var wrongConfiguration))
@@ -553,7 +561,9 @@ public static partial class WebLingoCommandLine
         // std:console a script's, but not a site's, which has no console (section 3.9, "The console: std:console").
         var native = new WebLingoNativeModuleLoader(schemes, services)
         {
-            Refused = program.HasConsole ? new Dictionary<string, string>() : WebLingoNativeModuleLoader.WithoutConsole
+            Refused = program.HasConsole ? new Dictionary<string, string>() : WebLingoNativeModuleLoader.WithoutConsole,
+            // A script that imports std:console, run, is a console program: given a console where it has none (section 3.9).
+            Loaded = console is null ? null : name => { if (name == "std:console") console(); }
         };
         // std:system, a native module installed with the runtime, in the std scheme's folder: its functions the host's
         // built-ins, which every module sees, and which std:system exports (section 3.9).

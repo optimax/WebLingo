@@ -70,9 +70,15 @@ weblingo hello.wlg
 | `weblingo disasm <bytecode-file>` | shows compiled bytecode as text |
 | `weblingo --version` | its version, `WebLingo 0.20.0-pre-alpha`, which `weblingo` alone prints first, before how it is used |
 
-On Windows, `weblingo` started in a console window of its own, as Explorer starts it for a script double-clicked
-(the repository's `Scripts/add-wlg-file-type.wlg` sets that up), waits for a key once the script has ended, so that what
-it wrote stays to be read; started from a console already open, it does not.
+A script is a console program only where it imports `std:console` ([section 15](#15-the-standard-library)). On
+Windows, `weblingo` started without a console, as Explorer starts it for a script double-clicked (the repository's
+`Scripts/add-wlg-file-type.wlg` sets that up), opens no window for a script that does not import it, and gives one that
+does a console window of its own, which waits for a key once the script has ended, so that what it wrote stays to be
+read; Windows 11 24H2 and later read the manifest that asks for this, earlier Windows opening a console window for
+every script, as before. Started from a console already open, or with its output sent to a file or a pipe, it writes
+there, and waits for nothing. `weblingow`, beside it, is `weblingo` as a Windows application, which opens a window only
+for a script that imports `std:console`, on every Windows. Where neither has a console, a script that fails, to compile
+or while it runs, shows its errors in a message box.
 
 `weblingo run` of a `.wlg` compiles it in memory, and writes no file; `weblingo compile` writes one, for the register VM
 by default (`.wlbr`). Set `"vm": "stack"` in the script's `weblingo.config` to use the stack VM for
