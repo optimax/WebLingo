@@ -212,7 +212,7 @@
         },
         {
           "name": "support.function.weblingo",
-          "match": "(?<![\\w.])(?:write|writeLn|delay|renderComponent|renderBody)\\b(?=\\s*\\()"
+          "match": "(?<![\\w.])(?:write|writeLn|print|printLn|writeError|writeErrorLn|delay|renderComponent|renderBody)\\b(?=\\s*\\()"
         }
       ]
     },

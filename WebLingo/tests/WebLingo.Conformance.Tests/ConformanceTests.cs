@@ -1305,6 +1305,19 @@ public sealed class ConformanceTests : IDisposable
     }
 
     [Fact]
+    public void PrintAndPrintLnAreWriteAndWriteLn()
+    {
+        // std:console's print and printLn, write and writeLn by other names (the owner's request, 20 November 2026,
+        // "Write Aliases"), an instance's toString() run as write runs it.
+        const string source = "import { print, printLn, write } from \"std:console\"; class P { toString() { return \"P!\"; } } "
+                              + "print(\"tea \"); printLn(new P()); printLn([1, null]); write(\"done\"); var p = print; p(\"!\");";
+        Assert.Equal((WebLingoCommandLine.Success, "tea P!\n[1, null]\ndone!", ""), Weblingo("run", source));
+        var (exit, _, error) = Weblingo("check", "printLn(1);");
+        Assert.Equal((WebLingoCommandLine.CompilationFailed, "program.wlg(1,1): ERROR WL2001: 'printLn' is not defined; did you mean printLn, from std:console?"),
+            (exit, error.Split('\n')[0].TrimEnd('\r')));
+    }
+
+    [Fact]
     public void WriteErrorWritesTheStandardError()
     {
         // std:console's writeError and writeErrorLn, as write and writeLn, to a script's standard error (the owner's

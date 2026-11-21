@@ -2077,6 +2077,7 @@ a script that imports it is a console program, and one that does not writes to n
 |---|---|
 | `write(value)` | writes a value's text, without a line break |
 | `writeLn(value)` | writes a value's text and a line break |
+| `print(value)`, `printLn(value)` | `write` and `writeLn` by other names, which write as they do |
 | `writeError(value)` | writes a value's text to the standard error, without a line break |
 | `writeErrorLn(value)` | writes a value's text and a line break to the standard error |
 | `readLine()` | a task of the console's next line, without its line break, `null` at the end of the input |
