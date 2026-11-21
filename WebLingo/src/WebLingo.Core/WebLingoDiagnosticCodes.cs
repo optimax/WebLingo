@@ -129,6 +129,12 @@ public static class WebLingoDiagnosticCodes
     public const string WaitsForever = "WL3020";
     /// <summary>A failed assertion from the standard testing module.</summary>
     public const string TestAssertionFailed = "WL3021";
+    /// <summary>
+    /// What the platform has not, a member of <c>std:console</c>'s <c>Console</c> .NET has on Windows alone used elsewhere,
+    /// a <c>PlatformError</c>, as .NET's <c>PlatformNotSupportedException</c> (the owner's answer, 20 November 2026, "Console
+    /// Module, Part 2", A5; section 3.9, "The console: <c>std:console</c>").
+    /// </summary>
+    public const string PlatformNotSupported = "WL3022";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";

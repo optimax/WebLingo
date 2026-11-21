@@ -1790,6 +1790,7 @@ An error the runtime raises becomes an instance of a class extending `Error`, wi
 | `ComPermissionError` | WL3018 | a COM object a script's configuration does not let it make |
 | `EnvironmentPermissionError` | WL3019 | an environment variable a site's script, under `wasp`, tries to set |
 | `DeadlockError` | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run, thrown at that `await` |
+| `PlatformError` | WL3022 | what the platform has not, a member of `std:console`'s `Console` that is Windows's alone, used elsewhere |
 
 Two errors cannot be caught, and always end the program: running past the execution's limits (WL3003) and being
 cancelled (WL3004).
@@ -2085,6 +2086,9 @@ a script that imports it is a console program, and one that does not writes to n
 | `prompt(text)` | writes the text, as `write` does, then a task of the next line, as `readLine()` |
 | `readPassword()` | a task of the next line, not shown as it is typed where the input is a console's |
 
+Its class `Console` controls the console, its colours, its cursor, its window, its keys and Ctrl+C, as .NET's `Console`
+does, and `ConsoleColor` names the colours; the Standard Library Reference, section 1, lists their members.
+
 A site has no console: under `wasp`, importing `std:console` is WL2015. A page's text, its `<%= %>` expressions and
 its blocks' own `write` and `writeLn`, which need no import, write its response, and a route handler writes it with
 `response.write(value)` and `response.writeLn(value)`.
@@ -2284,6 +2288,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL3019 | an environment variable a site's script, under `wasp`, tries to set |
 | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run |
 | WL3021 | an assertion from [`std:test`](weblingo-standard-library-reference.md#30-stdtest) failed |
+| WL3022 | what the platform has not, a member of `std:console`'s `Console` that is Windows's alone, used elsewhere |
 | **WL4xxx** | **bytecode** |
 | WL4001 | bytecode that fails verification, such as a damaged file or a VM mismatch |
 | WL4002 | a program too large for the bytecode |

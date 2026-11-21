@@ -11,6 +11,15 @@ public sealed class DotNetConsoleInput(TextReader reader, bool interactive) : IW
 {
     public string? ReadLine() => reader.ReadLine();
 
+    public string? ReadCharacter()
+    {
+        var first = reader.Read();
+        if (first < 0) return null;
+        if (!char.IsHighSurrogate((char)first)) return ((char)first).ToString();
+        var second = reader.Peek() >= 0 && char.IsLowSurrogate((char)reader.Peek()) ? reader.Read() : -1;
+        return second < 0 ? ((char)first).ToString() : new string([(char)first, (char)second]);
+    }
+
     public string? ReadPassword()
     {
         if (!interactive) return reader.ReadLine();

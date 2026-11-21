@@ -532,6 +532,7 @@ public static partial class WebLingoCommandLine
     private sealed record Host(WebLingoBuiltinRegistry Services, WebLingoNativeModuleLoader Native, WebLingoCompilerOptions Options,
         FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoTextOutput ErrorOutput, IWebLingoNetwork Network, IWebLingoDatabases Databases, IWebLingoFileSystem Files,
         IReadOnlyDictionary<string, IReadOnlyList<string>> Allowed, IWebLingoEnvironment Environment, IWebLingoConsoleInput? ConsoleInput,
+        IWebLingoConsole? Console,
         IWebLingoProcessRunner? Processes, WebLingoBytecodeKind? Vm);
 
     /// <summary>
@@ -589,7 +590,8 @@ public static partial class WebLingoCommandLine
             new DotNetFileSystem(files), allowed,
             // All of the machine's environment for a script's, what its configuration's "env" allows for a page's (section 7.15).
             program.ReachesAllEnvironment ? new DotNetEnvironment() : new DotNetEnvironment(env.MachineName, env.Variables, env.Platform),
-            input, program.AllowsProcesses ? new DotNetProcessRunner() : null, vm);
+            // The console itself, which std:console's Console controls: a script's, never a site's (section 3.9).
+            input, program.HasConsole ? new DotNetConsole() : null, program.AllowsProcesses ? new DotNetProcessRunner() : null, vm);
     }
 
     private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters,
@@ -611,6 +613,7 @@ public static partial class WebLingoCommandLine
             Crypto = new DotNetCrypto(),
             Environment = host.Environment,
             ConsoleInput = host.ConsoleInput,
+            Console = host.Console,
             Databases = host.Databases,
             Processes = host.Processes,
             SchedulerHost = new DotNetSchedulerHost()

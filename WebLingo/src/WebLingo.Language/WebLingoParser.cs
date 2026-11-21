@@ -60,6 +60,13 @@ public sealed class WebLingoParser : IWebLingoParser
 
     private WebLingoToken Current => _tokens[_index];
 
+    /// <summary>
+    /// Whether a static method may take a receiver, the class it is called on, <c>static m(this, …)</c>, as the compiler's
+    /// factories do (section 3.7, "No sealed classes"): a native class's methods written in WebLingo, which a host writes,
+    /// never a script's own class.
+    /// </summary>
+    public bool StaticReceivers { get; init; }
+
     public WebLingoSyntaxTree ParseCompilationUnit()
     {
         var statements = new List<WebLingoStatementSyntax>();
@@ -406,7 +413,7 @@ public sealed class WebLingoParser : IWebLingoParser
             try
             {
                 var superCalls = _superCalls;
-                var (parameters, body) = ParseFunctionRest();
+                var (parameters, body) = ParseFunctionRest(receiver: isStatic && StaticReceivers);
                 methods.Add(new WebLingoMethodSyntax(methodName.Text, methodName.Span, parameters, body, SpanFrom(memberStart))
                 {
                     CallsSuper = _superCalls != superCalls,

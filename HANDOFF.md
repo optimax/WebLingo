@@ -62,8 +62,9 @@ installed as `std/console.dll`, which `wasp`'s loaders refuse (WL2015). A page's
 `writeLn`, which only a template's code sees, and a handler writes with `response.write`. On Windows, `weblingo.exe`'s
 manifest says `detached` and `weblingow.exe` (`WebLingo.Windowed.Cli`) is a Windows application: either, started with
 no console, makes one only for a script that imports `std:console`, and shows a failure in a message box
-(`WebLingoConsoleSession`). These are parts 1 and 3 of the specification's section 9, "Console module, parts"; part 2,
-the `Console` class and `ConsoleColor`, waits for the owner's answers. Part 4 registers `.wlg` files to run
+(`WebLingoConsoleSession`). `Console` and `ConsoleColor` control the console through the platform's `IWebLingoConsole` (`DotNetConsole`), which
+`weblingo` gives a script; Ctrl+C's handler runs on the script's worker. These are the specification's section 9,
+"Console module, parts", all four landed. Part 4 registers `.wlg` files to run
 `weblingow.exe`, under the keys `Scripts/add-wlg-file-type.wlg` wrote before, which the uninstaller removes for either
 program; this machine's own registration and installation change only once its owner runs `build.bat` and setup.
 

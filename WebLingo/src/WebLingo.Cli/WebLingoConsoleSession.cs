@@ -167,6 +167,8 @@ public sealed class WebLingoConsoleSession
 
         public string? ReadPassword() => (_input ?? throw NoConsole()).ReadPassword();
 
+        public string? ReadCharacter() => (_input ?? throw NoConsole()).ReadCharacter();
+
         private static IOException NoConsole() => new("this program has no console");
     }
 

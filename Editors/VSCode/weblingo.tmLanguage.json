@@ -204,11 +204,11 @@
         },
         {
           "name": "support.class.weblingo",
-          "match": "(?<![\\w.])(?:Iterator|Bytes|BytesBuilder|DateTime|Decimal|Regex|Json|Html|File|Socket|Database|Environment|Request|Response|Headers|ComObject|ComEnumerator)\\b"
+          "match": "(?<![\\w.])(?:Iterator|Bytes|BytesBuilder|DateTime|Decimal|Regex|Json|Html|File|Socket|Database|Environment|Console|ConsoleColor|Request|Response|Headers|ComObject|ComEnumerator)\\b"
         },
         {
           "name": "support.class.error.weblingo",
-          "match": "(?<![\\w.])(?:Argument|Call|DivisionByZero|Index|Initialization|IO|Key|Member|Network|Database|Overflow|Permission|FilePermission|NetworkPermission|ComPermission|EnvironmentPermission|Com|Timeout|Type)Error\\b"
+          "match": "(?<![\\w.])(?:Argument|Call|DivisionByZero|Index|Initialization|IO|Key|Member|Network|Database|Overflow|Permission|FilePermission|NetworkPermission|ComPermission|EnvironmentPermission|Com|Timeout|Type|Deadlock|Platform)Error\\b"
         },
         {
           "name": "support.function.weblingo",

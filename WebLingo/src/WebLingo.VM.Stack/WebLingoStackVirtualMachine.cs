@@ -81,6 +81,7 @@ public sealed class WebLingoStackVirtualMachine
         heap.Environment = context.Environment;
         heap.ConsoleInput = context.ConsoleInput;
         heap.ErrorOutput = context.ErrorOutput;
+        heap.Console = context.Console;
         heap.WallClock = context.WallClock;
         heap.TimeZone = context.TimeZone;
         heap.SchedulerHost = context.SchedulerHost;

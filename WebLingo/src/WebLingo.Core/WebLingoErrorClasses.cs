@@ -23,7 +23,8 @@ public static class WebLingoErrorClasses
         ("NetworkPermissionError", WebLingoDiagnosticCodes.NetworkPermissionDenied),
         ("ComPermissionError", WebLingoDiagnosticCodes.ComPermissionDenied),
         ("EnvironmentPermissionError", WebLingoDiagnosticCodes.EnvironmentPermissionDenied),
-        ("DeadlockError", WebLingoDiagnosticCodes.WaitsForever)
+        ("DeadlockError", WebLingoDiagnosticCodes.WaitsForever),
+        ("PlatformError", WebLingoDiagnosticCodes.PlatformNotSupported)
     ];
 
     public static ReadOnlySpan<(string Name, string Code)> BuiltIn => Classes;

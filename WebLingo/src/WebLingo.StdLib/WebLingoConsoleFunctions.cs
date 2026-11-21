@@ -17,6 +17,19 @@ public sealed class WebLingoReadLineFunction(bool synchronous) : IWebLingoBuilti
         WebLingoConsoleFunctions.TryRead(Name, input => input.ReadLine(), synchronous, heap, out result, out error);
 }
 
+/// <summary>
+/// <c>Console.read()</c> and <c>Console.readSync()</c>, <c>std:console</c>'s (the owner's answer, 20 November 2026, "Console
+/// Module, Part 2", A3): the input's next character, a string of one, <c>null</c> at its end, as a task or at once.
+/// </summary>
+public sealed class WebLingoReadCharacterFunction(bool synchronous) : IWebLingoBuiltinFunction
+{
+    public string Name => synchronous ? "readSync" : "read";
+    public int Arity => 0;
+
+    public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        WebLingoConsoleFunctions.TryRead(Name, input => input.ReadCharacter(), synchronous, heap, out result, out error);
+}
+
 /// <summary><c>prompt(text)</c>: writes the text, as <c>write</c> does, then reads a line, as <c>readLine()</c> does, a task.</summary>
 public sealed class WebLingoPromptFunction(IWebLingoTextOutput? output = null) : IWebLingoBuiltinFunction
 {

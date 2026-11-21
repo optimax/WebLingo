@@ -117,6 +117,9 @@ public sealed class WebLingoHeap
     /// <summary>The console's input (<see cref="WebLingoExecutionContext.ConsoleInput"/>), for <c>std:console</c>'s <c>readLine</c> and the others.</summary>
     public WebLingo.Platform.Abstractions.IWebLingoConsoleInput? ConsoleInput { get; set; }
 
+    /// <summary>The console itself (<see cref="WebLingoExecutionContext.Console"/>), for <c>std:console</c>'s <c>Console</c>.</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoConsole? Console { get; set; }
+
     /// <summary>The class values of the native classes whose modules make their instances, each its class's (section 3.10).</summary>
     private Dictionary<object, WebLingoValue>? _nativeClassValues;
 

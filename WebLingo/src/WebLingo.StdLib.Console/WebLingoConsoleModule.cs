@@ -7,9 +7,10 @@ namespace WebLingo.StdLib.Console;
 /// being a console program only where it does (the owner's answers, 20 November 2026, "Console Module"): its writing,
 /// <c>write</c> and <c>writeLn</c>, to the execution's output, and <c>writeError</c> and <c>writeErrorLn</c>, to its errors
 /// (A9), and <c>print</c> and <c>printLn</c>, the same as <c>write</c> and <c>writeLn</c> (the owner's request, 20
-/// November 2026, "Write Aliases"); and its reading, <c>readLine</c>, <c>readLineSync</c>, <c>prompt</c> and
-/// <c>readPassword</c>, moved from
-/// <c>std:system</c> (A1). Under <c>wasp</c>, where a site has no console, it is not installed, its import WL2015 (A3).
+/// November 2026, "Write Aliases"); its reading, <c>readLine</c>, <c>readLineSync</c>, <c>prompt</c> and
+/// <c>readPassword</c>, moved from <c>std:system</c> (A1); and its classes, <c>Console</c>, the console's control, and
+/// <c>ConsoleColor</c>, its colours (A4, A5; <see cref="WebLingoConsoleClass"/>). Under <c>wasp</c>, where a site has no
+/// console, it is not installed, its import WL2015 (A3).
 /// </summary>
 public sealed class WebLingoConsoleModule : IWebLingoNativeModule
 {
@@ -25,5 +26,6 @@ public sealed class WebLingoConsoleModule : IWebLingoNativeModule
         registry.Function("readLineSync", 0, new WebLingoReadLineFunction(true).TryInvoke);
         registry.Function("prompt", 1, new WebLingoPromptFunction().TryInvoke);
         registry.Function("readPassword", 0, new WebLingoReadPasswordFunction().TryInvoke);
+        WebLingoConsoleClass.Register(registry.Class("Console"), registry.Class("ConsoleColor"));
     }
 }

@@ -110,6 +110,12 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     public WebLingo.Platform.Abstractions.IWebLingoConsoleInput? ConsoleInput { get; init; }
 
     /// <summary>
+    /// The console itself, which <c>std:console</c>'s <c>Console</c> controls through the heap (<see cref="WebLingoHeap.Console"/>,
+    /// section 3.9, "The console: <c>std:console</c>"); none by default, its members then an <c>IOError</c>.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoConsole? Console { get; init; }
+
+    /// <summary>
     /// The host's side of the execution's scheduler, on which work runs off the worker, its outcome posted back to it
     /// (section 7.8, WL-P007); without one, nothing asynchronous but the execution's own tasks and timers runs.
     /// </summary>

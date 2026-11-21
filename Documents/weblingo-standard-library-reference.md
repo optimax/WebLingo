@@ -111,6 +111,56 @@ GREEN TEA
 BLACK TEA
 ```
 
+### `Console` and `ConsoleColor`
+
+`Console` controls the console, its members static, .NET's `Console`'s in lower camel case: its colours, its cursor,
+its window and its buffer, its keys and Ctrl+C. `ConsoleColor`'s constants are the colours' names, so that a colour
+read compares with either, `Console.foregroundColor == ConsoleColor.red`.
+
+| Member | What it is |
+|---|---|
+| `Console.title` | the console window's title; reading it is Windows's alone |
+| `Console.foregroundColor`, `Console.backgroundColor` | the colours text is written in, each a name, `"darkBlue"`, or a constant of `ConsoleColor`; another name WL3001 |
+| `Console.resetColor()` | the colours as they were |
+| `Console.cursorLeft`, `Console.cursorTop` | the cursor's column and row, from 0 |
+| `Console.getCursorPosition()`, `Console.setCursorPosition(left, top)` | the cursor's position, a map `{ left, top }`, and its moving |
+| `Console.cursorSize`, `Console.cursorVisible` | the cursor's height, a percentage of a cell, set on Windows alone, and whether it shows, read on Windows alone |
+| `Console.windowWidth`, `Console.windowHeight`, `Console.windowLeft`, `Console.windowTop` | the window's size and position in the buffer, set on Windows alone |
+| `Console.setWindowSize(width, height)`, `Console.setWindowPosition(left, top)` | both at once, Windows's alone |
+| `Console.bufferWidth`, `Console.bufferHeight`, `Console.setBufferSize(width, height)` | the buffer's size, set on Windows alone |
+| `Console.largestWindowWidth`, `Console.largestWindowHeight` | the largest window the screen has room for |
+| `Console.moveBufferArea(sourceLeft, sourceTop, sourceWidth, sourceHeight, targetLeft, targetTop, sourceChar, sourceForeColor, sourceBackColor)` | copies an area of the buffer, the area filled with the character and its colours where they are given, Windows's alone |
+| `Console.clear()`, `Console.beep()`, `Console.beep(frequency, duration)` | clears the buffer; a beep, of a frequency and a duration on Windows alone |
+| `await Console.readKey(intercept)`, `Console.readKeySync(intercept)` | the next key typed, a map, `{ key: "enter", char: "\r", shift: false, alt: false, control: false }`, not shown where `intercept` is `true` |
+| `await Console.read()`, `Console.readSync()` | the input's next character, a string of one, `null` at its end |
+| `Console.keyAvailable`, `Console.capsLock`, `Console.numberLock` | whether a key waits to be read; Caps Lock and Num Lock, Windows's alone |
+| `Console.treatControlCAsInput` | whether Ctrl+C is read as a key, rather than pressed |
+| `Console.onCancelKeyPress(handler)` | Ctrl+C's and Ctrl+Break's handler, called with `"c"` or `"break"`, which keeps the program running by giving `true`, or none, `null` |
+| `Console.isInputRedirected`, `Console.isOutputRedirected`, `Console.isErrorRedirected` | whether the input, the output and the errors are a file's or a pipe's rather than the console's |
+| `Console.inputEncoding`, `Console.outputEncoding` | `"utf-8"`: a script's text is UTF-8 always |
+| `Console.write(value)` … `Console.readPassword()` | `std:console`'s writing and reading, as members of `Console` too |
+
+A member without a console, under a host that gives a script none, or that the console cannot do, its output a pipe's,
+is an `IOError`, WL3011; one the platform has not, Windows's alone elsewhere, a `PlatformError`, WL3022; a value it does
+not take, a cursor beyond the buffer, WL3001.
+
+```javascript
+import { Console, ConsoleColor, writeLn } from "std:console";
+Console.foregroundColor = ConsoleColor.yellow;
+writeLn("in yellow");
+Console.resetColor();
+Console.onCancelKeyPress(key => {
+  writeLn($"Ctrl+{key} pressed; running on");
+  return true;
+});
+writeLn([Console.foregroundColor == ConsoleColor.gray, Console.outputEncoding]);
+```
+
+```text
+in yellow
+[true, "utf-8"]
+```
+
 ---
 
 ## 2. `Object`
@@ -364,6 +414,7 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `ComPermissionError` | WL3018 | a COM object the configuration's `"com"` does not let a script make (section 23) |
 | `EnvironmentPermissionError` | WL3019 | a variable a site's scripts try to set, under `wasp`, which lets them read only (section 19) |
 | `DeadlockError` | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run, thrown at that `await`, naming where the task was made and where it is awaited |
+| `PlatformError` | WL3022 | a member of `Console` the platform has not, Windows's alone used elsewhere (section 1) |
 
 ```javascript
 import { writeLn } from "std:console";
