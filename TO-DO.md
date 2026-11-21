@@ -32,3 +32,17 @@ A2: (c)
 
 Rewrite the classic ASP application Links into WASP. Run locally, against the local SQL Server.
 
+## VIM mode
+
+Support ViM commands as a set of Keyboard Shortcuts that can be loaded. Also make sure that ViM mode is as complete as possible. Tell me if there is something that we don't support that ViM has.
+
+## Insert Dates with `@`
+
+See Obsidian plugin "Natural Language Dates Redux" by Tommy Bergeron. 
+
+## Double [[ Linking
+
+Wikilinks style auto linking to an existing document (offer suggestions in the local folder, or use .. etc.); create a new document if new title given. New llink can be deep including heading wiyj `#`.
+
+
+

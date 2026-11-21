@@ -4413,3 +4413,147 @@ restoration, side-by-side runtimes, WASP, changed files, locks and retry. The x6
 update, cancellation, self-removal from the installed folder, an extracted ZIP rerun, older-package removal and
 VS Code extension ownership. It used the actual VS Code CLI and disposable registry keys, with UAC simulated.
 Native ARM64 and 32-bit Windows were not exercised.
+
+## [DONE] Console Module, Part 1: The Writing and the Reading
+
+Part 1 of "Console Module" (the specification, section 9, "Console module, parts"): `std:console`, a native module installed as `std/console.dll`, its `write`, `writeLn`, `writeError` and `writeErrorLn` (A9), and the console's reading, `readLine`, `readLineSync`, `prompt` and `readPassword`, moved from `std:system` (A1), which keeps `delay`; under `wasp`, its import WL2015 (A3); a page's blocks writing with `write` and `writeLn` of their own, and a `.wlg` handler with `response.write` and `response.writeLn` (A2); every script, sample, test, example, workload and document gaining its import.
+
+2026-11-20 (Claude): done, and landed, as answered: `std:console`, `WebLingo.StdLib.Console`, a native module installed as `std/console.dll`, exporting `write`, `writeLn`, `writeError` and `writeErrorLn`, the last two to the standard error (A9), and `readLine`, `readLineSync`, `prompt` and `readPassword`, moved from `std:system`, which keeps `delay` (A1); `write` without its import WL2001, suggesting `std:console`; under `wasp`, its import WL2015, its message saying that a site has no console and how a page and a handler write (A3); a page's blocks writing with `write` and `writeLn` of their own, which only a template's code sees, a page's, its includes', a layout's and a component's, never a module it imports, and a handler with `response.write` and `response.writeLn` (A2). Every script, sample, test, example, workload, Script and document imports `std:console` where it writes or reads the console, which "Import std:console" asks, done here since nothing would run otherwise. Guessed, and recorded in the specification as Proposed (section 15.2, "The console"): `response.write`'s text made as an interpolation makes it, `null` as `null`, an instance's `toString()` run, then given to the response's own native `__write(text)`; a statement that calls a member named `write` or `writeLn` waiting for a slow client where the host declares the output's wait, so that a handler's writes wait as a page's did, a script's own `write` methods under `wasp` waiting so too; a page's `write(null)` writing `null`, as `write` does, where `<%= null %>` writes nothing; `import { writeLn } from "std:system";` compiling and WL3006 where it is used, as for any name a module does not export; and in-process test hosts giving `write` and `writeLn` as their own built-ins, `std:system` exporting them to them, so that the VM tests are as they were.
+
+Done (Claude, 2026-11-20, `8216d21`). Main's checks: the Release build, without warnings; the full suite, 4,277 tests, none failed or aborted; and the CLI: `weblingo` on the samples, every Script checked, the references' and the getting-started guide's examples run, their output as shown but where one needs a file, a server or a parameter of its own; `wasp run` on the website sample, and `wasp check` on the example sites' pages, but `example2`'s, whose layout takes the request, which `wasp check` cannot give, as before. Tried on Windows only; Linux not tried.
+
+## [DONE] Console Module, Part 3: Console Programs on Windows
+
+Part 3 of "Console Module" (the specification, section 9, "Console module, parts"): a script a console program only when it imports `std:console`: `weblingo.exe`'s manifest's `detached`, a console made where such a script has none, and `weblingow.exe`, a Windows application, which a double-click runs (A7); a failure without a console shown in a message box (A8).
+
+2026-11-20 (Claude): split in two, the specification's section 9, "Console module, parts", parts 3 and 4, the double-click's registration, which the uninstaller and its tests mirror, being part 4, "Console Module, Part 4: A Double-Click Runs weblingow". Done, and landed, as answered: `weblingo.exe`'s manifest saying `detached` (A7); `weblingow.exe`, `WebLingo.Windowed.Cli`, a Windows application, published beside `weblingo.exe` by `publish.ps1`, `wasp`'s project referencing it, and by `Installers/Windows/package.ps1`; either, started with no console and no standard output or error a file or a pipe takes, makes a console window of its own for a script that imports `std:console` (A7), and shows a failure's errors in a message box where it never had one (A8). Guessed, and recorded in the specification as Proposed (section 15.2, "The console"): a console made when `std:console` is first loaded to run a script, statically or dynamically, from source or bytecode, for `run` and `test`, never `check` or `compile`, so that a script that imports it and fails to compile shows its errors in its console; a process whose standard output or error a file or a pipe takes, as a debugger's or a test's, having a console for this; the message box titled with the program's name, showing the errors, or else the output, on a failure only; a console window of its own waiting for a key at the end, as before.
+
+Done (Claude, 2026-11-20, `c110b98`). Main's checks: the Release build, without warnings; the tests the change could affect, the conformance, template, hosting, architecture and VM tests, 3,787 tests, none failed or aborted, the compiler's, language's, bytecode's and runtime's unchanged since part 1's run; `publish.ps1` into a scratch folder, `weblingow.exe` and `std/console.dll` in it; and the programs themselves: `weblingo.exe` and `weblingow.exe` started without a console on a script that does not import `std:console`, which ran with no window, on one that does, which had a console window of its own, and on one that does not compile and one that throws, whose message boxes showed their errors, and both with their output piped, which went there. Not tried: Windows before 24H2, where `weblingo.exe` opens a console as before; `package.ps1`'s zips, not built. Tried on Windows only; Linux not tried.
+
+## [DONE] Console Module, Part 4: A Double-Click Runs weblingow
+
+Part 4 of "Console Module" (the specification, section 9, "Console module, parts"): `.wlg` files registered to `weblingow.exe` (A7), by `Scripts/add-wlg-file-type.wlg` and the Windows setup, the uninstaller removing it, an earlier registration of `weblingo.exe` moved over.
+
+2026-11-20 (Claude): done, and landed, as answered: `Scripts/add-wlg-file-type.wlg` registers `.wlg` files to run `weblingow.exe` (A7). Guessed, and recorded in the specification as Proposed (section 15.2, "The console"): the registration's keys as before, `WebLingo.Script` and `Applications\weblingo.exe`, so that a choice of `weblingo.exe` already made in Windows's "open with" holds, running `weblingow.exe` now, their command and icon `weblingow.exe`'s; the uninstaller removing a registration whose command runs either program, taking a surviving installation's own program, and refusing to remove an installation while either runs from it. While its tests were changed, a case reached the uninstaller's removal of WebLingo's VS Code extension, which `Find-Code` found in this account's own VS Code and uninstalled; it was reinstalled, version 0.2.0, from a VSIX built from `Editors/VSCode` as `package.ps1` builds it, the tests now stub `Find-Code`, and `implementation.md` records the trap.
+
+Done (Claude, 2026-11-20, `472d62a`). Main's checks: no .NET code changed, so neither the build nor its tests; the uninstaller's tests, `Installers/Windows/tests/uninstall.ps1`, which passed, an earlier registration's removal among them; and `weblingo check` of the changed scripts. Not tried: the registration on this machine, and setup, which the owner runs once `build.bat` has installed `weblingow.exe`. Tried on Windows only; Linux not tried.
+
+## [DONE] Write Aliases
+
+Add `print` and `printLn` as aliases for `write` and `writeLn` respectively in `std:console`.
+
+2026-11-20 (Claude): waits for "Console Module"'s answers, `std:console` being that task's.
+
+2026-11-20 (Claude): done, and landed: `std:console` exports `print` and `printLn`, `write` and `writeLn` by other names, registered with their functions, text built-ins as they are, so that an instance's `toString()` runs as for `write`; recorded in the specification's register as the owner's request, and in both references, and coloured in scripts by the editors' grammars, with `writeError` and `writeErrorLn`. `Console.print` and `Console.printLn` come with the `Console` class, "Console Module, Part 2: The Console's Control", which waits for the owner's answers.
+
+Done (Claude, 2026-11-20, `d692b77`). Main's checks: the Release build, without warnings; the conformance tests, 3,115 tests, none failed or aborted, `PrintAndPrintLnAreWriteAndWriteLn` among them, no other project's results affected; the editors' grammars parsed. Tried on Windows only; Linux not tried.
+
+## [DONE] Import std:console
+
+Make sure that all examples and documentation properly import `std:console` if they use `write` or `writeLn`.
+
+2026-11-20 (Claude): waits for "Console Module"'s answers, `std:console` being that task's.
+
+2026-11-20 (Claude): done, and landed. "Console Module, Part 1" (`8216d21`) gave every script, sample, example, workload, Script and document its import, since nothing would have run otherwise; this task checked them after "Write Aliases": each `.wlg` in the repository and each code block of its documents that writes or reads the console, for its import of `std:console`, and each page and handler, for no import of `std:system`'s former names. The specification's M0.6 example was the one left, and now imports `writeLn`; the examples' readme says where `01-hello.wlg`'s `write` and `writeLn` come from. The tests that run their own hosts in process, the VM tests among them, are neither examples nor documents: their hosts give `write` and `writeLn` as their own built-ins, which `std:system` exports to them, as `implementation.md` says.
+
+Done (Claude, 2026-11-20, `e8fd278`). Main's checks: documents and a readme only, which no build or test reads; the scan found nothing more. Tried on Windows only; Linux not tried.
+
+## [DONE] Console Module, Part 2: The Console's Control
+
+Part 2 of "Console Module" (the specification, section 9, "Console module, parts"): `Console`, its members static, all of .NET's `Console`, the writing and the reading among them (A4), `readKey()` and `readKeySync()` giving a map (A6), and `ConsoleColor`, the colours, which the colour members take as their names too (A5).
+
+2026-11-20 (Claude): part 1 landed (`8216d21`), `std:console` a native module, `std/console.dll`. Planned as the notes of "Console Module" say: `Console`'s members static, .NET's names in lower camel case, `Console.title`, `foregroundColor`, `backgroundColor`, `cursorLeft`, `cursorTop`, `cursorSize`, `cursorVisible`, `windowWidth`, `windowHeight`, `windowLeft`, `windowTop`, `bufferWidth`, `bufferHeight`, `largestWindowWidth`, `largestWindowHeight`, `keyAvailable`, `capsLock`, `numberLock`, `treatControlCAsInput`, `isInputRedirected`, `isOutputRedirected` and `isErrorRedirected`; `beep()`, `clear()`, `resetColor()`, `setCursorPosition(left, top)`, `getCursorPosition()`, a map `{ left, top }`, `setWindowSize`, `setWindowPosition`, `setBufferSize` and `moveBufferArea`, its optional arguments as .NET's overloads have them; `readKey()` and `readKeySync()`, an argument saying whether the key is shown, as .NET's `intercept`; the writing and the reading too, `Console.writeLn(x)` (A4); `ConsoleColor.darkBlue` being the string `"darkBlue"`, so that a colour read compares with either (A5, read so); through the platform's console, a new interface beside `IWebLingoConsoleInput`, which `weblingo` gives a script and `wasp` never does. Five things of .NET's `Console` have no plain counterpart:
+
+Q1, Ctrl+C and Ctrl+Break, .NET's `Console.CancelKeyPress`: (a) `Console.onCancelKeyPress(handler)`, the handler called on the script's worker with `"c"` or `"break"`, a handler giving `true` keeping the program running, as .NET's `e.Cancel = true`, `null` for no handler; (b) a task, `await Console.cancelKeyPress()`, completing with `"c"` or `"break"` at the next press, the program kept running while one is pending; (c) only `Console.treatControlCAsInput`, Ctrl+C then read as a key.
+
+A1: (a)
+
+Q2, .NET's `Console.In`, `Out` and `Error`, `SetIn`, `SetOut` and `SetError`, and `OpenStandardInput` and the others, the console's readers, writers and streams: (a) none, `std:console`'s writing and reading, and `isInputRedirected` and the others, being all of it; (b) `Console.setOut(file)`, `setError(file)` and `setIn(file)`, each a `std:fs` `File`, or `null` for the console again.
+
+A2: (a)
+
+Q3, `Console.read()`, .NET's `Console.Read()`, the input's next character: (a) a task of a string of one character, `null` at the input's end, with `Console.readSync()`; (b) none, `readLine` and `readKey` being enough.
+
+A3: (a)
+
+Q4, `Console.inputEncoding` and `outputEncoding`: (a) read only, `"utf-8"`, a script's text being UTF-8 always ("Text Written on Windows: UTF-8"); (b) set too, as .NET's, `Console.outputEncoding = "latin1";`.
+
+A4: (a)
+
+Q5, a member .NET has on Windows only, `Console.title`'s read, `beep(frequency, duration)`, `setWindowSize` and the like, used on Linux or macOS: (a) an `IOError`, WL3011, saying so; (b) an error of its own, `PlatformError`, a new code, as .NET's `PlatformNotSupportedException`.
+
+A5: (b)
+
+2026-11-20 (Claude): done, and landed, as answered: `Console`'s members .NET's `Console`'s in lower camel case, static, the writing and the reading among them; `onCancelKeyPress(handler)`, the handler on the script's worker, `true` keeping the program running (A1); none of .NET's readers, writers and streams (A2); `read()` and `readSync()` (A3); the encodings read only, `"utf-8"` (A4); and a member .NET has on Windows alone, used elsewhere, a `PlatformError`, WL3022 (A5). Guessed, and recorded in the specification as Proposed (section 15.2, "The console"): the code WL3022; `ConsoleColor`'s constants being the names; a key's `key` `null` for one .NET does not name, its `char` `null` for none; `readKey(intercept)`, `true` for a key not shown; `read`, `readSync`, `readKey` and `readKeySync` `Console`'s alone, not exported by name; `beep(frequency, duration)` both or neither; a press while the handler is busy with an earlier one ending the program, as .NET's default does, and a handler that gives anything but `true` ending it with Windows's `STATUS_CONTROL_C_EXIT`, or 130 elsewhere; without a console, or what the console cannot do, an `IOError`; a value it does not take WL3001. For `Console`'s members written in WebLingo, a static method of a native class's may take its class as a receiver, `static write(this, value)`, as the compiler's factories do, which the parser allows a host's native class alone (`WebLingoParser.StaticReceivers`).
+
+Done (Claude, 2026-11-20, `4562fd0`). Main's checks: the Release build, without warnings; the full suite, 4,287 tests, none aborted, all passed but `ConsoleTextTests.CaptureFailureStopsADescendantAfterTheLauncherExits`'s two cases, whose launched process outran their 6-second timeout under the full suite's load, as once before in part 1's runs, and which passed on their own; `ConsoleControlTests` among them, each member on both VMs with a console of the test's own, Ctrl+C's presses among them; the reference's example run; and `weblingo` in a real console window, its title, colours, cursor, window, buffer, locks, redirections, `moveBufferArea` both ways, an out-of-range cursor, Ctrl+C's handler set and taken away, and `clear()`. Not tried: a real press of Ctrl+C, which no test here can make; Linux and macOS, where the Windows-only members are a `PlatformError`. Tried on Windows only; Linux not tried.
+
+
+## [DONE] Console Module
+
+I want to revisit the decision made previously regarding `write` and `writeLn`. I want to build a `std:console` module that would export those, but also allow more control over the console, like setting background and foreground colors, controlling the position of the cursor, etc. At the minimum, I want all the capabilities that .NET Console has.
+
+We must no longer assume that every WebLingo program is necessarily a console app and therefore that it supports `write` or `writeLn`. A script becomes a console program only when it imports `std:console`. Otherwise it should run as a "normal" WinAPI application. This is in preparation to making it possible to write GUI scripts that bring up visible windows.
+
+2026-11-20 (Claude): read with "Write Aliases" and "Import std:console", which build on it. As the task asks, `write` and `writeLn` leave `std:system`, which every program imports implicitly, for `std:console`, which a program imports, and a program that does not import it is no console program; `std:system` keeps `delay`. That is the owner's revisiting of two approved decisions ("Standard Modules, Imported: The Rest", A3, and "Console Input", A5), recorded in the specification once the questions below are answered. Today a site's pages and its `.wlg` handlers write their responses with `write` too (`write(Json.stringify(…))` in `example2/site/api/fish.wlg`), so a site needs a way of its own. Windows decides whether a program gets a console window from its executable: `weblingo.exe` is a console program, and so opens a window when double-clicked. Since Windows 11 24H2 (build 26100; this machine is 26200), its manifest can say `consoleAllocationPolicy` `detached`, so that it gets a console only when started from one, and `AllocConsoleWithOptions` can make one later, once the compiler has seen `import … from "std:console"` (Microsoft's "Console allocation policy"). Everything else in .NET's `Console` is planned as it is, its names in lower camel case: `title`, `beep()`, `clear()`, `resetColor()`, the cursor's position, size and visibility, the window's and the buffer's size and position, `moveBufferArea`, `keyAvailable`, `capsLock`, `numberLock`, `treatControlCAsInput`, the redirections, and Ctrl+C; what .NET has on Windows only an error elsewhere, as .NET's `PlatformNotSupportedException`.
+
+Q1, the console's reading, `readLine`, `readLineSync`, `prompt` and `readPassword`: (a) moved to `std:console` with `write`, `std:system` keeping none of them; (b) left in `std:system`.
+
+A1: (a)
+
+Q2, how a site's pages and `.wlg` handlers write their response, a page's text and its `<%= %>` writing it as now: (a) `response.write(value)` and `response.writeLn(value)`, members of `Response`, as classic ASP's `Response.Write`; (b) `std:console`'s `write` and `writeLn`, writing the response under `wasp` and the console under `weblingo`; (c) (a), and in a page's blocks, `write` and `writeLn` of its own, without an import, writing the response, as its text does.
+
+A2: (c)
+
+Q3, a site's script that imports `std:console`, under `wasp`, where there is no console: (a) it compiles, and each of `std:console`'s members is an `IOError` where it is used, as `readLine` is now; (b) WL2015 where it is imported, as for a module that is not installed.
+
+A3: (b)
+
+Q4, the console's control: (a) a class, `Console`, its members static, as `std:env`'s `Environment`, `Console.foregroundColor = "red";`, `Console.setCursorPosition(0, 5);`, `Console.clear();`, beside `write`, `writeLn`, `print`, `printLn` and the reading, exported by name, `import { Console, writeLn } from "std:console";`; (b) (a), `Console` having the writing and the reading among its members too, `Console.writeLn(x)`, as .NET's has; (c) functions only, `import console from "std:console"; console.setForegroundColor("red");`.
+
+A4: (b)
+
+Q5, a colour: (a) a string, .NET's `ConsoleColor`'s names in lower camel case, `"darkBlue"`, a wrong one WL3001; (b) a constant of a class of its own, `ConsoleColor.darkBlue`, as .NET's enumeration; (c) both.
+
+A5: (c)
+
+Q6, a key read, `await Console.readKey()`, a task, and `Console.readKeySync()`, as the reading's forms: (a) a map, `{ key: "enter", char: "\r", shift: false, alt: false, control: false }`, the key's name .NET's `ConsoleKey`'s in lower camel case; (b) an instance of a class of its own, `KeyInfo`, with those as its properties.
+
+A6: (a)
+
+Q7, a script that does not import `std:console`, started without a console, by a double-click (from a terminal, it runs in the terminal, writing nothing to it): (a) no window, `weblingo.exe`'s manifest saying `detached`, a console window made only for a script that imports `std:console`, on Windows 11 24H2 and later, earlier Windows opening one as now; (b) a second program, `weblingow.exe`, a Windows application, as Python's `pythonw.exe`, which a double-click runs, on every Windows; (c) both.
+
+A7: (c)
+
+Q8, such a script, without a console, failing, as a compile error or an uncaught exception: (a) a message box showing what `weblingo` writes for it; (b) a console window, made for it, showing it, waiting for a key; (c) nothing shown, only the exit code.
+
+A8: (a)
+
+Q9, writing to the standard error, .NET's `Console.Error`: (a) `writeError(value)` and `writeErrorLn(value)`, beside `write`; (b) members of `Console`, `Console.error.write(value)`, as .NET's `Console.Error.Write`; (c) none for now.
+
+A9: (a)
+
+2026-11-20 (Claude): too large to land in one piece, so built in three parts, which the specification defines (section 9, "Console module, parts"), each a task below: "Console Module, Part 1: The Writing and the Reading", "Console Module, Part 2: The Console's Control" and "Console Module, Part 3: Console Programs on Windows", part 3 split in two, "Console Module, Part 4: A Double-Click Runs weblingow" its second. This task is [IDLE] until the last of them is done.
+
+2026-11-20 (Claude): parts 1, 3 and 4 landed (`8216d21`, `c110b98`, `472d62a`), and so did "Write Aliases" (`d692b77`) and "Import std:console" (`e8fd278`); part 2 waits for the owner's answers to its questions.
+
+2026-11-20 (Claude): done, its four parts landed: "Console Module, Part 1: The Writing and the Reading" (`8216d21`), "Console Module, Part 2: The Console's Control" (`4562fd0`), "Console Module, Part 3: Console Programs on Windows" (`c110b98`) and "Console Module, Part 4: A Double-Click Runs weblingow" (`472d62a`), each in `DONE.md` with its checks.
+
+Done (Claude, 2026-11-20, `4562fd0`). Main's checks: its parts'. Tried on Windows only; Linux not tried.
+
+## [DONE] Static Methods Given Their Class
+
+Let a script's own class have static methods that are given the class they are called on, as Python's `@classmethod` is, so that a script writes factories of its own: `static make(this) { return new this(); }`, called on a class extending it, `Tea.make()`, makes that class's instance. The owner asked for it on 20 November 2026, after "Console Module, Part 2" (`4562fd0`) let a native class's methods written in WebLingo do so, the parser's `WebLingoParser.StaticReceivers`, as the compiler's factories, `File.open(path, mode)`, already did.
+
+2026-11-20 (Claude): planned as a language change, recorded in the specification (sections 3.7 and the register): the runtime has it already, a static method whose function takes a receiver being given its class where it is read (`WebLingoHeap.TryGetStatic`'s `takesClass`), on both VMs; so the parser, for a class's body and an `extend` block alike, and the tests on both VMs, the references and the editors' grammars, if the syntax needs them. A function given a class while the program runs, `Point.make = function (this) { … };`, is already given its call's target, the class, as any function with a receiver is.
+
+Q1, how a static method reaches the class it is called on: (a) a receiver, `static make(this, …)`, as a function has one (section 3.7), `this` in a static method without one still WL2009; (b) `this` in every static method, the class it is called on, without a receiver, as JavaScript's static methods have it.
+
+A1:  (a)
+
+2026-11-20 (Claude): the owner changed the answer in chat, to (b): "I want this to be an implicit parameter on static methods, so it can be referenced and resolves to the class reference." So `this` in a static method is the class it is called on, `static make() { return new this(); }`, and `static make(this)` stays WL1001; `Console`'s methods and the compiler's factories, which took a receiver, use the implicit `this` too, and `WebLingoParser.StaticReceivers` is gone.
+
+2026-11-20 (Claude): done, and landed, as the owner decided in chat: `this` in a static method is the class it is called on, without a receiver, `static make() { return new this(); }`, `Green.make()` making a `Green`, in a class's body and an `extend` block alike, a static property's accessor too; `static make(this)` stays WL1001; recorded in the specification (section 3.7, "Static members", and the register, "Static methods' `this`", Approved), the Language Reference and `Examples.wlg/10-classes.wlg`. `Console`'s methods written in WebLingo and the compiler's factories use the implicit `this`, and `WebLingoParser.StaticReceivers` is gone. Guessed, and recorded in the specification as Proposed (section 15.2, "Static members"): only a static method whose body names `this` takes its class, so that one that does not costs nothing more; reached through an instance, or a collection of a class extending `Array`, `Map` or `Set`, its `this` is the instance's class; `this` in an operator, and in a static field's value, stays WL2009, its message now `'this' is not allowed in an operator or a static field's value.`
+
+Done (Claude, 2026-11-20, `0eacc21`). Main's checks: the Release build, without warnings; the full suite, 4,303 tests, none aborted, all passed, the conformance cases on both VMs and read back from their bytecode files among them; `weblingo` on both VMs, from source and from `.wlbr` and `.wlbs` files, on factories inherited, bound, reached through an instance, in an `extend` block, a static property's getter and a class extending `Array`, on `Console`'s methods and a class extending `fs.File` opened by its factory, and on the Language Reference's example; and the benchmark, `main` and the branch run alternately, every workload the same within the machine's noise. Tried on Windows only; Linux not tried.
+
