@@ -2,6 +2,10 @@
 
 > **IMPORTANT**: Follow the instructions found in [`TO-DO-INSTRUCTIONS.md`](TO-DO-INSTRUCTIONS.md).
 
+## Debug Info
+
+When compiling with --debug option, put debug symbol information into bytecode file such that `disasm`  can provide names for variables, functions, classes, etc.
+
 # END-OF-TO-DO
 
 ## [DEFER] Serialization: Text That Rebuilds a Value
