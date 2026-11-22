@@ -112,16 +112,30 @@ public static partial class WebLingoCommandLine
         if (args.Length >= 2 && (args[0] is "run" or "check" || (args[0] == "compile" && program.Bytecode)))
         {
             // run|check|compile [--scheme name=folder]… [for compile, --register or --stack, or their aliases
-            // --vm register and --vm stack] [--timeout ms, for run] file [name=value …, for run].
+            // --vm register and --vm stack, and --debug] [--timeout ms, for run] file [name=value …, for run].
             var schemes = new Dictionary<string, string>(StringComparer.Ordinal);
             WebLingoBytecodeKind? vm = null;
             var run = args[0] == "run";
             int? regexTimeout = null;
+            var debug = false;
             var at = 1;
             while (wrong is null && at < args.Length
                    && (args[at] == "--scheme" || (args[at] == "--timeout" && run)
-                       || (args[at] is "--register" or "--stack" or "--vm" && args[0] == "compile")))
+                       || (args[at] is "--register" or "--stack" or "--vm" or "--debug" && args[0] == "compile")))
             {
+                // The debugger's metadata written into the file, for disasm and debuggers (the owner's request, 22 November
+                // 2026, "Debug Info").
+                if (args[at] == "--debug")
+                {
+                    if (debug)
+                    {
+                        wrong = "--debug may be given only once.";
+                        break;
+                    }
+                    debug = true;
+                    at++;
+                    continue;
+                }
                 if (args[at] == "--timeout")
                 {
                     if (regexTimeout is not null)
@@ -176,7 +190,7 @@ public static partial class WebLingoCommandLine
                     if (at + 1 == args.Length)
                     {
                         var none = new Dictionary<string, string>();
-                        return args[0] == "compile" ? CompileFile(program, path, vm, schemes, error)
+                        return args[0] == "compile" ? CompileFile(program, path, vm, debug, schemes, error)
                             : bytecode ? RunBytecode(program, false, path, none, schemes, output, error, input)
                             : RunFile(program, false, path, none, schemes, output, error, input);
                     }
@@ -241,7 +255,7 @@ public static partial class WebLingoCommandLine
     private static string NotAnOption(WebLingoCommandLineProgram program, string option, string command)
     {
         var whose = option == "--timeout" ? "run"
-            : option is "--register" or "--stack" or "--vm" && program.Bytecode ? "compile"
+            : option is "--register" or "--stack" or "--vm" or "--debug" && program.Bytecode ? "compile"
             : null;
         return whose is null || whose == command ? $"'{option}' is not an option of {command}."
             : $"'{option}' is not an option of {command}, but of {whose}.";
@@ -258,7 +272,8 @@ public static partial class WebLingoCommandLine
         var file = $"<file{program.Extension}>";
         var options = program.Options + "[--scheme <name>=<folder> …]";
         var bytecodeUsage = program.Bytecode
-            ? $" | compile [--register|--stack] [--scheme <name>=<folder> …] <file{program.Extension}> | disasm <bytecode-file>"
+            ? $" | compile [--register|--stack] [--debug] [--scheme <name>=<folder> …] <file{program.Extension}>"
+              + " | disasm <bytecode-file>"
             : "";
         output.WriteLine($"Usage: {program.Name} --version | run {options} [--timeout <ms>] {file} [name=value …]"
             + $" | check {options} {file}{bytecodeUsage}" + (ReferenceEquals(program, Scripts) ? $" | {TestUsage}" : ""));
@@ -271,6 +286,7 @@ public static partial class WebLingoCommandLine
         {
             output.WriteLine("  compile   writes a .wlbr file for the register VM (--register) or a .wlbs for the stack VM (--stack)");
             output.WriteLine("            --vm register and --vm stack are the same as --register and --stack");
+            output.WriteLine("            --debug also writes the debugger's names and positions, which disasm shows");
             output.WriteLine("  disasm    shows compiled bytecode as text");
             output.WriteLine("            run, check and disasm accept .wlbr, .wlbs and legacy .wlbc files");
         }
@@ -399,26 +415,28 @@ public static partial class WebLingoCommandLine
 
     /// <summary>
     /// <c>compile</c>: the file compiled for <paramref name="vm"/>, written beside it (section 5.3), its files
-    /// named from its folder, the program's own by its name alone, so that the file holds none of the host's paths.
+    /// named from its folder, the program's own by its name alone, so that the file holds none of the host's paths; with
+    /// <paramref name="debug"/>, compiled for a debugger, the debugger's metadata in its debugging section.
     /// </summary>
-    private static int CompileFile(WebLingoCommandLineProgram program, string path, WebLingoBytecodeKind? selectedVm,
+    private static int CompileFile(WebLingoCommandLineProgram program, string path, WebLingoBytecodeKind? selectedVm, bool debug,
         IReadOnlyDictionary<string, string> givenSchemes, TextWriter error)
     {
         if (!TryReadText(path, error, out var source)) return FileUnreadable;
         var text = new WebLingoSourceText(source, path);
         if (TryHost(program, path, path, givenSchemes, TextWriter.Null, error, null) is not { } host) return FileUnreadable;
         var vm = selectedVm ?? host.Vm ?? WebLingoBytecodeKind.Register;
+        var options = debug ? host.Options with { Debugging = true } : host.Options;
         IReadOnlyList<WebLingoDiagnostic> diagnostics;
         WebLingoCompiledModule? register = null;
         WebLingoStackModule? stack = null;
         if (vm == WebLingoBytecodeKind.Stack)
         {
-            var compiled = new WebLingoStackCompiler(host.Options).Compile(source, path);
+            var compiled = new WebLingoStackCompiler(options).Compile(source, path);
             (diagnostics, stack) = (compiled.Diagnostics, compiled.Module);
         }
         else
         {
-            var compiled = new WebLingoCompiler(host.Options).Compile(source, path);
+            var compiled = new WebLingoCompiler(options).Compile(source, path);
             (diagnostics, register) = (compiled.Diagnostics, compiled.Module);
         }
         foreach (var diagnostic in diagnostics)
@@ -551,8 +569,11 @@ public static partial class WebLingoCommandLine
     /// <summary><c>disasm</c>: compiled bytecode as text, the register VM's or the stack VM's.</summary>
     private static int DisassembleFile(string path, TextWriter output, TextWriter error)
     {
-        if (!TryRead(path, error, out var bytes, out var register, out var stack, out _)) return bytes is null ? FileUnreadable : CompilationFailed;
-        output.Write(register is not null ? WebLingoDisassembler.Format(register) : WebLingoStackDisassembler.Format(stack!));
+        if (!TryRead(path, error, out var bytes, out var register, out var stack, out var positions))
+            return bytes is null ? FileUnreadable : CompilationFailed;
+        // Its line and column tables, for the debugging section's positions, where the file has one.
+        output.Write(register is not null ? WebLingoDisassembler.Format(register, positions)
+            : WebLingoStackDisassembler.Format(stack!, positions));
         return Success;
     }
 

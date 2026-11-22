@@ -1414,6 +1414,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("'--fast' is not an option of compile.", "compile", "--fast", "a.wlg")]
     [InlineData("--vm requires a VM: register or stack.", "compile", "--vm")]
     [InlineData("'--vm' is not an option of run, but of compile.", "run", "--vm", "stack", "a.wlg")]
+    [InlineData("'--debug' is not an option of check, but of compile.", "check", "--debug", "a.wlg")]
+    [InlineData("--debug may be given only once.", "compile", "--debug", "--debug", "a.wlg")]
     [InlineData("test requires the .wlg files whose tests it runs.", "test")]
     [InlineData("'notes.txt' is not a .wlg file of tests.", "test", "notes.txt")]
     [InlineData("--list may be given only once.", "test", "--list", "--list", "a.wlg")]

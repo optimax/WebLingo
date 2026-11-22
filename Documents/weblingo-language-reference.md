@@ -65,9 +65,9 @@ weblingo hello.wlg
 | `weblingo run <file.wlg> [name=value …]` | compiles the script and runs it, giving its parameters the values after it |
 | `weblingo <file.wlg> [name=value …]` | the same, the file named first, as a scripting language's runner takes it; a bytecode file works too |
 | `weblingo check <file.wlg>` | compiles the script and reports its errors, without running it |
-| `weblingo compile [--register \| --stack] <file.wlg>` | compiles the script into `.wlbr` (register) or `.wlbs` (stack) beside it |
+| `weblingo compile [--register \| --stack] [--debug] <file.wlg>` | compiles the script into `.wlbr` (register) or `.wlbs` (stack) beside it; `--debug` also writes the names and positions a debugger uses |
 | `weblingo run <bytecode-file>` | runs compiled bytecode without compiling anything |
-| `weblingo disasm <bytecode-file>` | shows compiled bytecode as text |
+| `weblingo disasm <bytecode-file>` | shows compiled bytecode as text, naming its variables, functions, classes and files; a file compiled with `--debug` adds its captures' names, each statement's line and column, and where each variable is visible |
 | `weblingo --version` | its version and its build's number, `WebLingo 0.20.0 (2026.11.21.2330)`, which `weblingo` alone prints first, before how it is used |
 
 A script is a console program only where it imports `std:console` ([section 15](#15-the-standard-library)). On

@@ -108,6 +108,66 @@ public sealed class BytecodeFileTests
     }
 
     [Fact]
+    public void TheDebuggersMetadataReadsBackFromItsOwnSection()
+    {
+        // weblingo compile --debug's section (the owner's request, 22 November 2026, "Debug Info"): written after the source
+        // positions, an eighth section, only for a module that has the metadata; its files are the functions' own.
+        var file = WebLingoBytecodeFile.Write(DebugRegisterModule(), Texts);
+        Assert.Equal(8UL, Fixed(file, 12, 4));
+        Assert.Equal(7UL, Fixed(WebLingoBytecodeFile.Write(RegisterModule(), Texts), 12, 4));
+        Assert.True(WebLingoBytecodeFile.TryReadRegister(file, out var read, out var positions, out var error), error);
+        Assert.Equal(file, WebLingoBytecodeFile.Write(read, Texts));
+
+        var main = read.EntryPoint.DebugInfo!;
+        Assert.Equal("main.wlg", main.Source);
+        Assert.Equal(new[] { (0, new WebLingoSourceSpan(0, 3)), (2, new WebLingoSourceSpan(7, 10)) },
+            main.Points.OrderBy(point => point.Key).Select(point => (point.Key, point.Value)));
+        Assert.Equal(DebugRegisterModule().EntryPoint.DebugInfo!.Locals, main.Locals);
+        Assert.Equal("writeLn", main.Locals[1].ExportName);
+        Assert.Equal("lib.wlg", read.Functions[0].DebugInfo!.Source);
+        Assert.Empty(read.Functions[0].DebugInfo!.Captures);
+        Assert.Null(read.Functions[1].DebugInfo);
+
+        // The disassembly shows the statements and the variables where the line and column tables put them, lib.wlg's
+        // "😀" making its offset 3 column 3.
+        var text = WebLingoDisassembler.Format(read, positions);
+        Assert.Contains("; 1:1\n00  LoadConstant r0(a), 42\n", text);
+        Assert.Contains("; 2:1\n02  Return\n", text);
+        Assert.Contains("variable a: r0, visible from 1:5\n", text);
+        Assert.Contains("variable w: r0(a).\"writeLn\", visible 2:1 to 2:11\n", text);
+        Assert.Contains("variable e: r0, visible 1:3 to 1:4\n", text);
+        Assert.DoesNotContain("variable", WebLingoDisassembler.Format(ReadRegister(WebLingoBytecodeFile.Write(RegisterModule(), Texts))));
+
+        var stack = WebLingoBytecodeFile.Write(DebugStackModule(), Texts);
+        Assert.True(WebLingoBytecodeFile.TryReadStack(stack, out var readStack, out _, out error), error);
+        Assert.Equal("stack.wlg", readStack.EntryPoint.DebugInfo!.Source);
+        Assert.Equal(DebugStackModule().EntryPoint.DebugInfo!.Locals, readStack.EntryPoint.DebugInfo.Locals);
+        Assert.Equal(stack, WebLingoBytecodeFile.Write(readStack, Texts));
+    }
+
+    [Fact]
+    public void ADebuggingSectionThatDoesNotFitItsFunctionsIsRefused()
+    {
+        var module = DebugRegisterModule();
+        var info = module.EntryPoint.DebugInfo!;
+        WebLingoCompiledModule With(WebLingoFunctionDebugInfo changed) => module with
+        {
+            EntryPoint = module.EntryPoint with { DebugInfo = changed }
+        };
+        AssertRefused(WebLingoBytecodeFile.Write(With(info with { Points = new Dictionary<int, WebLingoSourceSpan> { [3] = new(0, 1) } })),
+            "The file is damaged: its debugging section has a statement's instruction outside its function, or out of order.");
+        AssertRefused(WebLingoBytecodeFile.Write(With(info with { Locals = [new WebLingoDebugLocal("x", 1, 0, 1)] })),
+            "The file is damaged: its debugging section has a variable in a local its function does not have.");
+        AssertRefused(WebLingoBytecodeFile.Write(With(info with { Locals = [new WebLingoDebugLocal("x", 0, 5, 4)] })),
+            "The file is damaged: its debugging section has a variable visible in a span that ends before it starts.");
+        AssertRefused(WebLingoBytecodeFile.Write(With(info with { Captures = ["k"] })),
+            "The file is damaged: its debugging section names captures its function does not have.");
+        var file = WebLingoBytecodeFile.Write(module);
+        file[^1] ^= 0x01;
+        AssertRefused(file, "The file is damaged: its debugging section does not match its CRC-32.");
+    }
+
+    [Fact]
     public void AFileThatIsNotWlbcOrOfAnotherVersionIsRefused()
     {
         AssertRefused("hello"u8.ToArray(), "The file is not WLBC: it does not start with 'WLBC'.");
@@ -178,7 +238,8 @@ public sealed class BytecodeFileTests
     [Fact]
     public void ChangedBytesNeverMakeTheReaderThrow()
     {
-        var files = new[] { WebLingoBytecodeFile.Write(RegisterModule(), Texts), WebLingoBytecodeFile.Write(StackModule(), Texts) };
+        // The register module with the debugger's metadata, so that its debugging section is changed too.
+        var files = new[] { WebLingoBytecodeFile.Write(DebugRegisterModule(), Texts), WebLingoBytecodeFile.Write(StackModule(), Texts) };
         var random = new Random(5_3);
         var (refusedByCrc, read, refused) = (0, 0, 0);
         for (var round = 0; round < 20_000; round++)
@@ -193,7 +254,7 @@ public sealed class BytecodeFileTests
             var recrc = round % 4 < 2;
             if (recrc)
             {
-                for (var section = 1; section <= 7; section++) Recrc(file, section);
+                for (var section = 1; section <= 8; section++) Recrc(file, section);
             }
             var ok = round % 2 == 0
                 ? WebLingoBytecodeFile.TryReadRegister(file, out _, out _, out var error)
@@ -258,6 +319,47 @@ public sealed class BytecodeFileTests
             Functions = [closure, lib],
             Classes = [new WebLingoClassInfo("C", -1, []) { StaticFields = ["count"] }],
             Units = [new WebLingoUnitInfo("main.wlg", -1, []), new WebLingoUnitInfo("lib.wlg", 1, ["x"])],
+        };
+    }
+
+    /// <summary>
+    /// <see cref="RegisterModule"/> with the debugger's metadata: main's two statements, its variable and a named import, and
+    /// the closure's own, in lib.wlg; their files given only to be left out of the file.
+    /// </summary>
+    private static WebLingoCompiledModule DebugRegisterModule()
+    {
+        var module = RegisterModule();
+        return module with
+        {
+            EntryPoint = module.EntryPoint with
+            {
+                DebugInfo = new("C:/host/main.wlg",
+                    new Dictionary<int, WebLingoSourceSpan> { [2] = new(7, 10), [0] = new(0, 3) },
+                    [new WebLingoDebugLocal("a", 0, 4, int.MaxValue), new WebLingoDebugLocal("w", 0, 7, 17) { ExportName = "writeLn" }],
+                    [])
+            },
+            Functions =
+            [
+                module.Functions[0] with
+                {
+                    DebugInfo = new("C:/host/lib.wlg", new Dictionary<int, WebLingoSourceSpan> { [0] = new(3, 1) },
+                        [new WebLingoDebugLocal("e", 0, 3, 4)], [])
+                },
+                module.Functions[1]
+            ]
+        };
+    }
+
+    private static WebLingoStackModule DebugStackModule()
+    {
+        var module = StackModule();
+        return module with
+        {
+            EntryPoint = module.EntryPoint with
+            {
+                DebugInfo = new("stack.wlg", new Dictionary<int, WebLingoSourceSpan> { [0] = new(0, 1) },
+                    [new WebLingoDebugLocal("s", 1, 0, 5)], [])
+            }
         };
     }
 

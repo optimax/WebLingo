@@ -17,10 +17,15 @@ public sealed class WebLingoStackCodeGenerator
     private readonly List<WebLingoStackInstruction> _code = [];
     private readonly List<WebLingoSourceSpan> _spans = [];
     private readonly Stack<LoopJumps> _loops = new();
+    private readonly Dictionary<int, WebLingoSourceSpan>? _debugPoints;
     private int _depth;
     private int _maxDepth;
 
-    private WebLingoStackCodeGenerator(ModuleState module) => _module = module;
+    private WebLingoStackCodeGenerator(ModuleState module, bool debugging)
+    {
+        _module = module;
+        if (debugging) _debugPoints = [];
+    }
 
     /// <summary>
     /// Generates the module: the program's statements as its entry point, and each function it declares; null, with a
@@ -29,7 +34,10 @@ public sealed class WebLingoStackCodeGenerator
     public static WebLingoStackModule? Generate(WebLingoIrProgram program, string moduleName, List<WebLingoDiagnostic> diagnostics)
     {
         var module = new ModuleState();
-        var main = GenerateFunction(module, "main", program.IsImport || program.Parameters.Count > 0 ? 1 : 0, program.LocalNames, [], program.Statements, diagnostics);
+        // The debugger's metadata, as the register generator gives it, where the program was compiled for a debugger.
+        var source = program.IsImport && moduleName.StartsWith("import ", StringComparison.Ordinal) ? moduleName[7..] : moduleName;
+        var main = GenerateFunction(module, "main", program.IsImport || program.Parameters.Count > 0 ? 1 : 0, program.LocalNames, [],
+            program.Statements, diagnostics, source, program.DebugLocals, []);
         var functions = new List<WebLingoStackFunction>();
         foreach (var function in program.Functions)
         {
@@ -37,7 +45,7 @@ public sealed class WebLingoStackCodeGenerator
             foreach (var capture in function.Captures) captures.Add(new WebLingoCapture(capture.FromLocal, capture.Index));
             var name = function.Name.Length == 0 ? "function" : function.Name;
             var generated = GenerateFunction(module, name, function.ParameterCount, function.LocalNames, captures, function.Body,
-                diagnostics);
+                diagnostics, function.Source ?? source, function.DebugLocals, function.DebugCaptures);
             if (generated is not null) functions.Add(generated with
             {
                 HasThis = function.HasThis,
@@ -78,9 +86,10 @@ public sealed class WebLingoStackCodeGenerator
 
     private static WebLingoStackFunction? GenerateFunction(ModuleState module, string name, int parameterCount,
         IReadOnlyList<string> localNames, IReadOnlyList<WebLingoCapture> captures, IReadOnlyList<WebLingoIrStatement> body,
-        List<WebLingoDiagnostic> diagnostics)
+        List<WebLingoDiagnostic> diagnostics, string source, IReadOnlyList<WebLingoDebugLocal>? debugLocals,
+        IReadOnlyList<string> debugCaptures)
     {
-        var generator = new WebLingoStackCodeGenerator(module);
+        var generator = new WebLingoStackCodeGenerator(module, debugLocals is not null);
         foreach (var statement in body) generator.EmitStatement(statement);
         generator.Emit(WebLingoStackOpCode.Return, new WebLingoSourceSpan(0, 0));
         var slots = (long)localNames.Count + generator._maxDepth;
@@ -95,7 +104,8 @@ public sealed class WebLingoStackCodeGenerator
         {
             ParameterCount = parameterCount,
             Captures = captures,
-            Handlers = generator._handlers
+            Handlers = generator._handlers,
+            DebugInfo = generator._debugPoints is { } points ? new(source, points, debugLocals!, debugCaptures) : null
         };
     }
 
@@ -117,6 +127,7 @@ public sealed class WebLingoStackCodeGenerator
 
     private void EmitStatement(WebLingoIrStatement statement)
     {
+        var first = _code.Count;
         switch (statement)
         {
             case WebLingoIrInitializeLocal initialize:
@@ -232,6 +243,13 @@ public sealed class WebLingoStackCodeGenerator
             }
             default:
                 throw new InvalidOperationException($"Unknown statement {statement.GetType().Name}.");
+        }
+        // A statement's first instruction, where a debugger stops, as the register generator records it.
+        if (_debugPoints is not null && _code.Count > first && statement.Span.Length != 0
+            && statement is not (WebLingoIrBlock or WebLingoIrRegisterUnit or WebLingoIrNewCell or WebLingoIrBoxLocal
+                or WebLingoIrCopyCells or WebLingoIrTakeRest or WebLingoIrDefaultParameter or WebLingoIrRethrow))
+        {
+            _debugPoints.TryAdd(first, statement.Span);
         }
     }
 

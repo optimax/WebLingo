@@ -218,6 +218,11 @@ public sealed record WebLingoStackFunction(
     string Name, int LocalCount, int MaxStack, IReadOnlyList<WebLingoStackInstruction> Code,
     IReadOnlyList<WebLingoSourceSpan>? Spans = null, IReadOnlyList<string>? LocalNames = null)
 {
+    /// <summary>
+    /// Source debugger metadata, as a register function's (<see cref="WebLingoFunction.DebugInfo"/>), its locals' registers
+    /// this function's locals.
+    /// </summary>
+    public WebLingoFunctionDebugInfo? DebugInfo { get; init; }
     /// <summary>How many arguments it takes, into its first locals.</summary>
     public int ParameterCount { get; init; }
     /// <summary>The file its spans are in, when it is not the program's own: a module it imports (section 3.9).</summary>

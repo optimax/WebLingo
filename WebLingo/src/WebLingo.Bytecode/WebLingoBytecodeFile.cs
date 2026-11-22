@@ -5,8 +5,9 @@ namespace WebLingo.Bytecode;
 /// <summary>
 /// WLBC, WebLingo ByteCode (specification, sections 5.1 and 5.3): a module of one VM's bytecode as a file's bytes, and
 /// back. A file is a 32-byte header, a directory of 32-byte entries, one for each section, giving its kind, offset,
-/// length and CRC-32, and the sections: the module, constants, functions, code, classes and units, handlers, and
-/// source positions, the last optional (section 15.2, "WLBC's layout"). The same module is always written as the same
+/// length and CRC-32, and the sections: the module, constants, functions, code, classes and units, handlers, source
+/// positions, optional, and debugging, optional too, after the source positions, which a module compiled for a debugger
+/// has (<c>weblingo compile --debug</c>; section 15.2, "WLBC's layout"). The same module is always written as the same
 /// bytes. Reading checks the file and verifies the module with its VM's verifier (section 5.5); it never throws.
 /// Nothing here is frozen: the format may change without a new version until the owner freezes it.
 /// </summary>
@@ -33,11 +34,12 @@ public static class WebLingoBytecodeFile
     private const int EntrySize = 32;
     private const int SectionCount = 7;
     private const int PositionsSection = 7;
+    private const int DebuggingSection = 8;
 
     private static readonly byte[] Magic = [(byte)'W', (byte)'L', (byte)'B', (byte)'C'];
 
     private static readonly string[] SectionNames =
-        ["", "module", "constants", "functions", "code", "classes and units", "handlers", "source positions"];
+        ["", "module", "constants", "functions", "code", "classes and units", "handlers", "source positions", "debugging"];
 
     /// <summary>
     /// A register module as a file. <paramref name="textOf"/> gives a file's text, the program's own for null, or null
@@ -154,7 +156,8 @@ public static class WebLingoBytecodeFile
                 NativeBuiltin = h.NativeBuiltin,
                 NativeResult = h.NativeResult,
                 Captures = h.Captures,
-                Handlers = handlers
+                Handlers = handlers,
+                DebugInfo = h.DebugInfo
             });
         }
         if (Ended(codeReader, handlersReader) is { } damaged)
@@ -219,7 +222,8 @@ public static class WebLingoBytecodeFile
                 NativeBuiltin = h.NativeBuiltin,
                 NativeResult = h.NativeResult,
                 Captures = h.Captures,
-                Handlers = handlers
+                Handlers = handlers,
+                DebugInfo = h.DebugInfo
             });
         }
         if (Ended(codeReader, handlersReader) is { } damaged)
@@ -265,6 +269,7 @@ public static class WebLingoBytecodeFile
     {
         public IReadOnlyList<WebLingoSourceSpan>? Spans { get; set; }
         public IReadOnlyList<string>? LocalNames { get; set; }
+        public WebLingoFunctionDebugInfo? DebugInfo { get; set; }
         public bool HasRest { get; init; }
     }
 
@@ -282,6 +287,7 @@ public static class WebLingoBytecodeFile
     {
         Spans = f.Spans,
         LocalNames = f.LocalNames,
+        DebugInfo = f.DebugInfo,
         HasRest = f.HasRest
     };
 
@@ -290,17 +296,21 @@ public static class WebLingoBytecodeFile
     {
         Spans = f.Spans,
         LocalNames = f.LocalNames,
+        DebugInfo = f.DebugInfo,
         HasRest = f.HasRest
     };
 
     private static byte[] Assemble(WebLingoBytecodeKind kind, ModuleHead module, List<FunctionHead> functions,
         WebLingoBytecodeWriter code, WebLingoBytecodeWriter handlers, Func<string?, WebLingoSourceText?>? textOf)
     {
-        var sections = new[]
-        {
+        List<WebLingoBytecodeWriter> listed =
+        [
             WriteModule(module), WriteConstants(module.Constants), WriteFunctions(functions), code,
             WriteClassesAndUnits(module.Classes, module.Units), handlers, WritePositions(functions, textOf)
-        };
+        ];
+        // A module compiled for a debugger, its functions' debugging metadata after their source positions.
+        if (functions.Exists(f => f.DebugInfo is not null)) listed.Add(WriteDebugging(functions));
+        var sections = listed.ToArray();
         var total = HeaderSize + EntrySize * sections.Length;
         foreach (var section in sections) total += section.Length;
         var file = new WebLingoBytecodeWriter(total);
@@ -489,6 +499,16 @@ public static class WebLingoBytecodeFile
                     w.Signed(span.Length);
                     set!.Add(span.Start);
                 }
+                // The positions the debugging section names, where it is written, so that each has its own line and column.
+                if (f.DebugInfo is { } info)
+                {
+                    foreach (var point in info.Points.Values) set!.Add(point.Start);
+                    foreach (var local in info.Locals)
+                    {
+                        set!.Add(local.VisibleFrom);
+                        if (local.VisibleUntil != int.MaxValue) set.Add(local.VisibleUntil);
+                    }
+                }
             }
             if (f.LocalNames is not null) WriteNames(w, f.LocalNames);
         }
@@ -513,6 +533,43 @@ public static class WebLingoBytecodeFile
                 w.Signed(location.Line);
                 w.Signed(location.Column);
             }
+        }
+        return w;
+    }
+
+    /// <summary>
+    /// The debugging section: for each function, whether it has the debugger's metadata, and if so its statements' first
+    /// instructions with their spans, in order, its variables, each with its name, its local, the span of its source in which
+    /// it is visible, and the export it reads for a named import, and its captures' names. Its file is not written: a
+    /// function's is its own <see cref="FunctionHead.Source"/>, or the module's, which the reader gives it.
+    /// </summary>
+    private static WebLingoBytecodeWriter WriteDebugging(List<FunctionHead> functions)
+    {
+        var w = new WebLingoBytecodeWriter();
+        foreach (var f in functions)
+        {
+            w.Boolean(f.DebugInfo is not null);
+            if (f.DebugInfo is not { } info) continue;
+            var points = new List<KeyValuePair<int, WebLingoSourceSpan>>(info.Points);
+            points.Sort((x, y) => x.Key.CompareTo(y.Key));
+            w.Count(points.Count);
+            foreach (var (instruction, span) in points)
+            {
+                w.Signed(instruction);
+                w.Signed(span.Start);
+                w.Signed(span.Length);
+            }
+            w.Count(info.Locals.Count);
+            foreach (var local in info.Locals)
+            {
+                w.Text(local.Name);
+                w.Signed(local.Register);
+                w.Signed(local.VisibleFrom);
+                w.Signed(local.VisibleUntil);
+                w.Boolean(local.ExportName is not null);
+                if (local.ExportName is not null) w.Text(local.ExportName);
+            }
+            WriteNames(w, info.Captures);
         }
         return w;
     }
@@ -568,13 +625,13 @@ public static class WebLingoBytecodeFile
             error = $"The file is damaged: its header says it is {length} bytes long, and it is {file.Length}.";
             return false;
         }
-        if (count is not (SectionCount - 1 or SectionCount) || directory < HeaderSize || directory > length
+        if (count is not (SectionCount - 1 or SectionCount or DebuggingSection) || directory < HeaderSize || directory > length
             || count * EntrySize > length - directory)
         {
-            error = "The file is damaged: its directory is not where its header says, or does not have six or seven sections.";
+            error = "The file is damaged: its directory is not where its header says, or does not have six, seven or eight sections.";
             return false;
         }
-        var bounds = new (int Start, int End)[SectionCount + 1];
+        var bounds = new (int Start, int End)[DebuggingSection + 1];
         for (var i = 0; i < (int)count; i++)
         {
             var at = (int)directory + i * EntrySize;
@@ -606,9 +663,17 @@ public static class WebLingoBytecodeFile
         var classesReader = Reader(5);
         var head = ReadModule(moduleReader, ReadConstants(constantsReader), ReadClasses(classesReader), ReadUnits(classesReader));
         var functions = ReadFunctions(functionsReader);
-        var positionsReader = count == SectionCount ? Reader(PositionsSection) : null;
+        var positionsReader = count >= SectionCount ? Reader(PositionsSection) : null;
         if (positionsReader is not null) positions = ReadPositions(positionsReader, functions);
-        error = Ended(moduleReader, constantsReader, functionsReader, classesReader) ?? (positionsReader is null ? null : Ended(positionsReader));
+        var debuggingReader = count == DebuggingSection ? Reader(DebuggingSection) : null;
+        if (debuggingReader is not null)
+        {
+            var source = head.IsImport && head.Name.StartsWith("import ", StringComparison.Ordinal) ? head.Name[7..] : head.Name;
+            ReadDebugging(debuggingReader, functions, kind, source);
+        }
+        error = Ended(moduleReader, constantsReader, functionsReader, classesReader)
+                ?? (positionsReader is null ? null : Ended(positionsReader))
+                ?? (debuggingReader is null ? null : Ended(debuggingReader));
         if (error is not null) return false;
         if (functions.Count == 0)
         {
@@ -739,6 +804,43 @@ public static class WebLingoBytecodeFile
         var names = new string[r.Count()];
         for (var i = 0; i < names.Length; i++) names[i] = r.Text();
         return names;
+    }
+
+    /// <summary>
+    /// Gives each function the debugger's metadata the debugging section has for it, its file its own or the module's,
+    /// <paramref name="source"/>, each instruction, local and capture checked against the function.
+    /// </summary>
+    private static void ReadDebugging(WebLingoBytecodeReader r, List<FunctionHead> functions, WebLingoBytecodeKind kind, string source)
+    {
+        foreach (var f in functions)
+        {
+            if (r.Failed) return;
+            if (!r.Boolean()) continue;
+            var locals = kind == WebLingoBytecodeKind.Register ? f.Second : f.First;
+            var points = new Dictionary<int, WebLingoSourceSpan>();
+            var previous = -1;
+            for (var count = r.Count(); count > 0 && !r.Failed; count--)
+            {
+                var (instruction, start, length) = (r.Int(), r.Int(), r.Int());
+                if (instruction <= previous || instruction >= f.InstructionCount)
+                    r.Fail("has a statement's instruction outside its function, or out of order");
+                if (start < 0 || length < 0) r.Fail("has a statement's span that is negative");
+                points[instruction] = new WebLingoSourceSpan(Math.Max(0, start), Math.Max(0, length));
+                previous = instruction;
+            }
+            var variables = new List<WebLingoDebugLocal>();
+            for (var count = r.Count(); count > 0 && !r.Failed; count--)
+            {
+                var (name, register, from, until) = (r.Text(), r.Int(), r.Int(), r.Int());
+                var export = r.Boolean() ? r.Text() : null;
+                if (register < 0 || register >= locals) r.Fail("has a variable in a local its function does not have");
+                if (from < 0 || until < from) r.Fail("has a variable visible in a span that ends before it starts");
+                variables.Add(new WebLingoDebugLocal(name, register, from, until) { ExportName = export });
+            }
+            var captures = ReadNames(r);
+            if (captures.Length != 0 && captures.Length != f.Captures.Count) r.Fail("names captures its function does not have");
+            f.DebugInfo = new WebLingoFunctionDebugInfo(f.Source ?? source, points, variables, captures);
+        }
     }
 
     /// <summary>Gives each function its spans and its locals' names, and reads the files' line and column tables.</summary>

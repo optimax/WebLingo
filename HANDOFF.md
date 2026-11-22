@@ -89,3 +89,12 @@ the version, which the uninstaller compares. `weblingo --version` prints `WebLin
 `wasp --version` the same after `WASP` (`WebLingoCommandLine.VersionAndBuild`). A build more than a minute after the last
 compiles every project again; `-p:BuildStamp=…` gives a build a fixed number. The installers' ZIPs are named from the
 version, `WebLingo-0.20.0-win-x64-…`; none has been packaged since the change.
+
+## Debug information in bytecode
+
+`weblingo compile --debug` compiles with `WebLingoCompilerOptions.Debugging`, for either VM, the stack generator now
+giving `WebLingoStackFunction.DebugInfo` as the register one gives its functions', and `WebLingoBytecodeFile` writes the
+metadata as an eighth section, debugging, after the source positions, which a file without it does not have, its bytes
+unchanged. `disasm` (`WebLingoDisassembler`, `WebLingoStackDisassembler`, `WebLingoDisassemblyNames`) names the functions,
+classes and files instructions refer to, and, from a debug file, captures, statements' lines and columns, and variables.
+The VS Code debugger still compiles from source: nothing runs a debug file under a debugger yet.

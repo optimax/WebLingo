@@ -48,6 +48,37 @@ public sealed class BytecodeFileTests
             }
             Assert.Equal(Run(stack, text, null), Run(read, text, positions));
         }
+
+        // Compiled for a debugger, weblingo compile --debug, the debugger's metadata reads back as compiled, for either VM,
+        // and is written again as the same bytes (the owner's request, 22 November 2026, "Debug Info").
+        var debugging = Options with { Debugging = true };
+        if (new WebLingoCompiler(debugging).Compile(source, "program.wlg").Module is { } debugged)
+        {
+            var file = WebLingoBytecodeFile.Write(debugged, TextOf);
+            Assert.True(WebLingoBytecodeFile.TryReadRegister(file, out var read, out _, out var error), error);
+            Assert.Equal(file, WebLingoBytecodeFile.Write(read, TextOf));
+            foreach (var (compiled, readBack) in debugged.Functions.Prepend(debugged.EntryPoint).Zip(read.Functions.Prepend(read.EntryPoint)))
+                AssertSameDebugInfo(compiled.DebugInfo, readBack.DebugInfo);
+        }
+        if (new WebLingoStackCompiler(debugging).Compile(source, "program.wlg").Module is { } debuggedStack)
+        {
+            var file = WebLingoBytecodeFile.Write(debuggedStack, TextOf);
+            Assert.True(WebLingoBytecodeFile.TryReadStack(file, out var read, out _, out var error), error);
+            Assert.Equal(file, WebLingoBytecodeFile.Write(read, TextOf));
+            var compiledFunctions = debuggedStack.Functions.Prepend(debuggedStack.EntryPoint);
+            foreach (var (compiled, readBack) in compiledFunctions.Zip(read.Functions.Prepend(read.EntryPoint)))
+                AssertSameDebugInfo(compiled.DebugInfo, readBack.DebugInfo);
+        }
+    }
+
+    private static void AssertSameDebugInfo(WebLingoFunctionDebugInfo? compiled, WebLingoFunctionDebugInfo? read)
+    {
+        Assert.Equal(compiled is null, read is null);
+        if (compiled is null || read is null) return;
+        Assert.Equal(compiled.Source, read.Source);
+        Assert.Equal(compiled.Points.OrderBy(point => point.Key), read.Points.OrderBy(point => point.Key));
+        Assert.Equal(compiled.Locals, read.Locals);
+        Assert.Equal(compiled.Captures, read.Captures);
     }
 
     [Fact]

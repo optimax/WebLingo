@@ -4,29 +4,39 @@ namespace WebLingo.Bytecode;
 
 /// <summary>
 /// Shows a stack module as text, one instruction per line, as <see cref="WebLingoDisassembler"/> shows a register module:
-/// locals are <c>l0</c>, <c>l1</c>, …, named where the module knows their names. The format is for people, not a file
-/// format.
+/// locals are <c>l0</c>, <c>l1</c>, …, named where the module knows their names, and the functions, classes and files
+/// instructions refer to, and a function's debugger's metadata, as there. The format is for people, not a file format.
 /// </summary>
 public static class WebLingoStackDisassembler
 {
     /// <summary>The module's entry point, then each of its other functions, with its index.</summary>
-    public static string Format(WebLingoStackModule module)
+    public static string Format(WebLingoStackModule module) => Format(module, []);
+
+    /// <summary>
+    /// The module's entry point, then each of its other functions, with its index; <paramref name="positions"/> the file's
+    /// line and column tables, which a function's statements and variables are shown at.
+    /// </summary>
+    public static string Format(WebLingoStackModule module, IReadOnlyList<WebLingoSourcePositions> positions)
     {
         var text = new StringBuilder();
-        Append(text, module, module.EntryPoint, "");
-        for (var i = 0; i < module.Functions.Count; i++) Append(text.Append('\n'), module, module.Functions[i], $"function{i} ");
+        Append(text, module, module.EntryPoint, "", positions);
+        for (var i = 0; i < module.Functions.Count; i++)
+            Append(text.Append('\n'), module, module.Functions[i], $"function{i} ", positions);
         return text.ToString();
     }
 
-    private static void Append(StringBuilder text, WebLingoStackModule module, WebLingoStackFunction function, string label)
+    private static void Append(StringBuilder text, WebLingoStackModule module, WebLingoStackFunction function, string label,
+        IReadOnlyList<WebLingoSourcePositions> positions)
     {
         text.Append("function ").Append(label).Append(function.Name).Append(" (");
         if (function.ParameterCount > 0) text.Append(function.ParameterCount).Append(" parameters, ");
         if (function.HasRest) text.Append("a rest parameter, ");
         if (function.Captures.Count > 0) text.Append(function.Captures.Count).Append(" captures, ");
         text.Append(function.LocalCount).Append(" locals, ").Append(function.MaxStack).Append(" stack)\n");
+        var table = WebLingoDisassemblyNames.TableOf(positions, function.Source);
         for (var i = 0; i < function.Code.Count; i++)
         {
+            WebLingoDisassemblyNames.AppendStatement(text, function.DebugInfo, table, i);
             text.Append(i.ToString("D2", CultureInfo.InvariantCulture)).Append("  ")
                 .Append(Format(module, function, function.Code[i])).Append('\n');
         }
@@ -36,6 +46,8 @@ public static class WebLingoStackDisassembler
                 .Append(handler.Target).Append(", exception ").Append(Local(function, handler.Value)).Append(", origin ")
                 .Append(Local(function, handler.Origin)).Append(", depth ").Append(handler.Depth).Append('\n');
         }
+        WebLingoDisassemblyNames.AppendVariables(text, function.DebugInfo, table, local => $"l{local}",
+            local => Local(function, local));
     }
 
     public static string Format(WebLingoStackModule module, WebLingoStackFunction function, WebLingoStackInstruction instruction)
@@ -51,8 +63,9 @@ public static class WebLingoStackDisassembler
                 or WebLingoStackOpCode.TakeRest => $"{name} {Local(function, a)}",
             WebLingoStackOpCode.Jump or WebLingoStackOpCode.JumpIfFalse or WebLingoStackOpCode.JumpIfTrue => $"{name} {Target(a)}",
             WebLingoStackOpCode.JumpIfGiven => $"{name} {Local(function, b)}, {Target(a)}",
-            WebLingoStackOpCode.LoadCapture or WebLingoStackOpCode.StoreCapture => $"{name} capture{a}",
-            WebLingoStackOpCode.MakeClosure => $"{name} function{a}",
+            WebLingoStackOpCode.LoadCapture or WebLingoStackOpCode.StoreCapture =>
+                $"{name} {WebLingoDisassemblyNames.Capture(a, function.DebugInfo)}",
+            WebLingoStackOpCode.MakeClosure => $"{name} {WebLingoDisassemblyNames.Function(a, module.Functions, f => f.Name)}",
             WebLingoStackOpCode.LoadBuiltin => $"{name} {Import(module, a)}",
             WebLingoStackOpCode.Call or WebLingoStackOpCode.New => $"{name} ({a} arguments)",
             WebLingoStackOpCode.CallBuiltin => $"{name} {Import(module, a)} ({b} arguments)",
@@ -68,11 +81,11 @@ public static class WebLingoStackDisassembler
             WebLingoStackOpCode.ForEachNext or WebLingoStackOpCode.ForEachNextEntry =>
                 $"{name} {Local(function, b)}, {Local(function, b + 1)} else {Target(a)}",
             WebLingoStackOpCode.ForEachStart or WebLingoStackOpCode.ForEachVisits => $"{name} {Local(function, b)} visited {Target(a)}",
-            WebLingoStackOpCode.MakeClass => $"{name} class{a}" + (b == 1 ? " extends" : ""),
-            WebLingoStackOpCode.Extend => $"{name} class{a}",
+            WebLingoStackOpCode.MakeClass => $"{name} {WebLingoDisassemblyNames.Class(a, module.Classes)}" + (b == 1 ? " extends" : ""),
+            WebLingoStackOpCode.Extend => $"{name} {WebLingoDisassemblyNames.Class(a, module.Classes)}",
             WebLingoStackOpCode.GetSuper => $"{name} {Constant(module, a)}",
-            WebLingoStackOpCode.Import or WebLingoStackOpCode.RegisterUnit => $"{name} file{a}",
-            WebLingoStackOpCode.MakeModule => $"{name} file{a} ({b} cells)",
+            WebLingoStackOpCode.Import or WebLingoStackOpCode.RegisterUnit => $"{name} {WebLingoDisassemblyNames.File(a, module.Units)}",
+            WebLingoStackOpCode.MakeModule => $"{name} {WebLingoDisassemblyNames.File(a, module.Units)} ({b} cells)",
             WebLingoStackOpCode.ImportDynamic => name + ((a & 1) == 1 ? " with values" : "") + (a >= 2 ? ", anew" : ""),
             _ when Enum.IsDefined(instruction.OpCode) => name,
             _ => $"?{(int)instruction.OpCode} {a}, {b}"

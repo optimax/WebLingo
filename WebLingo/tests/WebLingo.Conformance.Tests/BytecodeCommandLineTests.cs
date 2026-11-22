@@ -142,6 +142,43 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.Contains("writeLn", output);
     }
 
+    [Theory]
+    [InlineData("register", "r")]
+    [InlineData("stack", "l")]
+    public void ADebugFileNamesItsVariablesCapturesAndStatements(string vm, string local)
+    {
+        // compile --debug writes the debugger's metadata, which disasm shows (the owner's request, 22 November 2026, "Debug
+        // Info"); the functions, classes and files instructions refer to are named with or without it.
+        var main = Write("main.wlg", """
+            import { writeLn } from "std:console";
+            class Point { constructor(x) { this.x = x; } }
+            function twice(n) { var doubled = n * 2; return doubled; }
+            var make = (k) => () => k + twice(new Point(1).x);
+            writeLn(make(3)());
+            """);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+        var compiled = Path.ChangeExtension(main, Extension(vm));
+        var plain = Weblingo("disasm", compiled).Output;
+        Assert.Matches(@"MakeClass .*class\d+\(Point\)", plain);
+        Assert.Matches(@"MakeClosure .*function\d+\(twice\)", plain);
+        Assert.Matches(@"file\d+\(std:console\)", plain);
+        Assert.DoesNotContain("\nvariable ", plain);
+        Assert.DoesNotMatch(@"capture\d+\(k\)", plain);
+        var size = new FileInfo(compiled).Length;
+
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, "--debug", main).Exit);
+        Assert.True(new FileInfo(compiled).Length > size);
+        Assert.Equal((WebLingoCommandLine.Success, "5\n", ""), Weblingo("run", compiled));
+        var (exit, output, error) = Weblingo("disasm", compiled);
+        Assert.Equal((WebLingoCommandLine.Success, ""), (exit, error));
+        Assert.Matches(@"LoadCapture .*capture\d+\(k\)", output);
+        Assert.Contains("\n; 3:21\n", output);
+        Assert.Contains($"\nvariable doubled: {local}1, visible 3:32 to 3:59\n", output);
+        Assert.Contains($"\nvariable writeLn: {local}1(import std:console).\"writeLn\", visible from 1:17\n", output);
+        var bytes = System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(compiled));
+        Assert.DoesNotContain(Path.GetFileName(_folder), bytes);
+    }
+
     [Fact]
     public void ADamagedFileIsReportedAndNothingRuns()
     {
@@ -210,7 +247,8 @@ public sealed class BytecodeCommandLineTests : IDisposable
     {
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run([], output, new StringWriter()));
-        Assert.Contains("| compile [--register|--stack] [--scheme <name>=<folder> …] <file.wlg> | disasm <bytecode-file>", output.ToString());
+        Assert.Contains("| compile [--register|--stack] [--debug] [--scheme <name>=<folder> …] <file.wlg> | disasm <bytecode-file>",
+            output.ToString());
         Assert.Contains("run, check and disasm accept .wlbr, .wlbs and legacy .wlbc files", output.ToString());
     }
 

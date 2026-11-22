@@ -3,29 +3,42 @@ namespace WebLingo.Bytecode;
 
 /// <summary>
 /// Shows a module as text, one instruction per line, for tests and for looking at what the compiler made. Registers
-/// are <c>r0</c>, <c>r1</c>, …; locals are named where the module knows their names. The format is for people, not a
-/// file format.
+/// are <c>r0</c>, <c>r1</c>, …; locals are named where the module knows their names, and the functions, classes and files
+/// instructions refer to by their tables' names. A function with the debugger's metadata (<c>weblingo compile --debug</c>)
+/// has its captures named too, a line <c>; 6:21</c> before each statement's first instruction, and its variables after its
+/// code, their lines and columns from the file's tables (<see cref="WebLingoDisassemblyNames"/>). The format is for
+/// people, not a file format.
 /// </summary>
 public static class WebLingoDisassembler
 {
     /// <summary>The module's entry point, then each of its other functions, with its index.</summary>
-    public static string Format(WebLingoCompiledModule module)
+    public static string Format(WebLingoCompiledModule module) => Format(module, []);
+
+    /// <summary>
+    /// The module's entry point, then each of its other functions, with its index; <paramref name="positions"/> the file's
+    /// line and column tables, which a function's statements and variables are shown at.
+    /// </summary>
+    public static string Format(WebLingoCompiledModule module, IReadOnlyList<WebLingoSourcePositions> positions)
     {
         var text = new StringBuilder();
-        Append(text, module, module.EntryPoint, "");
-        for (var i = 0; i < module.Functions.Count; i++) Append(text.Append('\n'), module, module.Functions[i], $"function{i} ");
+        Append(text, module, module.EntryPoint, "", positions);
+        for (var i = 0; i < module.Functions.Count; i++)
+            Append(text.Append('\n'), module, module.Functions[i], $"function{i} ", positions);
         return text.ToString();
     }
 
-    private static void Append(StringBuilder text, WebLingoCompiledModule module, WebLingoFunction function, string label)
+    private static void Append(StringBuilder text, WebLingoCompiledModule module, WebLingoFunction function, string label,
+        IReadOnlyList<WebLingoSourcePositions> positions)
     {
         text.Append("function ").Append(label).Append(function.Name).Append(" (");
         if (function.ParameterCount > 0) text.Append(function.ParameterCount).Append(" parameters, ");
         if (function.HasRest) text.Append("a rest parameter, ");
         if (function.Captures.Count > 0) text.Append(function.Captures.Count).Append(" captures, ");
         text.Append(function.LocalCount).Append(" locals, ").Append(function.RegisterCount).Append(" registers)\n");
+        var table = WebLingoDisassemblyNames.TableOf(positions, function.Source);
         for (var i = 0; i < function.Code.Count; i++)
         {
+            WebLingoDisassemblyNames.AppendStatement(text, function.DebugInfo, table, i);
             text.Append(i.ToString("D2", System.Globalization.CultureInfo.InvariantCulture)).Append("  ")
                 .Append(Format(module, function, function.Code[i])).Append('\n');
         }
@@ -35,6 +48,8 @@ public static class WebLingoDisassembler
                 .Append(handler.Target).Append(", exception ").Append(Register(function, handler.Value)).Append(", origin ")
                 .Append(Register(function, handler.Origin)).Append('\n');
         }
+        WebLingoDisassemblyNames.AppendVariables(text, function.DebugInfo, table, register => $"r{register}",
+            register => Register(function, register));
     }
 
     /// <summary>An instruction of the module's entry point.</summary>
@@ -62,9 +77,9 @@ public static class WebLingoDisassembler
                 or WebLingoOpCode.TakeRest =>
                 $"{instruction.OpCode} {Register(function, a)}",
             WebLingoOpCode.LoadCell or WebLingoOpCode.StoreCell => $"{instruction.OpCode} {Register(function, a)}, {Register(function, b)}",
-            WebLingoOpCode.LoadCapture => $"LoadCapture {Register(function, a)}, capture{b}",
-            WebLingoOpCode.StoreCapture => $"StoreCapture capture{a}, {Register(function, b)}",
-            WebLingoOpCode.MakeClosure => $"MakeClosure {Register(function, a)}, function{b}",
+            WebLingoOpCode.LoadCapture => $"LoadCapture {Register(function, a)}, {CaptureAt(function, b)}",
+            WebLingoOpCode.StoreCapture => $"StoreCapture {CaptureAt(function, a)}, {Register(function, b)}",
+            WebLingoOpCode.MakeClosure => $"MakeClosure {Register(function, a)}, {FunctionAt(module, b)}",
             WebLingoOpCode.LoadBuiltin => $"LoadBuiltin {Register(function, a)}, {Import(module, b)}",
             WebLingoOpCode.Call => $"Call {Register(function, a)}, {Register(function, b)}({Arguments(function, c, d)})",
             WebLingoOpCode.Add or WebLingoOpCode.Subtract or WebLingoOpCode.Multiply or WebLingoOpCode.Divide or WebLingoOpCode.Remainder
@@ -80,17 +95,19 @@ public static class WebLingoDisassembler
             WebLingoOpCode.ToText => $"ToText {Register(function, a)}, {Register(function, b)}" + (c == 1 ? ", written" : ""),
             WebLingoOpCode.ToJson => $"ToJson {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
             WebLingoOpCode.Await => $"Await {Register(function, a)}, {Register(function, b)}",
-            WebLingoOpCode.Extend => $"Extend {Register(function, a)}, class{b}",
+            WebLingoOpCode.Extend => $"Extend {Register(function, a)}, {WebLingoDisassemblyNames.Class(b, module.Classes)}",
             WebLingoOpCode.Hold => $"Hold {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
             WebLingoOpCode.ImportDynamic => ((d & 1) == 1
                 ? $"ImportDynamic {Register(function, a)}, {Register(function, b)}, {Register(function, c)}"
                 : $"ImportDynamic {Register(function, a)}, {Register(function, b)}") + (d >= 2 ? ", anew" : ""),
-            WebLingoOpCode.Import => d == 1 ? $"Import {Register(function, a)}, file{b}, {Register(function, c)}" : $"Import {Register(function, a)}, file{b}",
-            WebLingoOpCode.MakeModule => $"MakeModule {Register(function, a)}, file{b}, {Register(function, c)}+{d}",
-            WebLingoOpCode.RegisterUnit => $"RegisterUnit file{a}, {Register(function, b)}",
+            WebLingoOpCode.Import => d == 1 ? $"Import {Register(function, a)}, {FileAt(module, b)}, {Register(function, c)}"
+                : $"Import {Register(function, a)}, {FileAt(module, b)}",
+            WebLingoOpCode.MakeModule => $"MakeModule {Register(function, a)}, {FileAt(module, b)}, {Register(function, c)}+{d}",
+            WebLingoOpCode.RegisterUnit => $"RegisterUnit {FileAt(module, a)}, {Register(function, b)}",
             WebLingoOpCode.IsInstance => $"IsInstance {Register(function, a)}, {Register(function, b)}, {Register(function, c)}",
             WebLingoOpCode.Rethrow => $"Rethrow {Register(function, a)}, {Register(function, b)}",
-            WebLingoOpCode.MakeClass => $"MakeClass {Register(function, a)}, class{b}" + (d == 1 ? $" extends {Register(function, c)}" : ""),
+            WebLingoOpCode.MakeClass => $"MakeClass {Register(function, a)}, {WebLingoDisassemblyNames.Class(b, module.Classes)}"
+                                        + (d == 1 ? $" extends {Register(function, c)}" : ""),
             WebLingoOpCode.GetSuper => $"GetSuper {Register(function, a)}, {Register(function, b)}, {Register(function, c)}, {Constant(module, d)}",
             WebLingoOpCode.New => $"New {Register(function, a)}, {Register(function, b)}({Arguments(function, c, d)})",
             WebLingoOpCode.CallSpread or WebLingoOpCode.NewSpread =>
@@ -111,6 +128,13 @@ public static class WebLingoDisassembler
             _ => $"?{(int)instruction.OpCode} {a}, {b}, {c}, {d}"
         };
     }
+
+    private static string FunctionAt(WebLingoCompiledModule module, int index) =>
+        WebLingoDisassemblyNames.Function(index, module.Functions, function => function.Name);
+
+    private static string FileAt(WebLingoCompiledModule module, int index) => WebLingoDisassemblyNames.File(index, module.Units);
+
+    private static string CaptureAt(WebLingoFunction function, int index) => WebLingoDisassemblyNames.Capture(index, function.DebugInfo);
 
     private static string Register(WebLingoFunction function, int register)
     {
