@@ -80,3 +80,12 @@ script's option to load the pool's profile. All of the scripts compile (`webling
 repository publishes; the WebLingo installed on this machine, from 20 November 2026, predates `std:console`, which
 `iis.wlg` imports, so they run with `WebLingo\publish\WebLingo\weblingo.exe` until `build.bat` installs it again.
 Neither has been run as administrator since the move.
+
+## Versions and build numbers
+
+The solution's version is `0.20.0`, with no designation, and each build has a number, its local time, `yyyy.MM.dd.HHmm`,
+as MaxPad makes it: `WebLingo/Directory.Build.props` makes it every assembly's file version, the product version staying
+the version, which the uninstaller compares. `weblingo --version` prints `WebLingo 0.20.0 (2026.11.21.2330)`, and
+`wasp --version` the same after `WASP` (`WebLingoCommandLine.VersionAndBuild`). A build more than a minute after the last
+compiles every project again; `-p:BuildStamp=…` gives a build a fixed number. The installers' ZIPs are named from the
+version, `WebLingo-0.20.0-win-x64-…`; none has been packaged since the change.

@@ -5,7 +5,7 @@ the standard modules, and, in WASP's pages, the request, the response and their 
 statements, is the WebLingo Language Reference's (`Documents/weblingo-language-reference.md`); building sites is the
 WASP User Manual's (`Documents/wasp-user-manual.md`).
 
-This reference describes the standard library in the current pre-alpha release and shows what its examples write.
+This reference describes the standard library in the current release and shows what its examples write.
 
 ## Contents
 

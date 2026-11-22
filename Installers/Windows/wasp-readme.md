@@ -22,7 +22,7 @@ its `web.config` then runs `C:\Program Files (x86)\WebLingo\wasp.exe`.
 4. In that console, go to the unzipped folder, the one that holds this `readme.md`, and run:
 
    ```bat
-   cd /d "%USERPROFILE%\Downloads\WASP-0.20.0-pre-alpha-win-x64-self-contained"
+   cd /d "%USERPROFILE%\Downloads\WASP-0.20.0-win-x64-self-contained"
    weblingo run iis-install.wlg
    ```
 

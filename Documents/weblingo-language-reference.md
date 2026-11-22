@@ -5,7 +5,7 @@ programs, and the language of WASP, WebLingo's server pages. Its syntax will loo
 programmers. Conversions are explicit, conditions require Booleans, variables always have a value, and integer
 overflow raises an error.
 
-This reference describes the pre-alpha language and shows what its examples write. The WASP User Manual
+This reference describes the language and shows what its examples write. The WASP User Manual
 (`Documents/wasp-user-manual.md`) covers pages that put WebLingo into HTML. The WebLingo Standard Library Reference
 (`Documents/weblingo-standard-library-reference.md`) lists the standard modules and the members of each built-in class.
 
@@ -68,7 +68,7 @@ weblingo hello.wlg
 | `weblingo compile [--register \| --stack] <file.wlg>` | compiles the script into `.wlbr` (register) or `.wlbs` (stack) beside it |
 | `weblingo run <bytecode-file>` | runs compiled bytecode without compiling anything |
 | `weblingo disasm <bytecode-file>` | shows compiled bytecode as text |
-| `weblingo --version` | its version, `WebLingo 0.20.0-pre-alpha`, which `weblingo` alone prints first, before how it is used |
+| `weblingo --version` | its version and its build's number, `WebLingo 0.20.0 (2026.11.21.2330)`, which `weblingo` alone prints first, before how it is used |
 
 A script is a console program only where it imports `std:console` ([section 15](#15-the-standard-library)). On
 Windows, `weblingo` started without a console, as Explorer starts it for a script double-clicked (the repository's

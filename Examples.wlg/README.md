@@ -108,7 +108,7 @@ through, each ending with the errors `weblingo check` gives it:
 
 ## What is not there yet
 
-WebLingo is pre-alpha. These scripts show it as it is today, and these are among what it does not have yet:
+These scripts show WebLingo as it is today, and these are among what it does not have yet:
 
 - **A database's rows one at a time**, for results too large to hold whole, and databases other than SQLite and SQL
   Server.

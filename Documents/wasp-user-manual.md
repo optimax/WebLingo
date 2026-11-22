@@ -10,7 +10,7 @@ it is not a reference to the language; the WebLingo Language Reference, `Documen
 that, and the WebLingo Standard Library Reference, `Documents/weblingo-standard-library-reference.md`, lists what the
 built-in classes and the standard modules have.
 
-WASP is pre-alpha. Everything here works as described, and every example in this manual was run and gave the output
+Everything here works as described, and every example in this manual was run and gave the output
 shown, but names and details may still change before a first release. [What is not there yet](#19-what-is-not-there-yet)
 lists what is missing.
 
@@ -1064,7 +1064,7 @@ site anew, so the first request to each is slower than the rest.
 
 ## 19. What is not there yet
 
-WASP is pre-alpha. These are not there yet, and are planned or being designed:
+These are not there yet, and are planned or being designed:
 
 - **Uploaded files**: forms posted as `multipart/form-data` cannot be read.
 - **Sessions and cookies**: a page reads the `Cookie` header and sets `Set-Cookie` itself, with `response.headers.add`.

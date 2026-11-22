@@ -31,14 +31,30 @@ public static partial class WebLingoCommandLine
     public const int FileUnreadable = 4;
 
     /// <summary>
-    /// The solution's version, every assembly's, as <c>Directory.Build.props</c> sets it, <c>0.20.0-pre-alpha</c>: the
-    /// owner's answer, 18 November 2026, in place of the milestone each command line named, <c>WebLingo M0.6 (pre-alpha)</c>.
+    /// The solution's version, every assembly's, as <c>Directory.Build.props</c> sets it, <c>0.20.0</c>: the owner's
+    /// answer, 18 November 2026, in place of the milestone each command line named, <c>WebLingo M0.6 (pre-alpha)</c>,
+    /// without its <c>-pre-alpha</c> since 21 November 2026 (the owner's request, "Drop Pre-Alpha").
     /// </summary>
     public static string ProductVersion { get; } =
         typeof(WebLingoCommandLine).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
 
-    /// <summary>What <c>weblingo --version</c> prints, and <c>weblingo</c> first without arguments: <c>WebLingo 0.20.0-pre-alpha</c>.</summary>
-    public static string Version { get; } = "WebLingo " + ProductVersion;
+    /// <summary>
+    /// The build number, the build's local time, <c>2026.11.21.2330</c>, as MaxPad makes it, every assembly's file version
+    /// (<c>Directory.Build.props</c>; the owner's request, 21 November 2026).
+    /// </summary>
+    public static string BuildNumber { get; } =
+        typeof(WebLingoCommandLine).Assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version ?? "0";
+
+    /// <summary>
+    /// The version, then the build number in parentheses, as MaxPad's About box has them: <c>0.20.0 (2026.11.21.2330)</c>.
+    /// </summary>
+    public static string VersionAndBuild { get; } = $"{ProductVersion} ({BuildNumber})";
+
+    /// <summary>
+    /// What <c>weblingo --version</c> prints, and <c>weblingo</c> first without arguments:
+    /// <c>WebLingo 0.20.0 (2026.11.21.2330)</c>.
+    /// </summary>
+    public static string Version { get; } = "WebLingo " + VersionAndBuild;
 
     /// <summary>The legacy extension of a WLBC file (section 5.3).</summary>
     public const string BytecodeExtension = WebLingoBytecodeFile.LegacyExtension;

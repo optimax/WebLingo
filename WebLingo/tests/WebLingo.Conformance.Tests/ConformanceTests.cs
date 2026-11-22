@@ -1365,19 +1365,22 @@ public sealed class ConformanceTests : IDisposable
     [Fact]
     public void TheVersionIsTheSolutionsAndComesFirstWithoutArguments()
     {
-        // The solution's version, every assembly's, set once in Directory.Build.props, 0.N.0-pre-alpha for the last milestone
-        // landed whole, printed by --version, and first by weblingo without arguments (the owner's answer, 18 November 2026).
+        // The solution's version, every assembly's, set once in Directory.Build.props, 0.N.0 for the last milestone landed
+        // whole, printed by --version, and first by weblingo without arguments (the owner's answer, 18 November 2026), with
+        // the build's number after it, the file version, its local time (the owner's request, 21 November 2026).
         var version = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(WebLingoCommandLine).Assembly)!.InformationalVersion;
-        Assert.Matches(@"^0\.\d+\.0-pre-alpha$", version);
+        Assert.Matches(@"^0\.\d+\.0$", version);
         Assert.Equal(version,
             System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(WebLingoValue).Assembly)!.InformationalVersion);
+        var build = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyFileVersionAttribute>(typeof(WebLingoCommandLine).Assembly)!.Version;
+        Assert.Matches(@"^20\d\d\.(0[1-9]|1[0-2])\.(0[1-9]|[12]\d|3[01])\.([01]\d|2[0-3])[0-5]\d$", build);
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["--version"], output, new StringWriter()));
-        Assert.Equal("WebLingo " + version, output.ToString().TrimEnd());
+        Assert.Equal($"WebLingo {version} ({build})", output.ToString().TrimEnd());
         output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run([], output, new StringWriter()));
         var lines = output.ToString().Split('\n');
-        Assert.Equal("WebLingo " + version, lines[0].TrimEnd('\r'));
+        Assert.Equal($"WebLingo {version} ({build})", lines[0].TrimEnd('\r'));
         Assert.StartsWith("Usage: weblingo", lines[1]);
     }
 

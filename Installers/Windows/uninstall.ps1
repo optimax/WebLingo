@@ -259,7 +259,7 @@ function Get-FileDigest([string] $file) {
 }
 
 function Test-LegacyAssembly([string] $file, [string] $packaged) {
-    # Two builds of the same pre-alpha can give the project's DLLs different PDB identifiers and binary hashes.
+    # Two builds of the same version can give the project's DLLs different PDB identifiers and binary hashes.
     # Read metadata without loading or locking the assembly. Third-party DLLs still require their exact digest.
     $reference = [Diagnostics.FileVersionInfo]::GetVersionInfo($packaged)
     if ($reference.ProductName -ne 'weblingo' -and $reference.ProductName -notlike 'WebLingo.*') { return $false }

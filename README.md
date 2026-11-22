@@ -8,7 +8,7 @@ overflow raises an error. There is no prototype-based inheritance. The language 
 
 Write scripts and modules in `.wlg` files. For web applications, **WASP** (Web Application Server Pages) lets you
 embed WebLingo in HTML using `.wasp` templates, with automatic escaping for interpolated values based on where
-they appear in the page. WebLingo is currently pre-alpha.
+they appear in the page.
 
 ## Try it
 
