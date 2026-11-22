@@ -194,21 +194,26 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.Contains("std:console.writeLn", main);
         Assert.DoesNotContain(".\"writeLn\"", main);
         Assert.DoesNotContain(".\"abs\"", main);
+        // Nothing using either module as a value, neither is made, nor imported, but by its function, registered (step 2).
+        Assert.DoesNotMatch(@"(MakeModule|Import) .*\((std:console|std:math)\)", main);
+        Assert.Matches(@"RegisterUnit .*\(std:console\)", main);
         Assert.Equal((WebLingoCommandLine.Success, "2\n", ""), Weblingo("run", Path.ChangeExtension(calls, Extension(vm))));
 
-        // The same function, class and constant as the module's own; a call with other than its arguments an error where it runs.
+        // The same function, class and constant as the module's own, made where a whole import or a dynamic one first asks
+        // for it, one for every importer; a call with other than its arguments an error where it runs.
         var same = Write("same.wlg", """
             import { writeLn, Console } from "std:console";
             import console from "std:console";
             import { PI, min } from "std:math";
-            import math from "std:math";
             var f = writeLn;
-            writeLn([f == console.writeLn, Console == console.Console, PI == math.PI, min(3, 1, 2)]);
+            var math = await Module.import("std:math");
+            writeLn([f == console.writeLn, Console == console.Console, PI == math.PI, min(3, 1, 2), math == await Module.import("std:math")]);
             writeLn();
             """);
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, same).Exit);
+        Assert.Matches(@"Import .*\(std:console\)", Weblingo("disasm", Path.ChangeExtension(same, Extension(vm))).Output);
         var (exit, output, error) = Weblingo("run", Path.ChangeExtension(same, Extension(vm)));
-        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "[true, true, true, 1]\n"), (exit, output));
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "[true, true, true, 1, true]\n"), (exit, output));
         Assert.Contains("(7,1): ERROR WL2006 (ArgumentError): 'std:console.writeLn' takes 1 argument, not 0.", error);
     }
 

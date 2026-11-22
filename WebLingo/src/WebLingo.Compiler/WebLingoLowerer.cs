@@ -58,8 +58,9 @@ public sealed class WebLingoLowerer
         if (program.Units.Count > 0) prologue.Add(MakeModule(program.Units[0], 0));
         for (var i = 1; i < program.Units.Count; i++)
         {
-            // A standard or native module, made with the program's own instance, before any import (section 3.9).
-            if (program.Units[i].Builtins is { } builtins) prologue.Add(MakeModule(program.Units[i], i));
+            // A standard module the compiler makes, made with the program's own instance, before any import (section 3.9); a
+            // native one by its function, when something first imports it as a value.
+            if (program.Units[i] is { Builtins: not null, Function: null }) prologue.Add(MakeModule(program.Units[i], i));
         }
         var statements = lowerer.LowerBlock(program.Statements, prologue, program.MadeFirst);
         return new WebLingoIrProgram(statements, Names(program.Locals), program.Builtins)
@@ -96,7 +97,20 @@ public sealed class WebLingoLowerer
         var function = unit.Function!;
         var functionIndex = _functions.Count;
         _functions.Add(null);
-        var body = LowerBlock(function.Body, [MakeModule(unit, index)]);
+        List<WebLingoIrStatement> body;
+        if (unit.NativeValues is { } nativeValues)
+        {
+            // A native module's: its instance, of the program's locals it captures and its built-ins (step 2 of "A Native
+            // Module's Named Imports Bound Directly").
+            var values = new List<WebLingoIrExpression>();
+            foreach (var value in nativeValues) values.Add(LowerExpression(value));
+            foreach (var builtin in unit.Builtins ?? []) values.Add(new WebLingoIrLoadBuiltin(builtin.Index, default));
+            body = [Initialize(unit.Instance, new WebLingoIrMakeModule(index, values, default), default)];
+        }
+        else
+        {
+            body = LowerBlock(function.Body, [MakeModule(unit, index)]);
+        }
         body.Add(new WebLingoIrReturn(LowerExpression(new WebLingoBoundLocalReference(unit.Instance, default)), default));
         var captures = new List<WebLingoIrCapture>();
         foreach (var capture in function.Captures) captures.Add(new WebLingoIrCapture(capture.FromLocal, capture.Index));

@@ -383,8 +383,10 @@ A program may give a class its `toString()` at any time, by `setMethod` as by a 
 
 ### Inspecting named imports in the debugger
 
-A named import reads the export from its module each time the script uses the name (specification, section 3.9).
-Its own local slot is unused. Debug metadata records the module's register and the export name so the VM can inspect
+A named import reads the export from its module each time the script uses the name (specification, section 3.9),
+but a native module's, which is its export itself, the built-in or the local the program makes it in, and whose module
+is made only for an importer that uses it as a value; compiled for a debugger, a program still imports and makes it, so
+that the view below has a module to read (specification, section 15.2, "Native modules"). Its own local slot is unused. Debug metadata records the module's register and the export name so the VM can inspect
 the current binding, including when a closure captures the module register in a cell.
 
 ### Warnings Are Errors

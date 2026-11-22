@@ -447,6 +447,27 @@ public sealed class VerifierTests
             ? unread with { EntryPoint = unread.EntryPoint with { IsAsync = true } } : unread, 0, "register 0");
     }
 
+    [Fact]
+    public void ANativeModulesFileHasAFunctionThatMakesItOrNone()
+    {
+        // A native module's instance made by a function of its own, when first imported as a value (the owner's request,
+        // 22 November 2026, "A Native Module's Named Imports Bound Directly", step 2), or, in a file written before it, where
+        // the program begins; the program's own file never has one.
+        var maker = new WebLingoFunction("std:console", 1, 1, [I(WebLingoOpCode.LoadNull, 0), I(WebLingoOpCode.ReturnValue, 0),
+            I(WebLingoOpCode.Return)]) { IsAsync = true };
+        var module = Module(registers: 1, locals: 0, I(WebLingoOpCode.Return)) with { Functions = [maker] };
+        WebLingoCompiledModule WithNative(int function) => module with
+        {
+            Units = [new WebLingoUnitInfo("test", -1, []), new WebLingoUnitInfo("std:console", function, ["writeLn"]) { IsNative = true }]
+        };
+        Assert.Equal(Valid, Verify(WithNative(0)));
+        Assert.Equal(Valid, Verify(WithNative(-1)));
+        var notAsync = WithNative(0) with { Functions = [maker with { IsAsync = false }] };
+        Assert.Contains("File 1 ('std:console'): its function, 0, is not one that runs a file.", Verify(notAsync).Error);
+        var own = module with { Units = [new WebLingoUnitInfo("test", 0, [])] };
+        Assert.Contains("File 0 ('test'): its function, 0, is not one that runs a file.", Verify(own).Error);
+    }
+
     private static WebLingoInstruction I(WebLingoOpCode opCode, int a = 0, int b = 0, int c = 0, int d = 0) => new(opCode, a, b, c, d);
 
     private static WebLingoCompiledModule Module(int registers, int locals, params WebLingoInstruction[] code) =>

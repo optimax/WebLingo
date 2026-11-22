@@ -81,8 +81,11 @@ internal static class WebLingoClassTables
             {
                 if (parameter is null || string.IsNullOrEmpty(parameter.Name)) return $"File {i} ('{unit.Name}') has a parameter without a name.";
             }
+            // A native module's may have a function, which makes its instance when it is first imported as a value (the owner's
+            // request, 22 November 2026, "A Native Module's Named Imports Bound Directly", step 2), or none, made where the
+            // program begins.
             var hasInitializer = unit.Function != -1;
-            if (i == 0 || unit.IsNative ? hasInitializer
+            if (i == 0 ? hasInitializer
                 : hasInitializer ? !isUnitFunction(unit.Function, unit.Parameters.Count > 0 ? 1 : 0) : !standard)
             {
                 return $"File {i} ('{unit.Name}'): its function, {unit.Function}, is not one that runs a file.";

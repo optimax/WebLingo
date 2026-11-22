@@ -39,11 +39,21 @@ public sealed record WebLingoBoundProgram(
 public sealed record WebLingoBoundUnit(string Name, WebLingoBoundFunction? Function,
     IReadOnlyList<(string Name, WebLingoLocalSymbol Local)> Exports, WebLingoLocalSymbol Instance)
 {
-    /// <summary>For a standard module, <c>std:system</c>, or a native one: the built-ins it exports, and no function (section 3.9).</summary>
+    /// <summary>
+    /// For a standard module, <c>std:system</c>, or a native one: the built-ins it exports, and, for a standard module, no
+    /// function (section 3.9).
+    /// </summary>
     public IReadOnlyList<WebLingoBuiltinSymbol>? Builtins { get; init; }
 
     /// <summary>A native module's names for <see cref="Builtins"/>, which it exports them by; null for a standard module's.</summary>
     public IReadOnlyList<string>? BuiltinNames { get; init; }
+
+    /// <summary>
+    /// For a native module: its exports but its built-ins, as its function reads them, the program's locals it captures,
+    /// which that function makes its instance of, the first time something imports it as a value (the owner's request,
+    /// 22 November 2026, "A Native Module's Named Imports Bound Directly", step 2).
+    /// </summary>
+    public IReadOnlyList<WebLingoBoundExpression>? NativeValues { get; init; }
 
     /// <summary>Its parameters (section 3.9), whose values its function takes as one map.</summary>
     public IReadOnlyList<WebLingoModuleParameter> Parameters { get; init; } = [];

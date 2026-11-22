@@ -98,3 +98,14 @@ metadata as an eighth section, debugging, after the source positions, which a fi
 unchanged. `disasm` (`WebLingoDisassembler`, `WebLingoStackDisassembler`, `WebLingoDisassemblyNames`) names the functions,
 classes and files instructions refer to, and, from a debug file, captures, statements' lines and columns, and variables.
 The VS Code debugger still compiles from source: nothing runs a debug file under a debugger yet.
+
+## A native module's named imports
+
+`WebLingoBinder` binds the program's native modules before its statements (`BindNativeUnit`), and a name an import
+takes of one is its export itself: a function the built-in, a call a `CallBuiltin` where it gives the function's
+arguments, else a call of its value, so that its error stays a runtime one; a class, a constant or a function written in
+WebLingo the local the program makes it in (`ImportedNative`, `ImportedLocal`). Each native module's instance is made by
+a function of its own, registered as its file, which a whole import or a dynamic one runs once; an import whose every
+name is bound so is dropped, but in a debug build, whose view of a named import reads the module. `WebLingoClassTables`
+lets a native module's file have that function, older files having none. The benchmark's `imports` workload calls
+`std:math`'s `abs` and `sign` imported by name. Nothing of it is installed on this machine until `build.bat` runs.
