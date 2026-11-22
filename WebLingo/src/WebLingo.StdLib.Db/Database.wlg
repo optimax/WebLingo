@@ -1,0 +1,12 @@
+async transaction(work, options = null) {
+  await this.begin(options);
+  var result = null;
+  try {
+    result = await work();
+  } catch (e) {
+    await this.rollback();
+    throw;
+  }
+  await this.commit();
+  return result;
+}

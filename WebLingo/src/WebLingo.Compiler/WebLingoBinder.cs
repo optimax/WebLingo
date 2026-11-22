@@ -35,10 +35,11 @@ public sealed class WebLingoBinder
     /// <summary>
     /// <c>Object</c>, which every class without <c>extends</c> extends: <c>equal(other)</c> gives <c>this == other</c>,
     /// and <c>toString()</c> the text <c>write</c> writes, an instance's class and fields; any class may override them
-    /// (section 3.7).
+    /// (section 3.7). Its source is <c>Builtins/Object.wlg</c>, as every built-in class's is a <c>.wlg</c> file of
+    /// <c>Builtins/</c>, made a constant at build time (<see cref="WebLingoSources"/>; the owner's answer, 22 November 2026,
+    /// "Built-ins Written in WebLingo, in .wlg Files").
     /// </summary>
-    private const string ObjectSource =
-        "class Object { equal(other) { return this == other; } toString() { return toText(this); } }";
+    private const string ObjectSource = WebLingoSources.Object;
 
     /// <summary>Whether <c>Object</c> is being bound, whose <c>toString()</c> calls <c>toText</c>, which nothing else has.</summary>
     private bool _inPrelude;
@@ -57,7 +58,7 @@ public sealed class WebLingoBinder
     /// <c>code</c>, <c>null</c> for one a program throws; a runtime error a handler catches becomes one, its code set
     /// (section 3.7).
     /// </summary>
-    private const string ErrorSource = "class Error { constructor(message) { this.message = message; this.code = null; } }";
+    private const string ErrorSource = WebLingoSources.Error;
 
     /// <summary>The host's built-ins, in the order it gives them, which <c>std:system</c> exports (section 3.9).</summary>
     private readonly IReadOnlyList<WebLingoBuiltinDeclaration> _builtinDeclarations;
@@ -2037,9 +2038,7 @@ public sealed class WebLingoBinder
         {
             if (builtin == WebLingoParser.InterpolationText) return declaration.Local;
         }
-        return BindBuiltinClass(WebLingoParser.InterpolationText,
-            "class Text { static of(value) { if (value == null) { return \"\"; } return writtenText(value); } }", UseObject(),
-            inPrelude: true);
+        return BindBuiltinClass(WebLingoParser.InterpolationText, WebLingoSources.Text, UseObject(), inPrelude: true);
     }
 
     private WebLingoLocalSymbol UseBuiltinClass(string name)
@@ -2365,8 +2364,7 @@ public sealed class WebLingoBinder
         return _spread;
     }
 
-    private const string SpreadSource =
-        "class Spread { static array(...parts) { var result = []; foreach (var part in parts) { foreach (var item in part) result.push(item); } return result; } static set(...parts) { var result = #{}; foreach (var part in parts) { foreach (var item in part) result.add(item); } return result; } static map(...parts) { var result = {}; foreach (var part in parts) { foreach (var (key, value) in part) result[key] = value; } return result; } }";
+    private const string SpreadSource = WebLingoSources.Spread;
 
     private static bool IsArrayMethodName(string name) =>
         name is "map" or "select" or "filter" or "where" or "reduce" or "find" or "any" or "some" or "all" or "every" or "sort";
@@ -2405,166 +2403,7 @@ public sealed class WebLingoBinder
         _arrayMethods = new WebLingoBoundExtension(new WebLingoBoundLocalReference(array, default), bound, default);
     }
 
-    private const string ArrayMethodsSource =
-        "extend Array {\n" +
-        "  map(f) {\n" +
-        "    checkCallback(\"map\", f);\n" +
-        "    var items = this;\n" +
-        "    var result = [];\n" +
-        "    for (var i = 0; i < items.length; i++) {\n" +
-        "      var value = f(items[i]);\n" +
-        "      if (value is Task) {\n" +
-        "        var from = i;\n" +
-        "        var later = async () => {\n" +
-        "          result.push(await value);\n" +
-        "          for (var j = from + 1; j < items.length; j++) result.push(await f(items[j]));\n" +
-        "          return result;\n" +
-        "        };\n" +
-        "        return later();\n" +
-        "      }\n" +
-        "      result.push(value);\n" +
-        "    }\n" +
-        "    return result;\n" +
-        "  }\n" +
-        "  select(f) { checkCallback(\"select\", f); return this.map(f); }\n" +
-        "  filter(f) {\n" +
-        "    checkCallback(\"filter\", f);\n" +
-        "    var items = this;\n" +
-        "    var result = [];\n" +
-        "    for (var i = 0; i < items.length; i++) {\n" +
-        "      var item = items[i];\n" +
-        "      var keep = f(item);\n" +
-        "      if (keep is Task) {\n" +
-        "        var from = i;\n" +
-        "        var later = async () => {\n" +
-        "          if (await keep) result.push(item);\n" +
-        "          for (var j = from + 1; j < items.length; j++) {\n" +
-        "            var next = items[j];\n" +
-        "            if (await f(next)) result.push(next);\n" +
-        "          }\n" +
-        "          return result;\n" +
-        "        };\n" +
-        "        return later();\n" +
-        "      }\n" +
-        "      if (keep) result.push(item);\n" +
-        "    }\n" +
-        "    return result;\n" +
-        "  }\n" +
-        "  where(f) { checkCallback(\"where\", f); return this.filter(f); }\n" +
-        "  reduce(f, initial) {\n" +
-        "    checkCallback(\"reduce\", f);\n" +
-        "    var items = this;\n" +
-        "    var total = initial;\n" +
-        "    for (var i = 0; i < items.length; i++) {\n" +
-        "      total = f(total, items[i]);\n" +
-        "      if (total is Task) {\n" +
-        "        var from = i;\n" +
-        "        var pending = total;\n" +
-        "        var later = async () => {\n" +
-        "          var sum = await pending;\n" +
-        "          for (var j = from + 1; j < items.length; j++) sum = await f(sum, items[j]);\n" +
-        "          return sum;\n" +
-        "        };\n" +
-        "        return later();\n" +
-        "      }\n" +
-        "    }\n" +
-        "    return total;\n" +
-        "  }\n" +
-        "  find(f) {\n" +
-        "    checkCallback(\"find\", f);\n" +
-        "    var items = this;\n" +
-        "    for (var i = 0; i < items.length; i++) {\n" +
-        "      var item = items[i];\n" +
-        "      var found = f(item);\n" +
-        "      if (found is Task) {\n" +
-        "        var from = i;\n" +
-        "        var later = async () => {\n" +
-        "          if (await found) return item;\n" +
-        "          for (var j = from + 1; j < items.length; j++) {\n" +
-        "            var next = items[j];\n" +
-        "            if (await f(next)) return next;\n" +
-        "          }\n" +
-        "          return null;\n" +
-        "        };\n" +
-        "        return later();\n" +
-        "      }\n" +
-        "      if (found) return item;\n" +
-        "    }\n" +
-        "    return null;\n" +
-        "  }\n" +
-        "  any(f) {\n" +
-        "    checkCallback(\"any\", f);\n" +
-        "    var items = this;\n" +
-        "    for (var i = 0; i < items.length; i++) {\n" +
-        "      var found = f(items[i]);\n" +
-        "      if (found is Task) {\n" +
-        "        var from = i;\n" +
-        "        var later = async () => {\n" +
-        "          if (await found) return true;\n" +
-        "          for (var j = from + 1; j < items.length; j++) {\n" +
-        "            if (await f(items[j])) return true;\n" +
-        "          }\n" +
-        "          return false;\n" +
-        "        };\n" +
-        "        return later();\n" +
-        "      }\n" +
-        "      if (found) return true;\n" +
-        "    }\n" +
-        "    return false;\n" +
-        "  }\n" +
-        "  some(f) { checkCallback(\"some\", f); return this.any(f); }\n" +
-        "  all(f) {\n" +
-        "    checkCallback(\"all\", f);\n" +
-        "    var items = this;\n" +
-        "    for (var i = 0; i < items.length; i++) {\n" +
-        "      var kept = f(items[i]);\n" +
-        "      if (kept is Task) {\n" +
-        "        var from = i;\n" +
-        "        var later = async () => {\n" +
-        "          if (!(await kept)) return false;\n" +
-        "          for (var j = from + 1; j < items.length; j++) {\n" +
-        "            if (!(await f(items[j]))) return false;\n" +
-        "          }\n" +
-        "          return true;\n" +
-        "        };\n" +
-        "        return later();\n" +
-        "      }\n" +
-        "      if (!kept) return false;\n" +
-        "    }\n" +
-        "    return true;\n" +
-        "  }\n" +
-        "  every(f) { checkCallback(\"every\", f); return this.all(f); }\n" +
-        "  sort(compare = null) {\n" +
-        "    if (compare != null) checkCallback(\"sort\", compare);\n" +
-        "    var a = [];\n" +
-        "    foreach (var item in this) a.push(item);\n" +
-        "    var b = [];\n" +
-        "    foreach (var item in a) b.push(item);\n" +
-        "    var n = a.length;\n" +
-        "    for (var width = 1; width < n; width *= 2) {\n" +
-        "      for (var low = 0; low < n; low += 2 * width) {\n" +
-        "        var middle = low + width < n ? low + width : n;\n" +
-        "        var high = low + 2 * width < n ? low + 2 * width : n;\n" +
-        "        var i = low;\n" +
-        "        var j = middle;\n" +
-        "        for (var k = low; k < high; k++) {\n" +
-        "          var right = j < high && (i >= middle || (compare == null ? a[j] < a[i] : compare(a[j], a[i]) < 0));\n" +
-        "          if (right) {\n" +
-        "            b[k] = a[j];\n" +
-        "            j++;\n" +
-        "          } else {\n" +
-        "            b[k] = a[i];\n" +
-        "            i++;\n" +
-        "          }\n" +
-        "        }\n" +
-        "      }\n" +
-        "      var swap = a;\n" +
-        "      a = b;\n" +
-        "      b = swap;\n" +
-        "    }\n" +
-        "    return a;\n" +
-        "  }\n" +
-        "}\n";
+    private const string ArrayMethodsSource = WebLingoSources.ArrayMethods;
 
     private void Report(string code, string message, WebLingoSourceSpan span) =>
         _diagnostics.Add(new WebLingoDiagnostic(code, WebLingoDiagnosticSeverity.Error, message, span) { Source = _source });

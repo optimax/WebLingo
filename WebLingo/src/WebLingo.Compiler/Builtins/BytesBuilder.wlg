@@ -1,0 +1,1 @@
+class BytesBuilder { constructor() { hold(this, new BytesBuilder()); } }

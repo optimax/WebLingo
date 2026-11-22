@@ -33,9 +33,7 @@ internal sealed class WebLingoHttpObjects
     /// <c>null</c>; the text then given to the response's own <c>__write</c>, a name a program's members are unlikely to
     /// take (the owner's answer, 20 November 2026, "Console Module", A2).
     /// </summary>
-    private const string WritingSource =
-        "write(value) { this.__write(value == null ? \"null\" : $\"{value}\"); }\n" +
-        "writeLn(value) { this.__write((value == null ? \"null\" : $\"{value}\") + \"\\n\"); }\n";
+    private const string WritingSource = WebLingoSources.Response;
 
     private readonly WebLingoNativeClass _request = new("Request");
     private readonly WebLingoNativeClass _response = new("Response");

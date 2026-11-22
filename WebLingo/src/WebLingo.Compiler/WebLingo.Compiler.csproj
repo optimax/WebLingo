@@ -5,4 +5,8 @@
     <ProjectReference Include="../WebLingo.Language/WebLingo.Language.csproj" />
     <ProjectReference Include="../WebLingo.Bytecode/WebLingo.Bytecode.csproj" />
   </ItemGroup>
+  <!-- The built-in classes and std:test, written in WebLingo, WebLingoSources' constants (Directory.Build.targets). -->
+  <ItemGroup>
+    <WebLingoSource Include="Builtins/*.wlg" />
+  </ItemGroup>
 </Project>

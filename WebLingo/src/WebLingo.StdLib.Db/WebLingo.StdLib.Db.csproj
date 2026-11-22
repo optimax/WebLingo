@@ -6,4 +6,8 @@
     <ProjectReference Include="../WebLingo.Runtime/WebLingo.Runtime.csproj" />
     <ProjectReference Include="../WebLingo.Platform.Abstractions/WebLingo.Platform.Abstractions.csproj" />
   </ItemGroup>
+  <!-- Database's transaction, written in WebLingo, WebLingoSources.Database (Directory.Build.targets). -->
+  <ItemGroup>
+    <WebLingoSource Include="Database.wlg" />
+  </ItemGroup>
 </Project>

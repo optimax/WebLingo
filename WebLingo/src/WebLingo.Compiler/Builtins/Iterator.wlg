@@ -1,0 +1,1 @@
+class Iterator { hasNext() { return this.position < this.items.length; } next() { var item = this.items[this.position]; this.position = this.position + 1; return item; } }

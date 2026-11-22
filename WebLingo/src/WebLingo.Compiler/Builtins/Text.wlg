@@ -1,0 +1,1 @@
+class Text { static of(value) { if (value == null) { return ""; } return writtenText(value); } }

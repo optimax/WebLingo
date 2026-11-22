@@ -1,0 +1,1 @@
+class Regex { constructor(pattern, flags = "") { hold(this, new Regex(pattern, flags)); } }

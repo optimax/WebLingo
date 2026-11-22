@@ -1,0 +1,1 @@
+class Boolean { constructor(value = false) { hold(this, value); } }

@@ -1,0 +1,2 @@
+write(value) { this.__write(value == null ? "null" : $"{value}"); }
+writeLn(value) { this.__write((value == null ? "null" : $"{value}") + "\n"); }

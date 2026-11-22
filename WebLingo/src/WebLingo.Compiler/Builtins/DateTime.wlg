@@ -1,0 +1,1 @@
+class DateTime { constructor(...parts) { hold(this, new DateTime(...parts)); } }

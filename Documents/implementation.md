@@ -50,6 +50,7 @@ WebLingo/                      the repository
 └── WebLingo/                  the solution
     ├── WebLingo.slnx
     ├── Directory.Build.props
+    ├── Directory.Build.targets    the built-ins written in WebLingo made constants
     ├── Directory.Packages.props
     ├── global.json
     ├── publish.ps1
@@ -129,6 +130,7 @@ Add projects (FastCGI, database providers, native adapters, `WebLingo.Hosting.St
 - C#, with `LangVersion` latest
 - Target framework: `net10.0`, not `net10.0-windows`: nothing may depend on Windows
 - `Directory.Build.props` gives every project nullable reference types, implicit usings, deterministic builds, and warnings treated as errors
+- `Directory.Build.targets` makes the built-ins written in WebLingo constants: a project's `WebLingoSource` items, `.wlg` files beside the code that uses them (`WebLingo.Compiler/Builtins/`, `WebLingo.StdLib.Console/Console.wlg`, `WebLingo.StdLib.Db/Database.wlg`, `WebLingo.Hosting/Response.wlg`), become the constants of a class the build generates in `obj`, `WebLingoSources`, in the project's root namespace, each named by its file, its text with LF line breaks and its last one left out, by a task of MSBuild's own C# task factory, with no package (the owner's answer, 22 November 2026, A1 (a) of "Built-ins Written in WebLingo, in .wlg Files", for now). Edit a built-in in its `.wlg` file; the class is written only when its text changes. A toolchain other than MSBuild, Native C#'s, makes the same constants from the same files
 - Central package management: versions are in `Directory.Packages.props`, never in a project's `PackageReference`
 - Tests: xUnit v2 (2.9.3) through `Microsoft.NET.Test.Sdk` and `xunit.runner.visualstudio`, run with `dotnet test` (section 8)
 - Solution format: `.slnx`
@@ -373,7 +375,7 @@ interpolation was reported in the page (`PageTests`). `PageFuzzTests` makes posi
 
 ### A Built-in Written in WebLingo Has No File
 
-The built-in classes written in WebLingo (`WebLingoPrelude`'s, `Object`, `Error`, `Iterator`, `Json`, `Html` and the rest), the array methods, the spread and a native module's methods are compiled from sources of their own, which are no file of the program's: a position in one, located in the caller's file, names some other line there, or its end. So each is bound native (`WebLingoBinder.BindBuiltinClass`, `BindNativeClass`), and the VMs report an error raised in one where the program called it (`RaisedAt`); one that has awaited, which the scheduler resumes with no caller below it, is reported where its frame says it was called (`Frame.CalledFrom`, set by `Gave` when its first run ends). A new built-in written in WebLingo is bound through `BindBuiltinClass`, and so native. Until 17 November 2026, `Iterator`'s `next()`, `BytesBuilder`'s `add`, the constructors a class extending a value's class reaches, and an error after an await in `std:db`'s `transaction` or an array method, were not: a test in a short file often had its error on the right line by chance, so a test of one names a line its source's positions would not (`ConformanceTests.AnErrorInABuiltinWrittenInWebLingoIsReportedWhereItWasCalled`).
+The built-in classes written in WebLingo (`WebLingoPrelude`'s, `Object`, `Error`, `Iterator`, `Json`, `Html` and the rest), the array methods, the spread and a native module's methods are compiled from sources of their own, which are no file of the program's, `.wlg` files of the repository's that the build makes constants (`Directory.Build.targets`), none installed: a position in one, located in the caller's file, names some other line there, or its end. So each is bound native (`WebLingoBinder.BindBuiltinClass`, `BindNativeClass`), and the VMs report an error raised in one where the program called it (`RaisedAt`); one that has awaited, which the scheduler resumes with no caller below it, is reported where its frame says it was called (`Frame.CalledFrom`, set by `Gave` when its first run ends). A new built-in written in WebLingo is bound through `BindBuiltinClass`, and so native. Until 17 November 2026, `Iterator`'s `next()`, `BytesBuilder`'s `add`, the constructors a class extending a value's class reaches, and an error after an await in `std:db`'s `transaction` or an array method, were not: a test in a short file often had its error on the right line by chance, so a test of one names a line its source's positions would not (`ConformanceTests.AnErrorInABuiltinWrittenInWebLingoIsReportedWhereItWasCalled`).
 
 ### What a `toString()` Gives Is the Program's
 

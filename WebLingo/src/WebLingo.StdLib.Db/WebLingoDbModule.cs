@@ -24,19 +24,7 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
     private static readonly string[] Isolations = ["readUncommitted", "readCommitted", "repeatableRead", "serializable", "snapshot"];
 
     /// <summary><c>transaction</c>, written in WebLingo, since it calls the script's function and awaits it (section 3.9).</summary>
-    private const string TransactionSource =
-        "async transaction(work, options = null) {\n" +
-        "  await this.begin(options);\n" +
-        "  var result = null;\n" +
-        "  try {\n" +
-        "    result = await work();\n" +
-        "  } catch (e) {\n" +
-        "    await this.rollback();\n" +
-        "    throw;\n" +
-        "  }\n" +
-        "  await this.commit();\n" +
-        "  return result;\n" +
-        "}\n";
+    private const string TransactionSource = WebLingoSources.Database;
 
     public void Register(IWebLingoNativeRegistry registry)
     {

@@ -1,0 +1,8 @@
+class Html {
+    static js(value) {
+        var text = Json.stringify(value).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+            .replace("\u{2028}", "\\u2028").replace("\u{2029}", "\\u2029");
+        if (text.startsWith("\"") || text.startsWith("[") || text.startsWith("{")) return text;
+        return " " + text + " ";
+    }
+}

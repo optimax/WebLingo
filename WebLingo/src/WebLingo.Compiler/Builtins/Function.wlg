@@ -1,0 +1,1 @@
+class Function { constructor(f = function () {}) { hold(this, f); } }

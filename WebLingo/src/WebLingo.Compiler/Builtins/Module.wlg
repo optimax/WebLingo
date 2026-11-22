@@ -1,0 +1,1 @@
+class Module { constructor(name) { hold(this, name); } async exec() { return null; } }

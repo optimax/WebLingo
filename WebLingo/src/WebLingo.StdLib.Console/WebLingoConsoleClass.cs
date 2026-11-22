@@ -28,27 +28,7 @@ public static class WebLingoConsoleClass
     /// <c>__writeError</c>; and Ctrl+C's handler (A1), called on the script's worker with each press, a handler that gives
     /// anything but <c>true</c> ending the program as the press would have.
     /// </summary>
-    private const string WebLingoMethods = """
-        static write(value) { this.__write(value == null ? "null" : $"{value}"); }
-        static writeLn(value) { this.__write((value == null ? "null" : $"{value}") + "\n"); }
-        static print(value) { this.__write(value == null ? "null" : $"{value}"); }
-        static printLn(value) { this.__write((value == null ? "null" : $"{value}") + "\n"); }
-        static writeError(value) { this.__writeError(value == null ? "null" : $"{value}"); }
-        static writeErrorLn(value) { this.__writeError((value == null ? "null" : $"{value}") + "\n"); }
-        static onCancelKeyPress(handler) {
-          var generation = this.__watchCancelKeyPress(handler);
-          if (handler != null) this.__handleCancelKeyPress(handler, generation);
-        }
-        static async __handleCancelKeyPress(handler, generation) {
-          var key = await this.__nextCancelKeyPress(generation);
-          while (key != null) {
-            var kept = handler(key);
-            if (kept is Task) kept = await kept;
-            if (kept != true) this.__endAsCancelled(key);
-            key = await this.__nextCancelKeyPress(generation);
-          }
-        }
-        """;
+    private const string WebLingoMethods = WebLingoSources.Console;
 
     public static void Register(WebLingoNativeClass console, WebLingoNativeClass consoleColor)
     {

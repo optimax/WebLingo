@@ -41,49 +41,42 @@ internal static class WebLingoPrelude
     }
 
     /// <summary>
-    /// A built-in class's source: a kind of runtime error's, taking a message; a kind of value that a class may extend,
-    /// holding a value of its kind, which its constructor gives (<c>hold</c>, section 3.7); any other, empty.
+    /// A built-in class's source, its <c>.wlg</c> file's, <c>Builtins/</c>, made a constant at build time
+    /// (<see cref="WebLingoSources"/>; the owner's answer, 22 November 2026, "Built-ins Written in WebLingo, in .wlg Files"):
+    /// a kind of runtime error's, taking a message, each made from <c>RuntimeError.wlg</c>, its name the error's; a kind of
+    /// value that a class may extend, holding a value of its kind, which its constructor gives (<c>hold</c>, section 3.7);
+    /// any other, empty.
     /// </summary>
     public static string Source(string name) => name switch
     {
-        _ when IsErrorClass(name) => $"class {name} extends Error {{ constructor(message) {{ super(message); }} }}",
-        "Boolean" => "class Boolean { constructor(value = false) { hold(this, value); } }",
-        "Integer" => "class Integer { constructor(value = 0) { hold(this, value); } }",
-        "Number" => "class Number { constructor(value = 0.0) { hold(this, value); } }",
-        "Decimal" => "class Decimal { constructor(value = 0) { hold(this, value); } }",
+        _ when IsErrorClass(name) => "class " + name + WebLingoSources.RuntimeError["class RuntimeError".Length..],
+        "Boolean" => WebLingoSources.Boolean,
+        "Integer" => WebLingoSources.Integer,
+        "Number" => WebLingoSources.Number,
+        "Decimal" => WebLingoSources.Decimal,
         // new Regex(…) makes the value itself; a class extending Regex holds one, made by the class's own new.
-        "Json" => "class Json { static stringify(value, indent = 0) { return toJson(value, indent); } }",
+        "Json" => WebLingoSources.Json,
         // A value as a script takes it, Html.js(value) (section 13, "Context-aware escaping"): its JSON, its <, >, & and line
         // separators, which JSON leaves only in strings, as escapes, so that neither the script nor its attribute ends; a
         // number or a keyword between spaces, so that it runs into no name or operator beside it. Html's other members are
         // the runtime's.
-        "Html" => """
-            class Html {
-                static js(value) {
-                    var text = Json.stringify(value).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
-                        .replace("\u{2028}", "\\u2028").replace("\u{2029}", "\\u2029");
-                    if (text.startsWith("\"") || text.startsWith("[") || text.startsWith("{")) return text;
-                    return " " + text + " ";
-                }
-            }
-            """,
-        "Regex" => "class Regex { constructor(pattern, flags = \"\") { hold(this, new Regex(pattern, flags)); } }",
+        "Html" => WebLingoSources.Html,
+        "Regex" => WebLingoSources.Regex,
         // Bytes, a bytes builder and a date, each made by its class's own new, as Bytes.from(…), new BytesBuilder() and
         // DateTime.utc(…) make them, which a class extending one holds (section 3.7, "No sealed classes").
-        "Bytes" => "class Bytes { constructor(...parts) { hold(this, new Bytes(...parts)); } }",
-        "BytesBuilder" => "class BytesBuilder { constructor() { hold(this, new BytesBuilder()); } }",
-        "DateTime" => "class DateTime { constructor(...parts) { hold(this, new DateTime(...parts)); } }",
-        "String" => "class String { constructor(value = \"\") { hold(this, value); } }",
-        "Function" => "class Function { constructor(f = function () {}) { hold(this, f); } }",
+        "Bytes" => WebLingoSources.Bytes,
+        "BytesBuilder" => WebLingoSources.BytesBuilder,
+        "DateTime" => WebLingoSources.DateTime,
+        "String" => WebLingoSources.String,
+        "Function" => WebLingoSources.Function,
         // A module defined in code, its name given to new, and its body its exec(), which a class extending Module may
         // override (section 3.7, "No sealed classes").
-        "Module" => "class Module { constructor(name) { hold(this, name); } async exec() { return null; } }",
+        "Module" => WebLingoSources.Module,
         // A metaclass's super(name, base) names and bases the class it makes (section 3.7).
-        "Class" => "class Class { constructor(name = null, base = null) { hold(this, [name, base]); } }",
+        "Class" => WebLingoSources.Class,
         // The iterator a collection's iterate() gives, its items and its position set by the runtime (section 3.6): next()
         // past the last item is an index out of range (WL3005).
-        "Iterator" => "class Iterator { hasNext() { return this.position < this.items.length; } "
-            + "next() { var item = this.items[this.position]; this.position = this.position + 1; return item; } }",
+        "Iterator" => WebLingoSources.Iterator,
         _ => $"class {name} {{}}"
     };
 }

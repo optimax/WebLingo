@@ -1,0 +1,1 @@
+class Decimal { constructor(value = 0) { hold(this, value); } }

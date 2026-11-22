@@ -1,0 +1,1 @@
+class String { constructor(value = "") { hold(this, value); } }

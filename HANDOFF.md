@@ -99,6 +99,16 @@ unchanged. `disasm` (`WebLingoDisassembler`, `WebLingoStackDisassembler`, `WebLi
 classes and files instructions refer to, and, from a debug file, captures, statements' lines and columns, and variables.
 The VS Code debugger still compiles from source: nothing runs a debug file under a debugger yet.
 
+## Built-ins written in WebLingo
+
+The built-in classes, the array methods, the spread, `std:test` and the methods `Console`, `Database` and `Response`
+declare in WebLingo are `.wlg` files: `WebLingo/src/WebLingo.Compiler/Builtins/`, and `Console.wlg`, `Database.wlg` and
+`Response.wlg` in their projects. `WebLingo/Directory.Build.targets` makes each a constant of `WebLingoSources`, written
+to `obj` when its text changes; the C# that used a string uses the constant. A runtime error's class is
+`RuntimeError.wlg` with its name put in. Moved from the strings without a change but three final line breaks, which
+`ArrayMethods`, `Database` and `Response` had, and the line breaks of `Html`, `Test` and `Console`, CRLF in a Windows
+checkout before, LF now. `BuiltinSourcesTests` checks the five that `weblingo check` can.
+
 ## A native module's named imports
 
 `WebLingoBinder` binds the program's native modules before its statements (`BindNativeUnit`), and a name an import
