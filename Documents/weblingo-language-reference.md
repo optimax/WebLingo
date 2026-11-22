@@ -102,7 +102,7 @@ Terminals that support bold display `ERROR` in bold. The exit code says what hap
 |---|---|
 | 0 | it ran, or compiled, without errors |
 | 1 | the script has compilation errors |
-| 2 | the command line was wrong |
+| 2 | the command line was wrong, which the standard error says before how `weblingo` is used |
 | 3 | the script failed while it ran |
 | 4 | a file could not be read or written |
 

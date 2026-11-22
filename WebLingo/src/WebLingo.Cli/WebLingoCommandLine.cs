@@ -106,6 +106,9 @@ public static partial class WebLingoCommandLine
         if (args.Length >= 1 && args[0] == "test" && ReferenceEquals(program, Scripts))
             return RunTests(args, output, error, input, console);
         if (args.Length == 2 && args[0] == "disasm" && program.Bytecode) return DisassembleFile(args[1], output, error);
+        // What was wrong with the command line, written before how the program is used (the owner's request, 21 November
+        // 2026, "Enhance Errors About Command Line").
+        string? wrong = null;
         if (args.Length >= 2 && (args[0] is "run" or "check" || (args[0] == "compile" && program.Bytecode)))
         {
             // run|check|compile [--scheme name=folder]… [for compile, --register or --stack, or their aliases
@@ -115,7 +118,6 @@ public static partial class WebLingoCommandLine
             var run = args[0] == "run";
             int? regexTimeout = null;
             var at = 1;
-            string? wrong = null;
             while (wrong is null && at < args.Length
                    && (args[at] == "--scheme" || (args[at] == "--timeout" && run)
                        || (args[at] is "--register" or "--stack" or "--vm" && args[0] == "compile")))
@@ -139,10 +141,10 @@ public static partial class WebLingoCommandLine
                 }
                 if (args[at] is "--register" or "--stack" or "--vm")
                 {
-                    var named = args[at] == "--vm" ? (at + 1 < args.Length ? args[at + 1] : "") : args[at][2..];
+                    var named = args[at] == "--vm" ? (at + 1 < args.Length ? args[at + 1] : null) : args[at][2..];
                     if (named is not ("register" or "stack"))
                     {
-                        wrong = $"'{named}' is not a VM: register or stack.";
+                        wrong = named is null ? "--vm requires a VM: register or stack." : $"'{named}' is not a VM: register or stack.";
                         break;
                     }
                     if (vm is not null)
@@ -161,9 +163,11 @@ public static partial class WebLingoCommandLine
                     at += 2;
                     continue;
                 }
-                wrong = $"'{(at + 1 < args.Length ? args[at + 1] : "")}' is not a scheme, name=folder, or is given twice.";
+                wrong = at + 1 == args.Length ? "--scheme requires a scheme, name=folder."
+                    : $"'{args[at + 1]}' is not a scheme, name=folder, or is given twice.";
             }
-            if (wrong is null && at < args.Length)
+            if (wrong is null && at == args.Length) wrong = $"{args[0]} requires the file to {args[0]} after its options.";
+            if (wrong is null)
             {
                 var path = args[at];
                 var bytecode = program.Bytecode && WebLingoBytecodeFile.IsBytecodeExtension(Path.GetExtension(path));
@@ -176,6 +180,8 @@ public static partial class WebLingoCommandLine
                             : bytecode ? RunBytecode(program, false, path, none, schemes, output, error, input)
                             : RunFile(program, false, path, none, schemes, output, error, input);
                     }
+                    wrong = path.StartsWith("--", StringComparison.Ordinal) ? NotAnOption(program, path, args[0])
+                        : $"{args[0]} takes one file, not '{args[at + 1]}' after it.";
                 }
                 else if (TryParameters(args, at + 1, out var parameters, out var value))
                 {
@@ -185,14 +191,70 @@ public static partial class WebLingoCommandLine
                 }
                 else
                 {
-                    wrong = $"'{value}' is not a parameter's value, name=value, or is given twice.";
+                    wrong = path.StartsWith("--", StringComparison.Ordinal) ? NotAnOption(program, path, "run")
+                        : $"'{value}' is not a parameter's value, name=value, or is given twice.";
                 }
             }
-            if (wrong is not null) error.WriteLine(wrong);
         }
+        else if (args.Length >= 1)
+        {
+            wrong = Misuse(program, args);
+        }
+        return Usage(program, args.Length == 0, wrong, output, error);
+    }
 
-        // Without arguments, its version first, then how it is used (the owner's answer, 18 November 2026).
-        if (args.Length == 0) output.WriteLine(program.Version);
+    /// <summary>
+    /// What was wrong, <paramref name="wrong"/>, written to the standard error, then how the program is used, to its output,
+    /// as for any usage error: for a program's own commands, such as <c>wasp</c>'s <c>--root</c>.
+    /// </summary>
+    public static int ReportMisuse(WebLingoCommandLineProgram program, string wrong, TextWriter output, TextWriter error) =>
+        Usage(program, false, wrong, output, error);
+
+    /// <summary>
+    /// What was wrong with a command line that names no command the program has, or one without what it takes; the commands
+    /// with their files and options are checked where they are read.
+    /// </summary>
+    private static string Misuse(WebLingoCommandLineProgram program, string[] args)
+    {
+        var command = args[0];
+        if (command is "--version" or "version") return $"{command} takes nothing after it.";
+        if (command is "run" or "check" || (command == "compile" && program.Bytecode)) return $"{command} requires the file to {command}.";
+        if (command == "disasm" && program.Bytecode)
+            return args.Length == 1 ? "disasm requires the bytecode file to show." : $"disasm takes one file, not '{args[2]}' after it.";
+        List<string> commands = ["run", "check"];
+        if (program.Bytecode) commands.AddRange(["compile", "disasm"]);
+        if (ReferenceEquals(program, Scripts)) commands.Add("test");
+        commands.AddRange(program.MoreCommands);
+        commands.Add("--version");
+        var named = "";
+        if (program.RunsFileNamedFirst && command.IndexOfAny(['.', '/', '\\']) >= 0)
+        {
+            named = program.Bytecode
+                ? $"; a file named first is run when it is a {program.Extension}, {WebLingoBytecodeFile.RegisterExtension}, "
+                  + $"{WebLingoBytecodeFile.StackExtension} or {WebLingoBytecodeFile.LegacyExtension} file"
+                : $"; a file named first is run when it is a {program.Extension} file";
+        }
+        return $"'{command}' is not a command: {string.Join(", ", commands[..^1])} or {commands[^1]}{named}.";
+    }
+
+    /// <summary>An option the command does not take, and the command that takes it, where one does.</summary>
+    private static string NotAnOption(WebLingoCommandLineProgram program, string option, string command)
+    {
+        var whose = option == "--timeout" ? "run"
+            : option is "--register" or "--stack" or "--vm" && program.Bytecode ? "compile"
+            : null;
+        return whose is null || whose == command ? $"'{option}' is not an option of {command}."
+            : $"'{option}' is not an option of {command}, but of {whose}.";
+    }
+
+    /// <summary>
+    /// How the program is used, to its output, after what was wrong, if anything, to the standard error; without arguments,
+    /// its version first (the owner's answer, 18 November 2026), and not an error.
+    /// </summary>
+    private static int Usage(WebLingoCommandLineProgram program, bool noArguments, string? wrong, TextWriter output, TextWriter error)
+    {
+        if (wrong is not null) error.WriteLine(wrong);
+        if (noArguments) output.WriteLine(program.Version);
         var file = $"<file{program.Extension}>";
         var options = program.Options + "[--scheme <name>=<folder> …]";
         var bytecodeUsage = program.Bytecode
@@ -217,7 +279,7 @@ public static partial class WebLingoCommandLine
         output.WriteLine($"  --scheme  names a folder of native modules, over {program.Configuration}'s, in the file's folder");
         output.WriteLine("  --timeout sets the regular expression match timeout for run, in milliseconds (default 1000)");
         foreach (var line in program.OptionsHelp) output.WriteLine(line);
-        return args.Length == 0 ? Success : UsageError;
+        return noArguments ? Success : UsageError;
     }
 
     /// <summary>

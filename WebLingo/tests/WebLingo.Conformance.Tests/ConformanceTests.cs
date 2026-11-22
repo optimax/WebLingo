@@ -1395,6 +1395,39 @@ public sealed class ConformanceTests : IDisposable
         Assert.StartsWith("Usage: weblingo", output.ToString());
     }
 
+    // A usage error says what was wrong, on the standard error, before how weblingo is used (the owner's request,
+    // 21 November 2026, "Enhance Errors About Command Line"); none of these reaches a file.
+    [Theory]
+    [InlineData("'rnu' is not a command: run, check, compile, disasm, test or --version.", "rnu", "a.wlg")]
+    [InlineData("'notes.txt' is not a command: run, check, compile, disasm, test or --version; "
+        + "a file named first is run when it is a .wlg, .wlbr, .wlbs or .wlbc file.", "notes.txt")]
+    [InlineData("--version takes nothing after it.", "--version", "x")]
+    [InlineData("run requires the file to run.", "run")]
+    [InlineData("check requires the file to check.", "check")]
+    [InlineData("compile requires the file to compile.", "compile")]
+    [InlineData("disasm requires the bytecode file to show.", "disasm")]
+    [InlineData("disasm takes one file, not 'b' after it.", "disasm", "a.wlbr", "b")]
+    [InlineData("--scheme requires a scheme, name=folder.", "run", "--scheme")]
+    [InlineData("run requires the file to run after its options.", "run", "--timeout", "5")]
+    [InlineData("check takes one file, not 'b.wlg' after it.", "check", "a.wlg", "b.wlg")]
+    [InlineData("'--timeout' is not an option of check, but of run.", "check", "--timeout", "5", "a.wlg")]
+    [InlineData("'--fast' is not an option of compile.", "compile", "--fast", "a.wlg")]
+    [InlineData("--vm requires a VM: register or stack.", "compile", "--vm")]
+    [InlineData("'--vm' is not an option of run, but of compile.", "run", "--vm", "stack", "a.wlg")]
+    [InlineData("test requires the .wlg files whose tests it runs.", "test")]
+    [InlineData("'notes.txt' is not a .wlg file of tests.", "test", "notes.txt")]
+    [InlineData("--list may be given only once.", "test", "--list", "--list", "a.wlg")]
+    [InlineData("--filter requires the text that the labels of the tests to run contain.", "test", "--filter")]
+    [InlineData("'--fast' is not an option of test: --list or --filter <text>.", "test", "--fast", "a.wlg")]
+    public void AUsageErrorSaysWhatWasWrong(string message, params string[] args)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.UsageError, WebLingoCommandLine.Run(args, output, error));
+        Assert.Equal(message, error.ToString().Split('\n')[0].TrimEnd('\r'));
+        Assert.Contains("Usage: weblingo", output.ToString() + error.ToString());
+    }
+
     [Fact]
     public void AFileThatCannotBeReadExitsWith4()
     {

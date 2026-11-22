@@ -897,7 +897,7 @@ Terminals that support bold display `ERROR` in bold. The exit code says how it w
 |---|---|
 | 0 | it ran, or it compiled without errors |
 | 1 | the page has compilation errors |
-| 2 | the command line was wrong |
+| 2 | the command line was wrong, which the standard error says before how `wasp` is used |
 | 3 | the page failed while it ran |
 | 4 | a file could not be read or written |
 

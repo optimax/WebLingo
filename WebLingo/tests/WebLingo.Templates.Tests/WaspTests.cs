@@ -115,6 +115,23 @@ public sealed class WaspTests : IDisposable
         Assert.StartsWith("Usage: wasp", output.ToString());
     }
 
+    // A usage error says what was wrong, on the standard error, before how wasp is used (the owner's request,
+    // 21 November 2026, "Enhance Errors About Command Line").
+    [Theory]
+    [InlineData("'page.wasp' is not a command: run, check, serve, fastcgi or --version.", "page.wasp")]
+    [InlineData("'compile' is not a command: run, check, serve, fastcgi or --version.", "compile", "a.wasp")]
+    [InlineData("--root requires a folder.", "run", "--root")]
+    [InlineData("run requires the file to run after its options.", "run", "--root", "site")]
+    [InlineData("--root may be given only once.", "check", "--root", "a", "--root", "b", "p.wasp")]
+    public void AUsageErrorSaysWhatWasWrong(string message, params string[] args)
+    {
+        var output = new StringWriter();
+        var error = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.UsageError, WebLingoWaspCommandLine.Run(args, output, error));
+        Assert.Equal(message, error.ToString().TrimEnd());
+        Assert.StartsWith("Usage: wasp", output.ToString());
+    }
+
     [Fact]
     public void AnIncludeIsFoundFromTheRootOrFromItsFolder()
     {

@@ -42,12 +42,24 @@ public static partial class WebLingoCommandLine
                     filter = args[++first];
                     break;
                 default:
+                    // What was wrong, then how test is used (the owner's request, 21 November 2026, "Enhance Errors About
+                    // Command Line").
+                    error.WriteLine(args[first] switch
+                    {
+                        "--list" => "--list may be given only once.",
+                        "--filter" when filter is not null => "--filter may be given only once.",
+                        "--filter" => "--filter requires the text that the labels of the tests to run contain.",
+                        var option => $"'{option}' is not an option of test: --list or --filter <text>."
+                    });
                     error.WriteLine($"Usage: weblingo {TestUsage}");
                     return UsageError;
             }
         }
-        if (first == args.Length || args.Skip(first).Any(path => !path.EndsWith(Scripts.Extension, StringComparison.OrdinalIgnoreCase)))
+        var notTests = args.Skip(first).FirstOrDefault(path => !path.EndsWith(Scripts.Extension, StringComparison.OrdinalIgnoreCase));
+        if (first == args.Length || notTests is not null)
         {
+            error.WriteLine(notTests is null ? $"test requires the {Scripts.Extension} files whose tests it runs."
+                : $"'{notTests}' is not a {Scripts.Extension} file of tests.");
             error.WriteLine($"Usage: weblingo {TestUsage}");
             return UsageError;
         }

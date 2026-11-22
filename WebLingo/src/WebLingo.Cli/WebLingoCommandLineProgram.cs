@@ -23,6 +23,12 @@ public sealed record WebLingoCommandLineProgram(
     /// <summary>The usage's lines saying what <see cref="Options"/> are.</summary>
     public IReadOnlyList<string> OptionsHelp { get; init; } = [];
 
+    /// <summary>
+    /// The commands the program reads itself, before the shared command line, which a command it does not have names among
+    /// its commands: <c>wasp</c>'s <c>serve</c> and <c>fastcgi</c>.
+    /// </summary>
+    public IReadOnlyList<string> MoreCommands { get; init; } = [];
+
     /// <summary>The optional source compiler for the stack VM.</summary>
     public Func<WebLingoSourceText, WebLingoCompilerOptions, WebLingoCommandLineCompilation>? CompileForStack { get; init; }
 

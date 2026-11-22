@@ -35,6 +35,7 @@ public static class WebLingoWaspCommandLine
             HasConsole = false,
             Root = root,
             Options = "[--root <folder>] ",
+            MoreCommands = ["serve", "fastcgi"],
             OptionsHelp =
             [
                 "  --root the application's root, which an include's path starting with / is from; the page's folder when left out",
@@ -60,7 +61,12 @@ public static class WebLingoWaspCommandLine
                 at += 2;
                 continue;
             }
-            if (root is not null || at + 2 >= rest.Count) return WebLingoCommandLine.Run(Pages(null), ["--root"], output, error);
+            if (root is not null || at + 2 >= rest.Count)
+            {
+                return WebLingoCommandLine.ReportMisuse(Pages(null), root is not null ? "--root may be given only once."
+                    : at + 1 == rest.Count ? "--root requires a folder."
+                    : $"{args[0]} requires the file to {args[0]} after its options.", output, error);
+            }
             root = rest[at + 1];
             rest.RemoveRange(at, 2);
         }
