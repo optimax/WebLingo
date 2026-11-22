@@ -1,0 +1,666 @@
+function main (11 locals, 23 registers)
+00  NewCell r7(<text>)
+01  NewCell r8(Task)
+02  MakeClass r5(Object), class0(Object)
+03  MakeClass r11, class1(Text) extends r5(Object)
+04  StoreCell r7(<text>), r11
+05  MakeClass r11, class2(Task) extends r5(Object)
+06  StoreCell r8(Task), r11
+07  MakeClass r6(std:console.Console), class3(Console) extends r5(Object)
+08  MakeClass r9(std:console.ConsoleColor), class4(ConsoleColor) extends r5(Object)
+09  MakeModule r0(module), file0(01-hello.wlg), r0(module)+0
+10  Move r11, r6(std:console.Console)
+11  Move r12, r9(std:console.ConsoleColor)
+12  LoadBuiltin r13, std:console.write
+13  LoadBuiltin r14, std:console.writeLn
+14  LoadBuiltin r15, std:console.print
+15  LoadBuiltin r16, std:console.printLn
+16  LoadBuiltin r17, std:console.writeError
+17  LoadBuiltin r18, std:console.writeErrorLn
+18  LoadBuiltin r19, std:console.readLine
+19  LoadBuiltin r20, std:console.readLineSync
+20  LoadBuiltin r21, std:console.prompt
+21  LoadBuiltin r22, std:console.readPassword
+22  MakeModule r10(std:console), file1(std:console), r11+12
+23  Import r11, file1(std:console)
+24  Await r1(import std:console), r11
+25  GetMember r11, r1(import std:console)."writeLn"
+26  LoadConstant r12, "Hello, WebLingo!"
+27  Call r11, r11(r12)
+28  GetMember r11, r1(import std:console)."write"
+29  LoadConstant r12, "write leaves the line open, "
+30  Call r11, r11(r12)
+31  GetMember r11, r1(import std:console)."writeLn"
+32  LoadConstant r12, "writeLn ends it."
+33  Call r11, r11(r12)
+34  LoadConstant r4(answer), 42
+35  GetMember r11, r1(import std:console)."writeLn"
+36  Move r12, r4(answer)
+37  Call r11, r11(r12)
+38  GetMember r11, r1(import std:console)."writeLn"
+39  LoadConstant r13, 1
+40  LoadConstant r14, "two"
+41  LoadConstant r15, 3d
+42  LoadNull r16
+43  LoadBoolean r17, true
+44  NewArray r12, [r13, r14, r15, r16, r17]
+45  Call r11, r11(r12)
+46  Return
+
+function function0 Object (1 parameters, 1 locals, 1 registers)
+00  Return
+
+function function1 equal (2 parameters, 2 locals, 3 registers)
+00  Equal r2, r0(this), r1(other)
+01  ReturnValue r2
+02  Return
+
+function function2 toString (1 parameters, 1 locals, 2 registers)
+00  ToText r1, r0(this)
+01  ReturnValue r1
+02  Return
+
+function function3 Text (1 parameters, 1 locals, 1 registers)
+00  Return
+
+function function4 of (1 parameters, 1 locals, 2 registers)
+00  LoadNull r1
+01  Equal r1, r0(value), r1
+02  JumpIfFalse r1, 05
+03  LoadConstant r1, ""
+04  ReturnValue r1
+05  ToText r1, r0(value), written
+06  ReturnValue r1
+07  Return
+
+function function5 Task (1 parameters, 1 locals, 1 registers)
+00  Return
+
+function function6 Console (1 parameters, 1 locals, 2 registers)
+00  Move r1, r0(this)
+01  CallBuiltin r1, std:console.Console.constructor(r1)
+02  Return
+
+function function7 beep (2 parameters, 2 locals, 4 registers)
+00  JumpIfGiven r0(a0), 02
+01  LoadNull r0(a0)
+02  JumpIfGiven r1(a1), 04
+03  LoadNull r1(a1)
+04  Move r2, r0(a0)
+05  Move r3, r1(a1)
+06  CallBuiltin r2, std:console.Console.static.beep(r2, r3)
+07  ReturnValue r2
+08  Return
+
+function function8 clear (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.clear()
+01  ReturnValue r0
+02  Return
+
+function function9 resetColor (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.resetColor()
+01  ReturnValue r0
+02  Return
+
+function function10 getCursorPosition (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.getCursorPosition()
+01  ReturnValue r0
+02  Return
+
+function function11 setCursorPosition (2 parameters, 2 locals, 4 registers)
+00  Move r2, r0(a0)
+01  Move r3, r1(a1)
+02  CallBuiltin r2, std:console.Console.static.setCursorPosition(r2, r3)
+03  ReturnValue r2
+04  Return
+
+function function12 setWindowSize (2 parameters, 2 locals, 4 registers)
+00  Move r2, r0(a0)
+01  Move r3, r1(a1)
+02  CallBuiltin r2, std:console.Console.static.setWindowSize(r2, r3)
+03  ReturnValue r2
+04  Return
+
+function function13 setWindowPosition (2 parameters, 2 locals, 4 registers)
+00  Move r2, r0(a0)
+01  Move r3, r1(a1)
+02  CallBuiltin r2, std:console.Console.static.setWindowPosition(r2, r3)
+03  ReturnValue r2
+04  Return
+
+function function14 setBufferSize (2 parameters, 2 locals, 4 registers)
+00  Move r2, r0(a0)
+01  Move r3, r1(a1)
+02  CallBuiltin r2, std:console.Console.static.setBufferSize(r2, r3)
+03  ReturnValue r2
+04  Return
+
+function function15 moveBufferArea (9 parameters, 9 locals, 18 registers)
+00  JumpIfGiven r6(a6), 02
+01  LoadNull r6(a6)
+02  JumpIfGiven r7(a7), 04
+03  LoadNull r7(a7)
+04  JumpIfGiven r8(a8), 06
+05  LoadNull r8(a8)
+06  Move r9, r0(a0)
+07  Move r10, r1(a1)
+08  Move r11, r2(a2)
+09  Move r12, r3(a3)
+10  Move r13, r4(a4)
+11  Move r14, r5(a5)
+12  Move r15, r6(a6)
+13  Move r16, r7(a7)
+14  Move r17, r8(a8)
+15  CallBuiltin r9, std:console.Console.static.moveBufferArea(r9, r10, r11, r12, r13, r14, r15, r16, r17)
+16  ReturnValue r9
+17  Return
+
+function function16 readKey (1 parameters, 1 locals, 2 registers)
+00  JumpIfGiven r0(a0), 02
+01  LoadNull r0(a0)
+02  Move r1, r0(a0)
+03  CallBuiltin r1, std:console.Console.static.readKey(r1)
+04  ReturnValue r1
+05  Return
+
+function function17 readKeySync (1 parameters, 1 locals, 2 registers)
+00  JumpIfGiven r0(a0), 02
+01  LoadNull r0(a0)
+02  Move r1, r0(a0)
+03  CallBuiltin r1, std:console.Console.static.readKeySync(r1)
+04  ReturnValue r1
+05  Return
+
+function function18 read (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.read()
+01  ReturnValue r0
+02  Return
+
+function function19 readSync (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.readSync()
+01  ReturnValue r0
+02  Return
+
+function function20 readLine (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.readLine()
+01  ReturnValue r0
+02  Return
+
+function function21 readLineSync (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.readLineSync()
+01  ReturnValue r0
+02  Return
+
+function function22 prompt (1 parameters, 1 locals, 2 registers)
+00  Move r1, r0(a0)
+01  CallBuiltin r1, std:console.Console.static.prompt(r1)
+02  ReturnValue r1
+03  Return
+
+function function23 readPassword (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.readPassword()
+01  ReturnValue r0
+02  Return
+
+function function24 __write (1 parameters, 1 locals, 2 registers)
+00  Move r1, r0(a0)
+01  CallBuiltin r1, std:console.Console.static.__write(r1)
+02  ReturnValue r1
+03  Return
+
+function function25 __writeError (1 parameters, 1 locals, 2 registers)
+00  Move r1, r0(a0)
+01  CallBuiltin r1, std:console.Console.static.__writeError(r1)
+02  ReturnValue r1
+03  Return
+
+function function26 __watchCancelKeyPress (1 parameters, 1 locals, 2 registers)
+00  Move r1, r0(a0)
+01  CallBuiltin r1, std:console.Console.static.__watchCancelKeyPress(r1)
+02  ReturnValue r1
+03  Return
+
+function function27 __nextCancelKeyPress (1 parameters, 1 locals, 2 registers)
+00  Move r1, r0(a0)
+01  CallBuiltin r1, std:console.Console.static.__nextCancelKeyPress(r1)
+02  ReturnValue r1
+03  Return
+
+function function28 __endAsCancelled (1 parameters, 1 locals, 2 registers)
+00  Move r1, r0(a0)
+01  CallBuiltin r1, std:console.Console.static.__endAsCancelled(r1)
+02  ReturnValue r1
+03  Return
+
+function function29 get:title (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.title()
+01  ReturnValue r0
+02  Return
+
+function function30 set:title (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.title(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function31 get:foregroundColor (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.foregroundColor()
+01  ReturnValue r0
+02  Return
+
+function function32 set:foregroundColor (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.foregroundColor(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function33 get:backgroundColor (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.backgroundColor()
+01  ReturnValue r0
+02  Return
+
+function function34 set:backgroundColor (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.backgroundColor(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function35 get:cursorLeft (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.cursorLeft()
+01  ReturnValue r0
+02  Return
+
+function function36 set:cursorLeft (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.cursorLeft(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function37 get:cursorTop (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.cursorTop()
+01  ReturnValue r0
+02  Return
+
+function function38 set:cursorTop (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.cursorTop(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function39 get:cursorSize (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.cursorSize()
+01  ReturnValue r0
+02  Return
+
+function function40 set:cursorSize (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.cursorSize(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function41 get:cursorVisible (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.cursorVisible()
+01  ReturnValue r0
+02  Return
+
+function function42 set:cursorVisible (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.cursorVisible(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function43 get:windowWidth (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.windowWidth()
+01  ReturnValue r0
+02  Return
+
+function function44 set:windowWidth (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.windowWidth(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function45 get:windowHeight (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.windowHeight()
+01  ReturnValue r0
+02  Return
+
+function function46 set:windowHeight (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.windowHeight(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function47 get:windowLeft (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.windowLeft()
+01  ReturnValue r0
+02  Return
+
+function function48 set:windowLeft (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.windowLeft(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function49 get:windowTop (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.windowTop()
+01  ReturnValue r0
+02  Return
+
+function function50 set:windowTop (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.windowTop(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function51 get:bufferWidth (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.bufferWidth()
+01  ReturnValue r0
+02  Return
+
+function function52 set:bufferWidth (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.bufferWidth(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function53 get:bufferHeight (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.bufferHeight()
+01  ReturnValue r0
+02  Return
+
+function function54 set:bufferHeight (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.bufferHeight(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function55 get:largestWindowWidth (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.largestWindowWidth()
+01  ReturnValue r0
+02  Return
+
+function function56 get:largestWindowHeight (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.largestWindowHeight()
+01  ReturnValue r0
+02  Return
+
+function function57 get:keyAvailable (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.keyAvailable()
+01  ReturnValue r0
+02  Return
+
+function function58 get:capsLock (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.capsLock()
+01  ReturnValue r0
+02  Return
+
+function function59 get:numberLock (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.numberLock()
+01  ReturnValue r0
+02  Return
+
+function function60 get:treatControlCAsInput (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.treatControlCAsInput()
+01  ReturnValue r0
+02  Return
+
+function function61 set:treatControlCAsInput (1 parameters, 2 locals, 3 registers)
+00  Move r1(assigned), r0(a0)
+01  Move r2, r0(a0)
+02  CallBuiltin r2, std:console.Console.static.set.treatControlCAsInput(r2)
+03  ReturnValue r1(assigned)
+04  Return
+
+function function62 get:isInputRedirected (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.isInputRedirected()
+01  ReturnValue r0
+02  Return
+
+function function63 get:isOutputRedirected (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.isOutputRedirected()
+01  ReturnValue r0
+02  Return
+
+function function64 get:isErrorRedirected (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.isErrorRedirected()
+01  ReturnValue r0
+02  Return
+
+function function65 get:inputEncoding (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.inputEncoding()
+01  ReturnValue r0
+02  Return
+
+function function66 get:outputEncoding (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.Console.static.get.outputEncoding()
+01  ReturnValue r0
+02  Return
+
+function function67 write (2 parameters, 1 captures, 2 locals, 7 registers)
+00  Move r2, r0(this)
+01  LoadNull r5
+02  Equal r5, r1(value), r5
+03  JumpIfFalse r5, 06
+04  LoadConstant r4, "null"
+05  Jump 9
+06  LoadCapture r5, capture0
+07  Move r6, r1(value)
+08  CallMethod r4, r5."of"(r6)
+09  Move r3, r4
+10  CallMethod r2, r2."__write"(r3)
+11  Return
+
+function function68 writeLn (2 parameters, 1 captures, 2 locals, 7 registers)
+00  Move r2, r0(this)
+01  LoadNull r5
+02  Equal r5, r1(value), r5
+03  JumpIfFalse r5, 06
+04  LoadConstant r4, "null"
+05  Jump 9
+06  LoadCapture r5, capture0
+07  Move r6, r1(value)
+08  CallMethod r4, r5."of"(r6)
+09  LoadConstant r5, "
+"
+10  Add r3, r4, r5
+11  CallMethod r2, r2."__write"(r3)
+12  Return
+
+function function69 print (2 parameters, 1 captures, 2 locals, 7 registers)
+00  Move r2, r0(this)
+01  LoadNull r5
+02  Equal r5, r1(value), r5
+03  JumpIfFalse r5, 06
+04  LoadConstant r4, "null"
+05  Jump 9
+06  LoadCapture r5, capture0
+07  Move r6, r1(value)
+08  CallMethod r4, r5."of"(r6)
+09  Move r3, r4
+10  CallMethod r2, r2."__write"(r3)
+11  Return
+
+function function70 printLn (2 parameters, 1 captures, 2 locals, 7 registers)
+00  Move r2, r0(this)
+01  LoadNull r5
+02  Equal r5, r1(value), r5
+03  JumpIfFalse r5, 06
+04  LoadConstant r4, "null"
+05  Jump 9
+06  LoadCapture r5, capture0
+07  Move r6, r1(value)
+08  CallMethod r4, r5."of"(r6)
+09  LoadConstant r5, "
+"
+10  Add r3, r4, r5
+11  CallMethod r2, r2."__write"(r3)
+12  Return
+
+function function71 writeError (2 parameters, 1 captures, 2 locals, 7 registers)
+00  Move r2, r0(this)
+01  LoadNull r5
+02  Equal r5, r1(value), r5
+03  JumpIfFalse r5, 06
+04  LoadConstant r4, "null"
+05  Jump 9
+06  LoadCapture r5, capture0
+07  Move r6, r1(value)
+08  CallMethod r4, r5."of"(r6)
+09  Move r3, r4
+10  CallMethod r2, r2."__writeError"(r3)
+11  Return
+
+function function72 writeErrorLn (2 parameters, 1 captures, 2 locals, 7 registers)
+00  Move r2, r0(this)
+01  LoadNull r5
+02  Equal r5, r1(value), r5
+03  JumpIfFalse r5, 06
+04  LoadConstant r4, "null"
+05  Jump 9
+06  LoadCapture r5, capture0
+07  Move r6, r1(value)
+08  CallMethod r4, r5."of"(r6)
+09  LoadConstant r5, "
+"
+10  Add r3, r4, r5
+11  CallMethod r2, r2."__writeError"(r3)
+12  Return
+
+function function73 onCancelKeyPress (2 parameters, 3 locals, 6 registers)
+00  Move r3, r0(this)
+01  Move r4, r1(handler)
+02  CallMethod r2(generation), r3."__watchCancelKeyPress"(r4)
+03  LoadNull r3
+04  NotEqual r3, r1(handler), r3
+05  JumpIfFalse r3, 10
+06  Move r3, r0(this)
+07  Move r4, r1(handler)
+08  Move r5, r2(generation)
+09  CallMethod r3, r3."__handleCancelKeyPress"(r4, r5)
+10  Return
+
+function function74 __handleCancelKeyPress (3 parameters, 1 captures, 5 locals, 7 registers)
+00  Move r5, r0(this)
+01  Move r6, r2(generation)
+02  CallMethod r5, r5."__nextCancelKeyPress"(r6)
+03  Await r3(key), r5
+04  LoadNull r5
+05  NotEqual r5, r3(key), r5
+06  JumpIfFalse r5, 24
+07  Move r5, r3(key)
+08  Call r4(kept), r1(handler)(r5)
+09  LoadCapture r5, capture0
+10  IsInstance r5, r4(kept), r5
+11  JumpIfFalse r5, 13
+12  Await r4(kept), r4(kept)
+13  LoadBoolean r5, true
+14  NotEqual r5, r4(kept), r5
+15  JumpIfFalse r5, 19
+16  Move r5, r0(this)
+17  Move r6, r3(key)
+18  CallMethod r5, r5."__endAsCancelled"(r6)
+19  Move r5, r0(this)
+20  Move r6, r2(generation)
+21  CallMethod r5, r5."__nextCancelKeyPress"(r6)
+22  Await r3(key), r5
+23  Jump 4
+24  Return
+
+function function75 ConsoleColor (1 parameters, 1 locals, 2 registers)
+00  Move r1, r0(this)
+01  CallBuiltin r1, std:console.ConsoleColor.constructor(r1)
+02  Return
+
+function function76 get:black (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.black()
+01  ReturnValue r0
+02  Return
+
+function function77 get:darkBlue (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.darkBlue()
+01  ReturnValue r0
+02  Return
+
+function function78 get:darkGreen (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.darkGreen()
+01  ReturnValue r0
+02  Return
+
+function function79 get:darkCyan (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.darkCyan()
+01  ReturnValue r0
+02  Return
+
+function function80 get:darkRed (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.darkRed()
+01  ReturnValue r0
+02  Return
+
+function function81 get:darkMagenta (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.darkMagenta()
+01  ReturnValue r0
+02  Return
+
+function function82 get:darkYellow (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.darkYellow()
+01  ReturnValue r0
+02  Return
+
+function function83 get:gray (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.gray()
+01  ReturnValue r0
+02  Return
+
+function function84 get:darkGray (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.darkGray()
+01  ReturnValue r0
+02  Return
+
+function function85 get:blue (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.blue()
+01  ReturnValue r0
+02  Return
+
+function function86 get:green (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.green()
+01  ReturnValue r0
+02  Return
+
+function function87 get:cyan (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.cyan()
+01  ReturnValue r0
+02  Return
+
+function function88 get:red (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.red()
+01  ReturnValue r0
+02  Return
+
+function function89 get:magenta (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.magenta()
+01  ReturnValue r0
+02  Return
+
+function function90 get:yellow (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.yellow()
+01  ReturnValue r0
+02  Return
+
+function function91 get:white (0 locals, 1 registers)
+00  CallBuiltin r0, std:console.ConsoleColor.static.get.white()
+01  ReturnValue r0
+02  Return
