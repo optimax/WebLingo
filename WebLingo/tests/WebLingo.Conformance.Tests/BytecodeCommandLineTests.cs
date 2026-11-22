@@ -174,9 +174,42 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.Matches(@"LoadCapture .*capture\d+\(k\)", output);
         Assert.Contains("\n; 3:21\n", output);
         Assert.Contains($"\nvariable doubled: {local}1, visible 3:32 to 3:59\n", output);
-        Assert.Contains($"\nvariable writeLn: {local}1(import std:console).\"writeLn\", visible from 1:17\n", output);
+        Assert.Matches($"\nvariable writeLn: {local}\\d+\\(import std:console\\)\\.\"writeLn\", visible from 1:17\n", output);
         var bytes = System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(compiled));
         Assert.DoesNotContain(Path.GetFileName(_folder), bytes);
+    }
+
+    [Theory]
+    [InlineData("register")]
+    [InlineData("stack")]
+    public void ANativeModulesNamedImportIsItsExportItself(string vm)
+    {
+        // A name an import takes of a native module's export, which nothing assigns, is the export itself, a function called
+        // as the built-in it is, without reading the module's member (the owner's request, 22 November 2026, "A Native
+        // Module's Named Imports Bound Directly"); what the program writes, and its errors, as before.
+        var calls = Write("calls.wlg", "import { writeLn } from \"std:console\";\nimport { abs } from \"std:math\";\nwriteLn(abs(-2));\n");
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, calls).Exit);
+        var main = Weblingo("disasm", Path.ChangeExtension(calls, Extension(vm))).Output.Split("\n\n")[0];
+        Assert.Contains("CallBuiltin", main);
+        Assert.Contains("std:console.writeLn", main);
+        Assert.DoesNotContain(".\"writeLn\"", main);
+        Assert.DoesNotContain(".\"abs\"", main);
+        Assert.Equal((WebLingoCommandLine.Success, "2\n", ""), Weblingo("run", Path.ChangeExtension(calls, Extension(vm))));
+
+        // The same function, class and constant as the module's own; a call with other than its arguments an error where it runs.
+        var same = Write("same.wlg", """
+            import { writeLn, Console } from "std:console";
+            import console from "std:console";
+            import { PI, min } from "std:math";
+            import math from "std:math";
+            var f = writeLn;
+            writeLn([f == console.writeLn, Console == console.Console, PI == math.PI, min(3, 1, 2)]);
+            writeLn();
+            """);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, same).Exit);
+        var (exit, output, error) = Weblingo("run", Path.ChangeExtension(same, Extension(vm)));
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "[true, true, true, 1]\n"), (exit, output));
+        Assert.Contains("(7,1): ERROR WL2006 (ArgumentError): 'std:console.writeLn' takes 1 argument, not 0.", error);
     }
 
     [Fact]

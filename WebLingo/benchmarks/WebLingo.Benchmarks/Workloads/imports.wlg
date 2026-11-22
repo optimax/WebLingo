@@ -1,0 +1,8 @@
+// A native module's functions, imported by name, called in a loop: 400,000 calls of std:math's abs and sign.
+import { writeLn } from "std:console";
+import { abs, sign } from "std:math";
+var total = 0;
+for (var i = 0; i < 200000; i = i + 1) {
+    total = total + abs(i - 100000) + sign(i - 7);
+}
+writeLn(total);

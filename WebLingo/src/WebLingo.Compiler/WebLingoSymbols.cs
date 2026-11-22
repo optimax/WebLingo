@@ -125,6 +125,19 @@ public sealed class WebLingoLocalSymbol(string name, WebLingoDeclarationKind kin
     /// built-in, which the name means as a built-in every program had meant it, called directly (section 3.9).
     /// </summary>
     public WebLingoBuiltinDeclaration? ImportedBuiltin { get; set; }
+
+    /// <summary>
+    /// Whether <see cref="ImportedBuiltin"/> is a native module's function, which a call with too few or too many arguments
+    /// calls as a value, an error where it runs, as reading the module's export gave it (the owner's request, 22 November
+    /// 2026, "A Native Module's Named Imports Bound Directly").
+    /// </summary>
+    public bool ImportedNative { get; set; }
+
+    /// <summary>
+    /// For a name an import takes of a native module's class, constant, or function written in WebLingo: the local that holds
+    /// it, made where the program begins, which the module's instance exports, read directly rather than through the module.
+    /// </summary>
+    public WebLingoLocalSymbol? ImportedLocal { get; set; }
     public bool IsConstant => Kind is WebLingoDeclarationKind.Const or WebLingoDeclarationKind.Function or WebLingoDeclarationKind.Class;
 }
 

@@ -13,7 +13,8 @@ public sealed record WebLingoWorkload(string Name, string Exercises, string Sour
 }
 
 /// <summary>
-/// The benchmark's workloads (specification, section 5.6): loops, calls, closures, strings, collections, objects (property
+/// The benchmark's workloads (specification, section 5.6): loops, calls, imports (a native module's functions imported by
+/// name), closures, strings, collections, objects (property
 /// access), async (asynchronous suspension), templates (template output) and io (I/O-bound work, in a folder of its own,
 /// which the benchmark makes and removes). Each is a <c>.wlg</c> file in
 /// <c>Workloads/</c>, embedded in the assembly, that <c>weblingo run</c> also runs, and each writes one result, which
@@ -26,6 +27,7 @@ public static class WebLingoWorkloads
     [
         Load("loops", "nested for loops, int64 arithmetic, comparisons and if", "165666500\n"),
         Load("calls", "recursive calls of a declared function", "75025\n"),
+        Load("imports", "a native module's functions, imported by name, called in a loop", "10000199985\n"),
         Load("closures", "closures made and called, sharing captured cells", "3300000\n"),
         Load("strings", "string concatenation and comparison, the heap and its collector", "20000\n"),
         Load("bytes", "bytes built from many small pieces by BytesBuilders, and read", "600300\n"),

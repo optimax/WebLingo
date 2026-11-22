@@ -159,6 +159,17 @@ public sealed class WebLingoBinder
         // A program that imports, itself included, has a table of its files.
         var mainInstance = modules.Count > 1 || modules[0].Imports.Count > 0 ? DeclareHidden("module", default) : null;
         var programParameters = new List<WebLingoModuleParameter>();
+        // The native modules, bound before the program's statements, so that a name an import takes of one is its export
+        // itself (the owner's request, 22 November 2026, "A Native Module's Named Imports Bound Directly").
+        for (var i = 1; i < modules.Count; i++)
+        {
+            var module = modules[i];
+            if (module.Native is { } native && !(module.IsStandard && (WebLingoStandardModules.Classes.ContainsKey(module.Name)
+                    || WebLingoStandardModules.Functions.ContainsKey(module.Name))))
+            {
+                _nativeUnits[i] = BindNativeUnit(module.Name, native);
+            }
+        }
         var statements = BindProgramParameters(mainParameters, importedValues, programParameters);
         statements.AddRange(BindStatements(AfterParameters(modules[0].Root, mainParameters.Count)));
         if (isImport)
@@ -213,29 +224,9 @@ public sealed class WebLingoBinder
                 });
                 continue;
             }
-            if (module.Native is { } native)
+            if (_nativeUnits.TryGetValue(i, out var nativeUnit))
             {
-                // A native module: its functions, the host's built-ins, and its classes, made with the built-in ones, its
-                // exports, made where the program begins (section 3.9).
-                var functions = new List<WebLingoBuiltinSymbol>();
-                var names = new List<string>();
-                var classes = new List<(string, WebLingoLocalSymbol)>();
-                foreach (var export in native.Exports)
-                {
-                    if (export.Optional > 0 || export.Rest)
-                    {
-                        // One whose last parameters a call may leave out, or whose last is a rest parameter: a function
-                        // written in WebLingo, which calls it.
-                        classes.Add((export.Name, BindNativeFunction(module.Name, export)));
-                        continue;
-                    }
-                    functions.Add(UseBuiltin(new WebLingoBuiltinDeclaration(export.Builtin, export.Arity)));
-                    names.Add(export.Name);
-                }
-                foreach (var nativeClass in native.Classes) classes.Add((nativeClass.Name, BindNativeClass(module.Name, nativeClass)));
-                foreach (var constant in native.Constants) classes.Add((constant.Name, BindNativeConstant(module.Name, constant)));
-                var nativeInstance = DeclareHidden(module.Name, default);
-                units.Add(new WebLingoBoundUnit(module.Name, null, classes, nativeInstance) { Builtins = functions, BuiltinNames = names });
+                units.Add(nativeUnit.Unit);
                 continue;
             }
             var (outerFunction, outerScope) = (_function, _scope);
@@ -614,6 +605,14 @@ public sealed class WebLingoBinder
                         && _hostBuiltins.TryGetValue(imported.Name, out var hosted) && !hosted.RendersComponent && !hosted.InTemplates)
                     {
                         alias.ImportedBuiltin = hosted;
+                    }
+                    // A native module's export, which nothing assigns: its function the built-in itself, its class, constant or
+                    // function written in WebLingo the local that holds it, rather than the module's member read at each use.
+                    else if (_nativeUnits.TryGetValue(unit, out var native)
+                             && native.Exports.TryGetValue(imported.Name, out var given))
+                    {
+                        if (given.Builtin is { } builtin) (alias.ImportedBuiltin, alias.ImportedNative) = (builtin, true);
+                        else alias.ImportedLocal = given.Local;
                     }
                 }
             }
@@ -1546,6 +1545,7 @@ public sealed class WebLingoBinder
         if (LookupLocal(name.Name) is { } local)
         {
             if (local.ImportedBuiltin is { } imported) return new WebLingoBoundBuiltinReference(UseBuiltin(imported), name.Span);
+            if (local.ImportedLocal is { } exported) return Reference(exported, name.Span);
             // A name an import takes is its module's export, read as it is when read (section 3.9).
             return local.ImportOf is { } module
                 ? new WebLingoBoundMember(Reference(module, name.Span), local.ImportName!, name.Span)
@@ -1814,6 +1814,10 @@ public sealed class WebLingoBinder
                 var values = arguments.Count == 2 ? arguments[1] : null;
                 return new WebLingoBoundImportDynamic(arguments[0], values, call.Span) { Anew = true };
             }
+            // A native module's function given other than its arguments: called as its value, its error where it runs, as it
+            // was through the module's export.
+            if (arguments.Count != declaration.Arity && LookupLocal(name.Name) is { ImportedNative: true })
+                return new WebLingoBoundCall(BindExpression(calleeSyntax), arguments, call.Span);
             // A built-in called by its name: checked now, and called directly.
             if (!CheckArity(name.Name, declaration.Arity, arguments.Count, call.Span)) return new WebLingoBoundError(call.Span);
             if (WebLingoTemplateWriters.TryEscapedAs(name.Name, out var escape, out _) && escape == WebLingoHtmlEscape.Script)
@@ -2159,6 +2163,59 @@ public sealed class WebLingoBinder
 
     /// <summary>The native modules' functions with optional parameters, made after the built-in classes (section 3.9).</summary>
     private readonly List<WebLingoBoundStatement> _nativeFunctions = [];
+
+    /// <summary>
+    /// A native module bound: its unit, and each export by its name, a function the host's built-in, or the local holding a
+    /// class, a constant, or a function written in WebLingo, which a name an import takes is bound to.
+    /// </summary>
+    private sealed record NativeUnit(WebLingoBoundUnit Unit,
+        Dictionary<string, (WebLingoBuiltinDeclaration? Builtin, WebLingoLocalSymbol? Local)> Exports);
+
+    /// <summary>The program's native modules, by their files' indices, bound before its statements.</summary>
+    private readonly Dictionary<int, NativeUnit> _nativeUnits = [];
+
+    /// <summary>
+    /// A native module: its functions, the host's built-ins, and its classes, made with the built-in ones, its exports,
+    /// made where the program begins (section 3.9).
+    /// </summary>
+    private NativeUnit BindNativeUnit(string module, WebLingoNativeModuleInfo native)
+    {
+        var functions = new List<WebLingoBuiltinSymbol>();
+        var names = new List<string>();
+        var classes = new List<(string, WebLingoLocalSymbol)>();
+        var exports = new Dictionary<string, (WebLingoBuiltinDeclaration?, WebLingoLocalSymbol?)>(StringComparer.Ordinal);
+        foreach (var export in native.Exports)
+        {
+            if (export.Optional > 0 || export.Rest)
+            {
+                // One whose last parameters a call may leave out, or whose last is a rest parameter: a function written in
+                // WebLingo, which calls it.
+                var made = BindNativeFunction(module, export);
+                classes.Add((export.Name, made));
+                exports[export.Name] = (null, made);
+                continue;
+            }
+            var declaration = new WebLingoBuiltinDeclaration(export.Builtin, export.Arity);
+            functions.Add(UseBuiltin(declaration));
+            names.Add(export.Name);
+            exports[export.Name] = (declaration, null);
+        }
+        foreach (var nativeClass in native.Classes)
+        {
+            var made = BindNativeClass(module, nativeClass);
+            classes.Add((nativeClass.Name, made));
+            exports[nativeClass.Name] = (null, made);
+        }
+        foreach (var constant in native.Constants)
+        {
+            var made = BindNativeConstant(module, constant);
+            classes.Add((constant.Name, made));
+            exports[constant.Name] = (null, made);
+        }
+        var instance = DeclareHidden(module, default);
+        return new NativeUnit(new WebLingoBoundUnit(module, null, classes, instance) { Builtins = functions, BuiltinNames = names },
+            exports);
+    }
 
     /// <summary>
     /// A native class's member: a method whose body calls its built-in, giving what it gives, or nothing, for a constructor
