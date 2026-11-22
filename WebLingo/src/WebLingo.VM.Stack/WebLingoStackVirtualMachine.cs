@@ -2154,6 +2154,13 @@ public sealed class WebLingoStackVirtualMachine
             {
                 return sp;
             }
+            // A file with neither its instance nor a function that makes it, which only damaged bytecode imports.
+            if (_unitClosures[unit].Kind != WebLingoValueKind.Function)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.BytecodeVerificationFailure,
+                    $"The bytecode is invalid: file {unit} ('{info.Name}') is imported, but nothing makes its instance.");
+                return sp;
+            }
             Pend(_unitClosures[unit], info.Parameters.Count > 0 ? 1 : 0);
             return sp;
         }

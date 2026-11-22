@@ -161,7 +161,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         var plain = Weblingo("disasm", compiled).Output;
         Assert.Matches(@"MakeClass .*class\d+\(Point\)", plain);
         Assert.Matches(@"MakeClosure .*function\d+\(twice\)", plain);
-        Assert.Matches(@"file\d+\(std:console\)", plain);
+        Assert.Matches(@"file\d+\(main\.wlg\)", plain);
         Assert.DoesNotContain("\nvariable ", plain);
         Assert.DoesNotMatch(@"capture\d+\(k\)", plain);
         var size = new FileInfo(compiled).Length;
@@ -189,14 +189,18 @@ public sealed class BytecodeCommandLineTests : IDisposable
         // Module's Named Imports Bound Directly"); what the program writes, and its errors, as before.
         var calls = Write("calls.wlg", "import { writeLn } from \"std:console\";\nimport { abs } from \"std:math\";\nwriteLn(abs(-2));\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, calls).Exit);
-        var main = Weblingo("disasm", Path.ChangeExtension(calls, Extension(vm))).Output.Split("\n\n")[0];
+        var disassembly = Weblingo("disasm", Path.ChangeExtension(calls, Extension(vm))).Output;
+        var main = disassembly.Split("\n\n")[0];
         Assert.Contains("CallBuiltin", main);
         Assert.Contains("std:console.writeLn", main);
         Assert.DoesNotContain(".\"writeLn\"", main);
         Assert.DoesNotContain(".\"abs\"", main);
-        // Nothing using either module as a value, neither is made, nor imported, but by its function, registered (step 2).
+        // Nothing using either module as a value, neither is made, nor imported (step 2), and nothing of theirs the program
+        // does not name is in it, std:console's classes and their members none of its functions ("A Native Module's Unused
+        // Exports Left Out", the owner's request, 22 November 2026).
         Assert.DoesNotMatch(@"(MakeModule|Import) .*\((std:console|std:math)\)", main);
-        Assert.Matches(@"RegisterUnit .*\(std:console\)", main);
+        Assert.DoesNotMatch(@"RegisterUnit|MakeClass", main);
+        Assert.DoesNotContain("\nfunction ", disassembly);
         Assert.Equal((WebLingoCommandLine.Success, "2\n", ""), Weblingo("run", Path.ChangeExtension(calls, Extension(vm))));
 
         // The same function, class and constant as the module's own, made where a whole import or a dynamic one first asks

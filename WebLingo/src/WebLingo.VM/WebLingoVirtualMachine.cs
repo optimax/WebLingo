@@ -2163,6 +2163,13 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             {
                 return WebLingoValue.Null;
             }
+            // A file with neither its instance nor a function that makes it, which only damaged bytecode imports.
+            if (_unitClosures[unit].Kind != WebLingoValueKind.Function)
+            {
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.BytecodeVerificationFailure,
+                    $"The bytecode is invalid: file {unit} ('{info.Name}') is imported, but nothing makes its instance.");
+                return WebLingoValue.Null;
+            }
             _operands[0] = values;
             Pend(_unitClosures[unit], info.Parameters.Count > 0 ? 1 : 0, result);
             return WebLingoValue.Null;

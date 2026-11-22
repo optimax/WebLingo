@@ -116,6 +116,9 @@ takes of one is its export itself: a function the built-in, a call a `CallBuilti
 arguments, else a call of its value, so that its error stays a runtime one; a class, a constant or a function written in
 WebLingo the local the program makes it in (`ImportedNative`, `ImportedLocal`). Each native module's instance is made by
 a function of its own, registered as its file, which a whole import or a dynamic one runs once; an import whose every
-name is bound so is dropped, but in a debug build, whose view of a named import reads the module. `WebLingoClassTables`
+name is bound so is dropped, but in a debug build, whose view of a named import reads the module. An export is bound
+only when a name an import takes is it, or when the module's instance may be made (`TryNativeExport`,
+`FinishNativeUnit`): a whole import, an import kept, or any `Module.import` in the program; a `MadeByModule` class
+always. `WebLingoClassTables`
 lets a native module's file have that function, older files having none. The benchmark's `imports` workload calls
 `std:math`'s `abs` and `sign` imported by name. Nothing of it is installed on this machine until `build.bat` runs.
