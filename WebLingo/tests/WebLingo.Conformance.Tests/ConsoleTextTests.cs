@@ -138,10 +138,16 @@ public sealed class ConsoleTextTests : IDisposable
         }
         finally
         {
+            // The descendant may end between the check and the kill, which then has nothing to stop (a failure on
+            // ubuntu-latest, 21 November 2026).
             if (IsRunning(pid))
             {
-                using var leftover = Process.GetProcessById(pid);
-                leftover.Kill(entireProcessTree: true);
+                try
+                {
+                    using var leftover = Process.GetProcessById(pid);
+                    leftover.Kill(entireProcessTree: true);
+                }
+                catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { }
             }
         }
     }
@@ -234,7 +240,8 @@ public sealed class ConsoleTextTests : IDisposable
             try
             {
                 var stat = File.ReadAllText($"/proc/{pid}/stat");
-                return stat[stat.LastIndexOf(')') + 2] != 'Z';
+                // A zombie, Z, and one being reaped, X (x on older kernels), have both ended.
+                return stat[stat.LastIndexOf(')') + 2] is not ('Z' or 'X' or 'x');
             }
             catch (IOException) { return false; }
         }
