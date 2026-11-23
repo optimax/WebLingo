@@ -1384,8 +1384,10 @@ public sealed class WebLingoHeap
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'new' cannot make a value of the class {classObject.Name}.");
             return false;
         }
-        // A class extending Array, Map or Set makes a collection of its own class; Array, Map and Set, a plain one.
-        var own = classObject.IsCollectionClass ? null : new InstanceObject(classValue);
+        // A class extending Array, Map, Set, Module or Task makes a value of that kind, with an instance's fields; Array,
+        // Map and Set themselves, a plain one; any other class, an instance alone, made once.
+        var own = classObject.IsCollectionClass || classObject.Makes is not (WebLingoValueKind.Array or WebLingoValueKind.Map
+            or WebLingoValueKind.Set or WebLingoValueKind.Module or WebLingoValueKind.Task) ? null : new InstanceObject(classValue);
         return classObject.Makes switch
         {
             WebLingoValueKind.Array =>
@@ -1986,23 +1988,48 @@ public sealed class WebLingoHeap
 
     private sealed record BoundMethodObject(WebLingoValue Instance, WebLingoValue Closure, bool Disposes);
 
-    /// <summary>An instance: its class, and its fields, by name, in no defined order.</summary>
+    /// <summary>
+    /// An instance: its class, and its fields, by name, in no defined order. Its fields are an array, in the order they
+    /// were first assigned, searched in order, with a dictionary of their positions only once it has more than
+    /// <see cref="FieldsSearched"/>, so that an instance of a few fields is two .NET objects, and allocates nothing more
+    /// until its first field (the specification, section 5.6, "Where the time goes").
+    /// </summary>
     private sealed class InstanceObject(WebLingoValue classValue)
     {
-        private readonly Dictionary<string, int> _positions = new(StringComparer.Ordinal);
-        private readonly List<(string Name, WebLingoValue Value)> _fields = [];
+        /// <summary>How many fields an instance searches in order before it keeps their positions in a dictionary.</summary>
+        private const int FieldsSearched = 8;
+
+        private (string Name, WebLingoValue Value)[] _fields = [];
+        private int _count;
+        private Dictionary<string, int>? _positions;
 
         public WebLingoValue Class { get; } = classValue;
-        public int Count => _fields.Count;
+        public int Count => _count;
         /// <summary>Whether it holds a value, as an instance of a class extending a kind of value does, and which (section 3.7).</summary>
         public bool Holds { get; init; }
         public WebLingoValue Value { get; set; }
         /// <summary>Whether its disposal has begun, which runs at most once (section 3.7).</summary>
         public bool Disposed { get; set; }
 
+        /// <summary>
+        /// A field's position, or -1: its name is most often the very string the program's names hold, compared first by
+        /// reference, then by its characters.
+        /// </summary>
+        private int Find(string name)
+        {
+            if (_positions is not null) return _positions.TryGetValue(name, out var position) ? position : -1;
+            var fields = _fields;
+            for (var i = 0; i < _count; i++)
+            {
+                if (ReferenceEquals(fields[i].Name, name) || string.Equals(fields[i].Name, name, StringComparison.Ordinal)) return i;
+            }
+            return -1;
+        }
+
         public bool TryGet(string name, out WebLingoValue value)
         {
-            if (_positions.TryGetValue(name, out var position))
+            var position = Find(name);
+            if (position >= 0)
             {
                 value = _fields[position].Value;
                 return true;
@@ -2013,13 +2040,21 @@ public sealed class WebLingoHeap
 
         public void Set(string name, WebLingoValue value)
         {
-            if (_positions.TryGetValue(name, out var position))
+            var position = Find(name);
+            if (position >= 0)
             {
                 _fields[position] = (name, value);
                 return;
             }
-            _positions.Add(name, _fields.Count);
-            _fields.Add((name, value));
+            if (_count == _fields.Length) Array.Resize(ref _fields, Math.Max(4, _count * 2));
+            _fields[_count] = (name, value);
+            if (_positions is not null) _positions.Add(name, _count);
+            else if (_count == FieldsSearched)
+            {
+                _positions = new Dictionary<string, int>(_count + 1, StringComparer.Ordinal);
+                for (var i = 0; i <= _count; i++) _positions.Add(_fields[i].Name, i);
+            }
+            _count++;
         }
 
         public (string Name, WebLingoValue Value) At(int position) => _fields[position];
