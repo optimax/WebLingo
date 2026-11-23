@@ -72,6 +72,13 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// <summary>The mail its scripts may send, through the servers its configuration names, or their own (section 7.17); none without it.</summary>
     public WebLingo.Platform.Abstractions.IWebLingoMail? Mail { get; init; }
 
+    /// <summary>
+    /// What a request's body may be: its largest, a form's files' largest in all, how much of a file is kept in memory, and
+    /// where the rest is kept (section 6.12, "Uploaded files"); 30,000,000 bytes, as much for files, 64 KB, and no
+    /// temporary files, by default.
+    /// </summary>
+    public WebLingoUploads Uploads { get; init; } = WebLingoUploads.Default;
+
     /// <summary>The host's side of an execution's scheduler, a new one for each request, or none.</summary>
     public Func<IWebLingoSchedulerHost>? Scheduler { get; init; }
 

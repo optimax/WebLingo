@@ -64,8 +64,8 @@ public sealed class RequestBodyTests
     }
 
     [Theory]
-    [InlineData("/form", "application/json", "WL3001: request.form() reads a form sent as application/x-www-form-urlencoded, not as &#39;application/json&#39;.")]
-    [InlineData("/form", null, "WL3001: request.form() reads a form sent as application/x-www-form-urlencoded, not as &#39;&#39;.")]
+    [InlineData("/form", "application/json", "WL3001: request.form() reads a form sent as application/x-www-form-urlencoded or multipart/form-data, not as &#39;application/json&#39;.")]
+    [InlineData("/form", null, "WL3001: request.form() reads a form sent as application/x-www-form-urlencoded or multipart/form-data, not as &#39;&#39;.")]
     [InlineData("/text", "text/plain; charset=klingon", "WL3001: The request&#39;s body is in the charset &#39;klingon&#39;, which this host cannot read.")]
     public void ABodyThatCannotBeReadSoIsAnErrorWhereItIsRead(string path, string? type, string error)
     {

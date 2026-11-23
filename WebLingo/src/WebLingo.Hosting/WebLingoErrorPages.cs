@@ -17,6 +17,9 @@ internal static class WebLingoErrorPages
     /// <summary>A 405, its <c>Allow</c> the methods the handler answers, as <c>GET, HEAD, POST</c>.</summary>
     public static void MethodNotAllowed(IWebLingoHttpResponse response, string allow) => Write(response, 405, "Method Not Allowed", [], allow);
 
+    /// <summary>A 413, a request whose body is larger than its site takes (section 6.12, "Uploaded files").</summary>
+    public static void TooLarge(IWebLingoHttpResponse response) => Write(response, 413, "Content Too Large", []);
+
     public static void Failed(IWebLingoHttpResponse response, WebLingoMode mode, IReadOnlyList<string> errors) =>
         Write(response, 500, "Internal Server Error", mode == WebLingoMode.Development ? errors : []);
 

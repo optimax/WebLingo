@@ -589,7 +589,7 @@ public static partial class WebLingoCommandLine
         var folder = Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".";
         if (program.Root is { } root && Path.GetFullPath(root) != folder
             && !WebLingoSchemes.TryLoadFolder(root, program.Configuration, givenSchemes, out _, out _, out _, out _, out _,
-                out _, out _, out _, out _, out wrongConfiguration))
+                out _, out _, out _, out _, out _, out wrongConfiguration))
         {
             error.WriteLine(wrongConfiguration);
             return null;

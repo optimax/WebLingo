@@ -65,6 +65,59 @@ public sealed class WaspServeTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Files uploaded by a form through Kestrel (specification, section 6.12, "Uploaded files"): read as they arrive, a file
+    /// past the site's threshold kept in a temporary file in the folder its <c>wasp.config</c> names, removed as its request
+    /// ends; a body larger than its <c>"maxBodySize"</c> a 413, and one larger than Kestrel's own 30,000,000 bytes taken
+    /// where the site takes it.
+    /// </summary>
+    [Fact]
+    public async Task AFormsFilesAreUploaded()
+    {
+        var temporary = Path.Combine(_root, "..", Path.GetFileName(_root) + "-tmp");
+        Directory.CreateDirectory(temporary);
+        try
+        {
+            Write("wasp.config", "{ \"maxBodySize\": 31000000, \"uploads\": { \"inMemory\": 1024, \"folder\": \"../" + Path.GetFileName(temporary) + "\" } }");
+            Write("upload.wasp", "<% param request; var f = await request.form(); var d = (await request.files())[\"doc\"][0]; %>"
+                                 + "<%= f[\"title\"] %>|<%= d.fileName %>|<%= d.size %>|<%= (await d.bytes())[d.size - 1] %>");
+            var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+            Assert.True(server is not null, error);
+            await server.StartAsync();
+            try
+            {
+                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                using var client = new HttpClient { BaseAddress = new Uri(address) };
+                async Task<HttpResponseMessage> Upload(int size)
+                {
+                    var bytes = new byte[size];
+                    bytes[^1] = 7;
+                    using var form = new MultipartFormDataContent { { new StringContent("Tea"), "title" }, { new ByteArrayContent(bytes), "doc", "big.bin" } };
+                    return await client.PostAsync("/upload", form);
+                }
+                var small = await Upload(100);
+                Assert.Equal((HttpStatusCode.OK, "Tea|big.bin|100|7"), (small.StatusCode, await small.Content.ReadAsStringAsync()));
+                // Larger than Kestrel's own limit, within the site's, and kept in a temporary file, removed after.
+                var large = await Upload(30_500_000);
+                Assert.Equal((HttpStatusCode.OK, "Tea|big.bin|30500000|7"), (large.StatusCode, await large.Content.ReadAsStringAsync()));
+                Assert.Empty(Directory.GetFiles(temporary));
+                // Larger than the site's: 413, before its body is read, which a client that waits for 100 Continue sees, one
+                // that sends its body at once finding the connection closed as it sends.
+                client.DefaultRequestHeaders.ExpectContinue = true;
+                var refused = await Upload(31_500_000);
+                Assert.Equal(HttpStatusCode.RequestEntityTooLarge, refused.StatusCode);
+            }
+            finally
+            {
+                await server.StopAsync();
+            }
+        }
+        finally
+        {
+            Directory.Delete(temporary, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task TheExampleApplicationServesItsPages()
     {
@@ -362,7 +415,7 @@ public sealed class WaspServeTests : IDisposable
         Write("wasp.config", "{ \"environment\": \"production\" }");
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
         Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"mode\", "
-                        + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\" and \"mail\".", error);
+                        + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\" and \"uploads\".", error);
 
         Write("wasp.config", "{ \"sendTimeout\": 5 }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));

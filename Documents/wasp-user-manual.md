@@ -494,6 +494,7 @@ page's, or its layout's, as it sees any of their variables.
 | `request.host` | the host the client asked for, with its port if it gave one: `example.com:8443` |
 | `await request.text()` | the request's body, as text |
 | `await request.form()` | a form's fields, as a map |
+| `await request.files()` | a form's uploaded files, each input's name an array of `UploadedFile`s |
 | `await request.read()` | the body's next piece, as bytes, or `null` at its end |
 
 ```html
@@ -520,7 +521,8 @@ A form posted to a page, or anything else a client sends, is its body, which a p
 - `await request.text()` gives the whole body as text, in the character set its `Content-Type` names, UTF-8 if it
   names none.
 - `await request.form()` gives a form's fields as a map, for a form posted as `application/x-www-form-urlencoded`, which
-  is how a browser posts an ordinary form; a name given twice has its last value. A body of another type is an error.
+  is how a browser posts an ordinary form, or as `multipart/form-data`, how it posts one with files; a name given twice
+  has its last value. A body of another type is an error.
 
 ```html
 <% param request; %>
@@ -536,8 +538,7 @@ A form posted to a page, or anything else a client sends, is its body, which a p
   whole, such as an upload a page stores as it comes.
 
 The body is read only when a page asks for it. Read whole, it is kept, so that `text()` and `form()` may each be called again,
-and give the same; read in pieces, with `read()`, it cannot then be read whole too. Files uploaded through a form
-(`multipart/form-data`) cannot be read yet.
+and give the same; read in pieces, with `read()`, it cannot then be read whole too.
 
 ```javascript
 export async function post(request, response) {
@@ -552,6 +553,43 @@ export async function post(request, response) {
 ```
 
 Bytes, their members, and how to read them as text, are in the WebLingo Language Reference.
+
+### Uploaded files
+
+A form with a file input is posted as `multipart/form-data`, its `enctype`. `await request.files()` gives its files, a
+map of each file input's name to an array of `UploadedFile`s, an array even of one, so that an input that takes several,
+`<input type="file" name="photos" multiple>`, is read alike; and `await request.form()` its other fields, as for any form.
+A file input left empty uploads no file.
+
+| Member | What it gives |
+|---|---|
+| `file.name` | its input's name |
+| `file.fileName` | its file's name, as the browser gave it: never use it as a path |
+| `file.type` | its `Content-Type`, as the browser gave it, `application/octet-stream` if none |
+| `file.size` | its size, in bytes |
+| `await file.bytes()` | its content, as bytes |
+| `await file.text()` | its content, as text, in UTF-8 |
+| `await file.save(path)` | writes it at `path`, replacing a file there, within the folders `wasp.config`'s `"files"` lets the site write |
+
+```html
+<% param request; %>
+<% if (request.method == "POST") { %>
+<% var photo = (await request.files())["photo"][0]; %>
+<% await photo.save("../uploads/latest-photo"); %>
+<p>Thank you: <%= photo.fileName %>, <%= photo.size %> bytes.</p>
+<% } else { %>
+<form method="post" enctype="multipart/form-data"><input type="file" name="photo"><button>Send</button></form>
+<% } %>
+```
+
+with `wasp.config`'s `{ "files": { "write": ["../uploads"] } }`. A page that keeps a file names it itself: a file's name is
+whatever its sender chose, `../../web.config` among them.
+
+A form is read as it arrives, once, `form()` and `files()` reading the same body; read so, it cannot then be read with
+`text()` or `read()`, nor one read with `read()` as a form. A file is kept in memory up to 64 KB, the rest of it in a
+temporary file of the server's, removed when its request ends. The largest body a site takes is 30,000,000 bytes, a
+larger one refused with 413 before its page runs where its `Content-Length` says so, and an error where the page reads it
+otherwise; `wasp.config` changes both (section 14), and under IIS the site's `web.config` too (section 17).
 
 ### The response
 
@@ -757,6 +795,8 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"files"` | the folders the site's pages and handlers may read, and read and write, through `std:fs`: `{ "read": ["../data"], "write": ["../uploads"] }` | none |
 | `"com"` | the COM objects the site's pages and handlers may make, on Windows, through `windows:com`: `{ "allow": ["ADODB.Connection"] }`, `"*"` any; any other a `ComPermissionError`, WL3018 | none |
 | `"env"` | what the site's pages and handlers may read of the machine's environment, through `std:env`: `{ "machineName": true, "variables": ["PATH", "APP_*"] }` | nothing |
+| `"maxBodySize"` | the largest body a request may have, in bytes, a larger one a 413 (section 9, "Uploaded files") | 30,000,000 |
+| `"uploads"` | what a form's files may be: `{ "inMemory": 65536, "maxSize": 20000000, "folder": "../tmp" }`, how many bytes of a file are kept in memory, the rest in a temporary file, the most its files may take in all, and the folder their temporary files are made in, outside the site | 64 KB, `"maxBodySize"`, the system's temporary folder |
 | `"mail"` | the mail servers the site's pages and handlers send through, with `std:mail`, each a name and its settings: `{ "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": { "env": "SMTP_PASSWORD" } } }` | none |
 
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
@@ -977,6 +1017,10 @@ the requests to it. If WebLingo is installed elsewhere, change `processPath` to 
   application pools, or IIS (`iisreset /stop`), before copying the new version over the old, and start them again
   after.
 - **Under IIS, a site runs in production** unless its `wasp.config` says otherwise.
+- **A body larger than 30,000,000 bytes** is refused by IIS's request filtering before `wasp` sees it, whatever its
+  `wasp.config`'s `"maxBodySize"` says: a site that takes larger uploads raises IIS's limit too, in its `web.config`'s
+  `<system.webServer>`, `<security><requestFiltering><requestLimits maxAllowedContentLength="50000000" />`
+  `</requestFiltering></security>`.
 
 The repository's `Examples.wasp/example1` is such a site, and `Examples.wasp/README.md` walks through deploying it.
 
@@ -1088,7 +1132,6 @@ site anew, so the first request to each is slower than the rest.
 
 These are not there yet, and are planned or being designed:
 
-- **Uploaded files**: forms posted as `multipart/form-data` cannot be read.
 - **Sessions and cookies**: a page reads the `Cookie` header and sets `Set-Cookie` itself, with `response.headers.add`.
 - **A standalone server**, without IIS, nginx or Apache, is planned. WASP has been tried on Windows, through IIS's
   ASP.NET Core Module, and through FastCGI behind nginx and Apache httpd; Linux is built and tested, but no site has

@@ -145,8 +145,14 @@ times as fast, `loops` 1.4; as a user runs them, since arithmetic's slow paths l
 about 2.2 times, `loops` and `sort` about twice, `maps` 1.5, `calls` and `closures` as they were. Start-up is
 unchanged, .NET's JIT at work: its remedy is the
 deferred task "`weblingo` and `wasp` Published ReadyToRun". The benchmark's `io` measures .NET's thread pool more than
-the VM, and falls at about 1.1 s or 2.7 s by build. A young generation is designed, Proposed, in the specification's
-section 4.2, "A young generation" (`816efa6`), nothing built: it waits for the owner's answers in `TO-DO.md`.
+the VM, and falls at about 1.1 s or 2.7 s by build.
+
+A young generation for the collector is built as the owner approved it (the specification, section 4.2, "A young
+generation"), on the branch `claude/young-generation`, not on `main`: where much is live it makes an instance made and
+dropped about 1.7 times as fast, but `closures`, `objects`, `strings` and `imports` are 1 to 3 percent slower than
+`main`'s by a rank test over 24 alternating rounds, and the owner's A3 (a) lands it only where no workload is slower
+beyond the machine's noise. Its Q4 in `TO-DO.md` asks whether to land it so, tune it further, or drop it. The branch's
+section 4.2 and its `Documents/implementation.md`, "Every Store Goes Through the Heap", say how it works.
 
 Since `071ad6b` the heap reads the VM's frames when it collects (`WebLingoHeap.Frames`, `IWebLingoRootSource`), and
 since `9c2cc3b` it keeps what is being stored or made while it collects; `Documents/implementation.md`, "A Value Just
@@ -166,6 +172,16 @@ send through `SmtpTestServer`, a server of the tests' own on 127.0.0.1 with a se
 test; nothing reaches a real server. Not built, as the owner left them for later: SMTPUTF8, DKIM, IMAP and POP3, and
 a class `MailMessage`.
 
-Next: the owner's answers to the questions in `TO-DO.md`, on the young generation, uploads, sessions and debugging
-pages, then those tasks; "Visual Studio Debug Adapter" waits for Visual Studio installed here, and "Extensive WASP
-Example" for uploads and sessions. Nothing above `# END-OF-TO-DO` can go on without them.
+## Uploaded files
+
+A form posted as `multipart/form-data` is read as it arrives by the hosting core's own reader (`WebLingoMultipartReader`),
+`request.form()` its fields and `request.files()` its files, each an `UploadedFile` (`WebLingoHttpObjects`), a file past
+64 KB kept in a temporary file through the platform's `IWebLingoTemporaryFiles` (`DotNetTemporaryFiles`), removed as the
+request ends (`WebLingoApplication.Ended`). A site's limits are `wasp.config`'s `"maxBodySize"` and `"uploads"`
+(`WebLingoSchemes`, `WebLingoUploads`), a body larger by its `Content-Length` a 413 before the page runs; the ASP.NET
+Core adapter raises Kestrel's own limit to the site's, but IIS's request filtering keeps its own, which a site raises in
+its `web.config` (the WASP User Manual, section 17). `UploadTests` (`WebLingo.Hosting.Tests`) and
+`WaspServeTests.AFormsFilesAreUploaded`, through Kestrel, 30.5 MB among them.
+
+Next: "Debugging WASP Pages", answered; the young generation waits for its Q4, and "Sessions in WASP" for its Q5 and
+Q6; "Visual Studio Debug Adapter" waits for Visual Studio installed here, and "Extensive WASP Example" for sessions.

@@ -1151,8 +1151,17 @@ and `Headers {}`; one made by `new` holds no request, each of its members WL3001
 | `request.query` | the query's names and values, decoded, a map, a name given twice having its last value |
 | `request.headers` | its headers, a `Headers`, which cannot be changed |
 | `await request.text()` | its body as text, in the charset its `Content-Type` names, UTF-8 if it names none |
-| `await request.form()` | an `application/x-www-form-urlencoded` form's fields, a map, decoded as the query is; a body of another type WL3001 |
+| `await request.form()` | a form's fields, a map: an `application/x-www-form-urlencoded` one's, decoded as the query is, or a `multipart/form-data` one's; a body of another type WL3001 |
+| `await request.files()` | a `multipart/form-data` form's files, a map of each file input's name to an array of `UploadedFile`s; an `application/x-www-form-urlencoded` form's none, an empty map; a body of another type WL3001 |
 | `await request.read()` | the body's next piece as it arrives, `Bytes`, `null` at its end |
+
+An `UploadedFile`, a file a form uploaded: `name`, its input's; `fileName`, as the browser gave it, never a path;
+`type`, its `Content-Type`; `size`, in bytes; and `await file.bytes()`, `await file.text()`, in UTF-8, and
+`await file.save(path)`, which writes it at `path`, a file there replaced, within the folders the site may write, a
+`FilePermissionError`, WL3016, elsewhere. A `multipart/form-data` form is read once, as it arrives, `form()` and
+`files()` reading the same body, which `text()` and `read()` then cannot, WL3001. A body larger than the site takes,
+its `wasp.config`'s `"maxBodySize"`, 30,000,000 bytes unless it says otherwise, is WL3001 where it is read, and its
+files larger than its `"uploads"`' `"maxSize"` too.
 
 A body is read only when a script asks for it. Read whole, it is kept, `text()` and `form()` giving the same again, and
 `read()` giving it as one piece; read in pieces, it cannot then be read whole, WL3001, and neither can `read()` be called

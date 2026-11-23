@@ -21,7 +21,14 @@ namespace WebLingo.Hosting;
 /// last value; each read as it arrives, off the worker, once, and kept, so that each gives the same again. And
 /// <c>await request.read()</c>, the body's next piece as bytes as it arrives, <c>null</c> at its end, for a body too large
 /// to hold whole (section 9, "M0.14.7 parts", part 5): a body read in pieces cannot then be read whole, and one read whole
-/// is given by <c>read()</c> as one piece.
+/// is given by <c>read()</c> as one piece. A form posted as <c>multipart/form-data</c> (section 6.12, "Uploaded files"):
+/// <c>await request.form()</c> its fields, and <c>await request.files()</c> its files, a map of each file input's name to an
+/// array of <c>UploadedFile</c>s, read once, as the body arrives (<see cref="WebLingoMultipartReader"/>), a file kept in
+/// memory up to the site's threshold, then in a temporary file, removed when the request ends; a body read so cannot be
+/// read otherwise, nor one read otherwise so. An <c>UploadedFile</c>'s members: <c>name</c>, its input's, <c>fileName</c>,
+/// as the browser gave it, never a path, <c>type</c>, <c>size</c>, in bytes, and <c>bytes()</c>, <c>text()</c> and
+/// <c>save(path)</c>, each a task, <c>save</c> writing through the script's files, as <c>std:fs</c> writes, a file there
+/// replaced. A body larger than the site takes (<see cref="WebLingoUploads.MaxBodySize"/>) is an error where it is read.
 /// </summary>
 internal sealed class WebLingoHttpObjects
 {
@@ -38,6 +45,7 @@ internal sealed class WebLingoHttpObjects
     private readonly WebLingoNativeClass _request = new("Request");
     private readonly WebLingoNativeClass _response = new("Response");
     private readonly WebLingoNativeClass _headers = new("Headers");
+    private readonly WebLingoNativeClass _uploaded = new("UploadedFile");
 
     public WebLingoHttpObjects()
     {
@@ -50,7 +58,16 @@ internal sealed class WebLingoHttpObjects
             .DeclareProperty("headers", (a, heap, out r, out e) => RequestHeaders(a, heap, out r, out e))
             .DeclareMethod("text", 0, BodyText)
             .DeclareMethod("form", 0, BodyForm)
+            .DeclareMethod("files", 0, BodyFiles)
             .DeclareMethod("read", 0, BodyRead);
+        _uploaded
+            .DeclareProperty("name", (a, heap, out r, out e) => Uploaded(a, heap, part => part.Name, out r, out e))
+            .DeclareProperty("fileName", (a, heap, out r, out e) => Uploaded(a, heap, part => part.FileName, out r, out e))
+            .DeclareProperty("type", (a, heap, out r, out e) => Uploaded(a, heap, part => part.Type, out r, out e))
+            .DeclareProperty("size", UploadedSize)
+            .DeclareMethod("bytes", 0, UploadedBytes)
+            .DeclareMethod("text", 0, UploadedText)
+            .DeclareMethod("save", 1, UploadedSave);
         _response
             .DeclareProperty("status", Status, SetStatus)
             .DeclareProperty("headers", (a, heap, out r, out e) => ResponseHeaders(a, heap, out r, out e))
@@ -66,10 +83,11 @@ internal sealed class WebLingoHttpObjects
         var request = Info(_request, members);
         var response = Info(_response, members);
         var headers = Info(_headers, members);
+        var uploaded = Info(_uploaded, members);
         Members = members;
         Parameters =
         [
-            new WebLingoHostParameter("request", Prefix + ".request", [request, headers]),
+            new WebLingoHostParameter("request", Prefix + ".request", [request, headers, uploaded]),
             new WebLingoHostParameter("response", Prefix + ".response", [response, headers])
         ];
     }
@@ -82,17 +100,24 @@ internal sealed class WebLingoHttpObjects
 
     /// <summary>
     /// The built-ins that make a request's instances, given their classes, each made once, kept for the execution, the
-    /// response's writing to <paramref name="output"/>, where the page's text goes.
+    /// response's writing to <paramref name="output"/>, where the page's text goes, its body read within
+    /// <paramref name="uploads"/>; and <paramref name="ending"/>, which its host disposes as the request ends, removing
+    /// its uploads' temporary files.
     /// </summary>
-    public IWebLingoBuiltinFunction[] For(IWebLingoHttpRequest request, IWebLingoHttpResponse response, IWebLingoTextOutput output)
+    public IWebLingoBuiltinFunction[] For(IWebLingoHttpRequest request, IWebLingoHttpResponse response, IWebLingoTextOutput output,
+        WebLingoUploads uploads, out IDisposable ending)
     {
-        var requestState = new RequestState(request);
+        var requestState = new RequestState(request, uploads);
         var responseState = new ResponseState(response, output);
+        ending = requestState;
         return
         [
-            new Maker(Prefix + ".request", (classes, heap, out made, out error) =>
-                Make(_request, requestState, classes, heap, requestState.Roots, request.Headers, out made, out error)),
-            new Maker(Prefix + ".response", (classes, heap, out made, out error) =>
+            new Maker(Prefix + ".request", 3, (classes, heap, out made, out error) =>
+            {
+                requestState.Roots[4] = classes[2]; // UploadedFile's class, which files() makes its instances of.
+                return Make(_request, requestState, classes, heap, requestState.Roots, request.Headers, out made, out error);
+            }),
+            new Maker(Prefix + ".response", 2, (classes, heap, out made, out error) =>
                 Make(_response, responseState, classes, heap, responseState.Roots, response.Headers, out made, out error))
         ];
     }
@@ -160,21 +185,256 @@ internal sealed class WebLingoHttpObjects
             return TryDecode(body, state, out var text, out failed) && h.TryAllocateString(text, out made, out failed);
         }, out result, out error);
 
-    /// <summary><c>request.form()</c>: a task giving an <c>application/x-www-form-urlencoded</c> body's fields as a map.</summary>
-    private bool BodyForm(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
-        ReadBody(a, heap, (byte[] body, RequestState state, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? failed) =>
+    /// <summary>
+    /// <c>request.form()</c>: a task giving a form's fields as a map, an <c>application/x-www-form-urlencoded</c> one's or a
+    /// <c>multipart/form-data</c> one's.
+    /// </summary>
+    private bool BodyForm(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_request.TryGetHostObject<RequestState>(a[0], heap, out var state, out error)) return false;
+        var media = Media(state);
+        if (media.Equals("multipart/form-data", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReadMultipart(a, heap, (WebLingoMultipartReader form, RequestState s, WebLingoHeap h, out WebLingoValue made,
+                out WebLingoRuntimeError? failed) => TryMap(form.Fields, h, out made, out failed), out result, out error);
+        }
+        if (!media.Equals("application/x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase))
+        {
+            error = Invalid($"request.form() reads a form sent as application/x-www-form-urlencoded or multipart/form-data, not as '{media}'.");
+            return false;
+        }
+        return ReadBody(a, heap, (byte[] body, RequestState s, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? failed) =>
+            TryMap(Pairs(WebLingoTextCodec.Decode(body, WebLingoCharset.Utf8)), h, out made, out failed), out result, out error);
+    }
+
+    /// <summary>
+    /// <c>request.files()</c>: a task giving a <c>multipart/form-data</c> form's files, a map of each input's name to an
+    /// array of <c>UploadedFile</c>s, made once; an <c>application/x-www-form-urlencoded</c> form's none, an empty map.
+    /// </summary>
+    private bool BodyFiles(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_request.TryGetHostObject<RequestState>(a[0], heap, out var state, out error)) return false;
+        var media = Media(state);
+        if (media.Equals("application/x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReadBody(a, heap, (byte[] body, RequestState s, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? failed) =>
+                h.TryAllocateMap([], 0, 0, out made, out failed), out result, out error);
+        }
+        if (!media.Equals("multipart/form-data", StringComparison.OrdinalIgnoreCase))
+        {
+            error = Invalid($"request.files() reads a form sent as multipart/form-data, not as '{media}'.");
+            return false;
+        }
+        return ReadMultipart(a, heap, Files, out result, out error);
+    }
+
+    /// <summary>The request's media type, its <c>Content-Type</c> without its parameters.</summary>
+    private static string Media(RequestState state)
+    {
+        var type = state.Request.Headers.Get("Content-Type") ?? "";
+        var semicolon = type.IndexOf(';', StringComparison.Ordinal);
+        return (semicolon < 0 ? type : type[..semicolon]).Trim();
+    }
+
+    /// <summary>A form's files as a map of each input's name to an array of <c>UploadedFile</c>s, made once, the same after.</summary>
+    private bool Files(WebLingoMultipartReader form, RequestState state, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        (result, error) = (state.Roots[3], null);
+        if (result.Kind != WebLingoValueKind.Null) return true;
+        var made = new List<WebLingoValue>(); // Kept where the collector sees them until the map is whole.
+        heap.AddRoots(made);
+        try
+        {
+            var entries = new WebLingoValue[2 * form.FileNames.Count];
+            for (var i = 0; i < form.FileNames.Count; i++)
+            {
+                var name = form.FileNames[i];
+                var parts = form.Files[name];
+                var instances = new WebLingoValue[parts.Count];
+                for (var j = 0; j < parts.Count; j++)
+                {
+                    if (!_uploaded.TryMake(state.Roots[4], heap, out instances[j], out error)) return false;
+                    made.Add(instances[j]);
+                    if (!_uploaded.TrySetHostObject(instances[j], parts[j], heap, out error)) return false;
+                }
+                if (!heap.TryAllocateString(name, out entries[2 * i], out error)) return false;
+                made.Add(entries[2 * i]);
+                if (!heap.TryAllocateArray(instances, 0, instances.Length, out entries[2 * i + 1], out error)) return false;
+                made.Add(entries[2 * i + 1]);
+            }
+            if (!heap.TryAllocateMap(entries, 0, form.FileNames.Count, out result, out error)) return false;
+            state.Roots[3] = result;
+            return true;
+        }
+        finally
+        {
+            heap.RemoveLastRoots(made);
+        }
+    }
+
+    private delegate bool FormFinish(WebLingoMultipartReader form, RequestState state, WebLingoHeap heap, out WebLingoValue result,
+        out WebLingoRuntimeError? error);
+
+    /// <summary>A task that reads the request's body as a <c>multipart/form-data</c> form, once, then gives what <paramref name="finish"/> makes of it.</summary>
+    private bool ReadMultipart(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, FormFinish finish, out WebLingoValue result,
+        out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_request.TryGetHostObject<RequestState>(a[0], heap, out var state, out error)) return false;
+        if (heap.Scheduler is not { } scheduler || heap.SchedulerHost is not { } host)
+        {
+            error = Invalid("This host cannot read a request's body.");
+            return false;
+        }
+        if (state.ReadInPieces)
+        {
+            error = Invalid("The request's body is being read in pieces, with request.read(), and cannot be read as a form too.");
+            return false;
+        }
+        if (WebLingoMultipartReader.Boundary(state.Request.Headers.Get("Content-Type") ?? "") is not { } boundary)
+        {
+            error = Invalid("The request's form is sent as multipart/form-data without a boundary.");
+            return false;
+        }
+        return scheduler.TryWaitForHost<WebLingoMultipartReader?>(done => state.ReadForm(host, boundary, done), (WebLingoMultipartReader? form,
+            WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? failed) =>
         {
             made = WebLingoValue.Null;
-            var type = state.Request.Headers.Get("Content-Type") ?? "";
-            var semicolon = type.IndexOf(';', StringComparison.Ordinal);
-            var media = (semicolon < 0 ? type : type[..semicolon]).Trim();
-            if (!media.Equals("application/x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase))
+            if (form is null)
             {
-                failed = Invalid($"request.form() reads a form sent as application/x-www-form-urlencoded, not as '{media}'.");
+                failed = Invalid(state.TooLarge is { } limit ? TooLargeMessage(limit) : "The request's body could not be read: its client has gone.");
                 return false;
             }
-            return TryMap(Pairs(WebLingoTextCodec.Decode(body, WebLingoCharset.Utf8)), h, out made, out failed);
+            if (form.Error is { } why)
+            {
+                failed = Invalid(why);
+                return false;
+            }
+            return finish(form, state, h, out made, out failed);
         }, out result, out error);
+    }
+
+    private static string TooLargeMessage(long limit) => $"The request's body is larger than the {limit} bytes this site takes.";
+
+    /// <summary>An <c>UploadedFile</c>'s text member.</summary>
+    private bool Uploaded(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, Func<UploadedPart, string> read, out WebLingoValue result,
+        out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        return _uploaded.TryGetHostObject<UploadedPart>(a[0], heap, out var part, out error) && heap.TryAllocateString(read(part), out result, out error);
+    }
+
+    private bool UploadedSize(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_uploaded.TryGetHostObject<UploadedPart>(a[0], heap, out var part, out error)) return false;
+        result = WebLingoValue.FromInt64(part.Size);
+        return true;
+    }
+
+    /// <summary><c>file.bytes()</c>: a task giving the file's bytes, read off the worker.</summary>
+    private bool UploadedBytes(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        ReadUploaded(a, heap, (byte[] bytes, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? failed) =>
+            h.TryAllocateBytes(bytes, out made, out failed), out result, out error);
+
+    /// <summary><c>file.text()</c>: a task giving the file's text, its bytes read as UTF-8.</summary>
+    private bool UploadedText(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
+        ReadUploaded(a, heap, (byte[] bytes, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? failed) =>
+            h.TryAllocateString(WebLingoTextCodec.Decode(bytes, WebLingoCharset.Utf8), out made, out failed), out result, out error);
+
+    private bool ReadUploaded(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, WebLingoOffWorkerFinish<byte[]> finish, out WebLingoValue result,
+        out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_uploaded.TryGetHostObject<UploadedPart>(a[0], heap, out var part, out error)) return false;
+        if (heap.Scheduler is not { } scheduler)
+        {
+            error = Invalid("This host runs no operations off its worker.");
+            return false;
+        }
+        return scheduler.TryRunOffWorker(() => Content(part), finish, Failed, out result, out error);
+    }
+
+    /// <summary>An upload's bytes, from memory or its temporary file; a <see cref="WebLingo.Platform.Abstractions.WebLingoFileSystemException"/> where they cannot be read.</summary>
+    private static byte[] Content(UploadedPart part)
+    {
+        if (part.Bytes is { } bytes) return bytes;
+        var file = part.File!;
+        if (file.Length > Array.MaxLength)
+        {
+            throw new WebLingo.Platform.Abstractions.WebLingoFileSystemException(WebLingo.Platform.Abstractions.WebLingoFileErrorKind.Other,
+                "the file is too large to hold whole");
+        }
+        var content = new byte[file.Length];
+        var at = 0;
+        while (at < content.Length)
+        {
+            var read = file.Read(at, content, at, content.Length - at);
+            if (read <= 0) break;
+            at += read;
+        }
+        return content;
+    }
+
+    /// <summary>
+    /// <c>file.save(path)</c>: a task that writes the file at <paramref name="a"/>[1]'s path through the script's files,
+    /// checked as <c>std:fs</c>'s are (section 7.13, "File capabilities"), a file there replaced; <c>null</c> once written.
+    /// </summary>
+    private bool UploadedSave(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_uploaded.TryGetHostObject<UploadedPart>(a[0], heap, out var part, out error)) return false;
+        var given = heap.Held(a[1]);
+        if (given.Kind != WebLingoValueKind.String)
+        {
+            error = new WebLingoArgument("save", 0, 1, "the path", "a string, a file's path").Wrong(given, heap);
+            return false;
+        }
+        var path = heap.GetString(given);
+        if (heap.FileSystem is not { } files || heap.Scheduler is not { } scheduler)
+        {
+            error = Invalid("This host gives scripts no files.");
+            return false;
+        }
+        return scheduler.TryRunOffWorker(() =>
+        {
+            Write(part, files, path);
+            return 0;
+        }, (int _, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? failed) =>
+        {
+            (made, failed) = (WebLingoValue.Null, null);
+            return true;
+        }, exception => exception is WebLingo.Platform.Abstractions.WebLingoFileSystemException failure
+            ? new WebLingoRuntimeError(failure.Kind == WebLingo.Platform.Abstractions.WebLingoFileErrorKind.NotAllowed
+                ? WebLingoDiagnosticCodes.FilePermissionDenied
+                : WebLingoDiagnosticCodes.IOFailure, $"'{path}' cannot be written: {failure.Message}.")
+            : null, out result, out error);
+    }
+
+    /// <summary>Off the worker: an upload written at a path, from memory whole, or from its temporary file in pieces.</summary>
+    private static void Write(UploadedPart part, WebLingo.Platform.Abstractions.IWebLingoFileSystem files, string path)
+    {
+        using var target = files.Open(path, WebLingo.Platform.Abstractions.WebLingoFileMode.WriteBytes, "utf-8");
+        if (part.Bytes is { } bytes)
+        {
+            target.WriteBytes(bytes);
+            return;
+        }
+        var buffer = new byte[64 * 1024];
+        for (long at = 0; ; )
+        {
+            var read = part.File!.Read(at, buffer, 0, buffer.Length);
+            if (read <= 0) break;
+            target.WriteBytes(read == buffer.Length ? buffer : buffer[..read]);
+            at += read;
+        }
+    }
+
+    private static WebLingoRuntimeError? Failed(Exception exception) => exception is WebLingo.Platform.Abstractions.WebLingoFileSystemException failure
+        ? new WebLingoRuntimeError(WebLingoDiagnosticCodes.IOFailure, $"The uploaded file cannot be read: {failure.Message}.")
+        : null;
 
     /// <summary><c>request.read()</c>: a task giving the body's next piece as bytes, as it arrives, or <c>null</c> at its end.</summary>
     private bool BodyRead(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
@@ -191,6 +451,11 @@ internal sealed class WebLingoHttpObjects
             error = Invalid("request.read() is called again before the piece it gives has come: await each piece first.");
             return false;
         }
+        if (state.ReadAsForm)
+        {
+            error = Invalid("The request's body has been read as a form, with request.form() or request.files(), and cannot be read again.");
+            return false;
+        }
         state.PieceAwaited = true;
         return scheduler.TryWaitForHost<byte[]?>(done => state.ReadPiece(host, done), (byte[]? piece, WebLingoHeap h, out WebLingoValue made,
             out WebLingoRuntimeError? failed) =>
@@ -199,7 +464,7 @@ internal sealed class WebLingoHttpObjects
             (made, failed) = (WebLingoValue.Null, null);
             if (piece is null)
             {
-                failed = Invalid("The request's body could not be read: its client has gone.");
+                failed = Invalid(state.TooLarge is { } limit ? TooLargeMessage(limit) : "The request's body could not be read: its client has gone.");
                 return false;
             }
             return piece.Length == 0 || h.TryAllocateBytes(piece, out made, out failed);
@@ -223,6 +488,11 @@ internal sealed class WebLingoHttpObjects
             error = Invalid("The request's body is being read in pieces, with request.read(), and cannot be read whole too.");
             return false;
         }
+        if (state.ReadAsForm)
+        {
+            error = Invalid("The request's body has been read as a form, with request.form() or request.files(), and cannot be read again.");
+            return false;
+        }
         if (heap.SchedulerHost is not { } host)
         {
             error = Invalid("This host cannot read a request's body.");
@@ -232,7 +502,7 @@ internal sealed class WebLingoHttpObjects
         {
             if (body is not null) return finish(body, state, h, out made, out failed);
             made = WebLingoValue.Null;
-            failed = Invalid("The request's body could not be read: its client has gone.");
+            failed = Invalid(state.TooLarge is { } limit ? TooLargeMessage(limit) : "The request's body could not be read: its client has gone.");
             return false;
         }, out result, out error);
     }
@@ -506,15 +776,107 @@ internal sealed class WebLingoHttpObjects
     /// body once read. Its fields are the worker's alone: the body's reading runs off the worker, its pieces touched by
     /// nothing else, and hands its end over through the scheduler host, which posts it to the worker.
     /// </summary>
-    private sealed class RequestState(IWebLingoHttpRequest request)
+    private sealed class RequestState(IWebLingoHttpRequest request, WebLingoUploads uploads) : IDisposable
     {
         private List<Action<byte[]?>>? _waiting;
         private byte[]? _body;
         private bool _failed;
         private bool _wholeGiven;
+        private long _read;
+        private WebLingoMultipartReader? _form;
+        private bool _formFailed;
+        private List<Action<WebLingoMultipartReader?>>? _formWaiting;
 
         public IWebLingoHttpRequest Request { get; } = request;
-        public WebLingoValue[] Roots { get; } = new WebLingoValue[3];
+
+        /// <summary>The heap's roots of its instance, its headers, its query, its files' map and UploadedFile's class.</summary>
+        public WebLingoValue[] Roots { get; } = new WebLingoValue[5];
+
+        /// <summary>Whether its body has been read as a form, as it arrived, and so cannot be read otherwise.</summary>
+        public bool ReadAsForm { get; private set; }
+
+        /// <summary>The site's limit, where its body passed it, read so far; null otherwise.</summary>
+        public long? TooLarge { get; private set; }
+
+        /// <summary>Its uploads' temporary files removed: by its host, as it ends.</summary>
+        public void Dispose()
+        {
+            _form?.Dispose();
+            _form = null;
+        }
+
+        /// <summary>Off the worker: <paramref name="count"/> more of its body read; false, the limit kept, once it passes the site's.</summary>
+        private bool Within(int count)
+        {
+            _read += count;
+            if (_read <= uploads.MaxBodySize) return true;
+            TooLarge = uploads.MaxBodySize;
+            return false;
+        }
+
+        /// <summary>
+        /// On the worker: gives <paramref name="done"/> the body read as a <c>multipart/form-data</c> form, its parts divided by
+        /// <paramref name="boundary"/>, once, kept; null if it cannot be read: read off the worker as it arrives, or from the
+        /// body already read whole.
+        /// </summary>
+        public void ReadForm(WebLingo.Platform.Abstractions.IWebLingoSchedulerHost host, string boundary, Action<WebLingoMultipartReader?> done)
+        {
+            if (_form is not null || _formFailed)
+            {
+                done(_form);
+                return;
+            }
+            if (_body is not null || _failed || _waiting is not null)
+            {
+                ReadWhole(host, body =>
+                {
+                    if (body is not null && _form is null)
+                    {
+                        _form = Reader(boundary);
+                        if (_form.Feed(body, body.Length)) _form.End();
+                    }
+                    done(body is null ? null : _form);
+                });
+                return;
+            }
+            var first = _formWaiting is null;
+            (_formWaiting ??= []).Add(done);
+            if (!first) return;
+            ReadAsForm = true;
+            var reader = Reader(boundary);
+            var buffer = new byte[16 * 1024];
+            void Next() => Request.Body.ReadAsync(buffer, 0, buffer.Length, count =>
+            {
+                if (count > 0)
+                {
+                    if (!Within(count)) count = -1;
+                    else if (reader.Feed(buffer, count))
+                    {
+                        Next();
+                        return;
+                    }
+                }
+                else if (count == 0)
+                {
+                    reader.End();
+                }
+                var arrived = count < 0 ? null : reader;
+                if (arrived is null) reader.Dispose();
+                host.Post(() => FormArrived(arrived));
+            });
+            Next();
+        }
+
+        private WebLingoMultipartReader Reader(string boundary) => new(boundary, uploads.InMemory, uploads.MaxFiles, uploads.TemporaryFiles);
+
+        /// <summary>On the worker: the form, or null if it could not be read, given to everything that waits for it.</summary>
+        private void FormArrived(WebLingoMultipartReader? form)
+        {
+            (_form, _formFailed) = (form, form is null);
+            var waiting = _formWaiting!;
+            _formWaiting = null;
+            foreach (var done in waiting) done(_form);
+        }
 
         /// <summary>Whether <c>read()</c> has read a piece of the body, which then cannot be read whole.</summary>
         public bool ReadInPieces { get; private set; }
@@ -540,7 +902,7 @@ internal sealed class WebLingoHttpObjects
             }
             ReadInPieces = true;
             var buffer = new byte[16 * 1024];
-            Request.Body.ReadAsync(buffer, 0, buffer.Length, count => done(count < 0 ? null : buffer[..count]));
+            Request.Body.ReadAsync(buffer, 0, buffer.Length, count => done(count < 0 || count > 0 && !Within(count) ? null : buffer[..count]));
         }
 
         /// <summary>
@@ -563,12 +925,13 @@ internal sealed class WebLingoHttpObjects
         private void ReadNext(WebLingo.Platform.Abstractions.IWebLingoSchedulerHost host, List<byte[]> pieces, byte[] buffer) =>
             Request.Body.ReadAsync(buffer, 0, buffer.Length, count =>
             {
-                if (count > 0)
+                if (count > 0 && Within(count))
                 {
                     pieces.Add(buffer[..count]);
                     ReadNext(host, pieces, buffer);
                     return;
                 }
+                if (count > 0) count = -1; // Larger than the site takes.
                 byte[]? whole = null;
                 if (count == 0)
                 {
@@ -604,10 +967,10 @@ internal sealed class WebLingoHttpObjects
     }
 
     /// <summary>A built-in that makes an instance, given its classes.</summary>
-    private sealed class Maker(string name, WebLingoNativeFunction make) : IWebLingoBuiltinFunction
+    private sealed class Maker(string name, int arity, WebLingoNativeFunction make) : IWebLingoBuiltinFunction
     {
         public string Name => name;
-        public int Arity => 2;
+        public int Arity => arity;
 
         public bool TryInvoke(ReadOnlySpan<WebLingoValue> arguments, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
             make(arguments, heap, out result, out error);

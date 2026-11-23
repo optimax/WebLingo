@@ -15,7 +15,7 @@ namespace WebLingo.Hosting;
 /// What a request came to: a page's response, or a route handler's, a file the host serves as it is, no route, a handler
 /// that does not answer its method, or a 500; or, not yet ended, a request that waits (specification, section 6.6).
 /// </summary>
-public enum WebLingoRequestOutcomeKind { Page, File, NotFound, Failed, Handler, MethodNotAllowed, Waiting }
+public enum WebLingoRequestOutcomeKind { Page, File, NotFound, Failed, Handler, MethodNotAllowed, Waiting, TooLarge }
 
 /// <summary>A request's outcome; for <see cref="WebLingoRequestOutcomeKind.File"/>, the file, from the application's root.</summary>
 public sealed record WebLingoRequestOutcome(WebLingoRequestOutcomeKind Kind, string? File = null)
@@ -121,6 +121,9 @@ public sealed class WebLingoApplication
         {
             case { Kind: WebLingoRouteKind.File } file:
                 return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.File, file.File);
+            case { Kind: WebLingoRouteKind.Page or WebLingoRouteKind.Handler } when TooLarge(request):
+                WebLingoErrorPages.TooLarge(response);
+                return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.TooLarge);
             case { Kind: WebLingoRouteKind.Page } page:
                 return Run(generation.Page(worker, page.File, this), request, response, worker, cancellation, scheduler,
                     WebLingoRequestOutcomeKind.Page);
@@ -164,6 +167,14 @@ public sealed class WebLingoApplication
             WebLingoRequestOutcomeKind.Handler);
     }
 
+    /// <summary>The largest body a site's request may have (section 6.12, "Uploaded files"), which its hosts let through.</summary>
+    public long MaxBodySize => _options.Uploads.MaxBodySize;
+
+    /// <summary>Whether a request says its body is larger than the site takes, by its <c>Content-Length</c>, before it is read.</summary>
+    private bool TooLarge(IWebLingoHttpRequest request) =>
+        long.TryParse(request.Headers.Get("Content-Length"), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture,
+            out var length) && length > _options.Uploads.MaxBodySize;
+
     /// <summary>The names a <c>.wlg</c> exports, read from its text, or null if it does not parse.</summary>
     private HashSet<string>? ExportsOf(string file)
     {
@@ -197,9 +208,10 @@ public sealed class WebLingoApplication
         // A client that takes nothing for too long cancels the request, as a client that goes does.
         cancellation ??= new WebLingoCancellationSignal();
         var output = new WebLingoResponseText(response, _options.SendTimeout, cancellation.Cancel);
+        var made = _http.For(request, response, output, _options.Uploads, out var ending);
         var context = new WebLingoExecutionContext(worker)
         {
-            Services = new RequestServices([.. WebLingoTemplateBuiltins.Common(output), .. _http.For(request, response, output)], _http.Members,
+            Services = new RequestServices([.. WebLingoTemplateBuiltins.Common(output), .. made], _http.Members,
                 _services[worker.Value].Builtins, output),
             Output = output,
             FileSystem = _options.ScriptFileSystem ?? _options.FileSystem,
@@ -219,21 +231,22 @@ public sealed class WebLingoApplication
             Lines = page.LineOf
         };
         var vm = new WebLingoVirtualMachine { Loader = page.Modules, Components = page.Components };
-        return Ended(vm.Execute(page.Module, context), vm.Resume, page, output, response, done);
+        return Ended(vm.Execute(page.Module, context), vm.Resume, page, output, response, done, ending);
     }
 
     /// <summary>What a run came to: <paramref name="done"/>, a failure, or a wait, which its host resumes.</summary>
     private WebLingoRequestOutcome Ended(WebLingoExecutionResult result, Func<WebLingoExecutionResult> resume, CompiledPage page,
-        WebLingoResponseText output, IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done)
+        WebLingoResponseText output, IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done, IDisposable ending)
     {
         if (result.Waiting)
         {
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Waiting)
             {
-                Resume = () => Ended(resume(), resume, page, output, response, done),
+                Resume = () => Ended(resume(), resume, page, output, response, done, ending),
                 WaitMilliseconds = result.WaitMilliseconds
             };
         }
+        ending.Dispose(); // Its uploads' temporary files removed (section 6.12, "Uploaded files").
         if (!result.Succeeded)
         {
             var error = page.Describe(result.Error!);

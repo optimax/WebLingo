@@ -60,7 +60,7 @@ public static class WebLingoSchemes
         out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed, out WebLingoEnvSettings env,
         out IReadOnlyDictionary<string, WebLingoMailServer> mail, out string? error) =>
         TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
-            out databases, out files, out allowed, out env, out mail, out error);
+            out databases, out files, out allowed, out env, out mail, out _, out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
@@ -69,7 +69,8 @@ public static class WebLingoSchemes
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out string? error) =>
-        TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out _, out _, out _, out _, out _, out _, out error);
+        TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out _, out _, out _, out _, out _, out _, out _,
+            out error);
 
     /// <summary>
     /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, its databases,
@@ -79,7 +80,7 @@ public static class WebLingoSchemes
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out string? error) =>
         TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out allowedHosts, out databases, out files,
-            out _, out _, out _, out error);
+            out _, out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name, and what its
@@ -89,10 +90,12 @@ public static class WebLingoSchemes
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
-        out WebLingoEnvSettings env, out IReadOnlyDictionary<string, WebLingoMailServer> mail, out string? error)
+        out WebLingoEnvSettings env, out IReadOnlyDictionary<string, WebLingoMailServer> mail, out WebLingoUploadSettings uploads,
+        out string? error)
     {
         var servers = new Dictionary<string, WebLingoMailServer>(StringComparer.Ordinal);
         mail = servers;
+        uploads = WebLingoUploadSettings.Default;
         env = WebLingoEnvSettings.None;
         var allowing = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         allowed = allowing;
@@ -113,7 +116,7 @@ public static class WebLingoSchemes
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
         if (File.Exists(file) && !TryRead(file, folder, schemes, ref mode, ref sendTimeout, hosts, named, read, write,
-            allowing, ref env, servers, out error))
+            allowing, ref env, servers, ref uploads, out error))
         {
             return false;
         }
@@ -195,6 +198,30 @@ public static class WebLingoSchemes
                 return false;
             }
             mail[server.Name] = new WebLingoMailServer(host, port ?? WebLingoMailServer.DefaultPort(tls), tls, user, password, thumbprint);
+        }
+        error = null;
+        return true;
+    }
+
+    /// <summary>
+    /// <c>"uploads": { "inMemory": 65536, "maxSize": 20000000, "folder": "../tmp" }</c>, each optional: how many bytes of a
+    /// file a form uploads are kept in memory, the rest in a temporary file; the most its files may take in all; and the
+    /// folder their temporary files are made in, from the file's folder, the system's temporary folder if none is named.
+    /// </summary>
+    private static bool TryReadUploads(string file, string folder, JsonElement setting, ref WebLingoUploadSettings uploads, out string? error)
+    {
+        error = $"{file}: \"uploads\" is an object, {{ \"inMemory\": 65536, \"maxSize\": 20000000, \"folder\": \"../tmp\" }}, each "
+                + "optional, \"inMemory\" a number of bytes, 0 or more, \"maxSize\" one more than 0, and \"folder\" a folder.";
+        if (setting.ValueKind != JsonValueKind.Object) return false;
+        foreach (var entry in setting.EnumerateObject())
+        {
+            if (entry.Name == "inMemory" && entry.Value.ValueKind == JsonValueKind.Number && entry.Value.TryGetInt32(out var kept) && kept >= 0)
+                uploads = uploads with { InMemory = kept };
+            else if (entry.Name == "maxSize" && entry.Value.ValueKind == JsonValueKind.Number && entry.Value.TryGetInt64(out var most) && most > 0)
+                uploads = uploads with { MaxSize = most };
+            else if (entry.Name == "folder" && entry.Value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(entry.Value.GetString()))
+                uploads = uploads with { Folder = Path.GetFullPath(Path.Combine(folder, entry.Value.GetString()!)) };
+            else return false;
         }
         error = null;
         return true;
@@ -292,7 +319,7 @@ public static class WebLingoSchemes
     private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? mode, ref double? sendTimeout,
         List<string> hosts, Dictionary<string, WebLingoSecret> databases, List<string> read, List<string> write,
         Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, Dictionary<string, WebLingoMailServer> mail,
-        out string? error)
+        ref WebLingoUploadSettings uploads, out string? error)
     {
         error = null;
         try
@@ -402,6 +429,24 @@ public static class WebLingoSchemes
                     allowed["com"] = objects;
                     continue;
                 }
+                if (setting.Name == "maxBodySize")
+                {
+                    // The largest body a request may have, in bytes (section 6.12, "Uploaded files").
+                    if (setting.Value.ValueKind != JsonValueKind.Number || !setting.Value.TryGetInt64(out var largest) || largest < 1)
+                    {
+                        error = $"{file}: \"maxBodySize\" is a number of bytes, more than 0.";
+                        return false;
+                    }
+                    uploads = uploads with { MaxBodySize = largest };
+                    continue;
+                }
+                if (setting.Name == "uploads")
+                {
+                    // What a form's files may be: how much of each is kept in memory, their largest in all, and where the
+                    // rest of them is kept (section 6.12, "Uploaded files").
+                    if (!TryReadUploads(file, folder, setting.Value, ref uploads, out error)) return false;
+                    continue;
+                }
                 if (setting.Name == "mail")
                 {
                     // Its mail servers, each a name a script sends through it by, and its settings (section 7.17).
@@ -417,7 +462,7 @@ public static class WebLingoSchemes
                 if (setting.Name != "schemes")
                 {
                     error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"mode\", "
-                            + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\" and \"mail\".";
+                            + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\" and \"uploads\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)
@@ -445,6 +490,17 @@ public static class WebLingoSchemes
             return false;
         }
     }
+}
+
+/// <summary>
+/// What a site's configuration says of a request's body (specification, section 6.12, "Uploaded files"): its largest, in
+/// bytes; how much of a file a form uploads is kept in memory; the most its files may take in all, the body's largest where
+/// it says nothing; and the folder their temporary files are made in, the system's temporary folder where it names none.
+/// </summary>
+public sealed record WebLingoUploadSettings(long MaxBodySize, int InMemory, long? MaxSize, string? Folder)
+{
+    /// <summary>What a configuration that says nothing of them means: 30,000,000 bytes, 64 KB in memory.</summary>
+    public static WebLingoUploadSettings Default { get; } = new(30_000_000, 64 * 1024, null, null);
 }
 
 /// <summary>

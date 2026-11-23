@@ -31,6 +31,11 @@ public static class WebLingoAspNetCore
     /// </summary>
     public static async Task Serve(HttpContext context, WebLingoApplication application, string root, WebLingoWorkerPool workers)
     {
+        // The site's limit on a body is its own (section 6.12, "Uploaded files"), not Kestrel's 30,000,000 bytes.
+        if (context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
+        {
+            limit.MaxRequestBodySize = application.MaxBodySize;
+        }
         var request = Translate(context.Request, context.RequestAborted);
         var response = new WebLingoStreamingResponse(context.RequestAborted);
         var cancellation = new WebLingoCancellationSignal();
