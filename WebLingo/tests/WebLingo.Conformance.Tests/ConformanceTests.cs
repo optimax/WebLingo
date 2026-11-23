@@ -280,6 +280,8 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { writeLn } from \"std:console\"; var i = 0; var m = {a: i = 1, b: i}; writeLn(m[\"b\"]); writeLn(i);", "1\n1")]
     [InlineData("import { writeLn } from \"std:console\"; var s = 0; foreach (var x in [1, 2, 3]) s = s + x; writeLn(s);", "6")]
     [InlineData("import { writeLn } from \"std:console\"; class Point { constructor(x, y) { this.x = x; this.y = y; } function sum() { return this.x + this.y; } scaled(k) { return new Point(this.x * k, this.y * k); } } var p = new Point(1, 2); writeLn(p.sum()); writeLn(p); writeLn(p.scaled(10).x);", "3\nPoint {x: 1, y: 2}\n10")]
+    // A method found by a name a class remembers, never stale: given anew while the program calls it from the same place, and a base's given anew under a subclass (the specification, section 5.6).
+    [InlineData("import { writeLn } from \"std:console\"; class P { m() { return 1; } } var p = new P(); var r = []; for (var i = 0; i < 3; i++) { r.push(p.m()); if (i == 0) P.setMethod(\"m\", function (this) { return 2; }); if (i == 1) P.setMethod(\"m\", function (this) { return 3; }); } writeLn(r); class B { m() { return \"b1\"; } } class D extends B {} var d = new D(); var seen = [d.m()]; B.setMethod(\"m\", function (this) { return \"b2\"; }); seen.push(d.m()); writeLn(seen); var q = new P(); writeLn(q.m());", "[1, 2, 3]\n[\"b1\", \"b2\"]\n3")]
     // A comparison's branch taken at once, but after a class's own operator, which is called first; constant right operands,
     // their errors as before; loops tested at their bottom, with continue and break; and x++ whose value is not used (the
     // specification, section 5.6).

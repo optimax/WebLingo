@@ -324,8 +324,34 @@ public sealed class WebLingoHeap
             for (var i = 0; i < inherited.Length; i++) disposeChain[i + 1] = inherited[i];
         }
         target.DisposeChain = disposeChain;
+        Array.Clear(target.LookedUp);
         target.Version = _classVersion;
         return target;
+    }
+
+    /// <summary>
+    /// A class's method by its name, current methods' (<see cref="Current"/>): one of the names it was last looked up by,
+    /// compared by reference, the program's names being the same strings each time, what that lookup found; else its
+    /// methods' table, the name and what it found remembered in place of the oldest (the specification, section 5.6,
+    /// "Where the time goes", cause 3).
+    /// </summary>
+    private static bool FindMethod(ClassObject target, string name, out WebLingoValue closure)
+    {
+        var names = target.LookedUp;
+        for (var i = 0; i < names.Length; i++)
+        {
+            if (ReferenceEquals(names[i], name))
+            {
+                closure = target.Found[i];
+                return closure.Kind != WebLingoValueKind.Null;
+            }
+        }
+        var found = target.Methods.TryGetValue(name, out closure);
+        var at = target.NextLookedUp;
+        names[at] = name;
+        target.Found[at] = found ? closure : WebLingoValue.Null;
+        target.NextLookedUp = (at + 1) % names.Length;
+        return found;
     }
 
     /// <summary>
@@ -1156,7 +1182,7 @@ public sealed class WebLingoHeap
     {
         var target = Current(Get<ClassObject>(classValue, WebLingoValueKind.Class));
         setter = WebLingoValue.Null;
-        if (target.Methods.ContainsKey(name)) return Assignee.Method;
+        if (FindMethod(target, name, out _)) return Assignee.Method;
         if (target.Setters is { } setters && setters.TryGetValue(name, out setter)) return Assignee.Setter;
         return target.Getters is { } getters && getters.ContainsKey(name) ? Assignee.ReadOnly : Assignee.Field;
     }
@@ -1342,7 +1368,7 @@ public sealed class WebLingoHeap
 
     /// <summary>A method's closure, by its name, from a class.</summary>
     public bool TryGetMethod(WebLingoValue value, string name, out WebLingoValue closure) =>
-        Current(Get<ClassObject>(value, WebLingoValueKind.Class)).Methods.TryGetValue(name, out closure);
+        FindMethod(Current(Get<ClassObject>(value, WebLingoValueKind.Class)), name, out closure);
 
     /// <summary>How many members the runtime knows by number (<see cref="WebLingoMember"/>).</summary>
     private static readonly int KnownMemberCount = Enum.GetValues<WebLingoMember>().Length;
@@ -1354,7 +1380,7 @@ public sealed class WebLingoHeap
     public bool TryGetMethod(WebLingoValue value, WebLingoMember member, string name, out WebLingoValue closure)
     {
         var target = Current(Get<ClassObject>(value, WebLingoValueKind.Class));
-        if (member == WebLingoMember.Unknown) return target.Methods.TryGetValue(name, out closure);
+        if (member == WebLingoMember.Unknown) return FindMethod(target, name, out closure);
         closure = target.KnownMethods is { } known ? known[(int)member] : WebLingoValue.Null;
         return closure.Kind != WebLingoValueKind.Null;
     }
@@ -1959,6 +1985,13 @@ public sealed class WebLingoHeap
         /// <summary>Its properties' getters and setters, its own and its bases', by the property's name; null for none (section 3.7).</summary>
         public Dictionary<string, WebLingoValue>? Getters { get; set; }
         public Dictionary<string, WebLingoValue>? Setters { get; set; }
+        /// <summary>
+        /// The names its methods were last looked up by, and what each found, a method or null for none, which
+        /// <see cref="FindMethod"/> searches before its methods' table; emptied when its methods are gathered.
+        /// </summary>
+        public string?[] LookedUp { get; } = new string?[4];
+        public WebLingoValue[] Found { get; } = new WebLingoValue[4];
+        public int NextLookedUp { get; set; }
         /// <summary>
         /// Its methods, and its properties' getters, whose names the runtime knows by number (<see cref="WebLingoMember"/>),
         /// by that number, null for none; and its indexer's getter and setter, or null: each found without its name, as a
