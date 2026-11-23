@@ -25,8 +25,19 @@ namespace WebLingo.Data.DotNet;
 /// SqlClient uses its managed network layer on Windows too, as it does elsewhere,
 /// its native one, under Microsoft's own terms, not shipped: it reaches a server by TCP/IP, never by its shared memory.
 /// </summary>
-public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configured, string folder) : IWebLingoDatabases
+public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> configured, string folder, IWebLingoSecrets? secrets = null)
+    : IWebLingoDatabases
 {
+    /// <summary>The databases a configuration names, each by its connection string itself.</summary>
+    public DotNetDatabases(IReadOnlyDictionary<string, string> configured, string folder) : this(Given(configured), folder) { }
+
+    private static Dictionary<string, WebLingoSecret> Given(IReadOnlyDictionary<string, string> configured)
+    {
+        var given = new Dictionary<string, WebLingoSecret>(StringComparer.Ordinal);
+        foreach (var (name, connection) in configured) given[name] = WebLingoSecret.Given(connection);
+        return given;
+    }
+
     /// <summary>The providers this platform has.</summary>
     public static readonly IReadOnlyList<string> Providers = ["sqlite", "sqlserver", "mysql", "postgresql"];
 
@@ -44,7 +55,7 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
         string connection;
         string? relativeTo = null;
         if (nameOrConnection.Contains(':')) connection = nameOrConnection;
-        else if (configured.TryGetValue(nameOrConnection, out var found)) (connection, relativeTo) = (found, folder);
+        else if (configured.TryGetValue(nameOrConnection, out var found)) (connection, relativeTo) = (Read(nameOrConnection, found), folder);
         else throw Invalid($"'{nameOrConnection}' is not a database the configuration names");
         var colon = connection.IndexOf(':');
         if (colon < 0) throw Invalid("a configured database connection string must start with its provider and a colon");
@@ -66,6 +77,23 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, string> configur
         {
             opened.Dispose();
             throw new WebLingoDatabaseException(WebLingoDatabaseErrorKind.Failed, $"the database cannot be opened: {exception.Message}");
+        }
+    }
+
+    /// <summary>
+    /// A configured database's connection string, read where the configuration keeps it (section 7.17, "Secrets"), each
+    /// time it is opened.
+    /// </summary>
+    private string Read(string name, WebLingoSecret secret)
+    {
+        if (secret.Source == WebLingoSecretSource.Given) return secret.Text;
+        try
+        {
+            return (secrets ?? throw new WebLingoSecretException("this host reads no secrets")).Read(secret);
+        }
+        catch (WebLingoSecretException failure)
+        {
+            throw new WebLingoDatabaseException(WebLingoDatabaseErrorKind.Failed, $"the database '{name}''s connection string cannot be read: {failure.Message}");
         }
     }
 

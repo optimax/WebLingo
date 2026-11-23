@@ -135,6 +135,13 @@ public static class WebLingoDiagnosticCodes
     /// Module, Part 2", A5; section 3.9, "The console: <c>std:console</c>").
     /// </summary>
     public const string PlatformNotSupported = "WL3022";
+    /// <summary>
+    /// Mail that cannot be sent: a server that cannot be reached, offers no TLS, refuses the sign-in, a recipient or the
+    /// message, or a secret of its settings the host cannot read, a <c>MailError</c>, its <c>reply</c> the server's reply
+    /// code, or <c>null</c> (section 7.17, the owner's answers, 23 November 2026, "Mail: <c>std:mail</c>"); its name and
+    /// code Proposed.
+    /// </summary>
+    public const string MailFailure = "WL3023";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";

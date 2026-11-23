@@ -208,6 +208,7 @@ public sealed class WebLingoApplication
             Crypto = _options.Crypto,
             Environment = _options.Environment,
             Databases = _options.Databases,
+            Mail = _options.Mail,
             Clock = _options.Clock,
             WallClock = _options.WallClock,
             TimeZone = _options.TimeZone,

@@ -446,7 +446,7 @@ public static partial class WebLingoCommandLine
         {
             // Its configuration checked, as for a source file.
             if (!WebLingoSchemes.TryLoad(path, program.Configuration, givenSchemes, out _, out _, out _, out _, out _,
-                out _, out var wrongConfiguration))
+                out _, out _, out var wrongConfiguration))
             {
                 error.WriteLine(wrongConfiguration);
                 return FileUnreadable;
@@ -566,7 +566,8 @@ public static partial class WebLingoCommandLine
 
     /// <summary>What a command line gives the programs it compiles and runs: its built-ins, its native modules and its files.</summary>
     private sealed record Host(WebLingoBuiltinRegistry Services, WebLingoNativeModuleLoader Native, WebLingoCompilerOptions Options,
-        FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoTextOutput ErrorOutput, IWebLingoNetwork Network, IWebLingoDatabases Databases, IWebLingoFileSystem Files,
+        FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoTextOutput ErrorOutput, IWebLingoNetwork Network, IWebLingoDatabases Databases,
+        IWebLingoMail Mail, IWebLingoFileSystem Files,
         IReadOnlyDictionary<string, IReadOnlyList<string>> Allowed, IWebLingoEnvironment Environment, IWebLingoConsoleInput? ConsoleInput,
         IWebLingoConsole? Console,
         IWebLingoProcessRunner? Processes);
@@ -580,7 +581,7 @@ public static partial class WebLingoCommandLine
         TextWriter output, TextWriter error, IWebLingoConsoleInput? input, Action? console = null)
     {
         if (!WebLingoSchemes.TryLoad(path, program.Configuration, givenSchemes, out var schemes, out var allowedHosts, out var databases,
-            out var folders, out var allowed, out var env, out var wrongConfiguration))
+            out var folders, out var allowed, out var env, out var mail, out var wrongConfiguration))
         {
             error.WriteLine(wrongConfiguration);
             return null;
@@ -588,7 +589,7 @@ public static partial class WebLingoCommandLine
         var folder = Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".";
         if (program.Root is { } root && Path.GetFullPath(root) != folder
             && !WebLingoSchemes.TryLoadFolder(root, program.Configuration, givenSchemes, out _, out _, out _, out _, out _,
-                out _, out _, out _, out wrongConfiguration))
+                out _, out _, out _, out _, out wrongConfiguration))
         {
             error.WriteLine(wrongConfiguration);
             return null;
@@ -622,7 +623,10 @@ public static partial class WebLingoCommandLine
         // databases it names, their files from its folder (section 7.11), a script's own checked as its files are.
         var files = program.ReachesAnyFile ? null : new DotNetFileCapabilities(program.Root ?? folder, folders.Read, folders.Write);
         return new Host(services, native, new WebLingoCompilerOptions(declarations) { Resolver = resolver, Native = native }, resolver,
-            textOutput, new TextWriterOutput(error), new DotNetNetwork(program.ReachesAnyHost ? null : allowedHosts), new DotNetDatabases(databases, folder) { Files = files },
+            textOutput, new TextWriterOutput(error), new DotNetNetwork(program.ReachesAnyHost ? null : allowedHosts),
+            new DotNetDatabases(databases, folder, new DotNetSecrets()) { Files = files },
+            // The mail servers its configuration names, their passwords read where it keeps them (section 7.17).
+            new DotNetMail(mail, new DotNetSecrets()),
             new DotNetFileSystem(files), allowed,
             // All of the machine's environment for a script's, what its configuration's "env" allows for a page's (section 7.15).
             program.ReachesAllEnvironment ? new DotNetEnvironment() : new DotNetEnvironment(env.MachineName, env.Variables, env.Platform),
@@ -651,6 +655,7 @@ public static partial class WebLingoCommandLine
             ConsoleInput = host.ConsoleInput,
             Console = host.Console,
             Databases = host.Databases,
+            Mail = host.Mail,
             Processes = host.Processes,
             SchedulerHost = new DotNetSchedulerHost()
         };

@@ -1810,6 +1810,7 @@ An error the runtime raises becomes an instance of a class extending `Error`, wi
 | `EnvironmentPermissionError` | WL3019 | an environment variable a site's script, under `wasp`, tries to set |
 | `DeadlockError` | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run, thrown at that `await` |
 | `PlatformError` | WL3022 | what the platform has not, a member of `std:console`'s `Console` that is Windows's alone, used elsewhere |
+| `MailError` | WL3023 | mail that cannot be sent, a server that cannot be reached or refuses it, its `reply` the server's reply code |
 
 Two errors cannot be caught, and always end the program: running past the execution's limits (WL3003) and being
 cancelled (WL3004).
@@ -2237,6 +2238,14 @@ keeping their arguments' kind; `math.floor(x)`, `math.ceiling(x)`, `math.round(x
 `pow`, `exp`, `log`, `log10`, `log2`, the trigonometric functions and `atan2`, each giving a number; and `math.PI` and
 `math.E`. The Standard Library Reference describes the module.
 
+### `std:mail`
+
+Mail, sent by SMTP to a relay, `import mail from "std:mail";`: `await mail.send({ from: "…", to: "…", subject: "…",
+text: "…" })`, a task of the message's `Message-ID`, through a server the configuration names, `"mail": { "default":
+{ "host": "smtp.example.com" } }` in `weblingo.config` or a site's `wasp.config`, or one a script gives, encrypted by
+TLS. Every key of a message is checked, one it does not have WL3001, naming the one it may have meant, and a message
+that cannot be sent is a `MailError`, WL3023. The Standard Library Reference describes the module.
+
 ### Native modules
 
 A native module is code compiled for .NET, an assembly that extends what scripts can use, as Python's C extensions do.
@@ -2308,6 +2317,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run |
 | WL3021 | an assertion from [`std:test`](weblingo-standard-library-reference.md#30-stdtest) failed |
 | WL3022 | what the platform has not, a member of `std:console`'s `Console` that is Windows's alone, used elsewhere |
+| WL3023 | mail that cannot be sent, `std:mail`'s `MailError` |
 | **WL4xxx** | **bytecode** |
 | WL4001 | bytecode that fails verification, such as a damaged file or a VM mismatch |
 | WL4002 | a program too large for the bytecode |

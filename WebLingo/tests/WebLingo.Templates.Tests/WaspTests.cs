@@ -311,6 +311,33 @@ public sealed class WaspTests : IDisposable
     }
 
     /// <summary>
+    /// A page sends mail through a server its folder's <c>wasp.config</c> names, which needs no permission, or through one
+    /// of its own, only where <c>"network"</c> allows its host, a <c>NetworkPermissionError</c>, WL3017, otherwise
+    /// (specification, section 7.17); nothing listening on port 1, a <c>MailError</c>, WL3023, once it is allowed. A secret
+    /// a site keeps in a file is kept outside the site, whose files may be served.
+    /// </summary>
+    [Fact]
+    public void APageSendsMailThroughItsConfiguredServerOrAHostNetworkAllows()
+    {
+        const string own = "<% import mail from \"std:mail\"; try { await mail.send({ from: \"a@example.com\", to: \"b@example.com\" }, "
+                           + "{ host: \"127.0.0.1\", port: 1, tls: \"none\" }); } catch (e) { write(e.code); } %>";
+        Assert.Equal((WebLingoCommandLine.Success, "WL3017", ""), Wasp("run", own));
+        File.WriteAllText(Path.Combine(_folder, "wasp.config"), "{ \"network\": { \"allow\": [\"127.0.0.1\"] } }");
+        Assert.Equal((WebLingoCommandLine.Success, "WL3023", ""), Wasp("run", own));
+        const string configured = "<% import mail from \"std:mail\"; try { await mail.send({ from: \"a@example.com\", to: \"b@example.com\" }); } "
+                                  + "catch (e) { write(e.code); } %>";
+        File.WriteAllText(Path.Combine(_folder, "wasp.config"),
+            "{ \"mail\": { \"default\": { \"host\": \"127.0.0.1\", \"port\": 1, \"tls\": \"none\" } } }");
+        Assert.Equal((WebLingoCommandLine.Success, "WL3023", ""), Wasp("run", configured));
+        File.WriteAllText(Path.Combine(_folder, "wasp.config"), "{ \"mail\": { \"default\": { \"host\": \"127.0.0.1\", \"user\": \"a\", "
+                                                              + "\"password\": { \"file\": \"secrets/smtp.txt\" } } } }");
+        var (exit, _, error) = Wasp("run", configured);
+        Assert.Equal(WebLingoCommandLine.FileUnreadable, exit);
+        Assert.Contains("\"mail\"'s \"default\"'s \"password\"'s file must be outside the site, whose files may be served, not "
+                        + "\"secrets/smtp.txt\".", error, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// A page reads only what its folder's <c>wasp.config</c>'s <c>"env"</c> allows of the machine's environment
     /// (specification, section 7.15): nothing without it, <c>null</c> as if it were not there, its name and the variables
     /// it lists with it, a name ending in <c>*</c> those it begins; and sets no variable, an

@@ -24,7 +24,8 @@ public static class WebLingoErrorClasses
         ("ComPermissionError", WebLingoDiagnosticCodes.ComPermissionDenied),
         ("EnvironmentPermissionError", WebLingoDiagnosticCodes.EnvironmentPermissionDenied),
         ("DeadlockError", WebLingoDiagnosticCodes.WaitsForever),
-        ("PlatformError", WebLingoDiagnosticCodes.PlatformNotSupported)
+        ("PlatformError", WebLingoDiagnosticCodes.PlatformNotSupported),
+        ("MailError", WebLingoDiagnosticCodes.MailFailure)
     ];
 
     public static ReadOnlySpan<(string Name, string Code)> BuiltIn => Classes;

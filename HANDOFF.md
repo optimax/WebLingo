@@ -145,12 +145,27 @@ times as fast, `loops` 1.4; as a user runs them, since arithmetic's slow paths l
 about 2.2 times, `loops` and `sort` about twice, `maps` 1.5, `calls` and `closures` as they were. Start-up is
 unchanged, .NET's JIT at work: its remedy is the
 deferred task "`weblingo` and `wasp` Published ReadyToRun". The benchmark's `io` measures .NET's thread pool more than
-the VM, and falls at about 1.1 s or 2.7 s by build. A young generation waits for the owner's answer in `TO-DO.md`.
+the VM, and falls at about 1.1 s or 2.7 s by build. A young generation is designed, Proposed, in the specification's
+section 4.2, "A young generation" (`816efa6`), nothing built: it waits for the owner's answers in `TO-DO.md`.
 
 Since `071ad6b` the heap reads the VM's frames when it collects (`WebLingoHeap.Frames`, `IWebLingoRootSource`), and
 since `9c2cc3b` it keeps what is being stored or made while it collects; `Documents/implementation.md`, "A Value Just
 Made Is No Root", says how to find such places with a heap that collects every 16 units, a local trial never
 committed. Under it, every conformance case passes but one that counts collections.
 
-Next: the owner's answers to the questions in `TO-DO.md`, on uploads, sessions, mail, debugging pages and Visual
-Studio, then those tasks; nothing above `# END-OF-TO-DO` can go on without them.
+## Mail
+
+`std:mail` sends mail by SMTP to a relay (the specification, section 7.17, the owner's answers of 23 November 2026):
+`WebLingo.StdLib.Mail`, `std/mail.dll`, in the portable core, through the platform's `IWebLingoMail`; on .NET,
+`DotNetMail`, with an SMTP client and a MIME writer of WebLingo's own (`WebLingoSmtpClient`, `WebLingoMimeWriter`, in
+`WebLingo.Platform.DotNet`), STARTTLS or TLS from the start, PLAIN, LOGIN and XOAUTH2. Its servers are
+`"mail"` in `weblingo.config` and `wasp.config`, read by `WebLingoSchemes`; a password, and a database's connection
+string, may be kept in an environment variable or a file (`WebLingoSecret`, read by `IWebLingoSecrets`,
+`DotNetSecrets`, each time it is used). Its error is `MailError`, WL3023, Proposed. `MailTests` (`WebLingo.Conformance.Tests`)
+send through `SmtpTestServer`, a server of the tests' own on 127.0.0.1 with a self-signed certificate made for each
+test; nothing reaches a real server. Not built, as the owner left them for later: SMTPUTF8, DKIM, IMAP and POP3, and
+a class `MailMessage`.
+
+Next: the owner's answers to the questions in `TO-DO.md`, on the young generation, uploads, sessions and debugging
+pages, then those tasks; "Visual Studio Debug Adapter" waits for Visual Studio installed here, and "Extensive WASP
+Example" for uploads and sessions. Nothing above `# END-OF-TO-DO` can go on without them.

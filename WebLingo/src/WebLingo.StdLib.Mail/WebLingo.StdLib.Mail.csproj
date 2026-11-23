@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- std:mail, a standard module, a native module installed with the runtime as std/mail.dll (section 7.17). -->
+  <PropertyGroup><OutputType>Library</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../WebLingo.Core/WebLingo.Core.csproj" />
+    <ProjectReference Include="../WebLingo.Runtime/WebLingo.Runtime.csproj" />
+    <ProjectReference Include="../WebLingo.Platform.Abstractions/WebLingo.Platform.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

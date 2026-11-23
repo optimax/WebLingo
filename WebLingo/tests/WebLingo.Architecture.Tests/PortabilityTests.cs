@@ -21,6 +21,7 @@ public sealed class PortabilityTests
         ("Microsoft.AspNetCore", "ASP.NET Core is adapter-only"),
         ("System.Net.Http", "HTTP is a platform service, adapter-only"),
         ("System.Net.Sockets", "sockets are the platform's network, or a host's, adapter-only"),
+        ("System.Net.Security", "TLS is the platform's network's and mail's, adapter-only"),
         ("System.IO.Pipes", "pipes are a host's, adapter-only"),
         ("System.Linq", "LINQ is kept out of the portable core"),
         ("System.Security.Cryptography", "cryptography is the platform's, IWebLingoCrypto (section 7.10)"),
@@ -70,7 +71,7 @@ public sealed class PortabilityTests
         "WebLingo.Core", "WebLingo.Language", "WebLingo.Bytecode", "WebLingo.Compiler", "WebLingo.Runtime",
         "WebLingo.VM", "WebLingo.Templates", "WebLingo.StdLib", "WebLingo.StdLib.Tasks", "WebLingo.Platform.Abstractions",
         "WebLingo.StdLib.Fs", "WebLingo.StdLib.Http", "WebLingo.StdLib.Net", "WebLingo.StdLib.Db", "WebLingo.StdLib.Crypto", "WebLingo.Hosting.Abstractions",
-        "WebLingo.Hosting", "WebLingo.StdLib.Env", "WebLingo.StdLib.Math",
+        "WebLingo.Hosting", "WebLingo.StdLib.Env", "WebLingo.StdLib.Math", "WebLingo.StdLib.Mail",
         "WebLingo.StdLib.Csv", "WebLingo.StdLib.Random", "WebLingo.StdLib.Process", "WebLingo.StdLib.Test", "WebLingo.StdLib.Console",
     };
 

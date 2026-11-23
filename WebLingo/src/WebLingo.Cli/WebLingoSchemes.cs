@@ -1,5 +1,6 @@
 using System.Text.Json;
 using WebLingo.Bytecode;
+using WebLingo.Platform.Abstractions;
 namespace WebLingo.Cli;
 
 /// <summary>
@@ -21,7 +22,11 @@ namespace WebLingo.Cli;
 /// "File capabilities"); and the COM objects its scripts may make, <c>"com": { "allow": ["ADODB.Connection"] }</c>, by
 /// ProgID, CLSID or moniker, <c>"*"</c> any, which both read (section 3.10); and what its scripts may read of the machine's
 /// environment, <c>"env": { "machineName": true, "variables": ["PATH", "APP_*"] }</c>, which <c>wasp</c> reads,
-/// <c>weblingo</c>'s scripts reading all of it (section 7.15). On Windows, the <c>windows</c> scheme's folder is
+/// <c>weblingo</c>'s scripts reading all of it (section 7.15); and its mail servers, each a name and its settings,
+/// <c>"mail": { "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": "…" } }</c>, which both
+/// read (section 7.17). A secret, a mail server's password or a database's connection string, may be given where it is
+/// kept, <c>{ "env": "NAME" }</c> or <c>{ "file": "../secrets/name.txt" }</c>, a file from the file's folder, one a
+/// site's <c>wasp.config</c> names outside the site, read by the host when it is used. On Windows, the <c>windows</c> scheme's folder is
 /// <c>windows/</c> beside the program, unless configured, as <c>std</c>'s is <c>std/</c>.
 /// </summary>
 public static class WebLingoSchemes
@@ -42,20 +47,20 @@ public static class WebLingoSchemes
     /// each name's connection string, and the folders its scripts may read and write, none when it names none.
     /// </summary>
     public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
-        out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out IReadOnlyDictionary<string, string> databases,
+        out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out IReadOnlyDictionary<string, WebLingoSecret> databases,
         out WebLingoFileFolders files, out string? error) =>
-        TryLoad(program, configuration, given, out schemes, out allowedHosts, out databases, out files, out _, out _, out error);
+        TryLoad(program, configuration, given, out schemes, out allowedHosts, out databases, out files, out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name, and what its
-    /// scripts may read of the machine's environment.
+    /// scripts may read of the machine's environment, and its mail servers.
     /// </summary>
     public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
-        out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out IReadOnlyDictionary<string, string> databases,
+        out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out IReadOnlyDictionary<string, WebLingoSecret> databases,
         out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed, out WebLingoEnvSettings env,
-        out string? error) =>
+        out IReadOnlyDictionary<string, WebLingoMailServer> mail, out string? error) =>
         TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
-            out databases, out files, out allowed, out env, out error);
+            out databases, out files, out allowed, out env, out mail, out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
@@ -64,7 +69,7 @@ public static class WebLingoSchemes
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out string? error) =>
-        TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out _, out _, out _, out _, out _, out error);
+        TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out _, out _, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, its databases,
@@ -72,26 +77,29 @@ public static class WebLingoSchemes
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
-        out IReadOnlyDictionary<string, string> databases, out WebLingoFileFolders files, out string? error) =>
+        out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out string? error) =>
         TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out allowedHosts, out databases, out files,
-            out _, out _, out error);
+            out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name, and what its
-    /// scripts may read of the machine's environment, nothing when it says nothing.
+    /// scripts may read of the machine's environment, nothing when it says nothing, and its mail servers, none when it names
+    /// none.
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
-        out IReadOnlyDictionary<string, string> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
-        out WebLingoEnvSettings env, out string? error)
+        out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
+        out WebLingoEnvSettings env, out IReadOnlyDictionary<string, WebLingoMailServer> mail, out string? error)
     {
+        var servers = new Dictionary<string, WebLingoMailServer>(StringComparer.Ordinal);
+        mail = servers;
         env = WebLingoEnvSettings.None;
         var allowing = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         allowed = allowing;
         sendTimeout = null;
         var hosts = new List<string>();
         allowedHosts = hosts;
-        var named = new Dictionary<string, string>(StringComparer.Ordinal);
+        var named = new Dictionary<string, WebLingoSecret>(StringComparer.Ordinal);
         databases = named;
         var (read, write) = (new List<string>(), new List<string>());
         files = new WebLingoFileFolders(read, write);
@@ -105,7 +113,7 @@ public static class WebLingoSchemes
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
         if (File.Exists(file) && !TryRead(file, folder, schemes, ref mode, ref sendTimeout, hosts, named, read, write,
-            allowing, ref env, out error))
+            allowing, ref env, servers, out error))
         {
             return false;
         }
@@ -132,6 +140,101 @@ public static class WebLingoSchemes
         }
         error = null;
         return true;
+    }
+
+    /// <summary>
+    /// <c>"mail": { "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": "…", "tls": "starttls",
+    /// "thumbprint": "…" } }</c>: each server's name and its settings, its host required, its port by default its TLS's
+    /// (587, 465 for <c>"implicit"</c>, 25 for <c>"none"</c>), its password a secret, which needs its user (section 7.17).
+    /// </summary>
+    private static bool TryReadMail(string file, string folder, JsonElement setting, Dictionary<string, WebLingoMailServer> mail, out string? error)
+    {
+        if (setting.ValueKind != JsonValueKind.Object)
+        {
+            error = $"{file}: \"mail\" is an object, each server's name and its settings, {{ \"default\": {{ \"host\": \"smtp.example.com\" }} }}.";
+            return false;
+        }
+        foreach (var server in setting.EnumerateObject())
+        {
+            var what = $"\"mail\"'s \"{server.Name}\"";
+            if (server.Name.Length == 0 || server.Value.ValueKind != JsonValueKind.Object)
+            {
+                error = $"{file}: \"mail\" names each server, and gives its settings, {{ \"host\": \"smtp.example.com\" }}.";
+                return false;
+            }
+            string? host = null, user = null, thumbprint = null;
+            int? port = null;
+            var tls = WebLingoMailTls.StartTls;
+            WebLingoSecret? password = null;
+            foreach (var entry in server.Value.EnumerateObject())
+            {
+                var text = entry.Value.ValueKind == JsonValueKind.String ? entry.Value.GetString()! : "";
+                if (entry.Name == "host" && text.Length > 0) host = text;
+                else if (entry.Name == "user" && text.Length > 0) user = text;
+                else if (entry.Name == "port" && entry.Value.ValueKind == JsonValueKind.Number && entry.Value.TryGetInt32(out var number)
+                         && number is >= 1 and <= 65535) port = number;
+                else if (entry.Name == "tls" && text is "starttls" or "implicit" or "none")
+                    tls = text switch { "implicit" => WebLingoMailTls.Implicit, "none" => WebLingoMailTls.None, _ => WebLingoMailTls.StartTls };
+                else if (entry.Name == "thumbprint" && text.Length > 0 && text.All(c => char.IsAsciiHexDigit(c) || c is ':' or ' ' or '-'))
+                    thumbprint = text;
+                else if (entry.Name == "password")
+                {
+                    if (!TryReadSecret(file, folder, entry.Value, $"{what}'s \"password\"", out password, out error)) return false;
+                }
+                else
+                {
+                    error = $"{file}: {what} gives its \"host\", and, each optional, its \"port\", from 1 to 65535, its \"user\" and its \"password\", "
+                            + "its \"tls\", \"starttls\", \"implicit\" or \"none\", and a certificate's \"thumbprint\", in hexadecimal: "
+                            + $"'{entry.Name}' is not one, or not given as one.";
+                    return false;
+                }
+            }
+            if (host is null || password is not null && user is null)
+            {
+                error = host is null ? $"{file}: {what} gives its \"host\"." : $"{file}: {what}'s \"password\" needs its \"user\".";
+                return false;
+            }
+            mail[server.Name] = new WebLingoMailServer(host, port ?? WebLingoMailServer.DefaultPort(tls), tls, user, password, thumbprint);
+        }
+        error = null;
+        return true;
+    }
+
+    /// <summary>
+    /// A secret, a string, itself, or where it is kept, <c>{ "env": "NAME" }</c>, an environment variable, or
+    /// <c>{ "file": "../secrets/name.txt" }</c>, a file from the configuration's folder, one a site's <c>wasp.config</c>
+    /// names outside the site, whose files may be served (section 7.17, "Secrets"); never written in an error.
+    /// </summary>
+    private static bool TryReadSecret(string file, string folder, JsonElement value, string what, out WebLingoSecret secret, out string? error)
+    {
+        (secret, error) = (null!, null);
+        if (value.ValueKind == JsonValueKind.String && value.GetString()!.Length > 0)
+        {
+            secret = WebLingoSecret.Given(value.GetString()!);
+            return true;
+        }
+        var entries = value.ValueKind == JsonValueKind.Object ? value.EnumerateObject().ToList() : [];
+        var given = entries.Count == 1 && entries[0].Value.ValueKind == JsonValueKind.String ? entries[0].Value.GetString()! : "";
+        if (entries.Count == 1 && entries[0].Name == "env" && given.Length > 0 && !given.Contains('='))
+        {
+            secret = new WebLingoSecret(WebLingoSecretSource.Variable, given);
+            return true;
+        }
+        if (entries.Count == 1 && entries[0].Name == "file" && given.Length > 0)
+        {
+            var full = Path.GetFullPath(Path.Combine(folder, given));
+            var within = full.StartsWith(Path.TrimEndingDirectorySeparator(folder) + Path.DirectorySeparatorChar,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+            if (within && string.Equals(Path.GetFileName(file), "wasp.config", StringComparison.Ordinal))
+            {
+                error = $"{file}: {what}'s file must be outside the site, whose files may be served, not \"{given}\".";
+                return false;
+            }
+            secret = new WebLingoSecret(WebLingoSecretSource.File, full, given);
+            return true;
+        }
+        error = $"{file}: {what} is a string, or where it is kept, {{ \"env\": \"NAME\" }} or {{ \"file\": \"../secrets/name.txt\" }}.";
+        return false;
     }
 
     /// <summary>
@@ -187,8 +290,9 @@ public static class WebLingoSchemes
     }
 
     private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? mode, ref double? sendTimeout,
-        List<string> hosts, Dictionary<string, string> databases, List<string> read, List<string> write,
-        Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, out string? error)
+        List<string> hosts, Dictionary<string, WebLingoSecret> databases, List<string> read, List<string> write,
+        Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, Dictionary<string, WebLingoMailServer> mail,
+        out string? error)
     {
         error = null;
         try
@@ -250,7 +354,8 @@ public static class WebLingoSchemes
                 }
                 if (setting.Name == "databases")
                 {
-                    // Its databases, each a name a script opens it by, without a colon, and a connection string (section 7.11).
+                    // Its databases, each a name a script opens it by, without a colon, and a connection string (section 7.11), or
+                    // where one is kept (section 7.17, "Secrets").
                     if (setting.Value.ValueKind != JsonValueKind.Object)
                     {
                         error = $"{file}: \"databases\" is an object, {{ \"shop\": \"sqlite:../data/shop.db\" }}.";
@@ -258,6 +363,12 @@ public static class WebLingoSchemes
                     }
                     foreach (var database in setting.Value.EnumerateObject())
                     {
+                        if (database.Value.ValueKind == JsonValueKind.Object && database.Name.Length > 0 && !database.Name.Contains(':'))
+                        {
+                            if (!TryReadSecret(file, folder, database.Value, $"\"databases\"'s \"{database.Name}\"", out var kept, out error)) return false;
+                            databases[database.Name] = kept;
+                            continue;
+                        }
                         var connection = database.Value.ValueKind == JsonValueKind.String ? database.Value.GetString()! : "";
                         if (database.Name.Length == 0 || database.Name.Contains(':') || connection.IndexOf(':') < 1)
                         {
@@ -265,7 +376,7 @@ public static class WebLingoSchemes
                                     + "its provider's name, a colon, and what the provider reads, \"sqlite:../data/shop.db\".";
                             return false;
                         }
-                        databases[database.Name] = connection;
+                        databases[database.Name] = WebLingoSecret.Given(connection);
                     }
                     continue;
                 }
@@ -291,6 +402,12 @@ public static class WebLingoSchemes
                     allowed["com"] = objects;
                     continue;
                 }
+                if (setting.Name == "mail")
+                {
+                    // Its mail servers, each a name a script sends through it by, and its settings (section 7.17).
+                    if (!TryReadMail(file, folder, setting.Value, mail, out error)) return false;
+                    continue;
+                }
                 if (setting.Name == "files")
                 {
                     // The folders its scripts may read, and read and write (section 7.13, "File capabilities").
@@ -300,7 +417,7 @@ public static class WebLingoSchemes
                 if (setting.Name != "schemes")
                 {
                     error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"mode\", "
-                            + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\" and \"env\".";
+                            + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\" and \"mail\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)

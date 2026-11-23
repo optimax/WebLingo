@@ -81,6 +81,12 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     /// </summary>
     public WebLingo.Platform.Abstractions.IWebLingoDatabases? Databases { get; init; }
 
+    /// <summary>
+    /// The platform's mail, which <c>std:mail</c> reaches through the heap (<see cref="WebLingoHeap.Mail"/>, section 7.17),
+    /// the servers the configuration names among it; none by default, its functions then WL3001.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoMail? Mail { get; init; }
+
     /// <summary>The host's subprocess runner, if the execution is allowed to launch local programs.</summary>
     public WebLingo.Platform.Abstractions.IWebLingoProcessRunner? Processes { get; init; }
 

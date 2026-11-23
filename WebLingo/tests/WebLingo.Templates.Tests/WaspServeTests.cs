@@ -362,7 +362,7 @@ public sealed class WaspServeTests : IDisposable
         Write("wasp.config", "{ \"environment\": \"production\" }");
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
         Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"mode\", "
-                        + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\" and \"env\".", error);
+                        + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\" and \"mail\".", error);
 
         Write("wasp.config", "{ \"sendTimeout\": 5 }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));

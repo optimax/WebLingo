@@ -39,6 +39,7 @@ This reference describes the standard library in the current release and shows w
 28. [`std:random`](#28-stdrandom)
 29. [`std:process`](#29-stdprocess)
 30. [`std:test`](#30-stdtest)
+31. [`std:mail`](#31-stdmail)
 
 ---
 
@@ -415,6 +416,7 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `EnvironmentPermissionError` | WL3019 | a variable a site's scripts try to set, under `wasp`, which lets them read only (section 19) |
 | `DeadlockError` | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run, thrown at that `await`, naming where the task was made and where it is awaited |
 | `PlatformError` | WL3022 | a member of `Console` the platform has not, Windows's alone used elsewhere (section 1) |
+| `MailError` | WL3023 | mail that cannot be sent, a server that cannot be reached or refuses it, with its `reply`, the server's reply code (section 31) |
 
 ```javascript
 import { writeLn } from "std:console";
@@ -1122,7 +1124,7 @@ A native module is code compiled for .NET that extends what scripts can use: fun
 module's are, by a scheme naming a folder of them, `import db from "native:sqlite";`. The folders are named by the
 configuration, `weblingo.config` beside a script and `wasp.config` in a site, `{ "schemes": { "native":
 "C:/WebLingo/native" } }`, and by the command line's `--scheme native=folder`. The standard modules, `std:system`,
-`std:console`, `std:tasks`, `std:fs`, `std:http`, `std:net`, `std:db`, `std:crypto`, `std:env` and `std:math`, are native modules themselves, in the `std`
+`std:console`, `std:tasks`, `std:fs`, `std:http`, `std:net`, `std:db`, `std:crypto`, `std:env`, `std:math` and `std:mail`, are native modules themselves, in the `std`
 folder beside `weblingo` and `wasp`. A native module's function may have optional parameters, or a rest parameter, as
 `math.max(a, …)` has, and a module may export constants, as `math.PI` is, which no importer may assign.
 
@@ -1525,3 +1527,109 @@ Ordinary assertions throw `Error` with code `WL3021` when they fail. A compariso
 value, the actual value, and any supplied message. In a `checkAll` callback, call the assertions on the supplied
 checker to record failures and continue. An unexpected exception stops the callback and is reported with the
 failures collected so far. Await `checkAll` to observe the result.
+
+---
+
+## 31. `std:mail`
+
+Mail, sent by SMTP to a relay, a server that sends it on, as a provider's or an organization's does:
+`import mail from "std:mail";`, then `send`, asynchronous, a task of the message's `Message-ID`, sent off the worker,
+so that a page's other tasks go on while it waits.
+
+| Function | What it does |
+|---|---|
+| `send(message, server)` | sends `message`, a map, through `server`, which may be left out; gives its `Message-ID`, without its angle brackets |
+
+A message is a map of these, `from` and at least one recipient required, any other left out or given `null`:
+
+| Key | What it holds |
+|---|---|
+| `from` | the sender's address: `"ann@example.com"`, `"Ann <ann@example.com>"` or `"\"Smith, Ann\" <ann@example.com>"` |
+| `to`, `cc`, `bcc` | the recipients, each an address or an array of them; a `bcc` is sent to, never written in the message |
+| `replyTo` | where a reply goes, an address or an array of them |
+| `subject` | a string, on one line |
+| `text`, `html` | the message, as text, as HTML, or both, which a reader shows as it can |
+| `headers` | other headers, a map of names to strings, `{ "X-Order": "1042" }`, none of the message's own, `Subject`, `Content-Type` and the like |
+| `attachments` | an array of files, each `{ path: "…" }`, a file's, or `{ name: "receipt.txt", content: … }`, its content a string or bytes, and `type`, its `Content-Type`, which may be left out |
+
+Every key is checked, and every value's kind: a key a message does not have is WL3001, naming the one it may have
+meant, `'subjet' is not a field of a message; did you mean subject?`, and so is an address that is not one, or that is
+not ASCII, which mail cannot use yet. A subject and a header's value may hold any letters, and the text and the HTML
+any; an attachment's type, where it is left out, is its name's extension's, `application/pdf` for `.pdf`.
+
+The server is configured, in `weblingo.config` beside a script, or a site's `wasp.config`, each by a name, a send that
+names none using `"default"`, or the one there is:
+
+```json
+{
+  "mail": {
+    "default": { "host": "smtp.example.com", "port": 587, "user": "shop@example.com", "password": { "env": "SMTP_PASSWORD" } },
+    "newsletter": { "host": "mail.example.net", "port": 465, "tls": "implicit", "user": "news", "password": { "file": "../secrets/news.txt" } }
+  }
+}
+```
+
+| Setting | What it says | Default |
+|---|---|---|
+| `"host"` | the server's name or address | required |
+| `"port"` | its port, from 1 to 65535 | 587, 465 for `"implicit"`, 25 for `"none"` |
+| `"tls"` | `"starttls"`, TLS begun once connected, `"implicit"`, TLS from the start, or `"none"`, no TLS | `"starttls"` |
+| `"user"`, `"password"` | who it signs in as, and the password, which needs a user | none: no sign-in |
+| `"thumbprint"` | the SHA-256 or SHA-1 thumbprint of a certificate accepted though it cannot be checked, in hexadecimal | none |
+
+A password, as a database's connection string, may be given where it is kept rather than as itself, so that the
+configuration need not hold it: `{ "env": "SMTP_PASSWORD" }`, an environment variable, or `{ "file":
+"../secrets/smtp.txt" }`, a file, from the configuration's folder, which a site keeps outside its own, since its files
+may be served; either is read each time it is used, and a script never sees it, nor does any error show it.
+
+`server`, where given, names a configured server, `"newsletter"`, or is a map: `{ token: "…" }`, or `{ server:
+"newsletter", token: "…" }`, a configured server signed in to by XOAUTH2, with an OAuth 2.0 token the script got, as
+Google's and Microsoft's servers take; or a server of the script's own, `{ host: "…", port: 587, user: "…", password:
+"…", token: "…", tls: "starttls", thumbprint: "…" }`, every key but `host` optional, which a site may reach only where
+its `wasp.config`'s `"network"` allows its host, a `NetworkPermissionError`, WL3017, otherwise.
+
+Mail goes encrypted: a server that does not offer STARTTLS is refused, unless its settings say `"tls": "none"`; its
+certificate is checked, its chain and its name, one that cannot be, a self-signed one among them, accepted only by its
+`"thumbprint"`, which the error names; TLS is 1.2 or later; and a password is never sent without TLS but to a server on
+this machine. A server signs in by XOAUTH2 where a token is given, else by PLAIN, else by LOGIN.
+
+A message that cannot be sent is a `MailError`, WL3023: a server that cannot be reached, offers no TLS, refuses the
+sign-in, a recipient or the message; its `reply` is the server's reply code, `550`, or `null` where it gave none.
+Nothing is sent where a recipient is refused. A name the configuration does not give is WL3001, and a file an attachment
+names that cannot be read an `IOError`, WL3011.
+
+Given a mail server on this machine, at port 2525, without TLS, that refuses `nobody@example.com`, and a
+`weblingo.config` beside the script, `{ "mail": { "default": { "host": "localhost", "port": 2525, "tls": "none" } } }`:
+
+```javascript
+import { writeLn } from "std:console";
+import mail from "std:mail";
+var id = await mail.send({
+    from: "Tea Shop <shop@example.com>",
+    to: ["ann@example.com", "Bob <bob@example.com>"],
+    subject: "Your order",
+    text: "Your Sencha is on its way.",
+    html: "<p>Your <b>Sencha</b> is on its way.</p>",
+    attachments: [{ name: "receipt.txt", content: "Sencha 4.50" }]
+});
+writeLn(id.endsWith("@example.com"));
+try {
+    await mail.send({ from: "shop@example.com", to: "ann@example.com", subjet: "Hi" });
+} catch (e) {
+    writeLn(e.message);
+}
+try {
+    await mail.send({ from: "shop@example.com", to: "nobody@example.com", text: "Hi" });
+} catch (MailError e) {
+    writeLn([e.code, e.reply]);
+}
+```
+
+```text
+true
+'subjet' is not a field of a message; did you mean subject?
+["WL3023", 550]
+```
+
+What is not there yet: addresses that are not ASCII (SMTPUTF8), signing a message (DKIM), reading mail (IMAP, POP3),
+and a class of messages, `MailMessage`.

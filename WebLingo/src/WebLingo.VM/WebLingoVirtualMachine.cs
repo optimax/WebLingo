@@ -83,6 +83,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         heap.FileSystem = context.FileSystem;
         heap.Network = context.Network;
         heap.Databases = context.Databases;
+        heap.Mail = context.Mail;
         heap.Processes = context.Processes;
         heap.Allowed = context.Allowed;
         heap.Crypto = context.Crypto;

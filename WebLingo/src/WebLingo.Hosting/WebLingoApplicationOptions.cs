@@ -69,6 +69,9 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// <summary>The databases its scripts may open, those its configuration names among them; none without them (section 7.11).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoDatabases? Databases { get; init; }
 
+    /// <summary>The mail its scripts may send, through the servers its configuration names, or their own (section 7.17); none without it.</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoMail? Mail { get; init; }
+
     /// <summary>The host's side of an execution's scheduler, a new one for each request, or none.</summary>
     public Func<IWebLingoSchedulerHost>? Scheduler { get; init; }
 

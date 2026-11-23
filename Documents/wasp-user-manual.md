@@ -753,10 +753,11 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"sendTimeout"` | how many seconds a page waits for a client that has taken nothing of its output, more than 0 | 30 |
 | `"schemes"` | folders of native modules, each a name and a folder: `{ "native": "C:/WebLingo/native" }` | `std`, WebLingo's own |
 | `"network"` | the hosts the site's pages and handlers may reach, through `std:http` and `std:net`: `{ "allow": ["api.example.com"] }` | none |
-| `"databases"` | the site's databases, each a name its scripts open it by and its connection string: `{ "fish": "sqlite:../database/fish.db" }` | none |
+| `"databases"` | the site's databases, each a name its scripts open it by and its connection string, or where that is kept: `{ "fish": "sqlite:../database/fish.db" }` | none |
 | `"files"` | the folders the site's pages and handlers may read, and read and write, through `std:fs`: `{ "read": ["../data"], "write": ["../uploads"] }` | none |
 | `"com"` | the COM objects the site's pages and handlers may make, on Windows, through `windows:com`: `{ "allow": ["ADODB.Connection"] }`, `"*"` any; any other a `ComPermissionError`, WL3018 | none |
 | `"env"` | what the site's pages and handlers may read of the machine's environment, through `std:env`: `{ "machineName": true, "variables": ["PATH", "APP_*"] }` | nothing |
+| `"mail"` | the mail servers the site's pages and handlers send through, with `std:mail`, each a name and its settings: `{ "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": { "env": "SMTP_PASSWORD" } } }` | none |
 
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
 which. `wasp serve` and `wasp fastcgi` read the site's configuration when they start. Restart the host after changing it.
@@ -832,6 +833,28 @@ not set; without the setting, a site reads none of it. A site sets no variable: 
 `EnvironmentPermissionError`, WL3019, which a `catch` may catch. Under IIS, a site's variables are those its
 `web.config` gives `wasp` (`<environmentVariables>`), beside the server's own, and may hold secrets: list only those
 its pages need. A script that `weblingo` runs reads all of it, and sets variables, for its own process.
+
+A site sends mail with `std:mail` through the servers its `"mail"` names, which need no `"network"` of their own;
+a page that names a server of its own, `{ host: "…" }`, reaches only a host `"network"` allows. A send that names
+no server uses `"default"`, or the one there is:
+
+```json
+{ "mail": { "default": { "host": "smtp.example.com", "port": 587, "user": "shop@example.com",
+                          "password": { "file": "../secrets/smtp.txt" } } } }
+```
+
+```html
+<% import mail from "std:mail";
+   await mail.send({ from: "shop@example.com", to: "ann@example.com", subject: "Your order", text: "On its way." }); %>
+<p>We have sent you a confirmation.</p>
+```
+
+A password, as a database's connection string, need not be written in `wasp.config`: `{ "env": "SMTP_PASSWORD" }`
+reads it from an environment variable, which IIS gives `wasp` from the site's `web.config`, and `{ "file":
+"../secrets/smtp.txt" }` from a file outside the site, from `wasp.config`'s folder; one inside the site, whose files
+may be served, stops it from starting. Either is read each time it is used, so that a password changed there is
+used at once, and no page sees it, nor any error, the development error page included. The Standard Library
+Reference, section 31, describes the module, its messages and its servers' settings.
 
 Its name is `wasp.config`, in lower case: Linux tells `WASP.config` from it. A `weblingo.config` configures a folder of
 scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run` and `wasp check` read the

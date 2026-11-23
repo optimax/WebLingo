@@ -84,7 +84,7 @@ public static class WebLingoWaspServer
     {
         (workers, mode) = (Math.Max(1, Environment.ProcessorCount), defaultMode);
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
-            out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out var env,
+            out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out var env, out var mail,
             out error)) return null;
         if (configured is not null) mode = configured == "production" ? WebLingoMode.Production : WebLingoMode.Development;
 
@@ -112,7 +112,9 @@ public static class WebLingoWaspServer
             TimeZone = new DotNetTimeZone(),
             Network = new DotNetNetwork(allowedHosts), // Only the hosts wasp.config allows (section 7.9).
             // Those wasp.config names, their files from its folder (section 7.11); a script's own checked as its files are.
-            Databases = new DotNetDatabases(databases, full) { Files = files },
+            Databases = new DotNetDatabases(databases, full, new DotNetSecrets()) { Files = files },
+            // Those wasp.config names, their passwords read where it keeps them, outside the site (section 7.17).
+            Mail = new DotNetMail(mail, new DotNetSecrets()),
             Scheduler = () => new DotNetSchedulerHost(),
             Log = log is null ? null : log.WriteLine,
             SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30)
