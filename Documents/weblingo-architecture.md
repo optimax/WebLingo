@@ -629,6 +629,35 @@ Step 2, the same day, measured so against step 1: a native module's instance mad
 
 As a user runs it, WebLingo is the slowest of them: as fast as CPython only at `loops`, two to seven times slower than CPython and Lua at the rest, and slower still against Node.js, whose JIT makes most of these a few milliseconds. Its start-up, a tenth to a sixth of a second, is .NET's: `weblingo` is compiled by .NET's JIT as it starts, its compiler and its VMs included, and its VM's dispatch method runs at first as .NET's first tier compiles it, then as its on-stack replacement optimizes it; the in-process benchmark, whose methods are fully optimized before it times them, runs the same work two to three times faster (`calls`, `fib(25)`, 9 ms there, against about 230 ms here for `fib(30)`, which makes eleven times the calls). Turning .NET's tiers off for `weblingo` (`DOTNET_TieredCompilation=0`) doubles its start-up, to 338 ms, and makes `calls` 144 ms after it; neither `weblingo`'s build nor its publish is ReadyToRun, which would compile it ahead of time. Compiled bytecode saves 20 to 30 ms of a run, the compiling of its source. `objects` is WebLingo's slowest by far, 6.5 times CPython's, a million instances made and two million method calls costing about 1.3 µs for each of the loop's turns.
 
+**Where the time goes** (23 November 2026, the owner's request, "WebLingo is the worst in practically every category. Investigate why and suggest remediation"). Run in one process, every method fully optimized before it is timed, as the benchmark runs its workloads, the comparison's programs take about as long as through `weblingo` (`loops` 415 ms, `objects` 1,549 ms, on the register VM), so that the time is the runtime's, not .NET's start-up. Each operation below ran two million times in a loop, on the register VM, the median of 5 runs, the empty loop's own 14 ns a turn taken away, with what .NET allocated a turn:
+
+| Operation | ns | .NET bytes |
+|---|---:|---:|
+| `x = x + 1` | 11 | 0 |
+| `f()`, a function | 37 | 0 |
+| `c.m()`, a method | 72 | 0 |
+| `c.v`, a field read | 28 | 0 |
+| `c.v = i`, a field written | 52 | 0 |
+| `new E()`, no constructor | 476 | 370 |
+| `new P(i, i)`, two fields | 915 | 626 |
+| `{ a: i }`, a map | 680 | |
+| `[i]`, an array | 70 | |
+| `m["key"]`, a map read | 41 | 0 |
+| `"item" + s` | 33 | 34 |
+| `i.toString()` | 165 | 521 |
+
+Its causes, the largest first:
+
+1. **Instances and maps.** An instance holds its fields in a `Dictionary` and a `List` (`WebLingoHeap.InstanceObject`), five .NET objects, and a map likewise (`MapObject`); and `TryAllocateInstance` made a second `InstanceObject` for every instance, which only a class extending `Array`, `Map`, `Set`, `Module` or `Task` uses. What the program no longer reaches stays in the heap's table until WebLingo's own collector runs, at a million units, about 65,000 instances, so that .NET's collector promotes it to its older generations first: two million `new P(i, i)` spent 674 ms of 1,685 in .NET's collections, 40 of them of its oldest generation. Tried on a branch of its own (`claude/experiment-instances`, not landed): one `InstanceObject` an instance, its fields in a small array, a dictionary only for nine or more, made `new E()` 61 ns and `new P(i, i)` 300, and `objects` 476 ms in one process, 3.3 times faster, allocating 195 MB in place of 627.
+2. **A value's text.** `i.toString()` is `Object`'s, written in WebLingo, `toText(this)`, a method's call and the text builder's work for an integer: most of what `strings` and `maps` allocate, 170 and 245 MB.
+3. **Members found by their names.** A field read is a dictionary's lookup, its name hashed each time; a method call looks for a field of the name first, then the method; a field's assignment makes about six lookups, the first walking the class's bases for a static field (`WebLingoMembers.TrySet`, `WebLingoHeap.FindAssignee`, `TryAddField`). Nothing remembers where a member was found.
+4. **Calls.** A call and its return cost about 40 ns, Lua's 10 to 15: the closure found in the heap's table, the function's checks, the frame's fields, its registers made the collector's roots and let go.
+5. **Instructions.** The code generator loads every constant into a register before using it, tests and branches in two instructions, copies a variable before `j++` as if its old value were used, and tests a loop at its top, jumping back each time: `loops`' inner loop is 16 instructions, where Lua's is about 6. The stack VM runs about twice the register VM's.
+6. **Built-ins written in WebLingo.** `sort` is a merge sort written in WebLingo (`Builtins/ArrayMethods.wlg`), 120 million instructions for 200,000 integers, where CPython and Lua sort in C, calling only the comparison.
+7. **Start-up**, 136 to 172 ms, is .NET's JIT compiling `weblingo`'s compiler and VMs as it starts, neither its build nor its publish ReadyToRun.
+
+Not the cause: .NET's tiers; with them off, start-up doubles, and a program's own time falls by a third at most. The remedies are tasks of their own in `TO-DO.md`, each measured against `main` as section 5.6 has the VMs measured.
+
 ---
 
 ### 5.7 Local source debugging
