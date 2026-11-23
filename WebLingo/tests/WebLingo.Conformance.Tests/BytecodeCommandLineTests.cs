@@ -135,6 +135,33 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.DoesNotMatch(@"function\d+[ (]lib/util\.wlg", disassembly);
     }
 
+    [Theory]
+    [InlineData("register")]
+    [InlineData("stack")]
+    public void AClassThatDeclaresNoConstructorHasNone(string vm)
+    {
+        // A class that declares no constructor has none in the program, new passing its arguments on to a base's, or
+        // making the instance without a call (the owner's question, 22 November 2026, "No Empty Constructors"); Object
+        // keeps its own, which super() runs where no base declares one.
+        var main = Write("main.wlg", """
+            import { writeLn } from "std:console";
+            class P { name() { return "p"; } }
+            class Q extends P {}
+            class R extends Q { constructor(x) { super(); this.x = x; } }
+            writeLn([new P().name(), new Q().name(), new R(5).x]);
+            new Q(1);
+            """);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+        var compiled = Path.ChangeExtension(main, Extension(vm));
+        var disassembly = Weblingo("disasm", compiled).Output;
+        Assert.DoesNotMatch(@"\nfunction function\d+ (P|Q) \(", disassembly);
+        Assert.Matches(@"\nfunction function\d+ R \(", disassembly);
+        Assert.Matches(@"\nfunction function\d+ Object \(", disassembly);
+        var (exit, output, error) = Weblingo("run", compiled);
+        Assert.Equal((WebLingoCommandLine.RuntimeFailed, "[\"p\", \"p\", 5]\n"), (exit, output));
+        Assert.Matches(@"\(6,\d+\): ERROR WL2006 \(ArgumentError\): 'Q' takes 0 arguments, not 1\.", error);
+    }
+
     [Fact]
     public void TheFileHoldsNoneOfTheHostsPaths()
     {

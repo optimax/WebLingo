@@ -949,9 +949,11 @@ public sealed class WebLingoBinder
 
     /// <summary>
     /// A class: its base, bound where the class is, then its constructor and its methods, each a function whose first
-    /// parameter is <c>this</c>; a name declared twice in it is WL2002 (section 3.7). A class without a constructor gets
-    /// one that does nothing but run its base's; a constructor of a derived class that does not call <c>super(…)</c>
-    /// runs its base's first, with no arguments. Its static members, fields and methods, have names of their own, apart
+    /// parameter is <c>this</c>; a name declared twice in it is WL2002 (section 3.7). A class without a constructor has
+    /// none, <c>new</c> passing its arguments on to the nearest base that declares one, or, with none, making the instance
+    /// without a call, as for a class made while the program runs; but <c>Object</c>, whose constructor <c>super(…)</c>
+    /// runs where no base declares one (<c>WebLingoMembers.TryGetSuper</c>), gets one that does nothing. A constructor of
+    /// a derived class that does not call <c>super(…)</c> runs its base's first, with no arguments. Its static members, fields and methods, have names of their own, apart
     /// from its methods'; its static methods are functions without <c>this</c> or <c>super</c> (WL2009).
     /// </summary>
     private WebLingoBoundClass BindClass(WebLingoClassDeclarationSyntax declaration, WebLingoLocalSymbol? local, WebLingoBoundExpression? baseClass,
@@ -965,7 +967,7 @@ public sealed class WebLingoBinder
         var staticSyntax = new List<WebLingoMethodSyntax>();
         foreach (var member in declaration.Methods) (member.IsStatic ? staticSyntax : members).Add(member);
         var defaultConstructor = !members.Exists(member => member.Name == "constructor");
-        if (defaultConstructor)
+        if (defaultConstructor && !hasBase)
         {
             var span = new WebLingoSourceSpan(declaration.Span.Start, 0);
             members.Insert(0, new WebLingoMethodSyntax("constructor", span, [], new WebLingoBlockSyntax([], span), span));
