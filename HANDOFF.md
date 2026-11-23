@@ -136,3 +136,21 @@ WL4001 (`WebLingoBytecodeKind.Stack` kept only to recognize it). Some tests stil
 flag that now has the one value, `"register"` or `false` (`FileSystemTests`, `WaitingTests`, `BytesTests`,
 `DateTimeTests`, `HostParameterTests`, `OperatorTests`, and `BytecodeCommandLineTests`' `Extension(vm)`): a cleanup
 left for later. The conformance programs every-program tests take are `ConformancePrograms.All`.
+
+## Speed and the collector
+
+The specification's section 5.6 has where WebLingo's time went ("Where the time goes"), the eight remedies, each a
+task in `DONE.md`, and their measurements against `da0bd06` ("After the remedies"): in one process `objects` 2.8
+times as fast, `loops` 1.4; as a user runs them, since arithmetic's slow paths left `Run` (`d3b1b47`), `objects`
+about 2.2 times, `loops` and `sort` about twice, `maps` 1.5, `calls` and `closures` as they were. Start-up is
+unchanged, .NET's JIT at work: its remedy is the
+deferred task "`weblingo` and `wasp` Published ReadyToRun". The benchmark's `io` measures .NET's thread pool more than
+the VM, and falls at about 1.1 s or 2.7 s by build. A young generation waits for the owner's answer in `TO-DO.md`.
+
+Since `071ad6b` the heap reads the VM's frames when it collects (`WebLingoHeap.Frames`, `IWebLingoRootSource`), and
+since `9c2cc3b` it keeps what is being stored or made while it collects; `Documents/implementation.md`, "A Value Just
+Made Is No Root", says how to find such places with a heap that collects every 16 units, a local trial never
+committed. Under it, every conformance case passes but one that counts collections.
+
+Next: the owner's answers to the questions in `TO-DO.md`, on uploads, sessions, mail, debugging pages and Visual
+Studio, then those tasks; nothing above `# END-OF-TO-DO` can go on without them.
