@@ -660,6 +660,38 @@ Its causes, the largest first:
 
 Not the cause: .NET's tiers; with them off, start-up doubles, and a program's own time falls by a third at most. The remedies are tasks of their own in `TO-DO.md`, each measured against `main` as section 5.6 has the VMs measured.
 
+**After the remedies** (23 November 2026, the owner's word, "Run them after you finish all 8 optimizations"). The eight remedies landed: "One Instance per `new`, Its Fields in a Small Array", "Small Maps Without a Dictionary", "A Value's Text Without a Method Call", "Fewer Instructions for Loops and Arithmetic", "Short-Lived Objects Freed Before .NET Promotes Them", "Members Found Without Their Names: Shapes and Caches", "A Native `sort`" and "A Cheaper Call" (`d5df7a7` to `071ad6b`), measured against the commit before them, `da0bd06`, on the same machine, on the register VM. In one process, the benchmark, its 7 timed runs after 3 warm-ups, the median of three rounds run alternately, before and after:
+
+| Workload | Before | After | Before ÷ after | Instructions, before | Instructions, after | Allocated, before | Allocated, after |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| loops | 25.8 ms | 18.4 ms | 1.40× | 10,010,009 | 4,504,508 | 33,672 B | 33,240 B |
+| calls | 10.8 ms | 10.6 ms | 1.02× | 2,063,677 | 1,335,323 | 43,856 B | 42,328 B |
+| imports | 11.9 ms | 10.7 ms | 1.11× | 2,800,009 | 1,600,008 | 32,960 B | 32,576 B |
+| closures | 13.9 ms | 13.2 ms | 1.05× | 3,120,010 | 2,220,009 | 3,324,616 B | 2,369,120 B |
+| strings | 10.9 ms | 9.1 ms | 1.20× | 1,920,009 | 760,008 | 10,762,456 B | 9,288,360 B |
+| bytes | 12.5 ms | 12.2 ms | 1.02× | 1,602,129 | 1,101,528 | 11,918,680 B | 11,920,736 B |
+| collections | 4.9 ms | 4.1 ms | 1.20× | 615,069 | 435,067 | 1,090,880 B | 1,089,752 B |
+| objects | 105.7 ms | 38.1 ms | 2.77× | 3,200,027 | 2,800,026 | 64,079,424 B | 19,416,232 B |
+| async | 4.1 ms | 3.3 ms | 1.24× | 701,916 | 401,515 | 113,256 B | 112,936 B |
+| templates | 5.8 ms | 3.7 ms | 1.57× | 350,012 | 270,011 | 12,000,808 B | 6,844,648 B |
+| io | 2,688 ms | 1,139 ms | 2.36× | 114,099 | 82,099 | 10,335,208 B | 7,388,432 B |
+
+As a user runs them, the comparison, its 5 timed runs after a warm-up, in milliseconds, each runtime's start-up taken away but on the first line; WebLingo before from `da0bd06`'s `weblingo`, the other languages' runtimes measured the same hour:
+
+| Program | WebLingo, before | WebLingo, after | Compiled, before | Compiled, after | Node.js | Node.js, no JIT | CPython | Lua |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| start-up (`empty`, whole) | 164 | 159 | 133 | 126 | 46 | 49 | 33 | 17 |
+| loops | 586 | 468 | 592 | 481 | 13 | 110 | 712 | 93 |
+| calls | 230 | 219 | 195 | 201 | 7 | 48 | 69 | 35 |
+| closures | 234 | 266 | 200 | 204 | 7 | 50 | 130 | 32 |
+| strings | 283 | 247 | 308 | 253 | 12 | 27 | 61 | 75 |
+| arrays | 480 | 467 | 506 | 504 | 20 | 87 | 414 | 64 |
+| maps | 412 | 273 | 476 | 267 | 45 | 61 | 74 | 80 |
+| objects | 1,270 | 610 | 1,248 | 635 | 10 | 77 | 198 | 165 |
+| sort | 708 | 373 | 729 | 354 | 54 | 98 | 218 | 96 |
+
+`objects` is twice as fast as it was, `sort` 1.9 times and `maps` 1.5 times, and `loops` a fifth; in one process, where every method is optimized before it is timed, `objects` is 2.8 times as fast and `loops` 1.4 times. WebLingo is still the slowest of them but at `loops`, where it is faster than CPython: three times CPython's `objects`, four times Lua's, and more than that at `calls` and `closures`. As a user runs it, much of what is left is .NET's: start-up, unchanged, which cause 7's task would make ReadyToRun, and a program's first moments, run by .NET's first tier as it compiles the VM, where the in-process benchmark has none: `closures` from source is 30 ms slower than it was, where compiled it is the same, and in one process 5 percent faster, a difference that the run of the compiler before it makes, `weblingo check` taking as long as before. Calls gained least: `calls`, `fib(25)`, takes 10.6 ms as it did, though it runs a third fewer instructions. Measured commit by commit, "Fewer Instructions for Loops and Arithmetic" (`1cdb7ac`) made it 12.5 to 12.8 ms in place of its parent's 11.0 to 11.7, and `closures` 15.0 to 15.3 in place of 14.2 to 14.4, three rounds run alternately, as it made `loops` 24 to 18; "A Cheaper Call" then took that back. What in the VM's dispatch method costs calls there, a change to it that `Documents/implementation.md` warns of ("A VM's Dispatch Method Is Sensitive to Its Locals"), is a task of its own, "Calls Slower Since Fewer Instructions".
+
 ---
 
 ### 5.7 Local source debugging
