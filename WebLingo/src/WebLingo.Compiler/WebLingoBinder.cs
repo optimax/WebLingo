@@ -72,6 +72,9 @@ public sealed class WebLingoBinder
     /// <summary>The host's native modules, which name the standard modules an undefined name's import is suggested from.</summary>
     private readonly IWebLingoNativeResolver? _native;
 
+    /// <summary>How the host finds a program's files, which a module imported while it runs by a path it writes is found by.</summary>
+    private readonly IWebLingoSourceResolver? _resolver;
+
     /// <summary>Which of the program's files are templates, whose code sees the built-ins declared for templates alone.</summary>
     private readonly Func<string, bool>? _isTemplate;
 
@@ -87,6 +90,7 @@ public sealed class WebLingoBinder
         _builtinDeclarations = options.Builtins;
         _hostParameters = options.HostParameters;
         _native = options.Native;
+        _resolver = options.Resolver;
         _isTemplate = options.IsTemplate;
         foreach (var builtin in options.Builtins) _hostBuiltins[builtin.Name] = builtin;
         _function = _main = new FunctionContext(null, "main");
@@ -1790,7 +1794,7 @@ public sealed class WebLingoBinder
             // Module.import(path, values): a module imported while the program runs (section 3.9).
             if (arguments.Count is 1 or 2)
             {
-                _importsWhileRunning = true; // Which may ask for a native module's instance, and so needs its every export.
+                NoteImportWhileRunning(call.Arguments[0]);
                 return new WebLingoBoundImportDynamic(arguments[0], arguments.Count == 2 ? arguments[1] : null, call.Span);
             }
             Report(WebLingoDiagnosticCodes.WrongArgumentCount, $"'import' takes 1 to 2 arguments, not {arguments.Count}.", call.Span);
@@ -1837,7 +1841,6 @@ public sealed class WebLingoBinder
                 // name(path, values): a component's render (section 13), a dynamic import that runs its file anew.
                 if (!CheckArity(name.Name, 2, arguments.Count, call.Span, 1)) return new WebLingoBoundError(call.Span);
                 var values = arguments.Count == 2 ? arguments[1] : null;
-                _importsWhileRunning = true;
                 return new WebLingoBoundImportDynamic(arguments[0], values, call.Span) { Anew = true };
             }
             // A native module's function given other than its arguments: called as its value, its error where it runs, as it
@@ -2210,8 +2213,46 @@ public sealed class WebLingoBinder
     /// </summary>
     private readonly HashSet<int> _nativeInstances = [];
 
-    /// <summary>Whether the program imports a module while it runs, <c>Module.import</c> or a component's render.</summary>
+    /// <summary>
+    /// Whether the program imports a module while it runs by a path it knows only then, which may be any native module's,
+    /// and so needs every native module's every export.
+    /// </summary>
     private bool _importsWhileRunning;
+
+    /// <summary>
+    /// What a module imported while the program runs, <c>Module.import(path)</c>, may need of the program's native modules
+    /// (the owner's question, 22 November 2026, of <c>Examples.wlg/16-modules.wlg</c>): a path written as a string naming a
+    /// WebLingo file, nothing, a native module being named by its scheme or its assembly, the file one the program has and
+    /// runs as compiled, or one it compiles then, with native modules of its own; a native module's, by its scheme, that
+    /// module's instance, where the program has it; any other, its path known only when it runs, every native module's. A
+    /// component's render runs a page, never a native module.
+    /// </summary>
+    private void NoteImportWhileRunning(WebLingoExpressionSyntax path)
+    {
+        while (path is WebLingoParenthesizedExpressionSyntax parenthesized) path = parenthesized.Expression;
+        if (path is WebLingoStringLiteralSyntax { Value: var text } && !text.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+        {
+            // A scheme's name has two letters or more (section 3.9), where a drive's has one.
+            if (text.IndexOf(':', StringComparison.Ordinal) >= 2)
+            {
+                foreach (var (index, unit) in _nativeUnits)
+                {
+                    if (unit.Name == text) _nativeInstances.Add(index);
+                }
+                return;
+            }
+            // A file the program has, found as its static imports are, which runs as compiled; one it has not is compiled
+            // while it runs, and joined to the program, its native modules then the program's own, which need theirs.
+            if (_resolver is { } resolver && resolver.TryResolve(_source ?? _mainName, text, out var name, out _, out _))
+            {
+                foreach (var source in _moduleSources)
+                {
+                    if (source.Name == name) return;
+                }
+            }
+        }
+        _importsWhileRunning = true;
+    }
 
     /// <summary>
     /// A native module's export, bound the first time the program can use it (the owner's request, 22 November 2026, "A

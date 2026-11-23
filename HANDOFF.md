@@ -118,7 +118,9 @@ WebLingo the local the program makes it in (`ImportedNative`, `ImportedLocal`). 
 a function of its own, registered as its file, which a whole import or a dynamic one runs once; an import whose every
 name is bound so is dropped, but in a debug build, whose view of a named import reads the module. An export is bound
 only when a name an import takes is it, or when the module's instance may be made (`TryNativeExport`,
-`FinishNativeUnit`): a whole import, an import kept, or any `Module.import` in the program; a `MadeByModule` class
-always. `WebLingoClassTables`
+`FinishNativeUnit`): a whole import, an import kept, or a `Module.import` whose path is not a string naming a file the
+program has (`NoteImportWhileRunning`), a scheme's naming only its module; a `MadeByModule` class always. A module
+compiled while the program runs joins the program's native modules by name, keeping the program's: never leave the
+program's without exports where one could be joined, or the VM's `MakeModule` finds its exports missing. `WebLingoClassTables`
 lets a native module's file have that function, older files having none. The benchmark's `imports` workload calls
 `std:math`'s `abs` and `sign` imported by name. Nothing of it is installed on this machine until `build.bat` runs.

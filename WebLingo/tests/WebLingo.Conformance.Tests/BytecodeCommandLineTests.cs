@@ -222,6 +222,34 @@ public sealed class BytecodeCommandLineTests : IDisposable
     }
 
     [Fact]
+    public void ADynamicImportOfAFileTheProgramHasLinksNoNativeModuleWhole()
+    {
+        // Examples.wlg/16-modules.wlg's case (the owner's question, 22 November 2026): a dynamic import of a file the
+        // program has, which runs as compiled, needs nothing of a native module's the program does not name; one of a file
+        // it has not, compiled while it runs and joined to it, its every export, as a path known only then does.
+        Write("teas.wlg", "param currency = \"$\";\nexport var shown = currency;\n");
+        var has = Write("has.wlg", """
+            import { writeLn } from "std:console";
+            import teas from "teas.wlg";
+            var francs = await Module.import("teas.wlg", { currency: "CHF" });
+            writeLn([teas.shown, francs.shown]);
+            """);
+        Assert.Equal((WebLingoCommandLine.Success, "[\"$\", \"CHF\"]\n", ""), Weblingo("run", has));
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", has).Exit);
+        Assert.DoesNotContain("beep", Weblingo("disasm", Path.ChangeExtension(has, ".wlbr")).Output);
+
+        Write("other.wlg", "import console from \"std:console\";\nimport { writeLn } from \"std:console\";\nexport var w = writeLn;\n");
+        var hasNot = Write("hasNot.wlg", """
+            import { writeLn } from "std:console";
+            var other = await Module.import("other.wlg");
+            writeLn(other.w == writeLn);
+            """);
+        Assert.Equal((WebLingoCommandLine.Success, "false\n", ""), Weblingo("run", hasNot));
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", hasNot).Exit);
+        Assert.Contains("beep", Weblingo("disasm", Path.ChangeExtension(hasNot, ".wlbr")).Output);
+    }
+
+    [Fact]
     public void ADamagedFileIsReportedAndNothingRuns()
     {
         var main = Write("main.wlg", "import { write, writeLn } from \"std:console\"; writeLn(\"never\");\n");
