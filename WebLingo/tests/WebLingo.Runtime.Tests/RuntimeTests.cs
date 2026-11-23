@@ -125,6 +125,30 @@ public sealed class HeapTests
     }
 
     [Fact]
+    public void WhatARootSourceGivesIsKeptWhenTheHeapCollects()
+    {
+        // A VM gives the heap its frames' registers when it collects, rather than adding and removing them as roots on each
+        // call (the specification, section 5.6, "Where the time goes", cause 4): what only they hold is kept, and what they
+        // no longer hold is freed.
+        var heap = new WebLingoHeap();
+        var frames = new RootSource();
+        heap.Frames = frames;
+        Assert.True(heap.TryAllocateString("kept", out frames.Registers[0], out _));
+        Assert.True(heap.TryAllocateString("dropped", out frames.Registers[1], out _));
+        var count = heap.ObjectCount;
+        frames.Registers[1] = WebLingoValue.Null;
+        heap.Collect();
+        Assert.Equal("kept", heap.GetString(frames.Registers[0]));
+        Assert.Equal(count - 1, heap.ObjectCount);
+    }
+
+    private sealed class RootSource : IWebLingoRootSource
+    {
+        public WebLingoValue[] Registers { get; } = new WebLingoValue[2];
+        public void AddRootArrays(List<WebLingoValue[]> arrays) => arrays.Add(Registers);
+    }
+
+    [Fact]
     public void BytesDecimalsAndRegularExpressionsGiveBackTheirUnitsWhenCollected()
     {
         // Until 18 November 2026 the collector gave back only an object's overhead for these, not what they were charged

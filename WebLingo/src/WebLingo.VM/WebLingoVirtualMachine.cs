@@ -267,7 +267,36 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
 
     private sealed class Execution(WebLingoCompiledModule module, WebLingoInstruction[] entryCode, WebLingoInstruction[][] codes,
         WebLingoValue[] constants, WebLingoMemberName[] names, IWebLingoBuiltinFunction[] builtins, WebLingoExecutionContext context, WebLingoHeap heap)
+        : IWebLingoRootSource
     {
+        /// <summary>
+        /// The depth of the frame that runs, which <c>Run</c> writes where its own changes, and below which every frame of
+        /// <see cref="_frames"/> runs, or waits for a call it made, or is null, its task holding it while it awaits.
+        /// </summary>
+        private int _depth;
+
+        /// <summary>
+        /// The frames on the VM's stack, for the heap's collector: their registers and closures, the roots that each call
+        /// added and each return removed until 23 November 2026 (specification, section 5.6, "Where the time goes", cause 4).
+        /// </summary>
+        public void AddRootArrays(List<WebLingoValue[]> arrays)
+        {
+            var frames = _frames;
+            for (var depth = 0; depth <= _depth && depth < frames.Length; depth++)
+            {
+                if (frames[depth] is not { } frame) continue;
+                arrays.Add(frame.Registers);
+                arrays.Add(frame.Closure);
+            }
+        }
+
+        /// <summary>The frames, twice as many, which <see cref="_frames"/> then holds too.</summary>
+        private Frame[] Deeper(Frame[] frames)
+        {
+            Array.Resize(ref frames, frames.Length * 2);
+            return _frames = frames;
+        }
+
         public WebLingoExecutionResult Run(bool resuming)
         {
             Frame[] frames;
@@ -298,8 +327,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 for (var i = 0; i < module.Units.Count; i++) _unitClosures.Add(WebLingoValue.Null);
                 heap.AddRoots(_unitClosures);
                 heap.AddRoots(_linked);
-                heap.AddRoots(frame.Registers);
-                heap.AddRoots(frame.Closure);
+                _depth = 0;
+                heap.Frames = this;
                 _scheduler = new WebLingoScheduler(heap, context.Clock) { Suspends = context.Suspends };
                 heap.Scheduler = _scheduler;
                 heap.Output = context.Output;
@@ -904,7 +933,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                                 continue;
                             }
                             if (_asyncDisposal && !heap.TryAllocateTask(out _newTask, out error)) break;
-                            if (depth + 1 == frames.Length) Array.Resize(ref frames, frames.Length * 2);
+                            if (depth + 1 == frames.Length) frames = Deeper(frames);
                             Disposing(frames, depth + 1, chain, resource);
                             callee = chain[0];
                             self = resource;
@@ -969,8 +998,6 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         {
                             var result = ins.OpCode == WebLingoOpCode.ReturnValue ? registers[ins.A] : WebLingoValue.Null;
                             if (depth == 0 && frame.Task.Kind != WebLingoValueKind.Task) return Finish(executed);
-                            heap.RemoveLastRoots(frame.Closure);
-                            heap.RemoveLastRoots(registers);
                             Array.Clear(registers, 0, frame.Function.RegisterCount); // So that nothing stays reachable.
                             if (frame.DisposeChain is not null) goto disposed;
                             if (frame.Task.Kind == WebLingoValueKind.Task)
@@ -988,7 +1015,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             frame.Constructed = WebLingoValue.Null;
                             var returnTo = frame.ResultRegister;
 
-                            frame = frames[--depth];
+                            frame = frames[_depth = --depth];
                             code = frame.Code;
                             registers = frame.Registers;
                             cells = frame.Cells;
@@ -1098,7 +1125,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
 
                         if (function.IsAsync && !TryMakeTask(frames, depth, out error)) goto failed;
                         frame.Pc = pc + 1;
-                        if (++depth == frames.Length) Array.Resize(ref frames, frames.Length * 2);
+                        if ((_depth = ++depth) == frames.Length) frames = Deeper(frames);
                         var called = frames[depth] ??= new Frame();
                         if (called.Registers.Length < function.RegisterCount)
                         {
@@ -1117,8 +1144,6 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         called.ResultRegister = resultRegister;
                         called.Constructed = constructed;
                         if (function.IsAsync) Started(called);
-                        heap.AddRoots(calledRegisters);
-                        heap.AddRoots(called.Closure);
 
                         frame = called;
                         code = called.Code;
@@ -1141,7 +1166,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             pc++;
                             continue;
                         }
-                        if (depth + 1 == frames.Length) Array.Resize(ref frames, frames.Length * 2);
+                        if (depth + 1 == frames.Length) frames = Deeper(frames);
                         Disposing(frames, depth + 1, chain, self);
                         callee = chain[0];
                         goto call;
@@ -1160,7 +1185,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         var disposedTo = frame.ResultRegister;
                         var held = frame.Holds;
                         if (held) TakeHeld(frame);
-                        frame = frames[--depth];
+                        frame = frames[_depth = --depth];
                         code = frame.Code;
                         registers = frame.Registers;
                         cells = frame.Cells;
@@ -1191,8 +1216,6 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         frame.Code = code = codes[nextIndex];
                         frame.Cells = cells = nextCells;
                         frame.Closure[0] = next;
-                        heap.AddRoots(registers);
-                        heap.AddRoots(frame.Closure);
                         pc = 0;
                         continue;
                     }
@@ -1216,7 +1239,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                                 heap.AddRoots(building.Builder.Roots);
                                 building.Rooted = true;
                             }
-                            if (depth + 1 == frames.Length) Array.Resize(ref frames, frames.Length * 2);
+                            if (depth + 1 == frames.Length) frames = Deeper(frames);
                             (frames[depth + 1] ??= new Frame()).Waiter = building;
                             callee = method;
                             self = instance;
@@ -1247,7 +1270,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         _text = (TextCall)frame.Waiter!;
                         frame.Waiter = null;
                         frame.Closure[0] = WebLingoValue.Null;
-                        frame = frames[--depth];
+                        frame = frames[_depth = --depth];
                         code = frame.Code;
                         registers = frame.Registers;
                         cells = frame.Cells;
@@ -1277,7 +1300,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         _calls = (CallsWaiting)frame.Waiter!;
                         frame.Waiter = null;
                         frame.Closure[0] = WebLingoValue.Null;
-                        frame = frames[--depth];
+                        frame = frames[_depth = --depth];
                         code = frame.Code;
                         registers = frame.Registers;
                         cells = frame.Cells;
@@ -1299,7 +1322,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         pc++;
                         continue;
                     }
-                    if (depth + 1 == frames.Length) Array.Resize(ref frames, frames.Length * 2);
+                    if (depth + 1 == frames.Length) frames = Deeper(frames);
                     (frames[depth + 1] ??= new Frame()).Waiter = _calls;
                     callee = _calls.Work.Callee;
                     self = _calls.Work.Self;
@@ -1343,7 +1366,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     // An async function's first run has ended, at its first await, its return or its exception: its call
                     // gives its task, to where the call's result goes, or to the text whose toString() it is.
                     Gave(frame, frames, depth);
-                    frame = frames[--depth];
+                    frame = frames[_depth = --depth];
                     code = frame.Code;
                     registers = frame.Registers;
                     cells = frame.Cells;
@@ -1369,7 +1392,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         (_frames, _executed) = (frames, executed);
                         return WebLingoExecutionResult.Waits(_scheduler.WaitMilliseconds) with { Instructions = executed };
                     }
-                    depth = 0;
+                    depth = _depth = 0;
                     frame = frames[0];
                     code = frame.Code;
                     registers = frame.Registers;
@@ -1438,19 +1461,15 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         {
                             // Its next dispose method runs; the exception waits for the last, a later one replacing it.
                             Hold(frame);
-                            heap.RemoveLastRoots(frame.Closure);
-                            heap.RemoveLastRoots(registers);
                             Array.Clear(registers, 0, frame.Function.RegisterCount);
                             goto nextDisposal;
                         }
                         if (frame.Task.Kind == WebLingoValueKind.Task) goto faulted;
                         if (depth == 0) return Uncaught(executed);
-                        heap.RemoveLastRoots(frame.Closure);
-                        heap.RemoveLastRoots(registers);
                         Array.Clear(registers, 0, frame.Function.RegisterCount);
                         frame.Waiter?.Unroot(heap);
                         Release(frame);
-                        frame = frames[--depth];
+                        frame = frames[_depth = --depth];
                         code = frame.Code;
                         registers = frame.Registers;
                         cells = frame.Cells;
@@ -2354,8 +2373,6 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// <summary>An exception leaves an async function: its frame let go of, its task faults, and is what its call gives.</summary>
         private void Faulted(Frame frame)
         {
-            heap.RemoveLastRoots(frame.Closure);
-            heap.RemoveLastRoots(frame.Registers);
             Array.Clear(frame.Registers, 0, frame.Function.RegisterCount);
             var task = frame.Task;
             frame.Task = WebLingoValue.Null;
@@ -2378,8 +2395,6 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// </summary>
         private void Suspend(Frame frame)
         {
-            heap.RemoveLastRoots(frame.Closure);
-            heap.RemoveLastRoots(frame.Registers);
             var waiting = heap.GetTask(frame.Task);
             waiting.Frame = frame;
             var roots = frame.WaitingRoots;
@@ -2459,8 +2474,6 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     resumed.Frame = null;
                     resumed.FrameRoots = null;
                     frames[0] = frame;
-                    heap.AddRoots(frame.Registers);
-                    heap.AddRoots(frame.Closure);
                     _resumedThrowing = resumption.Throws;
                     if (resumption.Throws) (_thrown, _thrownError, _origin) = (resumption.Value, resumption.Error, resumption.Origin);
                     // A timeout's error, which no instruction raised, is thrown from the await it reaches (section 3.8).
@@ -2968,16 +2981,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             return true;
         }
 
-        /// <summary>The running frame's registers made <paramref name="length"/> long, its roots, the last added, replaced.</summary>
-        private WebLingoValue[] Grown(Frame frame, WebLingoValue[] registers, int length)
+        /// <summary>The running frame's registers made <paramref name="length"/> long.</summary>
+        private static WebLingoValue[] Grown(Frame frame, WebLingoValue[] registers, int length)
         {
-            heap.RemoveLastRoots(frame.Closure);
-            heap.RemoveLastRoots(registers);
             var grown = new WebLingoValue[length];
             Array.Copy(registers, grown, registers.Length);
             frame.Registers = grown;
-            heap.AddRoots(grown);
-            heap.AddRoots(frame.Closure);
             return grown;
         }
 

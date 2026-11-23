@@ -94,6 +94,9 @@ public sealed class WebLingoHeap
     /// <summary>The execution's tasks, which its VM runs, and which <c>delay</c> adds a timer to (section 3.8).</summary>
     public WebLingoScheduler? Scheduler { get; set; }
 
+    /// <summary>The frames a VM runs, whose registers and closures are roots, which it gives when the heap collects.</summary>
+    public IWebLingoRootSource? Frames { get; set; }
+
     /// <summary>Where the execution's text goes (<see cref="WebLingoExecutionContext.Output"/>), for native functions (section 3.9).</summary>
     public IWebLingoTextOutput? Output { get; set; }
 
@@ -1744,6 +1747,15 @@ public sealed class WebLingoHeap
             var scheduled = new List<WebLingoValue>();
             Scheduler.CopyRoots(scheduled);
             foreach (var value in scheduled) Mark(value, marked, pending);
+        }
+        if (Frames is not null)
+        {
+            var arrays = new List<WebLingoValue[]>();
+            Frames.AddRootArrays(arrays);
+            foreach (var roots in arrays)
+            {
+                foreach (var value in roots) Mark(value, marked, pending);
+            }
         }
         while (pending.Count > 0)
         {

@@ -165,6 +165,17 @@ public interface IWebLingoBuiltinFunction
 }
 
 /// <summary>
+/// Values a heap's owner holds where the heap cannot see them, as a VM's frames do, their registers and closures, which it
+/// gives the heap's collector when it collects, rather than adding them as roots and removing them on each call
+/// (specification, section 5.6, "Where the time goes", cause 4).
+/// </summary>
+public interface IWebLingoRootSource
+{
+    /// <summary>Adds the arrays whose values are roots now.</summary>
+    void AddRootArrays(List<WebLingoValue[]> arrays);
+}
+
+/// <summary>
 /// A built-in that writes its argument as text, as <c>write</c> does: a VM gives it the text of its argument, as a
 /// string, when the argument holds an instance whose class overrides <c>toString()</c>, having run that method
 /// (specification, section 3.7); otherwise the argument itself, whose text <see cref="WebLingoValueFormatter"/> gives.
