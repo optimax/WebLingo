@@ -48,6 +48,7 @@ running it.
 | `14-disposal.wlg` | `using`, `dispose()` and `destructor()`, disposal chained, once, on an exception too, and `async` |
 | `15-async.wlg` | `async` and `await`, `Task.all`, `Task.any`, `Task.timeout`, tasks completed by hand, `DeadlockError`, `forget()` |
 | `16-modules.wlg` | static and dynamic imports, exports read-only to importers, module parameters, a module defined in code; with `lib/teas.wlg` |
+| `16a-modules.wlg` | static imports of a module's names alone, `import { Tea, serve } from "lib/teas.wlg";`, the module run once; with `lib/teas.wlg` |
 | `17-parameters.wlg` | a script's parameters from the command line, `name=value`, always strings |
 | `18-files.wlg` | `std:fs`: text, lines, bytes, folders, copies, `IOError` |
 | `19-bytes-json-dates.wlg` | `std:bytes`, `std:json` and `std:datetime` |
