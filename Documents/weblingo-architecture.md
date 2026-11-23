@@ -613,6 +613,22 @@ Both ways, each call copies its arguments into an array of its own (8.1 MB alloc
 
 Step 2, the same day, measured so against step 1: a native module's instance made only for an importer that uses it as a value, `imports` runs 33 instructions fewer, and allocates 2.5 KB less, `std:console` and `std:math` no longer made where it begins; every workload was within the machine's noise, `imports` 11.3–12.9 ms against 11.2–15.1 on the register VM and 15.3–17.1 against 14.9–19.0 on the stack VM.
 
+**Against other languages** (23 November 2026, the owner's request, "Comparative Benchmarks"). `WebLingo.Benchmarks --compare` (`WebLingoComparison`) runs nine programs, each written alike in WebLingo, JavaScript, Python and Lua (`benchmarks/WebLingo.Benchmarks/Comparative/`), every one writing the same one line: `empty`, nothing but one line written, each runtime's start-up; `loops`, 9 million iterations of nested `for` loops, integer arithmetic, `%` and `if`; `calls`, a recursive `fib(30)`, about 2.7 million calls; `closures`, 2,000 closures made and a million calls of them, each changing its captured variable; `strings`, 300,000 strings made from integers, joined, compared, measured and searched; `arrays`, a million elements pushed, then read and written by index three times; `maps`, 200,000 entries of string keys set and looked up; `objects`, a million instances made, two million method calls, their fields read; and `sort`, 200,000 pseudo-random integers sorted by a comparison function (Python's `cmp_to_key`, Lua's `table.sort` with a less-than function). Each run is a process of its runtime's, timed whole, as a user runs a script, start-up included, its output checked; WebLingo runs as `weblingo run`, on each VM, from source and compiled (`.wlbr`, `.wlbs`); JavaScript on Node.js 26.13.1, with its JIT and without it (`--jitless`, V8's interpreter alone); Python on CPython 3.14.10; and Lua on PUC-Rio's Lua 5.4.6, an interpreter. Measured on one Windows development machine (x64, 8 logical processors), the median of 5 timed runs after a warm-up, in milliseconds; a runtime's start-up, `empty`'s time, taken away from the others':
+
+| Program | WebLingo, register | WebLingo, register, compiled | WebLingo, stack | WebLingo, stack, compiled | Node.js | Node.js, no JIT | CPython | Lua |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| start-up (`empty`, whole) | 164 | 136 | 172 | 136 | 52 | 55 | 37 | 16 |
+| loops | 604 | 577 | 729 | 745 | 12 | 104 | 720 | 95 |
+| calls | 255 | 214 | 247 | 226 | 6 | 42 | 68 | 39 |
+| closures | 280 | 211 | 257 | 240 | 5 | 38 | 143 | 37 |
+| strings | 331 | 314 | 292 | 309 | 8 | 19 | 56 | 76 |
+| arrays | 489 | 495 | 600 | 620 | 14 | 93 | 406 | 65 |
+| maps | 411 | 457 | 412 | 447 | 36 | 43 | 72 | 82 |
+| objects | 1,301 | 1,332 | 1,351 | 1,362 | 5 | 72 | 200 | 185 |
+| sort | 702 | 660 | 999 | 983 | 54 | 95 | 222 | 94 |
+
+As a user runs it, WebLingo is the slowest of them: as fast as CPython only at `loops`, two to seven times slower than CPython and Lua at the rest, and slower still against Node.js, whose JIT makes most of these a few milliseconds. Its start-up, a tenth to a sixth of a second, is .NET's: `weblingo` is compiled by .NET's JIT as it starts, its compiler and its VMs included, and its VM's dispatch method runs at first as .NET's first tier compiles it, then as its on-stack replacement optimizes it; the in-process benchmark, whose methods are fully optimized before it times them, runs the same work two to three times faster (`calls`, `fib(25)`, 9 ms there, against about 230 ms here for `fib(30)`, which makes eleven times the calls). Turning .NET's tiers off for `weblingo` (`DOTNET_TieredCompilation=0`) doubles its start-up, to 338 ms, and makes `calls` 144 ms after it; neither `weblingo`'s build nor its publish is ReadyToRun, which would compile it ahead of time. Compiled bytecode saves 20 to 30 ms of a run, the compiling of its source. `objects` is WebLingo's slowest by far, 6.5 times CPython's, a million instances made and two million method calls costing about 1.3 µs for each of the loop's turns.
+
 ---
 
 ### 5.7 Local source debugging

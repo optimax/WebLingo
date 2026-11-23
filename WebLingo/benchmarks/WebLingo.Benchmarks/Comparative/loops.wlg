@@ -1,0 +1,8 @@
+import { writeLn } from "std:console";
+var sum = 0;
+for (var i = 0; i < 3000; i++) {
+  for (var j = 0; j < 3000; j++) {
+    if ((i + j) % 3 == 0) { sum = (sum + i * j) % 1000003; } else { sum = sum + 1; }
+  }
+}
+writeLn(sum);

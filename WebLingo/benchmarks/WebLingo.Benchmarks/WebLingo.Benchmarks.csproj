@@ -8,6 +8,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Workloads/*.wlg" LogicalName="Workloads/%(Filename)%(Extension)" />
     <EmbeddedResource Include="Workloads/*.wasp" LogicalName="Workloads/%(Filename)%(Extension)" />
+    <!-- The comparison's programs, in each language, run where they are copied (WebLingoComparison). -->
+    <None Include="Comparative/*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/WebLingo.Compiler/WebLingo.Compiler.csproj" />

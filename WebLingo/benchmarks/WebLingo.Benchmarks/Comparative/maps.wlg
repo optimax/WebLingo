@@ -1,0 +1,9 @@
+import { writeLn } from "std:console";
+var m = {};
+for (var i = 0; i < 200000; i++) { m["k" + (i % 50000).toString()] = i; }
+var hits = 0;
+for (var i = 0; i < 200000; i++) {
+  var k = "k" + i.toString();
+  if (m.has(k)) { hits += m[k]; }
+}
+writeLn(hits);

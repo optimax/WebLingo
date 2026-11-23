@@ -1,0 +1,11 @@
+import { writeLn } from "std:console";
+function counter(start) {
+  var n = start;
+  return () => { n += 1; return n; };
+}
+var total = 0;
+for (var i = 0; i < 2000; i++) {
+  var next = counter(i);
+  for (var j = 0; j < 1000; j++) { total += next(); }
+}
+writeLn(total);

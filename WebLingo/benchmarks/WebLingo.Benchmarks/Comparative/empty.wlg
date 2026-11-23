@@ -1,0 +1,2 @@
+import { writeLn } from "std:console";
+writeLn(0);

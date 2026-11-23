@@ -1,0 +1,8 @@
+import { writeLn } from "std:console";
+var total = 0;
+for (var i = 0; i < 300000; i++) {
+  var s = "item" + i.toString();
+  if (s < "item5") { total += s.length; } else { total += 1; }
+  if (s.contains("99")) { total += 2; }
+}
+writeLn(total);
