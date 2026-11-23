@@ -12,7 +12,7 @@ public sealed class CodeGeneratorTests
         var module = Generate("var a = 10;\nvar b = 20;\nvar result = a + b;\nprintLn(result);");
         Assert.Equal(
             """
-            function main (3 locals, 4 registers)
+            function main of test.wlg (3 locals, 4 registers)
             00  LoadConstant r0(a), 10
             01  LoadConstant r1(b), 20
             02  Add r2(result), r0(a), r1(b)

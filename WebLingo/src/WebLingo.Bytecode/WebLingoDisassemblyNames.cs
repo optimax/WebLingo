@@ -28,6 +28,16 @@ internal static class WebLingoDisassemblyNames
     public static string Heading(int index, string name, IReadOnlyList<WebLingoUnitInfo> units) =>
         BodyOf(index, units) is { } file ? $"module_body of {file}" : $"function{index} {name}";
 
+    /// <summary>
+    /// What the entry point's heading names it by: <c>main of 16a-modules.wlg</c>, the program's file, as a file's body
+    /// is headed by its own (the owner's request, 22 November 2026), or <c>main</c> alone where the module names none.
+    /// </summary>
+    public static string EntryHeading(string name, string moduleName, IReadOnlyList<WebLingoUnitInfo> units)
+    {
+        var file = units.Count > 0 ? units[0].Name : moduleName;
+        return file.Length > 0 ? $"{name} of {file}" : name;
+    }
+
     /// <summary>The file whose body function <paramref name="index"/> is, or <c>null</c> for any other function.</summary>
     private static string? BodyOf(int index, IReadOnlyList<WebLingoUnitInfo> units)
     {

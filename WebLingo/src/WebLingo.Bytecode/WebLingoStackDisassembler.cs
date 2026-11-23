@@ -19,7 +19,8 @@ public static class WebLingoStackDisassembler
     public static string Format(WebLingoStackModule module, IReadOnlyList<WebLingoSourcePositions> positions)
     {
         var text = new StringBuilder();
-        Append(text, module, module.EntryPoint, module.EntryPoint.Name, positions);
+        Append(text, module, module.EntryPoint,
+            WebLingoDisassemblyNames.EntryHeading(module.EntryPoint.Name, module.Name, module.Units), positions);
         for (var i = 0; i < module.Functions.Count; i++)
         {
             Append(text.Append('\n'), module, module.Functions[i],

@@ -87,10 +87,11 @@ Compiled files name their VM in the header. The CLI rejects a header that disagr
 explicit configuration setting. `weblingo disasm hello.wlbr` shows what the compiler made.
 
 ```text
-function main (0 locals, 1 registers)
-00  LoadConstant r0, "Hello, WebLingo!"
-01  CallBuiltin r0, writeLn(r0)
-02  Return
+function main of hello.wlg (4 locals, 5 registers)
+00  MakeModule r0(module), file0(hello.wlg), r0(module)+0
+01  LoadConstant r4, "Hello, WebLingo!"
+02  CallBuiltin r4, std:console.writeLn(r4)
+03  Return
 ```
 
 What a script writes, and its errors, `weblingo` writes as UTF-8, on Windows too, to a file, a pipe or a console,

@@ -123,12 +123,13 @@ public sealed class BytecodeCommandLineTests : IDisposable
     public void DisasmNamesAFilesBodyByItsFile(string vm, string kind)
     {
         // A file's top level, which has no name in the source, is headed as its file's body, and closed over as one (the
-        // owner's request, 22 November 2026, "The Name of a File's Top Level in disasm"); the program's own stays main.
+        // owner's request, 22 November 2026, "The Name of a File's Top Level in disasm"), the program's own main of its
+        // file, as the owner asked the same day.
         Write("lib/util.wlg", "export function twice(x) { return x * 2; }");
         var main = Write("main.wlg", "import { writeLn } from \"std:console\";\nimport { twice } from \"lib/util.wlg\";\nwriteLn(twice(21));\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
         var disassembly = Weblingo("disasm", Path.ChangeExtension(main, Extension(vm))).Output;
-        Assert.StartsWith("function main (", disassembly);
+        Assert.StartsWith("function main of main.wlg (", disassembly);
         Assert.Contains("\nfunction module_body of lib/util.wlg (", disassembly);
         Assert.Matches(@"MakeClosure (" + kind + @"\d+, )?module_body\(lib/util\.wlg\)\n", disassembly);
         Assert.Matches(@"\nfunction function\d+ twice \(", disassembly);
@@ -174,8 +175,8 @@ public sealed class BytecodeCommandLineTests : IDisposable
     }
 
     [Theory]
-    [InlineData("register", "function main (", " registers)")]
-    [InlineData("stack", "function main (", " stack)")]
+    [InlineData("register", "function main of main.wlg (", " registers)")]
+    [InlineData("stack", "function main of main.wlg (", " stack)")]
     public void DisasmShowsTheBytecode(string vm, string start, string kind)
     {
         var main = Write("main.wlg", "import { write, writeLn } from \"std:console\"; var x = 40;\nwriteLn(x + 2);\n");
