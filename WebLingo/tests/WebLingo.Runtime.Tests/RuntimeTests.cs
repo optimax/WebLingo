@@ -125,6 +125,84 @@ public sealed class HeapTests
     }
 
     [Fact]
+    public void WhatAnObjectIsAboutToHoldIsKeptWhenTheHeapCollects()
+    {
+        // A value a caller has just made, which no root holds yet, given to an object: until 23 November 2026, the
+        // reservation of its unit, which may collect, freed it first, and the next object made took its handle, so that
+        // a runtime error a program caught had its code as its message. Each way of adding one, with the first
+        // collection falling at each step in turn, as a heap filled to each point below it makes it fall.
+        for (var room = 0; room < 200; room++)
+        {
+            var heap = Filled(room, out var roots);
+            Assert.True(heap.TryAllocateArray([], 0, 0, out roots[0], out _));
+            Assert.True(heap.TryAllocateString("pushed", out var value, out _));
+            Assert.True(heap.TryAddToArray(roots[0], value, out _));
+            Assert.True(heap.TryAllocateString("inserted", out value, out _));
+            Assert.True(heap.TryInsertIntoArray(roots[0], 0, value, out _));
+            Assert.Equal(new[] { "inserted", "pushed" }, heap.GetArray(roots[0]).Select(heap.GetString));
+
+            heap = Filled(room, out roots);
+            Assert.True(heap.TryAllocateString("element", out value, out _));
+            Assert.True(heap.TryAllocateArray([value], 0, 1, out roots[0], out _));
+            Assert.Equal("element", heap.GetString(heap.GetArray(roots[0])[0]));
+
+            heap = Filled(room, out roots);
+            Assert.True(heap.TryAllocateSet([], 0, 0, out roots[0], out _));
+            Assert.True(heap.TryAllocateString("member", out value, out _));
+            Assert.True(heap.TryAddToSet(roots[0], value, out _, out _));
+            Assert.Equal("member", heap.GetString(heap.SetValueAt(roots[0], 0)));
+
+            heap = Filled(room, out roots);
+            Assert.True(heap.TryAllocateMap([], 0, 0, out roots[0], out _));
+            Assert.True(heap.TryAllocateString("key", out roots[1], out _)); // A root while the value is made.
+            var key = roots[1];
+            Assert.True(heap.TryAllocateString("value", out value, out _));
+            Assert.True(heap.TrySetInMap(roots[0], roots[1], value, out _));
+            var (keptKey, keptValue) = heap.MapEntryAt(roots[0], 0);
+            Assert.Equal(("key", "value"), (heap.GetString(keptKey), heap.GetString(keptValue)));
+
+            heap = Filled(room, out roots);
+            Assert.True(heap.TryAllocateMap([], 0, 0, out roots[0], out _));
+            Assert.True(heap.TryAllocateString("value", out roots[1], out _));
+            Assert.True(heap.TryAllocateString("key", out key, out _));
+            Assert.True(heap.TrySetInMap(roots[0], key, roots[1], out _));
+            (keptKey, keptValue) = heap.MapEntryAt(roots[0], 0);
+            Assert.Equal(("key", "value"), (heap.GetString(keptKey), heap.GetString(keptValue)));
+
+            heap = Filled(room, out roots);
+            Assert.True(heap.TryMakeClass("P", WebLingoValue.Null, out roots[1], out _));
+            Assert.True(heap.TryAllocateInstance(roots[1], out roots[0], out _));
+            Assert.True(heap.TryAllocateString("field", out value, out _));
+            Assert.True(heap.TrySetField(roots[0], "f", value, out _));
+            Assert.Equal("field", heap.GetString(heap.FieldAt(roots[0], 0).Value));
+
+            heap = Filled(room, out roots);
+            Assert.True(heap.TryMakeClass("Error", WebLingoValue.Null, out roots[1], out _));
+            var error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "The message, not the code.");
+            Assert.True(WebLingoExceptions.TryMakeError(heap, roots[1], error, out roots[0]));
+            var fields = Enumerable.Range(0, heap.FieldCount(roots[0])).Select(i => heap.FieldAt(roots[0], i))
+                .ToDictionary(field => field.Name, field => heap.GetString(field.Value));
+            Assert.Equal((error.Message, error.Code), (fields["message"], fields["code"]));
+        }
+    }
+
+    /// <summary>
+    /// A heap whose first collection is <paramref name="room"/> units or so away, its strings made to fill it unreached,
+    /// and two roots for what a test makes.
+    /// </summary>
+    private static WebLingoHeap Filled(int room, out WebLingoValue[] roots)
+    {
+        var heap = new WebLingoHeap();
+        roots = new WebLingoValue[2];
+        heap.AddRoots(roots);
+        var target = WebLingoHeap.FirstCollectionAt - room;
+        while (target - heap.Units >= 34) Assert.True(heap.TryAllocateString("x", out _, out _));
+        if (target - heap.Units >= 16) Assert.True(heap.TryAllocateString(new string('x', (int)(target - heap.Units) - 16), out _, out _));
+        Assert.Equal(0, heap.CollectionCount);
+        return heap;
+    }
+
+    [Fact]
     public void WhatARootSourceGivesIsKeptWhenTheHeapCollects()
     {
         // A VM gives the heap its frames' registers when it collects, rather than adding and removing them as roots on each

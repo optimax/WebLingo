@@ -921,7 +921,7 @@ public sealed class WebLingoHeap
     public bool TryAddToArray(WebLingoValue array, WebLingoValue value, out WebLingoRuntimeError? error)
     {
         var elements = GetArray(array);
-        if (!TryReserve(1, out error)) return false;
+        if (!TryReserve(1, value, WebLingoValue.Null, out error)) return false;
         elements.Add(value);
         Units++;
         return true;
@@ -932,7 +932,7 @@ public sealed class WebLingoHeap
     public bool TryInsertIntoArray(WebLingoValue array, int index, WebLingoValue value, out WebLingoRuntimeError? error)
     {
         var elements = GetArray(array);
-        if (!TryReserve(1, out error)) return false;
+        if (!TryReserve(1, value, WebLingoValue.Null, out error)) return false;
         elements.Insert(index, value);
         Units++;
         return true;
@@ -1566,7 +1566,7 @@ public sealed class WebLingoHeap
             }
             current = target.Base;
         }
-        if (!TryReserve(1, out error)) return false;
+        if (!TryReserve(1, value, WebLingoValue.Null, out error)) return false;
         fields.Set(name, value);
         Units++;
         return true;
@@ -1617,7 +1617,7 @@ public sealed class WebLingoHeap
         var entries = Get<MapObject>(set, WebLingoValueKind.Set);
         if (!TryKey(value, out var key, out error, inSet: true)) return false;
         if (entries.TryGet(key, out _)) return true;
-        if (!TryReserve(1, out error)) return false;
+        if (!TryReserve(1, value, WebLingoValue.Null, out error)) return false;
         entries.Set(key, value, WebLingoValue.Null);
         Units++;
         added = true;
@@ -1669,7 +1669,7 @@ public sealed class WebLingoHeap
             entries.Set(mapKey, key, value);
             return true;
         }
-        if (!TryReserve(1, out error)) return false;
+        if (!TryReserve(1, key, value, out error)) return false;
         entries.Set(mapKey, key, value);
         Units++;
         return true;
@@ -1726,10 +1726,20 @@ public sealed class WebLingoHeap
     private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
     /// <summary>Marks what the roots refer to, through every object, and frees every other object.</summary>
-    public void Collect()
+    public void Collect() => Collect(null, WebLingoValue.Null, WebLingoValue.Null);
+
+    /// <summary>
+    /// As <see cref="Collect()"/>, an object being made, not yet in the heap, and two values an object is about to hold
+    /// kept too, so that what a caller has just made, which no root holds yet, is not freed while it is stored (until
+    /// 23 November 2026, it was, and its handle given to the next object made).
+    /// </summary>
+    private void Collect(object? making, WebLingoValue kept, WebLingoValue alsoKept)
     {
         var marked = new bool[_objects.Count];
         var pending = new Stack<int>();
+        Mark(kept, marked, pending);
+        Mark(alsoKept, marked, pending);
+        if (making is not null) MarkWithin(making, marked, pending);
         foreach (var roots in _roots)
         {
             foreach (var value in roots) Mark(value, marked, pending);
@@ -1757,72 +1767,7 @@ public sealed class WebLingoHeap
                 foreach (var value in roots) Mark(value, marked, pending);
             }
         }
-        while (pending.Count > 0)
-        {
-            switch (_objects[pending.Pop()])
-            {
-                case Closure closure:
-                    foreach (var cell in closure.Cells) Mark(cell, marked, pending);
-                    break;
-                case Cell cell:
-                    Mark(cell.Value, marked, pending);
-                    break;
-                case ArrayObject array:
-                    foreach (var element in array.Elements) Mark(element, marked, pending);
-                    MarkFields(array.Instance, marked, pending);
-                    break;
-                case ClassObject classObject:
-                    Mark(classObject.Base, marked, pending);
-                    Mark(classObject.Metaclass, marked, pending);
-                    Mark(classObject.Constructor, marked, pending);
-                    foreach (var method in classObject.Methods.Values) Mark(method, marked, pending);
-                    foreach (var method in classObject.OwnMethods.Values) Mark(method, marked, pending);
-                    foreach (var method in classObject.DisposeChain) Mark(method, marked, pending);
-                    foreach (var method in classObject.StaticMethods.Values) Mark(method, marked, pending);
-                    foreach (var field in classObject.StaticFields.Values) Mark(field, marked, pending);
-                    break;
-                case ModuleObject module:
-                    foreach (var cell in module.Exports.Values) Mark(cell, marked, pending);
-                    MarkFields(module.Instance, marked, pending);
-                    break;
-                case InstanceObject instance:
-                    Mark(instance.Class, marked, pending);
-                    Mark(instance.Value, marked, pending);
-                    for (var i = 0; i < instance.Count; i++) Mark(instance.At(i).Value, marked, pending);
-                    break;
-                case WebLingoTask task:
-                    MarkFields(task.Instance as InstanceObject, marked, pending);
-                    Mark(task.Result, marked, pending);
-                    Mark(task.Exception, marked, pending);
-                    Mark(task.Results, marked, pending);
-                    if (task.Joins is not null)
-                    {
-                        foreach (var (combinator, _) in task.Joins) Mark(combinator, marked, pending);
-                    }
-                    foreach (var waiter in task.Waiters) Mark(waiter, marked, pending);
-                    if (task.FrameRoots is not null)
-                    {
-                        foreach (var roots in task.FrameRoots)
-                        {
-                            foreach (var value in roots) Mark(value, marked, pending);
-                        }
-                    }
-                    break;
-                case BoundMethodObject bound:
-                    Mark(bound.Instance, marked, pending);
-                    Mark(bound.Closure, marked, pending);
-                    break;
-                case MapObject map: // A set's too, whose values are its keys.
-                    for (var i = 0; i < map.Count; i++)
-                    {
-                        var (key, value) = map.At(i);
-                        Mark(key, marked, pending);
-                        Mark(value, marked, pending);
-                    }
-                    MarkFields(map.Instance, marked, pending);
-                    break;
-            }
-        }
+        while (pending.Count > 0) MarkWithin(_objects[pending.Pop()], marked, pending);
         for (var handle = 0; handle < _objects.Count; handle++)
         {
             if (marked[handle] || _objects[handle] is not { } item) continue;
@@ -1833,6 +1778,74 @@ public sealed class WebLingoHeap
         }
         _nextCollectionAt = Math.Max(FirstCollectionAt, Units * 2);
         CollectionCount++;
+    }
+
+    /// <summary>Marks what an object refers to.</summary>
+    private static void MarkWithin(object? item, bool[] marked, Stack<int> pending)
+    {
+        switch (item)
+        {
+            case Closure closure:
+                foreach (var cell in closure.Cells) Mark(cell, marked, pending);
+                break;
+            case Cell cell:
+                Mark(cell.Value, marked, pending);
+                break;
+            case ArrayObject array:
+                foreach (var element in array.Elements) Mark(element, marked, pending);
+                MarkFields(array.Instance, marked, pending);
+                break;
+            case ClassObject classObject:
+                Mark(classObject.Base, marked, pending);
+                Mark(classObject.Metaclass, marked, pending);
+                Mark(classObject.Constructor, marked, pending);
+                foreach (var method in classObject.Methods.Values) Mark(method, marked, pending);
+                foreach (var method in classObject.OwnMethods.Values) Mark(method, marked, pending);
+                foreach (var method in classObject.DisposeChain) Mark(method, marked, pending);
+                foreach (var method in classObject.StaticMethods.Values) Mark(method, marked, pending);
+                foreach (var field in classObject.StaticFields.Values) Mark(field, marked, pending);
+                break;
+            case ModuleObject module:
+                foreach (var cell in module.Exports.Values) Mark(cell, marked, pending);
+                MarkFields(module.Instance, marked, pending);
+                break;
+            case InstanceObject instance:
+                Mark(instance.Class, marked, pending);
+                Mark(instance.Value, marked, pending);
+                for (var i = 0; i < instance.Count; i++) Mark(instance.At(i).Value, marked, pending);
+                break;
+            case WebLingoTask task:
+                MarkFields(task.Instance as InstanceObject, marked, pending);
+                Mark(task.Result, marked, pending);
+                Mark(task.Exception, marked, pending);
+                Mark(task.Results, marked, pending);
+                if (task.Joins is not null)
+                {
+                    foreach (var (combinator, _) in task.Joins) Mark(combinator, marked, pending);
+                }
+                foreach (var waiter in task.Waiters) Mark(waiter, marked, pending);
+                if (task.FrameRoots is not null)
+                {
+                    foreach (var roots in task.FrameRoots)
+                    {
+                        foreach (var value in roots) Mark(value, marked, pending);
+                    }
+                }
+                break;
+            case BoundMethodObject bound:
+                Mark(bound.Instance, marked, pending);
+                Mark(bound.Closure, marked, pending);
+                break;
+            case MapObject map: // A set's too, whose values are its keys.
+                for (var i = 0; i < map.Count; i++)
+                {
+                    var (key, value) = map.At(i);
+                    Mark(key, marked, pending);
+                    Mark(value, marked, pending);
+                }
+                MarkFields(map.Instance, marked, pending);
+                break;
+        }
     }
 
     private static void Mark(WebLingoValue value, bool[] marked, Stack<int> pending)
@@ -1892,9 +1905,16 @@ public sealed class WebLingoHeap
         return false;
     }
 
-    private bool TryReserve(long units, out WebLingoRuntimeError? error)
+    private bool TryReserve(long units, out WebLingoRuntimeError? error) =>
+        TryReserve(units, WebLingoValue.Null, WebLingoValue.Null, out error);
+
+    /// <summary>
+    /// Units reserved, the heap collected first where they would pass its threshold, <paramref name="kept"/> and
+    /// <paramref name="alsoKept"/>, which an object is about to hold, kept while it does.
+    /// </summary>
+    private bool TryReserve(long units, WebLingoValue kept, WebLingoValue alsoKept, out WebLingoRuntimeError? error)
     {
-        if (Units + units > _nextCollectionAt || Units + units > _maxUnits) Collect();
+        if (Units + units > _nextCollectionAt || Units + units > _maxUnits) Collect(null, kept, alsoKept);
         if (Units + units > _maxUnits)
         {
             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.BudgetExceeded, "The program has used all the memory this execution may use.");
@@ -1908,7 +1928,7 @@ public sealed class WebLingoHeap
         bool hasClass = false)
     {
         var units = content + ObjectOverhead;
-        if (Units + units > _nextCollectionAt || Units + units > _maxUnits) Collect();
+        if (Units + units > _nextCollectionAt || Units + units > _maxUnits) Collect(item, WebLingoValue.Null, WebLingoValue.Null);
         if (Units + units > _maxUnits)
         {
             value = WebLingoValue.Null;

@@ -323,6 +323,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 heap.AddRoots(_errorClasses);
                 heap.AddRoots(_main);
                 heap.AddRoots(_rest);
+                heap.AddRoots(_made);
+                heap.AddRoots(_operands); // A pending call's arguments, a module's values among them, until its frame holds them.
                 _modules = new WebLingoModuleTable(module.Units.Count, heap);
                 for (var i = 0; i < module.Units.Count; i++) _unitClosures.Add(WebLingoValue.Null);
                 heap.AddRoots(_unitClosures);
@@ -842,7 +844,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                                 pc++;
                                 continue;
                             }
-                            self = instance;
+                            self = _made[0] = instance;
                             constructed = instance;
                             arguments = registers;
                             firstArgument = ins.C;
@@ -1865,6 +1867,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         private readonly WebLingoValue[] _main = new WebLingoValue[1];
         /// <summary>A call's rest parameter, gathered before its frame is made, a root until its function takes it (section 3.5).</summary>
         private readonly WebLingoValue[] _rest = [WebLingoValue.Null];
+        /// <summary>
+        /// The instance <c>new</c> made last, a root until its constructor's frame holds it, since what the call makes
+        /// before that frame, a rest parameter's array or an async constructor's task, may collect; no program's code
+        /// runs in between, so that one is enough.
+        /// </summary>
+        private readonly WebLingoValue[] _made = [WebLingoValue.Null];
         /// <summary>The call a spread instruction is, once its array's elements are in place (section 3.5).</summary>
         private readonly WebLingoInstruction[] _spread = new WebLingoInstruction[1];
 
@@ -2053,6 +2061,19 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         private bool TryGiveParameters(WebLingoValue[] first)
         {
             var entries = new WebLingoValue[2 * context.Parameters.Count];
+            heap.AddRoots(entries); // While its strings are made, which may collect.
+            try
+            {
+                return TryGiveParameters(first, entries);
+            }
+            finally
+            {
+                heap.RemoveLastRoots(entries);
+            }
+        }
+
+        private bool TryGiveParameters(WebLingoValue[] first, WebLingoValue[] entries)
+        {
             var count = 0;
             WebLingoRuntimeError? error = null;
             foreach (var (name, value) in context.Parameters)

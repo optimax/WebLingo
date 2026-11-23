@@ -127,9 +127,17 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
     public bool TryAll(List<WebLingoValue> values, out WebLingoValue combined, out WebLingoRuntimeError? error)
     {
         var initial = new WebLingoValue[values.Count];
-        if (!heap.TryAllocateTask(out combined, out error) || !heap.TryAllocateArray(initial, 0, initial.Length, out var results, out error))
+        if (!heap.TryAllocateTask(out combined, out error)) return false;
+        var kept = new[] { combined };
+        heap.AddRoots(kept); // While the results' array is made, which may collect.
+        WebLingoValue results;
+        try
         {
-            return false;
+            if (!heap.TryAllocateArray(initial, 0, initial.Length, out results, out error)) return false;
+        }
+        finally
+        {
+            heap.RemoveLastRoots(kept);
         }
         var state = heap.GetTask(combined);
         (state.Combinator, state.Results) = (WebLingoCombinator.All, results);

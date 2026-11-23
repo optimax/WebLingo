@@ -107,8 +107,9 @@ public sealed class WebLingoHttpModule : IWebLingoNativeModule
             var charset = WebLingoCharset.Utf8;
             foreach (var (name, value) in response.Headers)
             {
-                if (!heap.TryAllocateString(name, out var key, out error) || !heap.TryAllocateString(value, out var text, out error)) return false;
-                made.Add(key);
+                if (!heap.TryAllocateString(name, out var key, out error)) return false;
+                made.Add(key); // Before the value is made, which may collect.
+                if (!heap.TryAllocateString(value, out var text, out error)) return false;
                 made.Add(text);
                 if (!heap.TrySetInMap(headers, key, text, out error)) return false;
                 if (name == "content-type" && Charset(value) is { } named && WebLingoTextCodec.TryFind(named, out var found)) charset = found;
