@@ -4,4 +4,5 @@ namespace WebLingo.Core;
 public static class WebLingoIntrinsicNames
 {
     public const string CheckArrayCallback = "#checkArrayCallback";
+    public const string SortArray = "#sortArray";
 }

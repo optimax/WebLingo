@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using WebLingo.Bytecode;
 using WebLingo.Core;
@@ -211,8 +212,11 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// error it raises once the scheduler has resumed it, with no caller below it, is reported.
         /// </summary>
         public long CalledFrom = WebLingoExceptions.Nowhere;
-        /// <summary>For a toString() that a text being built waits for: that text (section 3.7).</summary>
-        public TextCall? Text;
+        /// <summary>
+        /// For a toString() that a text being built waits for, that text (section 3.7); for a call that a built-in's work
+        /// waits for, that work (<see cref="WebLingoCalls"/>).
+        /// </summary>
+        public Waiter? Waiter;
         /// <summary>
         /// For an <c>async</c> function's frame: its task, its fourth root too; whether it still runs on its caller's stack,
         /// before its first <c>await</c>; and, while it waits, where its <c>await</c>'s value goes (section 3.8).
@@ -224,13 +228,36 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         public int AwaitDestination; // -1 drops what it gives, as a using's await of its disposal does.
     }
 
+    /// <summary>What a frame's caller waits for it to give: a text being built, or a built-in's work.</summary>
+    private abstract class Waiter
+    {
+        /// <summary>Lets go of the values it holds, as roots, where its frame ends with an exception, or is never pushed.</summary>
+        public abstract void Unroot(WebLingoHeap heap);
+    }
+
+    /// <summary>
+    /// A built-in's work that calls the program's functions (<see cref="WebLingoCalls"/>), its values roots from its
+    /// beginning to its end, its result going to the register <see cref="Destination"/> of the frame that called it.
+    /// </summary>
+    private sealed class CallsWaiting(WebLingoCalls work, int destination) : Waiter
+    {
+        public WebLingoCalls Work { get; } = work;
+        public int Destination { get; } = destination;
+        public override void Unroot(WebLingoHeap heap) => heap.RemoveLastRoots(Work.Values);
+    }
+
     /// <summary>
     /// A text being built (section 3.7), and what it is for: a <c>ToText</c>'s result, or a built-in that writes it,
     /// whose result goes where <see cref="Destination"/> says; and whether its VM keeps its values as roots, as it
     /// does while a toString() it waits for runs.
     /// </summary>
-    private sealed class TextCall(IWebLingoTextBuilder builder, IWebLingoBuiltinFunction? builtin, int destination)
+    private sealed class TextCall(IWebLingoTextBuilder builder, IWebLingoBuiltinFunction? builtin, int destination) : Waiter
     {
+        public override void Unroot(WebLingoHeap heap)
+        {
+            if (Rooted) heap.RemoveLastRoots(Builder.Roots);
+        }
+
         public IWebLingoTextBuilder Builder { get; } = builder;
         public IWebLingoBuiltinFunction? Builtin { get; } = builtin;
         /// <summary>The register its result goes to.</summary>
@@ -951,7 +978,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                                 _returned = result;
                                 goto asyncReturned;
                             }
-                            if (frame.Text is not null)
+                            if (frame.Waiter is not null)
                             {
                                 _returned = result;
                                 goto texted;
@@ -1190,7 +1217,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                                 building.Rooted = true;
                             }
                             if (depth + 1 == frames.Length) Array.Resize(ref frames, frames.Length * 2);
-                            (frames[depth + 1] ??= new Frame()).Text = building;
+                            (frames[depth + 1] ??= new Frame()).Waiter = building;
                             callee = method;
                             self = instance;
                             arguments = registers;
@@ -1216,8 +1243,9 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     // A toString() that a text waits for has returned, its frame let go of: its string goes into the
                     // text, which goes on, at the instruction it is for; anything but a string is WL3001 (section 3.7).
                     {
-                        _text = frame.Text!;
-                        frame.Text = null;
+                        if (frame.Waiter is CallsWaiting) goto called;
+                        _text = (TextCall)frame.Waiter!;
+                        frame.Waiter = null;
                         frame.Closure[0] = WebLingoValue.Null;
                         frame = frames[--depth];
                         code = frame.Code;
@@ -1241,6 +1269,47 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         _text = building;
                         goto text;
                     }
+
+                called:
+                    // A call that a built-in's work waits for has returned, its frame let go of: what it gave goes to the
+                    // work, which goes on, at the instruction that began it (specification, section 5.6, cause 6).
+                    {
+                        _calls = (CallsWaiting)frame.Waiter!;
+                        frame.Waiter = null;
+                        frame.Closure[0] = WebLingoValue.Null;
+                        frame = frames[--depth];
+                        code = frame.Code;
+                        registers = frame.Registers;
+                        cells = frame.Cells;
+                    }
+
+                callGiven:
+                    // What the call gave (_returned), for the work (_calls) of the instruction that began it.
+                    pc = frame.Pc - 1;
+                    _calls!.Work.Supply(_returned);
+                    _returned = WebLingoValue.Null;
+
+                calls:
+                    // A built-in's work, begun at pc: it goes on until it is done, its result where the instruction's goes,
+                    // or until it waits for a call, which this instruction makes, as any call, in a frame of its own; a
+                    // built-in it calls is called at once (specification, section 5.6, "Where the time goes", cause 6).
+                    if (!GoOn(registers, out error)) goto failed;
+                    if (_calls is null)
+                    {
+                        pc++;
+                        continue;
+                    }
+                    if (depth + 1 == frames.Length) Array.Resize(ref frames, frames.Length * 2);
+                    (frames[depth + 1] ??= new Frame()).Waiter = _calls;
+                    callee = _calls.Work.Callee;
+                    self = _calls.Work.Self;
+                    arguments = _calls.Work.Values;
+                    firstArgument = _calls.Work.FirstArgument;
+                    argumentCount = _calls.Work.ArgumentCount;
+                    resultRegister = 0;
+                    constructed = WebLingoValue.Null;
+                    _calls = null;
+                    goto call;
 
                 asyncDisposed:
                     // An async disposal's last method has returned: its task completes, or faults with what one of its
@@ -1273,12 +1342,13 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 asyncGave:
                     // An async function's first run has ended, at its first await, its return or its exception: its call
                     // gives its task, to where the call's result goes, or to the text whose toString() it is.
-                    _text = Gave(frame, frames, depth);
+                    Gave(frame, frames, depth);
                     frame = frames[--depth];
                     code = frame.Code;
                     registers = frame.Registers;
                     cells = frame.Cells;
                     if (_text is not null) goto textGiven;
+                    if (_calls is not null) goto callGiven;
                     if (_usingAwaits)
                     {
                         // A using awaits its async disposal, as await would, whatever it gives dropped (section 3.8).
@@ -1328,6 +1398,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         constructed = WebLingoValue.Null;
                         goto call;
                     }
+                    if (ReferenceEquals(error, CallsBegun)) goto calls; // A built-in's work, which calls the program's functions.
                     // A call that failed before its frame was pushed leaves nothing in that frame: no disposal, no text.
                     if (depth + 1 < frames.Length && frames[depth + 1] is { } unpushed)
                     {
@@ -1335,8 +1406,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         unpushed.Task = WebLingoValue.Null;
                         unpushed.Closure[3] = WebLingoValue.Null;
                         unpushed.FirstRun = false;
-                        if (unpushed.Text is { Rooted: true } stale) heap.RemoveLastRoots(stale.Builder.Roots);
-                        unpushed.Text = null;
+                        unpushed.Waiter?.Unroot(heap);
+                        unpushed.Waiter = null;
                     }
                     // A runtime error: one that cannot be caught stops the program, and any other is thrown (section 3.7).
                     if (!WebLingoExceptions.IsCatchable(error!.Code))
@@ -1377,7 +1448,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         heap.RemoveLastRoots(frame.Closure);
                         heap.RemoveLastRoots(registers);
                         Array.Clear(registers, 0, frame.Function.RegisterCount);
-                        if (frame.Text is { Rooted: true } waiting) heap.RemoveLastRoots(waiting.Builder.Roots);
+                        frame.Waiter?.Unroot(heap);
                         Release(frame);
                         frame = frames[--depth];
                         code = frame.Code;
@@ -2321,16 +2392,23 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
 
         /// <summary>
         /// An async function's first run has ended: its call gives its task (<see cref="_returned"/>) to its caller, or,
-        /// for a toString() a text waits for, to that text, which this gives.
+        /// for a toString() a text waits for, to that text, which this puts in <see cref="_text"/>, or, for a call a
+        /// built-in's work waits for, to that work, in <see cref="_calls"/>.
         /// </summary>
-        private TextCall? Gave(Frame frame, Frame[] frames, int depth)
+        private void Gave(Frame frame, Frame[] frames, int depth)
         {
             var caller = frames[depth - 1];
             if (frame.Function.IsNative) frame.CalledFrom = RaisedAt(frames, depth - 1, caller.Pc - 1);
             frame.FirstRun = false;
-            var text = frame.Text;
-            frame.Text = null;
-            if (text is null)
+            var waits = frame.Waiter;
+            frame.Waiter = null;
+            if (waits is CallsWaiting calls)
+            {
+                _calls = calls;
+                return;
+            }
+            _text = (TextCall?)waits;
+            if (waits is null)
             {
                 if (frame.ResultRegister >= 0)
                 {
@@ -2344,7 +2422,6 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 }
                 _returned = WebLingoValue.Null;
             }
-            return text;
         }
 
         /// <summary>
@@ -2432,6 +2509,81 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// <summary>A text to build, on its way to the code that builds it; and what a toString() a text waits for gave.</summary>
         private TextCall? _text;
         private WebLingoValue _returned;
+
+        /// <summary>
+        /// A built-in's work, on its way to the code that runs it (<see cref="GoOn"/>), and, from it, to the call it waits
+        /// for; null otherwise. <see cref="CallsBegun"/> is what <see cref="CallBuiltin(IWebLingoBuiltinFunction,
+        /// WebLingoValue[], in WebLingoInstruction)"/> gives once it has begun one, for <c>Run</c> to run it.
+        /// </summary>
+        private CallsWaiting? _calls;
+
+        private static readonly WebLingoRuntimeError CallsBegun =
+            new(WebLingoDiagnosticCodes.InvalidOperation, "A built-in's work has begun.");
+
+        /// <summary>A built-in's work begun, by the instruction that calls it, its values made roots.</summary>
+        private WebLingoRuntimeError? Begin(IWebLingoCallingBuiltin builtin, WebLingoValue[] registers, in WebLingoInstruction instruction)
+        {
+            var work = builtin.Begin(new ReadOnlySpan<WebLingoValue>(registers, instruction.C, instruction.D), heap, out var error);
+            if (work is null) return error ?? new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed.");
+            heap.AddRoots(work.Values);
+            _calls = new CallsWaiting(work, instruction.A);
+            return CallsBegun;
+        }
+
+        /// <summary>
+        /// The work in <see cref="_calls"/> goes on: true, <see cref="_calls"/> null, when it is done, its result in
+        /// <paramref name="registers"/>, its roots let go of; true, <see cref="_calls"/> kept, when it waits for a call of
+        /// a function, which <c>Run</c> makes; false, its roots let go of, when it fails, a built-in it calls among them.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool GoOn(WebLingoValue[] registers, out WebLingoRuntimeError? error)
+        {
+            var waiting = _calls!;
+            var work = waiting.Work;
+            while (true)
+            {
+                if (work.TryGoOn(heap, out var calls, out var result, out error))
+                {
+                    heap.RemoveLastRoots(work.Values);
+                    registers[waiting.Destination] = result;
+                    _calls = null;
+                    return true;
+                }
+                if (calls)
+                {
+                    if (!IsBuiltinCallee(work.Callee, out var builtin)) return true;
+                    // A built-in, which Run's call would call without a frame: called here, at once.
+                    var given = WebLingoValue.Null;
+                    error = builtin.Arity != work.ArgumentCount
+                        ? WrongArgumentCount(builtin.Name, builtin.Arity, work.ArgumentCount)
+                        : CallBuiltin(builtin, work.Values, work.FirstArgument, work.ArgumentCount, out given);
+                    if (error is null)
+                    {
+                        work.Supply(given);
+                        continue;
+                    }
+                }
+                heap.RemoveLastRoots(work.Values);
+                _calls = null;
+                error ??= new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "A built-in's work failed.");
+                return false;
+            }
+        }
+
+        /// <summary>Whether a call of the value calls a built-in, through a bound method or an instance holding one.</summary>
+        private bool IsBuiltinCallee(WebLingoValue callee, [NotNullWhen(true)] out IWebLingoBuiltinFunction? builtin)
+        {
+            builtin = null;
+            while (true)
+            {
+                if (callee.Kind == WebLingoValueKind.BoundMethod && !heap.IsDisposal(callee)) callee = heap.GetBoundMethod(callee).Closure;
+                else if (callee.Kind == WebLingoValueKind.Instance && heap.IsCallable(callee)) callee = heap.Held(callee);
+                else break;
+            }
+            if (callee.Kind != WebLingoValueKind.Builtin) return false;
+            builtin = builtins[callee.Handle];
+            return true;
+        }
 
         private static bool[] TextBuiltins(IWebLingoBuiltinFunction[] builtins)
         {
@@ -2685,7 +2837,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             frame.Closure[2] = WebLingoValue.Null;
             frame.Holds = false;
             frame.HeldError = null;
-            frame.Text = null;
+            frame.Waiter = null;
         }
 
         /// <summary>A frame an exception leaves keeps nothing: its closure, its instance, a disposal, a kept exception.</summary>
@@ -2702,7 +2854,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             frame.DisposeChain = null;
             frame.Holds = false;
             frame.HeldError = null;
-            frame.Text = null;
+            frame.Waiter = null;
         }
 
         /// <summary>
@@ -2970,7 +3122,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             out WebLingoRuntimeError? error)
         {
             error = null;
-            if (result < 0 || (depth + 1 < frames.Length && frames[depth + 1] is { Text: not null } or { DisposeChain: not null })) return false;
+            if (result < 0 || (depth + 1 < frames.Length && frames[depth + 1] is { Waiter: not null } or { DisposeChain: not null })) return false;
             var builtin = builtins[function.NativeBuiltin];
             var values = NativeArguments(self, withThis, arguments, first, count);
             try
@@ -3004,6 +3156,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             {
                 if (!builtin.TryInvoke(new ReadOnlySpan<WebLingoValue>(registers, instruction.C, instruction.D), heap, out var result, out var error))
                 {
+                    if (error is null && builtin is IWebLingoCallingBuiltin calling) return Begin(calling, registers, instruction);
                     return error ?? new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, $"'{builtin.Name}' failed.");
                 }
                 registers[instruction.A] = result;

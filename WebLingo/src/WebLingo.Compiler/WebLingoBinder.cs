@@ -2503,7 +2503,8 @@ public sealed class WebLingoBinder
         (_scope, _function, _class) = (_prelude, _main, null);
         _nativeCallees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal)
         {
-            ["checkCallback"] = new(WebLingoIntrinsicNames.CheckArrayCallback, 2)
+            ["checkCallback"] = new(WebLingoIntrinsicNames.CheckArrayCallback, 2),
+            ["sortArray"] = new(WebLingoIntrinsicNames.SortArray, 2)
         };
         var bound = BindExtension(extension, []);
         (_scope, _function, _class, _nativeCallees) = (outerScope, outerFunction, outerClass, outerCallees);

@@ -6,13 +6,12 @@ extend Array {
     for (var i = 0; i < items.length; i++) {
       var value = f(items[i]);
       if (value is Task) {
-        var from = i;
-        var later = async () => {
+        var later = async (items, f, result, from, value) => {
           result.push(await value);
           for (var j = from + 1; j < items.length; j++) result.push(await f(items[j]));
           return result;
         };
-        return later();
+        return later(items, f, result, i, value);
       }
       result.push(value);
     }
@@ -27,8 +26,7 @@ extend Array {
       var item = items[i];
       var keep = f(item);
       if (keep is Task) {
-        var from = i;
-        var later = async () => {
+        var later = async (items, f, result, from, keep, item) => {
           if (await keep) result.push(item);
           for (var j = from + 1; j < items.length; j++) {
             var next = items[j];
@@ -36,7 +34,7 @@ extend Array {
           }
           return result;
         };
-        return later();
+        return later(items, f, result, i, keep, item);
       }
       if (keep) result.push(item);
     }
@@ -50,14 +48,12 @@ extend Array {
     for (var i = 0; i < items.length; i++) {
       total = f(total, items[i]);
       if (total is Task) {
-        var from = i;
-        var pending = total;
-        var later = async () => {
+        var later = async (items, f, from, pending) => {
           var sum = await pending;
           for (var j = from + 1; j < items.length; j++) sum = await f(sum, items[j]);
           return sum;
         };
-        return later();
+        return later(items, f, i, total);
       }
     }
     return total;
@@ -69,8 +65,7 @@ extend Array {
       var item = items[i];
       var found = f(item);
       if (found is Task) {
-        var from = i;
-        var later = async () => {
+        var later = async (items, f, from, found, item) => {
           if (await found) return item;
           for (var j = from + 1; j < items.length; j++) {
             var next = items[j];
@@ -78,7 +73,7 @@ extend Array {
           }
           return null;
         };
-        return later();
+        return later(items, f, i, found, item);
       }
       if (found) return item;
     }
@@ -90,15 +85,14 @@ extend Array {
     for (var i = 0; i < items.length; i++) {
       var found = f(items[i]);
       if (found is Task) {
-        var from = i;
-        var later = async () => {
+        var later = async (items, f, from, found) => {
           if (await found) return true;
           for (var j = from + 1; j < items.length; j++) {
             if (await f(items[j])) return true;
           }
           return false;
         };
-        return later();
+        return later(items, f, i, found);
       }
       if (found) return true;
     }
@@ -111,49 +105,19 @@ extend Array {
     for (var i = 0; i < items.length; i++) {
       var kept = f(items[i]);
       if (kept is Task) {
-        var from = i;
-        var later = async () => {
+        var later = async (items, f, from, kept) => {
           if (!(await kept)) return false;
           for (var j = from + 1; j < items.length; j++) {
             if (!(await f(items[j]))) return false;
           }
           return true;
         };
-        return later();
+        return later(items, f, i, kept);
       }
       if (!kept) return false;
     }
     return true;
   }
   every(f) { checkCallback("every", f); return this.all(f); }
-  sort(compare = null) {
-    if (compare != null) checkCallback("sort", compare);
-    var a = [];
-    foreach (var item in this) a.push(item);
-    var b = [];
-    foreach (var item in a) b.push(item);
-    var n = a.length;
-    for (var width = 1; width < n; width *= 2) {
-      for (var low = 0; low < n; low += 2 * width) {
-        var middle = low + width < n ? low + width : n;
-        var high = low + 2 * width < n ? low + 2 * width : n;
-        var i = low;
-        var j = middle;
-        for (var k = low; k < high; k++) {
-          var right = j < high && (i >= middle || (compare == null ? a[j] < a[i] : compare(a[j], a[i]) < 0));
-          if (right) {
-            b[k] = a[j];
-            j++;
-          } else {
-            b[k] = a[i];
-            i++;
-          }
-        }
-      }
-      var swap = a;
-      a = b;
-      b = swap;
-    }
-    return a;
-  }
+  sort(compare = null) { return sortArray(this, compare); }
 }
