@@ -1,0 +1,14 @@
+// 16a-modules.wlg: importing modules, statically but selectively.
+//
+
+import { writeLn } from "std:console";
+import { Tea, serve } from "lib/teas.wlg";       // and names from it: the same module, run once
+
+var sencha = new Tea("Sencha", 4.5);
+writeLn([serve(sencha), serve("tea")]);
+
+
+/* Output:
+teas.wlg runs, its prices in $
+["Serving Sencha at $4.50", "Serving tea"]
+*/
