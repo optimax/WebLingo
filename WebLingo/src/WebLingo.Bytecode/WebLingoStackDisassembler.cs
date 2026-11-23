@@ -19,16 +19,19 @@ public static class WebLingoStackDisassembler
     public static string Format(WebLingoStackModule module, IReadOnlyList<WebLingoSourcePositions> positions)
     {
         var text = new StringBuilder();
-        Append(text, module, module.EntryPoint, "", positions);
+        Append(text, module, module.EntryPoint, module.EntryPoint.Name, positions);
         for (var i = 0; i < module.Functions.Count; i++)
-            Append(text.Append('\n'), module, module.Functions[i], $"function{i} ", positions);
+        {
+            Append(text.Append('\n'), module, module.Functions[i],
+                WebLingoDisassemblyNames.Heading(i, module.Functions[i].Name, module.Units), positions);
+        }
         return text.ToString();
     }
 
-    private static void Append(StringBuilder text, WebLingoStackModule module, WebLingoStackFunction function, string label,
+    private static void Append(StringBuilder text, WebLingoStackModule module, WebLingoStackFunction function, string heading,
         IReadOnlyList<WebLingoSourcePositions> positions)
     {
-        text.Append("function ").Append(label).Append(function.Name).Append(" (");
+        text.Append("function ").Append(heading).Append(" (");
         if (function.ParameterCount > 0) text.Append(function.ParameterCount).Append(" parameters, ");
         if (function.HasRest) text.Append("a rest parameter, ");
         if (function.Captures.Count > 0) text.Append(function.Captures.Count).Append(" captures, ");
@@ -65,7 +68,7 @@ public static class WebLingoStackDisassembler
             WebLingoStackOpCode.JumpIfGiven => $"{name} {Local(function, b)}, {Target(a)}",
             WebLingoStackOpCode.LoadCapture or WebLingoStackOpCode.StoreCapture =>
                 $"{name} {WebLingoDisassemblyNames.Capture(a, function.DebugInfo)}",
-            WebLingoStackOpCode.MakeClosure => $"{name} {WebLingoDisassemblyNames.Function(a, module.Functions, f => f.Name)}",
+            WebLingoStackOpCode.MakeClosure => $"{name} {WebLingoDisassemblyNames.Function(a, module.Functions, f => f.Name, module.Units)}",
             WebLingoStackOpCode.LoadBuiltin => $"{name} {Import(module, a)}",
             WebLingoStackOpCode.Call or WebLingoStackOpCode.New => $"{name} ({a} arguments)",
             WebLingoStackOpCode.CallBuiltin => $"{name} {Import(module, a)} ({b} arguments)",

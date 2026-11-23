@@ -21,16 +21,19 @@ public static class WebLingoDisassembler
     public static string Format(WebLingoCompiledModule module, IReadOnlyList<WebLingoSourcePositions> positions)
     {
         var text = new StringBuilder();
-        Append(text, module, module.EntryPoint, "", positions);
+        Append(text, module, module.EntryPoint, module.EntryPoint.Name, positions);
         for (var i = 0; i < module.Functions.Count; i++)
-            Append(text.Append('\n'), module, module.Functions[i], $"function{i} ", positions);
+        {
+            Append(text.Append('\n'), module, module.Functions[i],
+                WebLingoDisassemblyNames.Heading(i, module.Functions[i].Name, module.Units), positions);
+        }
         return text.ToString();
     }
 
-    private static void Append(StringBuilder text, WebLingoCompiledModule module, WebLingoFunction function, string label,
+    private static void Append(StringBuilder text, WebLingoCompiledModule module, WebLingoFunction function, string heading,
         IReadOnlyList<WebLingoSourcePositions> positions)
     {
-        text.Append("function ").Append(label).Append(function.Name).Append(" (");
+        text.Append("function ").Append(heading).Append(" (");
         if (function.ParameterCount > 0) text.Append(function.ParameterCount).Append(" parameters, ");
         if (function.HasRest) text.Append("a rest parameter, ");
         if (function.Captures.Count > 0) text.Append(function.Captures.Count).Append(" captures, ");
@@ -130,7 +133,7 @@ public static class WebLingoDisassembler
     }
 
     private static string FunctionAt(WebLingoCompiledModule module, int index) =>
-        WebLingoDisassemblyNames.Function(index, module.Functions, function => function.Name);
+        WebLingoDisassemblyNames.Function(index, module.Functions, function => function.Name, module.Units);
 
     private static string FileAt(WebLingoCompiledModule module, int index) => WebLingoDisassemblyNames.File(index, module.Units);
 

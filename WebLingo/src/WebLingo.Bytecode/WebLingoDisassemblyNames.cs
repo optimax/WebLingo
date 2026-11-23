@@ -11,11 +11,32 @@ namespace WebLingo.Bytecode;
 internal static class WebLingoDisassemblyNames
 {
     /// <summary>
-    /// <c>function3(twice)</c>; an anonymous function, which the compiler names <c>function</c>, as <c>function3</c>.
+    /// <c>function3(twice)</c>; an anonymous function, which the compiler names <c>function</c>, as <c>function3</c>; and
+    /// a file's body, its top level, as <c>module_body(lib/teas.wlg)</c> (<see cref="BodyOf"/>).
     /// </summary>
-    public static string Function<T>(int index, IReadOnlyList<T> functions, Func<T, string> name) =>
-        index >= 0 && index < functions.Count && name(functions[index]) is { Length: > 0 } named && named != "function"
-            ? $"function{index}({named})" : $"function{index}";
+    public static string Function<T>(int index, IReadOnlyList<T> functions, Func<T, string> name,
+        IReadOnlyList<WebLingoUnitInfo> units) =>
+        BodyOf(index, units) is { } file ? $"module_body({file})"
+            : index >= 0 && index < functions.Count && name(functions[index]) is { Length: > 0 } named && named != "function"
+                ? $"function{index}({named})" : $"function{index}";
+
+    /// <summary>
+    /// What a function's heading names it by, after <c>function</c>: its index and its name, <c>function3 twice</c>; a
+    /// file's body, which has no name in the source, the compiler naming it by its file, as <c>module_body of
+    /// lib/teas.wlg</c> (the owner's request, 22 November 2026). The program's own body, the entry point, stays <c>main</c>.
+    /// </summary>
+    public static string Heading(int index, string name, IReadOnlyList<WebLingoUnitInfo> units) =>
+        BodyOf(index, units) is { } file ? $"module_body of {file}" : $"function{index} {name}";
+
+    /// <summary>The file whose body function <paramref name="index"/> is, or <c>null</c> for any other function.</summary>
+    private static string? BodyOf(int index, IReadOnlyList<WebLingoUnitInfo> units)
+    {
+        foreach (var unit in units)
+        {
+            if (index >= 0 && unit.Function == index && unit.Name.Length > 0) return unit.Name;
+        }
+        return null;
+    }
 
     /// <summary><c>class2(Point)</c>.</summary>
     public static string Class(int index, IReadOnlyList<WebLingoClassInfo> classes) =>

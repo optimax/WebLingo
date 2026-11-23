@@ -117,6 +117,24 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.StartsWith("--timeout requires a whole number of milliseconds", error);
     }
 
+    [Theory]
+    [InlineData("register", "r")]
+    [InlineData("stack", "l")]
+    public void DisasmNamesAFilesBodyByItsFile(string vm, string kind)
+    {
+        // A file's top level, which has no name in the source, is headed as its file's body, and closed over as one (the
+        // owner's request, 22 November 2026, "The Name of a File's Top Level in disasm"); the program's own stays main.
+        Write("lib/util.wlg", "export function twice(x) { return x * 2; }");
+        var main = Write("main.wlg", "import { writeLn } from \"std:console\";\nimport { twice } from \"lib/util.wlg\";\nwriteLn(twice(21));\n");
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+        var disassembly = Weblingo("disasm", Path.ChangeExtension(main, Extension(vm))).Output;
+        Assert.StartsWith("function main (", disassembly);
+        Assert.Contains("\nfunction module_body of lib/util.wlg (", disassembly);
+        Assert.Matches(@"MakeClosure (" + kind + @"\d+, )?module_body\(lib/util\.wlg\)\n", disassembly);
+        Assert.Matches(@"\nfunction function\d+ twice \(", disassembly);
+        Assert.DoesNotMatch(@"function\d+[ (]lib/util\.wlg", disassembly);
+    }
+
     [Fact]
     public void TheFileHoldsNoneOfTheHostsPaths()
     {
