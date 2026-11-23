@@ -111,6 +111,20 @@ public sealed class HeapTests
     }
 
     [Fact]
+    public void WhileLittleIsLiveTheHeapCollectsSoon()
+    {
+        // With the default budget, what is made and dropped is collected within FirstCollectionAt's units, so that .NET's
+        // collector does not keep it long (the specification, section 5.6, "Where the time goes"): a million units of
+        // strings, which a heap collecting at a million units first would not yet have collected, collected many times.
+        var heap = new WebLingoHeap();
+        var roots = new WebLingoValue[1];
+        heap.AddRoots(roots);
+        for (var i = 0; i < 40_000; i++) Assert.True(heap.TryAllocateString("0123456789", out roots[0], out _));
+        Assert.InRange(heap.CollectionCount, 10, 1_000);
+        Assert.InRange(heap.Units, 0, 2 * WebLingoHeap.FirstCollectionAt);
+    }
+
+    [Fact]
     public void BytesDecimalsAndRegularExpressionsGiveBackTheirUnitsWhenCollected()
     {
         // Until 18 November 2026 the collector gave back only an object's overhead for these, not what they were charged

@@ -22,8 +22,14 @@ public sealed class WebLingoHeap
 {
     /// <summary>The default budget: 64 million units, about 128 MB of strings.</summary>
     public const long DefaultMaxUnits = 64L * 1024 * 1024;
-    /// <summary>How large the heap may grow before its first collection.</summary>
-    public const long FirstCollectionAt = 1024 * 1024;
+    /// <summary>
+    /// How large the heap may grow before its first collection, and before any while little is live: small, so that what a
+    /// program makes and drops is freed before .NET's own collector, which keeps every object the heap's table holds,
+    /// moves it to its older generations, where it is dear to collect (the specification, section 5.6, "Where the time
+    /// goes", cause 1): 32K units, two million instances of two fields made and dropped spending 13 ms in .NET's
+    /// collections where 1M units spent 286, in place of 1M (23 November 2026).
+    /// </summary>
+    public const long FirstCollectionAt = 32 * 1024;
     /// <summary>What every object counts, beyond its content, so that many small objects are bounded too.</summary>
     public const int ObjectOverhead = 16;
 
