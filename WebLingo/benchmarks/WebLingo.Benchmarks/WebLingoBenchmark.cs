@@ -26,31 +26,31 @@ public sealed record WebLingoMeasurement(
 /// </summary>
 public static class WebLingoBenchmark
 {
-    /// <summary>The standard modules' built-ins, which their loader registers as it loads them (section 3.9).</summary>
-    private static readonly WebLingoBuiltinRegistry NativeBuiltins = new();
-
     /// <summary>
-    /// The standard modules installed beside the benchmark in std/, as beside the command lines, <c>std:console</c>, whose
-    /// <c>writeLn</c> the workloads write with, and <c>std:fs</c> among them (section 3.9).
+    /// A measurement's standard modules, those installed beside the benchmark in std/, as beside the command lines,
+    /// <c>std:console</c>, whose <c>writeLn</c> the workloads write with, and <c>std:fs</c> among them (section 3.9),
+    /// and the built-ins their loader registers as it loads them: a loader and a registry for each measurement, so that
+    /// measurements made at once, as the tests make them on threads of their own, share neither.
     /// </summary>
-    private static readonly WebLingoCompilerOptions Options =
-        new([])
-        {
-            Native = new WebLingoNativeModuleLoader(new Dictionary<string, string> { ["std"] = Path.Combine(AppContext.BaseDirectory, "std") },
-                NativeBuiltins)
-        };
+    private static (WebLingoCompilerOptions Options, WebLingoBuiltinRegistry Builtins) StandardModules()
+    {
+        var builtins = new WebLingoBuiltinRegistry();
+        var folders = new Dictionary<string, string> { ["std"] = Path.Combine(AppContext.BaseDirectory, "std") };
+        return (new WebLingoCompilerOptions([]) { Native = new WebLingoNativeModuleLoader(folders, builtins) }, builtins);
+    }
 
     public static WebLingoMeasurement Measure(IWebLingoBenchmarkEngine engine, WebLingoWorkload workload, int runs, int warmUps)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(runs, 1);
         ArgumentOutOfRangeException.ThrowIfNegative(warmUps);
-        var program = engine.Compile(workload.Source, workload.FileName, Options);
+        var (options, natives) = StandardModules();
+        var program = engine.Compile(workload.Source, workload.FileName, options);
         // A workload's files, in a folder of its own, which its runs write anew, removed at the end.
         var folder = workload.UsesFolder ? Path.Combine(Path.GetTempPath(), "weblingo-benchmark-" + Guid.NewGuid().ToString("N")) : null;
         if (folder is not null) Directory.CreateDirectory(folder);
         try
         {
-            for (var i = 0; i < warmUps; i++) Run(engine, workload, program, folder);
+            for (var i = 0; i < warmUps; i++) Run(engine, workload, program, natives, folder);
 
             var times = new TimeSpan[runs];
             var instructions = 0L;
@@ -61,7 +61,7 @@ public static class WebLingoBenchmark
                 GC.WaitForPendingFinalizers();
                 var before = GC.GetAllocatedBytesForCurrentThread();
                 var watch = Stopwatch.StartNew();
-                instructions = Run(engine, workload, program, folder);
+                instructions = Run(engine, workload, program, natives, folder);
                 watch.Stop();
                 allocated = GC.GetAllocatedBytesForCurrentThread() - before;
                 times[i] = watch.Elapsed;
@@ -80,13 +80,14 @@ public static class WebLingoBenchmark
     /// Runs the program once, checks its output, and returns how many instructions it executed. Allocated is the worker's
     /// own: what the host's threads allocate, an I/O workload's files read and written, is not counted.
     /// </summary>
-    private static long Run(IWebLingoBenchmarkEngine engine, WebLingoWorkload workload, IWebLingoBenchmarkProgram program, string? folder)
+    private static long Run(IWebLingoBenchmarkEngine engine, WebLingoWorkload workload, IWebLingoBenchmarkProgram program,
+        WebLingoBuiltinRegistry natives, string? folder)
     {
         var output = new WebLingoCollectedOutput();
         // The built-ins a page calls (section 13), which a script does not, and the standard modules' functions, writing
         // to the execution's output.
         var services = new WebLingoBuiltinRegistry(WebLingoTemplateBuiltins.Create(output));
-        foreach (var builtin in NativeBuiltins.Builtins) services.Register(builtin);
+        foreach (var builtin in natives.Builtins) services.Register(builtin);
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services, Output = output };
         if (folder is not null)
         {
