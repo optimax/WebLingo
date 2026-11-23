@@ -220,12 +220,9 @@ public sealed class FastCgiTests : IDisposable
     }
 
     /// <summary><c>wasp fastcgi --root site --port n</c> itself: it says where it listens, serves there, and stops when told.</summary>
-    [Theory]
-    [InlineData("register")]
-    [InlineData("stack")]
-    public async Task WaspFastCgiServesARootOnAPort(string vm)
+    [Fact]
+    public async Task WaspFastCgiServesARootOnAPort()
     {
-        Write("wasp.config", "{\"vm\":\"" + vm + "\"}");
         int port;
         using (var free = new TcpListener(IPAddress.Loopback, 0))
         {

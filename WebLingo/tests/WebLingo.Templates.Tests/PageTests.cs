@@ -3,7 +3,6 @@ using WebLingo.Core;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
 using WebLingo.VM;
-using WebLingo.VM.Stack;
 using Xunit;
 namespace WebLingo.Templates.Tests;
 
@@ -342,20 +341,8 @@ public sealed class PageTests
         var registerResult = registerCompiled.Module is { } module
             ? new WebLingoVirtualMachine { Components = compiler.Components }.Execute(module, Context(registerOutput))
             : null;
-        var register = (Describe(compiler.Sources, text, registerCompiled.Diagnostics), registerOutput.Text,
+        return (Describe(compiler.Sources, text, registerCompiled.Diagnostics), registerOutput.Text,
             Describe(compiler.Sources, text, registerResult?.Error));
-
-        compiler = new WebLingoTemplateCompiler(Options, templates);
-        var stackCompiled = compiler.CompileForStack(text);
-        var stackOutput = new WebLingoCollectedOutput();
-        var stackResult = stackCompiled.Module is { } stackModule
-            ? new WebLingoStackVirtualMachine { Components = compiler.Components }.Execute(stackModule, Context(stackOutput))
-            : null;
-        var stack = (Describe(compiler.Sources, text, stackCompiled.Diagnostics), stackOutput.Text,
-            Describe(compiler.Sources, text, stackResult?.Error));
-
-        Assert.Equal(register, stack);
-        return register;
     }
 
     private static readonly WebLingoCompilerOptions Options =

@@ -27,12 +27,9 @@ public sealed class WaspServeTests : IDisposable
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("stack")]
-    public async Task AnApplicationIsServedOverHttp(string? vm)
+    [Fact]
+    public async Task AnApplicationIsServedOverHttp()
     {
-        if (vm is not null) Write("wasp.config", "{\"vm\":\"" + vm + "\"}");
         Write("api/answer.wlg", "export async function get(request, response) { await delay(10); response.write(42); }");
         Write("components/value.wasp", "<% param n; await delay(10); %><%= n %>");
         Write("component.wasp", "<% await renderComponent(\"/components/value.wasp\", {n: 42}); %>");
@@ -364,7 +361,7 @@ public sealed class WaspServeTests : IDisposable
         // "environment", its name until the owner renamed it "mode" (18 November 2026), nothing kept for it.
         Write("wasp.config", "{ \"environment\": \"production\" }");
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
-        Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"vm\", \"mode\", "
+        Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"mode\", "
                         + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\" and \"env\".", error);
 
         Write("wasp.config", "{ \"sendTimeout\": 5 }");

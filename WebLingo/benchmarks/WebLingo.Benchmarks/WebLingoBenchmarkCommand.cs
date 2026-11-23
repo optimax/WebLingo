@@ -14,7 +14,7 @@ public static class WebLingoBenchmarkCommand
     public const int MeasurementFailed = 1;
     public const int UsageError = 2;
 
-    public static IReadOnlyList<IWebLingoBenchmarkEngine> Engines { get; } = [new WebLingoRegisterEngine(), new WebLingoStackEngine()];
+    public static IReadOnlyList<IWebLingoBenchmarkEngine> Engines { get; } = [new WebLingoRegisterEngine()];
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {

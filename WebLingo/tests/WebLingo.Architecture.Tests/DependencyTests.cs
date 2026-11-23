@@ -18,7 +18,6 @@ public sealed class DependencyTests
         { "WebLingo.Runtime", ["WebLingo.Core", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.VM", ["WebLingo.Core", "WebLingo.Bytecode", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         // Not the register VM's: a host running one VM loads that VM's assembly alone.
-        { "WebLingo.VM.Stack", ["WebLingo.Core", "WebLingo.Bytecode", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.Templates", ["WebLingo.Core", "WebLingo.Language", "WebLingo.Compiler"] },
         { "WebLingo.StdLib", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
         { "WebLingo.StdLib.Tasks", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
@@ -41,7 +40,7 @@ public sealed class DependencyTests
         {
             "WebLingo.Hosting",
             ["WebLingo.Core", "WebLingo.Language", "WebLingo.Bytecode", "WebLingo.Compiler", "WebLingo.Templates", "WebLingo.Runtime",
-             "WebLingo.VM", "WebLingo.VM.Stack", "WebLingo.StdLib", "WebLingo.Platform.Abstractions", "WebLingo.Hosting.Abstractions"]
+             "WebLingo.VM", "WebLingo.StdLib", "WebLingo.Platform.Abstractions", "WebLingo.Hosting.Abstractions"]
         },
     };
 
@@ -73,7 +72,7 @@ public sealed class DependencyTests
     [Fact]
     public void TheRulesCoverEveryPortableAssembly()
     {
-        Assert.Equal(25, PortableCore.Count); // Section 3 of Documents/implementation.md lists the portable assemblies.
+        Assert.Equal(24, PortableCore.Count); // Section 3 of Documents/implementation.md lists the portable assemblies.
     }
 
     [Theory]

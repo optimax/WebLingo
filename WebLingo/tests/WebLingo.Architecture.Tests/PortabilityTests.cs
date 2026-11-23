@@ -68,7 +68,7 @@ public sealed class PortabilityTests
     public static TheoryData<string> PortableCore => new()
     {
         "WebLingo.Core", "WebLingo.Language", "WebLingo.Bytecode", "WebLingo.Compiler", "WebLingo.Runtime",
-        "WebLingo.VM", "WebLingo.VM.Stack", "WebLingo.Templates", "WebLingo.StdLib", "WebLingo.StdLib.Tasks", "WebLingo.Platform.Abstractions",
+        "WebLingo.VM", "WebLingo.Templates", "WebLingo.StdLib", "WebLingo.StdLib.Tasks", "WebLingo.Platform.Abstractions",
         "WebLingo.StdLib.Fs", "WebLingo.StdLib.Http", "WebLingo.StdLib.Net", "WebLingo.StdLib.Db", "WebLingo.StdLib.Crypto", "WebLingo.Hosting.Abstractions",
         "WebLingo.Hosting", "WebLingo.StdLib.Env", "WebLingo.StdLib.Math",
         "WebLingo.StdLib.Csv", "WebLingo.StdLib.Random", "WebLingo.StdLib.Process", "WebLingo.StdLib.Test", "WebLingo.StdLib.Console",

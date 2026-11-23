@@ -126,7 +126,7 @@ A site is a folder, its *root*, and everything in it. A request's path finds the
 Some files are never sent, whatever their path:
 
 - a page's source, and a module's, a `.wlg` that exports no handler (`/lib/catalog.wlg` is a 404);
-- compiled WebLingo (`.wlbr`, `.wlbs` and legacy `.wlbc` files);
+- compiled WebLingo (`.wlb` files, and earlier builds' `.wlbr`, `.wlbs` and `.wlbc`);
 - the site's configuration, `wasp.config`, and IIS's, `web.config`;
 - a page or a route handler whose name holds `\`, `:` or a control character, which a file's name on Windows cannot have, and whose includes and imports could not be found;
 - every file and folder whose name starts with `.`, such as `.git`.
@@ -749,7 +749,6 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 
 | Setting | What it says | Default |
 |---|---|---|
-| `"vm"` | `"register"` or `"stack"` for page and route handler compilation and execution | `"register"` |
 | `"mode"` | `"development"`, errors shown in their pages, or `"production"`, not shown | development under `wasp serve`, production under IIS |
 | `"sendTimeout"` | how many seconds a page waits for a client that has taken nothing of its output, more than 0 | 30 |
 | `"schemes"` | folders of native modules, each a name and a folder: `{ "native": "C:/WebLingo/native" }` | `std`, WebLingo's own |

@@ -6,7 +6,6 @@ using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
 using WebLingo.VM;
-using WebLingo.VM.Stack;
 using Xunit;
 namespace WebLingo.Conformance.Tests;
 
@@ -157,19 +156,10 @@ public sealed class ConsoleControlTests
 
     /// <summary>
     /// The program, given <paramref name="console"/>, or none, and <paramref name="input"/> as its console's input, compiled
-    /// and run on both VMs, which must give the same: its diagnostics, what it writes, and its runtime error.
+    /// and run: its diagnostics, what it writes, and its runtime error.
     /// </summary>
     private static (string Diagnostics, string Output, string Error) Run(string source, FakeConsole? console, string input = "",
         WebLingoCollectedOutput? errors = null)
-    {
-        var other = console?.Fresh();
-        var register = RunOn(false, source, console, input, errors);
-        var stack = RunOn(true, source, other, input, new WebLingoCollectedOutput());
-        Assert.Equal(register, stack);
-        return register;
-    }
-
-    private static (string, string, string) RunOn(bool stack, string source, FakeConsole? console, string input, WebLingoCollectedOutput? errors)
     {
         var services = new WebLingoBuiltinRegistry(new WebLingoDelayFunction());
         var schemes = new Dictionary<string, string>(StringComparer.Ordinal) { ["std"] = Path.Combine(AppContext.BaseDirectory, "std") };
@@ -190,22 +180,11 @@ public sealed class ConsoleControlTests
         };
         string diagnostics;
         WebLingoExecutionResult? result;
-        if (stack)
-        {
-            var compiled = new WebLingoStackCompiler(options).Compile(source, "program.wlg");
-            diagnostics = string.Join(" | ", compiled.Diagnostics.Select(d => $"{d.Code}: {d.Message}"));
-            result = compiled.Module is { } module
-                ? new WebLingoStackVirtualMachine { Loader = new WebLingoModuleLoader(options) }.Execute(module, context)
-                : null;
-        }
-        else
-        {
-            var compiled = new WebLingoCompiler(options).Compile(source, "program.wlg");
-            diagnostics = string.Join(" | ", compiled.Diagnostics.Select(d => $"{d.Code}: {d.Message}"));
-            result = compiled.Module is { } module
-                ? new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(options) }.Execute(module, context)
-                : null;
-        }
+        var compiled = new WebLingoCompiler(options).Compile(source, "program.wlg");
+        diagnostics = string.Join(" | ", compiled.Diagnostics.Select(d => $"{d.Code}: {d.Message}"));
+        result = compiled.Module is { } module
+            ? new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(options) }.Execute(module, context)
+            : null;
         return (diagnostics, output.Text, result?.Error is { } error ? $"{error.Code}: {error.Message}" : "");
     }
 

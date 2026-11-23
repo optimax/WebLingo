@@ -1,7 +1,6 @@
 using WebLingo.Compiler;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
-using WebLingo.VM.Stack;
 using Xunit;
 namespace WebLingo.VM.Tests;
 
@@ -76,25 +75,21 @@ public sealed class OperatorTests
     private static readonly WebLingoCompilerOptions WithWriteLn = new([new WebLingoBuiltinDeclaration("writeLn", 1)]);
 
     /// <summary>
-    /// Runs the expression on operands held in variables, so that the VM, not the compiler, evaluates it, on the
-    /// register VM and on the stack VM.
+    /// Runs the expression on operands held in variables, so that the VM, not the compiler, evaluates it.
     /// </summary>
     private static void AssertTheVmGives(string left, string symbol, string right, WebLingoValue value, WebLingoRuntimeError? error)
     {
         var source = $"import {{ write, writeLn }} from \"std:system\"; var a = {left}; var b = {right}; writeLn(a {symbol} b);";
         var registerModule = new WebLingoCompiler(WithWriteLn).Compile(source, "operators.wlg").Module;
-        var stackModule = new WebLingoStackCompiler(WithWriteLn).Compile(source, "operators.wlg").Module;
-        Assert.True(registerModule is not null && stackModule is not null, source);
-        foreach (var vm in new[] { "register", "stack" })
+        Assert.True(registerModule is not null, source);
+        foreach (var vm in new[] { "register" })
         {
             var output = new WebLingoCollectedOutput();
             var context = new WebLingoExecutionContext(new WebLingoWorkerId(0))
             {
                 Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output))
             };
-            var result = vm == "register"
-                ? new WebLingoVirtualMachine().Execute(registerModule, context)
-                : new WebLingoStackVirtualMachine().Execute(stackModule, context);
+            var result = new WebLingoVirtualMachine().Execute(registerModule, context);
             var what = $"{source} on the {vm} VM";
             if (error is null)
             {

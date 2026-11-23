@@ -27,7 +27,6 @@ public static class WebLingoWaspCommandLine
     public static WebLingoCommandLineProgram Pages(string? root) =>
         new("wasp", Version, ".wasp", WebLingoTemplateBuiltins.Create, (page, options) => Compile(page, options, root))
         {
-            CompileForStack = (page, options) => Compile(page, options, root, stack: true),
             Configuration = WebLingoRouteTable.ConfigurationFile,
             ReachesAnyHost = false,
             ReachesAnyFile = false,
@@ -115,15 +114,12 @@ public static class WebLingoWaspCommandLine
         return WebLingoCommandLine.Success;
     }
 
-    private static WebLingoCommandLineCompilation Compile(WebLingoSourceText page, WebLingoCompilerOptions options, string? root,
-        bool stack = false)
+    private static WebLingoCommandLineCompilation Compile(WebLingoSourceText page, WebLingoCompilerOptions options, string? root)
     {
         var rootFull = Path.GetFullPath(root ?? Path.GetDirectoryName(Path.GetFullPath(page.Name)) ?? ".");
         options = options with { Resolver = options.Resolver is { } modules ? new FromRoot(modules, rootFull) : null };
         var compiler = new WebLingoTemplateCompiler(options, new WebLingoTemplateFileResolver(page.Name, root));
-        var result = stack
-            ? new WebLingoCommandLineCompilation(compiler.CompileForStack(page)) { StackComponents = compiler.Components }
-            : new WebLingoCommandLineCompilation(compiler.Compile(page)) { Components = compiler.Components };
+        var result = new WebLingoCommandLineCompilation(compiler.Compile(page)) { Components = compiler.Components };
         return result with
         {
             Locate = compiler.Sources.Locate, TextOf = compiler.Sources.TextOf

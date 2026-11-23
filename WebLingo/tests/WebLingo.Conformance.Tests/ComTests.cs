@@ -178,8 +178,8 @@ public sealed class ComTests : IDisposable
         var path = Path.Combine(_folder, "program.wlg");
         File.WriteAllText(path, program);
         var register = OnApartment(() => Weblingo("run", path));
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", path).Exit);
-        var stack = OnApartment(() => Weblingo("run", Path.ChangeExtension(path, ".wlbs")));
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", path).Exit);
+        var stack = OnApartment(() => Weblingo("run", Path.ChangeExtension(path, ".wlb")));
         Assert.Equal((register.Output, register.Error.Replace("program.wlg", "program", StringComparison.Ordinal)),
             (stack.Output, stack.Error.Replace("program.wlg", "program", StringComparison.Ordinal)));
         return (register.Output, register.Error);

@@ -2,7 +2,6 @@ using WebLingo.Compiler;
 using WebLingo.Platform.Abstractions;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
-using WebLingo.VM.Stack;
 using Xunit;
 namespace WebLingo.VM.Tests;
 
@@ -17,7 +16,7 @@ public sealed class WaitingTests
     public void AnExecutionWaitingForATimerReturnsAndGoesOnWhenResumed()
     {
         const string program = "import { write, writeLn, delay } from \"std:system\"; var t = delay(1000); writeLn(\"before\"); await t; writeLn(\"after\"); await delay(500); writeLn(\"end\");";
-        foreach (var stack in new[] { false, true })
+        foreach (var stack in new[] { false })
         {
             var clock = new ManualClock();
             var output = new WebLingoCollectedOutput();
@@ -39,7 +38,7 @@ public sealed class WaitingTests
     public void AnExecutionWaitingForWorkOffItsWorkerReturnsUntilTheWorkIsPosted()
     {
         const string program = "import { write, writeLn } from \"std:system\"; writeLn(await offWorker(20)); writeLn(await offWorker(22));";
-        foreach (var stack in new[] { false, true })
+        foreach (var stack in new[] { false })
         {
             var host = new QueuedHost();
             var output = new WebLingoCollectedOutput();
@@ -61,7 +60,7 @@ public sealed class WaitingTests
     [Fact]
     public void WithoutSuspendsTheVmWaitsItself()
     {
-        foreach (var stack in new[] { false, true })
+        foreach (var stack in new[] { false })
         {
             var clock = new ManualClock();
             var output = new WebLingoCollectedOutput();
@@ -75,7 +74,7 @@ public sealed class WaitingTests
     [Fact]
     public void ACancelledExecutionEndsWhenResumed()
     {
-        foreach (var stack in new[] { false, true })
+        foreach (var stack in new[] { false })
         {
             var cancellation = new WebLingoCancellationSignal();
             var vm = Vm(stack);
@@ -88,17 +87,11 @@ public sealed class WaitingTests
         }
     }
 
-    private static IRunner Vm(bool stack) => stack ? new StackRunner() : new RegisterRunner();
+    private static IRunner Vm(bool stack) => new RegisterRunner();
 
     private static object Compile(string program, bool stack)
     {
         var options = new WebLingoCompilerOptions([new("write", 1), new("writeLn", 1), new("delay", 1), new("offWorker", 1)]);
-        if (stack)
-        {
-            var stackCompiled = new WebLingoStackCompiler(options).Compile(program, "main.wlg");
-            Assert.Empty(stackCompiled.Diagnostics);
-            return stackCompiled.Module!;
-        }
         var compiled = new WebLingoCompiler(options).Compile(program, "main.wlg");
         Assert.Empty(compiled.Diagnostics);
         return compiled.Module!;
@@ -124,13 +117,6 @@ public sealed class WaitingTests
     {
         private readonly WebLingoVirtualMachine _vm = new();
         public WebLingoExecutionResult Execute(object module, WebLingoExecutionContext context) => _vm.Execute((Bytecode.WebLingoCompiledModule)module, context);
-        public WebLingoExecutionResult Resume() => _vm.Resume();
-    }
-
-    private sealed class StackRunner : IRunner
-    {
-        private readonly WebLingoStackVirtualMachine _vm = new();
-        public WebLingoExecutionResult Execute(object module, WebLingoExecutionContext context) => _vm.Execute((Bytecode.WebLingoStackModule)module, context);
         public WebLingoExecutionResult Resume() => _vm.Resume();
     }
 

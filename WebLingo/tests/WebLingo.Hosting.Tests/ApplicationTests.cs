@@ -41,7 +41,7 @@ public sealed class ApplicationTests
     [InlineData("/lib/util")]
     [InlineData("/lib/util.wlg")]
     [InlineData("/app.wlbc")]
-    [InlineData("/app.wlbr")]
+    [InlineData("/app.wlb")]
     [InlineData("/app.WLBS")]
     [InlineData("/WASP.config")]
     [InlineData("/wasp.config")]
@@ -169,7 +169,7 @@ public sealed class ApplicationTests
         .Add("/site/lib/util.wlg", "export function twice(x) { return x * 2; }")
         .Add("/site/css/site.css", "body { }")
         .Add("/site/app.wlbc", "WLBC")
-        .Add("/site/app.wlbr", "WLBC")
+        .Add("/site/app.wlb", "WLBC")
         .Add("/site/app.WLBS", "WLBC")
         .Add("/site/wasp.config", "{ }")
         .Add("/site/weblingo.config", "{ }")

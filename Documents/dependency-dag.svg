@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 816" role="img" aria-labelledby="title desc">
   <title id="title">WebLingo product project dependencies</title>
-  <desc id="desc">Arrows point from each product project to a project it depends on. The WASP executable uses the WebLingo CLI and the FastCGI host. The register and stack VMs both use Bytecode and Runtime. The CLI builds and ships the grouped native modules, which depend on Runtime. Core has no project dependencies. Redundant arrows are omitted.</desc>
+  <desc id="desc">Arrows point from each product project to a project it depends on. The WASP executable uses the WebLingo CLI and the FastCGI host. The VM uses Bytecode and Runtime. The CLI builds and ships the grouped native modules, which depend on Runtime. Core has no project dependencies. Redundant arrows are omitted.</desc>
   <defs>
     <marker id="arrow" markerWidth="6.5" markerHeight="6.5" refX="6" refY="3.25" orient="auto">
       <path d="M0 0 6.5 3.25 0 6.5Z" fill="#627780"/>
@@ -37,14 +37,12 @@
     <path class="edge" data-from="Hosting.AspNetCore" data-to="Hosting" d="M814 241 L826 280"/>
     <path class="edge" data-from="Hosting.AspNetCore" data-to="Platform.DotNet" d="M890 241 L1035 276"/>
     <path class="edge" data-from="Cli" data-to="Templates" d="M346 171 C346 245 300 313 300 385"/>
-    <path class="edge" data-from="Cli" data-to="VM.Stack" d="M362 171 C362 246 425 316 425 385"/>
     <path class="edge" data-from="Cli" data-to="VM" d="M380 171 C384 257 555 303 575 385"/>
     <path class="edge" data-from="Cli" data-to="StdLib" d="M396 171 C427 249 713 264 727 385"/>
     <path class="edge" data-from="Cli" data-to="Platform.DotNet" d="M439 151 H487 Q510 151 526 168 L542 181 Q552 190 570 190 H925 Q949 190 967 207 L986 230 Q1000 249 1030 258 L1062 276"/>
     <path class="edge" data-from="Cli" data-to="Data.DotNet" d="M439 158 H480 Q501 158 517 174 L536 192 Q549 202 570 202 H650 Q674 202 674 226 V242 Q674 264 698 264 H977 Q994 264 994 283 V337 Q994 355 1031 367"/>
     <path class="edge package" data-from="Cli" data-to="BundledModules" d="M318 171 C278 203 176 220 142 275"/>
     <path class="edge" data-from="Hosting" data-to="Templates" d="M803 320 C796 350 324 313 322 385"/>
-    <path class="edge" data-from="Hosting" data-to="VM.Stack" d="M812 320 C799 355 463 332 455 385"/>
     <path class="edge" data-from="Hosting" data-to="VM" d="M822 320 C800 353 606 334 605 385"/>
     <path class="edge" data-from="Hosting" data-to="StdLib" d="M841 320 C838 363 752 341 751 385"/>
     <path class="edge" data-from="Hosting" data-to="Hosting.Abstractions" d="M862 320 C875 348 907 350 912 385"/>
@@ -53,8 +51,6 @@
     <path class="edge" data-from="Compiler" data-to="Bytecode" d="M324 520 L425 575"/>
     <path class="edge" data-from="VM" data-to="Bytecode" d="M577 425 L486 575"/>
     <path class="edge" data-from="VM" data-to="Runtime" d="M605 425 L713 575"/>
-    <path class="edge" data-from="VM.Stack" data-to="Bytecode" d="M426 425 L460 575"/>
-    <path class="edge" data-from="VM.Stack" data-to="Runtime" d="M450 425 C475 464 674 480 696 575"/>
     <path class="edge" data-from="StdLib" data-to="Runtime" d="M742 425 V575"/>
     <path class="edge" data-from="Hosting.Abstractions" data-to="Runtime" d="M902 425 L768 575"/>
     <path class="edge" data-from="Platform.DotNet" data-to="Platform.Abstractions" d="M1123 316 V606 Q1123 631 1090 639 L994 664"/>
@@ -122,10 +118,6 @@
   <g class="node core" role="group" aria-label="WebLingo.Templates">
     <rect x="249" y="385" width="114" height="40" rx="8"/>
     <text x="306" y="411" text-anchor="middle">Templates</text>
-  </g>
-  <g class="node core" role="group" aria-label="WebLingo.VM.Stack">
-    <rect x="367.5" y="385" width="137" height="40" rx="8"/>
-    <text x="436" y="411" text-anchor="middle">VM.Stack</text>
   </g>
   <g class="node core" role="group" aria-label="WebLingo.VM">
     <rect x="531.5" y="385" width="117" height="40" rx="8"/>

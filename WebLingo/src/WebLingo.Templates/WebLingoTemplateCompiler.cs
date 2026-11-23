@@ -43,14 +43,8 @@ public sealed class WebLingoTemplateCompiler
         return result with { Diagnostics = Locate(result.Diagnostics) };
     }
 
-    public WebLingoStackCompilationResult CompileForStack(WebLingoSourceText page)
-    {
-        var result = new WebLingoStackCompiler(_options).Compile(Parse(page, WebLingoTemplateKind.Page));
-        return result with { Diagnostics = Locate(result.Diagnostics) };
-    }
-
     /// <summary>
-    /// What finds and compiles the components a page renders while it runs, for either VM (section 13): each found by the
+    /// What finds and compiles the components a page renders while it runs (section 13): each found by the
     /// templates' resolver, from the rendering file's folder, or the root for a path starting with <c>/</c>, and compiled as
     /// an import, a page whose parameters a render gives; its files added to <see cref="Sources"/>.
     /// </summary>

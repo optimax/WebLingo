@@ -2,7 +2,6 @@ using WebLingo.Compiler;
 using WebLingo.Core;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
-using WebLingo.VM.Stack;
 using Xunit;
 namespace WebLingo.VM.Tests;
 
@@ -13,7 +12,7 @@ namespace WebLingo.VM.Tests;
 public sealed class ModuleTests
 {
     [Fact]
-    public void AFileImportedThatNothingMakesIsAnErrorOnBothVms()
+    public void AFileImportedThatNothingMakesIsAnError()
     {
         // A native module's file with neither its instance, made where the program begins, nor a function that makes it,
         // imported: bytecode no compiler writes, which each VM reports, rather than failing as it calls nothing.
@@ -25,20 +24,10 @@ public sealed class ModuleTests
         var register = new WebLingo.Bytecode.WebLingoCompiledModule("main.wlg", [], [],
             new WebLingo.Bytecode.WebLingoFunction("main", 1, 0,
                 [new(WebLingo.Bytecode.WebLingoOpCode.Import, 0, 1), new(WebLingo.Bytecode.WebLingoOpCode.Return)])) { Units = units };
-        var stack = new WebLingo.Bytecode.WebLingoStackModule("main.wlg", [], [],
-            new WebLingo.Bytecode.WebLingoStackFunction("main", 0, 1,
-                [new(WebLingo.Bytecode.WebLingoStackOpCode.Import, 1), new(WebLingo.Bytecode.WebLingoStackOpCode.Pop),
-                    new(WebLingo.Bytecode.WebLingoStackOpCode.Return)])) { Units = units };
-        foreach (var result in new[]
-                 {
-                     new WebLingoVirtualMachine().Execute(register, new WebLingoExecutionContext(new WebLingoWorkerId(0))),
-                     new WebLingoStackVirtualMachine().Execute(stack, new WebLingoExecutionContext(new WebLingoWorkerId(0)))
-                 })
-        {
-            Assert.Equal((WebLingoDiagnosticCodes.BytecodeVerificationFailure,
-                "The bytecode is invalid: file 1 ('native:none') is imported, but nothing makes its instance."),
-                (result.Error?.Code, result.Error?.Message));
-        }
+        var result = new WebLingoVirtualMachine().Execute(register, new WebLingoExecutionContext(new WebLingoWorkerId(0)));
+        Assert.Equal((WebLingoDiagnosticCodes.BytecodeVerificationFailure,
+            "The bytecode is invalid: file 1 ('native:none') is imported, but nothing makes its instance."),
+            (result.Error?.Code, result.Error?.Message));
     }
 
     [Fact]
@@ -260,15 +249,6 @@ public sealed class ModuleTests
             var compiled = new WebLingoCompiler(Options(files)).Compile(files[main], main);
             var result = compiled.Module is { } module
                 ? new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(Options(files)) }.Execute(module, Context(output))
-                : null;
-            return (compiled.Diagnostics, output.Text, result?.Error);
-        },
-        (files, main) =>
-        {
-            var output = new WebLingoCollectedOutput();
-            var compiled = new WebLingoStackCompiler(Options(files)).Compile(files[main], main);
-            var result = compiled.Module is { } module
-                ? new WebLingoStackVirtualMachine { Loader = new WebLingoModuleLoader(Options(files)) }.Execute(module, Context(output))
                 : null;
             return (compiled.Diagnostics, output.Text, result?.Error);
         },

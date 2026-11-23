@@ -7,7 +7,7 @@ namespace WebLingo.Compiler;
 /// The compiler as the loader a VM imports modules with while a program runs (section 3.9): it finds files with the
 /// host's resolver, as the compiler does for static imports, and compiles them as imports.
 /// </summary>
-public sealed class WebLingoModuleLoader(WebLingoCompilerOptions options) : IWebLingoModuleLoader, IWebLingoStackModuleLoader
+public sealed class WebLingoModuleLoader(WebLingoCompilerOptions options) : IWebLingoModuleLoader
 {
     private readonly Dictionary<string, string> _sources = new(StringComparer.Ordinal);
 
@@ -54,16 +54,6 @@ public sealed class WebLingoModuleLoader(WebLingoCompilerOptions options) : IWeb
     WebLingoCompiledModule? IWebLingoModuleLoader.Compile(string name, out WebLingoDiagnostic? error)
     {
         var compiler = new WebLingoCompiler(options);
-        var result = Parse is { } parse
-            ? compiler.CompileImport(parse(name, _sources.GetValueOrDefault(name, "")))
-            : compiler.CompileImport(name, _sources.GetValueOrDefault(name, ""));
-        error = FirstError(result.Diagnostics);
-        return result.Module;
-    }
-
-    WebLingoStackModule? IWebLingoStackModuleLoader.Compile(string name, out WebLingoDiagnostic? error)
-    {
-        var compiler = new WebLingoStackCompiler(options);
         var result = Parse is { } parse
             ? compiler.CompileImport(parse(name, _sources.GetValueOrDefault(name, "")))
             : compiler.CompileImport(name, _sources.GetValueOrDefault(name, ""));

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -10,14 +11,13 @@ using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
 using WebLingo.VM;
-using WebLingo.VM.Stack;
 namespace WebLingo.Cli;
 
 /// <summary>
 /// The <c>weblingo</c> command line (specification, section 8.4, "CLI"): <c>run</c>, <c>check</c>, <c>compile</c>,
 /// <c>disasm</c> and <c>--version</c>. It is the host: it registers <c>write</c> and <c>writeLn</c>, writing to standard
-/// output, compiles a file, and runs it in the VM; or it writes a WLBC file, <c>.wlbr</c> or <c>.wlbs</c> (section 5.3),
-/// which <c>run</c> runs on the VM it is for, without compiling anything. Diagnostics go to standard error as
+/// output, compiles a file, and runs it in the VM; or it writes a WLBC file, <c>.wlb</c> (section 5.3), which <c>run</c>
+/// runs without compiling anything. Diagnostics go to standard error as
 /// <c>file(line,column): ERROR CODE (ExceptionClass): message</c>, with the class if available.
 /// Exit codes (section 15.2): 0 success, 1 compilation errors or a
 /// WLBC file that cannot be used, 2 a usage error, 3 a runtime error, 4 a file that cannot be read or written.
@@ -56,15 +56,13 @@ public static partial class WebLingoCommandLine
     /// </summary>
     public static string Version { get; } = "WebLingo " + VersionAndBuild;
 
-    /// <summary>The legacy extension of a WLBC file (section 5.3).</summary>
-    public const string BytecodeExtension = WebLingoBytecodeFile.LegacyExtension;
+    /// <summary>A WLBC file's extension (section 5.3).</summary>
+    public const string BytecodeExtension = WebLingoBytecodeFile.Extension;
 
     /// <summary><c>weblingo</c>: scripts, <c>.wlg</c> files, compiled by the WebLingo compiler, and their WLBC files.</summary>
     public static WebLingoCommandLineProgram Scripts { get; } = new("weblingo", Version, ".wlg", _ => [],
         (file, options) => new WebLingoCommandLineCompilation(new WebLingoCompiler(options).Compile(file.Text, file.Name)))
     {
-        CompileForStack = (file, options) =>
-            new WebLingoCommandLineCompilation(new WebLingoStackCompiler(options).Compile(file.Text, file.Name)),
         Bytecode = true,
         RunsFileNamedFirst = true,
         AllowsProcesses = true
@@ -111,17 +109,16 @@ public static partial class WebLingoCommandLine
         string? wrong = null;
         if (args.Length >= 2 && (args[0] is "run" or "check" || (args[0] == "compile" && program.Bytecode)))
         {
-            // run|check|compile [--scheme name=folder]… [for compile, --register or --stack, or their aliases
-            // --vm register and --vm stack, and --debug] [--timeout ms, for run] file [name=value …, for run].
+            // run|check|compile [--scheme name=folder]… [--debug, for compile] [--timeout ms, for run] file
+            // [name=value …, for run].
             var schemes = new Dictionary<string, string>(StringComparer.Ordinal);
-            WebLingoBytecodeKind? vm = null;
             var run = args[0] == "run";
             int? regexTimeout = null;
             var debug = false;
             var at = 1;
             while (wrong is null && at < args.Length
                    && (args[at] == "--scheme" || (args[at] == "--timeout" && run)
-                       || (args[at] is "--register" or "--stack" or "--vm" or "--debug" && args[0] == "compile")))
+                       || (args[at] == "--debug" && args[0] == "compile")))
             {
                 // The debugger's metadata written into the file, for disasm and debuggers (the owner's request, 22 November
                 // 2026, "Debug Info").
@@ -153,23 +150,6 @@ public static partial class WebLingoCommandLine
                     at += 2;
                     continue;
                 }
-                if (args[at] is "--register" or "--stack" or "--vm")
-                {
-                    var named = args[at] == "--vm" ? (at + 1 < args.Length ? args[at + 1] : null) : args[at][2..];
-                    if (named is not ("register" or "stack"))
-                    {
-                        wrong = named is null ? "--vm requires a VM: register or stack." : $"'{named}' is not a VM: register or stack.";
-                        break;
-                    }
-                    if (vm is not null)
-                    {
-                        wrong = "Only one VM may be given: --register or --stack.";
-                        break;
-                    }
-                    vm = named == "stack" ? WebLingoBytecodeKind.Stack : WebLingoBytecodeKind.Register;
-                    at += args[at] == "--vm" ? 2 : 1;
-                    continue;
-                }
                 var equals = at + 1 < args.Length ? args[at + 1].IndexOf('=', StringComparison.Ordinal) : -1;
                 if (equals > 0 && WebLingoSchemes.IsName(args[at + 1][..equals]) && equals + 1 < args[at + 1].Length
                     && schemes.TryAdd(args[at + 1][..equals], args[at + 1][(equals + 1)..]))
@@ -190,7 +170,7 @@ public static partial class WebLingoCommandLine
                     if (at + 1 == args.Length)
                     {
                         var none = new Dictionary<string, string>();
-                        return args[0] == "compile" ? CompileFile(program, path, vm, debug, schemes, error)
+                        return args[0] == "compile" ? CompileFile(program, path, debug, schemes, error)
                             : bytecode ? RunBytecode(program, false, path, none, schemes, output, error, input)
                             : RunFile(program, false, path, none, schemes, output, error, input);
                     }
@@ -244,8 +224,7 @@ public static partial class WebLingoCommandLine
         if (program.RunsFileNamedFirst && command.IndexOfAny(['.', '/', '\\']) >= 0)
         {
             named = program.Bytecode
-                ? $"; a file named first is run when it is a {program.Extension}, {WebLingoBytecodeFile.RegisterExtension}, "
-                  + $"{WebLingoBytecodeFile.StackExtension} or {WebLingoBytecodeFile.LegacyExtension} file"
+                ? $"; a file named first is run when it is a {program.Extension} or {WebLingoBytecodeFile.Extension} file"
                 : $"; a file named first is run when it is a {program.Extension} file";
         }
         return $"'{command}' is not a command: {string.Join(", ", commands[..^1])} or {commands[^1]}{named}.";
@@ -255,7 +234,7 @@ public static partial class WebLingoCommandLine
     private static string NotAnOption(WebLingoCommandLineProgram program, string option, string command)
     {
         var whose = option == "--timeout" ? "run"
-            : option is "--register" or "--stack" or "--vm" or "--debug" && program.Bytecode ? "compile"
+            : option == "--debug" && program.Bytecode ? "compile"
             : null;
         return whose is null || whose == command ? $"'{option}' is not an option of {command}."
             : $"'{option}' is not an option of {command}, but of {whose}.";
@@ -272,7 +251,7 @@ public static partial class WebLingoCommandLine
         var file = $"<file{program.Extension}>";
         var options = program.Options + "[--scheme <name>=<folder> …]";
         var bytecodeUsage = program.Bytecode
-            ? $" | compile [--register|--stack] [--debug] [--scheme <name>=<folder> …] <file{program.Extension}>"
+            ? $" | compile [--debug] [--scheme <name>=<folder> …] <file{program.Extension}>"
               + " | disasm <bytecode-file>"
             : "";
         output.WriteLine($"Usage: {program.Name} --version | run {options} [--timeout <ms>] {file} [name=value …]"
@@ -284,14 +263,11 @@ public static partial class WebLingoCommandLine
             output.WriteLine("  test      runs or lists tests discovered in exported test classes");
         if (program.Bytecode)
         {
-            output.WriteLine("  compile   writes a .wlbr file for the register VM (--register) or a .wlbs for the stack VM (--stack)");
-            output.WriteLine("            --vm register and --vm stack are the same as --register and --stack");
+            output.WriteLine("  compile   writes the file's bytecode, a .wlb file beside it");
             output.WriteLine("            --debug also writes the debugger's names and positions, which disasm shows");
             output.WriteLine("  disasm    shows compiled bytecode as text");
-            output.WriteLine("            run, check and disasm accept .wlbr, .wlbs and legacy .wlbc files");
+            output.WriteLine("            run, check and disasm accept .wlb files, and earlier builds' .wlbr and .wlbc files");
         }
-        if (program.CompileForStack is not null)
-            output.WriteLine($"  {program.Configuration} may select the VM with \"vm\": \"register\" or \"stack\" (source defaults to register)");
         output.WriteLine($"  --scheme  names a folder of native modules, over {program.Configuration}'s, in the file's folder");
         output.WriteLine("  --timeout sets the regular expression match timeout for run, in milliseconds (default 1000)");
         foreach (var line in program.OptionsHelp) output.WriteLine(line);
@@ -359,9 +335,7 @@ public static partial class WebLingoCommandLine
         // The VM imports modules with the same resolver the compiler used (section 3.9).
         var context = Context(source.Host, parameters, source.LineOf, regexTimeout);
         var loader = new WebLingoModuleLoader(source.Options);
-        var result = source.Compilation.StackModule is { } stack
-            ? OnStackVm(stack, loader, source.Compilation.StackComponents, context)
-            : OnRegisterVm(source.Compilation.Result.Module!, loader, source.Compilation.Components, context);
+        var result = OnVm(source.Compilation.Result.Module!, loader, source.Compilation.Components, context);
         output.Flush();
         return source.Report(result, error);
     }
@@ -375,12 +349,10 @@ public static partial class WebLingoCommandLine
         var text = new WebLingoSourceText(source, path);
         if (TryHost(program, path, path, givenSchemes, output, error, input, console) is not { } host) return null;
         var options = debugging ? host.Options with { Debugging = true } : host.Options;
-        var compile = !debugging && host.Vm == WebLingoBytecodeKind.Stack && program.CompileForStack is { } stack
-            ? stack : program.Compile;
-        var compilation = compile(text, options);
+        var compilation = program.Compile(text, options);
         var prepared = new SourceRun(text, host, options, compilation);
         foreach (var diagnostic in compilation.Result.Diagnostics) WriteDiagnostic(error, prepared.TextOf(diagnostic), diagnostic);
-        exit = compilation.Result.Module is null && compilation.StackModule is null ? CompilationFailed : Success;
+        exit = compilation.Result.Module is null ? CompilationFailed : Success;
         return exit == Success ? prepared : null;
     }
 
@@ -414,37 +386,24 @@ public static partial class WebLingoCommandLine
     }
 
     /// <summary>
-    /// <c>compile</c>: the file compiled for <paramref name="vm"/>, written beside it (section 5.3), its files
+    /// <c>compile</c>: the file compiled, written beside it (section 5.3), its files
     /// named from its folder, the program's own by its name alone, so that the file holds none of the host's paths; with
     /// <paramref name="debug"/>, compiled for a debugger, the debugger's metadata in its debugging section.
     /// </summary>
-    private static int CompileFile(WebLingoCommandLineProgram program, string path, WebLingoBytecodeKind? selectedVm, bool debug,
+    private static int CompileFile(WebLingoCommandLineProgram program, string path, bool debug,
         IReadOnlyDictionary<string, string> givenSchemes, TextWriter error)
     {
         if (!TryReadText(path, error, out var source)) return FileUnreadable;
         var text = new WebLingoSourceText(source, path);
         if (TryHost(program, path, path, givenSchemes, TextWriter.Null, error, null) is not { } host) return FileUnreadable;
-        var vm = selectedVm ?? host.Vm ?? WebLingoBytecodeKind.Register;
         var options = debug ? host.Options with { Debugging = true } : host.Options;
-        IReadOnlyList<WebLingoDiagnostic> diagnostics;
-        WebLingoCompiledModule? register = null;
-        WebLingoStackModule? stack = null;
-        if (vm == WebLingoBytecodeKind.Stack)
-        {
-            var compiled = new WebLingoStackCompiler(options).Compile(source, path);
-            (diagnostics, stack) = (compiled.Diagnostics, compiled.Module);
-        }
-        else
-        {
-            var compiled = new WebLingoCompiler(options).Compile(source, path);
-            (diagnostics, register) = (compiled.Diagnostics, compiled.Module);
-        }
+        var (register, diagnostics) = new WebLingoCompiler(options).Compile(source, path);
         foreach (var diagnostic in diagnostics)
         {
             var file = diagnostic.Source is { } name && host.Resolver.Texts.TryGetValue(name, out var imported) ? imported : text;
             WriteDiagnostic(error, file, diagnostic);
         }
-        if (register is null && stack is null) return CompilationFailed;
+        if (register is null) return CompilationFailed;
 
         var folder = Path.GetDirectoryName(Path.GetFullPath(path)) ?? "";
         var originals = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -458,12 +417,8 @@ public static partial class WebLingoCommandLine
             name is null ? text
             : originals.TryGetValue(name, out var original) && host.Resolver.Texts.TryGetValue(original, out var imported) ? imported
             : null;
-        var bytes = register is not null
-            ? WebLingoBytecodeFile.Write(Renamed(register, FromFolder), TextOf)
-            : WebLingoBytecodeFile.Write(Renamed(stack!, FromFolder), TextOf);
-
-        var target = Path.ChangeExtension(path, vm == WebLingoBytecodeKind.Register
-            ? WebLingoBytecodeFile.RegisterExtension : WebLingoBytecodeFile.StackExtension);
+        var bytes = WebLingoBytecodeFile.Write(Renamed(register, FromFolder), TextOf);
+        var target = Path.ChangeExtension(path, WebLingoBytecodeFile.Extension);
         try
         {
             File.WriteAllBytes(target, bytes);
@@ -479,38 +434,36 @@ public static partial class WebLingoCommandLine
 
     /// <summary>
     /// <c>run</c> or <c>check</c> of WLBC: the file read and verified (section 5.3), its files named again from its
-    /// folder, the program's own as the file beside it, and, for <c>run</c>, the native modules it names loaded and it run on
-    /// the VM it is for, a runtime error located from the file's source positions.
+    /// folder, the program's own as the file beside it, and, for <c>run</c>, the native modules it names loaded and it run,
+    /// a runtime error located from the file's source positions.
     /// </summary>
     private static int RunBytecode(WebLingoCommandLineProgram program, bool run, string path, IReadOnlyDictionary<string, string> parameters,
         IReadOnlyDictionary<string, string> givenSchemes, TextWriter output, TextWriter error, IWebLingoConsoleInput? input,
         int regexTimeout = WebLingoHeap.DefaultRegexTimeoutMilliseconds, Action? console = null)
     {
-        if (!TryRead(path, error, out var bytes, out var register, out var stack, out var positions)) return Failed(bytes);
-        var kind = register is not null ? WebLingoBytecodeKind.Register : WebLingoBytecodeKind.Stack;
+        if (!TryRead(path, error, out var bytes, out var register, out var positions)) return Failed(bytes);
         if (!run)
         {
+            // Its configuration checked, as for a source file.
             if (!WebLingoSchemes.TryLoad(path, program.Configuration, givenSchemes, out _, out _, out _, out _, out _,
-                out _, out var configured, out var wrongConfiguration))
+                out _, out var wrongConfiguration))
             {
                 error.WriteLine(wrongConfiguration);
                 return FileUnreadable;
             }
-            return MatchesConfiguredVm(path, kind, configured, error) ? Success : CompilationFailed;
+            return Success;
         }
-        var main = register?.Name ?? stack!.Name;
+        var main = register.Name;
         var mainName = path[..^Path.GetFileName(path).Length] + main;
         if (TryHost(program, path, mainName, givenSchemes, output, error, input, console) is not { } host) return FileUnreadable;
-        if (!MatchesConfiguredVm(path, kind, host.Vm, error)) return CompilationFailed;
         var folder = Path.GetDirectoryName(Path.GetFullPath(path)) ?? "";
         string FromHere(string name) =>
             name == main ? mainName : IsScheme(name) ? name : Relative(Directory.GetCurrentDirectory(), Path.Combine(folder, name));
-        if (register is not null) register = Renamed(register, FromHere);
-        if (stack is not null) stack = Renamed(stack, FromHere);
+        register = Renamed(register, FromHere);
         var located = new List<WebLingoSourcePositions>();
         foreach (var table in positions) located.Add(table with { Source = table.Source is { } source ? FromHere(source) : null });
         // The native modules it names, which its compiler had loaded, so that their built-ins are the host's (section 3.9).
-        foreach (var unit in register?.Units ?? stack!.Units)
+        foreach (var unit in register.Units)
         {
             if (unit.IsNative && !host.Native.TryResolve(mainName, unit.Name, out _, out var why))
             {
@@ -520,7 +473,7 @@ public static partial class WebLingoCommandLine
         }
         var loader = new WebLingoModuleLoader(host.Options);
         var context = Context(host, parameters, LineOf, regexTimeout);
-        var result = register is not null ? OnRegisterVm(register, loader, null, context) : OnStackVm(stack!, loader, null, context);
+        var result = OnVm(register, loader, null, context);
         output.Flush();
         if (result.Succeeded) return Success;
         var diagnostic = result.Error!;
@@ -543,48 +496,32 @@ public static partial class WebLingoCommandLine
     }
 
     /// <summary>
-    /// A module run on the register VM. Each VM is named only in a method of its own, which .NET does not inline: it loads
-    /// a VM's assembly when it compiles a method naming it, so that a command loads the VM it runs and no other, and
-    /// <c>compile</c>, <c>check</c> and <c>disasm</c> load none.
+    /// A module run on the VM, named only in a method of its own, which .NET does not inline: it loads the VM's assembly
+    /// when it compiles a method naming it, so that <c>compile</c>, <c>check</c> and <c>disasm</c> load none.
     /// </summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static WebLingoExecutionResult OnRegisterVm(WebLingoCompiledModule module, IWebLingoModuleLoader loader,
+    private static WebLingoExecutionResult OnVm(WebLingoCompiledModule module, IWebLingoModuleLoader loader,
         IWebLingoModuleLoader? components, WebLingoExecutionContext context) =>
         new WebLingoVirtualMachine { Loader = loader, Components = components }.Execute(module, context);
 
-    /// <summary>A module run on the stack VM, as <see cref="OnRegisterVm"/> runs one on the register VM.</summary>
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static WebLingoExecutionResult OnStackVm(WebLingoStackModule module, IWebLingoStackModuleLoader loader,
-        IWebLingoStackModuleLoader? components, WebLingoExecutionContext context) =>
-        new WebLingoStackVirtualMachine { Loader = loader, Components = components }.Execute(module, context);
-
-    private static bool MatchesConfiguredVm(string path, WebLingoBytecodeKind kind, WebLingoBytecodeKind? configured, TextWriter error)
-    {
-        if (configured is null || configured == kind) return true;
-        WebLingoConsoleText.WriteErrorLine(error, path, $"{WebLingoDiagnosticCodes.BytecodeVerificationFailure}: "
-            + $"The configuration selects the {VmName(configured.Value)} VM, but the header names the {VmName(kind)} VM.");
-        return false;
-    }
-
-    /// <summary><c>disasm</c>: compiled bytecode as text, the register VM's or the stack VM's.</summary>
+    /// <summary><c>disasm</c>: compiled bytecode as text.</summary>
     private static int DisassembleFile(string path, TextWriter output, TextWriter error)
     {
-        if (!TryRead(path, error, out var bytes, out var register, out var stack, out var positions))
+        if (!TryRead(path, error, out var bytes, out var register, out var positions))
             return bytes is null ? FileUnreadable : CompilationFailed;
         // Its line and column tables, for the debugging section's positions, where the file has one.
-        output.Write(register is not null ? WebLingoDisassembler.Format(register, positions)
-            : WebLingoStackDisassembler.Format(stack!, positions));
+        output.Write(WebLingoDisassembler.Format(register, positions));
         return Success;
     }
 
     /// <summary>
-    /// A WLBC file read and verified, the module of the VM it is for; false, the reason written, and
-    /// <paramref name="bytes"/> null if the file cannot be read.
+    /// A WLBC file read and verified, its module; false, the reason written, and <paramref name="bytes"/> null if the file
+    /// cannot be read. A file of the stack VM's, which WebLingo had until 23 November 2026, is one it cannot use.
     /// </summary>
-    private static bool TryRead(string path, TextWriter error, out byte[]? bytes, out WebLingoCompiledModule? register,
-        out WebLingoStackModule? stack, out IReadOnlyList<WebLingoSourcePositions> positions)
+    private static bool TryRead(string path, TextWriter error, out byte[]? bytes, [NotNullWhen(true)] out WebLingoCompiledModule? register,
+        out IReadOnlyList<WebLingoSourcePositions> positions)
     {
-        (register, stack, positions) = (null, null, []);
+        (register, positions) = (null, []);
         try
         {
             bytes = File.ReadAllBytes(path);
@@ -598,11 +535,11 @@ public static partial class WebLingoCommandLine
         }
         if (WebLingoBytecodeFile.TryReadKind(bytes, out var kind, out var why))
         {
-            if (WebLingoBytecodeFile.KindForExtension(Path.GetExtension(path)) is { } expected && kind != expected)
+            // A file of the stack VM's is refused as such, whatever its name; a register VM's named as a stack VM's file, too.
+            if (kind == WebLingoBytecodeKind.Register && WebLingoBytecodeFile.KindForExtension(Path.GetExtension(path)) is { } expected
+                && kind != expected)
                 why = $"The file extension is for the {VmName(expected)} VM, but its header names the {VmName(kind)} VM.";
-            else if (kind == WebLingoBytecodeKind.Register
-                ? WebLingoBytecodeFile.TryReadRegister(bytes, out register, out positions, out why)
-                : WebLingoBytecodeFile.TryReadStack(bytes, out stack, out positions, out why))
+            else if (WebLingoBytecodeFile.TryReadRegister(bytes, out register, out positions, out why))
                 return true;
         }
         WebLingoConsoleText.WriteErrorLine(error, path, $"{WebLingoDiagnosticCodes.BytecodeVerificationFailure}: {why}");
@@ -632,7 +569,7 @@ public static partial class WebLingoCommandLine
         FileResolver Resolver, IWebLingoTextOutput Output, IWebLingoTextOutput ErrorOutput, IWebLingoNetwork Network, IWebLingoDatabases Databases, IWebLingoFileSystem Files,
         IReadOnlyDictionary<string, IReadOnlyList<string>> Allowed, IWebLingoEnvironment Environment, IWebLingoConsoleInput? ConsoleInput,
         IWebLingoConsole? Console,
-        IWebLingoProcessRunner? Processes, WebLingoBytecodeKind? Vm);
+        IWebLingoProcessRunner? Processes);
 
     /// <summary>
     /// The host for the file <paramref name="path"/>, whose program's own file is named <paramref name="mainName"/>: its
@@ -643,7 +580,7 @@ public static partial class WebLingoCommandLine
         TextWriter output, TextWriter error, IWebLingoConsoleInput? input, Action? console = null)
     {
         if (!WebLingoSchemes.TryLoad(path, program.Configuration, givenSchemes, out var schemes, out var allowedHosts, out var databases,
-            out var folders, out var allowed, out var env, out var vm, out var wrongConfiguration))
+            out var folders, out var allowed, out var env, out var wrongConfiguration))
         {
             error.WriteLine(wrongConfiguration);
             return null;
@@ -651,7 +588,7 @@ public static partial class WebLingoCommandLine
         var folder = Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".";
         if (program.Root is { } root && Path.GetFullPath(root) != folder
             && !WebLingoSchemes.TryLoadFolder(root, program.Configuration, givenSchemes, out _, out _, out _, out _, out _,
-                out _, out _, out _, out vm, out wrongConfiguration))
+                out _, out _, out _, out wrongConfiguration))
         {
             error.WriteLine(wrongConfiguration);
             return null;
@@ -690,7 +627,7 @@ public static partial class WebLingoCommandLine
             // All of the machine's environment for a script's, what its configuration's "env" allows for a page's (section 7.15).
             program.ReachesAllEnvironment ? new DotNetEnvironment() : new DotNetEnvironment(env.MachineName, env.Variables, env.Platform),
             // The console itself, which std:console's Console controls: a script's, never a site's (section 3.9).
-            input, program.HasConsole ? new DotNetConsole() : null, program.AllowsProcesses ? new DotNetProcessRunner() : null, vm);
+            input, program.HasConsole ? new DotNetConsole() : null, program.AllowsProcesses ? new DotNetProcessRunner() : null);
     }
 
     private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters,
@@ -755,25 +692,6 @@ public static partial class WebLingoCommandLine
     }
 
     private static WebLingoFunction Renamed(WebLingoFunction function, HashSet<string> files, Func<string, string> rename) =>
-        function with
-        {
-            Name = files.Contains(function.Name) ? rename(function.Name) : function.Name,
-            Source = function.Source is { } source ? rename(source) : null
-        };
-
-    private static WebLingoStackModule Renamed(WebLingoStackModule module, Func<string, string> rename)
-    {
-        var files = Files(module.Name, module.Units);
-        return module with
-        {
-            Name = rename(module.Name),
-            EntryPoint = Renamed(module.EntryPoint, files, rename),
-            Functions = [.. module.Functions.Select(function => Renamed(function, files, rename))],
-            Units = [.. module.Units.Select(unit => unit.IsNative ? unit : unit with { Name = rename(unit.Name) })]
-        };
-    }
-
-    private static WebLingoStackFunction Renamed(WebLingoStackFunction function, HashSet<string> files, Func<string, string> rename) =>
         function with
         {
             Name = files.Contains(function.Name) ? rename(function.Name) : function.Name,

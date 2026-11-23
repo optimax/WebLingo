@@ -78,8 +78,8 @@ public sealed class ExamplesTests : IDisposable
         if (command != "run") return;
 
         // The same from its WLBC, on the stack VM.
-        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo(["compile", "--stack", path], path));
-        Assert.Equal(expected, Weblingo(["run", Path.ChangeExtension(path, ".wlbs"), .. parameters], path));
+        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo(["compile", path], path));
+        Assert.Equal(expected, Weblingo(["run", Path.ChangeExtension(path, ".wlb"), .. parameters], path));
     }
 
     /// <summary>

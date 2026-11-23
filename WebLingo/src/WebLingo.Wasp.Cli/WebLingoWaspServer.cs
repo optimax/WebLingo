@@ -85,7 +85,7 @@ public static class WebLingoWaspServer
         (workers, mode) = (Math.Max(1, Environment.ProcessorCount), defaultMode);
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
             out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out var env,
-            out var vm, out error)) return null;
+            out error)) return null;
         if (configured is not null) mode = configured == "production" ? WebLingoMode.Production : WebLingoMode.Development;
 
         // std:system, loaded once here to fail early, then by each worker on its own.
@@ -107,7 +107,6 @@ public static class WebLingoWaspServer
             Workers = workers,
             WorkerServices = _ => Services(schemes, importer),
             Mode = mode,
-            Vm = vm ?? WebLingoBytecodeKind.Register,
             Clock = new WebLingoExecutionClock(new DotNetClock()),
             WallClock = new DotNetClock(),
             TimeZone = new DotNetTimeZone(),

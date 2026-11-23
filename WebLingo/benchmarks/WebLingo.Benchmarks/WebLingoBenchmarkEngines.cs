@@ -4,7 +4,6 @@ using WebLingo.Core;
 using WebLingo.Runtime;
 using WebLingo.VM;
 using WebLingo.Templates;
-using WebLingo.VM.Stack;
 namespace WebLingo.Benchmarks;
 
 /// <summary>A VM the benchmark measures, with the compiler that generates its bytecode.</summary>
@@ -88,66 +87,6 @@ public sealed class WebLingoRegisterEngine : IWebLingoBenchmarkEngine
             WebLingoOpCode.GetMember or WebLingoOpCode.GetIndex or WebLingoOpCode.SetIndex or WebLingoOpCode.NewArray or WebLingoOpCode.NewMap or WebLingoOpCode.NewSet
                 or WebLingoOpCode.ForEachNext => 3,
             _ => 2
-        };
-    }
-}
-
-/// <summary>The stack VM, <see cref="WebLingoStackVirtualMachine"/>, with <see cref="WebLingoStackCompiler"/>.</summary>
-public sealed class WebLingoStackEngine : IWebLingoBenchmarkEngine
-{
-    public string Name => "stack";
-
-    public IWebLingoBenchmarkProgram Compile(string source, string name, WebLingoCompilerOptions options)
-    {
-        var compiled = name.EndsWith(".wasp", StringComparison.Ordinal)
-            ? new WebLingoTemplateCompiler(options).CompileForStack(new WebLingoSourceText(source, name))
-            : new WebLingoStackCompiler(options).Compile(source, name);
-        if (compiled.Module is not { } module)
-        {
-            throw new InvalidOperationException($"{name} does not compile: {string.Join("; ", compiled.Diagnostics)}");
-        }
-        return new CompiledProgram(module);
-    }
-
-    private sealed class CompiledProgram(WebLingoStackModule module) : IWebLingoBenchmarkProgram
-    {
-        private readonly WebLingoStackVirtualMachine _vm = new();
-
-        public int CodeInstructions { get; } = Functions(module).Sum(function => function.Code.Count);
-
-        public long CodeBytes { get; } = Functions(module).Sum(function => function.Code.Sum(Bytes));
-
-        public WebLingoExecutionResult Run(WebLingoExecutionContext context) => _vm.Execute(module, context);
-
-        private static IEnumerable<WebLingoStackFunction> Functions(WebLingoStackModule module) =>
-            module.Functions.Prepend(module.EntryPoint);
-
-        private static long Bytes(WebLingoStackInstruction instruction)
-        {
-            int[] operands = [instruction.A, instruction.B];
-            // GetIndex uses its A only for ?[.
-            var count = instruction switch
-            {
-                { OpCode: WebLingoStackOpCode.GetIndex, A: not 0 } => 1,
-                { OpCode: WebLingoStackOpCode.GetMember or WebLingoStackOpCode.MakeClass, B: not 0 } => 2,
-                _ => OperandCount(instruction.OpCode)
-            };
-            return 1 + operands.Take(count).Sum(WebLingoEncoding.Leb128Size);
-        }
-
-        /// <summary>How many of A and B the operation uses (<see cref="WebLingoStackOpCode"/>); the ones it uses come first.</summary>
-        private static int OperandCount(WebLingoStackOpCode opCode) => opCode switch
-        {
-            WebLingoStackOpCode.LoadConstant or WebLingoStackOpCode.LoadBoolean or WebLingoStackOpCode.LoadLocal or WebLingoStackOpCode.StoreLocal
-                or WebLingoStackOpCode.Jump or WebLingoStackOpCode.JumpIfFalse or WebLingoStackOpCode.JumpIfTrue or WebLingoStackOpCode.NewCell
-                or WebLingoStackOpCode.BoxLocal or WebLingoStackOpCode.CopyCell or WebLingoStackOpCode.LoadCell or WebLingoStackOpCode.StoreCell
-                or WebLingoStackOpCode.LoadCapture or WebLingoStackOpCode.StoreCapture or WebLingoStackOpCode.MakeClosure
-                or WebLingoStackOpCode.LoadBuiltin or WebLingoStackOpCode.Call or WebLingoStackOpCode.GetMember
-                or WebLingoStackOpCode.StoreIndex or WebLingoStackOpCode.NewArray or WebLingoStackOpCode.NewMap
-                or WebLingoStackOpCode.NewSet or WebLingoStackOpCode.MakeClass or WebLingoStackOpCode.New or WebLingoStackOpCode.GetSuper => 1,
-            WebLingoStackOpCode.CallBuiltin or WebLingoStackOpCode.CallMethod or WebLingoStackOpCode.ForEachNext or WebLingoStackOpCode.SetMember
-                or WebLingoStackOpCode.ForEachNextEntry => 2,
-            _ => 0
         };
     }
 }

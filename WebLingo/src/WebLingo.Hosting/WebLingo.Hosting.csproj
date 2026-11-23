@@ -8,7 +8,6 @@
     <ProjectReference Include="../WebLingo.Templates/WebLingo.Templates.csproj" />
     <ProjectReference Include="../WebLingo.Runtime/WebLingo.Runtime.csproj" />
     <ProjectReference Include="../WebLingo.VM/WebLingo.VM.csproj" />
-    <ProjectReference Include="../WebLingo.VM.Stack/WebLingo.VM.Stack.csproj" />
     <ProjectReference Include="../WebLingo.StdLib/WebLingo.StdLib.csproj" />
     <ProjectReference Include="../WebLingo.Platform.Abstractions/WebLingo.Platform.Abstractions.csproj" />
     <ProjectReference Include="../WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />

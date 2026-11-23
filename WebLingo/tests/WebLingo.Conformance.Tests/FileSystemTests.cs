@@ -6,7 +6,6 @@ using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
 using WebLingo.VM;
-using WebLingo.VM.Stack;
 using Xunit;
 namespace WebLingo.Conformance.Tests;
 
@@ -33,7 +32,7 @@ public sealed class FileSystemTests : IDisposable
         }
     }
 
-    public static TheoryData<string> Vms => new() { "register", "stack" };
+    public static TheoryData<string> Vms => new() { "register" };
 
     [Theory]
     [MemberData(nameof(Vms))]
@@ -349,7 +348,7 @@ public sealed class FileSystemTests : IDisposable
     [InlineData("fs.readTextSync();", "WL2006")]
     public void WrongArgumentsAreReported(string source, string error)
     {
-        foreach (var vm in new[] { "register", "stack" }) Assert.StartsWith(error, Run(vm, source).Error);
+        Assert.StartsWith(error, Run("register", source).Error);
     }
 
     /// <summary>
@@ -365,21 +364,10 @@ public sealed class FileSystemTests : IDisposable
         var output = new WebLingoCollectedOutput();
         var services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output));
         var options = new WebLingoCompilerOptions(services.Builtins.Select(b => new WebLingoBuiltinDeclaration(b.Name, b.Arity)).ToList()) { Native = loader };
-        WebLingoExecutionResult result;
-        if (vm == "register")
-        {
-            var compiled = new WebLingoCompiler(options).Compile(source, "program.wlg");
-            Assert.True(compiled.Module is not null, string.Join("; ", compiled.Diagnostics));
-            foreach (var builtin in builtins.Builtins) services.Register(builtin);
-            result = new WebLingoVirtualMachine().Execute(compiled.Module, Context(services, output));
-        }
-        else
-        {
-            var compiled = new WebLingoStackCompiler(options).Compile(source, "program.wlg");
-            Assert.True(compiled.Module is not null, string.Join("; ", compiled.Diagnostics));
-            foreach (var builtin in builtins.Builtins) services.Register(builtin);
-            result = new WebLingoStackVirtualMachine().Execute(compiled.Module, Context(services, output));
-        }
+        var compiled = new WebLingoCompiler(options).Compile(source, "program.wlg");
+        Assert.True(compiled.Module is not null, string.Join("; ", compiled.Diagnostics));
+        foreach (var builtin in builtins.Builtins) services.Register(builtin);
+        var result = new WebLingoVirtualMachine().Execute(compiled.Module, Context(services, output));
         return (output.Text, result.Error is { } wrong ? $"{wrong.Code} {wrong.Message}" : "");
     }
 

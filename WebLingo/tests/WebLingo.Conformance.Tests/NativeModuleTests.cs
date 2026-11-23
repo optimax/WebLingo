@@ -4,7 +4,6 @@ using WebLingo.Core;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
 using WebLingo.VM;
-using WebLingo.VM.Stack;
 using Xunit;
 namespace WebLingo.Conformance.Tests;
 
@@ -124,8 +123,8 @@ public sealed class NativeModuleTests : IDisposable
     {
         const string released = "import { write, writeLn } from \"std:console\"; import t from \"native:test\"; writeLn(t.released());";
         var before = long.Parse(Run(released).Output, System.Globalization.CultureInfo.InvariantCulture);
-        Run("import { Counter } from \"native:test\"; var kept = new Counter(1);"); // On both VMs: two tallies.
-        Assert.Equal((before + 2).ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n", Run(released).Output);
+        Run("import { Counter } from \"native:test\"; var kept = new Counter(1);");
+        Assert.Equal((before + 1).ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n", Run(released).Output);
     }
 
     [Fact]
@@ -256,18 +255,7 @@ public sealed class NativeModuleTests : IDisposable
         var registerResult = registerCompiled.Module is { } module
             ? new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(registerOptions) }.Execute(module, Context(registerServices, registerOutput))
             : null;
-        var register = (Describe(registerCompiled.Diagnostics), registerOutput.Text, Describe(registerResult?.Error));
-
-        var stackOutput = new WebLingoCollectedOutput();
-        var (stackOptions, stackServices) = Options(schemes, stackOutput);
-        var stackCompiled = new WebLingoStackCompiler(stackOptions).Compile(source, name);
-        var stackResult = stackCompiled.Module is { } stackModule
-            ? new WebLingoStackVirtualMachine { Loader = new WebLingoModuleLoader(stackOptions) }.Execute(stackModule, Context(stackServices, stackOutput))
-            : null;
-        var stack = (Describe(stackCompiled.Diagnostics), stackOutput.Text, Describe(stackResult?.Error));
-
-        Assert.Equal(register, stack);
-        return register;
+        return (Describe(registerCompiled.Diagnostics), registerOutput.Text, Describe(registerResult?.Error));
     }
 
     private static (WebLingoCompilerOptions, WebLingoBuiltinRegistry) Options(Dictionary<string, string> schemes, IWebLingoTextOutput output)

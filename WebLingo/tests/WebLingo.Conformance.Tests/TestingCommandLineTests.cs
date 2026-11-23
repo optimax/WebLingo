@@ -10,12 +10,9 @@ public sealed class TestingCommandLineTests : IDisposable
 
     public void Dispose() => Directory.Delete(_folder, recursive: true);
 
-    [Theory]
-    [InlineData("register")]
-    [InlineData("stack")]
-    public void DiscoveryUsesSourceOrderAndIsolatedInstances(string vm)
+    [Fact]
+    public void DiscoveryUsesSourceOrderAndIsolatedInstances()
     {
-        Configure(vm);
         Write("base.wlg", """
             export class ImportedTests {
                 testInherited() { throw new Error("inherited method ran"); }
@@ -51,12 +48,9 @@ public sealed class TestingCommandLineTests : IDisposable
         Assert.Equal((WebLingoCommandLine.Success, "initializing\nran second\n4 passed, 0 failed.\n", ""), Run("test", file, second));
     }
 
-    [Theory]
-    [InlineData("register")]
-    [InlineData("stack")]
-    public void ReportsHardAssertionAndCleanupAndContinues(string vm)
+    [Fact]
+    public void ReportsHardAssertionAndCleanupAndContinues()
     {
-        Configure(vm);
         var helper = Write("assertions.wlg", """
             import { assertEqual } from "std:test";
             export function check() {
@@ -90,12 +84,9 @@ public sealed class TestingCommandLineTests : IDisposable
         Assert.Equal("continued\n1 passed, 1 failed.\n", output);
     }
 
-    [Theory]
-    [InlineData("register")]
-    [InlineData("stack")]
-    public void ChecksReportLocationsAndKeepAnUnexpectedException(string vm)
+    [Fact]
+    public void ChecksReportLocationsAndKeepAnUnexpectedException()
     {
-        Configure(vm);
         var file = Write("checks.wlg", """
             import { checkAll } from "std:test";
             export class ExampleTests {
@@ -120,10 +111,8 @@ public sealed class TestingCommandLineTests : IDisposable
         Assert.Equal("0 passed, 1 failed.\n", output);
     }
 
-    [Theory]
-    [InlineData("register")]
-    [InlineData("stack")]
-    public void ValueAndErrorAssertionsWorkInSourceAndBytecode(string vm)
+    [Fact]
+    public void ValueAndErrorAssertionsWorkInSourceAndBytecode()
     {
         var source = Write("assertions.wlg", """
             import { assert, assertEqual, assertNotEqual, assertDeepEqual, assertContains, assertHasKey,
@@ -154,15 +143,14 @@ public sealed class TestingCommandLineTests : IDisposable
             const asyncError = await assertRejects(async () => { await delay(1); throw new Failure("async"); });
             assertEqual(asyncError.message, "async");
             """);
-        Configure(vm);
         Assert.Equal((WebLingoCommandLine.Success, "", ""), Run("run", source));
         var dynamicSource = Write("dynamic.wlg", """
             const testing = await Module.import("std:test");
             testing.assertEqual(2 + 2, 4);
             """);
         Assert.Equal((WebLingoCommandLine.Success, "", ""), Run("run", dynamicSource));
-        Assert.Equal((WebLingoCommandLine.Success, "", ""), Run("compile", "--" + vm, source));
-        var bytecode = Path.ChangeExtension(source, vm == "stack" ? ".wlbs" : ".wlbr");
+        Assert.Equal((WebLingoCommandLine.Success, "", ""), Run("compile", source));
+        var bytecode = Path.ChangeExtension(source, ".wlb");
         File.Delete(source);
         Assert.Equal((WebLingoCommandLine.Success, "", ""), Run("run", bytecode));
     }
@@ -183,8 +171,6 @@ public sealed class TestingCommandLineTests : IDisposable
         Assert.Contains("No tests match", noMatches.Error);
         Assert.Equal(WebLingoCommandLine.UsageError, Run("test", "--filter").Exit);
     }
-
-    private void Configure(string vm) => Write("weblingo.config", $$"""{ "vm": "{{vm}}" }""");
 
     private string Write(string name, string text)
     {

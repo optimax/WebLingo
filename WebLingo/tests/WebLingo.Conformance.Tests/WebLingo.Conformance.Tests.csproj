@@ -9,7 +9,6 @@
     <ProjectReference Include="../../src/WebLingo.Windowed.Cli/WebLingo.Windowed.Cli.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../src/WebLingo.Compiler/WebLingo.Compiler.csproj" />
     <ProjectReference Include="../../src/WebLingo.VM/WebLingo.VM.csproj" />
-    <ProjectReference Include="../../src/WebLingo.VM.Stack/WebLingo.VM.Stack.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib/WebLingo.StdLib.csproj" />
     <!-- The native module the tests load, copied beside them, not referenced: only a host loads it (section 3.9). -->
     <ProjectReference Include="../WebLingo.Native.TestModule/WebLingo.Native.TestModule.csproj" ReferenceOutputAssembly="false" OutputItemType="Content" CopyToOutputDirectory="PreserveNewest" />

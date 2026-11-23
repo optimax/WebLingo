@@ -2,7 +2,6 @@ using WebLingo.Compiler;
 using WebLingo.Core;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
-using WebLingo.VM.Stack;
 using Xunit;
 namespace WebLingo.VM.Tests;
 
@@ -70,7 +69,7 @@ public sealed class BytesTests
         "[Log:BytesBuilder:[97, 10, 98, 10], \"a\\nb\\n\", true, 4]\n")]
     public void BytesBehaveAlikeOnBothVms(string program, string output)
     {
-        foreach (var stack in new[] { false, true })
+        foreach (var stack in new[] { false })
         {
             var (text, error) = Run(program, stack);
             Assert.True(error is null, error?.Message);
@@ -110,7 +109,7 @@ public sealed class BytesTests
     [InlineData("import { Bytes } from \"std:bytes\"; Bytes.from(\"x\").toHex(1);", "WL2006", "'toHex' takes 0 arguments, not 1.")]
     public void WrongUsesAreErrorsAlikeOnBothVms(string program, string code, string message)
     {
-        foreach (var stack in new[] { false, true })
+        foreach (var stack in new[] { false })
         {
             var (_, error) = Run(program, stack);
             Assert.NotNull(error);
@@ -123,13 +122,6 @@ public sealed class BytesTests
         var options = new WebLingoCompilerOptions([new("write", 1), new("writeLn", 1)]);
         var output = new WebLingoCollectedOutput();
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = new WebLingoBuiltinRegistry(WebLingoStandardBuiltins.Create(output)) };
-        if (stack)
-        {
-            var stackCompiled = new WebLingoStackCompiler(options).Compile(program, "main.wlg");
-            Assert.Empty(stackCompiled.Diagnostics);
-            var stackError = new WebLingoStackVirtualMachine().Execute(stackCompiled.Module!, context).Error;
-            return (output.Text, stackError);
-        }
         var compiled = new WebLingoCompiler(options).Compile(program, "main.wlg");
         Assert.Empty(compiled.Diagnostics);
         // Run first: the output is read once the program has written it.

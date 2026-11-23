@@ -9,7 +9,6 @@ using WebLingo.Runtime;
 using WebLingo.StdLib;
 using WebLingo.Templates;
 using WebLingo.VM;
-using WebLingo.VM.Stack;
 namespace WebLingo.Hosting;
 
 /// <summary>
@@ -194,7 +193,7 @@ public sealed class WebLingoApplication
     private WebLingoRequestOutcome Run(CompiledPage page, IWebLingoHttpRequest request, IWebLingoHttpResponse response, WebLingoWorkerId worker,
         WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler, WebLingoRequestOutcomeKind done)
     {
-        if (page.Module is null && page.StackModule is null) return Failed(response, page.Errors);
+        if (page.Module is null) return Failed(response, page.Errors);
         // A client that takes nothing for too long cancels the request, as a client that goes does.
         cancellation ??= new WebLingoCancellationSignal();
         var output = new WebLingoResponseText(response, _options.SendTimeout, cancellation.Cancel);
@@ -218,27 +217,8 @@ public sealed class WebLingoApplication
             Cancellation = cancellation,
             Lines = page.LineOf
         };
-        var (result, resume) = page.StackModule is { } stack
-            ? RunStack(stack, page, context)
-            : RunRegister(page.Module!, page, context);
-        return Ended(result, resume, page, output, response, done);
-    }
-
-    // Keep the VMs in separate methods so a request loads only its configured VM's assembly.
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (WebLingoExecutionResult, Func<WebLingoExecutionResult>) RunRegister(
-        WebLingoCompiledModule module, CompiledPage page, WebLingoExecutionContext context)
-    {
         var vm = new WebLingoVirtualMachine { Loader = page.Modules, Components = page.Components };
-        return (vm.Execute(module, context), vm.Resume);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (WebLingoExecutionResult, Func<WebLingoExecutionResult>) RunStack(
-        WebLingoStackModule module, CompiledPage page, WebLingoExecutionContext context)
-    {
-        var vm = new WebLingoStackVirtualMachine { Loader = page.Modules, Components = page.Components };
-        return (vm.Execute(module, context), vm.Resume);
+        return Ended(vm.Execute(page.Module, context), vm.Resume, page, output, response, done);
     }
 
     /// <summary>What a run came to: <paramref name="done"/>, a failure, or a wait, which its host resumes.</summary>
@@ -314,18 +294,9 @@ public sealed class WebLingoApplication
             : new WebLingoSourceText("<% param request; param response; import handler from \"/" + Escaped(file) + "\"; await handler."
                                      + function + "(request, response); %>", file + "#" + function);
         var page = new CompiledPage(text, compiler, modules, new WebLingoModuleLoader(options));
-        IReadOnlyList<WebLingoDiagnostic> diagnostics;
-        if (_options.Vm == WebLingoBytecodeKind.Stack)
-        {
-            var result = compiler.CompileForStack(text);
-            (page.StackModule, diagnostics) = (result.Module, result.Diagnostics);
-        }
-        else
-        {
-            var result = compiler.Compile(text);
-            (page.Module, diagnostics) = (result.Module, result.Diagnostics);
-        }
-        foreach (var diagnostic in diagnostics)
+        var result = compiler.Compile(text);
+        page.Module = result.Module;
+        foreach (var diagnostic in result.Diagnostics)
         {
             if (diagnostic.Severity == WebLingoDiagnosticSeverity.Error) page.Errors.Add(page.Describe(diagnostic));
         }
@@ -405,7 +376,6 @@ public sealed class WebLingoApplication
         WebLingoModuleLoader imports)
     {
         public WebLingoCompiledModule? Module { get; set; }
-        public WebLingoStackModule? StackModule { get; set; }
         public List<string> Errors { get; } = [];
 
         /// <summary>What finds and compiles a module the page imports while it runs (section 3.9).</summary>
@@ -438,19 +408,15 @@ public sealed class WebLingoApplication
     }
 
     /// <summary>A loader that compiles each module once, its result kept (WL-T007: a component is not compiled for every render).</summary>
-    private sealed class CachedLoader(WebLingoModuleLoader loader) : IWebLingoModuleLoader, IWebLingoStackModuleLoader
+    private sealed class CachedLoader(WebLingoModuleLoader loader) : IWebLingoModuleLoader
     {
         private Dictionary<string, (WebLingoCompiledModule? Module, WebLingoDiagnostic? Error)>? _compiled;
-        private Dictionary<string, (WebLingoStackModule? Module, WebLingoDiagnostic? Error)>? _stack;
 
         public bool TryResolve(string importer, string path, out string name, out string? error) =>
             loader.TryResolve(importer, path, out name, out error);
 
         public WebLingoCompiledModule? Compile(string name, out WebLingoDiagnostic? error) =>
             CompileOnce(_compiled ??= new(StringComparer.Ordinal), ((IWebLingoModuleLoader)loader).Compile, name, out error);
-
-        WebLingoStackModule? IWebLingoStackModuleLoader.Compile(string name, out WebLingoDiagnostic? error) =>
-            CompileOnce(_stack ??= new(StringComparer.Ordinal), ((IWebLingoStackModuleLoader)loader).Compile, name, out error);
 
         private delegate T? CompileModule<T>(string name, out WebLingoDiagnostic? error) where T : class;
 

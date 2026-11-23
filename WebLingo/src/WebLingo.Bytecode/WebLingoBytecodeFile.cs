@@ -15,14 +15,20 @@ public static class WebLingoBytecodeFile
 {
     public const int MajorVersion = 0;
     public const int MinorVersion = 1;
+    /// <summary>A WLBC file's extension (the owner's request, 23 November 2026, in place of <c>.wlbr</c> and <c>.wlbs</c>).</summary>
+    public const string Extension = ".wlb";
+    /// <summary>The register VM's before it, a file of which is read as one of <see cref="Extension"/>.</summary>
     public const string RegisterExtension = ".wlbr";
+    /// <summary>The stack VM's, which WebLingo no longer has: such a file is read only to be refused.</summary>
     public const string StackExtension = ".wlbs";
+    /// <summary>WLBC's first, before the VMs' own, a file of which its header names the VM of.</summary>
     public const string LegacyExtension = ".wlbc";
 
     /// <summary>The VM named by a filename extension, if it names one. The file's header must still be checked.</summary>
     public static WebLingoBytecodeKind? KindForExtension(string extension)
     {
-        if (extension.Equals(RegisterExtension, StringComparison.OrdinalIgnoreCase)) return WebLingoBytecodeKind.Register;
+        if (extension.Equals(Extension, StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(RegisterExtension, StringComparison.OrdinalIgnoreCase)) return WebLingoBytecodeKind.Register;
         if (extension.Equals(StackExtension, StringComparison.OrdinalIgnoreCase)) return WebLingoBytecodeKind.Stack;
         return null;
     }
@@ -74,37 +80,6 @@ public static class WebLingoBytecodeFile
             }
         }
         return Assemble(WebLingoBytecodeKind.Register, HeadOf(module), heads, code, handlers, textOf);
-    }
-
-    /// <summary>A stack module as a file, as <see cref="Write(WebLingoCompiledModule, Func{string?, WebLingoSourceText?}?)"/> writes a register module.</summary>
-    public static byte[] Write(WebLingoStackModule module, Func<string?, WebLingoSourceText?>? textOf = null)
-    {
-        var functions = new List<WebLingoStackFunction> { module.EntryPoint };
-        functions.AddRange(module.Functions);
-        var heads = new List<FunctionHead>();
-        foreach (var function in functions) heads.Add(HeadOf(function));
-        var code = new WebLingoBytecodeWriter();
-        var handlers = new WebLingoBytecodeWriter();
-        foreach (var function in functions)
-        {
-            foreach (var instruction in function.Code)
-            {
-                code.Byte((int)instruction.OpCode);
-                code.Signed(instruction.A);
-                code.Signed(instruction.B);
-            }
-            handlers.Count(function.Handlers.Count);
-            foreach (var handler in function.Handlers)
-            {
-                handlers.Signed(handler.Start);
-                handlers.Signed(handler.End);
-                handlers.Signed(handler.Target);
-                handlers.Signed(handler.Value);
-                handlers.Signed(handler.Origin);
-                handlers.Signed(handler.Depth);
-            }
-        }
-        return Assemble(WebLingoBytecodeKind.Stack, HeadOf(module), heads, code, handlers, textOf);
     }
 
     /// <summary>Which VM's bytecode a file holds, from its header; false, with why, for a file that is not WLBC this reader knows.</summary>
@@ -187,81 +162,14 @@ public static class WebLingoBytecodeFile
         return true;
     }
 
-    /// <summary>A file's stack module, verified, as <see cref="TryReadRegister"/> reads a register module.</summary>
-    public static bool TryReadStack(byte[] file, [NotNullWhen(true)] out WebLingoStackModule? module,
-        out IReadOnlyList<WebLingoSourcePositions> positions, out string? error)
-    {
-        module = null;
-        if (!TryOpen(file, WebLingoBytecodeKind.Stack, out var parts, out positions, out error)) return false;
-        var (head, heads, codeReader, handlersReader) = parts;
-        var functions = new List<WebLingoStackFunction>();
-        for (var f = 0; f < heads.Count; f++)
-        {
-            var h = heads[f];
-            if (h.InstructionCount > codeReader.Left / 3) codeReader.Fail($"has fewer instructions than function {f} has");
-            var code = new WebLingoStackInstruction[codeReader.Failed ? 0 : h.InstructionCount];
-            for (var i = 0; i < code.Length; i++)
-            {
-                code[i] = new WebLingoStackInstruction((WebLingoStackOpCode)codeReader.Byte(), codeReader.Int(), codeReader.Int());
-            }
-            var handlers = new WebLingoStackHandler[handlersReader.Count()];
-            for (var i = 0; i < handlers.Length; i++)
-            {
-                handlers[i] = new WebLingoStackHandler(handlersReader.Int(), handlersReader.Int(), handlersReader.Int(),
-                    handlersReader.Int(), handlersReader.Int(), handlersReader.Int());
-            }
-            functions.Add(new WebLingoStackFunction(h.Name, h.First, h.Second, code, h.Spans, h.LocalNames)
-            {
-                ParameterCount = h.ParameterCount,
-                OptionalCount = h.OptionalCount,
-                HasThis = h.HasThis,
-                IsAsync = h.IsAsync,
-                HasRest = h.HasRest,
-                IsNative = h.IsNative,
-                Source = h.Source,
-                NativeBuiltin = h.NativeBuiltin,
-                NativeResult = h.NativeResult,
-                Captures = h.Captures,
-                Handlers = handlers,
-                DebugInfo = h.DebugInfo
-            });
-        }
-        if (Ended(codeReader, handlersReader) is { } damaged)
-        {
-            error = damaged;
-            return false;
-        }
-        var read = new WebLingoStackModule(head.Name, head.Constants, head.Imports, functions[0])
-        {
-            Functions = functions.GetRange(1, functions.Count - 1),
-            Classes = head.Classes,
-            Units = head.Units,
-            ErrorClass = head.ErrorClass,
-            ObjectClass = head.ObjectClass,
-            ValueClasses = head.ValueClasses,
-            ErrorClasses = head.ErrorClasses,
-            IsImport = head.IsImport,
-            Parameters = head.Parameters
-        };
-        var verification = new WebLingoStackBytecodeVerifier().Verify(read);
-        if (!verification.IsValid)
-        {
-            error = "The file's bytecode fails verification: " + verification.Error;
-            return false;
-        }
-        module = read;
-        return true;
-    }
-
-    /// <summary>What both VMs' modules have alike.</summary>
+    /// <summary>A module's head: everything but its functions' code and handlers.</summary>
     private sealed record ModuleHead(string Name, bool IsImport, int ErrorClass, int ObjectClass, IReadOnlyList<int> ValueClasses,
         IReadOnlyList<WebLingoErrorClass> ErrorClasses, IReadOnlyList<WebLingoModuleParameter> Parameters,
         IReadOnlyList<WebLingoImport> Imports, IReadOnlyList<WebLingoConstant> Constants, IReadOnlyList<WebLingoClassInfo> Classes,
         IReadOnlyList<WebLingoUnitInfo> Units);
 
     /// <summary>
-    /// What both VMs' functions have alike: <see cref="First"/> and <see cref="Second"/> are a register function's
-    /// register and local counts, a stack function's local count and most stack values.
+    /// A function's head: <see cref="First"/> and <see cref="Second"/> are its register and local counts.
     /// </summary>
     private sealed record FunctionHead(string Name, int First, int Second, int ParameterCount, int OptionalCount, bool HasThis,
         bool IsAsync, bool IsNative, string? Source, int NativeBuiltin, WebLingoNativeResult NativeResult,
@@ -279,19 +187,7 @@ public static class WebLingoBytecodeFile
     private static ModuleHead HeadOf(WebLingoCompiledModule m) => new(m.Name, m.IsImport, m.ErrorClass, m.ObjectClass,
         m.ValueClasses, m.ErrorClasses, m.Parameters, m.Imports, m.Constants, m.Classes, m.Units);
 
-    private static ModuleHead HeadOf(WebLingoStackModule m) => new(m.Name, m.IsImport, m.ErrorClass, m.ObjectClass,
-        m.ValueClasses, m.ErrorClasses, m.Parameters, m.Imports, m.Constants, m.Classes, m.Units);
-
     private static FunctionHead HeadOf(WebLingoFunction f) => new(f.Name, f.RegisterCount, f.LocalCount, f.ParameterCount,
-        f.OptionalCount, f.HasThis, f.IsAsync, f.IsNative, f.Source, f.NativeBuiltin, f.NativeResult, f.Captures, f.Code.Count)
-    {
-        Spans = f.Spans,
-        LocalNames = f.LocalNames,
-        DebugInfo = f.DebugInfo,
-        HasRest = f.HasRest
-    };
-
-    private static FunctionHead HeadOf(WebLingoStackFunction f) => new(f.Name, f.LocalCount, f.MaxStack, f.ParameterCount,
         f.OptionalCount, f.HasThis, f.IsAsync, f.IsNative, f.Source, f.NativeBuiltin, f.NativeResult, f.Captures, f.Code.Count)
     {
         Spans = f.Spans,
@@ -614,9 +510,8 @@ public static class WebLingoBytecodeFile
         if (!TryReadKind(file, out var found, out error)) return false;
         if (found != kind)
         {
-            error = found == WebLingoBytecodeKind.Stack
-                ? "The file holds the stack VM's bytecode, which the register VM does not run."
-                : "The file holds the register VM's bytecode, which the stack VM does not run.";
+            // The stack VM's, which WebLingo had until 23 November 2026, when the owner chose the register VM (WL-BC002).
+            error = "The file holds the stack VM's bytecode, which WebLingo no longer runs: it has one VM, the register VM.";
             return false;
         }
         var (count, directory, length) = (Fixed(file, 12, 4), Fixed(file, 16, 8), Fixed(file, 24, 8));
@@ -669,7 +564,7 @@ public static class WebLingoBytecodeFile
         if (debuggingReader is not null)
         {
             var source = head.IsImport && head.Name.StartsWith("import ", StringComparison.Ordinal) ? head.Name[7..] : head.Name;
-            ReadDebugging(debuggingReader, functions, kind, source);
+            ReadDebugging(debuggingReader, functions, source);
         }
         error = Ended(moduleReader, constantsReader, functionsReader, classesReader)
                 ?? (positionsReader is null ? null : Ended(positionsReader))
@@ -810,13 +705,13 @@ public static class WebLingoBytecodeFile
     /// Gives each function the debugger's metadata the debugging section has for it, its file its own or the module's,
     /// <paramref name="source"/>, each instruction, local and capture checked against the function.
     /// </summary>
-    private static void ReadDebugging(WebLingoBytecodeReader r, List<FunctionHead> functions, WebLingoBytecodeKind kind, string source)
+    private static void ReadDebugging(WebLingoBytecodeReader r, List<FunctionHead> functions, string source)
     {
         foreach (var f in functions)
         {
             if (r.Failed) return;
             if (!r.Boolean()) continue;
-            var locals = kind == WebLingoBytecodeKind.Register ? f.Second : f.First;
+            var locals = f.Second;
             var points = new Dictionary<int, WebLingoSourceSpan>();
             var previous = -1;
             for (var count = r.Count(); count > 0 && !r.Failed; count--)

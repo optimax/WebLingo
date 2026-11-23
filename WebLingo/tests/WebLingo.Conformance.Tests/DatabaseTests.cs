@@ -270,9 +270,9 @@ public sealed class DatabaseTests : IDisposable
         var path = Write(Setup + "await db.transaction(async () => { await db.execute(\"DELETE FROM Fish WHERE Id = 1\"); }); " +
                          "writeLn(await db.query(\"SELECT Name FROM Fish\"));");
         var (compiled, error) = (new StringWriter(), new StringWriter());
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", path], compiled, error));
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", path], compiled, error));
         var output = new StringWriter();
-        var exit = WebLingoCommandLine.Run(["run", Path.ChangeExtension(path, ".wlbs")], output, error);
+        var exit = WebLingoCommandLine.Run(["run", Path.ChangeExtension(path, ".wlb")], output, error);
         Assert.Equal((WebLingoCommandLine.Success, "[{\"Name\": \"Clownfish\"}]\n", ""), (exit, output.ToString(), error.ToString()));
     }
 
@@ -299,9 +299,9 @@ public sealed class DatabaseTests : IDisposable
         var error = new StringWriter();
         if (stack)
         {
-            var compile = WebLingoCommandLine.Run(["compile", "--stack", path], output, error);
+            var compile = WebLingoCommandLine.Run(["compile", path], output, error);
             if (compile != WebLingoCommandLine.Success) return (compile, output.ToString(), error.ToString());
-            path = Path.ChangeExtension(path, ".wlbs");
+            path = Path.ChangeExtension(path, ".wlb");
             output.GetStringBuilder().Clear();
         }
         var exit = WebLingoCommandLine.Run(["run", path], output, error);

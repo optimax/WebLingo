@@ -2,7 +2,6 @@ using WebLingo.Compiler;
 using WebLingo.Core;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
-using WebLingo.VM.Stack;
 using Xunit;
 namespace WebLingo.VM.Tests;
 
@@ -18,7 +17,7 @@ public sealed class HostParameterTests
     {
         const string program = "param thing; param n = 2; import { write, writeLn } from \"std:system\"; function f() { return thing.name; } class Late { } "
                                + "writeLn([thing.name, n, f(), thing == f2()]); function f2() { return thing; }";
-        foreach (var vm in new[] { false, true })
+        foreach (var vm in new[] { false })
         {
             var (diagnostics, output, error) = Run(program, vm);
             Assert.Empty(diagnostics);
@@ -30,7 +29,7 @@ public sealed class HostParameterTests
     [Fact]
     public void AProgramWithOnlyTheHostsParameterTakesNoOthers()
     {
-        foreach (var vm in new[] { false, true })
+        foreach (var vm in new[] { false })
         {
             var (diagnostics, output, error) = Run("param thing; import { write, writeLn } from \"std:system\"; writeLn(thing.name);", vm);
             Assert.Empty(diagnostics);
@@ -61,12 +60,6 @@ public sealed class HostParameterTests
         foreach (var member in members) services.Register(member);
         services.Register(new Maker(thing));
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0)) { Services = services };
-        if (stack)
-        {
-            var compiled = new WebLingoStackCompiler(options).Compile(program, "main.wlg");
-            var result = compiled.Module is { } module ? new WebLingoStackVirtualMachine().Execute(module, context) : null;
-            return (compiled.Diagnostics, output.Text, result?.Error);
-        }
         var registerCompiled = new WebLingoCompiler(options).Compile(program, "main.wlg");
         var registerResult = registerCompiled.Module is { } registerModule ? new WebLingoVirtualMachine().Execute(registerModule, context) : null;
         return (registerCompiled.Diagnostics, output.Text, registerResult?.Error);

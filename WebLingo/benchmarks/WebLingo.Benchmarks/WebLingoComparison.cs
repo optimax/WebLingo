@@ -10,7 +10,7 @@ public sealed record WebLingoComparisonProgram(string Name, string Exercises, st
 /// <summary>
 /// A way of running the comparison's programs: a language's runtime, named on the command line by <see cref="Name"/>,
 /// headed in the table by <see cref="Heading"/>, given a program's file of its extension after its own arguments, in its
-/// folder, <see cref="Folder"/> for WebLingo's (a copy of the programs with its <c>weblingo.config</c>).
+/// folder, <see cref="Folder"/> for WebLingo's (a copy of the programs, compiled there).
 /// </summary>
 public sealed record WebLingoComparisonRuntime(
     string Name, string Heading, string Language, string Extension, IReadOnlyList<string> Arguments, string? Folder = null);
@@ -21,7 +21,7 @@ public sealed record WebLingoComparisonRuntime(
 /// [--python PATH] [--lua PATH]</c>. Each program of <c>Comparative/</c>, written alike in each language, is run as a
 /// user runs it, a process of its runtime's, timed whole, start-up included, and <c>empty</c>, which only writes 0,
 /// measures each runtime's start-up, which a second table takes away. WebLingo runs as <c>weblingo</c>, the one beside
-/// the benchmark unless <c>--weblingo</c> names another, on both VMs, from source and compiled; JavaScript on Node.js,
+/// the benchmark unless <c>--weblingo</c> names another, from source and compiled; JavaScript on Node.js,
 /// with its JIT and without it (<c>--jitless</c>), Python on CPython and Lua on Lua 5.4, each found on the PATH unless
 /// named. A runtime that is not found is left out, and said so. Exit codes as the benchmark's.
 /// </summary>
@@ -42,10 +42,8 @@ public static class WebLingoComparison
 
     public static IReadOnlyList<WebLingoComparisonRuntime> Runtimes { get; } =
     [
-        new("weblingo-register", "WebLingo, register VM", "weblingo", ".wlg", ["run"], "register"),
-        new("weblingo-register-compiled", "WebLingo, register VM, compiled", "weblingo", ".wlbr", ["run"], "register"),
-        new("weblingo-stack", "WebLingo, stack VM", "weblingo", ".wlg", ["run"], "stack"),
-        new("weblingo-stack-compiled", "WebLingo, stack VM, compiled", "weblingo", ".wlbs", ["run"], "stack"),
+        new("weblingo", "WebLingo", "weblingo", ".wlg", ["run"], "weblingo"),
+        new("weblingo-compiled", "WebLingo, compiled", "weblingo", ".wlb", ["run"], "weblingo"),
         new("node", "JavaScript, Node.js", "node", ".js", []),
         new("node-jitless", "JavaScript, Node.js without JIT", "node", ".js", ["--jitless"]),
         new("python", "Python, CPython", "python", ".py", []),
@@ -145,8 +143,8 @@ public static class WebLingoComparison
     }
 
     /// <summary>
-    /// A copy of the WebLingo programs for each VM, its <c>weblingo.config</c> naming it, each compiled there for the
-    /// runtimes that run bytecode; the other languages' programs are run where they are.
+    /// A copy of the WebLingo programs, each compiled there for the runtime that runs bytecode; the other languages'
+    /// programs are run where they are.
     /// </summary>
     private static void Prepare(string work, IReadOnlyList<WebLingoComparisonProgram> programs,
         IReadOnlyList<WebLingoComparisonRuntime> runtimes, IReadOnlyDictionary<string, string> executables)
@@ -155,13 +153,12 @@ public static class WebLingoComparison
         {
             var target = Path.Combine(work, folder);
             Directory.CreateDirectory(target);
-            File.WriteAllText(Path.Combine(target, "weblingo.config"), $"{{ \"vm\": \"{folder}\" }}\n");
             foreach (var program in programs)
             {
                 File.Copy(Path.Combine(ProgramsFolder, program.Name + ".wlg"), Path.Combine(target, program.Name + ".wlg"));
                 if (!runtimes.Any(runtime => runtime.Folder == folder && runtime.Extension != ".wlg")) continue;
                 var (exit, text) = RunOnce(executables["weblingo"], ["compile", program.Name + ".wlg"], target);
-                if (exit != 0) throw new InvalidOperationException($"{program.Name}.wlg did not compile for the {folder} VM: {text}");
+                if (exit != 0) throw new InvalidOperationException($"{program.Name}.wlg did not compile: {text}");
             }
         }
     }

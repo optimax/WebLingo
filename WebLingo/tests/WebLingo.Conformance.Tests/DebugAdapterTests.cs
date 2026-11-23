@@ -15,7 +15,6 @@ public sealed class DebugAdapterTests : IDisposable
     [Fact]
     public async Task BreakpointsAndStepsUseRealFramesAndVariables()
     {
-        Write("weblingo.config", """{ "vm": "stack" }""");
         var math = Write("math.wlg", """
             export function twice(value) {
                 var total = value * 2;

@@ -65,7 +65,7 @@ weblingo hello.wlg
 | `weblingo run <file.wlg> [name=value …]` | compiles the script and runs it, giving its parameters the values after it |
 | `weblingo <file.wlg> [name=value …]` | the same, the file named first, as a scripting language's runner takes it; a bytecode file works too |
 | `weblingo check <file.wlg>` | compiles the script and reports its errors, without running it |
-| `weblingo compile [--register \| --stack] [--debug] <file.wlg>` | compiles the script into `.wlbr` (register) or `.wlbs` (stack) beside it; `--debug` also writes the names and positions a debugger uses |
+| `weblingo compile [--debug] <file.wlg>` | compiles the script into a bytecode file, `.wlb`, beside it; `--debug` also writes the names and positions a debugger uses |
 | `weblingo run <bytecode-file>` | runs compiled bytecode without compiling anything |
 | `weblingo disasm <bytecode-file>` | shows compiled bytecode as text, naming its variables, functions, classes and files; a file compiled with `--debug` adds its captures' names, each statement's line and column, and where each variable is visible |
 | `weblingo --version` | its version and its build's number, `WebLingo 0.20.0 (2026.11.21.2330)`, which `weblingo` alone prints first, before how it is used |
@@ -80,11 +80,9 @@ there, and waits for nothing. `weblingow`, beside it, is `weblingo` as a Windows
 for a script that imports `std:console`, on every Windows. Where neither has a console, a script that fails, to compile
 or while it runs, shows its errors in a message box.
 
-`weblingo run` of a `.wlg` compiles it in memory, and writes no file; `weblingo compile` writes one, for the register VM
-by default (`.wlbr`). Set `"vm": "stack"` in the script's `weblingo.config` to use the stack VM for
-`run`, `check`, and `compile`. For `compile`, `--register` or `--stack` overrides that setting.
-Compiled files name their VM in the header. The CLI rejects a header that disagrees with a VM-specific extension or an
-explicit configuration setting. `weblingo disasm hello.wlbr` shows what the compiler made.
+`weblingo run` of a `.wlg` compiles it in memory, and writes no file; `weblingo compile` writes one, `.wlb`, which
+`weblingo run hello.wlb` runs without compiling anything, and `weblingo disasm hello.wlb` shows as text, what the compiler
+made. A `.wlbr` or a `.wlbc`, which earlier builds wrote, runs as a `.wlb` does.
 
 ```text
 function main of hello.wlg (4 locals, 5 registers)

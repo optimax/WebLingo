@@ -32,7 +32,6 @@ public sealed class BytecodeFileTests
             offset += length;
         }
         Assert.Equal((ulong)file.Length, offset);
-        Assert.Equal(2ul, Fixed(WebLingoBytecodeFile.Write(StackModule()), 8, 2));
     }
 
     [Fact]
@@ -65,13 +64,6 @@ public sealed class BytecodeFileTests
         Assert.Equal(module.Units.Select(u => (u.Name, u.Function, u.IsNative, string.Join(",", u.Exports))),
             read.Units.Select(u => (u.Name, u.Function, u.IsNative, string.Join(",", u.Exports))));
         Assert.Equal(["count"], read.Classes[0].StaticFields);
-
-        var stack = StackModule();
-        var stackFile = WebLingoBytecodeFile.Write(stack, Texts);
-        Assert.True(WebLingoBytecodeFile.TryReadStack(stackFile, out var readStack, out _, out error), error);
-        Assert.Equal(stackFile, WebLingoBytecodeFile.Write(readStack, Texts));
-        Assert.Equal(stack.EntryPoint.Code, readStack.EntryPoint.Code);
-        Assert.Equal(stack.EntryPoint.Handlers, readStack.EntryPoint.Handlers);
     }
 
     [Fact]
@@ -137,12 +129,6 @@ public sealed class BytecodeFileTests
         Assert.Contains("variable w: r0(a).\"writeLn\", visible 2:1 to 2:11\n", text);
         Assert.Contains("variable e: r0, visible 1:3 to 1:4\n", text);
         Assert.DoesNotContain("variable", WebLingoDisassembler.Format(ReadRegister(WebLingoBytecodeFile.Write(RegisterModule(), Texts))));
-
-        var stack = WebLingoBytecodeFile.Write(DebugStackModule(), Texts);
-        Assert.True(WebLingoBytecodeFile.TryReadStack(stack, out var readStack, out _, out error), error);
-        Assert.Equal("stack.wlg", readStack.EntryPoint.DebugInfo!.Source);
-        Assert.Equal(DebugStackModule().EntryPoint.DebugInfo!.Locals, readStack.EntryPoint.DebugInfo.Locals);
-        Assert.Equal(stack, WebLingoBytecodeFile.Write(readStack, Texts));
     }
 
     [Fact]
@@ -187,15 +173,16 @@ public sealed class BytecodeFileTests
     }
 
     [Fact]
-    public void EachVmRefusesTheOthersBytecode()
+    public void TheStackVmsBytecodeIsRefused()
     {
-        var stack = WebLingoBytecodeFile.Write(StackModule());
+        // A file whose header names the stack VM, which WebLingo had until the owner chose the register VM (23 November
+        // 2026, WL-BC002): known for what it is, and refused.
+        var stack = WebLingoBytecodeFile.Write(RegisterModule());
+        SetFixed(stack, 8, 2, 2);
         Assert.True(WebLingoBytecodeFile.TryReadKind(stack, out var kind, out _));
         Assert.Equal(WebLingoBytecodeKind.Stack, kind);
         Assert.False(WebLingoBytecodeFile.TryReadRegister(stack, out _, out _, out var error));
-        Assert.Equal("The file holds the stack VM's bytecode, which the register VM does not run.", error);
-        Assert.False(WebLingoBytecodeFile.TryReadStack(WebLingoBytecodeFile.Write(RegisterModule()), out _, out _, out error));
-        Assert.Equal("The file holds the register VM's bytecode, which the stack VM does not run.", error);
+        Assert.Equal("The file holds the stack VM's bytecode, which WebLingo no longer runs: it has one VM, the register VM.", error);
     }
 
     [Fact]
@@ -239,7 +226,7 @@ public sealed class BytecodeFileTests
     public void ChangedBytesNeverMakeTheReaderThrow()
     {
         // The register module with the debugger's metadata, so that its debugging section is changed too.
-        var files = new[] { WebLingoBytecodeFile.Write(DebugRegisterModule(), Texts), WebLingoBytecodeFile.Write(StackModule(), Texts) };
+        var files = new[] { WebLingoBytecodeFile.Write(DebugRegisterModule(), Texts), WebLingoBytecodeFile.Write(RegisterModule(), Texts) };
         var random = new Random(5_3);
         var (refusedByCrc, read, refused) = (0, 0, 0);
         for (var round = 0; round < 20_000; round++)
@@ -256,9 +243,7 @@ public sealed class BytecodeFileTests
             {
                 for (var section = 1; section <= 8; section++) Recrc(file, section);
             }
-            var ok = round % 2 == 0
-                ? WebLingoBytecodeFile.TryReadRegister(file, out _, out _, out var error)
-                : WebLingoBytecodeFile.TryReadStack(file, out _, out _, out error);
+            var ok = WebLingoBytecodeFile.TryReadRegister(file, out _, out _, out var error);
             if (ok)
             {
                 read++;
@@ -349,31 +334,6 @@ public sealed class BytecodeFileTests
             ]
         };
     }
-
-    private static WebLingoStackModule DebugStackModule()
-    {
-        var module = StackModule();
-        return module with
-        {
-            EntryPoint = module.EntryPoint with
-            {
-                DebugInfo = new("stack.wlg", new Dictionary<int, WebLingoSourceSpan> { [0] = new(0, 1) },
-                    [new WebLingoDebugLocal("s", 1, 0, 5)], [])
-            }
-        };
-    }
-
-    private static WebLingoStackModule StackModule() =>
-        new("stack.wlg", [WebLingoConstant.String("s")], [new WebLingoImport("writeLn", 1)],
-            new WebLingoStackFunction("main", 2, 1,
-                [
-                    new WebLingoStackInstruction(WebLingoStackOpCode.LoadConstant, 0),
-                    new WebLingoStackInstruction(WebLingoStackOpCode.Throw),
-                    new WebLingoStackInstruction(WebLingoStackOpCode.Return)
-                ])
-            {
-                Handlers = [new WebLingoStackHandler(0, 2, 2, 0, 1, 0)]
-            });
 
     private static WebLingoCompiledModule ReadRegister(byte[] file)
     {

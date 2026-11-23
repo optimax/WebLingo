@@ -11,7 +11,6 @@ namespace WebLingo.Cli;
 /// those the command line gives, <c>--scheme native=folder</c>, a relative folder from the current one, each over the
 /// file's of its name. A scheme's name is ASCII letters and digits, a letter first, at least two of them, so that a drive
 /// letter is never one. And an application's mode, <c>"mode": "development"</c> or <c>"production"</c>,
-/// the configured VM for a script or site, <c>"vm": "register"</c> or <c>"stack"</c>,
 /// and how long, in seconds, a page waits for a client that has not taken its output, <c>"sendTimeout": 30</c>, a number
 /// more than 0 (specification, section 6.12, "Streaming"), which only <c>wasp serve</c> reads; and the hosts its scripts may
 /// reach, <c>"network": { "allow": ["api.example.com"] }</c>, which <c>wasp</c> reads, <c>weblingo</c>'s scripts reaching
@@ -55,15 +54,8 @@ public static class WebLingoSchemes
         out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out IReadOnlyDictionary<string, string> databases,
         out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed, out WebLingoEnvSettings env,
         out string? error) =>
-        TryLoad(program, configuration, given, out schemes, out allowedHosts, out databases, out files, out allowed,
-            out env, out _, out error);
-
-    public static bool TryLoad(string program, string configuration, IReadOnlyDictionary<string, string> given,
-        out Dictionary<string, string> schemes, out IReadOnlyList<string> allowedHosts, out IReadOnlyDictionary<string, string> databases,
-        out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed, out WebLingoEnvSettings env,
-        out WebLingoBytecodeKind? vm, out string? error) =>
         TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
-            out databases, out files, out allowed, out env, out vm, out error);
+            out databases, out files, out allowed, out env, out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
@@ -91,14 +83,7 @@ public static class WebLingoSchemes
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, string> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
-        out WebLingoEnvSettings env, out string? error) =>
-        TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out allowedHosts, out databases,
-            out files, out allowed, out env, out _, out error);
-
-    public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
-        out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
-        out IReadOnlyDictionary<string, string> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
-        out WebLingoEnvSettings env, out WebLingoBytecodeKind? vm, out string? error)
+        out WebLingoEnvSettings env, out string? error)
     {
         env = WebLingoEnvSettings.None;
         var allowing = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
@@ -116,11 +101,11 @@ public static class WebLingoSchemes
         };
         // Windows's own native modules, windows:com among them, beside the program on Windows only (section 3.10).
         if (OperatingSystem.IsWindows()) schemes["windows"] = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "windows"));
-        (mode, vm, error) = (null, null, null);
+        (mode, error) = (null, null);
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
         if (File.Exists(file) && !TryRead(file, folder, schemes, ref mode, ref sendTimeout, hosts, named, read, write,
-            allowing, ref env, ref vm, out error))
+            allowing, ref env, out error))
         {
             return false;
         }
@@ -203,7 +188,7 @@ public static class WebLingoSchemes
 
     private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? mode, ref double? sendTimeout,
         List<string> hosts, Dictionary<string, string> databases, List<string> read, List<string> write,
-        Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, ref WebLingoBytecodeKind? vm, out string? error)
+        Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, out string? error)
     {
         error = null;
         try
@@ -216,16 +201,6 @@ public static class WebLingoSchemes
             }
             foreach (var setting in document.RootElement.EnumerateObject())
             {
-                if (setting.Name == "vm")
-                {
-                    if (setting.Value.ValueKind != JsonValueKind.String || setting.Value.GetString() is not ("register" or "stack"))
-                    {
-                        error = $"{file}: \"vm\" is \"register\" or \"stack\".";
-                        return false;
-                    }
-                    vm = setting.Value.GetString() == "stack" ? WebLingoBytecodeKind.Stack : WebLingoBytecodeKind.Register;
-                    continue;
-                }
                 if (setting.Name == "mode")
                 {
                     if (setting.Value.ValueKind != JsonValueKind.String || setting.Value.GetString() is not ("development" or "production"))
@@ -324,7 +299,7 @@ public static class WebLingoSchemes
                 }
                 if (setting.Name != "schemes")
                 {
-                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"vm\", \"mode\", "
+                    error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"mode\", "
                             + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\" and \"env\".";
                     return false;
                 }

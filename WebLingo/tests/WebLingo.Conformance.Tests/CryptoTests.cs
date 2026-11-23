@@ -74,8 +74,8 @@ public sealed class CryptoTests : IDisposable
         var path = Path.Combine(_folder, "program.wlg");
         File.WriteAllText(path, program);
         var register = Weblingo("run", path);
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", path).Exit);
-        var stack = Weblingo("run", Path.ChangeExtension(path, ".wlbs"));
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", path).Exit);
+        var stack = Weblingo("run", Path.ChangeExtension(path, ".wlb"));
         Assert.Equal((register.Output, register.Error), (stack.Output, stack.Error));
         return (register.Output, register.Error);
     }

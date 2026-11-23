@@ -29,8 +29,8 @@ public sealed class ConsoleProgramTests : IDisposable
         Assert.Equal((WebLingoCommandLine.Success, "3\n", true), Run("run", later));
         Assert.Equal((WebLingoCommandLine.Success, "", false), Run("check", loud));
         Assert.Equal((WebLingoCommandLine.Success, "", false), Run("compile", loud));
-        Assert.Equal((WebLingoCommandLine.Success, "2\n", true), Run("run", Path.ChangeExtension(loud, ".wlbr")));
-        Assert.Equal((WebLingoCommandLine.Success, "", false), Run("check", Path.ChangeExtension(loud, ".wlbr")));
+        Assert.Equal((WebLingoCommandLine.Success, "2\n", true), Run("run", Path.ChangeExtension(loud, ".wlb")));
+        Assert.Equal((WebLingoCommandLine.Success, "", false), Run("check", Path.ChangeExtension(loud, ".wlb")));
     }
 
     [Fact]

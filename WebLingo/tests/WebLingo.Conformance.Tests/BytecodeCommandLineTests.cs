@@ -15,23 +15,24 @@ public sealed class BytecodeCommandLineTests : IDisposable
 
     public void Dispose() => Directory.Delete(_folder, recursive: true);
 
-    [Theory]
-    [InlineData(1)]
-    [InlineData(1, "--register")]
-    [InlineData(1, "--vm", "register")]
-    [InlineData(2, "--stack")]
-    [InlineData(2, "--vm", "stack")]
-    public void CompileWritesTheRegisterVmsBytecodeUnlessAskedForTheStackVms(int header, params string[] options)
+    [Fact]
+    public void CompileWritesAWlbFile()
     {
+        // One VM, the register VM, the owner's choice (23 November 2026, WL-BC002), its bytecode a .wlb file (the owner's
+        // request the same day), which no option chooses.
         var main = Write("main.wlg", "import { write, writeLn } from \"std:console\"; writeLn(42);\n");
-        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo(["compile", .. options, main]));
-        Assert.Equal(header, File.ReadAllBytes(Path.ChangeExtension(main, header == 1 ? ".wlbr" : ".wlbs"))[8]);
+        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo("compile", main));
+        Assert.Equal(1, File.ReadAllBytes(Path.ChangeExtension(main, ".wlb"))[8]);
         Assert.Equal(2, Files().Length);
+        foreach (var option in new[] { "--register", "--stack", "--vm" })
+        {
+            var (exit, _, error) = Weblingo("compile", option, main);
+            Assert.Equal((WebLingoCommandLine.UsageError, $"'{option}' is not an option of compile."), (exit, error.TrimEnd()));
+        }
     }
 
     [Theory]
     [InlineData("register", 1)]
-    [InlineData("stack", 2)]
     public void ACompiledProgramRunsFromItsFileAsFromItsSource(string vm, int header)
     {
         Write("lib/greet.wlg", "export function greet(name) { return \"Hello, \" + name + \"!\"; }");
@@ -39,7 +40,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         var fromSource = Weblingo("run", main, "who=WLBC");
         Assert.Equal((WebLingoCommandLine.Success, "Hello, WLBC!\n", ""), fromSource);
 
-        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo("compile", "--" + vm, main));
+        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo("compile", main));
         var compiled = Path.ChangeExtension(main, Extension(vm));
         Assert.Equal((ulong)header, (ulong)File.ReadAllBytes(compiled)[8]);
         // The program and the file it imports are in the compiled file: it runs without them.
@@ -51,7 +52,6 @@ public sealed class BytecodeCommandLineTests : IDisposable
 
     [Theory]
     [InlineData("register")]
-    [InlineData("stack")]
     public void ARuntimeErrorIsLocatedFromTheFileAlone(string vm)
     {
         Write("lib/util.wlg", "export function f(n) {\n  return [1][n];\n}\n");
@@ -60,13 +60,13 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, fromSource.Exit);
         Assert.EndsWith("lib/util.wlg(2,10): ERROR WL3005 (IndexError): The index 2 is outside 0 to 0.", fromSource.Error.TrimEnd());
 
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         File.Delete(Path.Combine(_folder, "lib", "util.wlg"));
         Assert.Equal(fromSource, Weblingo("run", Path.ChangeExtension(main, Extension(vm))));
 
         // An error in the program's own file names it as the file beside the bytecode.
         main = Write("main.wlg", "var a = 1;\nvar b = a / 0 + null;\n");
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         var (exit, _, error) = Weblingo("run", Path.ChangeExtension(main, Extension(vm)));
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
         Assert.Equal(Weblingo("run", main).Error, error);
@@ -75,7 +75,6 @@ public sealed class BytecodeCommandLineTests : IDisposable
 
     [Theory]
     [InlineData("register")]
-    [InlineData("stack")]
     public void AnUncaughtExceptionNamesItsOwnClass(string vm)
     {
         var main = Write("main.wlg", "class MyError extends Error {}\nthrow new MyError(\"broken\");\n");
@@ -83,7 +82,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.Equal(WebLingoCommandLine.RuntimeFailed, fromSource.Exit);
         Assert.Equal(main + "(2,1): ERROR WL3008 (MyError): An error was thrown and not caught: broken", fromSource.Error.TrimEnd());
 
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         Assert.Equal(fromSource, Weblingo("run", Path.ChangeExtension(main, Extension(vm))));
     }
 
@@ -98,7 +97,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
             expected.Error);
         foreach (var vm in new[] { "register", "stack" })
         {
-            Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+            Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
             Assert.Equal(expected, Weblingo("run", "--timeout", "10", Path.ChangeExtension(main, Extension(vm))));
         }
     }
@@ -119,7 +118,6 @@ public sealed class BytecodeCommandLineTests : IDisposable
 
     [Theory]
     [InlineData("register", "r")]
-    [InlineData("stack", "l")]
     public void DisasmNamesAFilesBodyByItsFile(string vm, string kind)
     {
         // A file's top level, which has no name in the source, is headed as its file's body, and closed over as one (the
@@ -127,7 +125,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         // file, as the owner asked the same day.
         Write("lib/util.wlg", "export function twice(x) { return x * 2; }");
         var main = Write("main.wlg", "import { writeLn } from \"std:console\";\nimport { twice } from \"lib/util.wlg\";\nwriteLn(twice(21));\n");
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         var disassembly = Weblingo("disasm", Path.ChangeExtension(main, Extension(vm))).Output;
         Assert.StartsWith("function main of main.wlg (", disassembly);
         Assert.Contains("\nfunction module_body of lib/util.wlg (", disassembly);
@@ -138,7 +136,6 @@ public sealed class BytecodeCommandLineTests : IDisposable
 
     [Theory]
     [InlineData("register")]
-    [InlineData("stack")]
     public void AClassThatDeclaresNoConstructorHasNone(string vm)
     {
         // A class that declares no constructor has none in the program, new passing its arguments on to a base's, or
@@ -152,7 +149,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
             writeLn([new P().name(), new Q().name(), new R(5).x]);
             new Q(1);
             """);
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         var compiled = Path.ChangeExtension(main, Extension(vm));
         var disassembly = Weblingo("disasm", compiled).Output;
         Assert.DoesNotMatch(@"\nfunction function\d+ (P|Q) \(", disassembly);
@@ -169,18 +166,17 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Write("lib/util.wlg", "export function twice(x) { return x * 2; }");
         var main = Write("main.wlg", "import { write, writeLn } from \"std:console\"; import { twice } from \"lib/util.wlg\";\nwriteLn(twice(21));\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
-        var text = System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(_folder, "main.wlbr")));
+        var text = System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(_folder, "main.wlb")));
         Assert.DoesNotContain(Path.GetFileName(_folder), text);
         Assert.Contains("lib/util.wlg", text);
     }
 
     [Theory]
     [InlineData("register", "function main of main.wlg (", " registers)")]
-    [InlineData("stack", "function main of main.wlg (", " stack)")]
     public void DisasmShowsTheBytecode(string vm, string start, string kind)
     {
         var main = Write("main.wlg", "import { write, writeLn } from \"std:console\"; var x = 40;\nwriteLn(x + 2);\n");
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         var (exit, output, error) = Weblingo("disasm", Path.ChangeExtension(main, Extension(vm)));
         Assert.Equal((WebLingoCommandLine.Success, ""), (exit, error));
         Assert.StartsWith(start, output);
@@ -190,7 +186,6 @@ public sealed class BytecodeCommandLineTests : IDisposable
 
     [Theory]
     [InlineData("register", "r")]
-    [InlineData("stack", "l")]
     public void ADebugFileNamesItsVariablesCapturesAndStatements(string vm, string local)
     {
         // compile --debug writes the debugger's metadata, which disasm shows (the owner's request, 22 November 2026, "Debug
@@ -202,7 +197,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
             var make = (k) => () => k + twice(new Point(1).x);
             writeLn(make(3)());
             """);
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
         var compiled = Path.ChangeExtension(main, Extension(vm));
         var plain = Weblingo("disasm", compiled).Output;
         Assert.Matches(@"MakeClass .*class\d+\(Point\)", plain);
@@ -212,7 +207,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.DoesNotMatch(@"capture\d+\(k\)", plain);
         var size = new FileInfo(compiled).Length;
 
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, "--debug", main).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--debug", main).Exit);
         Assert.True(new FileInfo(compiled).Length > size);
         Assert.Equal((WebLingoCommandLine.Success, "5\n", ""), Weblingo("run", compiled));
         var (exit, output, error) = Weblingo("disasm", compiled);
@@ -227,14 +222,13 @@ public sealed class BytecodeCommandLineTests : IDisposable
 
     [Theory]
     [InlineData("register")]
-    [InlineData("stack")]
     public void ANativeModulesNamedImportIsItsExportItself(string vm)
     {
         // A name an import takes of a native module's export, which nothing assigns, is the export itself, a function called
         // as the built-in it is, without reading the module's member (the owner's request, 22 November 2026, "A Native
         // Module's Named Imports Bound Directly"); what the program writes, and its errors, as before.
         var calls = Write("calls.wlg", "import { writeLn } from \"std:console\";\nimport { abs } from \"std:math\";\nwriteLn(abs(-2));\n");
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, calls).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", calls).Exit);
         var disassembly = Weblingo("disasm", Path.ChangeExtension(calls, Extension(vm))).Output;
         var main = disassembly.Split("\n\n")[0];
         Assert.Contains("CallBuiltin", main);
@@ -260,7 +254,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
             writeLn([f == console.writeLn, Console == console.Console, PI == math.PI, min(3, 1, 2), math == await Module.import("std:math")]);
             writeLn();
             """);
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + vm, same).Exit);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", same).Exit);
         Assert.Matches(@"Import .*\(std:console\)", Weblingo("disasm", Path.ChangeExtension(same, Extension(vm))).Output);
         var (exit, output, error) = Weblingo("run", Path.ChangeExtension(same, Extension(vm)));
         Assert.Equal((WebLingoCommandLine.RuntimeFailed, "[true, true, true, 1, true]\n"), (exit, output));
@@ -282,7 +276,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
             """);
         Assert.Equal((WebLingoCommandLine.Success, "[\"$\", \"CHF\"]\n", ""), Weblingo("run", has));
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", has).Exit);
-        Assert.DoesNotContain("beep", Weblingo("disasm", Path.ChangeExtension(has, ".wlbr")).Output);
+        Assert.DoesNotContain("beep", Weblingo("disasm", Path.ChangeExtension(has, ".wlb")).Output);
 
         Write("other.wlg", "import console from \"std:console\";\nimport { writeLn } from \"std:console\";\nexport var w = writeLn;\n");
         var hasNot = Write("hasNot.wlg", """
@@ -292,7 +286,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
             """);
         Assert.Equal((WebLingoCommandLine.Success, "false\n", ""), Weblingo("run", hasNot));
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", hasNot).Exit);
-        Assert.Contains("beep", Weblingo("disasm", Path.ChangeExtension(hasNot, ".wlbr")).Output);
+        Assert.Contains("beep", Weblingo("disasm", Path.ChangeExtension(hasNot, ".wlb")).Output);
     }
 
     [Fact]
@@ -300,7 +294,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
     {
         var main = Write("main.wlg", "import { write, writeLn } from \"std:console\"; writeLn(\"never\");\n");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
-        var compiled = Path.Combine(_folder, "main.wlbr");
+        var compiled = Path.Combine(_folder, "main.wlb");
         var bytes = File.ReadAllBytes(compiled);
         bytes[^1] ^= 0xFF;
         File.WriteAllBytes(compiled, bytes);
@@ -322,10 +316,6 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.StartsWith(main + "(1,9): ERROR WL1001:", error);
         Assert.Equal([main], Files());
         Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("compile", "--fast", main).Exit);
-        var (usage, _, why) = Weblingo("compile", "--stack", "--vm", "register", main);
-        Assert.Equal((WebLingoCommandLine.UsageError, "Only one VM may be given: --register or --stack."), (usage, why.TrimEnd()));
-        (usage, _, why) = Weblingo("compile", "--vm", "fast", main);
-        Assert.Equal((WebLingoCommandLine.UsageError, "'fast' is not a VM: register or stack."), (usage, why.TrimEnd()));
     }
 
     [Fact]
@@ -349,7 +339,7 @@ public sealed class BytecodeCommandLineTests : IDisposable
         Assert.Equal((WebLingoCommandLine.Success, "Hello, Anna\n", ""), Weblingo(main, "name=Anna"));
         Assert.Equal(Weblingo("run", main, "name=Bo"), Weblingo(main, "name=Bo"));
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
-        Assert.Equal((WebLingoCommandLine.Success, "Hello, Cy\n", ""), Weblingo(Path.ChangeExtension(main, ".wlbr"), "name=Cy"));
+        Assert.Equal((WebLingoCommandLine.Success, "Hello, Cy\n", ""), Weblingo(Path.ChangeExtension(main, ".wlb"), "name=Cy"));
         Assert.Equal(WebLingoCommandLine.FileUnreadable, Weblingo(Path.Combine(_folder, "none.wlg")).Exit);
         Assert.Equal(WebLingoCommandLine.UsageError, Weblingo("rnu", main).Exit);
         Assert.Equal(WebLingoCommandLine.UsageError, Weblingo(Write("notes.txt", "")).Exit);
@@ -363,92 +353,69 @@ public sealed class BytecodeCommandLineTests : IDisposable
     {
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run([], output, new StringWriter()));
-        Assert.Contains("| compile [--register|--stack] [--debug] [--scheme <name>=<folder> …] <file.wlg> | disasm <bytecode-file>",
-            output.ToString());
-        Assert.Contains("run, check and disasm accept .wlbr, .wlbs and legacy .wlbc files", output.ToString());
-    }
-
-    [Theory]
-    [InlineData("register", "stack", ".WLBS")]
-    [InlineData("stack", "register", ".WLBR")]
-    public void TheVmNamedByTheExtensionMustMatchTheHeader(string actualVm, string expectedVm, string wrongExtension)
-    {
-        var main = Write("main.wlg", "import { writeLn } from \"std:console\"; writeLn(42);");
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--" + actualVm, main).Exit);
-        var compiled = Path.ChangeExtension(main, Extension(actualVm));
-        var wrong = Path.ChangeExtension(main, wrongExtension);
-        File.Copy(compiled, wrong);
-        var diagnostic = $"{wrong}: ERROR WL4001: The file extension is for the {expectedVm} VM, but its header names the {actualVm} VM.";
-        foreach (var command in new[] { "run", "check", "disasm" })
-        {
-            var (exit, output, error) = Weblingo(command, wrong);
-            Assert.Equal((WebLingoCommandLine.CompilationFailed, "", diagnostic), (exit, output, error.TrimEnd()));
-        }
-        Assert.Equal(Weblingo("run", wrong), Weblingo(wrong));
+        Assert.Contains("| compile [--debug] [--scheme <name>=<folder> …] <file.wlg> | disasm <bytecode-file>", output.ToString());
+        Assert.Contains("run, check and disasm accept .wlb files, and earlier builds' .wlbr and .wlbc files", output.ToString());
     }
 
     [Fact]
-    public void BothBytecodeTargetsCanCoexistAndStillRunWithALegacyName()
+    public void TheStackVmsBytecodeIsRefused()
     {
+        // The stack VM's files, which WebLingo had until 23 November 2026: a .wlbs, the stack VM's extension, and a file
+        // whose header names the stack VM, each refused, for run, check and disasm.
         var main = Write("main.wlg", "import { writeLn } from \"std:console\"; writeLn(42);");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", main).Exit);
-        Assert.Equal(3, Files().Length);
-        foreach (var extension in new[] { ".wlbr", ".wlbs" })
+        var compiled = Path.ChangeExtension(main, ".wlb");
+        var named = Path.ChangeExtension(main, ".WLBS");
+        File.Copy(compiled, named);
+        var headed = Write("stack.wlb", "");
+        var bytes = File.ReadAllBytes(compiled);
+        bytes[8] = 2;
+        File.WriteAllBytes(headed, bytes);
+        foreach (var (file, diagnostic) in new[]
+                 {
+                     (named, "The file extension is for the stack VM, but its header names the register VM."),
+                     (headed, "The file holds the stack VM's bytecode, which WebLingo no longer runs: it has one VM, the register VM.")
+                 })
         {
-            var compiled = Path.ChangeExtension(main, extension);
-            var legacy = Path.ChangeExtension(main, ".wlbc");
-            File.Copy(compiled, legacy, overwrite: true);
-            Assert.Equal((WebLingoCommandLine.Success, "42\n", ""), Weblingo(compiled));
-            Assert.Equal(Weblingo(compiled), Weblingo(legacy));
-            Assert.Equal(Weblingo("disasm", compiled), Weblingo("disasm", legacy));
+            foreach (var command in new[] { "run", "check", "disasm" })
+            {
+                var (exit, output, error) = Weblingo(command, file);
+                Assert.Equal((WebLingoCommandLine.CompilationFailed, "", $"{file}: ERROR WL4001: {diagnostic}"), (exit, output, error.TrimEnd()));
+            }
+            Assert.Equal(Weblingo("run", file), Weblingo(file));
         }
     }
-
-    private static string Extension(string vm) => vm == "register" ? ".wlbr" : ".wlbs";
 
     [Fact]
-    public void TheConfiguredVmControlsCompileRunAndCheck()
+    public void AnEarlierBuildsBytecodeFileStillRuns()
     {
+        // A .wlbr, the register VM's before .wlb, and a .wlbc, WLBC's first, each read as a .wlb, by its header.
         var main = Write("main.wlg", "import { writeLn } from \"std:console\"; writeLn(42);");
-        var config = Write("weblingo.config", """{ "vm": "stack" }""");
         Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--vm", "register", main).Exit);
-        var stack = Path.ChangeExtension(main, ".wlbs");
-        var register = Path.ChangeExtension(main, ".wlbr");
-        Assert.Equal((WebLingoCommandLine.Success, "42\n", ""), Weblingo(stack));
-        Assert.Equal((WebLingoCommandLine.Success, "", ""), Weblingo("check", stack));
-        foreach (var command in new[] { "run", "check" })
+        var compiled = Path.ChangeExtension(main, ".wlb");
+        Assert.Equal((WebLingoCommandLine.Success, "42\n", ""), Weblingo(compiled));
+        foreach (var extension in new[] { ".wlbr", ".wlbc" })
         {
-            var (exit, text, error) = Weblingo(command, register);
-            Assert.Equal((WebLingoCommandLine.CompilationFailed, ""), (exit, text));
-            Assert.Equal(register + ": ERROR WL4001: The configuration selects the stack VM, but the header names the register VM.",
-                error.TrimEnd());
+            var earlier = Path.ChangeExtension(main, extension);
+            File.Copy(compiled, earlier);
+            Assert.Equal(Weblingo(compiled), Weblingo(earlier));
+            Assert.Equal(Weblingo("disasm", compiled), Weblingo("disasm", earlier));
         }
-        var legacy = Path.ChangeExtension(main, ".wlbc");
-        File.Copy(register, legacy);
-        Assert.Equal(WebLingoCommandLine.CompilationFailed, Weblingo(legacy).Exit);
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("disasm", register).Exit);
-
-        File.WriteAllText(config, """{ "vm": "register" }""");
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", "--stack", main).Exit);
-        Assert.Contains("the configuration selects", Weblingo("run", stack).Error, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal((WebLingoCommandLine.Success, "42\n", ""), Weblingo(legacy));
-        File.Delete(config);
-        Assert.Equal((WebLingoCommandLine.Success, "42\n", ""), Weblingo(stack));
     }
 
+    private static string Extension(string vm) => ".wlb";
+
     [Theory]
-    [InlineData("\"other\"")]
-    [InlineData("null")]
-    [InlineData("1")]
-    public void InvalidVmSettingsAreReported(string value)
+    [InlineData("\"register\"")]
+    [InlineData("\"stack\"")]
+    public void AVmIsNoSetting(string value)
     {
+        // One VM, which no setting chooses (23 November 2026, WL-BC002): "vm" is a setting the configuration does not know.
         var program = Write("main.wlg", "import { writeLn } from \"std:console\"; writeLn(42);");
         var config = Write("weblingo.config", "{\"vm\":" + value + "}");
         var (exit, output, error) = Weblingo("check", program);
-        Assert.Equal((WebLingoCommandLine.FileUnreadable, "", config + ": \"vm\" is \"register\" or \"stack\"."),
-            (exit, output, error.TrimEnd()));
+        Assert.Equal((WebLingoCommandLine.FileUnreadable, ""), (exit, output));
+        Assert.StartsWith(config + ": 'vm' is not a setting; the settings are \"schemes\", \"mode\", ", error);
     }
 
     private string Write(string relative, string text)

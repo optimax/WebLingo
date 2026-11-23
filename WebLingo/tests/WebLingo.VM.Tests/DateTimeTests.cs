@@ -3,7 +3,6 @@ using WebLingo.Core;
 using WebLingo.Platform.Abstractions;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
-using WebLingo.VM.Stack;
 using Xunit;
 namespace WebLingo.VM.Tests;
 
@@ -72,7 +71,7 @@ public sealed class DateTimeTests
         "[Day:DateTime:2026-11-21T00:00:00Z, 2026, true, DateTime:2026-11-22T00:00:00Z, true, DateTime:2026-11-18T09:00:00Z, DateTime:2026-01-01T00:00:00Z, 86400000, true]\n")]
     public void DatesBehaveAlikeOnBothVms(string program, string output)
     {
-        foreach (var stack in new[] { false, true })
+        foreach (var stack in new[] { false })
         {
             var (text, error) = Run(program, stack);
             Assert.True(error is null, error?.Message);
@@ -112,7 +111,7 @@ public sealed class DateTimeTests
     [InlineData("import { writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.inZone(\"Test/Kolkata\", 2026, 1, 32));", "WL3001", "A date's day is from 1 to 31, not 32.")]
     public void WrongUsesAreErrorsAlikeOnBothVms(string program, string code, string message)
     {
-        foreach (var stack in new[] { false, true })
+        foreach (var stack in new[] { false })
         {
             var (_, error) = Run(program, stack);
             Assert.NotNull(error);
@@ -123,7 +122,7 @@ public sealed class DateTimeTests
     [Fact]
     public void WithoutAHostsClockNowIsAnErrorAndTheServersZoneIsUtc()
     {
-        foreach (var stack in new[] { false, true })
+        foreach (var stack in new[] { false })
         {
             var (_, error) = Run("import { write, writeLn } from \"std:system\"; import { DateTime } from \"std:datetime\"; writeLn(DateTime.now());", stack, clock: false);
             Assert.NotNull(error);
@@ -145,13 +144,6 @@ public sealed class DateTimeTests
             WallClock = clock ? new FixedClock() : null,
             TimeZone = clock ? new SummerZone() : null
         };
-        if (stack)
-        {
-            var stackCompiled = new WebLingoStackCompiler(options).Compile(program, "main.wlg");
-            Assert.Empty(stackCompiled.Diagnostics);
-            var stackError = new WebLingoStackVirtualMachine().Execute(stackCompiled.Module!, context).Error;
-            return (output.Text, stackError);
-        }
         var compiled = new WebLingoCompiler(options).Compile(program, "main.wlg");
         Assert.Empty(compiled.Diagnostics);
         // Run first: the output is read once the program has written it.

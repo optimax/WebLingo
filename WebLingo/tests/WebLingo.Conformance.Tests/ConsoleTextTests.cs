@@ -61,8 +61,8 @@ public sealed class ConsoleTextTests : IDisposable
         if (stack)
         {
             Assert.Equal(WebLingoCommandLine.Success,
-                WebLingoCommandLine.Run(["compile", "--stack", script], output, error));
-            script = Path.ChangeExtension(script, ".wlbs");
+                WebLingoCommandLine.Run(["compile", script], output, error));
+            script = Path.ChangeExtension(script, ".wlb");
         }
         var exit = WebLingoCommandLine.Run(["run", script, "executable=" + Program(), "child=" + child], output, error);
         Assert.Equal((WebLingoCommandLine.Success, "[3, true, true]\n", ""), (exit, output.ToString(), error.ToString()));

@@ -66,8 +66,8 @@ public sealed class ConsoleInputTests : IDisposable
         var path = Path.Combine(_folder, "program.wlg");
         File.WriteAllText(path, program);
         var register = Weblingo(["run", path], input);
-        Assert.Equal(WebLingoCommandLine.Success, Weblingo(["compile", "--stack", path], "").Exit);
-        var stack = Weblingo(["run", Path.ChangeExtension(path, ".wlbs")], input);
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo(["compile", path], "").Exit);
+        var stack = Weblingo(["run", Path.ChangeExtension(path, ".wlb")], input);
         Assert.Equal((register.Output, register.Error), (stack.Output, stack.Error));
         return (register.Output, register.Error);
     }

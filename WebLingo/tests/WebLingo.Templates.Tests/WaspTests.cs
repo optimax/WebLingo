@@ -179,12 +179,9 @@ public sealed class WaspTests : IDisposable
         Assert.Contains("ERROR WL3005", error);
     }
 
-    [Theory]
-    [InlineData("register")]
-    [InlineData("stack")]
-    public void AComponentIsFoundAndCompiledWhenItIsRendered(string vm)
+    [Fact]
+    public void AComponentIsFoundAndCompiledWhenItIsRendered()
     {
-        Write("site/wasp.config", "{\"vm\":\"" + vm + "\"}");
         Write("site/components/card.wasp", "<% param product; param size = \"small\"; %>\n<article class=\"<%= size %>\"><%= product %></article>\n");
         var page = Write("site/index.wasp",
             "<% foreach (var p in [\"Tea\", \"<Cake>\"]) { %>\n<% await renderComponent(\"/components/card.wasp\", { product: p }); %>\n<% } %>\n");
@@ -204,17 +201,18 @@ public sealed class WaspTests : IDisposable
     }
 
     [Fact]
-    public void APageSelectsTheVmFromItsExplicitSiteRoot()
+    public void APageReadsTheConfigurationOfItsExplicitSiteRoot()
     {
-        Write("site/wasp.config", """{ "vm": "stack" }""");
+        Write("site/wasp.config", """{ "mode": "development" }""");
         var page = Write("site/nested/page.wasp", "<% await delay(0); %><%= 42 %>");
         var root = Path.Combine(_folder, "site");
         Assert.Equal((WebLingoCommandLine.Success, "42", ""), Run(["run", "--root", root, page]));
         Assert.Equal((WebLingoCommandLine.Success, "", ""), Run(["check", "--root", root, page]));
-        var config = Write("site/wasp.config", """{ "vm": true }""");
+        // "vm", which chose a VM until there was one (23 November 2026, WL-BC002), a setting it does not know.
+        var config = Write("site/wasp.config", """{ "vm": "register" }""");
         var (exit, output, error) = Run(["check", "--root", root, page]);
         Assert.Equal((WebLingoCommandLine.FileUnreadable, ""), (exit, output));
-        Assert.Equal(Path.GetFullPath(config) + ": \"vm\" is \"register\" or \"stack\".", error.TrimEnd());
+        Assert.StartsWith(Path.GetFullPath(config) + ": 'vm' is not a setting;", error);
     }
 
     [Fact]

@@ -1174,13 +1174,13 @@ public sealed class ConformanceTests : IDisposable
         var (exit, _, error) = Weblingo("run", source);
         Assert.Equal((WebLingoCommandLine.RuntimeFailed, $"program.wlg(13,{column}): ERROR {code}:"), (exit, FirstLineStart(error)));
 
-        // On the stack VM, from a .wlbs, where the file's own positions locate it.
+        // From its compiled file, where the file's own positions locate it.
         var program = Path.Combine(_folder, "program.wlg");
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
-        var stackError = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", program], new StringWriter(), new StringWriter()));
+        var fileError = new StringWriter();
         Assert.Equal(WebLingoCommandLine.RuntimeFailed,
-            WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbs")], new StringWriter(), stackError));
-        Assert.Equal($"program.wlg(13,{column}): ERROR {code}:", FirstLineStart(stackError.ToString().Replace(program, "program.wlg", StringComparison.Ordinal)));
+            WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlb")], new StringWriter(), fileError));
+        Assert.Equal($"program.wlg(13,{column}): ERROR {code}:", FirstLineStart(fileError.ToString().Replace(program, "program.wlg", StringComparison.Ordinal)));
     }
 
     [Theory]
@@ -1200,13 +1200,13 @@ public sealed class ConformanceTests : IDisposable
         var (exit, output, error) = Weblingo("run", source);
         Assert.Equal((WebLingoCommandLine.RuntimeFailed, "", expected), (exit, output, error.Split('\n')[0].TrimEnd('\r')));
 
-        // On the stack VM, from a .wlbs.
+        // From its compiled file.
         var program = Path.Combine(_folder, "program.wlg");
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
-        var stackError = new StringWriter();
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", program], new StringWriter(), new StringWriter()));
+        var fileError = new StringWriter();
         Assert.Equal(WebLingoCommandLine.RuntimeFailed,
-            WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbs")], new StringWriter(), stackError));
-        Assert.Equal(expected, stackError.ToString().Replace(program, "program.wlg", StringComparison.Ordinal).Split('\n')[0].TrimEnd('\r'));
+            WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlb")], new StringWriter(), fileError));
+        Assert.Equal(expected, fileError.ToString().Replace(program, "program.wlg", StringComparison.Ordinal).Split('\n')[0].TrimEnd('\r'));
     }
 
     [Theory]
@@ -1223,11 +1223,11 @@ public sealed class ConformanceTests : IDisposable
     {
         Assert.Equal((WebLingoCommandLine.Success, printed + "\n", ""), Weblingo("run", source));
 
-        // On the stack VM, from a .wlbs.
+        // From its compiled file.
         var program = Path.Combine(_folder, "program.wlg");
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", program], new StringWriter(), new StringWriter()));
         var output = new StringWriter();
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbs")], output, new StringWriter()));
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlb")], output, new StringWriter()));
         Assert.Equal(printed + "\n", output.ToString());
     }
 
@@ -1255,11 +1255,11 @@ public sealed class ConformanceTests : IDisposable
     {
         Assert.Equal((WebLingoCommandLine.Success, printed + "\n", ""), Weblingo("run", source));
 
-        // On the stack VM, from a .wlbs.
+        // From its compiled file.
         var program = Path.Combine(_folder, "program.wlg");
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", program], new StringWriter(), new StringWriter()));
         var output = new StringWriter();
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbs")], output, new StringWriter()));
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlb")], output, new StringWriter()));
         Assert.Equal(printed + "\n", output.ToString());
     }
 
@@ -1402,20 +1402,20 @@ public sealed class ConformanceTests : IDisposable
     [Theory]
     [InlineData("'rnu' is not a command: run, check, compile, disasm, test or --version.", "rnu", "a.wlg")]
     [InlineData("'notes.txt' is not a command: run, check, compile, disasm, test or --version; "
-        + "a file named first is run when it is a .wlg, .wlbr, .wlbs or .wlbc file.", "notes.txt")]
+        + "a file named first is run when it is a .wlg or .wlb file.", "notes.txt")]
     [InlineData("--version takes nothing after it.", "--version", "x")]
     [InlineData("run requires the file to run.", "run")]
     [InlineData("check requires the file to check.", "check")]
     [InlineData("compile requires the file to compile.", "compile")]
     [InlineData("disasm requires the bytecode file to show.", "disasm")]
-    [InlineData("disasm takes one file, not 'b' after it.", "disasm", "a.wlbr", "b")]
+    [InlineData("disasm takes one file, not 'b' after it.", "disasm", "a.wlb", "b")]
     [InlineData("--scheme requires a scheme, name=folder.", "run", "--scheme")]
     [InlineData("run requires the file to run after its options.", "run", "--timeout", "5")]
     [InlineData("check takes one file, not 'b.wlg' after it.", "check", "a.wlg", "b.wlg")]
     [InlineData("'--timeout' is not an option of check, but of run.", "check", "--timeout", "5", "a.wlg")]
     [InlineData("'--fast' is not an option of compile.", "compile", "--fast", "a.wlg")]
-    [InlineData("--vm requires a VM: register or stack.", "compile", "--vm")]
-    [InlineData("'--vm' is not an option of run, but of compile.", "run", "--vm", "stack", "a.wlg")]
+    [InlineData("'--vm' is not an option of compile.", "compile", "--vm", "a.wlg")]
+    [InlineData("'--vm' is not an option of run.", "run", "--vm", "stack", "a.wlg")]
     [InlineData("'--debug' is not an option of check, but of compile.", "check", "--debug", "a.wlg")]
     [InlineData("--debug may be given only once.", "compile", "--debug", "--debug", "a.wlg")]
     [InlineData("test requires the .wlg files whose tests it runs.", "test")]
@@ -1569,9 +1569,9 @@ public sealed class ConformanceTests : IDisposable
         var source = "import { write, writeLn } from \"std:console\"; import { code, found, doubled } from \"lib/top.wlg\";\nwriteLn([code, found, doubled]);";
         Assert.Equal((WebLingoCommandLine.Success, "[\"WL3011\", 2, [2, 4]]\n", ""), Weblingo("run", source));
         var program = Path.Combine(_folder, "program.wlg");
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", "--stack", program], new StringWriter(), new StringWriter()));
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["compile", program], new StringWriter(), new StringWriter()));
         var output = new StringWriter();
-        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlbs")], output, new StringWriter()));
+        Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.ChangeExtension(program, ".wlb")], output, new StringWriter()));
         Assert.Equal("[\"WL3011\", 2, [2, 4]]\n", output.ToString());
     }
 

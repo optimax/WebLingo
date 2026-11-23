@@ -92,10 +92,9 @@ version, `WebLingo-0.20.0-win-x64-…`; none has been packaged since the change.
 
 ## Debug information in bytecode
 
-`weblingo compile --debug` compiles with `WebLingoCompilerOptions.Debugging`, for either VM, the stack generator now
-giving `WebLingoStackFunction.DebugInfo` as the register one gives its functions', and `WebLingoBytecodeFile` writes the
+`weblingo compile --debug` compiles with `WebLingoCompilerOptions.Debugging`, and `WebLingoBytecodeFile` writes the
 metadata as an eighth section, debugging, after the source positions, which a file without it does not have, its bytes
-unchanged. `disasm` (`WebLingoDisassembler`, `WebLingoStackDisassembler`, `WebLingoDisassemblyNames`) names the functions,
+unchanged. `disasm` (`WebLingoDisassembler`, `WebLingoDisassemblyNames`) names the functions,
 classes and files instructions refer to, and, from a debug file, captures, statements' lines and columns, and variables.
 The VS Code debugger still compiles from source: nothing runs a debug file under a debugger yet.
 
@@ -124,3 +123,16 @@ compiled while the program runs joins the program's native modules by name, keep
 program's without exports where one could be joined, or the VM's `MakeModule` finds its exports missing. `WebLingoClassTables`
 lets a native module's file have that function, older files having none. The benchmark's `imports` workload calls
 `std:math`'s `abs` and `sign` imported by name. Nothing of it is installed on this machine until `build.bat` runs.
+
+## One VM
+
+The owner chose the register VM (23 November 2026, WL-BC002; specification, section 5.2). The stack VM was removed:
+`WebLingo.VM.Stack`, `WebLingoStackCodeGenerator`, `WebLingoStackCompiler`, the stack bytecode, its verifier and its
+disassembler, `IWebLingoStackModuleLoader`, the hosts' and the command lines' stack paths, `--register`, `--stack`,
+`--vm` and the configurations' `"vm"`, the benchmark's stack engine, and the tests that ran it. The tag `stack-vm-end`
+(`de0cc94`) is the last commit with it. A bytecode file is `.wlb` (`WebLingoBytecodeFile.Extension`); an earlier
+build's `.wlbr` and `.wlbc` are read as one, by the header, and a `.wlbs`, or a header naming VM 2, is refused with
+WL4001 (`WebLingoBytecodeKind.Stack` kept only to recognize it). Some tests still take a VM parameter or loop over a
+flag that now has the one value, `"register"` or `false` (`FileSystemTests`, `WaitingTests`, `BytesTests`,
+`DateTimeTests`, `HostParameterTests`, `OperatorTests`, and `BytecodeCommandLineTests`' `Extension(vm)`): a cleanup
+left for later. The conformance programs every-program tests take are `ConformancePrograms.All`.

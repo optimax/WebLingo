@@ -29,9 +29,6 @@ public sealed record WebLingoCommandLineProgram(
     /// </summary>
     public IReadOnlyList<string> MoreCommands { get; init; } = [];
 
-    /// <summary>The optional source compiler for the stack VM.</summary>
-    public Func<WebLingoSourceText, WebLingoCompilerOptions, WebLingoCommandLineCompilation>? CompileForStack { get; init; }
-
     /// <summary>
     /// Whether it has WLBC files (specification, section 5.3): <c>compile</c> and <c>disasm</c>, and <c>run</c> and
     /// <c>check</c> of a bytecode file, as <c>weblingo</c> has; WASP never writes one (section 5.1).
@@ -90,15 +87,9 @@ public sealed record WebLingoCommandLineProgram(
 /// </summary>
 public sealed record WebLingoCommandLineCompilation(WebLingoCompilationResult Result)
 {
-    public WebLingoCommandLineCompilation(WebLingoStackCompilationResult result)
-        : this(new WebLingoCompilationResult(null, result.Diagnostics)) => StackModule = result.Module;
-
-    internal WebLingoStackModule? StackModule { get; }
-
     public Func<WebLingoDiagnostic, WebLingoDiagnostic> Locate { get; init; } = diagnostic => diagnostic;
     public Func<string, WebLingoSourceText?> TextOf { get; init; } = _ => null;
 
     /// <summary>What finds and compiles the components the program renders while it runs, if it renders any (section 13).</summary>
     public IWebLingoModuleLoader? Components { get; init; }
-    public IWebLingoStackModuleLoader? StackComponents { get; init; }
 }

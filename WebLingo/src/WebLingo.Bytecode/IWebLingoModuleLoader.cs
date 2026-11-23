@@ -15,10 +15,3 @@ public interface IWebLingoModuleLoader
     WebLingoCompiledModule? Compile(string name, out WebLingoDiagnostic? error);
 }
 
-/// <summary>A host's <see cref="IWebLingoModuleLoader"/> for the stack VM, whose modules are its own.</summary>
-public interface IWebLingoStackModuleLoader
-{
-    bool TryResolve(string importer, string path, out string name, out string? error);
-
-    WebLingoStackModule? Compile(string name, out WebLingoDiagnostic? error);
-}

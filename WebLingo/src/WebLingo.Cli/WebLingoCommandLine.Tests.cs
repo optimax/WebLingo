@@ -151,17 +151,14 @@ public static partial class WebLingoCommandLine
             Builtins = [.. host.Options.Builtins, new(reporter.Name, reporter.Arity), new(hooks.Name, hooks.Arity)]
         };
         var wrapper = new WebLingoSourceText(BuildTestScript(Path.GetFileName(fullPath), cases), mainName);
-        var stack = host.Vm == WebLingoBytecodeKind.Stack;
-        var compile = stack ? Scripts.CompileForStack! : Scripts.Compile;
-        var compilation = compile(wrapper, options);
+        var compilation = Scripts.Compile(wrapper, options);
         var prepared = new SourceRun(wrapper, host, options, compilation);
         foreach (var diagnostic in compilation.Result.Diagnostics) WriteDiagnostic(error, prepared.TextOf(diagnostic), diagnostic);
-        if (compilation.Result.Module is null && compilation.StackModule is null) return CompilationFailed;
+        if (compilation.Result.Module is null) return CompilationFailed;
 
         var loader = new WebLingoModuleLoader(options);
         var context = Context(host, none, prepared.LineOf, WebLingoHeap.DefaultRegexTimeoutMilliseconds);
-        var result = stack ? OnStackVm(compilation.StackModule!, loader, null, context)
-            : OnRegisterVm(compilation.Result.Module!, loader, null, context);
+        var result = OnVm(compilation.Result.Module, loader, null, context);
         passed += reporter.Passed;
         failed += reporter.Failed;
         var exit = prepared.Report(result, error);

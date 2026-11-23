@@ -497,20 +497,14 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
     /// For each instruction, the first handler whose region holds it, which an exception raised there goes to, or -1;
     /// <paramref name="steps"/> is the work done, which a module of many handlers could make large.
     /// </summary>
-    internal static int[] HandlerAt<THandler>(int count, IReadOnlyList<THandler> handlers, out long steps)
-        where THandler : struct
+    internal static int[] HandlerAt(int count, IReadOnlyList<WebLingoHandler> handlers, out long steps)
     {
         var at = new int[count];
         for (var index = 0; index < count; index++) at[index] = -1;
         steps = 0;
         for (var i = handlers.Count - 1; i >= 0; i--)
         {
-            var (start, end) = handlers[i] switch
-            {
-                WebLingoHandler handler => (handler.Start, handler.End),
-                WebLingoStackHandler handler => (handler.Start, handler.End),
-                _ => (0, 0)
-            };
+            var (start, end) = (handlers[i].Start, handlers[i].End);
             steps += end - start;
             if (steps > MaxSteps) return at;
             for (var index = start; index < end; index++) at[index] = i;

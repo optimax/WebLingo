@@ -23,7 +23,7 @@ public sealed class ComparisonTests
     [MemberData(nameof(ProgramNames))]
     public void EveryProgramIsWrittenInEveryLanguage(string name)
     {
-        foreach (var extension in WebLingoComparison.Runtimes.Select(runtime => runtime.Extension).Where(e => e != ".wlbr" && e != ".wlbs").Distinct())
+        foreach (var extension in WebLingoComparison.Runtimes.Select(runtime => runtime.Extension).Where(e => e != ".wlb").Distinct())
             Assert.True(File.Exists(Path.Combine(WebLingoComparison.ProgramsFolder, name + extension)), name + extension);
     }
 
@@ -43,10 +43,10 @@ public sealed class ComparisonTests
     {
         var (output, error) = (new StringWriter(), new StringWriter());
         var exit = WebLingoBenchmarkCommand.Run(["--compare", "--runs", "1", "--warm-ups", "0", "--program", "calls",
-            "--runtime", "weblingo-register", "--runtime", "weblingo-stack-compiled"], output, error);
+            "--runtime", "weblingo", "--runtime", "weblingo-compiled"], output, error);
         Assert.Equal((WebLingoBenchmarkCommand.Success, ""), (exit, error.ToString()));
         var lines = output.ToString().ReplaceLineEndings("\n").Split('\n');
-        Assert.Contains("| Program | WebLingo, register VM | WebLingo, stack VM, compiled |", lines);
+        Assert.Contains("| Program | WebLingo | WebLingo, compiled |", lines);
         // empty's row in the first table only, which the second takes away; calls's in both.
         Assert.Single(lines, line => line.StartsWith("| empty | ", StringComparison.Ordinal));
         Assert.Equal(2, lines.Count(line => line.StartsWith("| calls | ", StringComparison.Ordinal)));
@@ -58,6 +58,6 @@ public sealed class ComparisonTests
         var error = new StringWriter();
         Assert.Equal(WebLingoBenchmarkCommand.UsageError,
             WebLingoBenchmarkCommand.Run(["--compare", "--runtime", "perl"], new StringWriter(), error));
-        Assert.Contains("runtimes: weblingo-register,", error.ToString());
+        Assert.Contains("runtimes: weblingo, weblingo-compiled,", error.ToString());
     }
 }
