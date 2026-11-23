@@ -2064,22 +2064,43 @@ public sealed class WebLingoHeap
     private readonly record struct MapKey(WebLingoValueKind Kind, long Bits, string? Text);
 
     /// <summary>
-    /// A hash table, its entries kept in a list that a removal fills from its end, so that an entry is found by its key
-    /// and visited by its position, in no defined order (section 3.6).
+    /// A map's or a set's entries, in an array that a removal fills from its end, so that an entry is found by its key and
+    /// visited by its position, in no defined order (section 3.6): searched in order, with a hash table of their positions
+    /// only once it has more than <see cref="EntriesSearched"/>, so that a map of a few entries is two .NET objects, and
+    /// allocates nothing more until its first (the specification, section 5.6, "Where the time goes").
     /// </summary>
     private sealed class MapObject
     {
-        private readonly Dictionary<MapKey, int> _positions = [];
+        /// <summary>How many entries a map searches in order before it keeps their positions in a hash table.</summary>
+        private const int EntriesSearched = 8;
+
+        private (MapKey Key, WebLingoValue KeyValue, WebLingoValue Value)[] _entries = [];
+        private int _count;
+        private Dictionary<MapKey, int>? _positions;
 
         /// <summary>Its class and fields, if a class extending Map or Set made it (section 3.7).</summary>
         public InstanceObject? Instance { get; init; }
-        private readonly List<(MapKey Key, WebLingoValue KeyValue, WebLingoValue Value)> _entries = [];
 
-        public int Count => _entries.Count;
+        public int Count => _count;
+
+        /// <summary>An entry's position, or -1: a key compared as the hash table compares it, by its kind, bits and text.</summary>
+        private int Find(MapKey key)
+        {
+            if (_positions is not null) return _positions.TryGetValue(key, out var position) ? position : -1;
+            var entries = _entries;
+            for (var i = 0; i < _count; i++)
+            {
+                var found = entries[i].Key;
+                if (found.Kind == key.Kind && found.Bits == key.Bits && string.Equals(found.Text, key.Text, StringComparison.Ordinal))
+                    return i;
+            }
+            return -1;
+        }
 
         public bool TryGet(MapKey key, out WebLingoValue value)
         {
-            if (_positions.TryGetValue(key, out var position))
+            var position = Find(key);
+            if (position >= 0)
             {
                 value = _entries[position].Value;
                 return true;
@@ -2090,25 +2111,36 @@ public sealed class WebLingoHeap
 
         public void Set(MapKey key, WebLingoValue keyValue, WebLingoValue value)
         {
-            if (_positions.TryGetValue(key, out var position))
+            var position = Find(key);
+            if (position >= 0)
             {
                 _entries[position] = (key, _entries[position].KeyValue, value);
                 return;
             }
-            _positions.Add(key, _entries.Count);
-            _entries.Add((key, keyValue, value));
+            if (_count == _entries.Length) Array.Resize(ref _entries, Math.Max(4, _count * 2));
+            _entries[_count] = (key, keyValue, value);
+            if (_positions is not null) _positions.Add(key, _count);
+            else if (_count == EntriesSearched)
+            {
+                _positions = new Dictionary<MapKey, int>(_count + 1);
+                for (var i = 0; i <= _count; i++) _positions.Add(_entries[i].Key, i);
+            }
+            _count++;
         }
 
         public bool Remove(MapKey key)
         {
-            if (!_positions.Remove(key, out var position)) return false;
-            var last = _entries.Count - 1;
+            var position = Find(key);
+            if (position < 0) return false;
+            _positions?.Remove(key);
+            var last = _count - 1;
             if (position != last)
             {
                 _entries[position] = _entries[last];
-                _positions[_entries[position].Key] = position;
+                if (_positions is not null) _positions[_entries[position].Key] = position;
             }
-            _entries.RemoveAt(last);
+            _entries[last] = default; // So that nothing stays reachable through it.
+            _count--;
             return true;
         }
 
