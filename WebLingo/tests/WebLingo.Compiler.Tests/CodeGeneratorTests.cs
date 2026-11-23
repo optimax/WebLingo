@@ -54,8 +54,44 @@ public sealed class CodeGeneratorTests
     [Fact]
     public void TemporariesAreReusedAcrossStatements()
     {
+        // a, and a temporary each statement reuses, its constants read from the module's, and the call's argument.
         var module = Generate("var a = 1; printLn(a * 2 + 3); printLn(a * 4 + 5);");
-        Assert.Equal(4, module.EntryPoint.RegisterCount);
+        Assert.Equal(3, module.EntryPoint.RegisterCount);
+    }
+
+    [Fact]
+    public void AConstantRightOperandIsReadFromTheConstants()
+    {
+        // Each operation that has a constant form takes its constant from the module's constants, without a LoadConstant
+        // (the specification, section 5.6, "Where the time goes"); a constant on the left, and another operation, as before.
+        Assert.Equal(["LoadConstant r0(x), 5", "AddConstant r1, r0(x), 1", "CallBuiltin r1, printLn(r1)", "Return"],
+            Instructions("var x = 5; printLn(x + 1);"));
+        var all = Instructions("var x = 5; var s = \"a\"; var d = 1.5m; var ok = [x - 1, x * 2, x % 3, x == 4, x != 4, x < 4, x <= 4, x > 4, "
+            + "x >= 4, s < \"b\", d + 2.5m, x + 0.5, 1 + x, x / 2];");
+        foreach (var op in new[] { "SubtractConstant", "MultiplyConstant", "RemainderConstant", "EqualConstant", "NotEqualConstant",
+                     "LessConstant", "LessOrEqualConstant", "GreaterConstant", "GreaterOrEqualConstant" })
+            Assert.Contains(all, line => line.StartsWith(op + " ", StringComparison.Ordinal));
+        Assert.Contains(all, line => line.StartsWith("LessConstant r", StringComparison.Ordinal) && line.EndsWith(", r1(s), \"b\"", StringComparison.Ordinal));
+        Assert.Contains(all, line => line.StartsWith("AddConstant r", StringComparison.Ordinal) && line.EndsWith(", r2(d), 2.5m", StringComparison.Ordinal));
+        Assert.Contains(all, line => line.StartsWith("AddConstant r", StringComparison.Ordinal) && line.EndsWith(", r0(x), 0.5d", StringComparison.Ordinal));
+        Assert.Contains(all, line => line.StartsWith("Divide ", StringComparison.Ordinal));
+        Assert.Contains(all, line => line.StartsWith("Add ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ALoopIsTestedAtItsBottomAndAnIncrementNotUsedCopiesNothing()
+    {
+        // A jump to the test, then the body and the step, then the test, which jumps back to the body; i++ as a step, and as
+        // a statement, copying nothing, as ++i (section 5.6).
+        var code = Instructions("for (var i = 0; i < 3; i++) { printLn(i); } var j = 0; j++;");
+        Assert.Equal("Jump 5", code[1]);
+        Assert.Equal("AddConstant r0(i), r0(i), 1", code[4]);
+        Assert.StartsWith("LessConstant r", code[5]);
+        Assert.EndsWith(", r0(i), 3", code[5]);
+        Assert.StartsWith("JumpIfTrue r", code[6]);
+        Assert.EndsWith(", 02", code[6]);
+        Assert.DoesNotContain(code, line => line.Contains("temporary", StringComparison.Ordinal));
+        Assert.Equal("AddConstant r1(j), r1(j), 1", code[^2]);
     }
 
     [Fact]

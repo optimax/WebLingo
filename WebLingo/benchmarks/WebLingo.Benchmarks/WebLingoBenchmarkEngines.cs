@@ -81,7 +81,7 @@ public sealed class WebLingoRegisterEngine : IWebLingoBenchmarkEngine
                 or WebLingoOpCode.ReturnValue or WebLingoOpCode.Jump => 1,
             WebLingoOpCode.Add or WebLingoOpCode.Subtract or WebLingoOpCode.Multiply or WebLingoOpCode.Divide or WebLingoOpCode.Equal
                 or WebLingoOpCode.NotEqual or WebLingoOpCode.Less or WebLingoOpCode.LessOrEqual or WebLingoOpCode.Greater
-                or WebLingoOpCode.GreaterOrEqual => 3,
+                or WebLingoOpCode.GreaterOrEqual or WebLingoOpCode.AddConstant or WebLingoOpCode.SubtractConstant or WebLingoOpCode.MultiplyConstant or WebLingoOpCode.RemainderConstant or WebLingoOpCode.EqualConstant or WebLingoOpCode.NotEqualConstant or WebLingoOpCode.LessConstant or WebLingoOpCode.LessOrEqualConstant or WebLingoOpCode.GreaterConstant or WebLingoOpCode.GreaterOrEqualConstant => 3,
             WebLingoOpCode.CallBuiltin or WebLingoOpCode.Call or WebLingoOpCode.CallMethod or WebLingoOpCode.New or WebLingoOpCode.GetSuper => 4,
             WebLingoOpCode.SetMember => 3,
             WebLingoOpCode.GetMember or WebLingoOpCode.GetIndex or WebLingoOpCode.SetIndex or WebLingoOpCode.NewArray or WebLingoOpCode.NewMap or WebLingoOpCode.NewSet

@@ -362,23 +362,23 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             continue;
                         }
                         case WebLingoOpCode.Add:
-                            if (!Arithmetic(WebLingoOpCode.Add, registers, ins, out error)) break;
+                            if (!Arithmetic(WebLingoOpCode.Add, registers, ins, registers[ins.C], out error)) break;
                             pc++;
                             continue;
                         case WebLingoOpCode.Subtract:
-                            if (!Arithmetic(WebLingoOpCode.Subtract, registers, ins, out error)) break;
+                            if (!Arithmetic(WebLingoOpCode.Subtract, registers, ins, registers[ins.C], out error)) break;
                             pc++;
                             continue;
                         case WebLingoOpCode.Multiply:
-                            if (!Arithmetic(WebLingoOpCode.Multiply, registers, ins, out error)) break;
+                            if (!Arithmetic(WebLingoOpCode.Multiply, registers, ins, registers[ins.C], out error)) break;
                             pc++;
                             continue;
                         case WebLingoOpCode.Divide:
-                            if (!Arithmetic(WebLingoOpCode.Divide, registers, ins, out error)) break;
+                            if (!Arithmetic(WebLingoOpCode.Divide, registers, ins, registers[ins.C], out error)) break;
                             pc++;
                             continue;
                         case WebLingoOpCode.Remainder:
-                            if (!Arithmetic(WebLingoOpCode.Remainder, registers, ins, out error)) break;
+                            if (!Arithmetic(WebLingoOpCode.Remainder, registers, ins, registers[ins.C], out error)) break;
                             pc++;
                             continue;
                         case WebLingoOpCode.IntegerDivide:
@@ -386,29 +386,57 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             pc++;
                             continue;
                         case WebLingoOpCode.Equal:
-                            if (!Compare(WebLingoOpCode.Equal, registers, ins, out error)) break;
-                            pc++;
-                            continue;
+                            if (!Compare(WebLingoOpCode.Equal, registers, ins, registers[ins.C], out error)) break;
+                            goto compared;
                         case WebLingoOpCode.NotEqual:
-                            if (!Compare(WebLingoOpCode.NotEqual, registers, ins, out error)) break;
-                            pc++;
-                            continue;
+                            if (!Compare(WebLingoOpCode.NotEqual, registers, ins, registers[ins.C], out error)) break;
+                            goto compared;
                         case WebLingoOpCode.Less:
-                            if (!Compare(WebLingoOpCode.Less, registers, ins, out error)) break;
-                            pc++;
-                            continue;
+                            if (!Compare(WebLingoOpCode.Less, registers, ins, registers[ins.C], out error)) break;
+                            goto compared;
                         case WebLingoOpCode.LessOrEqual:
-                            if (!Compare(WebLingoOpCode.LessOrEqual, registers, ins, out error)) break;
-                            pc++;
-                            continue;
+                            if (!Compare(WebLingoOpCode.LessOrEqual, registers, ins, registers[ins.C], out error)) break;
+                            goto compared;
                         case WebLingoOpCode.Greater:
-                            if (!Compare(WebLingoOpCode.Greater, registers, ins, out error)) break;
-                            pc++;
-                            continue;
+                            if (!Compare(WebLingoOpCode.Greater, registers, ins, registers[ins.C], out error)) break;
+                            goto compared;
                         case WebLingoOpCode.GreaterOrEqual:
-                            if (!Compare(WebLingoOpCode.GreaterOrEqual, registers, ins, out error)) break;
+                            if (!Compare(WebLingoOpCode.GreaterOrEqual, registers, ins, registers[ins.C], out error)) break;
+                            goto compared;
+                        case WebLingoOpCode.AddConstant:
+                            if (!Arithmetic(WebLingoOpCode.Add, registers, ins, constants[ins.C], out error)) break;
                             pc++;
                             continue;
+                        case WebLingoOpCode.SubtractConstant:
+                            if (!Arithmetic(WebLingoOpCode.Subtract, registers, ins, constants[ins.C], out error)) break;
+                            pc++;
+                            continue;
+                        case WebLingoOpCode.MultiplyConstant:
+                            if (!Arithmetic(WebLingoOpCode.Multiply, registers, ins, constants[ins.C], out error)) break;
+                            pc++;
+                            continue;
+                        case WebLingoOpCode.RemainderConstant:
+                            if (!Arithmetic(WebLingoOpCode.Remainder, registers, ins, constants[ins.C], out error)) break;
+                            pc++;
+                            continue;
+                        case WebLingoOpCode.EqualConstant:
+                            if (!Compare(WebLingoOpCode.Equal, registers, ins, constants[ins.C], out error)) break;
+                            goto compared;
+                        case WebLingoOpCode.NotEqualConstant:
+                            if (!Compare(WebLingoOpCode.NotEqual, registers, ins, constants[ins.C], out error)) break;
+                            goto compared;
+                        case WebLingoOpCode.LessConstant:
+                            if (!Compare(WebLingoOpCode.Less, registers, ins, constants[ins.C], out error)) break;
+                            goto compared;
+                        case WebLingoOpCode.LessOrEqualConstant:
+                            if (!Compare(WebLingoOpCode.LessOrEqual, registers, ins, constants[ins.C], out error)) break;
+                            goto compared;
+                        case WebLingoOpCode.GreaterConstant:
+                            if (!Compare(WebLingoOpCode.Greater, registers, ins, constants[ins.C], out error)) break;
+                            goto compared;
+                        case WebLingoOpCode.GreaterOrEqualConstant:
+                            if (!Compare(WebLingoOpCode.GreaterOrEqual, registers, ins, constants[ins.C], out error)) break;
+                            goto compared;
                         case WebLingoOpCode.LoadNull:
                             registers[ins.A] = WebLingoValue.Null;
                             pc++;
@@ -948,6 +976,19 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             break;
                     }
                     goto failed;
+
+                compared:
+                    // A comparison whose result the next instruction branches on, as an if's or a loop's test does: the branch
+                    // taken at once, without the jump's own dispatch, the result in its register too (specification, section
+                    // 5.6, "Where the time goes"). A class's operator, which Compare leaves to a call, is branched on after it.
+                    if (pc + 1 < code.Length && code[pc + 1].OpCode is WebLingoOpCode.JumpIfFalse or WebLingoOpCode.JumpIfTrue
+                        && code[pc + 1].A == ins.A)
+                    {
+                        pc = registers[ins.A].AsBoolean == (code[pc + 1].OpCode == WebLingoOpCode.JumpIfTrue) ? code[pc + 1].B : pc + 2;
+                        continue;
+                    }
+                    pc++;
+                    continue;
 
                 call:
                     // The call the operations above set up: a built-in at once, a closure in a new frame, its arguments
@@ -1489,9 +1530,10 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// <see cref="WebLingoOperators"/>, which gives the same results.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool Arithmetic(WebLingoOpCode opCode, WebLingoValue[] registers, in WebLingoInstruction ins, out WebLingoRuntimeError? error)
+        private bool Arithmetic(WebLingoOpCode opCode, WebLingoValue[] registers, in WebLingoInstruction ins, WebLingoValue right,
+            out WebLingoRuntimeError? error)
         {
-            var (left, right) = (registers[ins.B], registers[ins.C]);
+            var left = registers[ins.B];
             error = null;
             if (left.Kind == WebLingoValueKind.Int64 && right.Kind == WebLingoValueKind.Int64)
             {
@@ -1555,16 +1597,17 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         private bool IntegerDivide(WebLingoValue[] registers, in WebLingoInstruction ins, out WebLingoRuntimeError? error) =>
-            Arithmetic(WebLingoOpCode.IntegerDivide, registers, ins, out error);
+            Arithmetic(WebLingoOpCode.IntegerDivide, registers, ins, registers[ins.C], out error);
 
         /// <summary>
         /// A comparison: two int64s, or two binary64s (IEEE 754's, so that NaN is unordered and unequal to itself),
         /// here; anything else by <see cref="WebLingoOperators"/>, which gives the same results.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool Compare(WebLingoOpCode opCode, WebLingoValue[] registers, in WebLingoInstruction ins, out WebLingoRuntimeError? error)
+        private bool Compare(WebLingoOpCode opCode, WebLingoValue[] registers, in WebLingoInstruction ins, WebLingoValue right,
+            out WebLingoRuntimeError? error)
         {
-            var (left, right) = (registers[ins.B], registers[ins.C]);
+            var left = registers[ins.B];
             error = null;
             if (left.Kind == WebLingoValueKind.Int64 && right.Kind == WebLingoValueKind.Int64)
             {
@@ -2039,7 +2082,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     moved[i] = ins.OpCode switch
                     {
                         WebLingoOpCode.LoadConstant or WebLingoOpCode.SetMember or WebLingoOpCode.CallMethod => ins with { B = ins.B + constantBase },
-                        WebLingoOpCode.GetMember => ins with { C = ins.C + constantBase },
+                        WebLingoOpCode.GetMember or WebLingoOpCode.AddConstant or WebLingoOpCode.SubtractConstant or WebLingoOpCode.MultiplyConstant or WebLingoOpCode.RemainderConstant or WebLingoOpCode.EqualConstant or WebLingoOpCode.NotEqualConstant or WebLingoOpCode.LessConstant or WebLingoOpCode.LessOrEqualConstant or WebLingoOpCode.GreaterConstant or WebLingoOpCode.GreaterOrEqualConstant => ins with { C = ins.C + constantBase },
                         WebLingoOpCode.GetSuper => ins with { D = ins.D + constantBase },
                         WebLingoOpCode.CallBuiltin or WebLingoOpCode.LoadBuiltin => ins with { B = ins.B + builtinBase },
                         WebLingoOpCode.MakeClosure => ins with { B = ins.B + functionBase },

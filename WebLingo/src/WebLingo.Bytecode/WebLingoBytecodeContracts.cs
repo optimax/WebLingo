@@ -232,7 +232,22 @@ public enum WebLingoOpCode : byte
     /// </summary>
     ToJson,
     /// <summary><c>A = B \ C</c>, two integers' quotient (section 3.5).</summary>
-    IntegerDivide
+    IntegerDivide,
+    /// <summary>
+    /// A = destination, B = left, C = a constant, the right operand: <see cref="Add"/>'s <c>A = B + C</c>, its constant
+    /// read from the module's constants, not loaded into a register first (specification, section 5.6, "Where the time
+    /// goes"); and so for the others below.
+    /// </summary>
+    AddConstant,
+    SubtractConstant,
+    MultiplyConstant,
+    RemainderConstant,
+    EqualConstant,
+    NotEqualConstant,
+    LessConstant,
+    LessOrEqualConstant,
+    GreaterConstant,
+    GreaterOrEqualConstant
 }
 
 public readonly record struct WebLingoInstruction(WebLingoOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);

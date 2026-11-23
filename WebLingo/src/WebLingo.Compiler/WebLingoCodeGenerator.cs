@@ -515,6 +515,16 @@ public sealed class WebLingoCodeGenerator
                 Emit(new WebLingoInstruction(opCode, destination, operand), unary.Span);
                 return destination;
             }
+            case WebLingoIrBinary binary when ConstantOpCodeOf(binary.Operator) is { } withConstant && IsConstant(binary.Right):
+            {
+                // The right operand a constant, which the operation reads from the module's constants (section 5.6).
+                var mark = _nextRegister;
+                var left = EmitExpression(binary.Left, null);
+                _nextRegister = mark;
+                var destination = target ?? Allocate();
+                Emit(new WebLingoInstruction(withConstant, destination, left, ConstantOf(binary.Right)), binary.Span);
+                return destination;
+            }
             case WebLingoIrBinary binary:
             {
                 var mark = _nextRegister;
@@ -814,6 +824,35 @@ public sealed class WebLingoCodeGenerator
         _ => throw new InvalidOperationException($"Unknown operator {op}.")
     };
 
+    /// <summary>The operation that takes its right operand from the module's constants, for those that have one.</summary>
+    private static WebLingoOpCode? ConstantOpCodeOf(WebLingoBinaryOperator op) => op switch
+    {
+        WebLingoBinaryOperator.Add => WebLingoOpCode.AddConstant,
+        WebLingoBinaryOperator.Subtract => WebLingoOpCode.SubtractConstant,
+        WebLingoBinaryOperator.Multiply => WebLingoOpCode.MultiplyConstant,
+        WebLingoBinaryOperator.Remainder => WebLingoOpCode.RemainderConstant,
+        WebLingoBinaryOperator.Equal => WebLingoOpCode.EqualConstant,
+        WebLingoBinaryOperator.NotEqual => WebLingoOpCode.NotEqualConstant,
+        WebLingoBinaryOperator.Less => WebLingoOpCode.LessConstant,
+        WebLingoBinaryOperator.LessOrEqual => WebLingoOpCode.LessOrEqualConstant,
+        WebLingoBinaryOperator.Greater => WebLingoOpCode.GreaterConstant,
+        WebLingoBinaryOperator.GreaterOrEqual => WebLingoOpCode.GreaterOrEqualConstant,
+        _ => null
+    };
+
+    private static bool IsConstant(WebLingoIrExpression expression) =>
+        expression is WebLingoIrInt64Constant or WebLingoIrBinary64Constant or WebLingoIrStringConstant or WebLingoIrDecimalConstant;
+
+    /// <summary>A constant's index in the module's constants, for an expression <see cref="IsConstant"/> is true of.</summary>
+    private int ConstantOf(WebLingoIrExpression expression) => expression switch
+    {
+        WebLingoIrInt64Constant constant => Int64Constant(constant.Value),
+        WebLingoIrBinary64Constant constant => Binary64Constant(constant.Value),
+        WebLingoIrStringConstant constant => StringConstant(constant.Value),
+        WebLingoIrDecimalConstant constant => DecimalConstant(constant.Digits),
+        _ => throw new InvalidOperationException("Not a constant.")
+    };
+
     private int Allocate()
     {
         var register = _nextRegister++;
@@ -831,21 +870,18 @@ public sealed class WebLingoCodeGenerator
     }
 
     /// <summary>
-    /// <c>while</c> and <c>for</c>: test, body, step, back to the test. <c>do … while</c>: body, then the test, which
-    /// jumps back if true. A <c>continue</c> goes to the step (or the test), a <c>break</c> past the end.
+    /// <c>while</c> and <c>for</c>: a jump to the test, then the body, the step, and the test, at the bottom, which jumps
+    /// back to the body if true, so that each turn runs one jump, the test's (specification, section 5.6, "Where the time
+    /// goes"). <c>do … while</c>: body, then the test, which jumps back if true. A loop without a test: body, step, back to
+    /// the body. A <c>continue</c> goes to the step (or the test), a <c>break</c> past the end.
     /// </summary>
     private void EmitLoop(WebLingoIrLoop loop)
     {
         var jumps = new LoopJumps { Guards = _guards.Count };
         _loops.Push(jumps);
+        var tested = loop.TestFirst ? loop.Condition : null;
+        int? enter = tested is null ? null : EmitJump(WebLingoOpCode.Jump, 0, loop.Span);
         var top = _code.Count;
-        int? exit = null;
-        if (loop.TestFirst && loop.Condition is { } test)
-        {
-            var condition = EmitExpression(test, null);
-            exit = EmitJump(WebLingoOpCode.JumpIfFalse, condition, test.Span);
-            _nextRegister = _locals;
-        }
         EmitStatement(loop.Body);
         foreach (var at in jumps.Continues) PatchJump(at);
         if (loop.PerIteration is { } perIteration) EmitStatement(perIteration);
@@ -854,7 +890,8 @@ public sealed class WebLingoCodeGenerator
             EmitExpression(step, null);
             _nextRegister = _locals;
         }
-        if (!loop.TestFirst && loop.Condition is { } last)
+        if (enter is { } entered) PatchJump(entered);
+        if ((tested ?? (loop.TestFirst ? null : loop.Condition)) is { } last)
         {
             var condition = EmitExpression(last, null);
             Emit(new WebLingoInstruction(WebLingoOpCode.JumpIfTrue, condition, top), last.Span);
@@ -864,7 +901,6 @@ public sealed class WebLingoCodeGenerator
         {
             Emit(new WebLingoInstruction(WebLingoOpCode.Jump, top), loop.Span);
         }
-        if (exit is { } exitJump) PatchJump(exitJump);
         foreach (var at in jumps.Breaks) PatchJump(at);
         _loops.Pop();
     }

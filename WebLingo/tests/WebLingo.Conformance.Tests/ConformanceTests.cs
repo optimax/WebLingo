@@ -280,6 +280,14 @@ public sealed class ConformanceTests : IDisposable
     [InlineData("import { writeLn } from \"std:console\"; var i = 0; var m = {a: i = 1, b: i}; writeLn(m[\"b\"]); writeLn(i);", "1\n1")]
     [InlineData("import { writeLn } from \"std:console\"; var s = 0; foreach (var x in [1, 2, 3]) s = s + x; writeLn(s);", "6")]
     [InlineData("import { writeLn } from \"std:console\"; class Point { constructor(x, y) { this.x = x; this.y = y; } function sum() { return this.x + this.y; } scaled(k) { return new Point(this.x * k, this.y * k); } } var p = new Point(1, 2); writeLn(p.sum()); writeLn(p); writeLn(p.scaled(10).x);", "3\nPoint {x: 1, y: 2}\n10")]
+    // A comparison's branch taken at once, but after a class's own operator, which is called first; constant right operands,
+    // their errors as before; loops tested at their bottom, with continue and break; and x++ whose value is not used (the
+    // specification, section 5.6).
+    [InlineData("import { write, writeLn } from \"std:console\"; class C { static operator <(a, b) { write(\"<\"); return true; } } var c = new C(); var n = 0;"
+        + " while (c < 5 && n < 3) n++; if (c < 5) writeLn(\"yes\"); writeLn(n); var t = 0; for (var i = 0; i < 10; i++) { if (i % 2 == 0) continue;"
+        + " if (i > 7) break; t += i; } writeLn(t); var k = 0; for (;;) { k++; if (k >= 4) break; } do { k--; } while (k > 1); writeLn(k);"
+        + " var s = \"b\"; var d = 1.25m; var p = 7; var q = -7; writeLn([s < \"c\", s == \"b\", d + 1.5m, d * 2, p % 3, q % 3]);",
+        "<<<<<yes\n3\n16\n1\n[true, true, 2.75m, 2.5m, 1, -1]")]
     // A value's toString() as Object's gives it, at once for the kinds the formatter writes (the specification, section 5.6).
     [InlineData("import { writeLn } from \"std:console\"; var i = -42; var n = 1.5; var z = -0.0; var d = 2.50m; var b = true; var s = \"tea\"; writeLn([i.toString(), n.toString(), z.toString(), NaN.toString(), d.toString(), b.toString(), s.toString(), $\"{i}|{d}|{b}\"]); writeLn([i.toString().length, s.toString() == s]);", "[\"-42\", \"1.5\", \"-0.0\", \"NaN\", \"2.5m\", \"true\", \"tea\", \"-42|2.5m|true\"]\n[3, true]")]
     // A map and a set of many entries, past those they search in order, their entries then found by their positions, and removed, before and after (the specification, section 5.6).

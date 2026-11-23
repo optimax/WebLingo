@@ -177,6 +177,18 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             case WebLingoOpCode.IntegerDivide:
                 return Register(function, a, "destination") ?? Register(function, b, "left")
                     ?? Register(function, c, "right") ?? Unused(d);
+            case WebLingoOpCode.AddConstant:
+            case WebLingoOpCode.SubtractConstant:
+            case WebLingoOpCode.MultiplyConstant:
+            case WebLingoOpCode.RemainderConstant:
+            case WebLingoOpCode.EqualConstant:
+            case WebLingoOpCode.NotEqualConstant:
+            case WebLingoOpCode.LessConstant:
+            case WebLingoOpCode.LessOrEqualConstant:
+            case WebLingoOpCode.GreaterConstant:
+            case WebLingoOpCode.GreaterOrEqualConstant:
+                return Register(function, a, "destination") ?? Register(function, b, "left")
+                    ?? Index(c, module.Constants.Count, "constant") ?? Unused(d);
             case WebLingoOpCode.CallBuiltin:
                 if (Register(function, a, "destination") is { } destination) return destination;
                 if (Index(b, module.Imports.Count, "import") is { } importError) return importError;
@@ -584,6 +596,16 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             case WebLingoOpCode.Await:
             case WebLingoOpCode.ForEachStart:
             case WebLingoOpCode.ForEachVisits:
+            case WebLingoOpCode.AddConstant:
+            case WebLingoOpCode.SubtractConstant:
+            case WebLingoOpCode.MultiplyConstant:
+            case WebLingoOpCode.RemainderConstant:
+            case WebLingoOpCode.EqualConstant:
+            case WebLingoOpCode.NotEqualConstant:
+            case WebLingoOpCode.LessConstant:
+            case WebLingoOpCode.LessOrEqualConstant:
+            case WebLingoOpCode.GreaterConstant:
+            case WebLingoOpCode.GreaterOrEqualConstant:
                 return Unwritten(instruction.B, state, locals);
             case WebLingoOpCode.JumpIfFalse:
             case WebLingoOpCode.JumpIfTrue:
@@ -760,7 +782,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             or WebLingoOpCode.Call or WebLingoOpCode.GetMember or WebLingoOpCode.CallMethod or WebLingoOpCode.GetIndex
             or WebLingoOpCode.NewArray or WebLingoOpCode.NewMap or WebLingoOpCode.NewSet or WebLingoOpCode.MakeClass or WebLingoOpCode.New
             or WebLingoOpCode.GetSuper or WebLingoOpCode.TakeRest or WebLingoOpCode.CallSpread or WebLingoOpCode.CallMethodSpread
-            or WebLingoOpCode.NewSpread or WebLingoOpCode.ToJson => instruction.A,
+            or WebLingoOpCode.NewSpread or WebLingoOpCode.ToJson or WebLingoOpCode.AddConstant or WebLingoOpCode.SubtractConstant or WebLingoOpCode.MultiplyConstant or WebLingoOpCode.RemainderConstant or WebLingoOpCode.EqualConstant or WebLingoOpCode.NotEqualConstant or WebLingoOpCode.LessConstant or WebLingoOpCode.LessOrEqualConstant or WebLingoOpCode.GreaterConstant or WebLingoOpCode.GreaterOrEqualConstant => instruction.A,
         _ => null
     };
 

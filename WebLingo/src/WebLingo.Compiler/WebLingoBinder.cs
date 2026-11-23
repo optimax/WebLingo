@@ -742,7 +742,7 @@ public sealed class WebLingoBinder
                         $"'{discarded.Name}' gives a new array, and leaves the one it is called on as it was: its result is discarded here.",
                         discarded.NameSpan) { Source = _source });
                 }
-                var bound = new WebLingoBoundExpressionStatement(BindExpression(expressionStatement.Expression), statement.Span);
+                var bound = new WebLingoBoundExpressionStatement(BindExpression(Discarded(expressionStatement.Expression)), statement.Span);
                 return bound.Expression switch
                 {
                     WebLingoBoundBuiltinCall { Builtin.Name: var written } => AfterWrite(bound, written),
@@ -774,7 +774,7 @@ public sealed class WebLingoBinder
                 var init = forLoop.Init is null ? null : BindStatement(forLoop.Init);
                 var perIteration = new List<WebLingoLocalSymbol>(_scope.Locals.Values);
                 var condition = forLoop.Condition is null ? null : BindExpression(forLoop.Condition);
-                var step = forLoop.Step is null ? null : BindExpression(forLoop.Step);
+                var step = forLoop.Step is null ? null : BindExpression(Discarded(forLoop.Step));
                 var body = BindLoopBody(forLoop.Body);
                 _scope = _scope.Parent!;
                 var loop = new WebLingoBoundLoop(condition, body, step, true, forLoop.Span) { PerIterationLocals = perIteration };
@@ -1396,6 +1396,14 @@ public sealed class WebLingoBinder
         return InOrder(steps, new WebLingoConditionalExpressionSyntax(IsNull(current, compound.Span), write(compound.Value), current,
             compound.Span), compound.Span);
     }
+
+    /// <summary>
+    /// An expression whose value is not used, an expression statement's or a <c>for</c> loop's step: <c>x++</c> as
+    /// <c>++x</c>, which changes <c>x</c> the same, without keeping its old value (specification, section 5.6, "Where the
+    /// time goes").
+    /// </summary>
+    private static WebLingoExpressionSyntax Discarded(WebLingoExpressionSyntax expression) =>
+        expression is WebLingoIncrementSyntax { IsPrefix: false } increment ? increment with { IsPrefix = true } : expression;
 
     /// <summary><c>++x</c> as <c>x += 1</c>; <c>x++</c> the same, its value the old one (section 3.5).</summary>
     private WebLingoExpressionSyntax Increment(WebLingoIncrementSyntax increment)
