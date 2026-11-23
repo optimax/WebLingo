@@ -1672,6 +1672,20 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     _ => x / y
                 }), registers, ins);
             }
+            return ArithmeticOtherwise(opCode, registers, ins, left, right, out error);
+        }
+
+        /// <summary>
+        /// Arithmetic that is not two int64s' without overflow, or two binary64s': a class's operator, as a call; anything
+        /// else, and every error, by <see cref="WebLingoOperators"/>. A helper that .NET does not inline, so that each of the
+        /// dispatch method's operations inlines only <see cref="Arithmetic"/>'s fast paths (specification, section 5.6,
+        /// "After the remedies"; <c>Documents/implementation.md</c>, "A VM's Dispatch Method Is Sensitive to Its Locals").
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool ArithmeticOtherwise(WebLingoOpCode opCode, WebLingoValue[] registers, in WebLingoInstruction ins,
+            WebLingoValue left, WebLingoValue right, out WebLingoRuntimeError? error)
+        {
+            error = null;
             if ((left.Kind == WebLingoValueKind.Instance || right.Kind == WebLingoValueKind.Instance || left.HasClass || right.HasClass)
                 && TryOperator(opCode, left, right))
             {
@@ -1727,6 +1741,18 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     _ => x >= y
                 }), registers, ins);
             }
+            return CompareOtherwise(opCode, registers, ins, left, right, out error);
+        }
+
+        /// <summary>
+        /// A comparison that is not two int64s' or two binary64s': a class's operator, as a call; anything else by
+        /// <see cref="WebLingoOperators"/>; in a helper .NET does not inline, as <see cref="ArithmeticOtherwise"/> is.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool CompareOtherwise(WebLingoOpCode opCode, WebLingoValue[] registers, in WebLingoInstruction ins,
+            WebLingoValue left, WebLingoValue right, out WebLingoRuntimeError? error)
+        {
+            error = null;
             if ((left.Kind == WebLingoValueKind.Instance || right.Kind == WebLingoValueKind.Instance || left.HasClass || right.HasClass)
                 && TryOperator(opCode, left, right))
             {
