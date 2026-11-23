@@ -637,6 +637,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                                 if (isMethod && name.Member == WebLingoMember.Dispose) goto dispose;
                                 goto call;
                             }
+                            if (TryValueToString(target, name, ins.D, heap, registers, ins.A, out error))
+                            {
+                                if (error is not null) break;
+                                pc++;
+                                continue;
+                            }
                             if (WebLingoMembers.TryGetValueMethod(target, name.Member, name.Text, heap, out var objectMethod))
                             {
                                 // Every value has Object's toString() and equal() (section 3.7).
@@ -875,6 +881,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         }
                         case WebLingoOpCode.ToText:
                             // C = 1: as write writes it, for an interpolation (section 3.5); else as Object's toString().
+                            if (TryPlainText(registers[ins.B], heap, registers, ins.A, out error))
+                            {
+                                if (error is not null) break;
+                                pc++;
+                                continue;
+                            }
                             _text = new TextCall(new WebLingoTextBuilder(heap, registers[ins.B], ins.C != 1), null, ins.A);
                             goto text;
                         case WebLingoOpCode.ToJson:
@@ -2661,6 +2673,44 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             if (!heap.TryAllocateArray(arguments, firstArgument + others, argumentCount - others, out var rest, out error)) return false;
             _rest[0] = rest;
             return true;
+        }
+
+        /// <summary>
+        /// A value's text at once, into <paramref name="destination"/>, for one that is neither a collection nor an
+        /// instance, whose text the text builder would give as the formatter does, whatever <c>toString()</c> a class has
+        /// (the specification, section 5.6, "Where the time goes"): a string itself; false for any other value, whose text
+        /// the builder makes. An error is the string's allocation's.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static bool TryPlainText(WebLingoValue value, WebLingoHeap heap, WebLingoValue[] registers, int destination,
+            out WebLingoRuntimeError? error)
+        {
+            error = null;
+            if (value.Kind is WebLingoValueKind.Array or WebLingoValueKind.Map or WebLingoValueKind.Set or WebLingoValueKind.Instance)
+                return false;
+            if (value.Kind == WebLingoValueKind.String)
+            {
+                registers[destination] = value;
+                return true;
+            }
+            if (heap.TryAllocateString(WebLingoValueFormatter.Format(value, heap), out var text, out error)) registers[destination] = text;
+            return true;
+        }
+
+        /// <summary>
+        /// <c>x.toString()</c> of an integer, a number, a decimal, a Boolean or a string, where no class has been given a
+        /// <c>toString()</c> of its own (<see cref="WebLingoHeap.ToStringGiven"/>), so that <c>Object</c>'s would run,
+        /// <c>toText(this)</c>: its text at once, without that call (section 3.7); false for any other call.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static bool TryValueToString(WebLingoValue target, WebLingoMemberName name, int count, WebLingoHeap heap,
+            WebLingoValue[] registers, int destination, out WebLingoRuntimeError? error)
+        {
+            error = null;
+            return name.Member == WebLingoMember.ToString && count == 0 && !heap.ToStringGiven
+                && target.Kind is WebLingoValueKind.Int64 or WebLingoValueKind.Binary64 or WebLingoValueKind.Decimal
+                    or WebLingoValueKind.Boolean or WebLingoValueKind.String
+                && TryPlainText(target, heap, registers, destination, out error);
         }
 
         /// <summary>WL2006 for a call of a function, which may have a rest parameter (section 3.5).</summary>
