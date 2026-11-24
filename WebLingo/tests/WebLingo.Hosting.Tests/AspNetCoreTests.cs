@@ -29,6 +29,22 @@ public sealed class AspNetCoreTests : IDisposable
     }
 
     [Fact]
+    public async Task CookiesAreReadAndEachIsSetByAHeaderOfItsOwn()
+    {
+        // Cookies (section 6.12, "Sessions and cookies"): read from ASP.NET Core's request, each set by a Set-Cookie of its own.
+        Write("cookies.wasp", "<% param request; param response; response.setCookie(\"a\", \"1\"); response.setCookie(\"b\", \"x y\"); %>"
+                              + "<%= request.cookies[\"tea\"] %>");
+        var context = new DefaultHttpContext();
+        context.Request.Method = "GET";
+        context.Request.Path = "/cookies";
+        context.Request.Headers.Cookie = "tea=green; other=1";
+        context.Response.Body = new MemoryStream();
+        await WebLingoAspNetCore.Serve(context, Load(), _root, _workers);
+        Assert.Equal("green", Body(context));
+        Assert.Equal(["a=1; Path=/; HttpOnly; SameSite=Lax", "b=x%20y; Path=/; HttpOnly; SameSite=Lax"], context.Response.Headers.SetCookie.Select(value => value ?? "").ToArray());
+    }
+
+    [Fact]
     public async Task ALongPageIsSentAsItIsWritten_WithoutALength()
     {
         var context = await Serve("GET", "/long");

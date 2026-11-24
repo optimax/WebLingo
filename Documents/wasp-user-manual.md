@@ -615,6 +615,38 @@ otherwise; `wasp.config` changes both (section 14), and under IIS the site's `we
 - Status and headers can be set until the page's output starts being sent, after its first 64 KB
   ([section 13](#13-how-a-pages-output-is-sent)); after that, setting them is an error. Set them before writing much.
 
+### Cookies
+
+| Member | What it is |
+|---|---|
+| `request.cookies` | the request's cookies, a map of their names to their values: `request.cookies["theme"]` |
+| `response.setCookie(name, value, options)` | sets a cookie, its value a string; `options`, a map, may be left out |
+| `response.deleteCookie(name, options)` | deletes a cookie; `options` may name its `path` and `domain`, as it was set |
+
+```html
+<% param request; param response; %>
+<% var visits = request.cookies.has("visits") ? Integer.parse(request.cookies["visits"]) + 1 : 1; %>
+<% response.setCookie("visits", visits.toString(), { maxAge: 60 * 60 * 24 * 365 }); %>
+<p>Visits: <%= visits %></p>
+```
+
+The first request gives `Visits: 1`, its response's header `Set-Cookie: visits=1; Path=/; Max-Age=31536000; HttpOnly;
+SameSite=Lax`, and the browser's next, `Visits: 2`.
+
+- A cookie is secure by default: `HttpOnly`, so that a page's scripts in the browser cannot read it, `SameSite=Lax`,
+  `Path=/`, and `Secure` when the request came over HTTPS. Each option changes one: `httpOnly` and `secure`, Booleans;
+  `sameSite`, `"lax"`, `"strict"` or `"none"`, the last only for a secure cookie, as browsers ask; `path`, from `/`;
+  `domain`; `maxAge`, in seconds; and `expires`, a `DateTime`. Without `maxAge` or `expires`, a cookie lasts until the
+  browser closes. An option that is not one is an error that names the one you may have meant.
+- A value may hold any text: what a cookie cannot hold as it is, a space, `;`, `"` or a letter outside ASCII, is sent
+  as `%xx`, and `request.cookies` gives it back as it was set. A cookie's name is letters, digits and
+  `!#$%&'*+-.^_`|~`.
+- A cookie set twice in one response, of the same name, path and domain, is sent once, as it was set last; so is a
+  cookie deleted after it was set.
+- A cookie sent twice by the browser, of one name and different paths, is read as the first it sent, the one of the
+  longest path.
+- A cookie, as any header, can be set until the page's output starts being sent; after that, setting one is an error.
+
 A page run by `wasp run` has no request: there, a page's parameters are values given on the command line
 ([section 16](#16-the-wasp-command-line)), and a page that declares `request` fails.
 
@@ -1138,7 +1170,8 @@ site anew, so the first request to each is slower than the rest.
 
 These are not there yet, and are planned or being designed:
 
-- **Sessions and cookies**: a page reads the `Cookie` header and sets `Set-Cookie` itself, with `response.headers.add`.
+- **Sessions**: a page keeps what it must remember between a browser's requests in cookies
+  ([section 9](#cookies)), or in a database of its own.
 - **A breakpoint's condition**: a breakpoint stops every request that reaches it, whatever its condition
   ([section 15](#15-while-you-work)); and a site served under IIS or through FastCGI is not debugged, only one served for
   the debugger.

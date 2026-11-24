@@ -1150,6 +1150,7 @@ and `Headers {}`; one made by `new` holds no request, each of its members WL3001
 | `request.scheme`, `request.host` | `"http"` or `"https"`, and the host the client asked for, with its port if it gave one |
 | `request.query` | the query's names and values, decoded, a map, a name given twice having its last value |
 | `request.headers` | its headers, a `Headers`, which cannot be changed |
+| `request.cookies` | its cookies, a map of their names to their values, decoded, a name sent twice having its first value |
 | `await request.text()` | its body as text, in the charset its `Content-Type` names, UTF-8 if it names none |
 | `await request.form()` | a form's fields, a map: an `application/x-www-form-urlencoded` one's, decoded as the query is, or a `multipart/form-data` one's; a body of another type WL3001 |
 | `await request.files()` | a `multipart/form-data` form's files, a map of each file input's name to an array of `UploadedFile`s; an `application/x-www-form-urlencoded` form's none, an empty map; a body of another type WL3001 |
@@ -1175,6 +1176,16 @@ again before the piece it gives has come.
 | `response.headers` | its headers, a `Headers`, which can be changed until the response is sent |
 | `response.write(value)` | writes a value's text to its body, as `write` writes it, `null` as `null`, giving `null` |
 | `response.writeLn(value)` | the same, then a line break |
+| `response.setCookie(name, value, options)` | sets a cookie, its value a string, giving `null`; `options`, a map, or `null` |
+| `response.deleteCookie(name, options)` | deletes a cookie, its `options` naming its `path` and `domain`, giving `null` |
+
+A cookie is `HttpOnly`, `SameSite=Lax`, `Path=/`, and `Secure` over HTTPS, unless its options say otherwise:
+`httpOnly` and `secure`, Booleans; `sameSite`, `"lax"`, `"strict"` or `"none"`, the last for a secure cookie only;
+`path`, from `/`; `domain`, a host's name; `maxAge`, seconds, an integer, 0 or more; and `expires`, a `DateTime`. Its
+value is sent with each byte a cookie cannot hold, and `%`, as `%xx`, and `request.cookies` decodes it. A name that is
+not a cookie's, a value that is not a string, an option that is not one, its error naming the one it may have meant,
+or a wrong option's value, is WL3001; and so is a cookie set or deleted once the response is sent. A cookie set again,
+of the same name, path and domain, replaces the one set before in the same response.
 
 A route handler writes its response's body with `response.write` and `response.writeLn`, as classic ASP's
 `Response.Write`; a page writes it with its text, its `<%= %>` and its own `write` and `writeLn` too, which write as

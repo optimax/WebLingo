@@ -29,6 +29,10 @@ namespace WebLingo.Hosting;
 /// as the browser gave it, never a path, <c>type</c>, <c>size</c>, in bytes, and <c>bytes()</c>, <c>text()</c> and
 /// <c>save(path)</c>, each a task, <c>save</c> writing through the script's files, as <c>std:fs</c> writes, a file there
 /// replaced. A body larger than the site takes (<see cref="WebLingoUploads.MaxBodySize"/>) is an error where it is read.
+/// Cookies (section 6.12, "Sessions and cookies"; <see cref="WebLingoCookies"/>): a request's <c>cookies</c>, a map of
+/// their names to their values, made when first read; and a response's <c>setCookie(name, value, options)</c> and
+/// <c>deleteCookie(name, options)</c>, written in WebLingo, their options optional, calling its own <c>__setCookie</c> and
+/// <c>__deleteCookie</c>, a cookie set or deleted once the response is being sent WL3001, as a header is.
 /// </summary>
 internal sealed class WebLingoHttpObjects
 {
@@ -56,6 +60,7 @@ internal sealed class WebLingoHttpObjects
             .DeclareProperty("host", (a, heap, out r, out e) => Text(a, heap, s => s.Request.Host, out r, out e))
             .DeclareProperty("query", Query)
             .DeclareProperty("headers", (a, heap, out r, out e) => RequestHeaders(a, heap, out r, out e))
+            .DeclareProperty("cookies", Cookies)
             .DeclareMethod("text", 0, BodyText)
             .DeclareMethod("form", 0, BodyForm)
             .DeclareMethod("files", 0, BodyFiles)
@@ -72,6 +77,8 @@ internal sealed class WebLingoHttpObjects
             .DeclareProperty("status", Status, SetStatus)
             .DeclareProperty("headers", (a, heap, out r, out e) => ResponseHeaders(a, heap, out r, out e))
             .DeclareMethod("__write", 1, WriteText)
+            .DeclareMethod("__setCookie", 3, SetCookie)
+            .DeclareMethod("__deleteCookie", 2, DeleteCookie)
             .DeclareWebLingoMethods(WritingSource);
         _headers
             .DeclareIndexer(GetHeader, SetHeader)
@@ -108,7 +115,7 @@ internal sealed class WebLingoHttpObjects
         WebLingoUploads uploads, out IDisposable ending)
     {
         var requestState = new RequestState(request, uploads);
-        var responseState = new ResponseState(response, output);
+        var responseState = new ResponseState(response, output, string.Equals(request.Scheme, "https", StringComparison.OrdinalIgnoreCase));
         ending = requestState;
         return
         [
@@ -164,6 +171,144 @@ internal sealed class WebLingoHttpObjects
         result = WebLingoValue.Null;
         if (!_response.TryGetHostObject<ResponseState>(a[0], heap, out var state, out error)) return false;
         result = state.Roots[1];
+        return true;
+    }
+
+    /// <summary>The request's cookies, decoded, as a map of their names to their values, made when first read and the same map after.</summary>
+    private bool Cookies(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_request.TryGetHostObject<RequestState>(a[0], heap, out var state, out error)) return false;
+        if (state.Roots[5].Kind == WebLingoValueKind.Null
+            && !TryMap(WebLingoCookies.Parse(state.Request.Headers.GetValues("Cookie")), heap, out state.Roots[5], out error)) return false;
+        result = state.Roots[5];
+        return true;
+    }
+
+    /// <summary><c>response.setCookie(name, value, options)</c>: its <c>Set-Cookie</c> added, giving <c>null</c>.</summary>
+    private bool SetCookie(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_response.TryGetHostObject<ResponseState>(a[0], heap, out var state, out error)
+            || !TryCookieName(a[1], heap, "setCookie", 3, out var name, out error)) return false;
+        var value = heap.Held(a[2]);
+        if (value.Kind != WebLingoValueKind.String)
+        {
+            error = new WebLingoArgument("setCookie", 1, 3, "the value", "a string").Wrong(value, heap);
+            return false;
+        }
+        if (!TryCookieOptions(a[3], heap, "setCookie", 2, 3, WebLingoCookies.SetOptions, state.Secure, out var options, out error)) return false;
+        var header = WebLingoCookies.Format(name, heap.GetString(value), options);
+        var size = header.IndexOf(';', StringComparison.Ordinal); // Its name and its value, as sent.
+        if (size > WebLingoCookies.MaxBytes)
+        {
+            error = Invalid($"The cookie '{name}' is {size} bytes, its name and its value as sent, more than the {WebLingoCookies.MaxBytes} a browser keeps of one.");
+            return false;
+        }
+        if (WebLingoCookies.TrySet(state.Response.Headers, name, options, header)) return true;
+        error = Invalid($"The cookie '{name}' cannot be set: the response has been sent.");
+        return false;
+    }
+
+    /// <summary><c>response.deleteCookie(name, options)</c>: a <c>Set-Cookie</c> that deletes it, its path and domain those it was set with.</summary>
+    private bool DeleteCookie(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_response.TryGetHostObject<ResponseState>(a[0], heap, out var state, out error)
+            || !TryCookieName(a[1], heap, "deleteCookie", 2, out var name, out error)
+            || !TryCookieOptions(a[2], heap, "deleteCookie", 1, 2, WebLingoCookies.DeleteOptions, state.Secure, out var options, out error)) return false;
+        if (WebLingoCookies.TrySet(state.Response.Headers, name, options, WebLingoCookies.Deletion(name, options))) return true;
+        error = Invalid($"The cookie '{name}' cannot be deleted: the response has been sent.");
+        return false;
+    }
+
+    private static bool TryCookieName(WebLingoValue given, WebLingoHeap heap, string member, int of, out string name, out WebLingoRuntimeError? error)
+    {
+        (name, error) = ("", null);
+        var argument = new WebLingoArgument(member, 0, of, "the name", "a cookie's name, a string of letters, digits and !#$%&'*+-.^_`|~");
+        given = heap.Held(given);
+        if (given.Kind != WebLingoValueKind.String)
+        {
+            error = argument.Wrong(given, heap);
+            return false;
+        }
+        name = heap.GetString(given);
+        if (WebLingoCookies.IsName(name)) return true;
+        error = argument.Wrong(WebLingoValueFormatter.Quote(name));
+        return false;
+    }
+
+    /// <summary>
+    /// A cookie's options, a map, or <c>null</c> for none, each checked: <c>httpOnly</c> and <c>secure</c> Booleans,
+    /// <c>sameSite</c> <c>"lax"</c>, <c>"strict"</c> or <c>"none"</c>, the last only for a secure cookie, <c>path</c> a path
+    /// from <c>/</c>, <c>domain</c> a host's name, <c>maxAge</c> seconds, an integer, and <c>expires</c> a date; one it does
+    /// not take an error naming the one it may have meant.
+    /// </summary>
+    private static bool TryCookieOptions(WebLingoValue given, WebLingoHeap heap, string member, int position, int of, string[] allowed, bool secure,
+        out WebLingoCookies.Options options, out WebLingoRuntimeError? error)
+    {
+        options = new WebLingoCookies.Options(secure);
+        error = null;
+        given = heap.Held(given);
+        if (given.Kind == WebLingoValueKind.Null) return true;
+        var argument = new WebLingoArgument(member, position, of, "the options", "a map of the cookie's options");
+        if (given.Kind != WebLingoValueKind.Map)
+        {
+            error = argument.Wrong(given, heap);
+            return false;
+        }
+        for (var i = 0; i < heap.MapCount(given); i++)
+        {
+            var (key, entry) = heap.MapEntryAt(given, i);
+            var name = key.Kind == WebLingoValueKind.String ? heap.GetString(key) : null;
+            if (name is null || Array.IndexOf(allowed, name) < 0)
+            {
+                var shown = name is null ? WebLingoValueFormatter.Describe(key, heap) : $"'{name}'";
+                error = Invalid($"{argument.Named} has {shown}, which is not an option of '{member}'{WebLingoCookies.Suggest(name, allowed)}");
+                return false;
+            }
+            var value = heap.Held(entry);
+            string? must = null;
+            switch (name)
+            {
+                case "httpOnly" or "secure":
+                    if (value.Kind != WebLingoValueKind.Boolean) must = "a Boolean";
+                    else if (name == "httpOnly") options.HttpOnly = value.AsBoolean;
+                    else options.Secure = value.AsBoolean;
+                    break;
+                case "sameSite":
+                    var same = value.Kind == WebLingoValueKind.String ? heap.GetString(value).ToLowerInvariant() : "";
+                    if (same is "lax" or "strict" or "none") options.SameSite = char.ToUpperInvariant(same[0]) + same[1..];
+                    else must = "\"lax\", \"strict\" or \"none\"";
+                    break;
+                case "path":
+                    if (value.Kind == WebLingoValueKind.String && heap.GetString(value) is var path && path.StartsWith('/')
+                        && WebLingoCookies.IsPath(path)) options.Path = path;
+                    else must = "a path from /, without ; or a character outside ASCII";
+                    break;
+                case "domain":
+                    if (value.Kind == WebLingoValueKind.String && heap.GetString(value) is var domain && domain.TrimStart('.').Length > 0
+                        && WebLingoCookies.IsDomain(domain)) options.Domain = domain;
+                    else must = "a host's name, letters, digits, - and .";
+                    break;
+                case "maxAge":
+                    if (value.Kind == WebLingoValueKind.Int64 && value.AsInt64 >= 0) options.MaxAge = value.AsInt64;
+                    else must = "a number of seconds, an integer, 0 or more";
+                    break;
+                case "expires":
+                    if (value.Kind == WebLingoValueKind.DateTime) options.Expires = value.UnixMilliseconds;
+                    else must = "a date";
+                    break;
+            }
+            if (must is null) continue;
+            error = Invalid($"{argument.Named} must give {name} {must}, not {WebLingoValueFormatter.Describe(value, heap)}.");
+            return false;
+        }
+        if (options.SameSite == "None" && !options.Secure)
+        {
+            error = Invalid($"A cookie whose sameSite is \"none\" must be secure: browsers refuse it otherwise; {argument.Named} gives secure false, or the request is not over HTTPS.");
+            return false;
+        }
         return true;
     }
 
@@ -789,8 +934,8 @@ internal sealed class WebLingoHttpObjects
 
         public IWebLingoHttpRequest Request { get; } = request;
 
-        /// <summary>The heap's roots of its instance, its headers, its query, its files' map and UploadedFile's class.</summary>
-        public WebLingoValue[] Roots { get; } = new WebLingoValue[5];
+        /// <summary>The heap's roots of its instance, its headers, its query, its files' map, UploadedFile's class and its cookies.</summary>
+        public WebLingoValue[] Roots { get; } = new WebLingoValue[6];
 
         /// <summary>Whether its body has been read as a form, as it arrived, and so cannot be read otherwise.</summary>
         public bool ReadAsForm { get; private set; }
@@ -958,10 +1103,14 @@ internal sealed class WebLingoHttpObjects
         }
     }
 
-    /// <summary>A response as its instance holds it: the response, and the heap's roots of its instance and its headers.</summary>
-    private sealed class ResponseState(IWebLingoHttpResponse response, IWebLingoTextOutput output)
+    /// <summary>
+    /// A response as its instance holds it: the response, the heap's roots of its instance and its headers, and whether its
+    /// request came over HTTPS, its cookies then secure unless they say otherwise.
+    /// </summary>
+    private sealed class ResponseState(IWebLingoHttpResponse response, IWebLingoTextOutput output, bool secure)
     {
         public IWebLingoHttpResponse Response { get; } = response;
+        public bool Secure { get; } = secure;
         public IWebLingoTextOutput Output { get; } = output;
         public WebLingoValue[] Roots { get; } = new WebLingoValue[2];
     }

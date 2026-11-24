@@ -205,8 +205,16 @@ Core adapter raises Kestrel's own limit to the site's, but IIS's request filteri
 its `web.config` (the WASP User Manual, section 17). `UploadTests` (`WebLingo.Hosting.Tests`) and
 `WaspServeTests.AFormsFilesAreUploaded`, through Kestrel, 30.5 MB among them.
 
-Next: "Sessions in WASP", answered, then "Debugging WASP Pages, Part 3: Conditional Breakpoints", answered; part 4
-waits for Visual Studio installed here, as "Visual Studio Debug Adapter" does, and "Extensive WASP Example" for
-sessions.
+## Sessions and cookies
 
-The last full suite, on Windows, in Release: 3,465 tests passing. Linux not tried since the last push.
+The specification's section 6.12, "Sessions and cookies", has the owner's answers, and "Sessions and cookies, parts"
+splits the task in three. Part 1, cookies, is built: `request.cookies`, `response.setCookie` and `response.deleteCookie`
+(`WebLingo/src/WebLingo.Hosting/WebLingoCookies.cs`, the glue in `WebLingoHttpObjects`, the two methods written in
+WebLingo in `Response.wlg`), tested by `CookieTests` and `AspNetCoreTests.CookiesAreReadAndEachIsSetByAHeaderOfItsOwn`.
+Part 2, sessions in memory, waits for its Q1 in `TO-DO.md`: whether a session's arrays and maps are its own or copies.
+
+Next: "Debugging WASP Pages, Part 3: Conditional Breakpoints", answered; "Sessions in WASP, Part 2" waits for its Q1,
+and part 3 for part 2; debugging's part 4 waits for Visual Studio installed here, as "Visual Studio Debug Adapter" does,
+and "Extensive WASP Example" for sessions.
+
+The last full suite, on Windows, in Release: 3,481 tests passing. Linux not tried since the last push.

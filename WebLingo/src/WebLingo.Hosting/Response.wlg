@@ -1,2 +1,4 @@
 write(value) { this.__write(value == null ? "null" : $"{value}"); }
 writeLn(value) { this.__write((value == null ? "null" : $"{value}") + "\n"); }
+setCookie(name, value, options = null) { this.__setCookie(name, value, options); }
+deleteCookie(name, options = null) { this.__deleteCookie(name, options); }
