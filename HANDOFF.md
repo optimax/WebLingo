@@ -23,8 +23,17 @@ component and a module, through `DebugAdapterSession`, the conformance tests' cl
 A page's code under a layout is an anonymous function in the call stack, `function`. The extension was tried with a
 stub of VS Code's API only, not in VS Code itself: install it again, from the folder or with `build.bat`, to try it.
 
-Parts 2 (a site under `wasp serve`, each request a thread, a stop suspending only its request) and 3 (conditional
-breakpoints) are next; part 4 waits for its Q1, which client to try.
+Part 2, a site under the debugger, is built too: a launch without `program` serves the site at `root`
+(`WebLingoWaspServer.ServeForDebugger`, Kestrel, `port`, 8080 by default), each request a thread of the session's
+(`IWebLingoDebuggerThreads` in `WebLingo.VM`, `WebLingoApplicationOptions.Debugger`, `WebLingoDebugSession.DebugThread`),
+named `GET /cart #12`. A request's stop makes `IWebLingoRegisterDebugger.Stopped` give false, and the VM returns waiting
+with its frames kept (`_stopDepth`), resumed in `Run`'s prologue through `GoesOn` once the session posts to the request's
+scheduler host; a script's and a page's stops still block their own thread. The send timeout leaves out time stopped
+(`WebLingoResponseText`, `IWebLingoDebuggerThread.Stops`). Tests: `DebuggerStopTests` (`WebLingo.VM.Tests`),
+`DebuggedRequestTests` (`WebLingo.Hosting.Tests`), `WaspDebugTests.ASiteStopsOnlyTheRequestAtABreakpoint`. The VS Code
+extension, 0.4.0, has "Debug WASP Site"; it was not tried in VS Code itself. The benchmark against `main`, 12 rounds alternating: no workload slower by the rank test; the resumption first written inside the dispatch loop made `closures` 9 percent slower, so it is in `Run`'s prologue.
+
+Part 3 (conditional breakpoints) is next; part 4 waits for its Q1, which client to try.
 
 ## Windows local installation
 
@@ -199,8 +208,8 @@ Core adapter raises Kestrel's own limit to the site's, but IIS's request filteri
 its `web.config` (the WASP User Manual, section 17). `UploadTests` (`WebLingo.Hosting.Tests`) and
 `WaspServeTests.AFormsFilesAreUploaded`, through Kestrel, 30.5 MB among them.
 
-Next: "Debugging WASP Pages, Part 2: A Site Under the Debugger", then part 3; part 4 waits for its Q1. The young
+Next: "Debugging WASP Pages, Part 3: Conditional Breakpoints"; part 4 waits for its Q1. The young
 generation waits for its Q4, and "Sessions in WASP" for its Q5 and Q6; "Visual Studio Debug Adapter" waits for Visual
 Studio installed here, and "Extensive WASP Example" for sessions.
 
-The last full suite, on Windows, in Release: 3,460 tests passing. Linux not tried since the last push.
+The last full suite, on Windows, in Release: 3,465 tests passing. Linux not tried since the last push.

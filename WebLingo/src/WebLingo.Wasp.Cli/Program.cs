@@ -12,7 +12,8 @@ internal static class Program
         // VS Code's, or another client's, debug adapter for pages, on the standard input and output (section 5.7).
         if (args is ["--debug-adapter"])
         {
-            return WebLingoDebugAdapter.Run(WebLingoWaspCommandLine.Pages, Console.OpenStandardInput(), Console.OpenStandardOutput());
+            return WebLingoDebugAdapter.Run(WebLingoWaspCommandLine.Pages, Console.OpenStandardInput(), Console.OpenStandardOutput(),
+                WebLingoWaspServer.ServeForDebugger);
         }
         // Text written as UTF-8, to a file, a pipe or a console alike (WebLingoConsoleText).
         var (output, error) = WebLingoConsoleText.Open();

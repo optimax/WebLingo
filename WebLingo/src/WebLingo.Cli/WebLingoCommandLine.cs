@@ -331,7 +331,7 @@ public static partial class WebLingoCommandLine
         };
         var vm = new WebLingoVirtualMachine
         {
-            Loader = new WebLingoModuleLoader(source.Options), Components = source.Compilation.Components, Debugger = debugger
+            Loader = new WebLingoModuleLoader(source.Options), Components = source.Compilation.Components, Debugger = debugger.Program
         };
         var result = vm.Execute(source.Compilation.Result.Module!, context);
         output.Flush();

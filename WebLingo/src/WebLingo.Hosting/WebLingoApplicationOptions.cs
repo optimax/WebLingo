@@ -96,4 +96,11 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// "Streaming"): the configuration's <c>"sendTimeout"</c>, 30 seconds by default.
     /// </summary>
     public TimeSpan SendTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// The debugger the application's requests run under (specification, section 5.7, "Debugging WASP pages, parts", part
+    /// 2), each a thread of its own, named for its method and its path, its pages compiled for a debugger; none by default.
+    /// A request is debugged only where its host gives it a scheduler host, through which a stopped request is resumed.
+    /// </summary>
+    public WebLingo.VM.IWebLingoDebuggerThreads? Debugger { get; init; }
 }

@@ -10,9 +10,12 @@ namespace WebLingo.Hosting;
 /// and the output sent as it is written, in pieces of about <see cref="Piece"/> bytes. Written as UTF-8, a surrogate
 /// without its pair as U+FFFD. Once sent, it is full while its response holds more than its client has taken, and a page
 /// waits for it (section 9, "M0.14.7 parts", part 3), for at most <paramref name="sendTimeout"/>, after which
-/// <paramref name="timedOut"/> is called, to cancel the request, and the page goes on, to see it cancelled.
+/// <paramref name="timedOut"/> is called, to cancel the request, and the page goes on, to see it cancelled. A request that
+/// its debugger, <paramref name="debugged"/>, stopped meanwhile waits the send timeout anew, the time it was stopped not its
+/// client's (section 5.7, "Debugging WASP pages, parts", part 2).
 /// </summary>
-internal sealed class WebLingoResponseText(IWebLingoHttpResponse response, TimeSpan sendTimeout, Action timedOut) : IWebLingoWaitingOutput
+internal sealed class WebLingoResponseText(IWebLingoHttpResponse response, TimeSpan sendTimeout, Action timedOut,
+    WebLingo.VM.IWebLingoDebuggerThread? debugged = null) : IWebLingoWaitingOutput
 {
     /// <summary>How much output is kept before its response is committed and it is sent.</summary>
     public const int Kept = 64 * 1024;
@@ -35,8 +38,15 @@ internal sealed class WebLingoResponseText(IWebLingoHttpResponse response, TimeS
     public bool IsFull => Sending && response.Body.IsFull;
 
     /// <summary>Calls <paramref name="ready"/> once the response can take more, or once the send timeout has passed, the request then cancelled.</summary>
-    public void WhenReady(Action ready) => response.Body.WhenReady(sendTimeout, inTime =>
+    public void WhenReady(Action ready) => WhenReady(ready, debugged?.Stops ?? 0);
+
+    private void WhenReady(Action ready, int stops) => response.Body.WhenReady(sendTimeout, inTime =>
     {
+        if (!inTime && debugged is { } thread && (thread.Stops != stops || (thread.Stops & 1) == 1))
+        {
+            WhenReady(ready, thread.Stops); // Stopped by its debugger since it began to wait: it waits anew.
+            return;
+        }
         if (!inTime)
         {
             TimedOut = true;

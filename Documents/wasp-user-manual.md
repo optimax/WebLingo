@@ -917,11 +917,12 @@ scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run
   for a page that needs no request ([section 16](#16-the-wasp-command-line)).
 - **Editors colour pages and modules**: the repository's `Editors/` folder has syntax colouring for `.wasp` and `.wlg`
   files, and its `README.md` says how to install it.
-- **VS Code debugs a page**: with WebLingo's extension, a breakpoint in a page, an include, a layout, a component or a
-  module it imports stops the page there, run as `wasp run` runs it, its parameters from the launch, with the call stack
-  and the variables to look at, and stepping. VS Code starts `wasp --debug-adapter` for it; the `Editors/` folder's
-  `README.md` says how to set it up. A site served by `wasp serve`, a request stopped where a browser sent it, is not
-  debugged yet.
+- **VS Code debugs a page, and a site**: with WebLingo's extension, a breakpoint in a page, an include, a layout, a
+  component or a module it imports stops the page there, run as `wasp run` runs it, its parameters from the launch, with
+  the call stack and the variables to look at, and stepping. A site is debugged as `wasp serve` serves it: a request a
+  browser sends stops at a breakpoint, alone, each request a thread of the debugger's, `GET /cart #12`, while the site
+  serves the others; the debugger's pause stops every request until it goes on. VS Code starts `wasp --debug-adapter`
+  for either; the `Editors/` folder's `README.md` says how to set it up.
 
 ---
 
@@ -1138,8 +1139,9 @@ site anew, so the first request to each is slower than the rest.
 These are not there yet, and are planned or being designed:
 
 - **Sessions and cookies**: a page reads the `Cookie` header and sets `Set-Cookie` itself, with `response.headers.add`.
-- **Debugging a served site**: VS Code debugs one page, as `wasp run` runs it ([section 15](#15-while-you-work)), not yet
-  a site's requests, as `wasp serve` serves them, nor a breakpoint's condition.
+- **A breakpoint's condition**: a breakpoint stops every request that reaches it, whatever its condition
+  ([section 15](#15-while-you-work)); and a site served under IIS or through FastCGI is not debugged, only one served for
+  the debugger.
 - **A standalone server**, without IIS, nginx or Apache, is planned. WASP has been tried on Windows, through IIS's
   ASP.NET Core Module, and through FastCGI behind nginx and Apache httpd; Linux is built and tested, but no site has
   been served on it yet.

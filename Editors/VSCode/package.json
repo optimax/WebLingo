@@ -1,8 +1,8 @@
 {
   "name": "weblingo",
   "displayName": "WebLingo",
-  "description": "Syntax highlighting for WebLingo and WASP, and source debugging for local WebLingo scripts and WASP pages.",
-  "version": "0.3.0",
+  "description": "Syntax highlighting for WebLingo and WASP, and source debugging for local WebLingo scripts, WASP pages and WASP sites.",
+  "version": "0.4.0",
   "publisher": "weblingo",
   "engines": { "vscode": "^1.80.0" },
   "categories": [ "Programming Languages", "Debuggers" ],
@@ -64,11 +64,11 @@
         "languages": [ "wasp" ],
         "configurationAttributes": {
           "launch": {
-            "required": [ "program" ],
             "properties": {
-              "program": { "type": "string", "description": "The local .wasp page to run.", "default": "${file}" },
-              "root": { "type": "string", "description": "The application's root folder. Defaults to the page's folder." },
-              "cwd": { "type": "string", "description": "Working directory for the page. Defaults to the page's folder." },
+              "program": { "type": "string", "description": "The local .wasp page to run. Leave it out to serve the site at root.", "default": "${file}" },
+              "root": { "type": "string", "description": "The site's root folder: a page's, its folder by default; without program, the site to serve." },
+              "port": { "type": "number", "default": 8080, "description": "The port a site is served on, on this machine only; 0 for one the system chooses." },
+              "cwd": { "type": "string", "description": "Working directory for the page or the site. Defaults to the page's folder, or the site's root." },
               "args": {
                 "type": "array",
                 "items": { "type": "string" },
@@ -80,7 +80,20 @@
           }
         },
         "initialConfigurations": [
-          { "type": "wasp", "request": "launch", "name": "Debug WASP Page", "program": "${file}", "root": "${workspaceFolder}" }
+          { "type": "wasp", "request": "launch", "name": "Debug WASP Page", "program": "${file}", "root": "${workspaceFolder}" },
+          { "type": "wasp", "request": "launch", "name": "Debug WASP Site", "root": "${workspaceFolder}", "port": 8080 }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "WASP: Debug a page",
+            "description": "Runs a page as wasp run does, stopping at its breakpoints.",
+            "body": { "type": "wasp", "request": "launch", "name": "Debug WASP Page", "program": "^\"\\${file}\"", "root": "^\"\\${workspaceFolder}\"" }
+          },
+          {
+            "label": "WASP: Debug a site",
+            "description": "Serves a site as wasp serve does, each request stopping at its breakpoints.",
+            "body": { "type": "wasp", "request": "launch", "name": "Debug WASP Site", "root": "^\"\\${workspaceFolder}\"", "port": 8080 }
+          }
         ]
       }
     ],

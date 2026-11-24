@@ -133,5 +133,29 @@ parameters:
 }
 ```
 
-The page runs with no request, as under `wasp run`; its output goes to the **Debug Console**. Debugging a site served
-by `wasp serve`, a request stopped where a browser sent it, is not there yet.
+The page runs with no request, as under `wasp run`; its output goes to the **Debug Console**.
+
+### Debug a WASP site
+
+A launch configuration without `program` serves the site at `root`, as `wasp serve` does, on `port` of this machine,
+8080 unless it says otherwise, 0 for a port the system chooses; **Add Configuration…** offers it as **WASP: Debug a
+site**. The **Debug Console** says where it serves, `WASP serving http://localhost:8080/ (development), under the
+debugger.`, and VS Code's `serverReadyAction` can open the browser there:
+
+```json
+{
+  "type": "wasp",
+  "request": "launch",
+  "name": "Debug WASP Site",
+  "root": "${workspaceFolder}",
+  "port": 8080,
+  "serverReadyAction": { "pattern": "WASP serving (https?://\\S+)", "uriFormat": "%s", "action": "openExternally" }
+}
+```
+
+Each request for a page or a handler is a thread in the **Call Stack** view, named by its method, its path and its
+number, `GET /cart #12`. A request that reaches a breakpoint stops alone: the site goes on serving the others, and the
+browser waits for its response until the request goes on. Stepping and **Continue** act on the request selected. The
+debugger's **Pause** stops every request at its next statement, those that come after it too, until **Continue**. A
+page changed while the site is served is reloaded, as under `wasp serve`, and its breakpoints are verified once it is
+next requested. Breakpoints' conditions are not supported yet.

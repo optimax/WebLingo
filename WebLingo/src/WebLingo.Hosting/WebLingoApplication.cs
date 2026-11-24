@@ -207,7 +207,9 @@ public sealed class WebLingoApplication
         if (page.Module is null) return Failed(response, page.Errors);
         // A client that takes nothing for too long cancels the request, as a client that goes does.
         cancellation ??= new WebLingoCancellationSignal();
-        var output = new WebLingoResponseText(response, _options.SendTimeout, cancellation.Cancel);
+        // Under a debugger, the request a thread of its, which its stops resume through the scheduler host (section 5.7).
+        var thread = scheduler is null ? null : _options.Debugger?.Begin(request.Method + " " + request.Path, page.Locate, scheduler);
+        var output = new WebLingoResponseText(response, _options.SendTimeout, cancellation.Cancel, thread);
         var made = _http.For(request, response, output, _options.Uploads, out var ending);
         var context = new WebLingoExecutionContext(worker)
         {
@@ -230,22 +232,24 @@ public sealed class WebLingoApplication
             Cancellation = cancellation,
             Lines = page.LineOf
         };
-        var vm = new WebLingoVirtualMachine { Loader = page.Modules, Components = page.Components };
-        return Ended(vm.Execute(page.Module, context), vm.Resume, page, output, response, done, ending);
+        var vm = new WebLingoVirtualMachine { Loader = page.Modules, Components = page.Components, Debugger = thread };
+        return Ended(vm.Execute(page.Module, context), vm.Resume, page, output, response, done, ending, thread);
     }
 
     /// <summary>What a run came to: <paramref name="done"/>, a failure, or a wait, which its host resumes.</summary>
     private WebLingoRequestOutcome Ended(WebLingoExecutionResult result, Func<WebLingoExecutionResult> resume, CompiledPage page,
-        WebLingoResponseText output, IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done, IDisposable ending)
+        WebLingoResponseText output, IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done, IDisposable ending,
+        IWebLingoDebuggerThread? thread)
     {
         if (result.Waiting)
         {
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Waiting)
             {
-                Resume = () => Ended(resume(), resume, page, output, response, done, ending),
+                Resume = () => Ended(resume(), resume, page, output, response, done, ending, thread),
                 WaitMilliseconds = result.WaitMilliseconds
             };
         }
+        thread?.Dispose(); // Its debugger's thread ended with it.
         ending.Dispose(); // Its uploads' temporary files removed (section 6.12, "Uploaded files").
         if (!result.Succeeded)
         {
@@ -300,7 +304,8 @@ public sealed class WebLingoApplication
         {
             Resolver = modules,
             Native = _services[worker.Value].Native,
-            HostParameters = _http.Parameters
+            HostParameters = _http.Parameters,
+            Debugging = _options.Debugger is not null // Its points and its variables, for the debugger (section 5.7).
         };
         var compiler = new WebLingoTemplateCompiler(options, templates);
         var text = function is null
@@ -410,11 +415,18 @@ public sealed class WebLingoApplication
         /// <summary>A position's line, in the file it is in, located as an error is, for a message that names it (section 3.8).</summary>
         public int LineOf(string? source, int offset)
         {
+            var (file, at) = Locate(source, offset);
+            return file.GetLocation(at).Line;
+        }
+
+        /// <summary>A position, its source's name and its offset there, as the file it is in and its offset there, located as an error is.</summary>
+        public (WebLingoSourceText Text, int Offset) Locate(string? source, int offset)
+        {
             var located = compiler.Sources.Locate(new WebLingoDiagnostic("", WebLingoDiagnosticSeverity.Error, "", new WebLingoSourceSpan(offset, 0))
             {
                 Source = source
             });
-            return FileOf(located).GetLocation(located.Span.Start).Line;
+            return (FileOf(located), located.Span.Start);
         }
 
         private WebLingoSourceText FileOf(WebLingoDiagnostic located) => located.Source is not { } name ? text

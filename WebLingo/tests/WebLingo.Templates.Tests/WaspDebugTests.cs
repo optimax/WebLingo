@@ -70,6 +70,69 @@ public sealed class WaspDebugTests : IDisposable
         await dap.Request("disconnect");
     }
 
+    /// <summary>
+    /// A site under the debugger (specification, section 5.7, "Debugging WASP pages, parts", part 2): served as <c>wasp
+    /// serve</c> serves it, each request a thread, named by its method, its path and its number; a request at a breakpoint
+    /// alone stops, others served meanwhile; stepped and continued, it ends; and the debugger's pause stops the requests that
+    /// come after it, until the debugger goes on.
+    /// </summary>
+    [Fact]
+    public async Task ASiteStopsOnlyTheRequestAtABreakpoint()
+    {
+        var slow = Write("slow.wasp", "<% var a = 1; %>\n<% var b = a + 1; %>\n<p>slow <%= b %></p>\n");
+        Write("other.wasp", "<p>other</p>\n");
+
+        await using var dap = new DebugAdapterSession("wasp");
+        await dap.Serve(_root);
+        await dap.Request("setBreakpoints", new { source = new { path = slow }, breakpoints = new[] { new { line = 1 } } });
+        await dap.Request("configurationDone");
+        using var client = new HttpClient { BaseAddress = new Uri(await Address(dap)), Timeout = TimeSpan.FromSeconds(30) };
+
+        var slowly = client.GetStringAsync("/slow");
+        var stopped = await dap.Event("stopped");
+        Assert.Equal(("breakpoint", false), (stopped.GetProperty("reason").GetString(), stopped.GetProperty("allThreadsStopped").GetBoolean()));
+        var thread = stopped.GetProperty("threadId").GetInt32();
+        var threads = (await dap.Request("threads")).GetProperty("threads").EnumerateArray()
+            .ToDictionary(item => item.GetProperty("id").GetInt32(), item => item.GetProperty("name").GetString());
+        Assert.Equal($"GET /slow #{thread}", threads[thread]);
+        AssertFrame((await dap.Frames(thread))[0], slow, 1);
+
+        // Another request is served while it is stopped.
+        Assert.Equal("<p>other</p>", (await client.GetStringAsync("/other")).Trim());
+        Assert.False(slowly.IsCompleted);
+
+        // Stepped, it stops at its next line; continued, it ends.
+        await dap.Request("next", new { threadId = thread });
+        Assert.Equal("step", (await dap.Event("stopped")).GetProperty("reason").GetString());
+        var frames = await dap.Frames(thread);
+        AssertFrame(frames[0], slow, 2);
+        Assert.Equal("1", (await dap.Locals(frames[0]))["a"]);
+        await dap.Request("continue", new { threadId = thread });
+        Assert.Equal("<p>slow 2</p>", (await slowly).Trim());
+
+        // Paused, the requests that come stop, until the debugger goes on.
+        await dap.Request("pause", new { threadId = thread });
+        var paused = client.GetStringAsync("/other");
+        stopped = await dap.Event("stopped");
+        Assert.Equal("pause", stopped.GetProperty("reason").GetString());
+        Assert.False(paused.IsCompleted);
+        await dap.Request("continue", new { threadId = stopped.GetProperty("threadId").GetInt32() });
+        Assert.Equal("<p>other</p>", (await paused).Trim());
+
+        await dap.Request("disconnect");
+    }
+
+    /// <summary>Where the site is served, as the adapter says it first.</summary>
+    private static async Task<string> Address(DebugAdapterSession dap)
+    {
+        while (true)
+        {
+            var said = (await dap.Event("output")).GetProperty("output").GetString()!;
+            var at = said.IndexOf("http://", StringComparison.Ordinal);
+            if (said.StartsWith("WASP serving ", StringComparison.Ordinal) && at >= 0) return said[at..said.IndexOf(' ', at)];
+        }
+    }
+
     private static async Task<JsonElement> Stopped(DebugAdapterSession dap)
     {
         await dap.Event("stopped");

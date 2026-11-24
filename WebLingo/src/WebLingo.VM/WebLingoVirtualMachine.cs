@@ -305,9 +305,19 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             Frame frame;
             if (resuming)
             {
-                // It waited with nothing on the VM's stack: it goes on where the scheduler resumes a task (section 6.6).
                 frames = _frames;
-                frame = new Frame();
+                if (_stopDepth < 0)
+                {
+                    // It waited with nothing on the VM's stack: it goes on where the scheduler resumes a task (section 6.6).
+                    frame = new Frame();
+                }
+                else
+                {
+                    // Stopped by its debugger as at an await: it goes on where it stopped, once the debugger lets it.
+                    if ((depth = GoesOn(_executed)) < 0) return _left!;
+                    frame = frames[depth];
+                    resuming = false;
+                }
             }
             else
             {
@@ -343,7 +353,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             var code = frame.Code;
             var registers = frame.Registers;
             var cells = frame.Cells;
-            var pc = 0;
+            var pc = frame.Pc; // 0 but where its debugger stopped it.
             var budget = context.InstructionBudget;
             var cancellation = context.Cancellation;
             var debugger = Debugger;
@@ -387,12 +397,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         }
                         dueAt = Math.Min(budget, (executed / CancellationInterval + 1) * CancellationInterval);
                     }
-                    if (debugger is not null && DebugInstruction(debugger, frames, frame, depth, pc)
-                        && cancellation is { IsCancellationRequested: true })
-                    {
-                        return Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled.", frame.Function, pc)
-                            with { Instructions = executed };
-                    }
+                    if (debugger is not null && DebugInstruction(debugger, frames, frame, depth, pc, executed)) return _left!;
                     executed++;
 
                     ref readonly var ins = ref code[pc];
@@ -1492,9 +1497,31 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         private long _debugActivation;
         public IWebLingoRegisterDebugger? Debugger { get; init; }
 
+        /// <summary>
+        /// The depth of the frame its debugger stopped it in, where it waits as at an await (section 5.7, "Debugging WASP
+        /// pages, parts", part 2), that frame's <c>Pc</c> the instruction it stopped at; -1 where it is not so stopped.
+        /// </summary>
+        private int _stopDepth = -1;
+
+        /// <summary>Whether it has just gone on from such a stop, which the point it stopped at is not stopped at again.</summary>
+        private bool _wentOn;
+
+        /// <summary>What <c>Run</c> returns where a debugger's stop leaves it: waiting, or cancelled.</summary>
+        private WebLingoExecutionResult? _left;
+
+        /// <summary>
+        /// At a point of the debugger's, a statement's first instruction: whether it stops there, its frames given to it, and
+        /// leaves <c>Run</c>, with <see cref="_left"/>: cancelled while the debugger held it, or waiting, as at an await, where
+        /// the debugger lets it wait (<see cref="IWebLingoRegisterDebugger.Stopped"/>).
+        /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private bool DebugInstruction(IWebLingoRegisterDebugger debugger, Frame[] frames, Frame frame, int depth, int pc)
+        private bool DebugInstruction(IWebLingoRegisterDebugger debugger, Frame[] frames, Frame frame, int depth, int pc, long executed)
         {
+            if (_wentOn)
+            {
+                _wentOn = false; // The point it stopped at, gone on from.
+                return false;
+            }
             if (frame.Function.DebugInfo is not { } info || !info.Points.TryGetValue(pc, out var span)) return false;
             if (frame.DebugActivation == 0) frame.DebugActivation = ++_debugActivation;
             if (!debugger.ShouldStop(new(info.Source, span, depth, frame.DebugActivation, pc))) return false;
@@ -1509,8 +1536,42 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 var visibility = level == depth ? span.Start : StatementStart(source, callerPc, position.Start);
                 stack.Add(new(current.Function.Name, source.Source, position, Inspect(current, source, visibility)));
             }
-            debugger.Stopped(stack);
+            if (debugger.Stopped(stack))
+            {
+                if (context.Cancellation is not { IsCancellationRequested: true }) return false;
+                _left = Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled.", frame.Function, pc) with { Instructions = executed };
+                return true;
+            }
+            // It waits where it stopped, its frames on the VM's stack, until its host resumes it and its debugger lets it go on.
+            frame.Pc = pc;
+            (_frames, _executed, _depth, _stopDepth) = (frames, executed, depth, depth);
+            _left = WebLingoExecutionResult.Waits(-1) with { Instructions = executed };
             return true;
+        }
+
+        /// <summary>
+        /// Resumed while its debugger stopped it: the depth it goes on at, or -1, with <see cref="_left"/>, where it is
+        /// cancelled, or waits still.
+        /// </summary>
+        private int GoesOn(long executed)
+        {
+            var frame = _frames[_stopDepth];
+            if (context.Cancellation is { IsCancellationRequested: true })
+            {
+                _stopDepth = -1;
+                _left = Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled.", frame.Function, frame.Pc)
+                    with { Instructions = executed };
+                return -1;
+            }
+            if (Debugger!.Waits)
+            {
+                _left = WebLingoExecutionResult.Waits(-1) with { Instructions = executed };
+                return -1;
+            }
+            var depth = _depth = _stopDepth;
+            _stopDepth = -1;
+            _wentOn = true;
+            return depth;
         }
 
         private static int StatementStart(WebLingoFunctionDebugInfo info, int pc, int offset)

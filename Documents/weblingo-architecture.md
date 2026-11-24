@@ -778,6 +778,30 @@ setting `weblingo.waspDebuggerPath` names; a page debugged without a `launch.jso
 folder above it, within its workspace folder, that holds a `wasp.config` or a `web.config`, and the page's own folder
 where none does.
 
+**A site under the debugger, as built** (part 2, 24 November 2026; Proposed where it says more than part 2 above): a
+launch without `program` serves the site at `root` as `wasp serve` does, on Kestrel, on `port` of the local machine,
+8080 by default, 0 for one the system chooses, its address said first on the debugger's output, `WASP serving
+http://localhost:8080/ (development), under the debugger.`, its pages compiled for the debugger
+(`WebLingoApplicationOptions.Debugger`), and ASP.NET Core logging nothing, the protocol being on the standard output.
+Each request for a page or a handler is a thread of the debugger's (`IWebLingoDebuggerThreads`, `IWebLingoDebuggerThread`),
+named `GET /cart #12`, its number its thread's id, told to the client as it starts and as it ends; a file sent as it is
+has none. At a stop, the VM leaves its dispatch method waiting, its frames on its stack and the instruction it stopped at
+kept, as an `await` leaves it, and its worker serves other requests; the debugger resumes it through the request's
+scheduler host, and the VM goes on where it stopped, that point not stopped at again; a request cancelled meanwhile, its
+client gone or the debugger ending, ends cancelled (WL3004). A request's `stopped` event says `allThreadsStopped: false`;
+`continue`, `next`, `stepIn` and `stepOut` go on with the thread they name alone, `continue`'s `allThreadsContinued`
+saying whether no other is still stopped (the protocol's `supportsSingleThreadExecutionRequests`). The debugger's pause,
+whatever thread the protocol's request names, stops every request at its next statement, those that come after it too,
+until the debugger goes on, a `continue` then letting every request the pause stopped go on, one a breakpoint stopped
+waiting still. The send timeout leaves out the time a request is stopped: a wait for its client that a stop has
+interrupted, or that a stop holds, waits anew (`IWebLingoDebuggerThread.Stops`); no other timeout of WASP's own runs
+while a request is stopped. A request's positions are located by
+its page's compilation, a file opened anew when a reload has changed its text; a handler's request's own code, which no
+file holds, is shown in no frame. VS Code's extension's `wasp` debugger has a second configuration, "Debug WASP Site",
+with `root` and `port`. Measured against `main`'s, 12 rounds alternating, no workload of the benchmark is slower by a
+rank test (Mann-Whitney's, every p above 0.06); the resumption first written in the dispatch loop's resuming branch made
+`closures` 9 percent slower and `imports` 6 (p 0.015 and 0.009), and was moved to `Run`'s prologue.
+
 ## 6. Hosting architecture (WL-H001–WL-H014)
 
 ### 6.1 Approved hosting decisions

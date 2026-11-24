@@ -34,6 +34,14 @@ public sealed class DebugAdapterSession : IAsyncDisposable
         await Event("initialized");
     }
 
+    /// <summary>Launches a site, served at <paramref name="root"/> on a port the system chooses (section 5.7, part 2).</summary>
+    public async Task Serve(string root)
+    {
+        await Request("initialize", new { adapterID = "wasp", linesStartAt1 = true, columnsStartAt1 = true, pathFormat = "path" });
+        await Request("launch", new { root, port = 0 });
+        await Event("initialized");
+    }
+
     public async Task<JsonElement> Request(string command, object? arguments = null)
     {
         var seq = ++_sequence;
@@ -73,8 +81,8 @@ public sealed class DebugAdapterSession : IAsyncDisposable
         }
     }
 
-    public async Task<JsonElement> Frames() =>
-        (await Request("stackTrace", new { threadId = 1 })).GetProperty("stackFrames");
+    public async Task<JsonElement> Frames(int threadId = 1) =>
+        (await Request("stackTrace", new { threadId })).GetProperty("stackFrames");
 
     public async Task<JsonElement> Variables(JsonElement frame)
     {

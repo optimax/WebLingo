@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using WebLingo.Bytecode;
@@ -9,6 +12,7 @@ using WebLingo.Hosting;
 using WebLingo.Hosting.AspNetCore;
 using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
+using WebLingo.VM;
 namespace WebLingo.Wasp.Cli;
 
 /// <summary>
@@ -43,19 +47,26 @@ public static class WebLingoWaspServer
     /// The server for the application at <paramref name="root"/>, a folder from the current one, or, under IIS, from the
     /// site's; on <paramref name="port"/> (0 for one the system chooses) on the local machine only, unless under IIS; null,
     /// with why, if the application cannot be loaded. It reloads the application when its files change (section 6.5),
-    /// each reload told to <paramref name="log"/>, if given, as is a page that fails after its response was sent.
+    /// each reload told to <paramref name="log"/>, if given, as is a page that fails after its response was sent. Under
+    /// <paramref name="debugger"/>, each request is a thread of its, ASP.NET Core logs nothing, the debugger's protocol being
+    /// on the standard output, and it stops within seconds, its requests no longer stopped (section 5.7).
     /// </summary>
     public static WebApplication? Create(string? root, int port, IReadOnlyDictionary<string, string> givenSchemes, out string? error,
-        out WebLingoMode mode, TextWriter? log = null)
+        out WebLingoMode mode, TextWriter? log = null, IWebLingoDebuggerThreads? debugger = null)
     {
         var site = SiteFolder(Environment.GetEnvironmentVariable("ASPNETCORE_IIS_PHYSICAL_PATH"), Directory.GetCurrentDirectory());
         var full = Path.GetFullPath(Path.Combine(site, root ?? "."));
         var application = Load(full, givenSchemes, UnderIis ? WebLingoMode.Production : WebLingoMode.Development, log, out var workers,
-            out mode, out error);
+            out mode, out error, debugger);
         if (application is null) return null;
 
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = AppContext.BaseDirectory });
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
+        if (debugger is not null)
+        {
+            builder.Logging.ClearProviders();
+            builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(3));
+        }
         // Kestrel chooses a port only for an address: 127.0.0.1 for port 0, localhost, IPv4's and IPv6's, otherwise.
         if (!UnderIis) builder.WebHost.UseUrls(port == 0 ? "http://127.0.0.1:0" : $"http://localhost:{port}");
         var server = builder.Build();
@@ -65,6 +76,41 @@ public static class WebLingoWaspServer
         server.Lifetime.ApplicationStopping.Register(reloader.Dispose);
         server.UseWebLingo(application, full, pool);
         return server;
+    }
+
+    /// <summary>
+    /// A site served for a debugger (specification, section 5.7, "Debugging WASP pages, parts", part 2), <c>wasp
+    /// --debug-adapter</c>'s: the site at <paramref name="root"/> served as <c>wasp serve</c> serves it, on Kestrel, on
+    /// <paramref name="port"/> of the local machine, <see cref="DefaultPort"/> where it is null, 0 for one the system chooses,
+    /// its pages compiled for the debugger and each request a thread of <paramref name="debugger"/>'s, until
+    /// <paramref name="stop"/> is signalled; where it serves said to <paramref name="output"/> first, its reloads after.
+    /// </summary>
+    public static int ServeForDebugger(string root, int? port, IWebLingoDebuggerThreads debugger, TextWriter output, TextWriter error,
+        CancellationToken stop)
+    {
+        var server = Create(root, port ?? DefaultPort, new Dictionary<string, string>(), out var why, out var mode, output, debugger);
+        if (server is null)
+        {
+            error.WriteLine(why);
+            return WebLingoCommandLine.FileUnreadable;
+        }
+        try
+        {
+            server.Start();
+        }
+        catch (IOException failure)
+        {
+            error.WriteLine($"WASP cannot serve on port {port ?? DefaultPort}: {failure.Message}");
+            return WebLingoCommandLine.FileUnreadable;
+        }
+        // The address it serves at, the system's port where it chose one.
+        var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()?.Addresses.FirstOrDefault()
+                      ?? $"http://localhost:{port ?? DefaultPort}";
+        output.WriteLine($"WASP serving {address}/ ({mode.ToString().ToLowerInvariant()}), under the debugger.");
+        output.Flush();
+        stop.WaitHandle.WaitOne();
+        server.StopAsync().Wait(TimeSpan.FromSeconds(10));
+        return WebLingoCommandLine.Success;
     }
 
     /// <summary>What watches an application's files, and reloads it, each reload told to <paramref name="log"/> (section 6.5).</summary>
@@ -78,9 +124,10 @@ public static class WebLingoWaspServer
     /// <c>wasp.config</c>, giving its schemes, its mode, <paramref name="defaultMode"/> unless it names one, how long a page
     /// waits for a slow client, the hosts, the folders and the COM objects its scripts may reach, what they may read of the
     /// machine's environment, and its databases; its workers, one for each processor; null, with why, if it cannot be loaded.
+    /// Under <paramref name="debugger"/>, each request a thread of its (section 5.7).
     /// </summary>
     public static WebLingoApplication? Load(string full, IReadOnlyDictionary<string, string> givenSchemes, WebLingoMode defaultMode,
-        TextWriter? log, out int workers, out WebLingoMode mode, out string? error)
+        TextWriter? log, out int workers, out WebLingoMode mode, out string? error, IWebLingoDebuggerThreads? debugger = null)
     {
         (workers, mode) = (Math.Max(1, Environment.ProcessorCount), defaultMode);
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
@@ -120,7 +167,8 @@ public static class WebLingoWaspServer
                 new DotNetTemporaryFiles(uploads.Folder)),
             Scheduler = () => new DotNetSchedulerHost(),
             Log = log is null ? null : log.WriteLine,
-            SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30)
+            SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30),
+            Debugger = debugger
         }, out error);
         if (application is null) error = $"{full}: {error}.";
         return application;
