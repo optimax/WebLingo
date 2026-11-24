@@ -36,6 +36,12 @@ namespace WebLingo.Templates;
 /// runs, and streams, where the layout has it. The layouts a page's leads to are followed here, so that a cycle of them,
 /// or a layout's parameters given wrong, is an error at compile time.
 /// </para>
+/// <para>
+/// <c>session readonly;</c>, a statement of its own at the top level of a page's own text, declares that the request the
+/// page answers only reads its session (specification, section 6.12, "Sessions and cookies"), so that its host takes no
+/// lock; it is nothing in the program. Its includes, its layout and its components read the session as the page declares,
+/// and cannot declare it themselves (WL5009).
+/// </para>
 /// </summary>
 public sealed class WebLingoTemplateParser
 {
@@ -49,6 +55,8 @@ public sealed class WebLingoTemplateParser
     private const string Include = "include";
     private const string Layout = "layout";
     private const string RenderBody = "renderBody";
+    private const string Session = "session";
+    private const string ReadOnly = "readonly";
 
     /// <summary>What an import's path begins with when it names a page's layout (section 13).</summary>
     public const string LayoutScheme = "layout:";
@@ -123,6 +131,9 @@ public sealed class WebLingoTemplateParser
     /// <summary>Where the page's body, after its layout statement, begins among the tokens.</summary>
     private int _bodyStart;
 
+    /// <summary>Where the page declares that it only reads its session, once read.</summary>
+    private WebLingoSourceSpan? _readOnlySession;
+
     private WebLingoTemplateParser(WebLingoSourceText page, IWebLingoSourceResolver? resolver, WebLingoTemplateKind kind)
     {
         _resolver = resolver;
@@ -139,7 +150,15 @@ public sealed class WebLingoTemplateParser
     /// The tree's positions are the program's: <paramref name="files"/> says which file each is in.
     /// </summary>
     public static WebLingoSyntaxTree Parse(WebLingoSourceText page, IWebLingoSourceResolver? resolver, out WebLingoTemplateFiles files,
-        WebLingoTemplateKind kind = WebLingoTemplateKind.Page, IReadOnlyCollection<string>? hostParameters = null)
+        WebLingoTemplateKind kind = WebLingoTemplateKind.Page, IReadOnlyCollection<string>? hostParameters = null) =>
+        Parse(page, resolver, out files, out _, kind, hostParameters);
+
+    /// <summary>
+    /// As the other, and where the page declares that it only reads its session, <c>session readonly;</c>, at the page's
+    /// own positions; null where it does not.
+    /// </summary>
+    public static WebLingoSyntaxTree Parse(WebLingoSourceText page, IWebLingoSourceResolver? resolver, out WebLingoTemplateFiles files,
+        out WebLingoSourceSpan? readOnlySession, WebLingoTemplateKind kind = WebLingoTemplateKind.Page, IReadOnlyCollection<string>? hostParameters = null)
     {
         var parser = new WebLingoTemplateParser(page, resolver, kind) { _hostParameters = hostParameters ?? [] };
         parser._including.Add(page.Name);
@@ -156,6 +175,7 @@ public sealed class WebLingoTemplateParser
         parser.AddLayoutImport();
         parser._tokens.Add(new WebLingoToken(WebLingoTokenKind.EndOfFile, "", new WebLingoSourceSpan(page.Text.Length, 0)));
         files = parser._files;
+        readOnlySession = parser._readOnlySession;
         return new WebLingoParser(page, parser._tokens, parser._diagnostics).ParseCompilationUnit();
     }
 
@@ -356,6 +376,12 @@ public sealed class WebLingoTemplateParser
         for (var i = 0; i < code.Count; i++)
         {
             var token = code[i];
+            if (token.Kind == WebLingoTokenKind.Identifier && token.Text == Session && i + 1 < code.Count
+                && code[i + 1].Kind == WebLingoTokenKind.Identifier && code[i + 1].Text == ReadOnly && !AfterDot(code, i))
+            {
+                i = AddSession(code, i, shift);
+                continue;
+            }
             var directive = token.Kind == WebLingoTokenKind.Identifier && token.Text is Include or Layout
                 && i + 1 < code.Count && code[i + 1].Kind == WebLingoTokenKind.StringLiteral && !AfterDot(code, i);
             if (directive && token.Text == Layout)
@@ -498,6 +524,39 @@ public sealed class WebLingoTemplateParser
             _layout = (keyword, path, entries);
             _bodyStart = _tokens.Count;
         }
+        return next - 1;
+    }
+
+    /// <summary>
+    /// <c>session readonly;</c> at <paramref name="at"/>: kept where a page may declare it, at the top level of its own text,
+    /// once; WL5009 elsewhere. The index of its last token.
+    /// </summary>
+    private int AddSession(List<WebLingoToken> code, int at, int shift)
+    {
+        var start = Shift(code[at].Span, shift).Start;
+        var last = Shift(code[at + 1].Span, shift);
+        var span = new WebLingoSourceSpan(start, last.Start + last.Length - start);
+        var next = at + 2;
+        if (next < code.Count && code[next].Kind == WebLingoTokenKind.Semicolon)
+        {
+            next++;
+        }
+        else
+        {
+            Report(WebLingoDiagnosticCodes.MissingSemicolon, "A ';' is missing here.", new WebLingoSourceSpan(span.Start + span.Length, 0));
+        }
+        var misplaced = _kind switch
+        {
+            WebLingoTemplateKind.Layout => "A layout cannot declare how the session is used: it reads it as its page declares.",
+            WebLingoTemplateKind.Component => "A component cannot declare how the session is used: it reads it as its page declares.",
+            _ when _including.Count > 1 => "A template a page includes cannot declare how the session is used: it reads it as its page declares.",
+            _ when _blocks.Count > 0 || _parentheses > 0 || _lastCode is not (WebLingoTokenKind.Semicolon or WebLingoTokenKind.CloseBrace) =>
+                "'session readonly;' is a statement of its own, at the page's top level, not inside another.",
+            _ when _readOnlySession is not null => "A page declares that it only reads its session once.",
+            _ => null
+        };
+        if (misplaced is null) _readOnlySession = span;
+        else Report(WebLingoDiagnosticCodes.MisplacedSession, misplaced, span);
         return next - 1;
     }
 

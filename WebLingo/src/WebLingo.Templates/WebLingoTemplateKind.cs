@@ -1,12 +1,13 @@
 namespace WebLingo.Templates;
 
 /// <summary>
-/// What a template is read as (specification, section 13): a page, which a host runs, or a component a page renders; or a
-/// layout, which a page's <c>layout</c> statement names, and whose <c>renderBody()</c> awaits the page's body, which the
-/// page gives it as its first parameter.
+/// What a template is read as (specification, section 13): a page, which a host runs; a component, which a page renders;
+/// or a layout, which a page's <c>layout</c> statement names, and whose <c>renderBody()</c> awaits the page's body, which
+/// the page gives it as its first parameter. Only a page declares how its request uses its session (section 6.12).
 /// </summary>
 public enum WebLingoTemplateKind
 {
     Page,
-    Layout
+    Layout,
+    Component
 }

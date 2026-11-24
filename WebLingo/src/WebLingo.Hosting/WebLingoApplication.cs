@@ -44,6 +44,12 @@ public sealed record WebLingoRequestOutcome(WebLingoRequestOutcomeKind Kind, str
 /// <c>post</c>, and so on, which is called with the request and the response, and awaited, as a page that imports the
 /// module would call it; <c>HEAD</c> calls <c>head</c>, or <c>get</c> if it has none; any other method is a 405, whose
 /// <c>Allow</c> names the ones it answers; and a <c>.wlg</c> exporting none is not a handler, its path a 404.
+/// A request's session (section 6.12, "Sessions and cookies"), where the host keeps sessions
+/// (<see cref="WebLingoApplicationOptions.Sessions"/>), is opened before its page or its handler runs, and its lock taken,
+/// unless the page declares that it only reads it, <c>session readonly;</c>, or the handler, <c>export const session =
+/// "readonly";</c>: a request whose session another holds waits, as at an <c>await</c>, its worker running other requests
+/// meanwhile, for the site's lock timeout at most, then runs without it, a <c>SessionLockError</c> where it reads it; and
+/// its lock is given up, its values written back where they changed, as it ends, whatever it came to.
 /// </summary>
 public sealed class WebLingoApplication
 {
@@ -125,8 +131,8 @@ public sealed class WebLingoApplication
                 WebLingoErrorPages.TooLarge(response);
                 return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.TooLarge);
             case { Kind: WebLingoRouteKind.Page } page:
-                return Run(generation.Page(worker, page.File, this), request, response, worker, cancellation, scheduler,
-                    WebLingoRequestOutcomeKind.Page);
+                var compiled = generation.Page(worker, page.File, this);
+                return Run(compiled, request, response, worker, cancellation, scheduler, WebLingoRequestOutcomeKind.Page, compiled.ReadOnly);
             case { Kind: WebLingoRouteKind.Handler } handler:
                 return Handler(generation, handler.File, request, response, worker, cancellation, scheduler);
             default:
@@ -143,7 +149,9 @@ public sealed class WebLingoApplication
     private WebLingoRequestOutcome Handler(Generation generation, string file, IWebLingoHttpRequest request, IWebLingoHttpResponse response,
         WebLingoWorkerId worker, WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler)
     {
-        var exports = generation.Exports(worker, file, this);
+        var handler = generation.Exports(worker, file, this);
+        if (handler?.Error is { } wrong) return Failed(response, [wrong]);
+        var exports = handler?.Names;
         string? function = null;
         var allowed = new List<string>();
         foreach (var method in Methods)
@@ -164,7 +172,7 @@ public sealed class WebLingoApplication
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.MethodNotAllowed);
         }
         return Run(generation.Handler(worker, file, function, this), request, response, worker, cancellation, scheduler,
-            WebLingoRequestOutcomeKind.Handler);
+            WebLingoRequestOutcomeKind.Handler, handler?.ReadOnly);
     }
 
     /// <summary>The largest body a site's request may have (section 6.12, "Uploaded files"), which its hosts let through.</summary>
@@ -175,8 +183,12 @@ public sealed class WebLingoApplication
         long.TryParse(request.Headers.Get("Content-Length"), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture,
             out var length) && length > _options.Uploads.MaxBodySize;
 
-    /// <summary>The names a <c>.wlg</c> exports, read from its text, or null if it does not parse.</summary>
-    private HashSet<string>? ExportsOf(string file)
+    /// <summary>
+    /// What a <c>.wlg</c> exports, read from its text, or null if it does not parse: the names, and where it declares that
+    /// it only reads its session, <c>export const session = "readonly";</c>, or its error, a <c>session</c> export that is not
+    /// that (section 6.12, "Sessions and cookies").
+    /// </summary>
+    private HandlerExports? ExportsOf(string file)
     {
         var text = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wlg").Read(file) ?? "";
         var tree = new WebLingoParser(text, file).ParseCompilationUnit();
@@ -185,6 +197,8 @@ public sealed class WebLingoApplication
             if (diagnostic.Severity == WebLingoDiagnosticSeverity.Error) return null;
         }
         var names = new HashSet<string>(StringComparer.Ordinal);
+        string? readOnly = null, error = null;
+        var source = new WebLingoSourceText(text, file);
         foreach (var statement in tree.Root.Statements)
         {
             if (statement is not WebLingoExportSyntax export) continue;
@@ -196,21 +210,86 @@ public sealed class WebLingoApplication
                 _ => null
             };
             if (name is not null) names.Add(name);
+            if (name != SessionExport) continue;
+            var at = source.GetLocation(export.Span.Start);
+            var where = $"{file}({at.Line},{at.Column})";
+            if (export.Declaration is WebLingoVariableDeclarationSyntax { Kind: WebLingoDeclarationKind.Const, Initializer: WebLingoStringLiteralSyntax { Value: "readonly" } })
+            {
+                readOnly = $"'export const session = \"readonly\";' at {where}";
+            }
+            else
+            {
+                error = $"{where}: error {WebLingoDiagnosticCodes.MisplacedSession}: A handler's 'session' export declares that it only reads "
+                        + "its session, 'export const session = \"readonly\";', and is nothing else.";
+            }
         }
-        return names;
+        return new HandlerExports(names, readOnly, error);
     }
 
-    /// <summary>A page run, or a handler's: <paramref name="done"/> once it has run, unless it fails, or waits.</summary>
+    /// <summary>The export that declares how a handler uses its session.</summary>
+    private const string SessionExport = "session";
+
+    /// <summary>A handler's exports, where it declares that it only reads its session, and what is wrong with its declaration.</summary>
+    private sealed record HandlerExports(HashSet<string> Names, string? ReadOnly, string? Error);
+
+    /// <summary>
+    /// A page run, or a handler's, its session opened first, waiting for its lock where another request holds it:
+    /// <paramref name="done"/> once it has run, unless it fails, or waits. <paramref name="readOnly"/> says where the page or
+    /// the handler declares that it only reads its session, null where it does not.
+    /// </summary>
     private WebLingoRequestOutcome Run(CompiledPage page, IWebLingoHttpRequest request, IWebLingoHttpResponse response, WebLingoWorkerId worker,
-        WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler, WebLingoRequestOutcomeKind done)
+        WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler, WebLingoRequestOutcomeKind done, string? readOnly = null)
     {
         if (page.Module is null) return Failed(response, page.Errors);
         // A client that takes nothing for too long cancels the request, as a client that goes does.
         cancellation ??= new WebLingoCancellationSignal();
+        var host = scheduler ?? _options.Scheduler?.Invoke();
+        var session = _options.Sessions is { } store ? new WebLingoSession(store, request, response, _options.Crypto, readOnly) : null;
+        var start = () => Start(page, request, response, worker, cancellation, scheduler, host, done, session);
+        if (session?.Id is not { } id) return start();
+        WebLingoSessionOpening? arrived = null;
+        var opening = session.Store.Open(id, readOnly is null, later => host?.Post(() => arrived = later));
+        if (opening.Kind != WebLingoSessionOpened.Waiting)
+        {
+            session.Opened(opening);
+            return start();
+        }
+        if (scheduler is null)
+        {
+            // A request run to its end waits on its own thread; one with nothing to wait on goes on without its session.
+            while (arrived is null && host is not null) host.RunPosted(-1);
+            session.Opened(arrived ?? WebLingoSessionOpening.TimedOut);
+            return start();
+        }
+        return WaitForSession(scheduler, () => arrived, session, start);
+    }
+
+    /// <summary>
+    /// A request that waits for its session's lock, resumed once the store has posted what the wait came to, then run; one
+    /// whose client has gone waits on for its turn, so that the lock it may be given is given up at once.
+    /// </summary>
+    private static WebLingoRequestOutcome WaitForSession(IWebLingoSchedulerHost scheduler, Func<WebLingoSessionOpening?> arrived, WebLingoSession session,
+        Func<WebLingoRequestOutcome> start) =>
+        new(WebLingoRequestOutcomeKind.Waiting)
+        {
+            Resume = () =>
+            {
+                scheduler.RunPosted(0);
+                if (arrived() is not { } opening) return WaitForSession(scheduler, arrived, session, start);
+                session.Opened(opening);
+                return start();
+            }
+        };
+
+    /// <summary>A page run, or a handler's, once its session is open: <paramref name="done"/> once it has run, unless it fails, or waits.</summary>
+    private WebLingoRequestOutcome Start(CompiledPage page, IWebLingoHttpRequest request, IWebLingoHttpResponse response, WebLingoWorkerId worker,
+        WebLingoCancellationSignal cancellation, IWebLingoSchedulerHost? scheduler, IWebLingoSchedulerHost? host, WebLingoRequestOutcomeKind done,
+        WebLingoSession? session)
+    {
         // Under a debugger, the request a thread of its, which its stops resume through the scheduler host (section 5.7).
         var thread = scheduler is null ? null : _options.Debugger?.Begin(request.Method + " " + request.Path, page.Locate, scheduler);
         var output = new WebLingoResponseText(response, _options.SendTimeout, cancellation.Cancel, thread);
-        var made = _http.For(request, response, output, _options.Uploads, out var ending);
+        var made = _http.For(request, response, output, _options.Uploads, session, out var ending);
         var context = new WebLingoExecutionContext(worker)
         {
             Services = new RequestServices([.. WebLingoTemplateBuiltins.Common(output), .. made], _http.Members,
@@ -226,29 +305,32 @@ public sealed class WebLingoApplication
             Clock = _options.Clock,
             WallClock = _options.WallClock,
             TimeZone = _options.TimeZone,
-            SchedulerHost = scheduler ?? _options.Scheduler?.Invoke(),
+            SchedulerHost = host,
             Suspends = scheduler is not null,
             InstructionBudget = _options.InstructionBudget,
             Cancellation = cancellation,
             Lines = page.LineOf
         };
         var vm = new WebLingoVirtualMachine { Loader = page.Modules, Components = page.Components, Debugger = thread };
-        return Ended(vm.Execute(page.Module, context), vm.Resume, page, output, response, done, ending, thread);
+        return Ended(vm.Execute(page.Module!, context), vm.Resume, page, output, response, done, ending, thread, session);
     }
 
     /// <summary>What a run came to: <paramref name="done"/>, a failure, or a wait, which its host resumes.</summary>
     private WebLingoRequestOutcome Ended(WebLingoExecutionResult result, Func<WebLingoExecutionResult> resume, CompiledPage page,
         WebLingoResponseText output, IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done, IDisposable ending,
-        IWebLingoDebuggerThread? thread)
+        IWebLingoDebuggerThread? thread, WebLingoSession? session)
     {
         if (result.Waiting)
         {
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Waiting)
             {
-                Resume = () => Ended(resume(), resume, page, output, response, done, ending, thread),
+                Resume = () => Ended(resume(), resume, page, output, response, done, ending, thread, session),
                 WaitMilliseconds = result.WaitMilliseconds
             };
         }
+        // Its session's lock given up, its values written back where they changed, before its response ends, so that the
+        // request its client sends next finds it free (section 6.12, "Sessions and cookies").
+        session?.End();
         thread?.Dispose(); // Its debugger's thread ended with it.
         ending.Dispose(); // Its uploads' temporary files removed (section 6.12, "Uploaded files").
         if (!result.Succeeded)
@@ -315,6 +397,11 @@ public sealed class WebLingoApplication
         var page = new CompiledPage(text, compiler, modules, new WebLingoModuleLoader(options));
         var result = compiler.Compile(text);
         page.Module = result.Module;
+        if (compiler.ReadOnlySession is { } declared)
+        {
+            var at = text.GetLocation(declared.Start);
+            page.ReadOnly = $"'session readonly;' at {text.Name}({at.Line},{at.Column})";
+        }
         foreach (var diagnostic in result.Diagnostics)
         {
             if (diagnostic.Severity == WebLingoDiagnosticSeverity.Error) page.Errors.Add(page.Describe(diagnostic));
@@ -332,10 +419,10 @@ public sealed class WebLingoApplication
     private sealed class Generation(WebLingoRouteTable routes, int workers)
     {
         private readonly Dictionary<string, CompiledPage>[] _pages = MakePages(workers);
-        private readonly Dictionary<string, HashSet<string>?>[] _exports = MakeExports(workers);
+        private readonly Dictionary<string, HandlerExports?>[] _exports = MakeExports(workers);
 
         /// <summary>A handler's exports on a worker, read once; null for one that does not parse.</summary>
-        public HashSet<string>? Exports(WebLingoWorkerId worker, string file, WebLingoApplication application)
+        public HandlerExports? Exports(WebLingoWorkerId worker, string file, WebLingoApplication application)
         {
             var exports = _exports[worker.Value];
             if (!exports.TryGetValue(file, out var names))
@@ -359,10 +446,10 @@ public sealed class WebLingoApplication
             return page;
         }
 
-        private static Dictionary<string, HashSet<string>?>[] MakeExports(int workers)
+        private static Dictionary<string, HandlerExports?>[] MakeExports(int workers)
         {
-            var exports = new Dictionary<string, HashSet<string>?>[workers];
-            for (var i = 0; i < workers; i++) exports[i] = new Dictionary<string, HashSet<string>?>(StringComparer.Ordinal);
+            var exports = new Dictionary<string, HandlerExports?>[workers];
+            for (var i = 0; i < workers; i++) exports[i] = new Dictionary<string, HandlerExports?>(StringComparer.Ordinal);
             return exports;
         }
 
@@ -396,6 +483,9 @@ public sealed class WebLingoApplication
     {
         public WebLingoCompiledModule? Module { get; set; }
         public List<string> Errors { get; } = [];
+
+        /// <summary>Where the page declares that it only reads its session, as an error names it; null where it does not.</summary>
+        public string? ReadOnly { get; set; }
 
         /// <summary>What finds and compiles a module the page imports while it runs (section 3.9).</summary>
         public WebLingoModuleLoader Modules { get; } = imports;

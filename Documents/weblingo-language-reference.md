@@ -1811,6 +1811,7 @@ An error the runtime raises becomes an instance of a class extending `Error`, wi
 | `DeadlockError` | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run, thrown at that `await` |
 | `PlatformError` | WL3022 | what the platform has not, a member of `std:console`'s `Console` that is Windows's alone, used elsewhere |
 | `MailError` | WL3023 | mail that cannot be sent, a server that cannot be reached or refuses it, its `reply` the server's reply code |
+| `SessionLockError` | WL3024 | a WASP page's session read after its request waited too long for it, another request of the session having it |
 
 Two errors cannot be caught, and always end the program: running past the execution's limits (WL3003) and being
 cancelled (WL3004).
@@ -2318,6 +2319,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL3021 | an assertion from [`std:test`](weblingo-standard-library-reference.md#30-stdtest) failed |
 | WL3022 | what the platform has not, a member of `std:console`'s `Console` that is Windows's alone, used elsewhere |
 | WL3023 | mail that cannot be sent, `std:mail`'s `MailError` |
+| WL3024 | a WASP page's session read after its request waited too long for it, `SessionLockError` |
 | **WL4xxx** | **bytecode** |
 | WL4001 | bytecode that fails verification, such as a damaged file or a VM mismatch |
 | WL4002 | a program too large for the bytecode |
@@ -2330,6 +2332,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL5006 | a component's or a layout's value not declared, or missing |
 | WL5007 | a layout statement where a page cannot have one |
 | WL5008 | a page's HTML that the escaping of its values cannot follow |
+| WL5009 | `session readonly;` where a page cannot have it, or a handler's `session` export that is not `"readonly"` |
 
 ---
 

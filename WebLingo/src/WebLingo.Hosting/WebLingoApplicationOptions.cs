@@ -79,6 +79,12 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// </summary>
     public WebLingoUploads Uploads { get; init; } = WebLingoUploads.Default;
 
+    /// <summary>
+    /// Where the site keeps its sessions (section 6.12, "Sessions and cookies"), which a request's <c>request.session</c>
+    /// reaches, its id made with <see cref="Crypto"/>; none by default, <c>request.session</c> then an error.
+    /// </summary>
+    public IWebLingoSessionStore? Sessions { get; init; }
+
     /// <summary>The host's side of an execution's scheduler, a new one for each request, or none.</summary>
     public Func<IWebLingoSchedulerHost>? Scheduler { get; init; }
 

@@ -142,6 +142,12 @@ public static class WebLingoDiagnosticCodes
     /// code Proposed.
     /// </summary>
     public const string MailFailure = "WL3023";
+    /// <summary>
+    /// A session whose lock a request waited for too long, another request of the session holding it, a
+    /// <c>SessionLockError</c>, raised where the page reads its session (section 6.12, "Sessions and cookies"; its name and
+    /// code Proposed).
+    /// </summary>
+    public const string SessionLocked = "WL3024";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";
@@ -168,4 +174,10 @@ public static class WebLingoDiagnosticCodes
     /// is ambiguous, a component rendered or a layout's body written outside HTML's text, or a page that ends outside it.
     /// </summary>
     public const string HtmlContext = "WL5008";
+    /// <summary>
+    /// A declaration that a request only reads its session where it cannot be (proposed, section 6.12, "Sessions and
+    /// cookies"): <c>session readonly;</c> in a template a page includes, a layout or a component, inside another
+    /// statement, or twice; or a handler's <c>session</c> export that is not <c>export const session = "readonly";</c>.
+    /// </summary>
+    public const string MisplacedSession = "WL5009";
 }

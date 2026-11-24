@@ -417,6 +417,7 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `DeadlockError` | WL3020 | a program stuck awaiting a task `new Task()` made, nothing else able to run, thrown at that `await`, naming where the task was made and where it is awaited |
 | `PlatformError` | WL3022 | a member of `Console` the platform has not, Windows's alone used elsewhere (section 1) |
 | `MailError` | WL3023 | mail that cannot be sent, a server that cannot be reached or refuses it, with its `reply`, the server's reply code (section 31) |
+| `SessionLockError` | WL3024 | a WASP page's session read after its request waited too long for it, another request of the session having it (section 22) |
 
 ```javascript
 import { writeLn } from "std:console";
@@ -1134,12 +1135,12 @@ folder beside `weblingo` and `wasp`. A native module's function may have optiona
 
 A page, a layout and a component that declare `param request;` and `param response;` are given the request they
 answer and the response they make, instances of the built-in classes `Request` and `Response`, their headers instances
-of `Headers`; a `.wlg` route handler is given them as its function's arguments. How a site uses them is the WASP User
-Manual's, section 9.
+of `Headers`, and the request's session of `Session`; a `.wlg` route handler is given them as its function's arguments.
+How a site uses them is the WASP User Manual's, section 9.
 
-The three classes' names are not in scope, `request is Request` being WL2001: a script reaches them as
-`request.__instanceOf` and the like. Only the host makes their instances, which are written `Request {}`, `Response {}`
-and `Headers {}`; one made by `new` holds no request, each of its members WL3001.
+The classes' names are not in scope, `request is Request` being WL2001: a script reaches them as
+`request.__instanceOf` and the like. Only the host makes their instances, which are written `Request {}`, `Response {}`,
+`Headers {}` and `Session {}`; one made by `new` holds no request, each of its members WL3001.
 
 ### `Request`
 
@@ -1155,6 +1156,7 @@ and `Headers {}`; one made by `new` holds no request, each of its members WL3001
 | `await request.form()` | a form's fields, a map: an `application/x-www-form-urlencoded` one's, decoded as the query is, or a `multipart/form-data` one's; a body of another type WL3001 |
 | `await request.files()` | a `multipart/form-data` form's files, a map of each file input's name to an array of `UploadedFile`s; an `application/x-www-form-urlencoded` form's none, an empty map; a body of another type WL3001 |
 | `await request.read()` | the body's next piece as it arrives, `Bytes`, `null` at its end |
+| `request.session` | its session, a `Session`, the same each time; a `SessionLockError`, WL3024, where its lock was waited for longer than the site waits, and WL3001 where the host keeps no sessions |
 
 An `UploadedFile`, a file a form uploaded: `name`, its input's; `fileName`, as the browser gave it, never a path;
 `type`, its `Content-Type`; `size`, in bytes; and `await file.bytes()`, `await file.text()`, in UTF-8, and
@@ -1192,6 +1194,28 @@ A route handler writes its response's body with `response.write` and `response.w
 `response.write` and `response.writeLn` do, and need no `param response;`. A call of either as a statement waits for a
 slow client, as a page's writes do. A response is sent once its output reaches 64 KB (the WASP User Manual, section
 13): setting its status or a header after that is WL3001.
+
+### `Session`
+
+A browser's session, which the site keeps between its requests, in the server's memory (the WASP User Manual, section
+9, "Sessions"):
+
+| Member | What it is |
+|---|---|
+| `s[name]` | the value of `name`, a copy made anew for each read; a missing one WL3007, `s?[name]` giving `null` |
+| `s[name] = value` | keeps a copy of `value`, the session made, and its cookie set, where there is none |
+| `s.has(name)` | whether it keeps a value of that name |
+| `s.remove(name)` | removes it, giving whether it was there |
+| `s.release()` | gives its lock up, its values written, giving `null`; a change after it WL3001 |
+| `s.renew()` | gives it a new id, its values and its lock kept, its cookie sent anew, giving `null`; nothing where there is no session |
+| `s.end()` | removes it, its cookie deleted where the response has not been sent, giving `null`; a value set after it makes a new one |
+
+A session keeps `null`, Booleans, integers, finite numbers, strings, and arrays and maps of them, a map's keys
+strings, written as JSON, each read back as the kind it was, `5.0` a number: anything else, a value that holds itself,
+and one nested more than 512 deep, is WL3001 where it is set, the message naming what it cannot keep. A name that is not
+a string is WL3001. Making a session, or renewing it, once the response is sent is WL3001, its cookie being a header;
+and so is any change in a request that declares that it only reads its session, `session readonly;` in a page,
+`export const session = "readonly";` in a handler, its message naming the declaration, or after `release()`.
 
 ### `Headers`
 

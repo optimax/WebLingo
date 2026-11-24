@@ -132,7 +132,7 @@ public static class WebLingoWaspServer
         (workers, mode) = (Math.Max(1, Environment.ProcessorCount), defaultMode);
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
             out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out var env, out var mail,
-            out var uploads, out error)) return null;
+            out var uploads, out var sessions, out error)) return null;
         if (configured is not null) mode = configured == "production" ? WebLingoMode.Production : WebLingoMode.Development;
 
         // std:system, loaded once here to fail early, then by each worker on its own.
@@ -165,6 +165,8 @@ public static class WebLingoWaspServer
             // Its body's largest, and its uploads', kept in temporary files where wasp.config says (section 6.12).
             Uploads = new WebLingoUploads(uploads.MaxBodySize, uploads.InMemory, uploads.MaxSize ?? uploads.MaxBodySize,
                 new DotNetTemporaryFiles(uploads.Folder)),
+            // Its sessions in the process's memory, kept while it reloads (section 6.12, "Sessions and cookies").
+            Sessions = new WebLingoMemorySessions(TimeSpan.FromMinutes(sessions.TimeoutMinutes), TimeSpan.FromSeconds(sessions.LockTimeoutSeconds)),
             Scheduler = () => new DotNetSchedulerHost(),
             Log = log is null ? null : log.WriteLine,
             SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30),

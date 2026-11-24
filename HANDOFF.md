@@ -216,9 +216,18 @@ The specification's section 6.12, "Sessions and cookies", has the owner's answer
 splits the task in three. Part 1, cookies, is built: `request.cookies`, `response.setCookie` and `response.deleteCookie`
 (`WebLingo/src/WebLingo.Hosting/WebLingoCookies.cs`, the glue in `WebLingoHttpObjects`, the two methods written in
 WebLingo in `Response.wlg`), tested by `CookieTests` and `AspNetCoreTests.CookiesAreReadAndEachIsSetByAHeaderOfItsOwn`.
-Part 2, sessions in memory, waits for its Q1 in `TO-DO.md`: whether a session's arrays and maps are its own or copies.
+Part 2, sessions in memory, is built: a request's session (`WebLingo/src/WebLingo.Hosting/WebLingoSessions.cs`,
+`WebLingoSession`, its values JSON text, `WebLingoSessionValues`, and the store's contract, `IWebLingoSessionStore`) is
+opened, its lock taken, in `WebLingoApplication.Run` before the page runs, a request that waits for it a `Waiting`
+outcome, and closed in `Ended`; `request.session` and the class `Session` are in `WebLingoHttpObjects`; the store in
+memory is `WebLingoMemorySessions` (`WebLingo.Hosting.AspNetCore`), which `WebLingoWaspServer.Load` gives a site, from
+`wasp.config`'s `"sessions"` (`WebLingoSchemes`, `WebLingoSessionSettings`); `session readonly;` is the template
+parser's (`AddSession`), a handler's `export const session = "readonly";` read with its exports (`ExportsOf`). Tested by
+`SessionTests` (`WebLingo.Hosting.Tests`), `PageTests`' session cases and `WaspServeTests.ASessionIsKeptBetweenRequestsAndOneAtATime`.
+Part 3, sessions in a database, is next: a store of its own beside `WebLingoMemorySessions`, its values each name's JSON
+text already.
 
-Next: "Sessions in WASP, Part 2" waits for its Q1, and part 3 for part 2; debugging's part 4 waits for Visual Studio
-installed here, as "Visual Studio Debug Adapter" does, and "Extensive WASP Example" for sessions.
+Next: "Sessions in WASP, Part 3: Sessions in a Database"; debugging's part 4 waits for Visual Studio installed here, as
+"Visual Studio Debug Adapter" does, and "Extensive WASP Example" for sessions.
 
-The last full suite, on Windows, in Release: 3,483 tests passing. Linux not tried since the last push.
+The last full suite, on Windows, in Release: 3,515 tests passing. Linux not tried since the last push.

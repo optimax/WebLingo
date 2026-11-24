@@ -275,6 +275,45 @@ public sealed class PageTests
         Assert.StartsWith(diagnostic, Render(page, Templates(templates)).Diagnostics);
     }
 
+    /// <summary>
+    /// <c>session readonly;</c> (specification, section 6.12, "Sessions and cookies", A5): a statement of its own at the top
+    /// level of a page's own text, which is nothing in its program, and which the template compiler gives its host.
+    /// </summary>
+    [Fact]
+    public void APageDeclaresThatItOnlyReadsItsSession()
+    {
+        Assert.Equal(("", "a b", ""), Render("<% session readonly; %>a <% var session = \"b\"; %><%= session %>"));
+        var compiler = new WebLingoTemplateCompiler(Options, Templates("l.wasp=[<% renderBody(); %>]"));
+        compiler.Compile(new WebLingoSourceText("<% param x = 1;\nsession readonly; layout \"/l.wasp\"; %>x", "page.wasp"));
+        Assert.Equal(new WebLingoSourceSpan(16, 16), compiler.ReadOnlySession);
+        compiler = new WebLingoTemplateCompiler(Options);
+        compiler.Compile(new WebLingoSourceText("<% var session = 1; %>", "page.wasp"));
+        Assert.Null(compiler.ReadOnlySession);
+    }
+
+    [Theory]
+    [InlineData("<% include \"/h.wasp\"; %>", "h.wasp=<% session readonly; %>",
+        "WL5009 at h.wasp 1,4: A template a page includes cannot declare how the session is used: it reads it as its page declares.")]
+    [InlineData("<% layout \"/l.wasp\"; %>x", "l.wasp=<% session readonly; %><% renderBody(); %>",
+        "WL5009 at l.wasp 1,4: A layout cannot declare how the session is used: it reads it as its page declares.")]
+    [InlineData("<% if (true) { session readonly; } %>", "",
+        "WL5009 at page.wasp 1,16: 'session readonly;' is a statement of its own, at the page's top level, not inside another.")]
+    [InlineData("<% var x = (1 + %><% session readonly; %><% 2); %>", "",
+        "WL5009 at page.wasp 1,22: 'session readonly;' is a statement of its own, at the page's top level, not inside another.")]
+    [InlineData("<% session readonly; session readonly; %>", "", "WL5009 at page.wasp 1,22: A page declares that it only reads its session once.")]
+    [InlineData("<% session readonly %>", "", "WL1002 at page.wasp 1,20: A ';' is missing here.")]
+    public void ASessionDeclaredWhereItCannotBeIsAnError(string page, string templates, string diagnostic)
+    {
+        Assert.StartsWith(diagnostic, Render(page, Templates(templates)).Diagnostics);
+    }
+
+    [Fact]
+    public void AComponentCannotDeclareHowTheSessionIsUsed()
+    {
+        Assert.Contains("A component cannot declare how the session is used: it reads it as its page declares.",
+            Render("<% await renderComponent(\"/c.wasp\"); %>", Templates("c.wasp=<% session readonly; %>c")).Error);
+    }
+
     [Fact]
     public void ARuntimeErrorInALayoutIsReportedInIt()
     {

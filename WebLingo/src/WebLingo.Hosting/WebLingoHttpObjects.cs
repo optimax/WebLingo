@@ -32,7 +32,10 @@ namespace WebLingo.Hosting;
 /// Cookies (section 6.12, "Sessions and cookies"; <see cref="WebLingoCookies"/>): a request's <c>cookies</c>, a map of
 /// their names to their values, made when first read; and a response's <c>setCookie(name, value, options)</c> and
 /// <c>deleteCookie(name, options)</c>, written in WebLingo, their options optional, calling its own <c>__setCookie</c> and
-/// <c>__deleteCookie</c>, a cookie set or deleted once the response is being sent WL3001, as a header is.
+/// <c>__deleteCookie</c>, a cookie set or deleted once the response is being sent WL3001, as a header is. A request's
+/// <c>session</c> (section 6.12, "Sessions and cookies"; <see cref="WebLingoSession"/>), an instance of <c>Session</c>, the
+/// same each time, read and set by indexing, a name a string, a value read a copy, a missing one WL3007, <c>?[]</c> giving
+/// <c>null</c> for it; <c>has(name)</c> and <c>remove(name)</c>; and <c>release()</c>, <c>renew()</c> and <c>end()</c>.
 /// </summary>
 internal sealed class WebLingoHttpObjects
 {
@@ -50,6 +53,7 @@ internal sealed class WebLingoHttpObjects
     private readonly WebLingoNativeClass _response = new("Response");
     private readonly WebLingoNativeClass _headers = new("Headers");
     private readonly WebLingoNativeClass _uploaded = new("UploadedFile");
+    private readonly WebLingoNativeClass _session = new("Session");
 
     public WebLingoHttpObjects()
     {
@@ -61,6 +65,7 @@ internal sealed class WebLingoHttpObjects
             .DeclareProperty("query", Query)
             .DeclareProperty("headers", (a, heap, out r, out e) => RequestHeaders(a, heap, out r, out e))
             .DeclareProperty("cookies", Cookies)
+            .DeclareProperty("session", Session)
             .DeclareMethod("text", 0, BodyText)
             .DeclareMethod("form", 0, BodyForm)
             .DeclareMethod("files", 0, BodyFiles)
@@ -73,6 +78,13 @@ internal sealed class WebLingoHttpObjects
             .DeclareMethod("bytes", 0, UploadedBytes)
             .DeclareMethod("text", 0, UploadedText)
             .DeclareMethod("save", 1, UploadedSave);
+        _session
+            .DeclareIndexer(SessionGet, SessionSet)
+            .DeclareMethod("has", 1, SessionHas)
+            .DeclareMethod("remove", 1, SessionRemove)
+            .DeclareMethod("release", 0, (a, heap, out r, out e) => SessionDo(a, heap, (WebLingoSession s, out WebLingoRuntimeError? f) => s.TryRelease(out f), out r, out e))
+            .DeclareMethod("renew", 0, (a, heap, out r, out e) => SessionDo(a, heap, (WebLingoSession s, out WebLingoRuntimeError? f) => s.TryRenew(out f), out r, out e))
+            .DeclareMethod("end", 0, (a, heap, out r, out e) => SessionDo(a, heap, (WebLingoSession s, out WebLingoRuntimeError? f) => s.TryEnd(out f), out r, out e));
         _response
             .DeclareProperty("status", Status, SetStatus)
             .DeclareProperty("headers", (a, heap, out r, out e) => ResponseHeaders(a, heap, out r, out e))
@@ -91,10 +103,11 @@ internal sealed class WebLingoHttpObjects
         var response = Info(_response, members);
         var headers = Info(_headers, members);
         var uploaded = Info(_uploaded, members);
+        var session = Info(_session, members);
         Members = members;
         Parameters =
         [
-            new WebLingoHostParameter("request", Prefix + ".request", [request, headers, uploaded]),
+            new WebLingoHostParameter("request", Prefix + ".request", [request, headers, uploaded, session]),
             new WebLingoHostParameter("response", Prefix + ".response", [response, headers])
         ];
     }
@@ -108,20 +121,21 @@ internal sealed class WebLingoHttpObjects
     /// <summary>
     /// The built-ins that make a request's instances, given their classes, each made once, kept for the execution, the
     /// response's writing to <paramref name="output"/>, where the page's text goes, its body read within
-    /// <paramref name="uploads"/>; and <paramref name="ending"/>, which its host disposes as the request ends, removing
-    /// its uploads' temporary files.
+    /// <paramref name="uploads"/>, its session <paramref name="session"/>, none where the host keeps none; and
+    /// <paramref name="ending"/>, which its host disposes as the request ends, removing its uploads' temporary files.
     /// </summary>
     public IWebLingoBuiltinFunction[] For(IWebLingoHttpRequest request, IWebLingoHttpResponse response, IWebLingoTextOutput output,
-        WebLingoUploads uploads, out IDisposable ending)
+        WebLingoUploads uploads, WebLingoSession? session, out IDisposable ending)
     {
-        var requestState = new RequestState(request, uploads);
+        var requestState = new RequestState(request, uploads) { Session = session };
         var responseState = new ResponseState(response, output, string.Equals(request.Scheme, "https", StringComparison.OrdinalIgnoreCase));
         ending = requestState;
         return
         [
-            new Maker(Prefix + ".request", 3, (classes, heap, out made, out error) =>
+            new Maker(Prefix + ".request", 4, (classes, heap, out made, out error) =>
             {
                 requestState.Roots[4] = classes[2]; // UploadedFile's class, which files() makes its instances of.
+                requestState.Roots[6] = classes[3]; // Session's, which session makes its instance of.
                 return Make(_request, requestState, classes, heap, requestState.Roots, request.Headers, out made, out error);
             }),
             new Maker(Prefix + ".response", 2, (classes, heap, out made, out error) =>
@@ -183,6 +197,88 @@ internal sealed class WebLingoHttpObjects
             && !TryMap(WebLingoCookies.Parse(state.Request.Headers.GetValues("Cookie")), heap, out state.Roots[5], out error)) return false;
         result = state.Roots[5];
         return true;
+    }
+
+    /// <summary>
+    /// The request's session, an instance of <c>Session</c>, made when first read and the same after; a
+    /// <c>SessionLockError</c> where its lock was waited for too long, and WL3001 where the host keeps no sessions.
+    /// </summary>
+    private bool Session(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_request.TryGetHostObject<RequestState>(a[0], heap, out var state, out error)) return false;
+        if (state.Session is not { } session)
+        {
+            error = Invalid("This host keeps no sessions.");
+            return false;
+        }
+        if (!session.TryCheckUsable(out error)) return false;
+        if (state.Roots[7].Kind == WebLingoValueKind.Null
+            && (!_session.TryMake(state.Roots[6], heap, out state.Roots[7], out error) || !_session.TrySetHostObject(state.Roots[7], session, heap, out error)))
+        {
+            state.Roots[7] = WebLingoValue.Null;
+            return false;
+        }
+        result = state.Roots[7];
+        return true;
+    }
+
+    /// <summary><c>session[name]</c>: a copy of its value; WL3007 where it has none.</summary>
+    private bool SessionGet(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        return _session.TryGetHostObject<WebLingoSession>(a[0], heap, out var session, out error) && TrySessionName(a[1], heap, out var name, out error)
+            && session.TryGet(name, heap, out result, out error);
+    }
+
+    /// <summary><c>session[name] = value</c>: a copy of the value kept, checked; the session made where there is none.</summary>
+    private bool SessionSet(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        return _session.TryGetHostObject<WebLingoSession>(a[0], heap, out var session, out error) && TrySessionName(a[1], heap, out var name, out error)
+            && session.TrySet(name, a[2], heap, out error);
+    }
+
+    /// <summary><c>session.has(name)</c>: whether it has a value of that name.</summary>
+    private bool SessionHas(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_session.TryGetHostObject<WebLingoSession>(a[0], heap, out var session, out error) || !session.TryCheckUsable(out error)
+            || !TrySessionName(a[1], heap, out var name, out error)) return false;
+        result = WebLingoValue.FromBoolean(session.Has(name));
+        return true;
+    }
+
+    /// <summary><c>session.remove(name)</c>: the value removed, giving whether it was there, as a map's <c>remove</c> does.</summary>
+    private bool SessionRemove(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_session.TryGetHostObject<WebLingoSession>(a[0], heap, out var session, out error) || !TrySessionName(a[1], heap, out var name, out error)
+            || !session.TryRemove(name, out var had, out error)) return false;
+        result = WebLingoValue.FromBoolean(had);
+        return true;
+    }
+
+    private delegate bool SessionAction(WebLingoSession session, out WebLingoRuntimeError? error);
+
+    /// <summary><c>release()</c>, <c>renew()</c> and <c>end()</c>, each giving <c>null</c>.</summary>
+    private bool SessionDo(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, SessionAction action, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        return _session.TryGetHostObject<WebLingoSession>(a[0], heap, out var session, out error) && action(session, out error);
+    }
+
+    private static bool TrySessionName(WebLingoValue given, WebLingoHeap heap, out string name, out WebLingoRuntimeError? error)
+    {
+        (name, error) = ("", null);
+        given = heap.Held(given);
+        if (given.Kind == WebLingoValueKind.String)
+        {
+            name = heap.GetString(given);
+            return true;
+        }
+        error = Invalid($"A session's names are strings, not {WebLingoValueFormatter.Describe(given, heap)}.");
+        return false;
     }
 
     /// <summary><c>response.setCookie(name, value, options)</c>: its <c>Set-Cookie</c> added, giving <c>null</c>.</summary>
@@ -915,7 +1011,6 @@ internal sealed class WebLingoHttpObjects
 
     private static WebLingoNativeExport Export(string name, IWebLingoBuiltinFunction builtin) => new(name, builtin.Name, builtin.Arity);
 
-    /// <summary>A request as its instance holds it: the request, and the heap's roots of its instance, its headers and its query.</summary>
     /// <summary>
     /// A request as its instance holds it: the request, the heap's roots of its instance, its headers and its query, and its
     /// body once read. Its fields are the worker's alone: the body's reading runs off the worker, its pieces touched by
@@ -934,8 +1029,14 @@ internal sealed class WebLingoHttpObjects
 
         public IWebLingoHttpRequest Request { get; } = request;
 
-        /// <summary>The heap's roots of its instance, its headers, its query, its files' map, UploadedFile's class and its cookies.</summary>
-        public WebLingoValue[] Roots { get; } = new WebLingoValue[6];
+        /// <summary>
+        /// The heap's roots of its instance, its headers, its query, its files' map, UploadedFile's class, its cookies,
+        /// Session's class and its session's instance.
+        /// </summary>
+        public WebLingoValue[] Roots { get; } = new WebLingoValue[8];
+
+        /// <summary>Its session, none where the host keeps none.</summary>
+        public WebLingoSession? Session { get; init; }
 
         /// <summary>Whether its body has been read as a form, as it arrived, and so cannot be read otherwise.</summary>
         public bool ReadAsForm { get; private set; }

@@ -37,6 +37,12 @@ public sealed class WebLingoTemplateCompiler
     /// <summary>The files of what it compiled, the page's, its layouts' and its components', which say where a diagnostic is.</summary>
     public WebLingoTemplateSources Sources { get; } = new();
 
+    /// <summary>
+    /// Where the page it compiled declares that it only reads its session, <c>session readonly;</c>, in the page's own
+    /// file; null where it does not (section 6.12, "Sessions and cookies").
+    /// </summary>
+    public WebLingoSourceSpan? ReadOnlySession { get; private set; }
+
     public WebLingoCompilationResult Compile(WebLingoSourceText page)
     {
         var result = new WebLingoCompiler(_options).Compile(Parse(page, WebLingoTemplateKind.Page));
@@ -49,13 +55,14 @@ public sealed class WebLingoTemplateCompiler
     /// an import, a page whose parameters a render gives; its files added to <see cref="Sources"/>.
     /// </summary>
     public WebLingoModuleLoader Components =>
-        new(_options) { Resolver = _templates, Parse = (name, text) => Parse(new WebLingoSourceText(text, name), WebLingoTemplateKind.Page) };
+        new(_options) { Resolver = _templates, Parse = (name, text) => Parse(new WebLingoSourceText(text, name), WebLingoTemplateKind.Component) };
 
     private WebLingoSyntaxTree Parse(WebLingoSourceText page, WebLingoTemplateKind kind)
     {
         var hosted = new List<string>();
         foreach (var parameter in _options.HostParameters) hosted.Add(parameter.Name);
-        var tree = WebLingoTemplateParser.Parse(page, _templates, out var files, kind, hosted);
+        var tree = WebLingoTemplateParser.Parse(page, _templates, out var files, out var readOnly, kind, hosted);
+        if (kind == WebLingoTemplateKind.Page) ReadOnlySession = readOnly;
         Sources.Add(files);
         _templateFiles.Add(page.Name);
         return tree;

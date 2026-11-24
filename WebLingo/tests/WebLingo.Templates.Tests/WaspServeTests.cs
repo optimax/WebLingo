@@ -118,6 +118,60 @@ public sealed class WaspServeTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Sessions in memory under <c>wasp serve</c> (specification, section 6.12, "Sessions and cookies"; "Sessions and cookies,
+    /// parts", part 2): a value kept from one request to the next, by the session's cookie; a request of the session that
+    /// comes while another holds it waiting for it, through Kestrel and the workers; and <c>wasp.config</c>'s
+    /// <c>"sessions"</c>, each of its settings checked.
+    /// </summary>
+    [Fact]
+    public async Task ASessionIsKeptBetweenRequestsAndOneAtATime()
+    {
+        Write("wasp.config", "{ \"sessions\": { \"store\": \"memory\", \"timeout\": 20, \"lockTimeout\": 10 } }");
+        Write("count.wasp", "<% param request; var n = (request.session?[\"n\"] ?? 0) + 1; request.session[\"n\"] = n; %><%= n %>");
+        Write("slow.wasp", "<% param request; import { delay } from \"std:system\"; request.session[\"step\"] = \"begun\"; await delay(700);\n"
+                           + "request.session[\"step\"] = \"ended\"; %>slow");
+        Write("step.wasp", "<% param request; %><%= request.session[\"step\"] %>");
+        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        Assert.True(server is not null, error);
+        await server.StartAsync();
+        try
+        {
+            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            using var client = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(address) };
+            Assert.Equal("1", await client.GetStringAsync("/count"));
+            Assert.Equal("2", await client.GetStringAsync("/count"));
+            var slow = client.GetStringAsync("/slow");
+            await Task.Delay(200);
+            // Sent while the slow request holds the session, it waits for it, and reads what the slow one wrote last.
+            Assert.Equal("ended", await client.GetStringAsync("/step"));
+            Assert.Equal("slow", await slow);
+            // Another client has a session of its own.
+            using var other = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(address) };
+            Assert.Equal("1", await other.GetStringAsync("/count"));
+            Assert.Equal("3", await client.GetStringAsync("/count"));
+        }
+        finally
+        {
+            await server.StopAsync();
+        }
+
+        foreach (var (setting, message) in new[]
+                 {
+                     ("{ \"store\": \"database\" }", "\"sessions\"'s \"store\" is \"memory\", the process's memory, sessions in a database not being built yet."),
+                     ("{ \"timeout\": 0 }", "\"sessions\" is an object, { \"store\": \"memory\", \"timeout\": 20, \"lockTimeout\": 30 }, each optional, "
+                                            + "\"timeout\" a number of minutes, and \"lockTimeout\" a number of seconds, each more than 0."),
+                     ("{ \"lockTimeout\": \"30\" }", "\"lockTimeout\" a number of seconds, each more than 0."),
+                     ("{ \"cookie\": \"x\" }", "\"lockTimeout\" a number of seconds, each more than 0."),
+                     ("[]", "\"lockTimeout\" a number of seconds, each more than 0.")
+                 })
+        {
+            Write("wasp.config", "{ \"sessions\": " + setting + " }");
+            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+            Assert.EndsWith(message, error);
+        }
+    }
+
     [Fact]
     public async Task TheExampleApplicationServesItsPages()
     {
@@ -415,7 +469,8 @@ public sealed class WaspServeTests : IDisposable
         Write("wasp.config", "{ \"environment\": \"production\" }");
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
         Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"mode\", "
-                        + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\" and \"uploads\".", error);
+                        + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\" "
+                        + "and \"sessions\".", error);
 
         Write("wasp.config", "{ \"sendTimeout\": 5 }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));

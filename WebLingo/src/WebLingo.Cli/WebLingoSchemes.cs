@@ -24,7 +24,9 @@ namespace WebLingo.Cli;
 /// environment, <c>"env": { "machineName": true, "variables": ["PATH", "APP_*"] }</c>, which <c>wasp</c> reads,
 /// <c>weblingo</c>'s scripts reading all of it (section 7.15); and its mail servers, each a name and its settings,
 /// <c>"mail": { "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": "…" } }</c>, which both
-/// read (section 7.17). A secret, a mail server's password or a database's connection string, may be given where it is
+/// read (section 7.17); and where a site keeps its sessions, <c>"sessions": { "store": "memory", "timeout": 20,
+/// "lockTimeout": 30 }</c>, which <c>wasp</c> reads (section 6.12, "Sessions and cookies"). A secret, a mail server's
+/// password or a database's connection string, may be given where it is
 /// kept, <c>{ "env": "NAME" }</c> or <c>{ "file": "../secrets/name.txt" }</c>, a file from the file's folder, one a
 /// site's <c>wasp.config</c> names outside the site, read by the host when it is used. On Windows, the <c>windows</c> scheme's folder is
 /// <c>windows/</c> beside the program, unless configured, as <c>std</c>'s is <c>std/</c>.
@@ -60,7 +62,7 @@ public static class WebLingoSchemes
         out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed, out WebLingoEnvSettings env,
         out IReadOnlyDictionary<string, WebLingoMailServer> mail, out string? error) =>
         TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
-            out databases, out files, out allowed, out env, out mail, out _, out error);
+            out databases, out files, out allowed, out env, out mail, out _, out _, out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
@@ -70,7 +72,7 @@ public static class WebLingoSchemes
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out string? error) =>
         TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out _, out _, out _, out _, out _, out _, out _,
-            out error);
+            out _, out error);
 
     /// <summary>
     /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, its databases,
@@ -80,22 +82,23 @@ public static class WebLingoSchemes
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out string? error) =>
         TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out allowedHosts, out databases, out files,
-            out _, out _, out _, out _, out error);
+            out _, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name, and what its
-    /// scripts may read of the machine's environment, nothing when it says nothing, and its mail servers, none when it names
-    /// none.
+    /// scripts may read of the machine's environment, nothing when it says nothing, its mail servers, none when it names
+    /// none, what it says of a request's body, and where it keeps its sessions.
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
         out WebLingoEnvSettings env, out IReadOnlyDictionary<string, WebLingoMailServer> mail, out WebLingoUploadSettings uploads,
-        out string? error)
+        out WebLingoSessionSettings sessions, out string? error)
     {
         var servers = new Dictionary<string, WebLingoMailServer>(StringComparer.Ordinal);
         mail = servers;
         uploads = WebLingoUploadSettings.Default;
+        sessions = WebLingoSessionSettings.Default;
         env = WebLingoEnvSettings.None;
         var allowing = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         allowed = allowing;
@@ -116,7 +119,7 @@ public static class WebLingoSchemes
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
         if (File.Exists(file) && !TryRead(file, folder, schemes, ref mode, ref sendTimeout, hosts, named, read, write,
-            allowing, ref env, servers, ref uploads, out error))
+            allowing, ref env, servers, ref uploads, ref sessions, out error))
         {
             return false;
         }
@@ -228,6 +231,34 @@ public static class WebLingoSchemes
     }
 
     /// <summary>
+    /// <c>"sessions": { "store": "memory", "timeout": 20, "lockTimeout": 30 }</c>, each optional: where a site keeps its
+    /// sessions, the process's memory, the one store built yet; how many minutes a session lasts once no request uses it;
+    /// and how many seconds a request waits for a session's lock (section 6.12, "Sessions and cookies").
+    /// </summary>
+    private static bool TryReadSessions(string file, JsonElement setting, ref WebLingoSessionSettings sessions, out string? error)
+    {
+        error = $"{file}: \"sessions\" is an object, {{ \"store\": \"memory\", \"timeout\": 20, \"lockTimeout\": 30 }}, each optional, "
+                + "\"timeout\" a number of minutes, and \"lockTimeout\" a number of seconds, each more than 0.";
+        if (setting.ValueKind != JsonValueKind.Object) return false;
+        foreach (var entry in setting.EnumerateObject())
+        {
+            var number = entry.Value.ValueKind == JsonValueKind.Number && entry.Value.TryGetDouble(out var given) && given > 0
+                && given <= TimeSpan.MaxValue.TotalSeconds / 120 ? given : (double?)null;
+            if (entry.Name == "store" && entry.Value.ValueKind == JsonValueKind.String)
+            {
+                if (entry.Value.GetString() == "memory") continue;
+                error = $"{file}: \"sessions\"'s \"store\" is \"memory\", the process's memory, sessions in a database not being built yet.";
+                return false;
+            }
+            if (entry.Name == "timeout" && number is { } minutes) sessions = sessions with { TimeoutMinutes = minutes };
+            else if (entry.Name == "lockTimeout" && number is { } seconds) sessions = sessions with { LockTimeoutSeconds = seconds };
+            else return false;
+        }
+        error = null;
+        return true;
+    }
+
+    /// <summary>
     /// A secret, a string, itself, or where it is kept, <c>{ "env": "NAME" }</c>, an environment variable, or
     /// <c>{ "file": "../secrets/name.txt" }</c>, a file from the configuration's folder, one a site's <c>wasp.config</c>
     /// names outside the site, whose files may be served (section 7.17, "Secrets"); never written in an error.
@@ -319,7 +350,7 @@ public static class WebLingoSchemes
     private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? mode, ref double? sendTimeout,
         List<string> hosts, Dictionary<string, WebLingoSecret> databases, List<string> read, List<string> write,
         Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, Dictionary<string, WebLingoMailServer> mail,
-        ref WebLingoUploadSettings uploads, out string? error)
+        ref WebLingoUploadSettings uploads, ref WebLingoSessionSettings sessions, out string? error)
     {
         error = null;
         try
@@ -447,6 +478,12 @@ public static class WebLingoSchemes
                     if (!TryReadUploads(file, folder, setting.Value, ref uploads, out error)) return false;
                     continue;
                 }
+                if (setting.Name == "sessions")
+                {
+                    // Where the site keeps its sessions, how long they last, and how long a request waits for one's lock (section 6.12).
+                    if (!TryReadSessions(file, setting.Value, ref sessions, out error)) return false;
+                    continue;
+                }
                 if (setting.Name == "mail")
                 {
                     // Its mail servers, each a name a script sends through it by, and its settings (section 7.17).
@@ -462,7 +499,8 @@ public static class WebLingoSchemes
                 if (setting.Name != "schemes")
                 {
                     error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"mode\", "
-                            + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\" and \"uploads\".";
+                            + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\" "
+                            + "and \"sessions\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)
@@ -501,6 +539,17 @@ public sealed record WebLingoUploadSettings(long MaxBodySize, int InMemory, long
 {
     /// <summary>What a configuration that says nothing of them means: 30,000,000 bytes, 64 KB in memory.</summary>
     public static WebLingoUploadSettings Default { get; } = new(30_000_000, 64 * 1024, null, null);
+}
+
+/// <summary>
+/// Where a site keeps its sessions (specification, section 6.12, "Sessions and cookies"): the process's memory, the one
+/// store built yet; how many minutes a session lasts once no request uses it, 20 by default; and how many seconds a request
+/// waits for a session's lock, 30 by default.
+/// </summary>
+public sealed record WebLingoSessionSettings(double TimeoutMinutes, double LockTimeoutSeconds)
+{
+    /// <summary>What a configuration that says nothing of them means.</summary>
+    public static WebLingoSessionSettings Default { get; } = new(20, 30);
 }
 
 /// <summary>

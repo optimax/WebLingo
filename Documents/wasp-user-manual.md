@@ -496,6 +496,7 @@ page's, or its layout's, as it sees any of their variables.
 | `await request.form()` | a form's fields, as a map |
 | `await request.files()` | a form's uploaded files, each input's name an array of `UploadedFile`s |
 | `await request.read()` | the body's next piece, as bytes, or `null` at its end |
+| `request.session` | the browser's session, which the site keeps between its requests (below, "Sessions") |
 
 ```html
 <% param request; %>
@@ -647,6 +648,102 @@ SameSite=Lax`, and the browser's next, `Visits: 2`.
   longest path.
 - A cookie, as any header, can be set until the page's output starts being sent; after that, setting one is an error.
 
+### Sessions
+
+A session keeps what a site must remember of a browser between its requests, a user who has signed in or what is in a
+cart, on the server; the browser keeps only the session's id, in a cookie.
+
+| Member | What it is |
+|---|---|
+| `request.session[name]` | a value the session keeps; set, `request.session["user"] = "ann";`, it is kept for the browser's next requests |
+| `request.session.has(name)` | whether the session keeps a value of that name |
+| `request.session.remove(name)` | removes a value, giving whether it was there |
+| `request.session.release()` | gives the session up before the request ends, so that the browser's other requests need not wait for it |
+| `request.session.renew()` | gives the session a new id, its values kept, as a user signs in |
+| `request.session.end()` | ends the session, as a user signs out |
+
+```html
+<% param request; %>
+<% var visits = (request.session?["visits"] ?? 0) + 1; %>
+<% request.session["visits"] = visits; %>
+<p>Visits: <%= visits %></p>
+```
+
+The first request gives `Visits: 1`, its response's header `Set-Cookie: WASPSESSIONID=3da01f93ffffb71921519e9538ff061b;
+Path=/; HttpOnly; SameSite=Lax`, the id another for each session, and the browser's next, `Visits: 2`.
+
+- A session is made, and its cookie sent, once a page sets a value in it: a request that sets none makes none. Its
+  cookie, `WASPSESSIONID`, holds a random id of 128 bits; it is `HttpOnly` and `SameSite=Lax`, `Secure` over HTTPS, and
+  lasts until the browser closes. A session ends once no request has used it for 20 minutes.
+- A session keeps what JSON holds: `null`, Booleans, integers, numbers, strings, and arrays and maps of them, a map's
+  keys strings. Anything else, a decimal, a date, a set, an instance of a class, is an error where it is set: keep a
+  decimal's or a date's text instead.
+- A value read from a session is a copy, as classic ASP's `Session` gives an array: a change to an array or a map read
+  from it is kept only once it is set again.
+
+  ```javascript
+  var cart = request.session?["cart"] ?? [];
+  cart.push(item);
+  request.session["cart"] = cart;
+  ```
+
+- A name the session does not keep is an error with `[…]`, as a map's missing key is, and `null` with `?[…]`.
+- A session is made, renewed and ended with its cookie, which, as any header, can be set until the page's output starts
+  being sent: set what a page keeps before writing much.
+- Sites served under one host name, at different ports, share their cookies, the session's among them, as browsers keep
+  cookies by host: each site then replaces the other's session. Give each site a name of its own.
+
+**One request at a time.** A browser's requests of one session run one at a time: one that comes while another has the
+session waits for it, as at an `await`, its server running other requests meanwhile, then reads what the other wrote. A
+page that only reads its session says so, so that it does not wait:
+
+```html
+<% session readonly; %>
+<% param request; %>
+<p>Signed in as <%= request.session?["user"] ?? "nobody" %>.</p>
+```
+
+A route handler says so by an export, `export const session = "readonly";`. Such a request reads the values last
+written, and changing them is an error that names where it declared it. Only the page or the handler that answers the
+request declares it, once, at its top level: its includes, its layout and its components read the session as it says,
+and declaring it there is WL5009. A request that has done with its session before it ends may give it up,
+`request.session.release()`, its values written then, so that the browser's other requests run; changing it after is
+an error. A request waits for its session for 30 seconds at most, then runs without it, and reading `request.session` is
+then a `SessionLockError`, WL3024, which a `catch` may catch.
+
+**Signing in and out.** Give the session a new id as a user signs in, so that an id someone saw before does not become
+a signed-in user's, and end it as the user signs out:
+
+```javascript
+// api/sign-in.wlg
+export async function post(request, response) {
+  var form = await request.form();
+  // … the user's password checked …
+  request.session.renew();
+  request.session["user"] = form["user"];
+  response.status = 303;
+  response.headers["Location"] = "/";
+}
+```
+
+```javascript
+// api/sign-out.wlg
+export function post(request, response) {
+  request.session.end();
+  response.status = 303;
+  response.headers["Location"] = "/";
+}
+```
+
+`renew()` keeps the session's values, and does nothing where there is no session yet; `end()` removes the session, and
+deletes its cookie.
+
+**Where sessions are kept.** In the server's memory: they last while `wasp` runs, kept as the site reloads for a change
+to its files, and lost as it stops, as when IIS recycles the site's application pool. They are one process's: a site
+served by several processes at once, as Apache's `mod_fcgid` may start them, needs its sessions in a database, which is
+planned ([section 19](#19-what-is-not-there-yet)). `wasp.config`'s `"sessions"` says how long a session lasts, and how
+long a request waits for one ([section 14](#14-configuration-waspconfig)).
+
 A page run by `wasp run` has no request: there, a page's parameters are values given on the command line
 ([section 16](#16-the-wasp-command-line)), and a page that declares `request` fails.
 
@@ -692,6 +789,7 @@ and `POST /api/teas`, a 201 and `Received 5 characters.` for a body of `hello`.
 - A `.wlg` that exports none of those functions is a module, not a handler, and its path is a 404.
 - A handler's `Content-Type` is `text/html; charset=utf-8` unless it sets another.
 - The module runs anew for each request, its top level first, then the function: nothing in it lasts between requests.
+- A handler that only reads its session says so, `export const session = "readonly";` ([section 9](#sessions)).
 
 `Json.stringify` writes a value as JSON, an instance as its fields, and `Json.parse(await request.text())` reads a
 JSON body, `Json` imported from `std:json` (the Standard Library Reference, "`Json` and `std:json`").
@@ -829,6 +927,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"env"` | what the site's pages and handlers may read of the machine's environment, through `std:env`: `{ "machineName": true, "variables": ["PATH", "APP_*"] }` | nothing |
 | `"maxBodySize"` | the largest body a request may have, in bytes, a larger one a 413 (section 9, "Uploaded files") | 30,000,000 |
 | `"uploads"` | what a form's files may be: `{ "inMemory": 65536, "maxSize": 20000000, "folder": "../tmp" }`, how many bytes of a file are kept in memory, the rest in a temporary file, the most its files may take in all, and the folder their temporary files are made in, outside the site | 64 KB, `"maxBodySize"`, the system's temporary folder |
+| `"sessions"` | where the site keeps its sessions, and how long: `{ "store": "memory", "timeout": 20, "lockTimeout": 30 }`, the server's memory, the minutes a session lasts once no request uses it, and the seconds a request waits for a session another has (section 9, "Sessions") | the server's memory, 20 minutes, 30 seconds |
 | `"mail"` | the mail servers the site's pages and handlers send through, with `std:mail`, each a name and its settings: `{ "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": { "env": "SMTP_PASSWORD" } } }` | none |
 
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
@@ -1171,8 +1270,8 @@ site anew, so the first request to each is slower than the rest.
 
 These are not there yet, and are planned or being designed:
 
-- **Sessions**: a page keeps what it must remember between a browser's requests in cookies
-  ([section 9](#cookies)), or in a database of its own.
+- **Sessions in a database**: a site keeps its sessions in the server's memory ([section 9](#sessions)), one process's,
+  lost as it stops; sessions kept in a database, which several processes share, are being built.
 - **Debugging a site under IIS or FastCGI**: a site is debugged only as the debugger serves it
   ([section 15](#15-while-you-work)).
 - **A standalone server**, without IIS, nginx or Apache, is planned. WASP has been tried on Windows, through IIS's
