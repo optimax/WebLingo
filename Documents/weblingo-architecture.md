@@ -804,6 +804,36 @@ with `root` and `port`. Measured against `main`'s, 12 rounds alternating, no wor
 rank test (Mann-Whitney's, every p above 0.06); the resumption first written in the dispatch loop's resuming branch made
 `closures` 9 percent slower and `imports` 6 (p 0.015 and 0.009), and was moved to `Run`'s prologue.
 
+**Conditional breakpoints** (the owner's answers, 24 November 2026, part 3's Q1 and Q2): a condition is an expression
+without calls of the program's code, names, literals, members, indexing and operators, read without running the
+program's code, so that a condition changes nothing; a native member, a property that the runtime or a native module
+gives, `request.path`, `items.length`, allowed, since no WebLingo code runs for it; of methods, the built-in classes'
+that only read, of strings, arrays and maps, `name.startsWith("A")`, not every native function, a native module's having
+side effects, `fs.remove` or `db.execute`; a property or a method written in WebLingo an error there, its message saying
+that a condition does not run the program's code; and calls of the program's code, in conditions, watches and the
+debugger's console alike, a task of its own, later, if asked for (A1 (b)). A condition that fails, by an error or by
+giving anything but a Boolean, stops the breakpoint, its message saying why, the condition's error or the kind of value
+it gave; and a condition is checked where it is set, against the scope of its line, a syntax error, a name not in scope
+there, or what A1 does not allow, leaving the breakpoint unverified, its message saying why, as the Debug Adapter
+Protocol shows one, before the program runs (A2 (a)).
+
+**Conditional breakpoints, as built** (part 3, 24 November 2026; Proposed where it says more than the answers above):
+the adapter says it supports conditions (`supportsConditionalBreakpoints`), for scripts, pages and sites alike; a
+condition read where it is set (`WebLingoDebugCondition`), into the VM's own form (`WebLingoDebugExpression`): literals,
+names, `.`, `?.`, `[]`, `?[]`, `!`, unary `-` and `+`, the arithmetic operators, `\`, comparisons, `&&`, `||`, `??` and
+`? :`, and a call of a method whose name a string's, an array's, a map's or a set's that only reads has (`indexOf`,
+`contains`, `startsWith`, `slice`, `join`, `has` and the others, `WebLingoDebugExpression.ReadsOnly`); anything else,
+an assignment, `new`, `await`, a function, a collection's literal, `this` or `is`, refused, its message saying what.
+The names it reads are checked once its line's statements are known, against the names in scope at them, as the
+Variables view shows them, the breakpoint told why where one is not. At each visit of its line, the VM evaluates it in
+the frame's scope (`IWebLingoDebugScope`), what it makes kept from the collector meanwhile: a member or an index by the
+runtime's own rules (`WebLingoMembers`), a native class's property or indexer called, its built-in, and one written in
+WebLingo refused; an operator by `WebLingoOperators`, a class's operator written in WebLingo refused; a method only on a
+string, an array, a map or a set of no class of the program's, whose kind's method of that name only reads, which no
+`extend` block replaces, given no function, by `WebLingoMembers.TryCall`. A condition that fails stops the breakpoint,
+the `stopped` event's `text` saying why, written to the Debug Console too. `hitCondition` and `logMessage` stay
+unsupported.
+
 ## 6. Hosting architecture (WL-H001–WL-H014)
 
 ### 6.1 Approved hosting decisions

@@ -953,8 +953,9 @@ scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run
   component or a module it imports stops the page there, run as `wasp run` runs it, its parameters from the launch, with
   the call stack and the variables to look at, and stepping. A site is debugged as `wasp serve` serves it: a request a
   browser sends stops at a breakpoint, alone, each request a thread of the debugger's, `GET /cart #12`, while the site
-  serves the others; the debugger's pause stops every request until it goes on. VS Code starts `wasp --debug-adapter`
-  for either; the `Editors/` folder's `README.md` says how to set it up.
+  serves the others; the debugger's pause stops every request until it goes on. A breakpoint's condition stops only
+  the requests it names, `request.path == "/cart"`, read without running the page's code. VS Code starts `wasp
+  --debug-adapter` for either; the `Editors/` folder's `README.md` says how to set it up.
 
 ---
 
@@ -1172,9 +1173,8 @@ These are not there yet, and are planned or being designed:
 
 - **Sessions**: a page keeps what it must remember between a browser's requests in cookies
   ([section 9](#cookies)), or in a database of its own.
-- **A breakpoint's condition**: a breakpoint stops every request that reaches it, whatever its condition
-  ([section 15](#15-while-you-work)); and a site served under IIS or through FastCGI is not debugged, only one served for
-  the debugger.
+- **Debugging a site under IIS or FastCGI**: a site is debugged only as the debugger serves it
+  ([section 15](#15-while-you-work)).
 - **A standalone server**, without IIS, nginx or Apache, is planned. WASP has been tried on Windows, through IIS's
   ASP.NET Core Module, and through FastCGI behind nginx and Apache httpd; Linux is built and tested, but no site has
   been served on it yet.

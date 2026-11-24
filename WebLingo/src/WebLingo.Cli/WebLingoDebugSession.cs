@@ -98,7 +98,7 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
                         _protocol.Respond(id, command, new
                         {
                             supportsConfigurationDoneRequest = true, supportsTerminateRequest = true,
-                            supportsSingleThreadExecutionRequests = true
+                            supportsSingleThreadExecutionRequests = true, supportsConditionalBreakpoints = true
                         });
                         break;
                     case "launch":
@@ -315,15 +315,21 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
         return (file, text.GetLocation(offset).Line, offset);
     }
 
-    /// <summary>The breakpoints a module just loaded makes verified, each told to the client.</summary>
+    /// <summary>
+    /// The breakpoints a module just loaded makes verified, each told to the client; and one whose line it makes known but
+    /// whose condition does not fit the line's scope, told why, once.
+    /// </summary>
     private void VerifyBreakpoints()
     {
         foreach (var (path, entries) in _breakpoints)
         {
             foreach (var point in entries)
             {
-                if (point.Verified || !CanBreak(path, point)) continue;
-                point.Verified = true;
+                if (point.Verified) continue;
+                var why = Why(path, point);
+                if (why is null) point.Verified = true;
+                else if (why == point.Told) continue;
+                point.Told = why;
                 SendEvent("breakpoint", new { reason = "changed", breakpoint = Report(point) });
             }
         }
@@ -341,9 +347,16 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
             {
                 var line = Number(request, "line", -1);
                 if (!_oneBasedLines && line is >= 0 and < int.MaxValue) line++;
-                var allowed = Text(request, "condition") is null && Text(request, "hitCondition") is null && Text(request, "logMessage") is null;
+                var allowed = Text(request, "hitCondition") is null && Text(request, "logMessage") is null;
                 var point = new Breakpoint(++_nextBreakpoint, line, allowed);
-                point.Verified = CanBreak(path, point);
+                // A condition read where it is set, its syntax and what it holds checked now, its names once its line's scope is known.
+                if (Text(request, "condition") is { } condition && condition.Trim().Length > 0)
+                {
+                    WebLingoDebugCondition.TryRead(condition, out var read, out var names, out var wrong);
+                    (point.Condition, point.Names, point.ConditionError) = (read, names, wrong);
+                }
+                point.Told = Why(path, point);
+                point.Verified = point.Told is null;
                 next.Add(point);
             }
         }
@@ -351,13 +364,28 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
         return next.Select(Report).ToArray();
     }
 
-    private bool CanBreak(string path, Breakpoint point) =>
-        point.Allowed && _files.TryGetValue(path, out var file) && file.Executable.Contains(point.Line);
+    /// <summary>
+    /// Why a breakpoint cannot be verified yet, or null where it can: a kind the debugger does not support, its condition's
+    /// error, its line no statement's, or a name its condition reads that is not in scope on its line (section 5.7, part 3).
+    /// </summary>
+    private string? Why(string path, Breakpoint point)
+    {
+        if (!point.Allowed) return "Only line breakpoints, and their conditions, are supported.";
+        if (point.ConditionError is { } error) return error;
+        if (!_files.TryGetValue(path, out var file) || !file.Executable.Contains(point.Line)) return "No executable statement on this line.";
+        if (point.Names is null) return null;
+        file.Names.TryGetValue(point.Line, out var visible);
+        foreach (var name in point.Names)
+        {
+            if (visible is null || !visible.Contains(name)) return $"The condition reads '{name}', which is not in scope on this line.";
+        }
+        return null;
+    }
 
     private object Report(Breakpoint point) => new
     {
         id = point.Id, verified = point.Verified, line = ClientLine(Math.Max(1, point.Line)),
-        message = point.Verified ? null : point.Allowed ? "No executable statement on this line." : "Only line breakpoints are supported."
+        message = point.Verified ? null : point.Told
     };
 
     private object StackTrace(JsonElement arguments)
@@ -428,11 +456,22 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
     internal sealed record SourceFile(string Path, WebLingoSourceText Text)
     {
         public HashSet<int> Executable { get; } = [];
+        /// <summary>The names in scope at each line's statements, as the Variables view shows them, which a condition may read.</summary>
+        public Dictionary<int, HashSet<string>> Names { get; } = [];
         /// <summary>The texts of it, each compilation's own, known to be the text it was opened with.</summary>
         public HashSet<WebLingoSourceText> Known { get; } = new(ReferenceEqualityComparer.Instance);
     }
 
-    private sealed record Breakpoint(int Id, int Line, bool Allowed) { public bool Verified { get; set; } }
+    private sealed record Breakpoint(int Id, int Line, bool Allowed)
+    {
+        public bool Verified { get; set; }
+        /// <summary>Why it is not verified, as last told to the client.</summary>
+        public string? Told { get; set; }
+        /// <summary>Its condition, read where it was set, the names it reads, or why it cannot be one (section 5.7, part 3).</summary>
+        public WebLingoDebugExpression? Condition { get; set; }
+        public HashSet<string>? Names { get; set; }
+        public string? ConditionError { get; set; }
+    }
 
     /// <summary>
     /// A thread of the debugger's: the program a launch runs, whose stops wait on its own thread until the debugger goes on;
@@ -447,6 +486,7 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
         private Step _step;
         private int _stepDepth;
         private int? _hit;
+        private string? _why;
         private WebLingoDebugPoint? _last;
         private int _lastLine;
         private int _stops;
@@ -493,10 +533,20 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
                 if (_points.ContainsKey((info.Source, span.Start)) || session.Where(Locate, info.Source, span.Start) is not var (file, line, _)) continue;
                 _points[(info.Source, span.Start)] = (file, line);
                 file.Executable.Add(line);
+                // The names a condition on this line may read: those in scope at its statements.
+                if (!file.Names.TryGetValue(line, out var names)) file.Names[line] = names = new(StringComparer.Ordinal);
+                foreach (var capture in info.Captures)
+                {
+                    if (capture.Length > 0) names.Add(capture);
+                }
+                foreach (var local in info.Locals)
+                {
+                    if (span.Start >= local.VisibleFrom && span.Start < local.VisibleUntil) names.Add(local.Name);
+                }
             }
         }
 
-        public bool ShouldStop(WebLingoDebugPoint point)
+        public bool ShouldStop(WebLingoDebugPoint point, IWebLingoDebugScope scope)
         {
             lock (session._gate)
             {
@@ -506,8 +556,12 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
                 var fresh = _last is not { } prior || prior.Activation != point.Activation
                     || _lastLine != line || point.Instruction <= prior.Instruction;
                 (_last, _lastLine) = (point, line);
-                _hit = fresh && session._breakpoints.TryGetValue(source.Path, out var points)
-                    ? points.Find(candidate => candidate.Verified && candidate.Line == line)?.Id : null;
+                var hit = fresh && session._breakpoints.TryGetValue(source.Path, out var points)
+                    ? points.Find(candidate => candidate.Verified && candidate.Line == line) : null;
+                _why = null;
+                // A condition, tested where it stands: it stops where it holds, or where it fails, saying why (section 5.7, part 3).
+                if (hit?.Condition is { } condition && scope.TryTest(condition, out var holds, out _why) && !holds) hit = null;
+                _hit = hit?.Id;
                 Reason = session._entry ? "entry" : session._pause ? "pause" : _hit is not null ? "breakpoint"
                     : fresh && (_step == Step.In || (_step == Step.Over && point.Depth <= _stepDepth)
                         || (_step == Step.Out && point.Depth < _stepDepth)) ? "step" : "";
@@ -532,11 +586,24 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
                 (Frames, FirstFrame) = (frames, session._nextFrame + 1);
                 session._nextFrame += frames.Count;
                 Interlocked.Increment(ref _stops);
-                session.SendEvent("stopped", new
+                if (Reason == "breakpoint" && _why is { } why)
                 {
-                    reason = Reason, threadId = id, allThreadsStopped = scheduler is null,
-                    hitBreakpointIds = Reason == "breakpoint" && _hit is { } hit ? new[] { hit } : []
-                });
+                    // Its condition failed: it stops, saying why (the owner's answer, 24 November 2026, part 3's A2).
+                    session.SendEvent("output", new { category = "stderr", output = $"The breakpoint's condition failed: {why}\n" });
+                    session.SendEvent("stopped", new
+                    {
+                        reason = Reason, description = "Paused on a breakpoint whose condition failed", text = why, threadId = id,
+                        allThreadsStopped = scheduler is null, hitBreakpointIds = _hit is { } failed ? new[] { failed } : []
+                    });
+                }
+                else
+                {
+                    session.SendEvent("stopped", new
+                    {
+                        reason = Reason, threadId = id, allThreadsStopped = scheduler is null,
+                        hitBreakpointIds = Reason == "breakpoint" && _hit is { } hit ? new[] { hit } : []
+                    });
+                }
                 // A site's request waits as at an await, its worker free; the program waits here.
                 if (scheduler is not null) return false;
                 while (IsStopped && !session.Ignores) Monitor.Wait(session._gate);

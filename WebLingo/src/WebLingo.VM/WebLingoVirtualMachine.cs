@@ -268,7 +268,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
 
     private sealed class Execution(WebLingoCompiledModule module, WebLingoInstruction[] entryCode, WebLingoInstruction[][] codes,
         WebLingoValue[] constants, WebLingoMemberName[] names, IWebLingoBuiltinFunction[] builtins, WebLingoExecutionContext context, WebLingoHeap heap)
-        : IWebLingoRootSource
+        : IWebLingoRootSource, IWebLingoDebugScope
     {
         /// <summary>
         /// The depth of the frame that runs, which <c>Run</c> writes where its own changes, and below which every frame of
@@ -1524,7 +1524,10 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             }
             if (frame.Function.DebugInfo is not { } info || !info.Points.TryGetValue(pc, out var span)) return false;
             if (frame.DebugActivation == 0) frame.DebugActivation = ++_debugActivation;
-            if (!debugger.ShouldStop(new(info.Source, span, depth, frame.DebugActivation, pc))) return false;
+            (_scopeFrame, _scopeInfo, _scopeOffset) = (frame, info, span.Start);
+            var stops = debugger.ShouldStop(new(info.Source, span, depth, frame.DebugActivation, pc), this);
+            (_scopeFrame, _scopeInfo) = (null, null);
+            if (!stops) return false;
 
             var stack = new List<WebLingoDebugFrame>();
             for (var level = depth; level >= 0; level--)
@@ -1588,6 +1591,14 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
 
         private IReadOnlyList<WebLingoDebugVariable> Inspect(Frame frame, WebLingoFunctionDebugInfo info, int offset)
         {
+            var variables = new List<WebLingoDebugVariable>();
+            foreach (var (name, value) in Visible(frame, info, offset)) variables.Add(DescribeVariable(name, value, expand: true));
+            return variables;
+        }
+
+        /// <summary>The variables a frame's code sees at an offset, its captures and its locals, a named import as its export.</summary>
+        private Dictionary<string, WebLingoValue> Visible(Frame frame, WebLingoFunctionDebugInfo info, int offset)
+        {
             var visible = new Dictionary<string, WebLingoValue>(StringComparer.Ordinal);
             for (var i = 0; i < info.Captures.Count && i < frame.Cells.Length; i++)
             {
@@ -1598,9 +1609,280 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 if (offset >= local.VisibleFrom && offset < local.VisibleUntil && (uint)local.Register < (uint)frame.Function.LocalCount)
                     visible[local.Name] = DebugLocalValue(frame.Registers[local.Register], local.ExportName);
             }
-            var variables = new List<WebLingoDebugVariable>();
-            foreach (var (name, value) in visible) variables.Add(DescribeVariable(name, value, expand: true));
-            return variables;
+            return visible;
+        }
+
+        /// <summary>The frame, and the offset in it, a debugger's <see cref="TryTest"/> reads its variables in, while it decides whether to stop.</summary>
+        private Frame? _scopeFrame;
+        private WebLingoFunctionDebugInfo? _scopeInfo;
+        private int _scopeOffset;
+
+        /// <summary>
+        /// A breakpoint's condition, evaluated in the scope of the frame a debugger decides whether to stop in, without running
+        /// the program's code (section 5.7, "Debugging WASP pages, parts", part 3): true, with whether it holds, where it gives
+        /// a Boolean; false, with why, where it fails, or gives anything else. What it makes is kept from the collector while it
+        /// is evaluated.
+        /// </summary>
+        public bool TryTest(WebLingoDebugExpression condition, out bool holds, out string? why)
+        {
+            holds = false;
+            if (_scopeFrame is not { } frame || _scopeInfo is not { } info)
+            {
+                why = "There is no frame to evaluate the condition in.";
+                return false;
+            }
+            var kept = new List<WebLingoValue>();
+            heap.AddRoots(kept);
+            try
+            {
+                if (!TryEvaluate(condition, Visible(frame, info, _scopeOffset), kept, out var value, out why)) return false;
+                value = heap.Held(value);
+                if (value.Kind != WebLingoValueKind.Boolean)
+                {
+                    why = $"The condition gives {WebLingoValueFormatter.Describe(value, heap)}, not a Boolean.";
+                    return false;
+                }
+                holds = value.AsBoolean;
+                return true;
+            }
+            catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IndexOutOfRangeException)
+            {
+                why = "The condition cannot be evaluated: " + exception.Message;
+                return false;
+            }
+            finally
+            {
+                heap.RemoveLastRoots(kept);
+            }
+        }
+
+        private const string RunsCode = "a condition does not run the program's code";
+
+        /// <summary>One expression of a condition, its value kept in <paramref name="kept"/>; false, with why, where it fails.</summary>
+        private bool TryEvaluate(WebLingoDebugExpression expression, Dictionary<string, WebLingoValue> visible, List<WebLingoValue> kept,
+            out WebLingoValue value, out string? why)
+        {
+            value = WebLingoValue.Null;
+            why = null;
+            WebLingoRuntimeError? error = null;
+            switch (expression)
+            {
+                case WebLingoDebugExpression.Literal literal:
+                    switch (literal.Value)
+                    {
+                        case null: break;
+                        case bool flag: value = WebLingoValue.FromBoolean(flag); break;
+                        case long integer: value = WebLingoValue.FromInt64(integer); break;
+                        case double number: value = WebLingoValue.FromBinary64Bits(BitConverter.DoubleToInt64Bits(number)); break;
+                        case decimal exact:
+                            if (!heap.TryAllocateDecimal(exact, out value, out error)) return Failed(error, out why);
+                            break;
+                        case string text:
+                            if (!heap.TryAllocateString(text, out value, out error)) return Failed(error, out why);
+                            break;
+                    }
+                    break;
+                case WebLingoDebugExpression.Name name:
+                    if (!visible.TryGetValue(name.Identifier, out value))
+                    {
+                        why = $"'{name.Identifier}' is not in scope here.";
+                        return false;
+                    }
+                    if (value.Kind == WebLingoValueKind.Cell && !heap.TryReadCell(value, out value))
+                    {
+                        why = $"'{name.Identifier}' is read before it is set.";
+                        return false;
+                    }
+                    if (value.Kind == WebLingoValueKind.Missing)
+                    {
+                        why = $"'{name.Identifier}' has no value here.";
+                        return false;
+                    }
+                    break;
+                case WebLingoDebugExpression.Member member:
+                {
+                    if (!TryEvaluate(member.Target, visible, kept, out var target, out why)) return false;
+                    if (WebLingoMembers.TryGet(target, WebLingoMembers.Find(member.Identifier), member.Identifier, heap, member.Optional, out value, out error)) break;
+                    if (!ReferenceEquals(error, WebLingoMembers.Getter)) return Failed(error, out why);
+                    // A property's getter: a native class's, called, its built-in; one written in WebLingo, refused.
+                    if (!TryNative(value, out var getter))
+                    {
+                        why = $"'{member.Identifier}' of {WebLingoValueFormatter.Describe(target, heap)} is a property written in WebLingo, and {RunsCode}.";
+                        return false;
+                    }
+                    if (!TryInvoke(getter, [target], out value, out why)) return false;
+                    break;
+                }
+                case WebLingoDebugExpression.Index index:
+                {
+                    if (!TryEvaluate(index.Target, visible, kept, out var target, out why)) return false;
+                    if (!TryEvaluate(index.Key, visible, kept, out var key, out why)) return false;
+                    if (WebLingoMembers.TryGetIndex(target, key, heap, index.Optional, out value, out error)) break;
+                    if (!ReferenceEquals(error, WebLingoMembers.Getter)) return Failed(error, out why);
+                    if (!TryNative(value, out var getter))
+                    {
+                        why = $"The indexer of {WebLingoValueFormatter.Describe(target, heap)} is written in WebLingo, and {RunsCode}.";
+                        return false;
+                    }
+                    if (!TryInvoke(getter, [target, key], out value, out why)) return false;
+                    break;
+                }
+                case WebLingoDebugExpression.Call call:
+                {
+                    if (!TryEvaluate(call.Target, visible, kept, out var target, out why)) return false;
+                    if (call.Optional && target.Kind == WebLingoValueKind.Null) break;
+                    var member = WebLingoMembers.Find(call.Method);
+                    if (target.HasClass || !WebLingoDebugExpression.ReadsOnly(target.Kind, call.Method)
+                        || WebLingoMembers.TryGetValueMethod(target, member, call.Method, heap, out _))
+                    {
+                        why = $"'{call.Method}' of {WebLingoValueFormatter.Describe(target, heap)} is not a method of the built-in classes that only "
+                              + $"reads, a string's, an array's, a map's or a set's, and {RunsCode}.";
+                        return false;
+                    }
+                    var arguments = new WebLingoValue[call.Arguments.Count];
+                    for (var i = 0; i < arguments.Length; i++)
+                    {
+                        if (!TryEvaluate(call.Arguments[i], visible, kept, out arguments[i], out why)) return false;
+                        if (arguments[i].Kind is WebLingoValueKind.Function or WebLingoValueKind.Class)
+                        {
+                            why = $"'{call.Method}' is given {WebLingoValueFormatter.Describe(arguments[i], heap)}, which it would call, and {RunsCode}.";
+                            return false;
+                        }
+                    }
+                    if (!WebLingoMembers.TryCall(target, member, call.Method, arguments, 0, arguments.Length, heap, out value, out error)) return Failed(error, out why);
+                    break;
+                }
+                case WebLingoDebugExpression.Unary unary:
+                {
+                    if (!TryEvaluate(unary.Operand, visible, kept, out var operand, out why)) return false;
+                    var done = unary.Operator switch
+                    {
+                        WebLingoDebugOperator.Not => WebLingoOperators.TryNot(heap.Held(operand), out value, out error),
+                        WebLingoDebugOperator.Negate => WebLingoOperators.TryNegate(operand, heap, out value, out error),
+                        _ => WebLingoOperators.TryPlus(operand, heap, out value, out error)
+                    };
+                    if (!done) return Failed(error, out why);
+                    break;
+                }
+                case WebLingoDebugExpression.Binary { Operator: WebLingoDebugOperator.And or WebLingoDebugOperator.Or } logic:
+                {
+                    if (!TryEvaluate(logic.Left, visible, kept, out var left, out why) || !TryBoolean(left, logic.Operator, out var first, out why)) return false;
+                    if (first == (logic.Operator == WebLingoDebugOperator.Or))
+                    {
+                        value = WebLingoValue.FromBoolean(first);
+                        break;
+                    }
+                    if (!TryEvaluate(logic.Right, visible, kept, out var right, out why) || !TryBoolean(right, logic.Operator, out var second, out why)) return false;
+                    value = WebLingoValue.FromBoolean(second);
+                    break;
+                }
+                case WebLingoDebugExpression.Binary { Operator: WebLingoDebugOperator.Coalesce } coalesce:
+                    if (!TryEvaluate(coalesce.Left, visible, kept, out value, out why)) return false;
+                    if (value.Kind == WebLingoValueKind.Null && !TryEvaluate(coalesce.Right, visible, kept, out value, out why)) return false;
+                    break;
+                case WebLingoDebugExpression.Binary binary:
+                {
+                    if (!TryEvaluate(binary.Left, visible, kept, out var left, out why) || !TryEvaluate(binary.Right, visible, kept, out var right, out why)) return false;
+                    if (OperatorNameOf(binary.Operator) is { } operatorName && WebLingoMembers.TryFindOperator(operatorName, left, right, heap, out _))
+                    {
+                        why = $"'{operatorName["operator".Length..]}' on {WebLingoValueFormatter.Describe(left, heap)} and {WebLingoValueFormatter.Describe(right, heap)} "
+                              + $"is a class's operator, written in WebLingo, and {RunsCode}.";
+                        return false;
+                    }
+                    var done = binary.Operator switch
+                    {
+                        WebLingoDebugOperator.Add => WebLingoOperators.TryBinary(WebLingoArithmeticOperator.Add, heap.Held(left), heap.Held(right), heap, out value, out error),
+                        WebLingoDebugOperator.Subtract => WebLingoOperators.TryBinary(WebLingoArithmeticOperator.Subtract, heap.Held(left), heap.Held(right), heap, out value, out error),
+                        WebLingoDebugOperator.Multiply => WebLingoOperators.TryBinary(WebLingoArithmeticOperator.Multiply, heap.Held(left), heap.Held(right), heap, out value, out error),
+                        WebLingoDebugOperator.Divide => WebLingoOperators.TryBinary(WebLingoArithmeticOperator.Divide, heap.Held(left), heap.Held(right), heap, out value, out error),
+                        WebLingoDebugOperator.Remainder => WebLingoOperators.TryBinary(WebLingoArithmeticOperator.Remainder, heap.Held(left), heap.Held(right), heap, out value, out error),
+                        WebLingoDebugOperator.IntegerDivide => WebLingoOperators.TryBinary(WebLingoArithmeticOperator.IntegerDivide, heap.Held(left), heap.Held(right), heap, out value, out error),
+                        WebLingoDebugOperator.Equal => WebLingoOperators.TryCompare(WebLingoComparisonOperator.Equal, left, right, heap, out value, out error),
+                        WebLingoDebugOperator.NotEqual => WebLingoOperators.TryCompare(WebLingoComparisonOperator.NotEqual, left, right, heap, out value, out error),
+                        WebLingoDebugOperator.Less => WebLingoOperators.TryCompare(WebLingoComparisonOperator.Less, left, right, heap, out value, out error),
+                        WebLingoDebugOperator.LessOrEqual => WebLingoOperators.TryCompare(WebLingoComparisonOperator.LessOrEqual, left, right, heap, out value, out error),
+                        WebLingoDebugOperator.Greater => WebLingoOperators.TryCompare(WebLingoComparisonOperator.Greater, left, right, heap, out value, out error),
+                        _ => WebLingoOperators.TryCompare(WebLingoComparisonOperator.GreaterOrEqual, left, right, heap, out value, out error)
+                    };
+                    if (!done) return Failed(error, out why);
+                    break;
+                }
+                case WebLingoDebugExpression.Conditional conditional:
+                {
+                    if (!TryEvaluate(conditional.Test, visible, kept, out var test, out why)) return false;
+                    test = heap.Held(test);
+                    if (test.Kind != WebLingoValueKind.Boolean)
+                    {
+                        why = $"'?' chooses by a Boolean, not {WebLingoValueFormatter.Describe(test, heap)}.";
+                        return false;
+                    }
+                    if (!TryEvaluate(test.AsBoolean ? conditional.WhenTrue : conditional.WhenFalse, visible, kept, out value, out why)) return false;
+                    break;
+                }
+                default:
+                    why = $"The condition holds what a condition cannot: {RunsCode}.";
+                    return false;
+            }
+            kept.Add(value);
+            return true;
+        }
+
+        private static bool Failed(WebLingoRuntimeError? error, out string? why)
+        {
+            why = error is null ? "The condition cannot be evaluated." : $"{error.Message} ({error.Code})";
+            return false;
+        }
+
+        private bool TryBoolean(WebLingoValue value, WebLingoDebugOperator logic, out bool flag, out string? why)
+        {
+            value = heap.Held(value);
+            (flag, why) = (value.Kind == WebLingoValueKind.Boolean && value.AsBoolean, null);
+            if (value.Kind == WebLingoValueKind.Boolean) return true;
+            why = $"'{(logic == WebLingoDebugOperator.And ? "&&" : "||")}' takes Booleans, not {WebLingoValueFormatter.Describe(value, heap)}.";
+            return false;
+        }
+
+        /// <summary>The name a class's operator for an arithmetic operator or an ordering has; null for equality, which has none.</summary>
+        private static string? OperatorNameOf(WebLingoDebugOperator op) => op switch
+        {
+            WebLingoDebugOperator.Add => "operator+",
+            WebLingoDebugOperator.Subtract => "operator-",
+            WebLingoDebugOperator.Multiply => "operator*",
+            WebLingoDebugOperator.Divide => "operator/",
+            WebLingoDebugOperator.Remainder => "operator%",
+            WebLingoDebugOperator.IntegerDivide => "operator\\",
+            WebLingoDebugOperator.Less => "operator<",
+            WebLingoDebugOperator.LessOrEqual => "operator<=",
+            WebLingoDebugOperator.Greater => "operator>",
+            WebLingoDebugOperator.GreaterOrEqual => "operator>=",
+            _ => null
+        };
+
+        /// <summary>Whether a function is a native member that only calls its built-in, that built-in; false for one written in WebLingo.</summary>
+        private bool TryNative(WebLingoValue function, out IWebLingoBuiltinFunction builtin)
+        {
+            builtin = null!;
+            if (function.Kind != WebLingoValueKind.Function) return false;
+            var called = module.Functions[heap.GetClosure(function).Function];
+            if (called.NativeBuiltin < 0 || called.NativeResult != WebLingoNativeResult.Result) return false;
+            builtin = builtins[called.NativeBuiltin];
+            return true;
+        }
+
+        private bool TryInvoke(IWebLingoBuiltinFunction builtin, WebLingoValue[] arguments, out WebLingoValue value, out string? why)
+        {
+            why = null;
+            try
+            {
+                if (builtin.TryInvoke(arguments, heap, out value, out var error)) return true;
+                return Failed(error, out why);
+            }
+            catch (Exception exception)
+            {
+                value = WebLingoValue.Null;
+                why = $"'{builtin.Name}' failed: {exception.Message}";
+                return false;
+            }
         }
 
         private WebLingoValue DebugLocalValue(WebLingoValue value, string? exportName)

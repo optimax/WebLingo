@@ -33,7 +33,12 @@ scheduler host; a script's and a page's stops still block their own thread. The 
 `DebuggedRequestTests` (`WebLingo.Hosting.Tests`), `WaspDebugTests.ASiteStopsOnlyTheRequestAtABreakpoint`. The VS Code
 extension, 0.4.0, has "Debug WASP Site"; it was not tried in VS Code itself. The benchmark against `main`, 12 rounds alternating: no workload slower by the rank test; the resumption first written inside the dispatch loop made `closures` 9 percent slower, so it is in `Run`'s prologue.
 
-Part 3 (conditional breakpoints) is next; part 4 waits for its Q1, which client to try.
+Part 3, conditional breakpoints, is built: the session reads a condition where it is set
+(`WebLingo/src/WebLingo.Cli/WebLingoDebugCondition.cs`) into `WebLingoDebugExpression` (`WebLingo.VM`), checks its
+names against its line's scope once the file is compiled, and the VM evaluates it at each visit (`TryTest`, outside
+`Run`), never running the program's code: the built-in classes' read-only methods of strings, arrays, maps and sets,
+and native properties, allowed. Tested by `DebugAdapterTests.ABreakpointsConditionStopsOnlyWhereItHolds` and
+`WaspDebugTests.AConditionStopsOnlyTheRequestsItNames`. Part 4 waits for Visual Studio installed here.
 
 ## Windows local installation
 
@@ -213,8 +218,7 @@ splits the task in three. Part 1, cookies, is built: `request.cookies`, `respons
 WebLingo in `Response.wlg`), tested by `CookieTests` and `AspNetCoreTests.CookiesAreReadAndEachIsSetByAHeaderOfItsOwn`.
 Part 2, sessions in memory, waits for its Q1 in `TO-DO.md`: whether a session's arrays and maps are its own or copies.
 
-Next: "Debugging WASP Pages, Part 3: Conditional Breakpoints", answered; "Sessions in WASP, Part 2" waits for its Q1,
-and part 3 for part 2; debugging's part 4 waits for Visual Studio installed here, as "Visual Studio Debug Adapter" does,
-and "Extensive WASP Example" for sessions.
+Next: "Sessions in WASP, Part 2" waits for its Q1, and part 3 for part 2; debugging's part 4 waits for Visual Studio
+installed here, as "Visual Studio Debug Adapter" does, and "Extensive WASP Example" for sessions.
 
-The last full suite, on Windows, in Release: 3,481 tests passing. Linux not tried since the last push.
+The last full suite, on Windows, in Release: 3,483 tests passing. Linux not tried since the last push.

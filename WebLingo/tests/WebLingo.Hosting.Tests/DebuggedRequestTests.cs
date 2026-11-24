@@ -109,7 +109,7 @@ public sealed class DebuggedRequestTests
 
         public void ModuleLoaded(WebLingoCompiledModule module) { }
 
-        public bool ShouldStop(WebLingoDebugPoint point)
+        public bool ShouldStop(WebLingoDebugPoint point, IWebLingoDebugScope scope)
         {
             if (Stops > 0) return false;
             var (text, offset) = locate(point.Source, point.Span.Start);

@@ -122,6 +122,35 @@ public sealed class WaspDebugTests : IDisposable
         await dap.Request("disconnect");
     }
 
+    /// <summary>
+    /// A breakpoint's condition in a site (section 5.7, "Debugging WASP pages, parts", part 3): in code every page shares,
+    /// it stops only the requests it names, a native class's property, <c>request.path</c>, read without running a page's code.
+    /// </summary>
+    [Fact]
+    public async Task AConditionStopsOnlyTheRequestsItNames()
+    {
+        var shared = Write("shared.wasp", "<% var seen = request.path; %>\n<p><%= seen %></p>\n");
+        Write("a.wasp", "<% param request; %>\n<% include \"/shared.wasp\"; %>\n");
+        Write("b.wasp", "<% param request; %>\n<% include \"/shared.wasp\"; %>\n");
+
+        await using var dap = new DebugAdapterSession("wasp");
+        await dap.Serve(_root);
+        await dap.Request("setBreakpoints", new { source = new { path = shared }, breakpoints = new[] { new { line = 2, condition = "request.path == \"/b\"" } } });
+        await dap.Request("configurationDone");
+        using var client = new HttpClient { BaseAddress = new Uri(await Address(dap)), Timeout = TimeSpan.FromSeconds(30) };
+
+        Assert.Equal("<p>/a</p>", (await client.GetStringAsync("/a")).Trim());
+        var named = client.GetStringAsync("/b");
+        var stopped = await dap.Event("stopped");
+        var thread = stopped.GetProperty("threadId").GetInt32();
+        var frame = (await dap.Frames(thread))[0];
+        AssertFrame(frame, shared, 2);
+        Assert.Equal("\"/b\"", (await dap.Locals(frame))["seen"]);
+        await dap.Request("continue", new { threadId = thread });
+        Assert.Equal("<p>/b</p>", (await named).Trim());
+        await dap.Request("disconnect");
+    }
+
     /// <summary>Where the site is served, as the adapter says it first.</summary>
     private static async Task<string> Address(DebugAdapterSession dap)
     {

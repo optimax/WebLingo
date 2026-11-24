@@ -81,7 +81,7 @@ public sealed class DebuggerStopTests
 
         public void ModuleLoaded(WebLingoCompiledModule module) { }
 
-        public bool ShouldStop(WebLingoDebugPoint point) => point.Span.Start == start;
+        public bool ShouldStop(WebLingoDebugPoint point, IWebLingoDebugScope scope) => point.Span.Start == start;
 
         public bool Stopped(IReadOnlyList<WebLingoDebugFrame> frames)
         {

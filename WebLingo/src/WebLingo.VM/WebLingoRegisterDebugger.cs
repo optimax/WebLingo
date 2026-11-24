@@ -7,7 +7,12 @@ namespace WebLingo.VM;
 public interface IWebLingoRegisterDebugger
 {
     void ModuleLoaded(WebLingoCompiledModule module);
-    bool ShouldStop(WebLingoDebugPoint point);
+
+    /// <summary>
+    /// Whether it stops at a point, a statement's first instruction: <paramref name="scope"/> the frame's, in which a
+    /// breakpoint's condition is tested (section 5.7, "Debugging WASP pages, parts", part 3).
+    /// </summary>
+    bool ShouldStop(WebLingoDebugPoint point, IWebLingoDebugScope scope);
 
     /// <summary>
     /// Stopped where <see cref="ShouldStop"/> said, its frames given: true once the program may go on, the debugger having

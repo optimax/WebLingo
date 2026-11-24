@@ -158,4 +158,14 @@ number, `GET /cart #12`. A request that reaches a breakpoint stops alone: the si
 browser waits for its response until the request goes on. Stepping and **Continue** act on the request selected. The
 debugger's **Pause** stops every request at its next statement, those that come after it too, until **Continue**. A
 page changed while the site is served is reloaded, as under `wasp serve`, and its breakpoints are verified once it is
-next requested. Breakpoints' conditions are not supported yet.
+next requested.
+
+### A breakpoint's condition
+
+A breakpoint may have a condition (**Edit Condition** on its marker), for scripts, pages and sites alike: it stops only
+where the condition is `true`, `request.path == "/cart"` in a site's shared code, or `name.startsWith("A") && i > 0` in
+a loop. A condition reads without running the program's code: names, literals, members, indexing, operators, and the
+methods of strings, arrays, maps and sets that only read, `startsWith`, `contains`, `indexOf`, `has` and the like; a
+property or a method written in WebLingo, an assignment or a call of a function cannot be in one. A condition that cannot
+be one, or that reads a name not in scope on its line, leaves its breakpoint unverified, its marker saying why; one
+that fails as it runs, or gives anything but a Boolean, stops there, the **Debug Console** saying why.

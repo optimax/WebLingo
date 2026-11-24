@@ -166,6 +166,71 @@ public sealed class DebugAdapterTests : IDisposable
         await dap.Request("disconnect");
     }
 
+    /// <summary>
+    /// Conditional breakpoints (specification, section 5.7, "Debugging WASP pages, parts", part 3): a condition stops only
+    /// where it gives true, read without running the program's code, the built-in classes' methods that only read allowed;
+    /// one that fails stops, saying why; and one that cannot be a condition, or reads a name not in scope on its line, leaves
+    /// the breakpoint unverified, saying why, before the program runs.
+    /// </summary>
+    [Fact]
+    public async Task ABreakpointsConditionStopsOnlyWhereItHolds()
+    {
+        var program = Write("loop.wlg", """
+            import { writeLn } from "std:console";
+            class Cup { constructor(size) { this.size = size; } property doubled { get { return this.size * 2; } } }
+            var names = ["Ann", "Bob", "Ava"];
+            var total = 0;
+            for (var i = 0; i < names.length; i++) {
+                var name = names[i];
+                total = total + i;
+            }
+            var cup = new Cup(3);
+            writeLn(total);
+            """);
+
+        await using var dap = new DebugAdapterSession();
+        await dap.Start(program);
+        var set = (await dap.Request("setBreakpoints", new
+        {
+            source = new { path = program },
+            breakpoints = new object[]
+            {
+                new { line = 7, condition = "name.startsWith(\"A\") && i > 0" },
+                new { line = 10, condition = "cup.doubled == 6" },
+                new { line = 4, condition = "names.push(\"Eve\")" },
+                new { line = 4, condition = "i ==" },
+                new { line = 10, condition = "nothing == 1" }
+            }
+        })).GetProperty("breakpoints");
+        // What cannot be a condition is refused where it is set, before the program runs.
+        Assert.False(set[2].GetProperty("verified").GetBoolean());
+        Assert.Contains("does not run the program's code: 'push' is not such a method.", set[2].GetProperty("message").GetString());
+        Assert.StartsWith("The condition does not parse:", set[3].GetProperty("message").GetString());
+        await dap.Request("configurationDone");
+
+        // Once the program is compiled, a name not in scope on its line is refused too.
+        var changes = new List<JsonElement>();
+        for (var i = 0; i < 3; i++) changes.Add((await dap.Event("breakpoint")).GetProperty("breakpoint"));
+        var unknown = Assert.Single(changes, change => change.GetProperty("id").GetInt32() == set[4].GetProperty("id").GetInt32());
+        Assert.Equal((false, "The condition reads 'nothing', which is not in scope on this line."),
+            (unknown.GetProperty("verified").GetBoolean(), unknown.GetProperty("message").GetString()));
+
+        // It stops only where it holds: at Ava, not at Ann (i is 0) nor at Bob.
+        Assert.Equal("breakpoint", (await dap.Event("stopped")).GetProperty("reason").GetString());
+        var locals = await dap.Locals((await dap.Frames())[0]);
+        Assert.Equal(("\"Ava\"", "2"), (locals["name"], locals["i"]));
+
+        // A property written in WebLingo is not run: the condition fails, and the breakpoint stops, saying why.
+        await dap.Request("continue", new { threadId = 1 });
+        var failed = await dap.Event("stopped");
+        Assert.Equal("breakpoint", failed.GetProperty("reason").GetString());
+        Assert.Contains("is a property written in WebLingo, and a condition does not run the program's code.", failed.GetProperty("text").GetString());
+        AssertFrame((await dap.Frames())[0], "main", program, 10);
+        await dap.Request("continue", new { threadId = 1 });
+        Assert.Equal(0, (await dap.Event("exited")).GetProperty("exitCode").GetInt32());
+        await dap.Request("disconnect");
+    }
+
     private string Write(string name, string source)
     {
         var file = Path.Combine(_folder, name);
