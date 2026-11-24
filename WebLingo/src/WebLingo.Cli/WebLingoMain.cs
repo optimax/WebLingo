@@ -23,5 +23,16 @@ public static class WebLingoMain
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int RunDebugAdapter() =>
-        new WebLingoDebugSession(Console.OpenStandardInput(), Console.OpenStandardOutput()).Run();
+        WebLingoDebugAdapter.Run(_ => WebLingoCommandLine.Scripts, Console.OpenStandardInput(), Console.OpenStandardOutput());
+}
+
+/// <summary>
+/// The debug adapter (specification, section 5.7): <c>weblingo --debug-adapter</c>'s, a script's, and
+/// <c>wasp --debug-adapter</c>'s, a page's, speaking the Debug Adapter Protocol on <paramref name="input"/> and
+/// <paramref name="output"/>, the program it runs given its root by <paramref name="programFor"/>.
+/// </summary>
+public static class WebLingoDebugAdapter
+{
+    public static int Run(Func<string?, WebLingoCommandLineProgram> programFor, Stream input, Stream output) =>
+        new WebLingoDebugSession(input, output, programFor).Run();
 }

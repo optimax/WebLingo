@@ -731,6 +731,53 @@ to the account that opened the launcher. The installed `VSCode\WebLingo.vsix` al
 On 20 November 2026, the owner requested a matching uninstall script. The installed runtime and release ZIP provide
 `Uninstall WebLingo.bat` to undo setup's machine installation and the initiating account's optional integrations.
 
+**Debugging WASP pages** (the owner's answers, 23 November 2026, "Debugging WASP Pages"): a WASP debugging session runs
+one page, as `wasp run page.wasp` runs it, its parameters from its launch settings, with no request, or the site, as
+`wasp serve` serves it, a breakpoint stopping the request a browser sent, both, as two launch configurations (A1 (c)).
+Under `wasp serve`, a request that reaches a breakpoint alone stops, each request a thread of the debugger's, named by
+its method, its path and its number, `GET /cart #12`, the others going on, its worker running them meanwhile, the
+stopped request waiting as at an `await`; the debugger's pause, given no thread, pauses every request, for a snapshot; a
+breakpoint's condition, as the Debug Adapter Protocol gives it, lets a breakpoint in shared code stop only the requests it
+names; and a request stopped by the debugger is kept from WASP's own timeouts, `"sendTimeout"`'s among them, while it is
+stopped (A2 (a)). Debugged in VS Code here, in Visual Studio through the task "Visual Studio Debug Adapter", which then
+debugs pages as it debugs scripts; the adapter's launch settings for pages kept to the Debug Adapter Protocol's own,
+documented, with nothing only VS Code's extension gives, so that any client launches them; and pages' debugging tried
+once, besides VS Code, through a client of another kind, without an extension of its own, Visual Studio's
+`DebugAdapterHost.Launch` or nvim-dap, so that nothing VS Code alone does is relied on (A3 (a)).
+
+**Debugging WASP pages, parts** (Proposed, 24 November 2026), each a task of its own in `TO-DO.md`, landed in this order:
+
+1. **A page under the debugger.** `wasp --debug-adapter`, speaking the Debug Adapter Protocol on its standard streams,
+   sharing `weblingo`'s session; a launch configuration for one page, run as `wasp run` runs it, with its parameters and
+   no request; the template compiler compiling for a debugger, each statement point and local of a page, and of its
+   includes, layouts and components, located in its own file, as `WebLingoTemplateFiles` locates a diagnostic; line
+   breakpoints in `.wasp` and `.wlg` files, stepping, the call stack and local variables, as a script has them; and VS
+   Code's extension's debugger `wasp`.
+2. **A site under the debugger.** A launch configuration that serves the site as `wasp serve` does, on Kestrel; each
+   request a thread, `GET /cart #12`; a stop that suspends only its request, the VM leaving its dispatch method at the
+   breakpoint as at an `await`, and resumed by the debugger, its worker serving the others; the debugger's pause, given
+   no thread, pausing every request; and a stopped request kept from WASP's timeouts.
+3. **Conditional breakpoints.** The protocol's `condition`, an expression of WebLingo's evaluated in the stopped
+   frame's scope, for scripts, pages and sites alike, a breakpoint stopping only where it gives `true`.
+4. **Another client.** The launch settings documented, the protocol's own, and pages' debugging tried through a client
+   without an extension of its own, nvim-dap or Visual Studio's `DebugAdapterHost.Launch`.
+
+**A page under the debugger, as built** (part 1, 24 November 2026; Proposed where it says more than part 1 above):
+`wasp --debug-adapter` runs `weblingo`'s session, `WebLingoDebugSession`, given the command line's program
+(`WebLingoDebugAdapter.Run`), `wasp`'s for a page, as `wasp run` has it. A launch's `program` is a `.wasp` page; `root`
+the application's root, from which `/` is found, the page's folder by default, as `wasp run --root` gives it, and a
+script's launch refused one; and `cwd`, `args`, each `name=value`, a string, and `stopOnEntry` as a script's. The page
+is compiled as `wasp run` compiles it, for a debugger, and run on the register VM with its components' loader; a point,
+a statement's first instruction, is located in its own file through the compilation's own `Locate`, as a diagnostic is,
+so that a breakpoint in the page, an include, a layout, a component or a module it imports is verified against that
+file's points, a component's once it is first rendered, and a stop names that file and its line. A line of a page's
+text, which writes it, has a point, as a block's statement has. A page's code under a layout runs as its body, an
+anonymous function, which the call stack names `function`, and a component's top level is named by its path. VS Code's
+extension has a debugger of its own, `wasp`, for `.wasp` files, its executable `wasp` on the PATH, or the one the
+setting `weblingo.waspDebuggerPath` names; a page debugged without a `launch.json` is given, as its root, the nearest
+folder above it, within its workspace folder, that holds a `wasp.config` or a `web.config`, and the page's own folder
+where none does.
+
 ## 6. Hosting architecture (WL-H001–WL-H014)
 
 ### 6.1 Approved hosting decisions

@@ -107,3 +107,31 @@ Use a `.vscode/launch.json` configuration to pass script parameters or choose a 
 With no `cwd`, the debugger uses the script's folder. Breakpoints are verified when the source is compiled.
 The debugger shows the active frames of asynchronous code and previews the first 32 entries of a collection.
 Debug Console input does not supply standard input to the script.
+
+### Debug a WASP page
+
+The extension debugs a `.wasp` page as `wasp run` runs it, with `wasp --debug-adapter`: put `wasp` on PATH, as
+`build.bat` and the installer do, or set **WebLingo: Wasp Debugger Path** (`weblingo.waspDebuggerPath`) to the
+executable's full path. A Release build puts it in `WebLingo/src/WebLingo.Wasp.Cli/bin/Release/net10.0/`.
+
+Open the page and press **F5**, choosing **WASP** if VS Code asks for a debugger. Breakpoints may stand in the page and
+in the files it is made of: its includes, its layout, its components and the `.wlg` modules it imports, each stopping
+at its own line; a line of the page's text, which writes it, is a statement too. Without a `launch.json`, the page's
+site, from which a path that starts with `/` is found, is the nearest folder above it in the workspace that holds a
+`wasp.config` or a `web.config`, else the page's own folder. A launch configuration names it, and gives the page its
+parameters:
+
+```json
+{
+  "type": "wasp",
+  "request": "launch",
+  "name": "Debug WASP Page",
+  "program": "${workspaceFolder}/index.wasp",
+  "root": "${workspaceFolder}",
+  "args": ["name=Anna"],
+  "stopOnEntry": false
+}
+```
+
+The page runs with no request, as under `wasp run`; its output goes to the **Debug Console**. Debugging a site served
+by `wasp serve`, a request stopped where a browser sent it, is not there yet.

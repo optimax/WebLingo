@@ -1,13 +1,13 @@
 {
   "name": "weblingo",
   "displayName": "WebLingo",
-  "description": "Syntax highlighting for WebLingo and WASP, and source debugging for local WebLingo scripts.",
-  "version": "0.2.0",
+  "description": "Syntax highlighting for WebLingo and WASP, and source debugging for local WebLingo scripts and WASP pages.",
+  "version": "0.3.0",
   "publisher": "weblingo",
   "engines": { "vscode": "^1.80.0" },
   "categories": [ "Programming Languages", "Debuggers" ],
   "main": "./extension.js",
-  "activationEvents": [ "onDebugResolve:weblingo" ],
+  "activationEvents": [ "onDebugResolve:weblingo", "onDebugResolve:wasp" ],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
@@ -15,7 +15,7 @@
     }
   },
   "contributes": {
-    "breakpoints": [ { "language": "weblingo" } ],
+    "breakpoints": [ { "language": "weblingo" }, { "language": "wasp" } ],
     "configuration": {
       "title": "WebLingo",
       "properties": {
@@ -24,6 +24,12 @@
           "default": "weblingo",
           "scope": "machine",
           "description": "Path to a WebLingo executable that supports the debug adapter."
+        },
+        "weblingo.waspDebuggerPath": {
+          "type": "string",
+          "default": "wasp",
+          "scope": "machine",
+          "description": "Path to a WASP executable that supports the debug adapter."
         }
       }
     },
@@ -50,6 +56,31 @@
         },
         "initialConfigurations": [
           { "type": "weblingo", "request": "launch", "name": "Debug WebLingo Script", "program": "${file}" }
+        ]
+      },
+      {
+        "type": "wasp",
+        "label": "WASP",
+        "languages": [ "wasp" ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [ "program" ],
+            "properties": {
+              "program": { "type": "string", "description": "The local .wasp page to run.", "default": "${file}" },
+              "root": { "type": "string", "description": "The application's root folder. Defaults to the page's folder." },
+              "cwd": { "type": "string", "description": "Working directory for the page. Defaults to the page's folder." },
+              "args": {
+                "type": "array",
+                "items": { "type": "string" },
+                "default": [],
+                "description": "Page parameters as name=value strings."
+              },
+              "stopOnEntry": { "type": "boolean", "default": false, "description": "Pause before the first executable statement." }
+            }
+          }
+        },
+        "initialConfigurations": [
+          { "type": "wasp", "request": "launch", "name": "Debug WASP Page", "program": "${file}", "root": "${workspaceFolder}" }
         ]
       }
     ],

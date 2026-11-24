@@ -10,5 +10,6 @@
     <ProjectReference Include="../../src/WebLingo.VM/WebLingo.VM.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib/WebLingo.StdLib.csproj" />
     <Compile Include="../WebLingo.Conformance.Tests/SqlServerFactAttribute.cs" Link="SqlServerFactAttribute.cs" />
+    <Compile Include="../WebLingo.Conformance.Tests/DebugAdapterSession.cs" Link="DebugAdapterSession.cs" />
   </ItemGroup>
 </Project>

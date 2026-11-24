@@ -7,19 +7,23 @@ using WebLingo.Runtime;
 using WebLingo.VM;
 namespace WebLingo.Cli;
 
-/// <summary>One local launch. The request loop and the register VM run on separate threads.</summary>
-internal sealed class WebLingoDebugSession(Stream input, Stream output) : IWebLingoRegisterDebugger
+/// <summary>
+/// One local launch, of a script, <c>weblingo</c>'s, or of a page, <c>wasp</c>'s, as <paramref name="programFor"/> gives the
+/// program for a root (specification, section 5.7). The request loop and the register VM run on separate threads. A position
+/// of the program is located in its file by the compilation (<see cref="SetSources"/>), a page's include's in the include.
+/// </summary>
+internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<string?, WebLingoCommandLineProgram> programFor)
+    : IWebLingoRegisterDebugger
 {
     private const int ThreadId = 1;
     private static readonly StringComparer PathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
     private readonly WebLingoDebugProtocol _protocol = new(input, output);
     private readonly object _gate = new();
     private readonly Dictionary<string, SourceFile> _files = new(PathComparer);
-    private readonly Dictionary<string, SourceFile> _sources = new(StringComparer.Ordinal);
+    private readonly Dictionary<(string Source, int Start), (SourceFile File, int Line)> _points = [];
     private readonly Dictionary<string, List<Breakpoint>> _breakpoints = new(PathComparer);
     private readonly Dictionary<int, IReadOnlyList<WebLingoDebugVariable>> _variables = [];
-    private WebLingoSourceText? _main;
-    private IReadOnlyDictionary<string, WebLingoSourceText>? _imports;
+    private Func<string, int, (WebLingoSourceText Text, int Offset)>? _locate;
     private Action? _flushOutput;
     private LaunchSettings? _launch;
     private IReadOnlyList<WebLingoDebugFrame> _frames = [];
@@ -83,8 +87,8 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output) : IWebLi
                         _protocol.Respond(id, command, new { supportsConfigurationDoneRequest = true, supportsTerminateRequest = true });
                         break;
                     case "launch":
-                        if (_launch is not null) throw new ArgumentException("The session has already launched a script.");
-                        _launch = LaunchSettings.Read(arguments);
+                        if (_launch is not null) throw new ArgumentException("The session has already launched a program.");
+                        _launch = LaunchSettings.Read(arguments, programFor);
                         _entry = _launch.StopOnEntry;
                         _protocol.Respond(id, command);
                         _protocol.Event("initialized");
@@ -163,7 +167,7 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output) : IWebLi
             using var stdout = new DebugWriter(_protocol, "stdout");
             using var stderr = new DebugWriter(_protocol, "stderr");
             exit = WebLingoCommandThread.Run(
-                () => WebLingoCommandLine.RunDebugFile(launch.Program, launch.Arguments, stdout, stderr, this), background: true);
+                () => WebLingoCommandLine.RunDebugFile(launch.Runner, launch.Program, launch.Arguments, stdout, stderr, this), background: true);
         }
         catch (Exception failure)
         {
@@ -212,11 +216,25 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output) : IWebLi
         catch (IOException) { _disconnected = true; Cancel(); }
     }
 
-    public void SetSources(WebLingoSourceText main, IReadOnlyDictionary<string, WebLingoSourceText> imports, Action flushOutput)
+    /// <summary>
+    /// How a position of the program, its file's name as the compiler gives it and its offset there, is found in the file it
+    /// is in, its text and its offset in it, as a diagnostic is, a page's include's in the include; and how the output is
+    /// flushed before a stop is reported.
+    /// </summary>
+    public void SetSources(Func<string, int, (WebLingoSourceText Text, int Offset)> locate, Action flushOutput)
     {
-        _main = main;
-        _imports = imports;
+        _locate = locate;
         _flushOutput = flushOutput;
+    }
+
+    /// <summary>A position's file, opened once, by its full path, and its line there; null where it is in no file.</summary>
+    private (SourceFile File, int Line, int Offset)? Where(string source, int start)
+    {
+        if (_locate is not { } locate) return null;
+        var (text, offset) = locate(source, start);
+        var path = Path.GetFullPath(text.Name);
+        if (!_files.TryGetValue(path, out var file)) _files[path] = file = new(path, text);
+        return (file, text.GetLocation(offset).Line, offset);
     }
 
     public void ModuleLoaded(WebLingoCompiledModule module)
@@ -241,23 +259,11 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output) : IWebLi
     private void Record(WebLingoFunction function)
     {
         if (function.DebugInfo is not { } info) return;
-        if (!_sources.TryGetValue(info.Source, out var source))
-        {
-            var path = Path.GetFullPath(info.Source);
-            if (!_files.TryGetValue(path, out source))
-            {
-                var text = _main is { } main && PathComparer.Equals(info.Source, main.Name) ? main
-                    : _imports?.GetValueOrDefault(info.Source);
-                if (text is null) return;
-                _files[path] = source = new(path, text);
-            }
-            _sources.Add(info.Source, source);
-        }
         foreach (var span in info.Points.Values)
         {
-            if (!source.Lines.TryGetValue(span.Start, out var line))
-                source.Lines[span.Start] = line = source.Text.GetLocation(span.Start).Line;
-            source.Executable.Add(line);
+            if (_points.ContainsKey((info.Source, span.Start)) || Where(info.Source, span.Start) is not var (file, line, _)) continue;
+            _points[(info.Source, span.Start)] = (file, line);
+            file.Executable.Add(line);
         }
     }
 
@@ -266,8 +272,8 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output) : IWebLi
         lock (_gate)
         {
             if (_launch is null || _launch.NoDebug || Cancellation.IsCancellationRequested) return false;
-            if (!_sources.TryGetValue(point.Source, out var source) || !source.Lines.TryGetValue(point.Span.Start, out var line))
-                return false;
+            if (!_points.TryGetValue((point.Source, point.Span.Start), out var at)) return false;
+            var (source, line) = at;
             var fresh = _last is not { } prior || prior.Activation != point.Activation
                 || _lastLine != line || point.Instruction <= prior.Instruction;
             (_last, _lastLine) = (point, line);
@@ -337,9 +343,8 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output) : IWebLi
         for (var i = start; i < end; i++)
         {
             var frame = _frames[i];
-            var path = Path.GetFullPath(frame.Source);
-            if (!_files.TryGetValue(path, out var file)) continue;
-            var at = file.Text.GetLocation(frame.Span.Start);
+            if (Where(frame.Source, frame.Span.Start) is not var (file, _, offset)) continue;
+            var at = file.Text.GetLocation(offset);
             var column = at.Offset - file.Text.GetLineStart(at.Line) + (_oneBasedColumns ? 1 : 0);
             shown.Add(new
             {
@@ -389,19 +394,31 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output) : IWebLi
     private sealed record SourceFile(string Path, WebLingoSourceText Text)
     {
         public HashSet<int> Executable { get; } = [];
-        public Dictionary<int, int> Lines { get; } = [];
     }
     private sealed record Breakpoint(int Id, int Line, bool Allowed) { public bool Verified { get; set; } }
 
-    private sealed record LaunchSettings(string Program, string Directory, string[] Arguments, bool StopOnEntry, bool NoDebug)
+    /// <summary>
+    /// A launch's settings, the Debug Adapter Protocol's <c>noDebug</c> and the adapter's own: <c>program</c>, the script or
+    /// the page, from <c>cwd</c>, its working folder, the program's own by default; <c>args</c>, its parameters, each
+    /// <c>name=value</c>; <c>stopOnEntry</c>; and, for a page, <c>root</c>, the application's, the page's folder by default,
+    /// as <c>wasp run --root</c> gives it (specification, section 5.7).
+    /// </summary>
+    private sealed record LaunchSettings(WebLingoCommandLineProgram Runner, string Program, string Directory, string[] Arguments,
+        bool StopOnEntry, bool NoDebug)
     {
-        public static LaunchSettings Read(JsonElement message)
+        public static LaunchSettings Read(JsonElement message, Func<string?, WebLingoCommandLineProgram> programFor)
         {
-            var file = Text(message, "program") ?? throw new ArgumentException("Set program to a WebLingo .wlg script.");
+            var kind = programFor(null);
+            var what = kind.Extension == ".wasp" ? "WASP .wasp page" : "WebLingo .wlg script";
+            var file = Text(message, "program") ?? throw new ArgumentException($"Set program to a {what}.");
             var directory = Text(message, "cwd") is { } cwd ? Path.GetFullPath(cwd) : null;
             var program = directory is null ? Path.GetFullPath(file) : Path.GetFullPath(file, directory);
-            if (!program.EndsWith(".wlg", StringComparison.OrdinalIgnoreCase) || !File.Exists(program))
-                throw new ArgumentException($"'{program}' is not an existing .wlg script.");
+            if (!program.EndsWith(kind.Extension, StringComparison.OrdinalIgnoreCase) || !File.Exists(program))
+                throw new ArgumentException($"'{program}' is not an existing {what}.");
+            var root = Text(message, "root");
+            if (root is not null && kind.Extension != ".wasp") throw new ArgumentException("root is a page's setting, not a script's.");
+            root = root is null ? null : directory is null ? Path.GetFullPath(root) : Path.GetFullPath(root, directory);
+            if (root is not null && !System.IO.Directory.Exists(root)) throw new ArgumentException($"The root '{root}' does not exist.");
             directory ??= Path.GetDirectoryName(program)!;
             if (!System.IO.Directory.Exists(directory)) throw new ArgumentException($"The working directory '{directory}' does not exist.");
             var values = Property(message, "args");
@@ -415,7 +432,7 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output) : IWebLi
                     args.Add(value.GetString()!);
                 }
             }
-            return new(program, directory, args.ToArray(), Flag(message, "stopOnEntry"), Flag(message, "noDebug"));
+            return new(programFor(root), program, directory, args.ToArray(), Flag(message, "stopOnEntry"), Flag(message, "noDebug"));
         }
     }
 

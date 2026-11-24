@@ -10,6 +10,22 @@ The Windows Release solution built with zero warnings and zero errors. All three
 The installed debugger stopped on line 10 of `Examples.wlg/16-modules.wlg` and reported `Tea` as `class Tea`
 (type `Class`) and `serve` as `function` (type `Function`). The example continued to completion.
 
+## Debugging WASP pages
+
+The specification's section 5.7, "Debugging WASP pages, parts", splits the task "Debugging WASP Pages" in four; part
+1, a page under the debugger, is built. `wasp --debug-adapter` (`WebLingo/src/WebLingo.Wasp.Cli/Program.cs`) runs
+`WebLingoDebugSession` (`WebLingo/src/WebLingo.Cli`), given the command line's program; a launch's `program` is a page,
+`root` the site's root. `WebLingoCommandLine.RunDebugFile` compiles it for a debugger and gives the session the
+compilation's `Locate` and `TextOf`, so that each point is found in its own file, an include's, a layout's, a
+component's or a module's. VS Code's extension (`Editors/VSCode`, 0.3.0) has a debugger `wasp`, its executable named by
+`weblingo.waspDebuggerPath`. `WaspDebugTests` (`WebLingo.Templates.Tests`) stops in a page, its layout, an include, a
+component and a module, through `DebugAdapterSession`, the conformance tests' client, linked into that project.
+A page's code under a layout is an anonymous function in the call stack, `function`. The extension was tried with a
+stub of VS Code's API only, not in VS Code itself: install it again, from the folder or with `build.bat`, to try it.
+
+Parts 2 (a site under `wasp serve`, each request a thread, a stop suspending only its request) and 3 (conditional
+breakpoints) are next; part 4 waits for its Q1, which client to try.
+
 ## Windows local installation
 
 Users installing a release double-click `Install WebLingo.bat` in the extracted ZIP. Its source is
@@ -183,5 +199,8 @@ Core adapter raises Kestrel's own limit to the site's, but IIS's request filteri
 its `web.config` (the WASP User Manual, section 17). `UploadTests` (`WebLingo.Hosting.Tests`) and
 `WaspServeTests.AFormsFilesAreUploaded`, through Kestrel, 30.5 MB among them.
 
-Next: "Debugging WASP Pages", answered; the young generation waits for its Q4, and "Sessions in WASP" for its Q5 and
-Q6; "Visual Studio Debug Adapter" waits for Visual Studio installed here, and "Extensive WASP Example" for sessions.
+Next: "Debugging WASP Pages, Part 2: A Site Under the Debugger", then part 3; part 4 waits for its Q1. The young
+generation waits for its Q4, and "Sessions in WASP" for its Q5 and Q6; "Visual Studio Debug Adapter" waits for Visual
+Studio installed here, and "Extensive WASP Example" for sessions.
+
+The last full suite, on Windows, in Release: 3,460 tests passing. Linux not tried since the last push.

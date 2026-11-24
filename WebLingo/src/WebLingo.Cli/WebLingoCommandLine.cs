@@ -305,22 +305,34 @@ public static partial class WebLingoCommandLine
         return true;
     }
 
-    internal static int RunDebugFile(string path, string[] args, TextWriter output, TextWriter error, WebLingoDebugSession debugger)
+    internal static int RunDebugFile(WebLingoCommandLineProgram program, string path, string[] args, TextWriter output, TextWriter error,
+        WebLingoDebugSession debugger)
     {
         if (!TryParameters(args, 0, out var parameters, out var wrong))
         {
             error.WriteLine($"'{wrong}' is not a parameter's value, name=value, or is given twice.");
             return UsageError;
         }
-        var source = PrepareSource(Scripts, path, new Dictionary<string, string>(), output, error, null, true, out var exit);
+        var source = PrepareSource(program, path, new Dictionary<string, string>(), output, error, null, true, out var exit);
         if (source is null) return exit;
-        debugger.SetSources(source.Text, source.Host.Resolver.Texts, () => { output.Flush(); error.Flush(); });
+        // A position located as a runtime error is, in the file it is in, a page's include's in the include (section 5.7).
+        debugger.SetSources((name, offset) =>
+        {
+            var at = source.Compilation.Locate(new WebLingoDiagnostic("", WebLingoDiagnosticSeverity.Error, "", new WebLingoSourceSpan(offset, 0))
+            {
+                Source = name
+            });
+            return (source.TextOf(at), at.Span.Start);
+        }, () => { output.Flush(); error.Flush(); });
         var context = Context(source.Host, parameters, source.LineOf, WebLingoHeap.DefaultRegexTimeoutMilliseconds) with
         {
             Cancellation = debugger.Cancellation,
             SchedulerHost = debugger.Scheduler
         };
-        var vm = new WebLingoVirtualMachine { Loader = new WebLingoModuleLoader(source.Options), Debugger = debugger };
+        var vm = new WebLingoVirtualMachine
+        {
+            Loader = new WebLingoModuleLoader(source.Options), Components = source.Compilation.Components, Debugger = debugger
+        };
         var result = vm.Execute(source.Compilation.Result.Module!, context);
         output.Flush();
         return debugger.Cancellation.IsCancellationRequested ? Success : source.Report(result, error);
