@@ -1097,8 +1097,30 @@ declares.` A store is `IWebLingoSessionStore` (`WebLingo.Hosting`), an adapter's
 memory, `WebLingoMemorySessions` (`WebLingo.Hosting.AspNetCore`), the application's, kept as it reloads for a change to
 its files, lost as its process ends, its waiting requests given the lock in their order, a session ending once unused for
 `"timeout"`, 20 minutes, found so as a request asks for it, and swept once a minute at most; `wasp.config`'s
-`"sessions": { "store": "memory", "timeout": 20, "lockTimeout": 30 }`, each optional, `"database"` refused until part 3.
-A host that keeps no sessions gives `request.session` as WL3001.
+`"sessions": { "store": "memory", "timeout": 20, "lockTimeout": 30 }`, each optional. A host that keeps no sessions gives
+`request.session` as WL3001.
+
+**Sessions in a database, as built** (part 3, 24 November 2026; Proposed where it says more than A6):
+`"sessions": { "store": "database", "database": "main", "table": "wasp_sessions", "create": false }`, the database one
+`"databases"` names, the table `wasp_sessions` unless it names another, letters, digits and `_`, 58 at most; a store of
+the ASP.NET Core adapter's, `WebLingoDatabaseSessions`, through the platform's databases. The table's schema 1: `id`, 32
+characters, its key; `data`, the session's values, a JSON object of each name's JSON text; `used`, when a request last
+used it, and `locked_until`, while a request holds its lock, when that lock ends, both milliseconds since 1970, UTC, by
+the server's clock, as a parameter, so that each database's statements are the same but for the table's types; an index
+of `used`; and a row of its own, `schema`, `{"schema": 1}`, its `used` the largest integer, so that it never ends, which
+the store reads before anything else, once, a missing table WL3015, `DatabaseError`, where a page uses a session, its
+message naming `wasp sessions create --database main`, a table of a later schema reported, with its schema, and one
+without the row not WASP's, never changed by the store. A lock is taken by an update only a free lock lets through, for
+60 seconds, its holder's process renewing it every 20, so that a lock whose process ended ends within a minute; a request
+whose session another holds reads it again every 100 ms, off its worker, for the site's lock timeout at most. Opening a
+session, and writing it back as its request ends, run off the worker, the request waiting as at an `await`, the session
+written before its response ends; making, renewing and ending one, which a page does by a member that gives no task, on
+it. A session ended is removed by a request that comes after it, once a minute at most for each process. `wasp sessions
+create [--root <folder>] [--database <name>] [--table <name>] [--sql]` makes the table, in one transaction where the
+database's statements of tables take part in one, as the account running it reaches the database, the database and the
+table those `"sessions"` names unless it names others; says that a table there already is, its schema with it; and,
+with `--sql`, prints the statements instead. `"create": true` makes the table where it is missing. Tried on SQLite and SQL
+Server; MySQL's and PostgreSQL's SQL written, not tried.
 
 **As built** (M0.14.2, 16 November 2026; Proposed, §15.2, "The host's core"): `WebLingo.Hosting`'s `WebLingoApplication` loads an application from its root through the platform's files, its routes made then (`WebLingoRouteTable`), and serves a request on the worker its host gives: a page compiled when first requested, once on each worker, and kept for the generation's life with the components it renders, its output kept until it has run, then written to the response as UTF-8 (from M0.14.7.1, kept until it reaches 64 KB, then sent as it is written, §15.2, "Output sent as it is written"); a file that is not a page's, nor a handler's, left to the host to serve (`WebLingoRequestOutcomeKind.File`); and a 404 for a path without a route. The host gives its built-ins, its native modules, its workers' count and the environment.
 

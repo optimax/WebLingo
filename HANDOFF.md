@@ -224,10 +224,15 @@ memory is `WebLingoMemorySessions` (`WebLingo.Hosting.AspNetCore`), which `WebLi
 `wasp.config`'s `"sessions"` (`WebLingoSchemes`, `WebLingoSessionSettings`); `session readonly;` is the template
 parser's (`AddSession`), a handler's `export const session = "readonly";` read with its exports (`ExportsOf`). Tested by
 `SessionTests` (`WebLingo.Hosting.Tests`), `PageTests`' session cases and `WaspServeTests.ASessionIsKeptBetweenRequestsAndOneAtATime`.
-Part 3, sessions in a database, is next: a store of its own beside `WebLingoMemorySessions`, its values each name's JSON
-text already.
+Part 3, sessions in a database, is built: `WebLingoDatabaseSessions` (`WebLingo.Hosting.AspNetCore`), through the
+platform's `IWebLingoDatabases`, its table's statements in `CreateStatements`, which `wasp sessions create`
+(`WebLingo/src/WebLingo.Wasp.Cli/WebLingoWaspSessions.cs`) runs or prints; the store's contract gained a failure for
+opening and a close done off the worker (`WebLingoApplication.Ended` waits for it before the response ends). Tested by
+`DatabaseSessionTests` (`WebLingo.Hosting.Tests`, which references `WebLingo.Data.DotNet` for it, on SQLite),
+`WaspServeTests.SessionsAreKeptInTheSitesDatabase` and `SessionsAreKeptInSqlServer`; MySQL's and PostgreSQL's SQL is not
+tried, no server of theirs being here.
 
-Next: "Sessions in WASP, Part 3: Sessions in a Database"; debugging's part 4 waits for Visual Studio installed here, as
-"Visual Studio Debug Adapter" does, and "Extensive WASP Example" for sessions.
+Next: "Extensive WASP Example", its prerequisites done, waits for them installed (its A3 to A5); debugging's part 4
+waits for Visual Studio installed here, as "Visual Studio Debug Adapter" does.
 
-The last full suite, on Windows, in Release: 3,515 tests passing. Linux not tried since the last push.
+The last full suite, on Windows, in Release: 3,525 tests passing. Linux not tried since the last push.

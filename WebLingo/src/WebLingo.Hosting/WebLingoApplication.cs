@@ -312,27 +312,52 @@ public sealed class WebLingoApplication
             Lines = page.LineOf
         };
         var vm = new WebLingoVirtualMachine { Loader = page.Modules, Components = page.Components, Debugger = thread };
-        return Ended(vm.Execute(page.Module!, context), vm.Resume, page, output, response, done, ending, thread, session);
+        return Ended(vm.Execute(page.Module!, context), vm.Resume, page, output, response, done, ending, thread, session, scheduler, host);
     }
 
     /// <summary>What a run came to: <paramref name="done"/>, a failure, or a wait, which its host resumes.</summary>
     private WebLingoRequestOutcome Ended(WebLingoExecutionResult result, Func<WebLingoExecutionResult> resume, CompiledPage page,
         WebLingoResponseText output, IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done, IDisposable ending,
-        IWebLingoDebuggerThread? thread, WebLingoSession? session)
+        IWebLingoDebuggerThread? thread, WebLingoSession? session, IWebLingoSchedulerHost? scheduler, IWebLingoSchedulerHost? host)
     {
         if (result.Waiting)
         {
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Waiting)
             {
-                Resume = () => Ended(resume(), resume, page, output, response, done, ending, thread, session),
+                Resume = () => Ended(resume(), resume, page, output, response, done, ending, thread, session, scheduler, host),
                 WaitMilliseconds = result.WaitMilliseconds
             };
         }
-        // Its session's lock given up, its values written back where they changed, before its response ends, so that the
-        // request its client sends next finds it free (section 6.12, "Sessions and cookies").
-        session?.End();
         thread?.Dispose(); // Its debugger's thread ended with it.
         ending.Dispose(); // Its uploads' temporary files removed (section 6.12, "Uploaded files").
+        // Its session's lock given up, its values written back where they changed, before its response ends, so that the
+        // request its client sends next finds them (section 6.12, "Sessions and cookies"): at once, or, where the store
+        // writes them off the worker, once it has, the request waiting meanwhile.
+        var closed = false;
+        if (session is null || session.End(() => host?.Post(() => closed = true))) return Finished(result, page, output, response, done);
+        if (scheduler is null)
+        {
+            while (!closed && host is not null) host.RunPosted(-1);
+            return Finished(result, page, output, response, done);
+        }
+        return WaitForClose(scheduler, () => closed, () => Finished(result, page, output, response, done));
+    }
+
+    /// <summary>A request that waits for its session to be written, resumed once the store has posted that it is, then finished.</summary>
+    private static WebLingoRequestOutcome WaitForClose(IWebLingoSchedulerHost scheduler, Func<bool> closed, Func<WebLingoRequestOutcome> finish) =>
+        new(WebLingoRequestOutcomeKind.Waiting)
+        {
+            Resume = () =>
+            {
+                scheduler.RunPosted(0);
+                return closed() ? finish() : WaitForClose(scheduler, closed, finish);
+            }
+        };
+
+    /// <summary>A run that has ended, its session closed: <paramref name="done"/>, or a failure.</summary>
+    private WebLingoRequestOutcome Finished(WebLingoExecutionResult result, CompiledPage page, WebLingoResponseText output,
+        IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done)
+    {
         if (!result.Succeeded)
         {
             var error = page.Describe(result.Error!);

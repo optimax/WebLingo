@@ -24,8 +24,9 @@ namespace WebLingo.Cli;
 /// environment, <c>"env": { "machineName": true, "variables": ["PATH", "APP_*"] }</c>, which <c>wasp</c> reads,
 /// <c>weblingo</c>'s scripts reading all of it (section 7.15); and its mail servers, each a name and its settings,
 /// <c>"mail": { "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": "…" } }</c>, which both
-/// read (section 7.17); and where a site keeps its sessions, <c>"sessions": { "store": "memory", "timeout": 20,
-/// "lockTimeout": 30 }</c>, which <c>wasp</c> reads (section 6.12, "Sessions and cookies"). A secret, a mail server's
+/// read (section 7.17); and where a site keeps its sessions, <c>"sessions": { "store": "database", "database": "main",
+/// "table": "wasp_sessions", "create": false, "timeout": 20, "lockTimeout": 30 }</c>, which <c>wasp</c> reads (section 6.12,
+/// "Sessions and cookies"). A secret, a mail server's
 /// password or a database's connection string, may be given where it is
 /// kept, <c>{ "env": "NAME" }</c> or <c>{ "file": "../secrets/name.txt" }</c>, a file from the file's folder, one a
 /// site's <c>wasp.config</c> names outside the site, read by the host when it is used. On Windows, the <c>windows</c> scheme's folder is
@@ -231,30 +232,56 @@ public static class WebLingoSchemes
     }
 
     /// <summary>
-    /// <c>"sessions": { "store": "memory", "timeout": 20, "lockTimeout": 30 }</c>, each optional: where a site keeps its
-    /// sessions, the process's memory, the one store built yet; how many minutes a session lasts once no request uses it;
-    /// and how many seconds a request waits for a session's lock (section 6.12, "Sessions and cookies").
+    /// <c>"sessions": { "store": "database", "database": "main", "table": "wasp_sessions", "create": false, "timeout": 20,
+    /// "lockTimeout": 30 }</c>, each optional: where a site keeps its sessions, <c>"memory"</c>, the process's, or
+    /// <c>"database"</c>, a table of a database <c>"databases"</c> names, which <c>"database"</c> names, the table
+    /// <c>"table"</c>, <c>wasp_sessions</c> unless it names another, made where it is missing where <c>"create"</c> is
+    /// <c>true</c>; how many minutes a session lasts once no request uses it; and how many seconds a request waits for a
+    /// session's lock (section 6.12, "Sessions and cookies").
     /// </summary>
     private static bool TryReadSessions(string file, JsonElement setting, ref WebLingoSessionSettings sessions, out string? error)
     {
-        error = $"{file}: \"sessions\" is an object, {{ \"store\": \"memory\", \"timeout\": 20, \"lockTimeout\": 30 }}, each optional, "
+        error = $"{file}: \"sessions\" is an object, {{ \"store\": \"database\", \"database\": \"main\", \"table\": \"wasp_sessions\", "
+                + "\"create\": false, \"timeout\": 20, \"lockTimeout\": 30 }, each optional, \"store\" \"memory\" or \"database\", "
+                + "\"database\" a name \"databases\" gives, \"table\" a table's name, letters, digits and _, \"create\" a Boolean, "
                 + "\"timeout\" a number of minutes, and \"lockTimeout\" a number of seconds, each more than 0.";
         if (setting.ValueKind != JsonValueKind.Object) return false;
         foreach (var entry in setting.EnumerateObject())
         {
             var number = entry.Value.ValueKind == JsonValueKind.Number && entry.Value.TryGetDouble(out var given) && given > 0
                 && given <= TimeSpan.MaxValue.TotalSeconds / 120 ? given : (double?)null;
-            if (entry.Name == "store" && entry.Value.ValueKind == JsonValueKind.String)
-            {
-                if (entry.Value.GetString() == "memory") continue;
-                error = $"{file}: \"sessions\"'s \"store\" is \"memory\", the process's memory, sessions in a database not being built yet.";
-                return false;
-            }
-            if (entry.Name == "timeout" && number is { } minutes) sessions = sessions with { TimeoutMinutes = minutes };
+            var text = entry.Value.ValueKind == JsonValueKind.String ? entry.Value.GetString()! : null;
+            if (entry.Name == "store" && text is "memory" or "database") sessions = sessions with { Store = text };
+            else if (entry.Name == "database" && text is { Length: > 0 } && !text.Contains(':')) sessions = sessions with { Database = text };
+            else if (entry.Name == "table" && text is not null && IsTable(text)) sessions = sessions with { Table = text };
+            else if (entry.Name == "create" && entry.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                sessions = sessions with { Create = entry.Value.ValueKind == JsonValueKind.True };
+            else if (entry.Name == "timeout" && number is { } minutes) sessions = sessions with { TimeoutMinutes = minutes };
             else if (entry.Name == "lockTimeout" && number is { } seconds) sessions = sessions with { LockTimeoutSeconds = seconds };
             else return false;
         }
+        if (sessions.Store == "database" && sessions.Database is null)
+        {
+            error = $"{file}: \"sessions\" kept in a database names it, \"database\": \"main\", one \"databases\" gives.";
+            return false;
+        }
+        if (sessions.Store == "memory" && (sessions.Database is not null || sessions.Table is not null || sessions.Create))
+        {
+            error = $"{file}: \"sessions\" kept in memory, as they are unless \"store\" is \"database\", have no \"database\", \"table\" or \"create\".";
+            return false;
+        }
         error = null;
+        return true;
+    }
+
+    /// <summary>Whether a text may name a table of sessions: letters, digits and <c>_</c>, a letter or <c>_</c> first, 58 at most.</summary>
+    public static bool IsTable(string name)
+    {
+        if (name.Length is 0 or > 58 || char.IsAsciiDigit(name[0])) return false;
+        foreach (var c in name)
+        {
+            if (!char.IsAsciiLetterOrDigit(c) && c != '_') return false;
+        }
         return true;
     }
 
@@ -542,14 +569,20 @@ public sealed record WebLingoUploadSettings(long MaxBodySize, int InMemory, long
 }
 
 /// <summary>
-/// Where a site keeps its sessions (specification, section 6.12, "Sessions and cookies"): the process's memory, the one
-/// store built yet; how many minutes a session lasts once no request uses it, 20 by default; and how many seconds a request
-/// waits for a session's lock, 30 by default.
+/// Where a site keeps its sessions (specification, section 6.12, "Sessions and cookies"): <c>"memory"</c>, the process's,
+/// by default, or <c>"database"</c>, a table, <see cref="Table"/>, <c>wasp_sessions</c> where it names none, of the database
+/// <see cref="Database"/> names, made where it is missing where <see cref="Create"/>; how many minutes a session lasts once
+/// no request uses it, 20 by default; and how many seconds a request waits for a session's lock, 30 by default.
 /// </summary>
 public sealed record WebLingoSessionSettings(double TimeoutMinutes, double LockTimeoutSeconds)
 {
     /// <summary>What a configuration that says nothing of them means.</summary>
     public static WebLingoSessionSettings Default { get; } = new(20, 30);
+
+    public string Store { get; init; } = "memory";
+    public string? Database { get; init; }
+    public string? Table { get; init; }
+    public bool Create { get; init; }
 }
 
 /// <summary>

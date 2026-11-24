@@ -83,13 +83,13 @@ public sealed class WebLingoMemorySessions : IWebLingoSessionStore
         }
     }
 
-    public void Close(string id, IReadOnlyDictionary<string, string>? values)
+    public bool Close(string id, IReadOnlyDictionary<string, string>? values, Action done)
     {
         Waiter? next;
         IReadOnlyDictionary<string, string> given;
         lock (_gate)
         {
-            if (!_sessions.TryGetValue(id, out var entry)) return;
+            if (!_sessions.TryGetValue(id, out var entry)) return true;
             if (values is not null) entry.Values = values;
             entry.Used = _now();
             entry.Locked = false;
@@ -97,6 +97,7 @@ public sealed class WebLingoMemorySessions : IWebLingoSessionStore
             given = entry.Values;
         }
         next?.Tell(new WebLingoSessionOpening(WebLingoSessionOpened.Found, given));
+        return true;
     }
 
     public bool Renew(string id, string renewed)

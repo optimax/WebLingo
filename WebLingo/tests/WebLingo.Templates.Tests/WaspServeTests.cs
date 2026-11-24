@@ -158,9 +158,17 @@ public sealed class WaspServeTests : IDisposable
 
         foreach (var (setting, message) in new[]
                  {
-                     ("{ \"store\": \"database\" }", "\"sessions\"'s \"store\" is \"memory\", the process's memory, sessions in a database not being built yet."),
-                     ("{ \"timeout\": 0 }", "\"sessions\" is an object, { \"store\": \"memory\", \"timeout\": 20, \"lockTimeout\": 30 }, each optional, "
-                                            + "\"timeout\" a number of minutes, and \"lockTimeout\" a number of seconds, each more than 0."),
+                     ("{ \"store\": \"database\" }", "\"sessions\" kept in a database names it, \"database\": \"main\", one \"databases\" gives."),
+                     ("{ \"store\": \"database\", \"database\": \"nowhere\" }", "\"sessions\"'s \"database\" names 'nowhere', which \"databases\" does not."),
+                     ("{ \"table\": \"t\" }", "\"sessions\" kept in memory, as they are unless \"store\" is \"database\", have no \"database\", "
+                                              + "\"table\" or \"create\"."),
+                     ("{ \"store\": \"database\", \"database\": \"main\", \"table\": \"1t\" }", "\"lockTimeout\" a number of seconds, each more than 0."),
+                     ("{ \"store\": \"files\" }", "\"lockTimeout\" a number of seconds, each more than 0."),
+                     ("{ \"timeout\": 0 }", "\"sessions\" is an object, { \"store\": \"database\", \"database\": \"main\", \"table\": "
+                                            + "\"wasp_sessions\", \"create\": false, \"timeout\": 20, \"lockTimeout\": 30 }, each optional, \"store\" "
+                                            + "\"memory\" or \"database\", \"database\" a name \"databases\" gives, \"table\" a table's name, letters, "
+                                            + "digits and _, \"create\" a Boolean, \"timeout\" a number of minutes, and \"lockTimeout\" a number of seconds, "
+                                            + "each more than 0."),
                      ("{ \"lockTimeout\": \"30\" }", "\"lockTimeout\" a number of seconds, each more than 0."),
                      ("{ \"cookie\": \"x\" }", "\"lockTimeout\" a number of seconds, each more than 0."),
                      ("[]", "\"lockTimeout\" a number of seconds, each more than 0.")
@@ -170,6 +178,104 @@ public sealed class WaspServeTests : IDisposable
             Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
             Assert.EndsWith(message, error);
         }
+    }
+
+    /// <summary>
+    /// Sessions in a database (specification, section 6.12, "Sessions and cookies"; "Sessions and cookies, parts", part 3), a
+    /// SQLite file outside the site: <c>wasp sessions create</c> prints the SQL that makes the table with <c>--sql</c>, makes
+    /// it, and says it is there when it is; and <c>wasp serve</c> keeps a session in it, from one request to the next.
+    /// </summary>
+    [Fact]
+    public async Task SessionsAreKeptInTheSitesDatabase()
+    {
+        var data = Path.Combine(_root, "..", Path.GetFileName(_root) + "-data");
+        Directory.CreateDirectory(data);
+        try
+        {
+            Write("wasp.config", "{ \"databases\": { \"main\": \"sqlite:../" + Path.GetFileName(data) + "/sessions.db\" }, "
+                                 + "\"sessions\": { \"store\": \"database\", \"database\": \"main\" } }");
+            Write("count.wasp", "<% param request; var n = (request.session?[\"n\"] ?? 0) + 1; request.session[\"n\"] = n; %><%= n %>");
+            Assert.Equal((WebLingoCommandLine.Success, "CREATE TABLE wasp_sessions (id TEXT NOT NULL PRIMARY KEY, data TEXT NOT NULL, used INTEGER NOT NULL, "
+                                                       + "locked_until INTEGER NULL);\nCREATE INDEX wasp_sessions_used ON wasp_sessions (used);\n"
+                                                       + "INSERT INTO wasp_sessions (id, data, used, locked_until) VALUES ('schema', '{\"schema\": 1}', "
+                                                       + "9223372036854775807, NULL);\n", ""), Sessions("create", "--root", _root, "--sql"));
+            Assert.False(File.Exists(Path.Combine(data, "sessions.db")));
+            Assert.Equal((WebLingoCommandLine.Success, "WASP made the table of sessions 'wasp_sessions' in the database 'main', its schema 1.\n", ""),
+                Sessions("create", "--root", _root));
+            Assert.Equal((WebLingoCommandLine.Success, "The database 'main' has its table of sessions 'wasp_sessions' already, its schema 1.\n", ""),
+                Sessions("create", "--root", _root));
+            Assert.Equal((WebLingoCommandLine.UsageError, "Usage: wasp sessions create [--root <folder>] [--database <name>] [--table <name>] [--sql]\n",
+                "'remove' is not what wasp sessions does: create.\n"), Sessions("remove"));
+
+            var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+            Assert.True(server is not null, error);
+            await server.StartAsync();
+            try
+            {
+                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                using var client = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(address) };
+                Assert.Equal("1", await client.GetStringAsync("/count"));
+                Assert.Equal("2", await client.GetStringAsync("/count"));
+            }
+            finally
+            {
+                await server.StopAsync();
+            }
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Directory.Delete(data, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Sessions in SQL Server, on the machine's own, in a database of the test's own, dropped after it: the table made by
+    /// <c>wasp sessions create</c>, as the user running the tests, and a session kept in it by <c>wasp serve</c>.
+    /// </summary>
+    [SqlServerFact]
+    public async Task SessionsAreKeptInSqlServer()
+    {
+        var database = "WebLingoSessionTests" + Guid.NewGuid().ToString("N");
+        var server = new WebLingo.Data.DotNet.DotNetDatabases(new Dictionary<string, string> { ["master"] = SqlServerFactAttribute.ConnectionString("master") }, _root);
+        using (var master = server.Open("master")) master.Execute($"CREATE DATABASE [{database}]", [], null);
+        try
+        {
+            Write("wasp.config", "{ \"databases\": { \"main\": \"" + SqlServerFactAttribute.ConnectionString(database) + "\" }, "
+                                 + "\"sessions\": { \"store\": \"database\", \"database\": \"main\", \"table\": \"sessions\" } }");
+            Write("count.wasp", "<% param request; var n = (request.session?[\"n\"] ?? 0) + 1; request.session[\"n\"] = n; %><%= n %>");
+            Assert.Equal((WebLingoCommandLine.Success, "WASP made the table of sessions 'sessions' in the database 'main', its schema 1.\n", ""),
+                Sessions("create", "--root", _root));
+            var site = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+            Assert.True(site is not null, error);
+            await site.StartAsync();
+            try
+            {
+                var address = site.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                using var client = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(address) };
+                Assert.Equal("1", await client.GetStringAsync("/count"));
+                Assert.Equal("2", await client.GetStringAsync("/count"));
+            }
+            finally
+            {
+                await site.StopAsync();
+            }
+        }
+        finally
+        {
+            Microsoft.Data.SqlClient.SqlConnection.ClearAllPools();
+            using var master = server.Open("master");
+            master.Execute($"IF DB_ID(N'{database}') IS NOT NULL BEGIN ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; "
+                           + $"DROP DATABASE [{database}]; END", [], null);
+        }
+    }
+
+    /// <summary><c>wasp sessions …</c>, run in the test's process: its exit code, what it wrote, and its errors, line breaks LF.</summary>
+    private static (int Exit, string Output, string Error) Sessions(params string[] args)
+    {
+        var (output, error) = (new StringWriter(), new StringWriter());
+        var exit = WebLingoWaspCommandLine.Run(["sessions", .. args], output, error);
+        return (exit, output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal), error.ToString().Replace("\r\n", "\n", StringComparison.Ordinal));
     }
 
     [Fact]

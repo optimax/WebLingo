@@ -738,11 +738,72 @@ export function post(request, response) {
 `renew()` keeps the session's values, and does nothing where there is no session yet; `end()` removes the session, and
 deletes its cookie.
 
-**Where sessions are kept.** In the server's memory: they last while `wasp` runs, kept as the site reloads for a change
-to its files, and lost as it stops, as when IIS recycles the site's application pool. They are one process's: a site
-served by several processes at once, as Apache's `mod_fcgid` may start them, needs its sessions in a database, which is
-planned ([section 19](#19-what-is-not-there-yet)). `wasp.config`'s `"sessions"` says how long a session lasts, and how
-long a request waits for one ([section 14](#14-configuration-waspconfig)).
+**Where sessions are kept.** In the server's memory, by default: they last while `wasp` runs, kept as the site reloads
+for a change to its files, and lost as it stops, as when IIS recycles the site's application pool; and they are one
+process's. A site whose sessions must outlast its process, or that is served by several processes at once, as Apache's
+`mod_fcgid` may start them, or by several servers, keeps them in one of its databases instead (below). `wasp.config`'s
+`"sessions"` says where, how long a session lasts, and how long a request waits for one
+([section 14](#14-configuration-waspconfig)).
+
+### Sessions in a database
+
+A site keeps its sessions in a table of a database its `wasp.config` names, which every process serving the site
+shares:
+
+```json
+{
+  "databases": { "main": "sqlite:../data/site.db" },
+  "sessions": { "store": "database", "database": "main" }
+}
+```
+
+The table, `wasp_sessions` unless `"sessions"` names another, `"table": "sessions"`, is made by the site's
+administrator, once, before the site uses it: `wasp sessions create`, run in the site's folder, or with `--root`, makes it
+in the database `"sessions"` names, or `--database` names, as an account allowed to make tables, which the site's own
+need not be, reaches the database, Windows's own with SQL Server's integrated security; `--sql` prints the SQL instead,
+for the administrator to run:
+
+```text
+> wasp sessions create --root site
+WASP made the table of sessions 'wasp_sessions' in the database 'main', its schema 1.
+```
+
+Run again, it says that the table is there, and leaves it as it is. The SQL, for each database:
+
+```sql
+-- SQLite
+CREATE TABLE wasp_sessions (id TEXT NOT NULL PRIMARY KEY, data TEXT NOT NULL, used INTEGER NOT NULL, locked_until INTEGER NULL);
+CREATE INDEX wasp_sessions_used ON wasp_sessions (used);
+INSERT INTO wasp_sessions (id, data, used, locked_until) VALUES ('schema', '{"schema": 1}', 9223372036854775807, NULL);
+
+-- SQL Server
+CREATE TABLE wasp_sessions (id VARCHAR(32) NOT NULL PRIMARY KEY, data NVARCHAR(MAX) NOT NULL, used BIGINT NOT NULL, locked_until BIGINT NULL);
+CREATE INDEX wasp_sessions_used ON wasp_sessions (used);
+INSERT INTO wasp_sessions (id, data, used, locked_until) VALUES ('schema', '{"schema": 1}', 9223372036854775807, NULL);
+
+-- MySQL
+CREATE TABLE wasp_sessions (id VARCHAR(32) NOT NULL PRIMARY KEY, data LONGTEXT NOT NULL, used BIGINT NOT NULL, locked_until BIGINT NULL) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+CREATE INDEX wasp_sessions_used ON wasp_sessions (used);
+INSERT INTO wasp_sessions (id, data, used, locked_until) VALUES ('schema', '{"schema": 1}', 9223372036854775807, NULL);
+
+-- PostgreSQL
+CREATE TABLE wasp_sessions (id VARCHAR(32) NOT NULL PRIMARY KEY, data TEXT NOT NULL, used BIGINT NOT NULL, locked_until BIGINT NULL);
+CREATE INDEX wasp_sessions_used ON wasp_sessions (used);
+INSERT INTO wasp_sessions (id, data, used, locked_until) VALUES ('schema', '{"schema": 1}', 9223372036854775807, NULL);
+```
+
+- A site whose table is missing fails where a page uses a session, a `DatabaseError`, WL3015, its message naming the
+  command that makes the table: `The session cannot be made: the database 'main' has no table of sessions
+  'wasp_sessions', or cannot read it (…): make it with 'wasp sessions create --database main'.` For development, or a
+  SQLite file of the site's own, `"create": true` has the site make its table where it is missing.
+- A row holds a session: its id, its values, as JSON, when a request last used it, in milliseconds since 1970, UTC, and,
+  while a request has its lock, when the lock ends unless that request's process renews it, which it does every 20
+  seconds, so that a lock a process that stopped held ends within a minute. A request whose session another has reads
+  its row again every 100 ms. The servers' clocks should agree, as each reads the times the others write.
+- The row `schema` gives the table's schema: a later WASP, whose schema is another, says so, with the command that
+  upgrades the table, and never changes the table itself.
+- A session that has ended is removed by a request that comes after it, once a minute at most.
+- The SQL for MySQL and PostgreSQL has not been tried on their servers yet; SQLite's and SQL Server's have.
 
 A page run by `wasp run` has no request: there, a page's parameters are values given on the command line
 ([section 16](#16-the-wasp-command-line)), and a page that declares `request` fails.
@@ -927,7 +988,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"env"` | what the site's pages and handlers may read of the machine's environment, through `std:env`: `{ "machineName": true, "variables": ["PATH", "APP_*"] }` | nothing |
 | `"maxBodySize"` | the largest body a request may have, in bytes, a larger one a 413 (section 9, "Uploaded files") | 30,000,000 |
 | `"uploads"` | what a form's files may be: `{ "inMemory": 65536, "maxSize": 20000000, "folder": "../tmp" }`, how many bytes of a file are kept in memory, the rest in a temporary file, the most its files may take in all, and the folder their temporary files are made in, outside the site | 64 KB, `"maxBodySize"`, the system's temporary folder |
-| `"sessions"` | where the site keeps its sessions, and how long: `{ "store": "memory", "timeout": 20, "lockTimeout": 30 }`, the server's memory, the minutes a session lasts once no request uses it, and the seconds a request waits for a session another has (section 9, "Sessions") | the server's memory, 20 minutes, 30 seconds |
+| `"sessions"` | where the site keeps its sessions, and how long: `{ "store": "database", "database": "main", "table": "wasp_sessions", "create": false, "timeout": 20, "lockTimeout": 30 }`, the server's memory, `"memory"`, or a table of a database `"databases"` names, `"database"`, the table made where it is missing where `"create"` is `true`; the minutes a session lasts once no request uses it, and the seconds a request waits for a session another has (section 9, "Sessions" and "Sessions in a database") | the server's memory, `wasp_sessions`, `false`, 20 minutes, 30 seconds |
 | `"mail"` | the mail servers the site's pages and handlers send through, with `std:mail`, each a name and its settings: `{ "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": { "env": "SMTP_PASSWORD" } } }` | none |
 
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
@@ -1065,6 +1126,7 @@ wasp serve [--root <folder>] [--port <port>] [--scheme <name>=<folder> …]
 wasp fastcgi [--root <folder>] [--port <port> | --socket <path> | --stdin] [--scheme <name>=<folder> …]
 wasp run [--root <folder>] [--scheme <name>=<folder> …] <page.wasp> [name=value …]
 wasp check [--root <folder>] [--scheme <name>=<folder> …] <page.wasp>
+wasp sessions create [--root <folder>] [--database <name>] [--table <name>] [--sql]
 wasp --version
 ```
 
@@ -1087,6 +1149,9 @@ wasp --version
   The default is one second.
 - **`wasp check`** compiles a page and reports its errors, without running it: `wasp check broken.wasp` writes
   `broken.wasp(1,8): ERROR WL2001: 'nope' is not defined.`
+- **`wasp sessions create`** makes the table a site keeps its sessions in, in the database its `wasp.config`'s
+  `"sessions"` names, or `--database` names, the table `wasp_sessions` unless `"sessions"` or `--table` names another;
+  `--sql` prints its SQL instead ([section 9](#sessions-in-a-database)).
 - **`--scheme name=folder`** names a folder of native modules, over the configuration's.
 
 Command-line diagnostics go to standard error. An error starts with the file, line, column and `ERROR CODE`.
@@ -1270,8 +1335,6 @@ site anew, so the first request to each is slower than the rest.
 
 These are not there yet, and are planned or being designed:
 
-- **Sessions in a database**: a site keeps its sessions in the server's memory ([section 9](#sessions)), one process's,
-  lost as it stops; sessions kept in a database, which several processes share, are being built.
 - **Debugging a site under IIS or FastCGI**: a site is debugged only as the debugger serves it
   ([section 15](#15-while-you-work)).
 - **A standalone server**, without IIS, nginx or Apache, is planned. WASP has been tried on Windows, through IIS's

@@ -144,6 +144,19 @@ public static class WebLingoWaspServer
         }
         // Its scripts reach only the folders wasp.config allows, a relative path from the root (section 7.13).
         var files = new DotNetFileCapabilities(full, folders.Read, folders.Write);
+        // Those wasp.config names, their files from its folder (section 7.11); a script's own checked as its files are.
+        var siteDatabases = new DotNetDatabases(databases, full, new DotNetSecrets()) { Files = files };
+        if (sessions.Database is { } named && !databases.ContainsKey(named))
+        {
+            error = $"{Path.Combine(full, WebLingoRouteTable.ConfigurationFile)}: \"sessions\"'s \"database\" names '{named}', which \"databases\" does not.";
+            return null;
+        }
+        // Its sessions in the process's memory, kept while it reloads, or in a database (section 6.12, "Sessions and cookies").
+        var (timeout, lockTimeout) = (TimeSpan.FromMinutes(sessions.TimeoutMinutes), TimeSpan.FromSeconds(sessions.LockTimeoutSeconds));
+        IWebLingoSessionStore store = sessions.Database is { } database
+            ? new WebLingoDatabaseSessions(siteDatabases, database, sessions.Table ?? WebLingoDatabaseSessions.DefaultTable, sessions.Create, timeout,
+                lockTimeout, log is null ? null : log.WriteLine)
+            : new WebLingoMemorySessions(timeout, lockTimeout);
         var application = WebLingoApplication.Load(new WebLingoApplicationOptions(full, new DotNetFileSystem())
         {
             ScriptFileSystem = new DotNetFileSystem(files),
@@ -158,15 +171,13 @@ public static class WebLingoWaspServer
             WallClock = new DotNetClock(),
             TimeZone = new DotNetTimeZone(),
             Network = new DotNetNetwork(allowedHosts), // Only the hosts wasp.config allows (section 7.9).
-            // Those wasp.config names, their files from its folder (section 7.11); a script's own checked as its files are.
-            Databases = new DotNetDatabases(databases, full, new DotNetSecrets()) { Files = files },
+            Databases = siteDatabases,
             // Those wasp.config names, their passwords read where it keeps them, outside the site (section 7.17).
             Mail = new DotNetMail(mail, new DotNetSecrets()),
             // Its body's largest, and its uploads', kept in temporary files where wasp.config says (section 6.12).
             Uploads = new WebLingoUploads(uploads.MaxBodySize, uploads.InMemory, uploads.MaxSize ?? uploads.MaxBodySize,
                 new DotNetTemporaryFiles(uploads.Folder)),
-            // Its sessions in the process's memory, kept while it reloads (section 6.12, "Sessions and cookies").
-            Sessions = new WebLingoMemorySessions(TimeSpan.FromMinutes(sessions.TimeoutMinutes), TimeSpan.FromSeconds(sessions.LockTimeoutSeconds)),
+            Sessions = store,
             Scheduler = () => new DotNetSchedulerHost(),
             Log = log is null ? null : log.WriteLine,
             SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30),

@@ -1197,8 +1197,8 @@ slow client, as a page's writes do. A response is sent once its output reaches 6
 
 ### `Session`
 
-A browser's session, which the site keeps between its requests, in the server's memory (the WASP User Manual, section
-9, "Sessions"):
+A browser's session, which the site keeps between its requests, in the server's memory or in a table of its database
+(the WASP User Manual, section 9, "Sessions" and "Sessions in a database"):
 
 | Member | What it is |
 |---|---|
@@ -1215,7 +1215,9 @@ strings, written as JSON, each read back as the kind it was, `5.0` a number: any
 and one nested more than 512 deep, is WL3001 where it is set, the message naming what it cannot keep. A name that is not
 a string is WL3001. Making a session, or renewing it, once the response is sent is WL3001, its cookie being a header;
 and so is any change in a request that declares that it only reads its session, `session readonly;` in a page,
-`export const session = "readonly";` in a handler, its message naming the declaration, or after `release()`.
+`export const session = "readonly";` in a handler, its message naming the declaration, or after `release()`. Where
+sessions are kept in a database, one that fails, or whose table of sessions is missing, is a `DatabaseError`, WL3015,
+where a page reads its session, makes, renews or ends it, its message naming the command that makes the table.
 
 ### `Headers`
 

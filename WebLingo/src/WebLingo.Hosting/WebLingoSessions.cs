@@ -7,26 +7,39 @@ using WebLingo.Runtime;
 namespace WebLingo.Hosting;
 
 /// <summary>What opening a session came to (<see cref="IWebLingoSessionStore.Open"/>).</summary>
-public enum WebLingoSessionOpened { Found, NotFound, Waiting, TimedOut }
+public enum WebLingoSessionOpened { Found, NotFound, Waiting, TimedOut, Failed }
 
 /// <summary>
 /// What opening a session came to: found, with its values, each a name and its value's JSON text; not found, there being no
-/// such session, or none any more; waiting for its lock, another request holding it; or, its lock waited for too long,
-/// timed out.
+/// such session, or none any more; waiting for its lock, another request holding it; its lock waited for too long, timed
+/// out; or failed, where the sessions are kept failing, <see cref="Error"/> saying why.
 /// </summary>
 public sealed record WebLingoSessionOpening(WebLingoSessionOpened Kind, IReadOnlyDictionary<string, string>? Values = null)
 {
     public static WebLingoSessionOpening NotFound { get; } = new(WebLingoSessionOpened.NotFound);
     public static WebLingoSessionOpening Waiting { get; } = new(WebLingoSessionOpened.Waiting);
     public static WebLingoSessionOpening TimedOut { get; } = new(WebLingoSessionOpened.TimedOut);
+
+    /// <summary>Why it failed, in words a script's error reads after a colon, without a capital or a full stop.</summary>
+    public string? Error { get; init; }
+
+    public static WebLingoSessionOpening Failed(string error) => new(WebLingoSessionOpened.Failed) { Error = error };
 }
+
+/// <summary>
+/// Where a site's sessions are kept failing (<see cref="IWebLingoSessionStore"/>), as a script's error reads after a colon,
+/// without a capital or a full stop: a database that cannot be reached, or whose table of sessions is missing.
+/// </summary>
+public sealed class WebLingoSessionStoreException(string message) : Exception(message);
 
 /// <summary>
 /// Where a site keeps its sessions (specification, section 6.12, "Sessions and cookies"): each by its id, with its values,
 /// each a name and its value's JSON text, and a lock, which one request at a time holds, the others that ask for it waiting
 /// in their order, each for <see cref="LockTimeout"/> at most; a session nothing has used for the site's timeout ended.
 /// Every worker uses one store, from its own thread, and its waits end on others: so a store is an adapter's, which
-/// synchronizes its own threads, the portable core taking no lock.
+/// synchronizes its own threads, the portable core taking no lock. <see cref="Create"/>, <see cref="Renew"/> and
+/// <see cref="Remove"/> throw a <see cref="WebLingoSessionStoreException"/> where the store fails; opening one gives its
+/// failure, and closing one tells the store's log of its own.
 /// </summary>
 public interface IWebLingoSessionStore
 {
@@ -46,9 +59,10 @@ public interface IWebLingoSessionStore
 
     /// <summary>
     /// Gives up a session's lock, its values replaced by <paramref name="values"/> unless they are null, the first request
-    /// that waits for it given it.
+    /// that waits for it given it: true where that is done at once; false where it is done later, <paramref name="done"/>
+    /// then called once, from another thread, as it is.
     /// </summary>
-    void Close(string id, IReadOnlyDictionary<string, string>? values);
+    bool Close(string id, IReadOnlyDictionary<string, string>? values, Action done);
 
     /// <summary>Gives a session, its lock held still, the id <paramref name="renewed"/>, those waiting for it finding none; false where one has that id.</summary>
     bool Renew(string id, string renewed);
@@ -81,6 +95,7 @@ internal sealed class WebLingoSession
     private bool _changed;
     private bool _released;
     private bool _lockFailed;
+    private string? _failure;
 
     public WebLingoSession(IWebLingoSessionStore store, IWebLingoHttpRequest request, IWebLingoHttpResponse response, IWebLingoCrypto? crypto,
         string? readOnly)
@@ -124,24 +139,38 @@ internal sealed class WebLingoSession
             case WebLingoSessionOpened.NotFound:
                 Id = null; // An id the site does not know is never taken for a new session's.
                 break;
+            case WebLingoSessionOpened.Failed:
+                (Id, _failure) = (null, opening.Error);
+                break;
             default:
                 (Id, _lockFailed) = (null, true);
                 break;
         }
     }
 
-    /// <summary>As the request ends: its lock given up, its values written back where they changed.</summary>
-    public void End()
+    /// <summary>
+    /// As the request ends: its lock given up, its values written back where they changed; true where that is done,
+    /// false where the store does it later, <paramref name="later"/> then called, from another thread, once it has.
+    /// </summary>
+    public bool End(Action later)
     {
-        if (!_locked) return;
-        Store.Close(Id!, _changed ? new Dictionary<string, string>(_values, StringComparer.Ordinal) : null);
+        if (!_locked) return true;
         _locked = false;
+        return Store.Close(Id!, _changed ? new Dictionary<string, string>(_values, StringComparer.Ordinal) : null, later);
     }
 
-    /// <summary>Whether the page can read its session; a <c>SessionLockError</c> where its lock was waited for too long.</summary>
+    /// <summary>
+    /// Whether the page can read its session: a <c>SessionLockError</c> where its lock was waited for too long, and a
+    /// <c>DatabaseError</c> where the store it is kept in failed.
+    /// </summary>
     public bool TryCheckUsable(out WebLingoRuntimeError? error)
     {
         error = null;
+        if (_failure is { } failure)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.DatabaseFailure, $"The session cannot be read: {failure}.");
+            return false;
+        }
         if (!_lockFailed) return true;
         var seconds = Store.LockTimeout.TotalSeconds.ToString(CultureInfo.InvariantCulture);
         error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.SessionLocked,
@@ -190,7 +219,7 @@ internal sealed class WebLingoSession
     public bool TryRelease(out WebLingoRuntimeError? error)
     {
         if (!TryCheckUsable(out error)) return false;
-        End();
+        End(() => { });
         _released = true;
         return true;
     }
@@ -205,9 +234,17 @@ internal sealed class WebLingoSession
             return false;
         }
         if (!TryNewId(out var renewed, out error)) return false;
-        for (var tries = 0; !Store.Renew(Id, renewed); tries++)
+        try
         {
-            if (tries == 3 || !TryNewId(out renewed, out error)) return false;
+            for (var tries = 0; !Store.Renew(Id, renewed); tries++)
+            {
+                if (tries == 3 || !TryNewId(out renewed, out error)) return false;
+            }
+        }
+        catch (WebLingoSessionStoreException failure)
+        {
+            error = Failed("renewed", failure);
+            return false;
         }
         Id = renewed;
         SetCookie(renewed);
@@ -218,7 +255,15 @@ internal sealed class WebLingoSession
     public bool TryEnd(out WebLingoRuntimeError? error)
     {
         if (!TryCheckWritable(out error) || Id is null) return error is null;
-        Store.Remove(Id);
+        try
+        {
+            Store.Remove(Id);
+        }
+        catch (WebLingoSessionStoreException failure)
+        {
+            error = Failed("ended", failure);
+            return false;
+        }
         WebLingoCookies.TrySet(_response.Headers, CookieName, Options(), WebLingoCookies.Deletion(CookieName, Options()));
         (Id, _locked, _changed, _values) = (null, false, false, new Dictionary<string, string>(StringComparer.Ordinal));
         return true;
@@ -246,9 +291,17 @@ internal sealed class WebLingoSession
             return false;
         }
         if (!TryNewId(out var id, out error)) return false;
-        for (var tries = 0; !Store.Create(id); tries++)
+        try
         {
-            if (tries == 3 || !TryNewId(out id, out error)) return false;
+            for (var tries = 0; !Store.Create(id); tries++)
+            {
+                if (tries == 3 || !TryNewId(out id, out error)) return false;
+            }
+        }
+        catch (WebLingoSessionStoreException failure)
+        {
+            error = Failed("made", failure);
+            return false;
         }
         (Id, _locked) = (id, true);
         SetCookie(id);
@@ -278,6 +331,10 @@ internal sealed class WebLingoSession
     }
 
     private static WebLingoRuntimeError Invalid(string message) => new(WebLingoDiagnosticCodes.InvalidOperation, message);
+
+    /// <summary>The store's failure, a <c>DatabaseError</c>: <c>The session cannot be made: …</c>.</summary>
+    private static WebLingoRuntimeError Failed(string done, WebLingoSessionStoreException failure) =>
+        new(WebLingoDiagnosticCodes.DatabaseFailure, $"The session cannot be {done}: {failure.Message}.");
 }
 
 /// <summary>

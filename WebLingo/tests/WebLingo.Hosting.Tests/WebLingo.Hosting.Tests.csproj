@@ -7,6 +7,7 @@
     <ProjectReference Include="../../src/WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />
     <ProjectReference Include="../../src/WebLingo.Hosting/WebLingo.Hosting.csproj" />
     <ProjectReference Include="../../src/WebLingo.Hosting.AspNetCore/WebLingo.Hosting.AspNetCore.csproj" />
+    <ProjectReference Include="../../src/WebLingo.Data.DotNet/WebLingo.Data.DotNet.csproj" />
   </ItemGroup>
   <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>
 </Project>
