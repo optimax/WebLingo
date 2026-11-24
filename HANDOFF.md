@@ -172,12 +172,9 @@ unchanged, .NET's JIT at work: its remedy is the
 deferred task "`weblingo` and `wasp` Published ReadyToRun". The benchmark's `io` measures .NET's thread pool more than
 the VM, and falls at about 1.1 s or 2.7 s by build.
 
-A young generation for the collector is built as the owner approved it (the specification, section 4.2, "A young
-generation"), on the branch `claude/young-generation`, not on `main`: where much is live it makes an instance made and
-dropped about 1.7 times as fast, but `closures`, `objects`, `strings` and `imports` are 1 to 3 percent slower than
-`main`'s by a rank test over 24 alternating rounds, and the owner's A3 (a) lands it only where no workload is slower
-beyond the machine's noise. Its Q4 in `TO-DO.md` asks whether to land it so, tune it further, or drop it. The branch's
-section 4.2 and its `Documents/implementation.md`, "Every Store Goes Through the Heap", say how it works.
+A young generation for the collector (the specification, section 4.2, "A young generation") was built on a branch,
+measured, and dropped by the owner (24 November 2026): about 1.7 times as fast where much is live, but four of the
+benchmark's workloads 1 to 3 percent slower. Its design stays in the specification, Proposed; nothing of it is on `main`.
 
 Since `071ad6b` the heap reads the VM's frames when it collects (`WebLingoHeap.Frames`, `IWebLingoRootSource`), and
 since `9c2cc3b` it keeps what is being stored or made while it collects; `Documents/implementation.md`, "A Value Just
@@ -208,8 +205,8 @@ Core adapter raises Kestrel's own limit to the site's, but IIS's request filteri
 its `web.config` (the WASP User Manual, section 17). `UploadTests` (`WebLingo.Hosting.Tests`) and
 `WaspServeTests.AFormsFilesAreUploaded`, through Kestrel, 30.5 MB among them.
 
-Next: "Debugging WASP Pages, Part 3: Conditional Breakpoints"; part 4 waits for its Q1. The young
-generation waits for its Q4, and "Sessions in WASP" for its Q5 and Q6; "Visual Studio Debug Adapter" waits for Visual
-Studio installed here, and "Extensive WASP Example" for sessions.
+Next: "Sessions in WASP", answered, then "Debugging WASP Pages, Part 3: Conditional Breakpoints", answered; part 4
+waits for Visual Studio installed here, as "Visual Studio Debug Adapter" does, and "Extensive WASP Example" for
+sessions.
 
 The last full suite, on Windows, in Release: 3,465 tests passing. Linux not tried since the last push.
