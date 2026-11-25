@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -8,12 +9,20 @@ namespace WebLingo.Conformance.Tests;
 /// <summary>
 /// A client of the debug adapter's (specification, section 5.7), for tests: <c>weblingo --debug-adapter</c> or
 /// <c>wasp --debug-adapter</c> started beside them, spoken to by the Debug Adapter Protocol, its events kept until asked for.
+/// Each request's answer, and each event, is waited for 30 s at most from when it is asked for. Its requests are written,
+/// and the adapter's messages read, by threads of its own, a thread of its own reading them: never by the thread pool's,
+/// which tests running beside it may keep busy for longer than that. Until 24 November 2026 the whole session had 30 s from
+/// its start, and its pipes were read and written through the pool, so that it failed on a loaded machine ("Flaky Tests
+/// Found Under Load").
 /// </summary>
 public sealed class DebugAdapterSession : IAsyncDisposable
 {
+    private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(30);
+
     private readonly Process _process;
+    private readonly BlockingCollection<JsonElement> _messages = [];
+    private readonly Thread _reader;
     private readonly List<JsonElement> _events = [];
-    private readonly CancellationTokenSource _timeout = new(TimeSpan.FromSeconds(30));
     private int _sequence;
 
     /// <summary>A session of <paramref name="adapter"/>'s, <c>weblingo</c> or <c>wasp</c>, beside the tests.</summary>
@@ -24,6 +33,8 @@ public sealed class DebugAdapterSession : IAsyncDisposable
         {
             UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true
         })!;
+        _reader = new Thread(ReadAll) { IsBackground = true, Name = "The debug adapter's messages" };
+        _reader.Start();
     }
 
     public async Task Start(string program, bool stopOnEntry = false, string[]? args = null, string? root = null)
@@ -42,17 +53,18 @@ public sealed class DebugAdapterSession : IAsyncDisposable
         await Event("initialized");
     }
 
-    public async Task<JsonElement> Request(string command, object? arguments = null)
+    public Task<JsonElement> Request(string command, object? arguments = null)
     {
+        var deadline = Environment.TickCount64 + (long)Deadline.TotalMilliseconds;
         var seq = ++_sequence;
         var payload = JsonSerializer.SerializeToUtf8Bytes(new { seq, type = "request", command, arguments });
         var stream = _process.StandardInput.BaseStream;
-        await stream.WriteAsync(Encoding.ASCII.GetBytes($"Content-Length: {payload.Length}\r\n\r\n"), _timeout.Token);
-        await stream.WriteAsync(payload, _timeout.Token);
-        await stream.FlushAsync(_timeout.Token);
+        stream.Write(Encoding.ASCII.GetBytes($"Content-Length: {payload.Length}\r\n\r\n"));
+        stream.Write(payload);
+        stream.Flush();
         while (true)
         {
-            var message = await Read();
+            var message = Next(deadline, $"the answer to '{command}'");
             if (message.GetProperty("type").GetString() == "event")
             {
                 _events.Add(message);
@@ -60,12 +72,13 @@ public sealed class DebugAdapterSession : IAsyncDisposable
             }
             Assert.Equal(seq, message.GetProperty("request_seq").GetInt32());
             Assert.True(message.GetProperty("success").GetBoolean(), message.GetRawText());
-            return message.TryGetProperty("body", out var body) ? body : default;
+            return Task.FromResult(message.TryGetProperty("body", out var body) ? body : default);
         }
     }
 
-    public async Task<JsonElement> Event(string name)
+    public Task<JsonElement> Event(string name)
     {
+        var deadline = Environment.TickCount64 + (long)Deadline.TotalMilliseconds;
         while (true)
         {
             var index = _events.FindIndex(message => message.GetProperty("event").GetString() == name);
@@ -73,9 +86,9 @@ public sealed class DebugAdapterSession : IAsyncDisposable
             {
                 var message = _events[index];
                 _events.RemoveAt(index);
-                return message.TryGetProperty("body", out var body) ? body : default;
+                return Task.FromResult(message.TryGetProperty("body", out var body) ? body : default);
             }
-            var next = await Read();
+            var next = Next(deadline, $"the event '{name}'");
             Assert.Equal("event", next.GetProperty("type").GetString());
             _events.Add(next);
         }
@@ -95,38 +108,69 @@ public sealed class DebugAdapterSession : IAsyncDisposable
         (await Variables(frame)).EnumerateArray().ToDictionary(variable => variable.GetProperty("name").GetString()!,
             variable => variable.GetProperty("value").GetString()!);
 
-    private async Task<JsonElement> Read()
+    /// <summary>The adapter's next message, by <paramref name="deadline"/>, or a failure naming what was awaited.</summary>
+    private JsonElement Next(long deadline, string awaited)
     {
-        var stream = _process.StandardOutput.BaseStream;
+        var left = Math.Max(0, deadline - Environment.TickCount64);
+        if (_messages.TryTake(out var message, TimeSpan.FromMilliseconds(left))) return message;
+        throw new TimeoutException(_messages.IsAddingCompleted
+            ? $"The debug adapter ended before {awaited}."
+            : $"{awaited} did not come within {Deadline.TotalSeconds} s.");
+    }
+
+    /// <summary>The adapter's messages, read on the session's own thread until its output ends.</summary>
+    private void ReadAll()
+    {
+        try
+        {
+            var stream = _process.StandardOutput.BaseStream;
+            while (Read(stream) is { } message) _messages.Add(message);
+        }
+        catch (Exception exception) when (exception is IOException or ObjectDisposedException or InvalidOperationException)
+        {
+            // The adapter's output closed under the session as it was disposed.
+        }
+        finally
+        {
+            // Once disposed, the session has done with its messages: a reader slower to end than its wait finds the
+            // collection gone, which it must not fail on, a thread's exception ending the test host.
+            try { _messages.CompleteAdding(); }
+            catch (ObjectDisposedException) { }
+        }
+    }
+
+    /// <summary>A message, its header and its payload, read synchronously, or null where the output ends before one.</summary>
+    private static JsonElement? Read(Stream stream)
+    {
         var header = new StringBuilder();
-        var buffer = new byte[1];
         while (!header.ToString().EndsWith("\r\n\r\n", StringComparison.Ordinal))
         {
-            await stream.ReadExactlyAsync(buffer, _timeout.Token);
-            header.Append((char)buffer[0]);
+            var b = stream.ReadByte();
+            if (b < 0) return null;
+            header.Append((char)b);
         }
         const string prefix = "Content-Length: ";
         Assert.StartsWith(prefix, header.ToString());
         var count = int.Parse(header.ToString().AsSpan(prefix.Length).Trim(), CultureInfo.InvariantCulture);
         var payload = new byte[count];
-        await stream.ReadExactlyAsync(payload, _timeout.Token);
+        stream.ReadExactly(payload);
         return JsonSerializer.Deserialize<JsonElement>(payload);
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         if (!_process.HasExited)
         {
             _process.StandardInput.Close();
-            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            try { await _process.WaitForExitAsync(deadline.Token); }
-            catch (OperationCanceledException)
+            if (!_process.WaitForExit(2_000))
             {
-                if (!_process.HasExited) _process.Kill(entireProcessTree: true);
-                await _process.WaitForExitAsync();
+                _process.Kill(entireProcessTree: true);
+                _process.WaitForExit();
             }
         }
+        var read = _reader.Join(TimeSpan.FromSeconds(10));
         _process.Dispose();
-        _timeout.Dispose();
+        if (read) _messages.Dispose();
+        return ValueTask.CompletedTask;
     }
 }

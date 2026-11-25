@@ -113,6 +113,22 @@ public sealed class MailTests : IDisposable
     }
 
     [Fact]
+    public void AServerNothingAnswersAtCannotBeReached()
+    {
+        // A port nothing listens on: its connection refused, at once, the connection being made without the thread pool.
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        File.WriteAllText(Path.Combine(_folder, "weblingo.config"),
+            $"{{ \"mail\": {{ \"default\": {{ \"host\": \"127.0.0.1\", \"port\": {port}, \"tls\": \"none\" }} }} }}");
+        var (exit, output, error) = Weblingo($"try {{ await mail.send({Message}); }} catch (MailError e) {{ writeLn([e.code, e.reply]); writeLn(e.message); }}");
+        Assert.Equal((0, ""), (exit, error));
+        Assert.StartsWith($"[\"WL3023\", null]\nThe message cannot be sent: the mail server 127.0.0.1:{port} cannot be reached: ", output,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AServerThatOffersNoTlsIsRefusedUnlessItsSettingsSayNone()
     {
         var server = Server(SmtpTestTls.None);

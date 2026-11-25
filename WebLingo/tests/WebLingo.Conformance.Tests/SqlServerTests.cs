@@ -20,7 +20,7 @@ public sealed class SqlServerTests : IDisposable
         {
             // The database dropped, the connections the provider keeps in its pool closed with it.
             if (_made) Weblingo($"using (var db = await Database.open(\"master\")) {{ await db.execute(\"ALTER DATABASE [{_database}] " +
-                                $"SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{_database}];\"); }}");
+                                $"SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{_database}];\", {{}}, {{ timeout: {MakingTimeout} }}); }}");
         }
         finally
         {
@@ -82,6 +82,13 @@ public sealed class SqlServerTests : IDisposable
             "[\"WL3015\", true]\n[{\"n\": 1}]\n[{\"Id\": 1}, {\"Id\": 3}]\nInvalid object name 'Nowhere'.\n", ""), (exit, output, error));
     }
 
+    /// <summary>
+    /// How long the server may take to make the test's database, or to drop it, in seconds: a quarter of a second on an idle
+    /// machine, more than a statement's 30 s on a loaded one (24 November 2026, "Flaky Tests Found Under Load"), the
+    /// server's own time, not what the test tries.
+    /// </summary>
+    internal const int MakingTimeout = 300;
+
     /// <summary>The test's database, made on the server, and a configuration naming it "shop", and the server's master "master".</summary>
     private void Make()
     {
@@ -92,7 +99,8 @@ public sealed class SqlServerTests : IDisposable
             ["shop"] = SqlServerFactAttribute.ConnectionString(_database)
         };
         File.WriteAllText(Path.Combine(_folder, WebLingoSchemes.ConfigurationFile), JsonSerializer.Serialize(new { databases }));
-        var (exit, output, error) = Weblingo($"using (var db = await Database.open(\"master\")) {{ await db.execute(\"CREATE DATABASE [{_database}]\"); }}");
+        var (exit, output, error) = Weblingo($"using (var db = await Database.open(\"master\")) {{ await db.execute(\"CREATE DATABASE [{_database}]\", {{}}, "
+                                             + $"{{ timeout: {MakingTimeout} }}); }}");
         Assert.Equal((WebLingoCommandLine.Success, "", ""), (exit, output, error));
         _made = true;
     }

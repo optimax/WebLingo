@@ -101,9 +101,10 @@ public sealed class ConsoleTextTests : IDisposable
         var (launcher, arguments) = OperatingSystem.IsWindows()
             ? MakeWindowsLauncher(marker, overflow)
             : MakeLinuxLauncher(marker, overflow);
-        // The timeout covers the launcher's start and the descendant's, on Windows two PowerShells, the launcher no longer
-        // compiling C# with Add-Type, with which they once took more than 20 s on GitHub's windows-latest runner
-        // (24 November 2026); without an overflow, the test lasts it.
+        // The timeout covers the launcher's start and the descendant's: on Windows a PowerShell, then a cmd, which starts in
+        // milliseconds. Two PowerShells, the launcher compiling C# with Add-Type, once took more than 20 s on GitHub's
+        // windows-latest runner, and two without it on this machine under load ("Flaky Tests Found Under Load", 24 November
+        // 2026); without an overflow, the test lasts it.
         var script = Write("run.wlg", """
             param executable;
             param launchArgs;
@@ -164,33 +165,24 @@ public sealed class ConsoleTextTests : IDisposable
         catch (IOException exception) { return "its log unreadable, " + exception.Message; }
     }
 
+    /// <summary>
+    /// A PowerShell that starts its descendant, a cmd, writes the descendant's id where the test reads it, and exits; the
+    /// descendant, not redirected, sharing its console and inheriting its standard handles, the capture's pipes, waits two
+    /// seconds, for the launcher to have exited, then, for an overflow, writes 8,192 bytes, a file's the launcher wrote
+    /// (<c>&lt;marker&gt;.bytes</c>), and holds the pipes for a minute, its <c>ping</c> writing nowhere.
+    /// </summary>
     private static (string Program, string[] Arguments) MakeWindowsLauncher(string marker, bool overflow)
     {
         var shell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
-        var writeOutput = $$"""
-            $raw = [Console]::OpenStandardOutput()
-            $bytes = [Text.Encoding]::ASCII.GetBytes('x' * 8192)
-            try {
-              $raw.Write($bytes, 0, $bytes.Length)
-              $raw.Flush()
-              [IO.File]::WriteAllText('{{marker.Replace("'", "''")}}.output', $raw.GetType().FullName)
-            }
-            catch { [IO.File]::WriteAllText('{{marker.Replace("'", "''")}}.output', [string]$_) }
-            """;
+        var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+        var output = marker + ".bytes";
+        if (overflow) File.WriteAllText(output, new string('x', 8192));
+        var commands = "ping -n 3 127.0.0.1 >nul & " + (overflow ? $"type \"{output}\" & " : "") + "ping -n 61 127.0.0.1 >nul";
         var launcher = $$"""
-            $child = @'
-            $launcher = Get-Process -Id PARENT_ID -ErrorAction SilentlyContinue
-            if ($launcher -and !$launcher.WaitForExit(10000)) { exit 1 }
-            [IO.File]::WriteAllText('{{marker.Replace("'", "''")}}', [string]$PID)
-            {{(overflow ? writeOutput : "")}}
-            Start-Sleep -Seconds 60
-            '@ -replace 'PARENT_ID', [string]$PID
-            $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($child))
-            # Not redirected, the descendant shares the launcher's console and inherits its standard handles, the pipes.
-            $arguments = "-NoProfile -NonInteractive -EncodedCommand $encoded"
-            $start = New-Object Diagnostics.ProcessStartInfo '{{shell.Replace("'", "''")}}', $arguments
+            $start = New-Object Diagnostics.ProcessStartInfo '{{cmd.Replace("'", "''")}}', '/d /c "{{commands.Replace("'", "''")}}"'
             $start.UseShellExecute = $false
-            [void][Diagnostics.Process]::Start($start)
+            $descendant = [Diagnostics.Process]::Start($start)
+            [IO.File]::WriteAllText('{{marker.Replace("'", "''")}}', [string]$descendant.Id)
             """;
         return (shell, ["-NoProfile", "-NonInteractive", "-EncodedCommand",
             Convert.ToBase64String(Encoding.Unicode.GetBytes(launcher))]);

@@ -14,7 +14,10 @@ public enum SmtpTestTls { StartTls, Implicit, None }
 /// The tests' SMTP server, on the loopback address, for <c>std:mail</c>'s tests (specification, section 7.17): never a
 /// real one. It offers STARTTLS, or TLS from the start, with a self-signed certificate, the sign-ins it is given, and
 /// takes a message, recording each command and the message's lines, a dot-stuffed line unstuffed; it refuses one
-/// recipient where it is told to, and a sign-in that does not match.
+/// recipient where it is told to, and a sign-in that does not match. It serves on a thread of its own, never the thread
+/// pool's, which tests running beside it may keep busy for longer than a client waits for its greeting: until 24 November
+/// 2026 it accepted through the pool, and a client waited a minute for it on a loaded machine ("Flaky Tests Found Under
+/// Load").
 /// </summary>
 public sealed class SmtpTestServer : IDisposable
 {
@@ -49,7 +52,7 @@ public sealed class SmtpTestServer : IDisposable
     public SmtpTestServer Start()
     {
         _listener.Start();
-        _ = Task.Run(Serve);
+        new Thread(Serve) { IsBackground = true, Name = "The SMTP test server" }.Start();
         return this;
     }
 
@@ -74,16 +77,17 @@ public sealed class SmtpTestServer : IDisposable
         return X509CertificateLoader.LoadPkcs12(made.Export(X509ContentType.Pkcs12), null);
     }
 
-    private async Task Serve()
+    private void Serve()
     {
         while (!_stop.IsCancellationRequested)
         {
             TcpClient client;
             try
             {
-                client = await _listener.AcceptTcpClientAsync(_stop.Token);
+                // Stopping the listener ends a wait here.
+                client = _listener.AcceptTcpClient();
             }
-            catch (Exception exception) when (exception is OperationCanceledException or SocketException or ObjectDisposedException)
+            catch (Exception exception) when (exception is SocketException or ObjectDisposedException or InvalidOperationException)
             {
                 return;
             }

@@ -15,7 +15,11 @@ namespace WebLingo.Platform.DotNet;
 /// certificate checked, its chain and its name, one that cannot be checked accepted only by its thumbprint, SHA-256 or
 /// SHA-1, as the settings give it. Signing in by AUTH (RFC 4954): XOAUTH2 with a token, else PLAIN, else LOGIN; a password
 /// never sent without TLS, but to a server on this machine. Each step blocks, for <see cref="Timeout"/> at most, the
-/// message's end for ten minutes, as RFC 5321 allows a server.
+/// message's end for ten minutes, as RFC 5321 allows a server: synchronously, the connection and TLS's handshake too, since
+/// a send runs on a thread that may block (the scheduler host's <c>RunBlocking</c>, one of the thread pool's), where an
+/// asynchronous operation waited for needs another of the pool's threads to complete it, which a busy pool may not give
+/// for longer than the server waits (24 November 2026, "Flaky Tests Found Under Load": a handshake waited for so took more
+/// than 10 s on a loaded machine).
 /// </summary>
 public sealed class WebLingoSmtpClient : IDisposable
 {
@@ -67,20 +71,62 @@ public sealed class WebLingoSmtpClient : IDisposable
 
     private static WebLingoSmtpClient Connect(WebLingoMailServer server)
     {
-        var tcp = new TcpClient();
+        Socket socket;
         try
         {
-            using var cancel = new CancellationTokenSource(Timeout);
-            tcp.ConnectAsync(server.Host, server.Port, cancel.Token).AsTask().GetAwaiter().GetResult();
+            socket = ConnectWithin(server.Host, server.Port, Timeout);
         }
-        catch (Exception exception) when (exception is SocketException or OperationCanceledException or IOException)
+        catch (Exception exception) when (exception is SocketException or TimeoutException)
         {
-            tcp.Dispose();
-            var why = exception is OperationCanceledException ? "it did not answer in time" : exception.Message.TrimEnd('.');
+            var why = exception is TimeoutException ? "it did not answer in time" : exception.Message.TrimEnd('.');
             throw Failed($"the mail server {server.Host}:{server.Port} cannot be reached: {why}");
         }
+        var tcp = new TcpClient { Client = socket };
         tcp.ReceiveTimeout = tcp.SendTimeout = (int)Timeout.TotalMilliseconds;
         return new WebLingoSmtpClient(server, tcp);
+    }
+
+    /// <summary>
+    /// A connection to <paramref name="host"/>, made synchronously within <paramref name="timeout"/>, each of its addresses
+    /// tried in turn, as <see cref="TcpClient"/>'s own connect tries them: a socket that does not block connecting, its
+    /// end waited for by <see cref="Socket.Select"/>, which no thread of the pool completes.
+    /// </summary>
+    private static Socket ConnectWithin(string host, int port, TimeSpan timeout)
+    {
+        var deadline = Environment.TickCount64 + (long)timeout.TotalMilliseconds;
+        var addresses = IPAddress.TryParse(host, out var given) ? [given] : Dns.GetHostAddresses(host);
+        Exception failure = new SocketException((int)SocketError.HostNotFound);
+        foreach (var address in addresses)
+        {
+            var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { Blocking = false };
+            try
+            {
+                try
+                {
+                    socket.Connect(address, port);
+                }
+                catch (SocketException exception) when (exception.SocketErrorCode is SocketError.WouldBlock or SocketError.InProgress)
+                {
+                    // Being made: Windows says so by WouldBlock, Linux by InProgress. A connection made is writable; one
+                    // refused is writable on Linux, and an error on Windows, either way its error in SO_ERROR.
+                    List<Socket> writable = [socket], failed = [socket];
+                    var left = Math.Max(0, deadline - Environment.TickCount64);
+                    Socket.Select(null, writable, failed, (int)Math.Min(left * 1000, int.MaxValue));
+                    if (writable.Count == 0 && failed.Count == 0) throw new TimeoutException();
+                    var error = (SocketError)(int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Error)!;
+                    if (error != SocketError.Success) throw new SocketException((int)error);
+                }
+                socket.Blocking = true;
+                return socket;
+            }
+            catch (Exception exception) when (exception is SocketException or TimeoutException)
+            {
+                socket.Dispose();
+                if (exception is TimeoutException || Environment.TickCount64 >= deadline) throw new TimeoutException();
+                failure = exception;
+            }
+        }
+        throw failure;
     }
 
     private void Converse(string? password, string? token, string from, IReadOnlyList<string> recipients, byte[] data)
@@ -211,10 +257,10 @@ public sealed class WebLingoSmtpClient : IDisposable
         };
         try
         {
-            using var cancel = new CancellationTokenSource(Timeout);
-            ssl.AuthenticateAsClientAsync(options, cancel.Token).GetAwaiter().GetResult();
+            // Synchronous, its reads and writes the socket's own, each within its timeout, Timeout.
+            ssl.AuthenticateAsClient(options);
         }
-        catch (Exception exception) when (exception is AuthenticationException or IOException or OperationCanceledException)
+        catch (Exception exception) when (exception is AuthenticationException or IOException)
         {
             ssl.Dispose();
             if (seen is not null)

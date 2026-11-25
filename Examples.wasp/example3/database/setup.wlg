@@ -35,7 +35,8 @@ if (database != null) {
 }
 
 // Each batch run on one connection, so that its USE holds for the batches after it; the last rows one gives are the
-// script's summary.
+// script's summary. Each is given five minutes, since a busy server may take longer than a statement's 30 s to make a
+// database.
 var summary = null;
 using (var db = await Database.open("server")) {
     foreach (var batch in batches) {
@@ -44,7 +45,7 @@ using (var db = await Database.open("server")) {
             sql = sql.replace($"$({name})", value);
         }
         if (sql.trim() != "") {
-            var rows = await db.query(sql);
+            var rows = await db.query(sql, {}, { timeout: 300 });
             if (rows.length > 0) {
                 summary = rows[0];
             }

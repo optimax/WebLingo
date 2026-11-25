@@ -85,7 +85,7 @@ public sealed class DatabaseSessionTests : IDisposable
         var (first, second) = (Load(Store(create: true), clock, Pages()), Load(Store(create: true), clock, Pages()));
         var id = Cookie.Match(Get(first, "/set").Response.Headers.GetValues("Set-Cookie")[0]).Groups[1].Value;
 
-        var holding = Begin(first, "/slow", id);
+        var holding = Begin(first, "/slow", id, toTimer: true);
         Assert.Equal(50L, holding.Outcome.WaitMilliseconds);
         var waiting = Begin(second, "/look", id);
         // Read again every 100 ms, it stays waiting while the first process holds the lock.
@@ -103,7 +103,7 @@ public sealed class DatabaseSessionTests : IDisposable
         var clock = new ManualClock();
         var app = Load(Store(create: true, lockTimeout: TimeSpan.FromMilliseconds(300)), clock, Pages());
         var id = Cookie.Match(Get(app, "/set").Response.Headers.GetValues("Set-Cookie")[0]).Groups[1].Value;
-        var holding = Begin(app, "/slow", id);
+        var holding = Begin(app, "/slow", id, toTimer: true);
         var waiting = Begin(app, "/locked", id);
         Finish(waiting);
         Assert.Equal("WL3024", Body(waiting.Response));
@@ -253,25 +253,44 @@ public sealed class DatabaseSessionTests : IDisposable
         public WebLingoRequestOutcome Outcome { get; set; } = null!;
     }
 
-    /// <summary>A request begun with a scheduler host of its own, gone on with while it waits only for the database.</summary>
-    private static Running Begin(WebLingoApplication app, string path, string id)
+    /// <summary>
+    /// A request begun with a scheduler host of its own, gone on with while it waits only for the database: where
+    /// <paramref name="toTimer"/> is true, until it waits for a timer, as a page holding the lock while it awaits a delay,
+    /// each answer of the database waited for 10 s at most, however slow the machine; otherwise until the database has
+    /// answered nothing for 200 ms, as for a request waiting for the lock another holds, which reads the table again every
+    /// 100 ms and answers only once it has the lock. Until 24 November 2026 a request to its timer stopped too once 200 ms
+    /// passed without an answer, so that on a loaded machine it was left before its delay, which then fell at a time the
+    /// test's clock never reached, and <see cref="Finish"/> resumed it for ever.
+    /// </summary>
+    private static Running Begin(WebLingoApplication app, string path, string id, bool toTimer = false)
     {
         var running = new Running(new WebLingoBufferedResponse(), new Posts());
         running.Outcome = app.Handle(Request(path, id), running.Response, new WebLingoWorkerId(0), scheduler: running.Posts);
-        while (running.Outcome is { Kind: WebLingoRequestOutcomeKind.Waiting, WaitMilliseconds: < 0 }
-               && SpinWait.SpinUntil(() => running.Posts.Count > 0, TimeSpan.FromMilliseconds(200)))
+        var within = TimeSpan.FromMilliseconds(toTimer ? 10_000 : 200);
+        while (running.Outcome is { Kind: WebLingoRequestOutcomeKind.Waiting, WaitMilliseconds: < 0 })
         {
+            if (!SpinWait.SpinUntil(() => running.Posts.Count > 0, within))
+            {
+                Assert.False(toTimer, $"{path} had no answer from the database within 10 s.");
+                break;
+            }
             running.Outcome = running.Outcome.Resume!();
         }
+        Assert.True(!toTimer || running.Outcome.WaitMilliseconds >= 0, $"{path} did not come to its timer.");
         return running;
     }
 
-    /// <summary>A request gone on with until it ends, its waits for the database and for its timers resumed.</summary>
+    /// <summary>
+    /// A request gone on with until it ends, its waits for the database and for its timers resumed; a timer whose time
+    /// the test's clock does not reach failing the test, not resumed for ever.
+    /// </summary>
     private static void Finish(Running running)
     {
+        var timers = 0;
         while (running.Outcome.Kind == WebLingoRequestOutcomeKind.Waiting)
         {
             if (running.Outcome.WaitMilliseconds < 0) Assert.True(SpinWait.SpinUntil(() => running.Posts.Count > 0, TimeSpan.FromSeconds(10)));
+            else Assert.True(++timers < 100, $"The request waits for a timer, {running.Outcome.WaitMilliseconds} ms, that the test's clock does not reach.");
             running.Outcome = running.Outcome.Resume!();
         }
     }

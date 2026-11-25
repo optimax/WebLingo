@@ -238,7 +238,9 @@ public sealed class WaspServeTests : IDisposable
     {
         var database = "WebLingoSessionTests" + Guid.NewGuid().ToString("N");
         var server = new WebLingo.Data.DotNet.DotNetDatabases(new Dictionary<string, string> { ["master"] = SqlServerFactAttribute.ConnectionString("master") }, _root);
-        using (var master = server.Open("master")) master.Execute($"CREATE DATABASE [{database}]", [], null);
+        // The server's own time to make a database, or drop it, given five minutes: more than a statement's 30 s on a
+        // loaded machine (24 November 2026, "Flaky Tests Found Under Load").
+        using (var master = server.Open("master")) master.Execute($"CREATE DATABASE [{database}]", [], 300);
         try
         {
             Write("wasp.config", "{ \"databases\": { \"main\": \"" + SqlServerFactAttribute.ConnectionString(database) + "\" }, "
@@ -266,7 +268,7 @@ public sealed class WaspServeTests : IDisposable
             Microsoft.Data.SqlClient.SqlConnection.ClearAllPools();
             using var master = server.Open("master");
             master.Execute($"IF DB_ID(N'{database}') IS NOT NULL BEGIN ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; "
-                           + $"DROP DATABASE [{database}]; END", [], null);
+                           + $"DROP DATABASE [{database}]; END", [], 300);
         }
     }
 
@@ -507,7 +509,7 @@ public sealed class WaspServeTests : IDisposable
             var drop = Path.Combine(copy, "database", "drop.wlg");
             File.WriteAllText(drop, "import { Database } from \"std:db\"; using (var db = await Database.open(\"server\")) { " +
                                     $"await db.execute(\"IF DB_ID(N'{database}') IS NOT NULL BEGIN ALTER DATABASE [{database}] " +
-                                    $"SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{database}]; END\"); }}");
+                                    $"SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{database}]; END\", {{}}, {{ timeout: 300 }}); }}");
             WebLingoCommandLine.Run(["run", drop], new StringWriter(), new StringWriter());
             Directory.Delete(copy, recursive: true);
         }
