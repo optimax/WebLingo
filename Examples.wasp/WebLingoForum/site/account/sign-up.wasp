@@ -1,0 +1,22 @@
+<% param request; param response; import { signUpPage } from "/lib/accounts.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await signUpPage(request, response)).title }; %>
+<% var view = await signUpPage(request, response); var site = view.site; %>
+<h1><%= view.title %></h1>
+<% if (view.closed) { %>
+<p class="notice"><%= site.t("signUp.closed") %></p>
+<% } else if (view.sent != null) { %>
+<p class="notice" role="status"><%= site.f("signUp.sent", { email: view.sent }) %></p>
+<% if (view.mailFailed) { %><p class="problems"><%= site.t("signUp.mailFailed") %></p><% } %>
+<% } else { %>
+<p><%= site.t("signUp.intro") %></p>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems }); %>
+<form method="post" class="form" action="/account/sign-up?back=<%= view.back %>">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <label><%= site.t("signUp.name") %> <input name="name" value="<%= view.values["name"] %>" required maxlength="40" autocomplete="username"></label>
+  <label><%= site.t("signUp.email") %> <input type="email" name="email" value="<%= view.values["email"] %>" required maxlength="254" autocomplete="email"></label>
+  <label><%= site.t("signUp.password") %> <input type="password" name="password" required minlength="8" maxlength="200" autocomplete="new-password"></label>
+  <label><%= site.t("signUp.passwordAgain") %> <input type="password" name="passwordAgain" required minlength="8" maxlength="200" autocomplete="new-password"></label>
+  <button><%= site.t("signUp.submit") %></button>
+</form>
+<p><%= site.t("signUp.haveAccount") %> <a href="/account/sign-in"><%= site.t("nav.signIn") %></a></p>
+<% } %>

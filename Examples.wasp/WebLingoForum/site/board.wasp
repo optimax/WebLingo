@@ -1,3 +1,4 @@
+<% session readonly; %>
 <% param request; param response; import { boardPage } from "/lib/pages.wlg"; %>
 <% layout "/layouts/main.wasp", { title: (await boardPage(request)).title, crumbs: (await boardPage(request)).crumbs }; %>
 <% var view = await boardPage(request); var site = view.site; %>

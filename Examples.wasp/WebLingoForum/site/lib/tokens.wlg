@@ -1,0 +1,52 @@
+// The tokens of links the forum mails a member, to confirm their address or to reset their password: 256 random bits,
+// as 64 hexadecimal digits, the database keeping only their SHA-256, each used once, before it expires.
+
+import crypto from "std:crypto";
+import { insert } from "./sql.wlg";
+
+function hashOf(token) {
+    return crypto.sha256(token).toHex();
+}
+
+// Makes a token of a kind for a member, which expires so many hours from now, and gives it.
+export async function make(db, user, kind, hours, now) {
+    var token = crypto.randomBytes(32).toHex();
+    await insert(db, "tokens", { user_id: user, kind: kind, token_hash: hashOf(token), created_at: now,
+                                 expires_at: now.addHours(hours), used_at: null });
+    return token;
+}
+
+// The token's row, if it is one of that kind, neither used nor expired; else null.
+async function find(db, token, kind, now) {
+    if (!(token is String) || token.length != 64) {
+        return null;
+    }
+    var rows = await db.query("SELECT id, user_id, expires_at, used_at FROM tokens WHERE token_hash = @hash AND kind = @kind",
+                              { hash: hashOf(token), kind: kind });
+    if (rows.length == 0 || rows[0]["used_at"] != null || rows[0]["expires_at"] < now) {
+        return null;
+    }
+    return rows[0];
+}
+
+// The member a token is for, where it can still be used, without using it; else null.
+export async function peek(db, token, kind, now) {
+    return (await find(db, token, kind, now))?["user_id"];
+}
+
+// The member a token is for, the token used, where it could still be; else null. Of two requests that use one token
+// at once, one gets it.
+export async function take(db, token, kind, now) {
+    var row = await find(db, token, kind, now);
+    if (row == null) {
+        return null;
+    }
+    var used = await db.execute("UPDATE tokens SET used_at = @now WHERE id = @id AND used_at IS NULL", { now: now, id: row["id"] });
+    return used == 1 ? row["user_id"] : null;
+}
+
+// Uses every token of a kind a member has still, as a new password does its other links to reset it.
+export async function useAll(db, user, kind, now) {
+    await db.execute("UPDATE tokens SET used_at = @now WHERE user_id = @user AND kind = @kind AND used_at IS NULL",
+                     { now: now, user: user, kind: kind });
+}

@@ -1,8 +1,9 @@
 # WebLingo Forum
 
 A discussion forum written in WASP, on SQLite, SQL Server, MySQL or PostgreSQL. Its design, and the parts it is built in,
-are in `Documents/weblingo-forum.md`; this is what is built so far: part 1, its foundations, a forum's boards and topics
-read from its database. Members, writing, moderation and the rest come in the parts after it.
+are in `Documents/weblingo-forum.md`; this is what is built so far: its foundations, a forum's boards and topics read
+from its database, and its members, who sign up, confirm their address by mail, sign in and out, reset a forgotten
+password and keep a profile. Writing, moderation and the rest come in the parts after them.
 
 ```text
 WebLingoForum/
@@ -12,7 +13,10 @@ WebLingoForum/
     index.wasp  /                 the categories and their boards
     board.wasp  /board?id=1       a board's topics, 25 a page, the pinned first
     topic.wasp  /topic?id=1       a topic's posts, 20 a page
-    lib/        the forum's modules: the database's SQL, its schema, settings, texts, and what each page shows
+    account/    signing up, confirming an address, signing in and out, a forgotten password, the member's profile
+    members/    /members, the members by name, and /members/member?id=1, a member's page
+    lib/        the forum's modules: the database's SQL, its schema, settings, texts, members, their mail and tokens,
+                and what each page shows
     texts/      the forum's texts, a module for each language: en.wlg
     layouts/, includes/, components/, css/    its look, each piece a file of its own
   tests/        the forum's modules' own tests, run by weblingo test
@@ -36,8 +40,33 @@ its administrator, and a first category, board and topic. Run on a database it h
 The forum's own tests, from `tests`:
 
 ```bash
-weblingo test sql-tests.wlg schema-tests.wlg texts-tests.wlg users-tests.wlg
+weblingo test accounts-tests.wlg schema-tests.wlg sql-tests.wlg texts-tests.wlg users-tests.wlg
 ```
+
+## Mail, and members
+
+A newcomer confirms their address by a link the forum mails them, good for 48 hours, and a member who forgot their
+password resets it by a link good for an hour: the forum sends mail through the server its `site/wasp.config`'s
+`"mail"` names (the Standard Library Reference, section 31), from the address its settings' `"mailFrom"` gives:
+
+```json
+{
+  "databases": { "forum": "sqlite:../data/forum.db" },
+  "mail": { "default": { "host": "smtp.example.com", "port": 587, "user": "forum@example.com", "password": { "env": "FORUM_SMTP_PASSWORD" } } }
+}
+```
+
+Without a mail server, a newcomer is told that their mail could not be sent, and gets it when they sign in later. The
+settings, which its administration's pages will change, are `site/lib/settings.wlg`'s defaults for now: `"signUp"`,
+whether anyone may sign up; `"confirmEmail"`, whether a newcomer confirms their address first; `"mailFrom"`; and
+`"address"`, the forum's own address, `"https://forum.example.com"`, for the links in its mail, which, left `null`, is
+the address each request came to, its `Host` header's: set it where the forum is served by its name, so that no request
+can give its mail another host.
+
+Five failed sign-ins to one account in 15 minutes make the next wait. A signed-in member is their id in the request's
+session, kept in `wasp`'s memory: under IIS, or wherever more than one process serves the forum, keep the sessions in
+its database instead, `"sessions": { "store": "database", "database": "forum" }`, its table made once by
+`wasp sessions create --root site` (the WASP User Manual, section 9, "Sessions in a database").
 
 ## Another database
 

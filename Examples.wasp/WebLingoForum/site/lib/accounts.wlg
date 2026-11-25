@@ -1,0 +1,322 @@
+// What the account's pages do, and show (Documents/weblingo-forum.md, sections 2 and 3.4): signing up, confirming an
+// address, signing in, resetting a forgotten password, and the member's own profile. Each page's work runs once for
+// each request, from its layout's values, before anything is written, so that a page signed in, or sent on, shows so.
+
+import { DateTime } from "std:datetime";
+import { begin, open, viewOf, signIn, formOf, fieldOf, redirect, backOf } from "./forum.wlg";
+import { languages } from "./texts.wlg";
+import users from "./users.wlg";
+import tokens from "./tokens.wlg";
+import { sendConfirmation, sendReset } from "./mail.wlg";
+
+// Failed sign-ins to one account that make the next wait, and for how long, in minutes.
+export const failuresAllowed = 5;
+export const failuresWindow = 15;
+
+function view(site, title, request) {
+    var page = viewOf(site, title, []);
+    page.problems = [];
+    page.notice = null;
+    page.back = backOf(request.query?["back"]);
+    return page;
+}
+
+// A form's answer where its token against cross-site request forgery is not the browser's: 400, saying so.
+function expired(page, response) {
+    response.status = 400;
+    page.problems.push("form.expired");
+    return page;
+}
+
+// /account/sign-up: a name, an address and a password; the member made, unconfirmed, and mailed a link to confirm
+// their address, or, where the forum's settings confirm none, signed in.
+export async function signUpPage(request, response) {
+    var site = await begin(request);
+    return await site.once("signUp", async () => {
+        var page = view(site, site.t("signUp.title"), request);
+        page.values = { name: "", email: "" };
+        page.closed = !site.settings["signUp"];
+        page.sent = null;
+        page.mailFailed = false;
+        if (site.user != null) {
+            redirect(response, "/");
+            return page;
+        }
+        if (request.method != "POST" || page.closed) {
+            return page;
+        }
+        var form = await formOf(request);
+        if (form == null) {
+            return expired(page, response);
+        }
+        var name = fieldOf(form, "name");
+        var email = fieldOf(form, "email");
+        var password = form?["password"] ?? "";
+        page.values = { name: name, email: email };
+        foreach (var problem in [users.nameProblem(name), users.emailProblem(email), users.passwordProblem(password),
+                                 password == (form?["passwordAgain"] ?? "") ? null : "signUp.passwordsDiffer"]) {
+            if (problem != null) {
+                page.problems.push(problem);
+            }
+        }
+        if (page.problems.length > 0) {
+            response.status = 400;
+            return page;
+        }
+        var passwordHash = await users.hash(password);
+        using (var db = await open()) {
+            if (await users.byName(db, users.keyOf(name)) != null) {
+                page.problems.push("signUp.nameTaken");
+            }
+            if (await users.byEmail(db, users.keyOf(email)) != null) {
+                page.problems.push("signUp.emailTaken");
+            }
+            if (page.problems.length > 0) {
+                response.status = 400;
+                return page;
+            }
+            var now = DateTime.utcNow();
+            var confirm = site.settings["confirmEmail"];
+            var id = await db.transaction(async () => {
+                var made = await users.make(db, name, email, passwordHash, now, confirm ? null : now);
+                await users.join(db, made, "members");
+                return made;
+            });
+            if (!confirm) {
+                signIn(request, id);
+                redirect(response, page.back);
+                return page;
+            }
+            page.sent = email;
+            page.mailFailed = !(await sendConfirmation(db, site, request, { id: id, name: name, email: email }, now));
+        }
+        return page;
+    });
+}
+
+// /account/confirm?token=…: the link mailed to a member, their address confirmed, and they signed in.
+export async function confirmPage(request, response) {
+    var site = await begin(request);
+    return await site.once("confirm", async () => {
+        var page = view(site, site.t("confirm.title"), request);
+        page.confirmed = null;
+        using (var db = await open()) {
+            var now = DateTime.utcNow();
+            var id = await tokens.take(db, request.query?["token"], "confirm", now);
+            if (id == null) {
+                response.status = 404;
+                return page;
+            }
+            await db.execute("UPDATE users SET confirmed_at = @now WHERE id = @id AND confirmed_at IS NULL", { now: now, id: id });
+            page.confirmed = (await users.byId(db, id))["name"];
+            signIn(request, id);
+        }
+        return page;
+    });
+}
+
+// /account/sign-in?back=…: a name or an address, and a password; the member signed in and sent back, unless too many
+// sign-ins to the account failed lately, or their address is not confirmed, when they are mailed a new link.
+export async function signInPage(request, response) {
+    var site = await begin(request);
+    return await site.once("signIn", async () => {
+        var page = view(site, site.t("signIn.title"), request);
+        page.values = { name: "" };
+        if (site.user != null) {
+            redirect(response, page.back);
+            return page;
+        }
+        if (request.method != "POST") {
+            return page;
+        }
+        var form = await formOf(request);
+        if (form == null) {
+            return expired(page, response);
+        }
+        var name = fieldOf(form, "name");
+        var password = form?["password"] ?? "";
+        page.values = { name: name };
+        using (var db = await open()) {
+            var user = name == "" ? null : await users.byNameOrEmail(db, name);
+            var now = DateTime.utcNow();
+            if (user != null) {
+                var failures = (await db.query("SELECT COUNT(*) AS n FROM sign_in_failures WHERE user_id = @user AND failed_at > @since",
+                                               { user: user["id"], since: now.addMinutes(-failuresWindow) }))[0]["n"];
+                if (failures >= failuresAllowed) {
+                    response.status = 429;
+                    page.problems.push("signIn.tooMany");
+                    return page;
+                }
+            }
+            if (!(await users.verify(password, user?["password_hash"]))) {
+                if (user != null) {
+                    await db.execute("INSERT INTO sign_in_failures (user_id, failed_at) VALUES (@user, @now)", { user: user["id"], now: now });
+                }
+                response.status = 400;
+                page.problems.push("signIn.wrong");
+                return page;
+            }
+            await db.execute("DELETE FROM sign_in_failures WHERE user_id = @user", { user: user["id"] });
+            if (user["confirmed_at"] == null) {
+                await sendConfirmation(db, site, request, user, now);
+                page.notice = site.f("signIn.unconfirmed", { email: user["email"] });
+                return page;
+            }
+            signIn(request, user["id"]);
+            redirect(response, page.back);
+        }
+        return page;
+    });
+}
+
+// /account/forgot: an address, mailed a link to reset its password where it is a member's; the same answer whether it
+// is or not, so that the page does not tell who is a member.
+export async function forgotPage(request, response) {
+    var site = await begin(request);
+    return await site.once("forgot", async () => {
+        var page = view(site, site.t("forgot.title"), request);
+        page.values = { email: "" };
+        if (request.method != "POST") {
+            return page;
+        }
+        var form = await formOf(request);
+        if (form == null) {
+            return expired(page, response);
+        }
+        var email = fieldOf(form, "email");
+        page.values = { email: email };
+        if (users.emailProblem(email) != null) {
+            response.status = 400;
+            page.problems.push("user.emailInvalid");
+            return page;
+        }
+        using (var db = await open()) {
+            var user = await users.byEmail(db, users.keyOf(email));
+            if (user != null) {
+                await sendReset(db, site, request, user, DateTime.utcNow());
+            }
+        }
+        page.notice = site.f("forgot.sent", { email: email });
+        return page;
+    });
+}
+
+// /account/reset?token=…: the link mailed to a member, and a new password, which signs them in; their address
+// confirmed by it, and their other links to reset it used.
+export async function resetPage(request, response) {
+    var site = await begin(request);
+    return await site.once("reset", async () => {
+        var page = view(site, site.t("reset.title"), request);
+        using (var db = await open()) {
+            var now = DateTime.utcNow();
+            if (request.method != "POST") {
+                page.token = request.query?["token"];
+                if (await tokens.peek(db, page.token, "reset", now) == null) {
+                    response.status = 404;
+                    page.token = null;
+                }
+                return page;
+            }
+            var form = await formOf(request);
+            page.token = form?["token"];
+            if (form == null) {
+                return expired(page, response);
+            }
+            var password = form?["password"] ?? "";
+            var problem = users.passwordProblem(password) ?? (password == (form?["passwordAgain"] ?? "") ? null : "signUp.passwordsDiffer");
+            if (problem != null) {
+                response.status = 400;
+                page.problems.push(problem);
+                return page;
+            }
+            var passwordHash = await users.hash(password);
+            var id = await tokens.take(db, page.token, "reset", now);
+            if (id == null) {
+                response.status = 404;
+                page.token = null;
+                return page;
+            }
+            await users.setPassword(db, id, passwordHash);
+            await tokens.useAll(db, id, "reset", now);
+            await db.execute("UPDATE users SET confirmed_at = @now WHERE id = @id AND confirmed_at IS NULL", { now: now, id: id });
+            await db.execute("DELETE FROM sign_in_failures WHERE user_id = @user", { user: id });
+            signIn(request, id);
+            redirect(response, "/");
+        }
+        return page;
+    });
+}
+
+// Whether a time zone's name is one the server knows.
+function isZone(name) {
+    try {
+        DateTime.utcNow().toZone(name);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// /account/profile: the member's own time zone, language and signature, and their password changed; a reader not
+// signed in sent to sign in first.
+export async function profilePage(request, response) {
+    var site = await begin(request);
+    return await site.once("profile", async () => {
+        var page = view(site, site.t("profile.title"), request);
+        page.languages = languages;
+        if (site.user == null) {
+            redirect(response, "/account/sign-in?back=/account/profile");
+            return page;
+        }
+        page.values = { timeZone: site.user["time_zone"] ?? "", language: site.user["language"] ?? "",
+                        signature: site.user["signature"] ?? "" };
+        if (request.method != "POST") {
+            return page;
+        }
+        var form = await formOf(request);
+        if (form == null) {
+            return expired(page, response);
+        }
+        using (var db = await open()) {
+            if (form?["action"] == "password") {
+                var current = await users.byId(db, site.user["id"]);
+                var password = form?["newPassword"] ?? "";
+                var problem = users.passwordProblem(password) ?? (password == (form?["newPasswordAgain"] ?? "") ? null : "signUp.passwordsDiffer");
+                if (!(await users.verify(form?["currentPassword"] ?? "", current["password_hash"]))) {
+                    problem = "profile.wrongPassword";
+                }
+                if (problem != null) {
+                    response.status = 400;
+                    page.problems.push(problem);
+                    return page;
+                }
+                await users.setPassword(db, site.user["id"], await users.hash(password));
+                request.session.renew();
+                page.notice = site.t("profile.passwordChanged");
+                return page;
+            }
+            var zone = fieldOf(form, "timeZone");
+            var language = fieldOf(form, "language");
+            var signature = (form?["signature"] ?? "").trim().replace("\r\n", "\n");
+            page.values = { timeZone: zone, language: language, signature: signature };
+            if (zone != "" && !isZone(zone)) {
+                page.problems.push("profile.badZone");
+            }
+            if (language != "" && !languages.has(language)) {
+                page.problems.push("profile.badLanguage");
+            }
+            if (signature.length > 500) {
+                page.problems.push("profile.signatureTooLong");
+            }
+            if (page.problems.length > 0) {
+                response.status = 400;
+                return page;
+            }
+            await db.execute("UPDATE users SET time_zone = @zone, language = @language, signature = @signature WHERE id = @id",
+                             { zone: zone == "" ? null : zone, language: language == "" ? null : language,
+                               signature: signature == "" ? null : signature, id: site.user["id"] });
+            redirect(response, "/account/profile?saved=1");
+        }
+        return page;
+    });
+}

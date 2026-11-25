@@ -1,4 +1,4 @@
-<% param title; param crumbs = []; param request; import { begin } from "/lib/forum.wlg"; %>
+<% param title; param crumbs = []; param request; import { begin, hereOf } from "/lib/forum.wlg"; %>
 <%
   // Every page's frame: its head, the forum's colours from its settings, its header, the trail of links to the page,
   // and its footer (Documents/weblingo-forum.md, section 3.5).

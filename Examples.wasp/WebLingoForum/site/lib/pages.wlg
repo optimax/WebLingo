@@ -1,16 +1,13 @@
 // What each of the forum's pages shows, read from the database once for each request, so that a page and its layout
 // share it: its title, the trail of links above it, and its own data, as an object's fields.
 
-import { begin, open, idOf, pageOf, pagesOf } from "./forum.wlg";
+import { begin, open, viewOf, idOf, pageOf, pagesOf } from "./forum.wlg";
 import boards from "./boards.wlg";
 import topics from "./topics.wlg";
+import users from "./users.wlg";
 
 function view(site, title, crumbs) {
-    var made = new Object();
-    made.site = site;
-    made.title = title;
-    made.crumbs = crumbs;
-    return made;
+    return viewOf(site, title, crumbs);
 }
 
 // The page a query asks for, within the pages there are.
@@ -75,6 +72,40 @@ export async function topicPage(request) {
             page.first = (page.page - 1) * perPage;
             page.posts = await topics.posts(db, topic["id"], page.first, perPage);
             await topics.viewed(db, topic["id"]);
+            return page;
+        }
+    });
+}
+
+// The members' page, /members?page=2: a page of the members, by name, and the page numbers.
+export async function membersPage(request) {
+    var site = await begin(request);
+    return await site.once("members", async () => {
+        var page = view(site, site.t("members.title"), []);
+        var perPage = 50;
+        using (var db = await open()) {
+            page.pages = pagesOf(await users.count(db), perPage);
+            page.page = pageWithin(request, page.pages);
+            page.members = await users.list(db, (page.page - 1) * perPage, perPage);
+        }
+        return page;
+    });
+}
+
+// A member's page, /members/member?id=3: their name, when they joined and were last seen, their posts and signature;
+// its member null where the query names none, or one whose address is not confirmed.
+export async function memberPage(request) {
+    var site = await begin(request);
+    return await site.once("member", async () => {
+        using (var db = await open()) {
+            var member = await users.byId(db, idOf(request.query?["id"]));
+            if (member == null || member["confirmed_at"] == null) {
+                var missing = view(site, site.t("member.notFound"), [[site.t("members.title"), "/members"]]);
+                missing.member = null;
+                return missing;
+            }
+            var page = view(site, member["name"], [[site.t("members.title"), "/members"]]);
+            page.member = member;
             return page;
         }
     });

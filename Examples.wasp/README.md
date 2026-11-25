@@ -298,4 +298,4 @@ rights to read and change the database, which `Scripts/add-sql-server-login.wlg`
 
 A discussion forum written in WASP, on SQLite, SQL Server, MySQL or PostgreSQL, built in parts, as
 `Documents/weblingo-forum.md` designs it: its categories, boards and topics so far, read from its database, made by its
-`setup/setup.wlg`. Its own `README.md` says how to run it.
+`setup/setup.wlg`, and its members, signed up, their addresses confirmed by mail. Its own `README.md` says how to run it.

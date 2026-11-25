@@ -1,0 +1,33 @@
+<% param request; param response; import { profilePage } from "/lib/accounts.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await profilePage(request, response)).title }; %>
+<% var view = await profilePage(request, response); var site = view.site; %>
+<% if (site.user != null) { %>
+<h1><%= view.title %></h1>
+<% var notice = view.notice ?? (request.query?["saved"] == "1" && request.method == "GET" ? site.t("profile.saved") : null); %>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems, notice: notice }); %>
+<form method="post" class="form" action="/account/profile">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <input type="hidden" name="action" value="profile">
+  <label><%= site.t("profile.timeZone") %> <input name="timeZone" value="<%= view.values["timeZone"] %>" maxlength="64">
+    <span class="note"><%= site.f("profile.timeZoneHint", { zone: site.settings["timeZone"] }) %></span></label>
+  <label><%= site.t("profile.language") %>
+    <select name="language">
+      <option value=""<% if (view.values["language"] == "") { %> selected<% } %>><%= site.t("profile.languageForum") %></option>
+<% foreach (var (code, name) in view.languages) { %>
+      <option value="<%= code %>"<% if (view.values["language"] == code) { %> selected<% } %>><%= name %></option>
+<% } %>
+    </select></label>
+  <label><%= site.t("profile.signature") %> <textarea name="signature" rows="3" maxlength="500"><%= view.values["signature"] %></textarea>
+    <span class="note"><%= site.t("profile.signatureHint") %></span></label>
+  <button><%= site.t("form.save") %></button>
+</form>
+<h2 class="plain"><%= site.t("profile.password") %></h2>
+<form method="post" class="form" action="/account/profile">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <input type="hidden" name="action" value="password">
+  <label><%= site.t("profile.currentPassword") %> <input type="password" name="currentPassword" required autocomplete="current-password"></label>
+  <label><%= site.t("profile.newPassword") %> <input type="password" name="newPassword" required minlength="8" maxlength="200" autocomplete="new-password"></label>
+  <label><%= site.t("profile.newPasswordAgain") %> <input type="password" name="newPasswordAgain" required minlength="8" maxlength="200" autocomplete="new-password"></label>
+  <button><%= site.t("profile.changePassword") %></button>
+</form>
+<% } %>

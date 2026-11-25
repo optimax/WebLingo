@@ -1,0 +1,21 @@
+<% session readonly; %>
+<% param request; param response; import { memberPage } from "/lib/pages.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await memberPage(request)).title, crumbs: (await memberPage(request)).crumbs }; %>
+<% var view = await memberPage(request); var site = view.site; %>
+<% if (view.member == null) { response.status = 404; %>
+<h1><%= site.t("member.notFound") %></h1>
+<p><%= site.t("forum.notFoundText") %> <a href="/members"><%= site.t("members.title") %></a>.</p>
+<% } else { var member = view.member; %>
+<h1><%= member["name"] %></h1>
+<ul class="facts">
+  <li><%= site.f("member.joined", { time: site.time(member["created_at"]) }) %></li>
+<% if (member["last_seen_at"] != null) { %>
+  <li><%= site.f("member.lastSeen", { time: site.time(member["last_seen_at"]) }) %></li>
+<% } %>
+  <li><%= site.f("user.posts", { count: member["post_count"] }) %></li>
+</ul>
+<% if (member["signature"] != null) { %>
+<h2 class="plain"><%= site.t("member.signature") %></h2>
+<div class="body text"><%= member["signature"] %></div>
+<% } %>
+<% } %>

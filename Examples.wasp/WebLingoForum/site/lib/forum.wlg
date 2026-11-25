@@ -1,23 +1,26 @@
-// The forum as a request sees it: its settings, its texts and the time zone its dates are shown in, read once for each
-// request, since a module runs once for each request that imports it (the WASP User Manual, section 8).
+// The forum as a request sees it: its settings, its texts, the member signed in, and the time zone its dates are shown
+// in, read once for each request, since a module runs once for each request that imports it (the WASP User Manual,
+// section 8); and what its pages share: their forms, their redirects, and the member a session keeps.
 
 import { Database } from "std:db";
+import { DateTime } from "std:datetime";
 import settings from "./settings.wlg";
 import { load } from "./texts.wlg";
 
 export class Forum {
-    constructor(values, texts) {
+    constructor(values, texts, user) {
         this.settings = values;
         this.texts = texts;
-        this.zone = values["timeZone"];
+        this.user = user;
+        this.zone = user?["time_zone"] ?? values["timeZone"];
         this.kept = {};
     }
 
-    // A text by its name, and a text with values, in the forum's language.
+    // A text by its name, and a text with values, in the reader's language.
     t(name) { return this.texts.get(name); }
     f(name, values) { return this.texts.format(name, values); }
 
-    // A date as the forum shows it, in its time zone.
+    // A date as the forum shows it, in the reader's time zone.
     time(date) {
         return date == null ? "" : date.toZone(this.zone).format("d MMMM yyyy, HH:mm");
     }
@@ -38,17 +41,100 @@ var current = null;
 export async function begin(request) {
     if (current == null) {
         var values = null;
+        var user = null;
         using (var db = await open()) {
             values = await settings.load(db);
+            user = await signedIn(db, request);
         }
-        current = new Forum(values, await load(values["language"]));
+        current = new Forum(values, await load(user?["language"] ?? values["language"]), user);
     }
     return current;
+}
+
+// The member the request's session keeps, whose address is confirmed, or null; when they were last seen kept, to five
+// minutes.
+async function signedIn(db, request) {
+    var id = request.session?["user"];
+    if (!(id is Integer)) {
+        return null;
+    }
+    var rows = await db.query("""
+        SELECT id, name, email, time_zone, language, signature, last_seen_at FROM users
+        WHERE id = @id AND confirmed_at IS NOT NULL
+        """, { id: id });
+    if (rows.length == 0) {
+        return null;
+    }
+    var now = DateTime.utcNow();
+    if (rows[0]["last_seen_at"] == null || now - rows[0]["last_seen_at"] > 5 * 60 * 1000) {
+        await db.execute("UPDATE users SET last_seen_at = @now WHERE id = @id", { now: now, id: id });
+    }
+    return rows[0];
+}
+
+// Signs a member in: the session given a new id, so that one someone saw before does not become theirs, and kept.
+export function signIn(request, user) {
+    request.session.renew();
+    request.session["user"] = user;
 }
 
 // The forum's database, which wasp.config names "forum".
 export async function open() {
     return await Database.open("forum");
+}
+
+// A page's view: its forum, its title, and the trail of links above it, each a text and its link; its own data are
+// fields its page gives it.
+export function viewOf(site, title, crumbs) {
+    var made = new Object();
+    made.site = site;
+    made.title = title;
+    made.crumbs = crumbs;
+    return made;
+}
+
+// The form a POST sent, or null where its token against cross-site request forgery is not the one the browser keeps.
+export async function formOf(request) {
+    if (!(await request.checkCsrf())) {
+        return null;
+    }
+    return await request.form();
+}
+
+// A field of a form, trimmed, or "" where it is not there.
+export function fieldOf(form, name) {
+    return (form?[name] ?? "").trim();
+}
+
+// Sends the browser on to a path, 303 See Other, as a form's answer does.
+export function redirect(response, path) {
+    response.status = 303;
+    response.headers["Location"] = path;
+}
+
+// A path a link gives to come back to, if it is one of the forum's own: a path from its root, of plain characters;
+// else the front page.
+export function backOf(text) {
+    if (!(text is String) || !text.startsWith("/") || text.startsWith("//") || text.length > 200) {
+        return "/";
+    }
+    foreach (var c in text) {
+        if (!"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/?=&-_.".contains(c)) {
+            return "/";
+        }
+    }
+    return text;
+}
+
+// Where a request is, as a link back to it gives it: its path, and its id and page where the query gives them.
+export function hereOf(request) {
+    var id = idOf(request.query?["id"]);
+    var page = idOf(request.query?["page"]);
+    var query = id == null ? "" : $"?id={id}";
+    if (page != null) {
+        query = query + (query == "" ? "?" : "&") + $"page={page}";
+    }
+    return backOf(request.path + query);
 }
 
 // A positive integer from a query's text, or null where it is not one.

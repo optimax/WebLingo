@@ -1,0 +1,13 @@
+<% param request; param response; import { forgotPage } from "/lib/accounts.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await forgotPage(request, response)).title }; %>
+<% var view = await forgotPage(request, response); var site = view.site; %>
+<h1><%= view.title %></h1>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems, notice: view.notice }); %>
+<% if (view.notice == null) { %>
+<p><%= site.t("forgot.intro") %></p>
+<form method="post" class="form" action="/account/forgot">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <label><%= site.t("forgot.email") %> <input type="email" name="email" value="<%= view.values["email"] %>" required autocomplete="email"></label>
+  <button><%= site.t("forgot.submit") %></button>
+</form>
+<% } %>

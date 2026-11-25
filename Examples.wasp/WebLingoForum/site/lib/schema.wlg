@@ -3,8 +3,9 @@
 
 import { columnType } from "./sql.wlg";
 
-// The schema's version, which the table schema_version holds.
-export const version = 1;
+// The schema's version, which the table schema_version holds: 1, the forum's first part's; 2, its members' tokens and
+// failed sign-ins.
+export const version = 2;
 
 function id() { return { name: "id", type: "id", nullable: false }; }
 function integer(name) { return { name: name, type: "integer", nullable: false }; }
@@ -15,7 +16,7 @@ function date(name) { return { name: name, type: "date", nullable: false }; }
 function optional(column) { return { ...column, nullable: true }; }
 
 // Each table, in the order they are made, a table after those it refers to: its columns; its key, where it is not an
-// identity's; the tables its columns refer to; and its indexes.
+// identity's; the tables its columns refer to; its indexes; and the schema's version that added it, 1 where it says none.
 export const tables = [
     { name: "schema_version", columns: [integer("version")] },
     { name: "settings", columns: [string("name", 100), text("value")], key: ["name"] },
@@ -46,8 +47,23 @@ export const tables = [
         optional(integer("edited_by")), boolean("deleted")],
       references: { "topic_id": "topics", "user_id": "users" },
       indexes: [{ name: "posts_topic", columns: ["topic_id", "id"], unique: false },
-                { name: "posts_user", columns: ["user_id"], unique: false }] }
+                { name: "posts_user", columns: ["user_id"], unique: false }] },
+    // A link's token mailed to a member, to confirm their address or reset their password: kept only as its hash, used once.
+    { name: "tokens", since: 2, columns: [
+        id(), integer("user_id"), string("kind", 20), string("token_hash", 64), date("created_at"), date("expires_at"),
+        optional(date("used_at"))],
+      references: { "user_id": "users" },
+      indexes: [{ name: "tokens_hash", columns: ["token_hash"], unique: true }] },
+    // A failed sign-in to a member's account, which too many of in a short time make the next wait.
+    { name: "sign_in_failures", since: 2, columns: [id(), integer("user_id"), date("failed_at")],
+      references: { "user_id": "users" },
+      indexes: [{ name: "sign_in_failures_user", columns: ["user_id", "failed_at"], unique: false }] }
 ];
+
+// The schema's version that added a table.
+function sinceOf(table) {
+    return table?["since"] ?? 1;
+}
 
 // The statements that make a table and its indexes in the provider's DDL.
 export function createTable(provider, table) {
@@ -75,12 +91,28 @@ export function createTable(provider, table) {
     return statements;
 }
 
-// Every statement that makes the schema, in order, in the provider's DDL.
-export function create(provider) {
+// Every statement that makes the schema, in order, in the provider's DDL: the whole of it, or that of a version.
+export function create(provider, upTo = version) {
     var statements = [];
     foreach (var table in tables) {
-        foreach (var statement in createTable(provider, table)) {
-            statements.push(statement);
+        if (sinceOf(table) <= upTo) {
+            foreach (var statement in createTable(provider, table)) {
+                statements.push(statement);
+            }
+        }
+    }
+    return statements;
+}
+
+// The statements that upgrade a database's schema from a version to this one, in the provider's DDL: the tables added
+// since.
+export function upgrade(provider, from) {
+    var statements = [];
+    foreach (var table in tables) {
+        if (sinceOf(table) > from) {
+            foreach (var statement in createTable(provider, table)) {
+                statements.push(statement);
+            }
         }
     }
     return statements;

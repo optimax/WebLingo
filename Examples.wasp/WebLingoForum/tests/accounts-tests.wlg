@@ -1,0 +1,89 @@
+// Members' passwords and the tokens of the links the forum mails them (site/lib/users.wlg, site/lib/tokens.wlg), and the
+// schema's upgrade from its first version (site/lib/schema.wlg). weblingo test accounts-tests.wlg
+
+import { assertEqual, assertDeepEqual } from "std:test";
+import { Database } from "std:db";
+import { DateTime } from "std:datetime";
+import schema from "../site/lib/schema.wlg";
+import tokens from "../site/lib/tokens.wlg";
+import users from "../site/lib/users.wlg";
+
+// A database of the forum's in memory, with a member, Anna, whose id is 1.
+async function forumWithAnna(db) {
+    foreach (var statement in schema.create(db.provider)) {
+        await db.execute(statement);
+    }
+    var now = DateTime.utc(2026, 11, 25, 12, 0);
+    assertEqual(await users.make(db, "Anna", "Anna@Example.com", "no hash", now, now), 1);
+}
+
+export class AccountsTests {
+    async testAPasswordIsKeptAsItsHash() {
+        var hash = await users.hash("correct-horse");
+        assertEqual(hash.startsWith("pbkdf2-sha256$600000$"), true);
+        assertEqual(await users.verify("correct-horse", hash), true);
+        assertEqual(await users.verify("wrong-horse", hash), false);
+        assertEqual(await users.verify("correct-horse", null), false);
+    }
+
+    async testAMemberIsFoundByNameOrAddressWhateverTheirCase() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forumWithAnna(db);
+            assertEqual((await users.byNameOrEmail(db, " ANNA "))["id"], 1);
+            assertEqual((await users.byNameOrEmail(db, "anna@example.COM"))["id"], 1);
+            assertEqual((await users.byNameOrEmail(db, "anna@example.com"))["email"], "Anna@Example.com");
+            assertEqual(await users.byNameOrEmail(db, "Bob"), null);
+        }
+    }
+
+    async testATokenIsUsedOnceBeforeItExpires() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forumWithAnna(db);
+            var now = DateTime.utc(2026, 11, 25, 12, 0);
+            var token = await tokens.make(db, 1, "confirm", 48, now);
+            assertEqual(token.length, 64);
+            assertEqual((await db.query("SELECT token_hash FROM tokens"))[0]["token_hash"] == token, false);
+            assertEqual(await tokens.peek(db, token, "confirm", now), 1);
+            assertEqual(await tokens.take(db, token, "reset", now), null);
+            assertEqual(await tokens.take(db, token, "confirm", now.addHours(49)), null);
+            assertEqual(await tokens.take(db, token, "confirm", now.addHours(47)), 1);
+            assertEqual(await tokens.take(db, token, "confirm", now), null);
+            assertEqual(await tokens.peek(db, token, "confirm", now), null);
+            assertEqual(await tokens.take(db, "x".repeat(64), "confirm", now), null);
+            assertEqual(await tokens.take(db, null, "confirm", now), null);
+        }
+    }
+
+    async testAMembersTokensOfAKindAreUsedAtOnce() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forumWithAnna(db);
+            var now = DateTime.utc(2026, 11, 25, 12, 0);
+            var first = await tokens.make(db, 1, "reset", 1, now);
+            var second = await tokens.make(db, 1, "reset", 1, now);
+            var confirm = await tokens.make(db, 1, "confirm", 48, now);
+            await tokens.useAll(db, 1, "reset", now);
+            assertEqual(await tokens.peek(db, first, "reset", now), null);
+            assertEqual(await tokens.peek(db, second, "reset", now), null);
+            assertEqual(await tokens.peek(db, confirm, "confirm", now), 1);
+        }
+    }
+
+    async testTheFirstVersionIsUpgradedToThisOne() {
+        assertEqual(schema.version, 2);
+        var upgraded = schema.create("postgresql", 1);
+        foreach (var statement in schema.upgrade("postgresql", 1)) {
+            upgraded.push(statement);
+        }
+        assertDeepEqual(upgraded, schema.create("postgresql"));
+        assertEqual(schema.upgrade("mysql", 2).length, 0);
+        using (var db = await Database.open("sqlite::memory:")) {
+            foreach (var statement in schema.create(db.provider, 1)) {
+                await db.execute(statement);
+            }
+            foreach (var statement in schema.upgrade(db.provider, 1)) {
+                await db.execute(statement);
+            }
+            assertEqual((await db.query("SELECT COUNT(*) AS n FROM tokens"))[0]["n"], 0);
+        }
+    }
+}

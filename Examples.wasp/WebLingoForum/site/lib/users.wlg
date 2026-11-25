@@ -1,11 +1,15 @@
-// The forum's members: what a name, an address and a password must be, and making a member.
+// The forum's members: what a name, an address and a password must be, and making, finding and changing a member.
 
 import crypto from "std:crypto";
 import { Regex } from "std:regex";
-import { insert } from "./sql.wlg";
+import { insert, page } from "./sql.wlg";
 
 // A name: 2 to 40 letters and digits of any script, with spaces, dots, hyphens and underscores between them.
 const namePattern = new Regex("^[\\p{L}\\p{N}](?:[\\p{L}\\p{N} ._-]*[\\p{L}\\p{N}])?$");
+
+// A password's hash that no password gives, checked where a sign-in names no member, so that a sign-in takes as long
+// whether its name is a member's or not.
+const noOnesHash = "pbkdf2-sha256$600000$k36HTS7vqmcq1w8HyNCb7Q==$Us51Q35SRUIK0NzKYikogHMe6WyYsKxa0QRUjgTdfT8=";
 
 // The key a name or an address is unique by, whatever its case: two names that differ only by case are one name.
 export function keyOf(text) {
@@ -52,12 +56,68 @@ export function passwordProblem(password) {
     return null;
 }
 
-// Makes a member, its name, address and password checked by the caller, and gives its id; its password kept only as its
-// hash. confirmed is when its address was confirmed, or null.
-export async function make(db, name, email, password, now, confirmed) {
+// A password's hash, as the database keeps it, made off the worker.
+export async function hash(password) {
+    return await crypto.hashPasswordAsync(password);
+}
+
+// Whether a password is the one a hash was made of; a hash of null checks the password against no one's, false.
+export async function verify(password, passwordHash) {
+    var matches = await crypto.verifyPasswordAsync(password, passwordHash ?? noOnesHash);
+    return matches && passwordHash != null;
+}
+
+// Makes a member, its name and address checked by the caller, given its password's hash, and gives its id. confirmed
+// is when its address was confirmed, or null.
+export async function make(db, name, email, passwordHash, now, confirmed) {
     return await insert(db, "users", {
         name: name.trim(), name_key: keyOf(name), email: email.trim(), email_key: keyOf(email),
-        password_hash: await crypto.hashPasswordAsync(password), created_at: now, confirmed_at: confirmed,
+        password_hash: passwordHash, created_at: now, confirmed_at: confirmed,
         time_zone: null, language: null, signature: null, post_count: 0, last_seen_at: null
     });
+}
+
+// Puts a member in the group of a kind: "members", "moderators" or "administrators".
+export async function join(db, user, kind) {
+    await db.execute("INSERT INTO group_members (group_id, user_id) SELECT id, @user FROM member_groups WHERE kind = @kind",
+                     { user: user, kind: kind });
+}
+
+const columns = "id, name, email, password_hash, created_at, confirmed_at, time_zone, language, signature, post_count, last_seen_at";
+
+// The member of an id, a name's key or an address's key, or null.
+export async function byId(db, id) {
+    var rows = await db.query($"SELECT {columns} FROM users WHERE id = @id", { id: id });
+    return rows.length == 0 ? null : rows[0];
+}
+export async function byName(db, key) {
+    var rows = await db.query($"SELECT {columns} FROM users WHERE name_key = @key", { key: key });
+    return rows.length == 0 ? null : rows[0];
+}
+export async function byEmail(db, key) {
+    var rows = await db.query($"SELECT {columns} FROM users WHERE email_key = @key", { key: key });
+    return rows.length == 0 ? null : rows[0];
+}
+
+// The member a name or an address, as someone signing in gives it, names.
+export async function byNameOrEmail(db, text) {
+    var key = keyOf(text);
+    return key.contains("@") ? await byEmail(db, key) : await byName(db, key);
+}
+
+// Changes a member's password, given its new hash.
+export async function setPassword(db, user, passwordHash) {
+    await db.execute("UPDATE users SET password_hash = @hash WHERE id = @id", { hash: passwordHash, id: user });
+}
+
+// How many members have confirmed their addresses, and a page of them, by name.
+export async function count(db) {
+    return (await db.query("SELECT COUNT(*) AS n FROM users WHERE confirmed_at IS NOT NULL"))[0]["n"];
+}
+export async function list(db, skip, count) {
+    return await db.query($"""
+        SELECT id, name, created_at, post_count, last_seen_at FROM users WHERE confirmed_at IS NOT NULL
+        ORDER BY name_key, id
+        {page(db.provider)}
+        """, { skip: skip, count: count });
 }

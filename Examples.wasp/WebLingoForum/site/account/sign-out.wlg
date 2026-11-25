@@ -1,0 +1,10 @@
+// /account/sign-out, posted by the header's button: the session ended, where the form's token against cross-site
+// request forgery is the browser's, and the browser sent to the front page.
+
+export async function post(request, response) {
+    if (await request.checkCsrf()) {
+        request.session.end();
+    }
+    response.status = 303;
+    response.headers["Location"] = "/";
+}

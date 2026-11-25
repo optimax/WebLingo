@@ -1,0 +1,17 @@
+<% param request; param response; import { resetPage } from "/lib/accounts.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await resetPage(request, response)).title }; %>
+<% var view = await resetPage(request, response); var site = view.site; %>
+<h1><%= view.title %></h1>
+<% if (view.token == null) { %>
+<p class="problems"><%= site.t("reset.invalid") %></p>
+<p><a href="/account/forgot"><%= site.t("signIn.forgot") %></a></p>
+<% } else { %>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems }); %>
+<form method="post" class="form" action="/account/reset">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <input type="hidden" name="token" value="<%= view.token %>">
+  <label><%= site.t("reset.password") %> <input type="password" name="password" required minlength="8" maxlength="200" autocomplete="new-password"></label>
+  <label><%= site.t("reset.passwordAgain") %> <input type="password" name="passwordAgain" required minlength="8" maxlength="200" autocomplete="new-password"></label>
+  <button><%= site.t("reset.submit") %></button>
+</form>
+<% } %>

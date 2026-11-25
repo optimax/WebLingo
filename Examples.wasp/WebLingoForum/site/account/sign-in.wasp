@@ -1,0 +1,12 @@
+<% param request; param response; import { signInPage } from "/lib/accounts.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await signInPage(request, response)).title }; %>
+<% var view = await signInPage(request, response); var site = view.site; %>
+<h1><%= view.title %></h1>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems, notice: view.notice }); %>
+<form method="post" class="form" action="/account/sign-in?back=<%= view.back %>">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <label><%= site.t("signIn.name") %> <input name="name" value="<%= view.values["name"] %>" required autocomplete="username"></label>
+  <label><%= site.t("signIn.password") %> <input type="password" name="password" required autocomplete="current-password"></label>
+  <button><%= site.t("signIn.submit") %></button>
+</form>
+<p><a href="/account/forgot"><%= site.t("signIn.forgot") %></a> · <%= site.t("signIn.noAccount") %> <a href="/account/sign-up"><%= site.t("nav.signUp") %></a></p>

@@ -1,0 +1,17 @@
+<% session readonly; %>
+<% param request; import { membersPage } from "/lib/pages.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await membersPage(request)).title }; %>
+<% var view = await membersPage(request); var site = view.site; %>
+<h1><%= view.title %></h1>
+<% await renderComponent("/components/pages.wasp", { site: site, base: "/members", page: view.page, pages: view.pages }); %>
+<table class="list members">
+  <tr><th><%= site.t("members.name") %></th><th><%= site.t("members.joined") %></th><th><%= site.t("members.posts") %></th></tr>
+<% foreach (var member in view.members) { %>
+  <tr>
+    <td><a href="/members/member?id=<%= member["id"] %>"><%= member["name"] %></a></td>
+    <td><%= site.time(member["created_at"]) %></td>
+    <td><%= member["post_count"] %></td>
+  </tr>
+<% } %>
+</table>
+<% await renderComponent("/components/pages.wasp", { site: site, base: "/members", page: view.page, pages: view.pages }); %>

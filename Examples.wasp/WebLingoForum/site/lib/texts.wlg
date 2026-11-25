@@ -1,6 +1,9 @@
 // The forum's texts, every word it shows, from a module of each language, texts/en.wlg, which exports them as a map
 // from a text's name to its words, and its plural rule (Documents/weblingo-forum.md, section 3.6).
 
+// The languages the forum has texts in, each with its own name for itself.
+export const languages = { "en": "English" };
+
 // A language's texts, and how a text takes values.
 export class Texts {
     constructor(language, words, plural) {

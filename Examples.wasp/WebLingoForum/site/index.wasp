@@ -1,3 +1,4 @@
+<% session readonly; %>
 <% param request; import { indexPage } from "/lib/pages.wlg"; %>
 <% layout "/layouts/main.wasp", { title: (await indexPage(request)).title }; %>
 <% var view = await indexPage(request); var site = view.site; %>

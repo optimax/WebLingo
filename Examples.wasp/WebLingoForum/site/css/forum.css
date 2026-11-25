@@ -42,6 +42,23 @@ table.list tr.pinned { background: color-mix(in srgb, var(--accent) 6%, var(--su
 .pages a, .pages strong { padding: 0.1rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); text-decoration: none; }
 .pages strong { color: var(--accent-text); background: var(--accent); border-color: var(--accent); }
 
+header.site nav.account { margin-left: auto; display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; align-items: baseline; }
+header.site nav.account a, header.site nav.account button.link { color: var(--accent-text); }
+header.site nav.account form { display: inline; margin: 0; }
+button.link { background: none; border: none; padding: 0; font: inherit; text-decoration: underline; cursor: pointer; }
+
+h2.plain { color: var(--text); background: none; padding: 0; margin: 1.5rem 0 0.5rem; }
+form.form { display: flex; flex-direction: column; gap: 0.75rem; max-width: 28rem; padding: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+form.form label { display: flex; flex-direction: column; gap: 0.25rem; font-weight: 600; }
+form.form input, form.form select, form.form textarea { font: inherit; font-weight: normal; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; }
+form.form button, .button { align-self: flex-start; font: inherit; padding: 0.4rem 1rem; color: var(--accent-text); background: var(--accent); border: none; border-radius: 4px; cursor: pointer; }
+form.form .note { font-weight: normal; }
+.problems { padding: 0.5rem 0.75rem; color: #8a1c1c; background: #fdecec; border: 1px solid #f3c1c1; border-radius: 6px; margin-bottom: 0.75rem; }
+.problems p { margin: 0.15rem 0; }
+.notice { margin-bottom: 0.75rem; }
+table.list th { text-align: left; padding: 0.5rem 0.75rem; color: var(--muted); font-weight: 600; font-size: 0.875rem; }
+ul.facts { padding-left: 1.2rem; color: var(--muted); }
+
 @media (max-width: 40rem) {
   table.list td.count, table.list td.last { display: none; }
   .post { flex-direction: column; }

@@ -1,7 +1,8 @@
 <% param site; param base; param page; param pages; %>
 <%
-  // The page numbers of a board or a topic: the first, the last, and those near the page shown, with a gap between,
-  // each a link to base, its page after it, &page=2, but the page shown.
+  // The page numbers of a list: the first, the last, and those near the page shown, with a gap between, each a link to
+  // base with its page in its query, ?page=2 or &page=2, but the page shown.
+  var join = base.contains("?") ? "&" : "?";
   var near = [];
   var gap = false;
   for (var n = 1; n <= pages; n++) {
@@ -15,10 +16,10 @@
 %>
 <% if (pages > 1) { %>
 <nav class="pages" aria-label="<%= site.t("forum.pages") %>">
-<% if (page > 1) { %>  <a rel="prev" href="<%= base %>&amp;page=<%= page - 1 %>"><%= site.t("forum.previous") %></a><% } %>
+<% if (page > 1) { %>  <a rel="prev" href="<%= base + join + $"page={page - 1}" %>"><%= site.t("forum.previous") %></a><% } %>
 <% foreach (var n in near) { %><% if (n < 0) { %> <span class="gap">…</span><% } %>
-<% var shown = n < 0 ? -n : n; %><% if (shown == page) { %>  <strong aria-current="page"><%= shown %></strong><% } else { %>  <a href="<%= base %>&amp;page=<%= shown %>"><%= shown %></a><% } %>
+<% var shown = n < 0 ? -n : n; %><% if (shown == page) { %>  <strong aria-current="page"><%= shown %></strong><% } else { %>  <a href="<%= base + join + $"page={shown}" %>"><%= shown %></a><% } %>
 <% } %>
-<% if (page < pages) { %>  <a rel="next" href="<%= base %>&amp;page=<%= page + 1 %>"><%= site.t("forum.next") %></a><% } %>
+<% if (page < pages) { %>  <a rel="next" href="<%= base + join + $"page={page + 1}" %>"><%= site.t("forum.next") %></a><% } %>
 </nav>
 <% } %>

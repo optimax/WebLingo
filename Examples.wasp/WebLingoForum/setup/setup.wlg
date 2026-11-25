@@ -2,7 +2,8 @@
 // comes, or a database of SQL Server's, MySQL's or PostgreSQL's, made empty by its administrator, whose connection string
 // this folder's weblingo.config and the site's wasp.config both give instead (Documents/weblingo-forum.md, section 3.3).
 // A new database gets the forum's tables, its groups, its first administrator, and a first category, board and topic; a
-// database the forum's version made already is left as it is. Run it from this folder:
+// database an earlier version of the forum made is upgraded to this one's; and one at this version is left as it is.
+// Run it from this folder:
 //
 //   weblingo run setup.wlg
 //   weblingo run setup.wlg name=Anna email=anna@example.com
@@ -63,9 +64,9 @@ async function make(db, admin) {
     foreach (var group in [["guests", "Guests"], ["members", "Members"], ["moderators", "Moderators"], ["administrators", "Administrators"]]) {
         groups[group[0]] = await insert(db, "member_groups", { name: group[1], kind: group[0] });
     }
-    var user = await users.make(db, admin["name"], admin["email"], admin["password"], now, now);
+    var user = await users.make(db, admin["name"], admin["email"], admin["passwordHash"], now, now);
     foreach (var kind in ["members", "administrators"]) {
-        await db.execute("INSERT INTO group_members (group_id, user_id) VALUES (@group, @user)", { group: groups[kind], user: user });
+        await users.join(db, user, kind);
     }
     var category = await insert(db, "categories", { name: "General", sort_order: 1 });
     var board = await insert(db, "boards", {
@@ -86,14 +87,29 @@ using (var db = await Database.open(database)) {
     var version = await schema.versionOf(db);
     if (version == schema.version) {
         writeLn($"The forum's database '{database}' is at version {version} already: nothing to do.");
+    } else if (version > schema.version) {
+        throw new Error($"The forum's database '{database}' is at version {version}, later than this forum's, {schema.version}.");
     } else if (version != 0) {
-        throw new Error($"The forum's database '{database}' is at version {version}, which this setup cannot upgrade to {schema.version}.");
+        // The tables added since, and the version, in one transaction where the database takes DDL in one.
+        async function upgrade() {
+            foreach (var statement in schema.upgrade(db.provider, version)) {
+                await db.execute(statement);
+            }
+            await db.execute("UPDATE schema_version SET version = @version", { version: schema.version });
+        }
+        if (db.provider == "mysql") {
+            await upgrade();
+        } else {
+            await db.transaction(upgrade);
+        }
+        writeLn($"Upgraded the forum's database '{database}' on {db.provider} from version {version} to {schema.version}.");
     } else {
         var admin = {
             name: await given(name, "The administrator's name: ", users.nameProblem, false),
             email: await given(email, "The administrator's address: ", users.emailProblem, false),
             password: await given(password, "The administrator's password: ", users.passwordProblem, true)
         };
+        admin["passwordHash"] = await users.hash(admin["password"]);
         // Made in one transaction where the database takes DDL in one, so that a failure leaves nothing behind; MySQL
         // commits each statement of DDL as it runs it.
         if (db.provider == "mysql") {

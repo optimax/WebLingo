@@ -1,0 +1,36 @@
+// The forum's mail, sent through the server its wasp.config's "mail" names (Documents/weblingo-forum.md, section 3.10):
+// each mail's subject and text are texts of the forum's, its links to the forum's address.
+
+import mail from "std:mail";
+import tokens from "./tokens.wlg";
+
+// The forum's address, for links in its mail: its settings' "address", or the address the request came to.
+export function addressOf(site, request) {
+    return site.settings["address"] ?? $"{request.scheme}://{request.host}";
+}
+
+// Sends a mail to a member, its subject and text the forum's texts of those names, filled with values, the forum's name
+// among them; gives whether it was sent.
+export async function send(site, email, subject, text, values) {
+    var filled = { ...values, forum: site.settings["name"] };
+    try {
+        await mail.send({ from: site.settings["mailFrom"], to: email, subject: site.f(subject, filled), text: site.f(text, filled) });
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// Mails a member a link to confirm their address, good for 48 hours; gives whether it was sent.
+export async function sendConfirmation(db, site, request, user, now) {
+    var token = await tokens.make(db, user["id"], "confirm", 48, now);
+    return await send(site, user["email"], "mail.confirm.subject", "mail.confirm.text",
+                      { name: user["name"], link: $"{addressOf(site, request)}/account/confirm?token={token}" });
+}
+
+// Mails a member a link to reset their password, good for an hour; gives whether it was sent.
+export async function sendReset(db, site, request, user, now) {
+    var token = await tokens.make(db, user["id"], "reset", 1, now);
+    return await send(site, user["email"], "mail.reset.subject", "mail.reset.text",
+                      { name: user["name"], link: $"{addressOf(site, request)}/account/reset?token={token}" });
+}

@@ -2,5 +2,19 @@
   <div class="bar">
     <a class="name" href="/"><%= site.settings["name"] %></a>
     <span class="description"><%= site.settings["description"] %></span>
+    <nav class="account">
+      <a href="/members"><%= site.t("nav.members") %></a>
+<% if (site.user == null) { %>
+      <a href="/account/sign-in?back=<%= hereOf(request) %>"><%= site.t("nav.signIn") %></a>
+      <a href="/account/sign-up"><%= site.t("nav.signUp") %></a>
+<% } else { %>
+      <a href="/members/member?id=<%= site.user["id"] %>"><%= site.user["name"] %></a>
+      <a href="/account/profile"><%= site.t("nav.profile") %></a>
+      <form method="post" action="/account/sign-out">
+        <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+        <button class="link"><%= site.t("nav.signOut") %></button>
+      </form>
+<% } %>
+    </nav>
   </div>
 </header>

@@ -1,0 +1,11 @@
+<% param site; param problems; param notice = null; %>
+<% if (problems.length > 0) { %>
+<div class="problems" role="alert">
+<% foreach (var problem in problems) { %>
+  <p><%= site.t(problem) %></p>
+<% } %>
+</div>
+<% } %>
+<% if (notice != null) { %>
+<p class="notice" role="status"><%= notice %></p>
+<% } %>
