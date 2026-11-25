@@ -30,6 +30,7 @@ The current state (specification, sections 9 and 15): a compiler and a VM, a reg
 - `Documents/weblingo-standard-library-reference.md` is the WebLingo Standard Library Reference: the built-in functions, every built-in class's members, the standard modules, and the request and the response of WASP's pages, each example in it run with `weblingo`, its output as shown. It describes what is built, so that a change to a built-in class, a standard module or the host's objects updates it in the same change.
 - `Documents/wasp-user-manual.md` is the WASP User Manual, for those who build sites with WASP: how to write, serve and deploy one, each example in it run, its output as shown. It describes what is built, not what is planned, so that a change to what a site's author sees or writes updates it in the same change.
 - `Documents/M0.6.1-status.md` records what the current milestone delivered and what it does not implement.
+- `Documents/production-readiness.md` assesses whether WebLingo and WASP are ready for production use, as of 24 November 2026, and recommends what it would take, each recommendation a task of `TO-DO.md`. It is an assessment at one date, not kept current.
 - `Documents/native-compatibility.md` is the inventory of .NET facilities and how the portable core may use each (section 6).
 - `HANDOFF.md` at the root, when present, records the current state of the work and its next steps.
 - `TO-DO.md`, `TO-DO-INSTRUCTIONS.md` and `DONE.md` at the root hold the tasks, how to work them, and the tasks that are done.
