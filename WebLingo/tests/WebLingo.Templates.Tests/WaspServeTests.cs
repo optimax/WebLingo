@@ -589,6 +589,73 @@ public sealed class WaspServeTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// A page replaced while it is served, as a deployment replaces it, written beside it and moved over it: each answer
+    /// one version's whole (section 6.5, WL-H004). Until 24 November 2026, a page read while it was being replaced failed
+    /// to be read, and was compiled as an empty page, which its worker served until the next reload, 5% of the answers
+    /// under the load benchmark's reload ("A Page Replaced While WASP Reads It").
+    /// </summary>
+    [Fact]
+    public async Task APageReplacedWhileItIsServedIsServedWhole()
+    {
+        string[] versions = ["<p>first</p>", "<p>second</p>"];
+        Write("page.wasp", versions[0]);
+        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        Assert.True(server is not null, error);
+        await server.StartAsync();
+        try
+        {
+            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            var until = DateTime.UtcNow.AddSeconds(5);
+            var replacing = Task.Run(async () =>
+            {
+                var path = Path.Combine(_root, "page.wasp");
+                for (var i = 1; DateTime.UtcNow < until; i++)
+                {
+                    // Longer than the reloader waits for quiet, 250 ms, so that each replacement is a generation of its own.
+                    await Task.Delay(300);
+                    File.WriteAllText(path + ".new", versions[i % 2]);
+                    // Windows refuses to move a file over one a request has open: tried again, as a deployment's tools try.
+                    for (var tries = 0; ; tries++)
+                    {
+                        try
+                        {
+                            File.Move(path + ".new", path, overwrite: true);
+                            break;
+                        }
+                        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException && tries < 500)
+                        {
+                            await Task.Delay(5);
+                        }
+                    }
+                }
+            });
+            var wrong = new System.Collections.Concurrent.ConcurrentBag<string>();
+            var seen = new System.Collections.Concurrent.ConcurrentDictionary<string, bool>();
+            var asked = 0;
+            await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(async () =>
+            {
+                using var client = new HttpClient { BaseAddress = new Uri(address) };
+                while (DateTime.UtcNow < until)
+                {
+                    using var response = await client.GetAsync("/page");
+                    var body = await response.Content.ReadAsStringAsync();
+                    Interlocked.Increment(ref asked);
+                    if (response.StatusCode != HttpStatusCode.OK || !versions.Contains(body)) wrong.Add($"{(int)response.StatusCode} '{body}'");
+                    else seen[body] = true;
+                }
+            })));
+            await replacing;
+            Assert.True(asked > 100, $"only {asked} requests");
+            Assert.Equal(2, seen.Count); // Reloaded: both versions served.
+            Assert.True(wrong.IsEmpty, $"{wrong.Count} of {asked} answers were neither version, the first {wrong.FirstOrDefault()}");
+        }
+        finally
+        {
+            await server.StopAsync();
+        }
+    }
+
     [Fact]
     public void UnderIisTheSiteIsTheFolderTheModuleStartsWaspIn()
     {

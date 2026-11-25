@@ -11,6 +11,9 @@ internal sealed class MemoryFileSystem : IWebLingoFileSystem
 
     public Dictionary<string, int> Reads { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>The files whose next read fails, once, as a file another program is replacing may fail a read.</summary>
+    public HashSet<string> FailOnce { get; } = new(StringComparer.Ordinal);
+
     public MemoryFileSystem Add(string path, string text)
     {
         _files[path] = text;
@@ -20,6 +23,7 @@ internal sealed class MemoryFileSystem : IWebLingoFileSystem
     public string ReadText(string path, string encoding)
     {
         if (!_files.TryGetValue(path, out var text)) throw new WebLingoFileSystemException(WebLingoFileErrorKind.NotFound, "there is no such file");
+        if (FailOnce.Remove(path)) throw new WebLingoFileSystemException(WebLingoFileErrorKind.Other, "it is being used by another process");
         Reads[path] = Reads.GetValueOrDefault(path) + 1;
         return text;
     }

@@ -34,6 +34,23 @@ public sealed class FileSystemTests : IDisposable
 
     public static TheoryData<string> Vms => new() { "register" };
 
+    [Fact]
+    public void AFileBeingReadMayBeWrittenAndRemovedMeanwhile()
+    {
+        // Read sharing its writing and its deletion, so that another program's replacing it never fails a read, as a
+        // deployment replacing a site's page failed one (24 November 2026, "A Page Replaced While WASP Reads It").
+        var path = Path.Combine(_folder, "page.txt");
+        File.WriteAllText(path, "first");
+        var files = new DotNetFileSystem();
+        using (var file = files.Open(path, WebLingo.Platform.Abstractions.WebLingoFileMode.ReadBytes, "utf-8"))
+        {
+            File.WriteAllText(path, "second");
+            Assert.Equal("second", files.ReadText(path, "utf-8"));
+            File.Delete(path);
+        }
+        Assert.False(File.Exists(path));
+    }
+
     [Theory]
     [MemberData(nameof(Vms))]
     public void TextIsWrittenAppendedAndReadBothWays(string vm)

@@ -975,6 +975,16 @@ The runtime can host multiple applications. Application boundaries isolate modul
 
 **As built** (M0.14.6, 16 November 2026; Proposed, §15.2, "Reloading"): `WebLingoApplication.TryReload` makes a new generation from the root's files and publishes it, at once and whole, if its routes can be made, and otherwise keeps the generation served; a request already running finishes on the generation it began on, which goes, with its compiled pages, once the last such request has. `wasp serve` watches the root (`WebLingoReloader`, in the ASP.NET Core adapter) and reloads once the files have stopped changing for a quarter of a second, one generation for a burst of changes.
 
+**A page replaced while it is served** (24 November 2026, "A Page Replaced While WASP Reads It", found by "Under load",
+§5.6): a site's files, its pages, its modules and its configuration, are read sharing their writing and their deletion
+(`DotNetFileSystem`, `std:fs`'s reads too), so that a deployment replacing them, writing a file beside one and moving it
+over it, never fails a read, as it failed one on Windows with .NET's default sharing; and a page whose route was found but
+whose file cannot be read when it is compiled is a 500, WL5002, `The page cannot be read just now; its next request reads it
+again.`, which its worker does not keep, where until then it was compiled as an empty page and served so, a 200 with no
+body, for the rest of its generation, 5% of the answers while `hello.wasp` was replaced every quarter of a second, and none
+since. Windows still refuses to move a file over one a request is reading, for that moment, so that a deployment's tools
+try again, as `robocopy` and the load benchmark do (Proposed).
+
 ### 6.6 Request lifecycle
 
 `Received → Select application generation → Resolve route → Create worker-affine execution context → Invoke script/template → Stream response → Cleanup → Release`

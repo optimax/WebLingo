@@ -1276,7 +1276,10 @@ It runs in one of two ways:
   `--stdin` says so outright. What it writes then goes to its error output, which the web server logs.
 
 Either way, a site runs in production unless its `wasp.config` says otherwise ([section 14](#14-configuration-waspconfig)),
-and `wasp` reloads it when its files change, as `wasp serve` does. Pass the web server every request, the site's other
+and `wasp` reloads it when its files change, as `wasp serve` does: a page a request reads while it is replaced is served
+whole, its old version or its new. Replace a site's files by copying them beside the site and moving them in, or with a tool
+that does, such as `robocopy`: on Windows, a move over a file a request is reading is refused for that moment, and the tool
+tries again. Pass the web server every request, the site's other
 files' included: `wasp` serves those too, and never serves the site's modules or its configuration, which a web server
 serving the folder itself would.
 

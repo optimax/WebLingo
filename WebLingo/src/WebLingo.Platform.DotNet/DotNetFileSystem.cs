@@ -24,8 +24,19 @@ public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = n
     /// A reader in the encoding named, which skips that encoding's byte order mark, UTF-8's too, but takes no other mark as
     /// naming another encoding in its place.
     /// </summary>
-    private static StreamReader Reader(string path, string encoding) =>
-        new(path, EncodingOf(encoding), detectEncodingFromByteOrderMarks: IsUtf8(encoding));
+    private static StreamReader Reader(string path, string encoding)
+    {
+        var named = EncodingOf(encoding); // An encoding it does not know is the error, before the file is opened.
+        return new(Shared(path), named, detectEncodingFromByteOrderMarks: IsUtf8(encoding));
+    }
+
+    /// <summary>
+    /// A file opened for reading that shares its writing and its deletion with every other program: so that a read never
+    /// fails because another program replaces the file meanwhile, as a deployment replaces a site's pages, written beside
+    /// them and moved over them, which with .NET's default sharing failed a read of a page being replaced on Windows, a
+    /// page then served empty (24 November 2026, "A Page Replaced While WASP Reads It").
+    /// </summary>
+    private static FileStream Shared(string path) => new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
 
     private static bool IsUtf8(string name) =>
         string.Equals(name, "utf-8", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "utf8", StringComparison.OrdinalIgnoreCase);
@@ -37,7 +48,13 @@ public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = n
         return true;
     });
 
-    public byte[] ReadBytes(string path) => Translated(() => File.ReadAllBytes(Reach(path, false)));
+    public byte[] ReadBytes(string path) => Translated(() =>
+    {
+        using var stream = Shared(Reach(path, false));
+        using var bytes = new MemoryStream();
+        stream.CopyTo(bytes);
+        return bytes.ToArray();
+    });
 
     public void WriteBytes(string path, byte[] bytes, bool append) => Translated(() =>
     {
@@ -93,7 +110,7 @@ public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = n
     public IWebLingoFile Open(string path, WebLingoFileMode mode, string encoding) => Translated<IWebLingoFile>(() => mode switch
     {
         WebLingoFileMode.Read => new DotNetFile(Reader(Reach(path, false), encoding), null, null),
-        WebLingoFileMode.ReadBytes => new DotNetFile(null, null, new FileStream(Reach(path, false), FileMode.Open, FileAccess.Read, FileShare.Read)),
+        WebLingoFileMode.ReadBytes => new DotNetFile(null, null, Shared(Reach(path, false))),
         WebLingoFileMode.WriteBytes => new DotNetFile(null, null, new FileStream(Reach(path, true), FileMode.Create, FileAccess.Write, FileShare.Read)),
         WebLingoFileMode.AppendBytes => new DotNetFile(null, null, new FileStream(Reach(path, true), FileMode.Append, FileAccess.Write, FileShare.Read)),
         _ => new DotNetFile(null, new StreamWriter(Reach(path, true), mode == WebLingoFileMode.Append, EncodingOf(encoding)), null)

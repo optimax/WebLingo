@@ -176,6 +176,21 @@ public sealed class ApplicationTests
         .Add("/site/Web.config", "<configuration/>")
         .Add("/site/.git/config", "secret");
 
+    [Fact]
+    public void APageThatCannotBeReadJustNowIsA500_ReadAgainOnItsNextRequest()
+    {
+        // As a page a deployment is replacing may not be read for a moment (24 November 2026, "A Page Replaced While WASP
+        // Reads It"): never compiled as an empty page and kept, as it was, served empty until the next reload.
+        var files = new MemoryFileSystem().Add("/site/page.wasp", "<p>page</p>");
+        var app = Load(files, WebLingoMode.Development);
+        files.FailOnce.Add("/site/page.wasp");
+        var (status, body) = Get(app, "/page");
+        Assert.Equal(500, status);
+        Assert.Contains("page.wasp(1,1): error WL5002: The page cannot be read just now; its next request reads it again.", body,
+            StringComparison.Ordinal);
+        Assert.Equal((200, "<p>page</p>"), Get(app, "/page"));
+    }
+
     private static WebLingoApplication Load(MemoryFileSystem files, WebLingoMode environment = WebLingoMode.Production)
     {
         var app = WebLingoApplication.Load(new WebLingoApplicationOptions(Root, files)

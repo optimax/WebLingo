@@ -438,11 +438,21 @@ public sealed class WebLingoApplication
             Debugging = _options.Debugger is not null // Its points and its variables, for the debugger (section 5.7).
         };
         var compiler = new WebLingoTemplateCompiler(options, templates);
+        var read = function is null ? templates.Read(file) : null;
         var text = function is null
-            ? new WebLingoSourceText(templates.Read(file) ?? "", file)
+            ? new WebLingoSourceText(read ?? "", file)
             : new WebLingoSourceText("<% param request; param response; import handler from \"/" + Escaped(file) + "\"; await handler."
                                      + function + "(request, response); %>", file + "#" + function);
         var page = new CompiledPage(text, compiler, modules, new WebLingoModuleLoader(options));
+        if (function is null && read is null)
+        {
+            // Its route found, its file not read just now, as one being replaced may not be: a 500, not an empty page, and
+            // not kept, so that its next request reads it again (24 November 2026, "A Page Replaced While WASP Reads It").
+            page.Errors.Add($"{file}(1,1): error {WebLingoDiagnosticCodes.TemplateNotFound}: The page cannot be read just now; its next "
+                            + "request reads it again.");
+            page.Unread = true;
+            return page;
+        }
         var result = compiler.Compile(text);
         page.Module = result.Module;
         if (compiler.ReadOnlySession is { } declared)
@@ -512,7 +522,7 @@ public sealed class WebLingoApplication
             if (!pages.TryGetValue(file, out var page))
             {
                 page = application.Compile(file, worker);
-                pages.Add(file, page);
+                if (!page.Unread) pages.Add(file, page);
             }
             return page;
         }
@@ -534,6 +544,9 @@ public sealed class WebLingoApplication
 
         /// <summary>Where the page declares that it only reads its session, as an error names it; null where it does not.</summary>
         public string? ReadOnly { get; set; }
+
+        /// <summary>Whether its file could not be read when it was compiled, so that its worker does not keep it.</summary>
+        public bool Unread { get; set; }
 
         /// <summary>What finds and compiles a module the page imports while it runs (section 3.9).</summary>
         public WebLingoModuleLoader Modules { get; } = imports;

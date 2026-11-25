@@ -719,7 +719,8 @@ writeLn(Json.stringify(data));
 ## 14. `std:fs`
 
 Files and folders, through the platform's file system. Each function is asynchronous, giving a task, and has a
-synchronous form whose name ends in `Sync`: `readText` and `readTextSync`.
+synchronous form whose name ends in `Sync`: `readText` and `readTextSync`. A file being read may be written, replaced or
+removed by another program meanwhile, on Windows as on Linux: a read never keeps another program from changing it.
 
 | Function | What it does |
 |---|---|
