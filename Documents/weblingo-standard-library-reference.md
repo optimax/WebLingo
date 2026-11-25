@@ -1158,6 +1158,8 @@ The classes' names are not in scope, `request is Request` being WL2001: a script
 | `await request.files()` | a `multipart/form-data` form's files, a map of each file input's name to an array of `UploadedFile`s; an `application/x-www-form-urlencoded` form's none, an empty map; a body of another type WL3001 |
 | `await request.read()` | the body's next piece as it arrives, `Bytes`, `null` at its end |
 | `request.session` | its session, a `Session`, the same each time; a `SessionLockError`, WL3024, where its lock was waited for longer than the site waits, and WL3001 where the host keeps no sessions |
+| `request.csrfToken` | its token against cross-site request forgery, 32 hexadecimal digits, the same each time: its `WASPCSRF` cookie's, or a new one, that cookie set, `HttpOnly` and `SameSite=Lax`; WL3001 once its response has been sent |
+| `await request.checkCsrf(token)` | whether `token` is its `WASPCSRF` cookie's, compared in constant time, `false` without the cookie; with no token, its `X-CSRF-Token` header's, else its form's `csrfToken` field's; a token neither a string nor `null` WL3001 |
 
 An `UploadedFile`, a file a form uploaded: `name`, its input's; `fileName`, as the browser gave it, never a path;
 `type`, its `Content-Type`; `size`, in bytes; and `await file.bytes()`, `await file.text()`, in UTF-8, and

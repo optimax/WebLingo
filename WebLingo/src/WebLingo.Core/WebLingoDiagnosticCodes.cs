@@ -180,4 +180,11 @@ public static class WebLingoDiagnosticCodes
     /// statement, or twice; or a handler's <c>session</c> export that is not <c>export const session = "readonly";</c>.
     /// </summary>
     public const string MisplacedSession = "WL5009";
+
+    /// <summary>
+    /// A page's declaration that it takes requests other sites send misplaced (section 6.12, "Cross-site request forgery"):
+    /// <c>crossorigin allowed;</c> in a template a page includes, a layout or a component, inside another statement, or
+    /// twice; or a handler's <c>crossorigin</c> export that is not <c>export const crossorigin = "allowed";</c>.
+    /// </summary>
+    public const string MisplacedCrossOrigin = "WL5010";
 }

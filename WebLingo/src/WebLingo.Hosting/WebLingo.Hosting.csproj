@@ -12,8 +12,10 @@
     <ProjectReference Include="../WebLingo.Platform.Abstractions/WebLingo.Platform.Abstractions.csproj" />
     <ProjectReference Include="../WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />
   </ItemGroup>
-  <!-- Response's writing, written in WebLingo, WebLingoSources.Response (Directory.Build.targets). -->
+  <!-- Response's writing and the request's checkCsrf, written in WebLingo, WebLingoSources.Response and .Request
+       (Directory.Build.targets). -->
   <ItemGroup>
     <WebLingoSource Include="Response.wlg" />
+    <WebLingoSource Include="Request.wlg" />
   </ItemGroup>
 </Project>

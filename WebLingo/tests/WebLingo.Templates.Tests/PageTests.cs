@@ -307,6 +307,46 @@ public sealed class PageTests
         Assert.StartsWith(diagnostic, Render(page, Templates(templates)).Diagnostics);
     }
 
+    /// <summary>
+    /// <c>crossorigin allowed;</c> (specification, section 6.12, "Cross-site request forgery"): a statement of its own at the
+    /// top level of a page's own text, which is nothing in its program, and which the template compiler gives its host.
+    /// </summary>
+    [Fact]
+    public void APageDeclaresThatItTakesRequestsOtherSitesSend()
+    {
+        Assert.Equal(("", "a 1", ""), Render("<% crossorigin allowed; %>a <% var crossorigin = 1; %><%= crossorigin %>"));
+        var compiler = new WebLingoTemplateCompiler(Options, Templates("l.wasp=[<% renderBody(); %>]"));
+        compiler.Compile(new WebLingoSourceText("<% param x = 1;\ncrossorigin allowed; session readonly; layout \"/l.wasp\"; %>x", "page.wasp"));
+        Assert.Equal((new WebLingoSourceSpan(16, 19), new WebLingoSourceSpan(37, 16)), (compiler.CrossOriginAllowed, compiler.ReadOnlySession));
+        compiler = new WebLingoTemplateCompiler(Options);
+        compiler.Compile(new WebLingoSourceText("<% session readonly; %>", "page.wasp"));
+        Assert.Null(compiler.CrossOriginAllowed);
+    }
+
+    [Theory]
+    [InlineData("<% include \"/h.wasp\"; %>", "h.wasp=<% crossorigin allowed; %>",
+        "WL5010 at h.wasp 1,4: A template a page includes cannot declare which requests it takes: it takes those its page takes.")]
+    [InlineData("<% layout \"/l.wasp\"; %>x", "l.wasp=<% crossorigin allowed; %><% renderBody(); %>",
+        "WL5010 at l.wasp 1,4: A layout cannot declare which requests it takes: it takes those its page takes.")]
+    [InlineData("<% if (true) { crossorigin allowed; } %>", "",
+        "WL5010 at page.wasp 1,16: 'crossorigin allowed;' is a statement of its own, at the page's top level, not inside another.")]
+    [InlineData("<% crossorigin allowed; crossorigin allowed; %>", "",
+        "WL5010 at page.wasp 1,25: A page declares once that it takes requests other sites send.")]
+    [InlineData("<% crossorigin allowed %>", "", "WL1002 at page.wasp 1,23: A ';' is missing here.")]
+    public void ACrossOriginDeclaredWhereItCannotBeIsAnError(string page, string templates, string diagnostic)
+    {
+        Assert.StartsWith(diagnostic, Render(page, Templates(templates)).Diagnostics);
+    }
+
+    // A component is compiled when it is rendered, its errors the page's runtime error.
+    [Fact]
+    public void AComponentCannotDeclareWhichRequestsItTakes()
+    {
+        var error = Render("<% await renderComponent(\"/c.wasp\"); %>", Templates("c.wasp=<% crossorigin allowed; %>")).Error;
+        Assert.StartsWith("WL5010 at page.wasp 1,10: The component '/c.wasp'", error);
+        Assert.Contains("A component cannot declare which requests it takes: it takes those its page takes.", error);
+    }
+
     [Fact]
     public void AComponentCannotDeclareHowTheSessionIsUsed()
     {

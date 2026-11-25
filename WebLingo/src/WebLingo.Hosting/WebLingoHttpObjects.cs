@@ -49,6 +49,15 @@ internal sealed class WebLingoHttpObjects
     /// </summary>
     private const string WritingSource = WebLingoSources.Response;
 
+    /// <summary>
+    /// <c>request.checkCsrf(token)</c>, written in WebLingo, so that it may await the form it reads its token from where it
+    /// is given none (section 6.12, "Cross-site request forgery").
+    /// </summary>
+    private const string CheckingSource = WebLingoSources.Request;
+
+    /// <summary>The cookie that holds a request's token against cross-site request forgery, its double submitted.</summary>
+    internal const string CsrfCookie = "WASPCSRF";
+
     private readonly WebLingoNativeClass _request = new("Request");
     private readonly WebLingoNativeClass _response = new("Response");
     private readonly WebLingoNativeClass _headers = new("Headers");
@@ -66,10 +75,14 @@ internal sealed class WebLingoHttpObjects
             .DeclareProperty("headers", (a, heap, out r, out e) => RequestHeaders(a, heap, out r, out e))
             .DeclareProperty("cookies", Cookies)
             .DeclareProperty("session", Session)
+            .DeclareProperty("csrfToken", CsrfToken)
             .DeclareMethod("text", 0, BodyText)
             .DeclareMethod("form", 0, BodyForm)
             .DeclareMethod("files", 0, BodyFiles)
-            .DeclareMethod("read", 0, BodyRead);
+            .DeclareMethod("read", 0, BodyRead)
+            .DeclareMethod("__readsForm", 0, ReadsForm)
+            .DeclareMethod("__checkCsrf", 1, CheckCsrf)
+            .DeclareWebLingoMethods(CheckingSource);
         _uploaded
             .DeclareProperty("name", (a, heap, out r, out e) => Uploaded(a, heap, part => part.Name, out r, out e))
             .DeclareProperty("fileName", (a, heap, out r, out e) => Uploaded(a, heap, part => part.FileName, out r, out e))
@@ -127,8 +140,9 @@ internal sealed class WebLingoHttpObjects
     public IWebLingoBuiltinFunction[] For(IWebLingoHttpRequest request, IWebLingoHttpResponse response, IWebLingoTextOutput output,
         WebLingoUploads uploads, WebLingoSession? session, out IDisposable ending)
     {
-        var requestState = new RequestState(request, uploads) { Session = session };
-        var responseState = new ResponseState(response, output, string.Equals(request.Scheme, "https", StringComparison.OrdinalIgnoreCase));
+        var secure = string.Equals(request.Scheme, "https", StringComparison.OrdinalIgnoreCase);
+        var requestState = new RequestState(request, uploads) { Session = session, Response = response, Secure = secure };
+        var responseState = new ResponseState(response, output, secure);
         ending = requestState;
         return
         [
@@ -196,6 +210,95 @@ internal sealed class WebLingoHttpObjects
         if (state.Roots[5].Kind == WebLingoValueKind.Null
             && !TryMap(WebLingoCookies.Parse(state.Request.Headers.GetValues("Cookie")), heap, out state.Roots[5], out error)) return false;
         result = state.Roots[5];
+        return true;
+    }
+
+    /// <summary>
+    /// <c>request.csrfToken</c>: the request's token against cross-site request forgery, 128 bits from the platform's
+    /// cryptography as 32 hexadecimal digits, the same each time it is read; the one its <c>WASPCSRF</c> cookie holds, or,
+    /// where it has none, a new one, which a <c>Set-Cookie</c> gives the browser, <c>HttpOnly</c>, <c>SameSite=Lax</c>,
+    /// <c>Path=/</c> and <c>Secure</c> over HTTPS, until the browser closes (section 6.12, "Cross-site request forgery").
+    /// </summary>
+    private bool CsrfToken(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_request.TryGetHostObject<RequestState>(a[0], heap, out var state, out error)) return false;
+        if (state.CsrfToken is null)
+        {
+            if (SentCsrfToken(state) is { } sent)
+            {
+                state.CsrfToken = sent;
+            }
+            else
+            {
+                if (heap.Crypto is not { } crypto)
+                {
+                    error = Invalid("This host makes no tokens against cross-site request forgery: it has no cryptography to make them with.");
+                    return false;
+                }
+                Span<byte> bits = stackalloc byte[16];
+                crypto.FillRandom(bits);
+                var text = new System.Text.StringBuilder(32);
+                foreach (var b in bits) text.Append("0123456789abcdef"[b >> 4]).Append("0123456789abcdef"[b & 15]);
+                var options = new WebLingoCookies.Options(state.Secure);
+                if (state.Response is not { } response
+                    || !WebLingoCookies.TrySet(response.Headers, CsrfCookie, options, WebLingoCookies.Format(CsrfCookie, text.ToString(), options)))
+                {
+                    error = Invalid("The token against cross-site request forgery cannot be made: the response has been sent, its cookie with it.");
+                    return false;
+                }
+                state.CsrfToken = text.ToString();
+            }
+        }
+        return heap.TryAllocateString(state.CsrfToken, out result, out error);
+    }
+
+    /// <summary>The token the request's <c>WASPCSRF</c> cookie holds, where it holds one as <c>csrfToken</c> makes them; else null.</summary>
+    private static string? SentCsrfToken(RequestState state)
+    {
+        if (!WebLingoCookies.Parse(state.Request.Headers.GetValues("Cookie")).TryGetValue(CsrfCookie, out var sent) || sent.Length != 32) return null;
+        foreach (var c in sent)
+        {
+            if (c is not (>= '0' and <= '9' or >= 'a' and <= 'f')) return null;
+        }
+        return sent;
+    }
+
+    /// <summary>Whether the request's body is a form, which <c>checkCsrf()</c> reads its token from where it is given none.</summary>
+    private bool ReadsForm(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_request.TryGetHostObject<RequestState>(a[0], heap, out var state, out error)) return false;
+        var media = Media(state);
+        result = WebLingoValue.FromBoolean(media.Equals("application/x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase)
+            || media.Equals("multipart/form-data", StringComparison.OrdinalIgnoreCase));
+        return true;
+    }
+
+    /// <summary>
+    /// <c>checkCsrf</c>'s check: whether the token, a string, is the one the request's <c>WASPCSRF</c> cookie holds,
+    /// compared in constant time; false for <c>null</c>, and where the request has no such cookie.
+    /// </summary>
+    private bool CheckCsrf(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_request.TryGetHostObject<RequestState>(a[0], heap, out var state, out error)) return false;
+        var given = heap.Held(a[1]);
+        if (given.Kind is not (WebLingoValueKind.String or WebLingoValueKind.Null))
+        {
+            error = new WebLingoArgument("checkCsrf", 0, 1, "the token", "a string, or null").Wrong(given, heap);
+            return false;
+        }
+        var token = given.Kind == WebLingoValueKind.String ? heap.GetString(given) : null;
+        var sent = SentCsrfToken(state);
+        var same = token is not null && sent is not null && token.Length == sent.Length;
+        if (same)
+        {
+            var differs = 0;
+            for (var i = 0; i < sent!.Length; i++) differs |= token![i] ^ sent[i];
+            same = differs == 0;
+        }
+        result = WebLingoValue.FromBoolean(same);
         return true;
     }
 
@@ -1037,6 +1140,13 @@ internal sealed class WebLingoHttpObjects
 
         /// <summary>Its session, none where the host keeps none.</summary>
         public WebLingoSession? Session { get; init; }
+
+        /// <summary>Its response, which <c>csrfToken</c> sets its cookie on, and whether it came over HTTPS.</summary>
+        public IWebLingoHttpResponse? Response { get; init; }
+        public bool Secure { get; init; }
+
+        /// <summary>Its token against cross-site request forgery, once <c>csrfToken</c> has been read.</summary>
+        public string? CsrfToken { get; set; }
 
         /// <summary>Whether its body has been read as a form, as it arrived, and so cannot be read otherwise.</summary>
         public bool ReadAsForm { get; private set; }

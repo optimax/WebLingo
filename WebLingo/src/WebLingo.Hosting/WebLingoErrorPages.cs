@@ -18,6 +18,13 @@ internal static class WebLingoErrorPages
     /// <summary>A 405, its <c>Allow</c> the methods the handler answers, as <c>GET, HEAD, POST</c>.</summary>
     public static void MethodNotAllowed(IWebLingoHttpResponse response, string allow) => Write(response, 405, "Method Not Allowed", [], allow);
 
+    /// <summary>
+    /// A 403, a request another site sent that its page does not take (section 6.12, "Cross-site request forgery"), why shown in
+    /// development only.
+    /// </summary>
+    public static void Forbidden(IWebLingoHttpResponse response, WebLingoMode mode, IReadOnlyList<string> why) =>
+        Write(response, 403, "Forbidden", mode == WebLingoMode.Development ? why : []);
+
     /// <summary>A 413, a request whose body is larger than its site takes (section 6.12, "Uploaded files").</summary>
     public static void TooLarge(IWebLingoHttpResponse response) => Write(response, 413, "Content Too Large", []);
 

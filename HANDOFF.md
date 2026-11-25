@@ -93,6 +93,16 @@ WL3003. The hosting core reports a cancellation whose signal says it passed a li
 and the FastCGI host start for each request, and which wakes a waiting request as a gone client does. No time limit
 under the debugger. Specification, section 6.12, "A request's limits"; WASP User Manual, section 12.
 
+## Cross-site request forgery
+
+A POST, PUT, PATCH or DELETE another site sent is a 403 before its page runs (`WebLingoApplication.CrossSite`, called in
+`Run`): by `Sec-Fetch-Site`, else `Origin` against the request's host, one with neither taken. A page opts out by
+`crossorigin allowed;` (`WebLingoTemplateParser`, `WebLingoTemplateCompiler.CrossOriginAllowed`), a handler by
+`export const crossorigin = "allowed";` (`ExportsOf`), misplaced WL5010. The token: `request.csrfToken`, a `WASPCSRF`
+cookie's, and `await request.checkCsrf(token = null)`, written in WebLingo (`WebLingo.Hosting/Request.wlg`), taking the
+`X-CSRF-Token` header or the form's `csrfToken` where given none (`WebLingoHttpObjects`). Specification, section 6.12,
+"Cross-site request forgery"; WASP User Manual, section 9, "Requests from other sites"; `CsrfTests`.
+
 ## Linux installation
 
 `Installers/Linux/package.sh`, run on Linux, makes a self-contained archive with `install.sh` and a Debian package for

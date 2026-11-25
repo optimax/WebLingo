@@ -810,6 +810,42 @@ INSERT INTO wasp_sessions (id, data, used, locked_until) VALUES ('schema', '{"sc
 A page run by `wasp run` has no request: there, a page's parameters are values given on the command line
 ([section 16](#16-the-wasp-command-line)), and a page that declares `request` fails.
 
+### Requests from other sites
+
+A page that another site's form posts to may be made to act for a user signed in here, the browser sending this site's
+cookies with the form: a cross-site request forgery. WASP refuses such a request: a POST, PUT, PATCH or DELETE that
+another site sent is a 403 Forbidden before its page runs. Browsers say where a request comes from, by its
+`Sec-Fetch-Site` header, and an older browser by its `Origin`; a request with neither, from a program such as `curl`,
+is taken, as a browser that sends cookies sends one of them. GET, HEAD and OPTIONS are never refused, so change
+things on a POST, never on a GET.
+
+A page that other sites are meant to post to, an API's, says so, once, at its top level, as a session is declared read
+only: `<% crossorigin allowed; %>`, and a route handler by an export, `export const crossorigin = "allowed";`. Only the
+page or the handler that answers the request declares it: its includes, its layout and its components cannot, WL5010.
+
+A page may check a token besides, its own check, called where it calls it. `request.csrfToken` is the request's token,
+which the browser keeps in a cookie, `WASPCSRF`, set the first time a page reads it; a form sends it back in a hidden
+field, `csrfToken`, or a script's request in a header, `X-CSRF-Token`; and `await request.checkCsrf()` says whether
+the request sent the token its cookie holds:
+
+```html
+<% param request; %>
+<% if (request.method == "POST") { %>
+<p><%= await request.checkCsrf() ? "Saved." : "This form has expired: send it again." %></p>
+<% } %>
+<form method="post">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <button>Save</button>
+</form>
+```
+
+Its first GET sets the cookie, `Set-Cookie: WASPCSRF=db83381894436e88eea1fc0f97a66980; Path=/; HttpOnly; SameSite=Lax`,
+and writes the token into the form; the form posted back writes `<p>Saved.</p>`, and one posted with another token
+`<p>This form has expired: send it again.</p>`. Posted from another site, the page does not run: under `wasp serve`,
+in development, its 403 says why, `A POST from another site was refused, as a cross-site request forgery may be: its
+Origin, 'https://attacker.example', is not this site's, 'localhost:8080'; …`, and in production only `403 Forbidden`.
+`request.checkCsrf(token)` checks a token the page read itself, `await request.checkCsrf(form["t"])`.
+
 ---
 
 ## 10. Route handlers

@@ -57,6 +57,8 @@ public sealed class WebLingoTemplateParser
     private const string RenderBody = "renderBody";
     private const string Session = "session";
     private const string ReadOnly = "readonly";
+    private const string CrossOrigin = "crossorigin";
+    private const string Allowed = "allowed";
 
     /// <summary>What an import's path begins with when it names a page's layout (section 13).</summary>
     public const string LayoutScheme = "layout:";
@@ -133,6 +135,7 @@ public sealed class WebLingoTemplateParser
 
     /// <summary>Where the page declares that it only reads its session, once read.</summary>
     private WebLingoSourceSpan? _readOnlySession;
+    private WebLingoSourceSpan? _crossOrigin;
 
     private WebLingoTemplateParser(WebLingoSourceText page, IWebLingoSourceResolver? resolver, WebLingoTemplateKind kind)
     {
@@ -158,7 +161,16 @@ public sealed class WebLingoTemplateParser
     /// own positions; null where it does not.
     /// </summary>
     public static WebLingoSyntaxTree Parse(WebLingoSourceText page, IWebLingoSourceResolver? resolver, out WebLingoTemplateFiles files,
-        out WebLingoSourceSpan? readOnlySession, WebLingoTemplateKind kind = WebLingoTemplateKind.Page, IReadOnlyCollection<string>? hostParameters = null)
+        out WebLingoSourceSpan? readOnlySession, WebLingoTemplateKind kind = WebLingoTemplateKind.Page, IReadOnlyCollection<string>? hostParameters = null) =>
+        Parse(page, resolver, out files, out readOnlySession, out _, kind, hostParameters);
+
+    /// <summary>
+    /// As the other, and where the page declares that it takes requests other sites send, <c>crossorigin allowed;</c>, at the
+    /// page's own positions; null where it does not (section 6.12, "Cross-site request forgery").
+    /// </summary>
+    public static WebLingoSyntaxTree Parse(WebLingoSourceText page, IWebLingoSourceResolver? resolver, out WebLingoTemplateFiles files,
+        out WebLingoSourceSpan? readOnlySession, out WebLingoSourceSpan? crossOrigin, WebLingoTemplateKind kind = WebLingoTemplateKind.Page,
+        IReadOnlyCollection<string>? hostParameters = null)
     {
         var parser = new WebLingoTemplateParser(page, resolver, kind) { _hostParameters = hostParameters ?? [] };
         parser._including.Add(page.Name);
@@ -176,6 +188,7 @@ public sealed class WebLingoTemplateParser
         parser._tokens.Add(new WebLingoToken(WebLingoTokenKind.EndOfFile, "", new WebLingoSourceSpan(page.Text.Length, 0)));
         files = parser._files;
         readOnlySession = parser._readOnlySession;
+        crossOrigin = parser._crossOrigin;
         return new WebLingoParser(page, parser._tokens, parser._diagnostics).ParseCompilationUnit();
     }
 
@@ -376,10 +389,10 @@ public sealed class WebLingoTemplateParser
         for (var i = 0; i < code.Count; i++)
         {
             var token = code[i];
-            if (token.Kind == WebLingoTokenKind.Identifier && token.Text == Session && i + 1 < code.Count
-                && code[i + 1].Kind == WebLingoTokenKind.Identifier && code[i + 1].Text == ReadOnly && !AfterDot(code, i))
+            if (token.Kind == WebLingoTokenKind.Identifier && i + 1 < code.Count && code[i + 1].Kind == WebLingoTokenKind.Identifier
+                && (token.Text, code[i + 1].Text) is (Session, ReadOnly) or (CrossOrigin, Allowed) && !AfterDot(code, i))
             {
-                i = AddSession(code, i, shift);
+                i = AddDeclaration(code, i, shift, token.Text == CrossOrigin);
                 continue;
             }
             var directive = token.Kind == WebLingoTokenKind.Identifier && token.Text is Include or Layout
@@ -528,10 +541,11 @@ public sealed class WebLingoTemplateParser
     }
 
     /// <summary>
-    /// <c>session readonly;</c> at <paramref name="at"/>: kept where a page may declare it, at the top level of its own text,
-    /// once; WL5009 elsewhere. The index of its last token.
+    /// <c>session readonly;</c>, or, where <paramref name="crossOrigin"/>, <c>crossorigin allowed;</c>, at <paramref name="at"/>:
+    /// kept where a page may declare it, at the top level of its own text, once; WL5009, or WL5010, elsewhere. The index of
+    /// its last token.
     /// </summary>
-    private int AddSession(List<WebLingoToken> code, int at, int shift)
+    private int AddDeclaration(List<WebLingoToken> code, int at, int shift, bool crossOrigin)
     {
         var start = Shift(code[at].Span, shift).Start;
         var last = Shift(code[at + 1].Span, shift);
@@ -545,18 +559,31 @@ public sealed class WebLingoTemplateParser
         {
             Report(WebLingoDiagnosticCodes.MissingSemicolon, "A ';' is missing here.", new WebLingoSourceSpan(span.Start + span.Length, 0));
         }
+        var what = crossOrigin ? "which requests it takes" : "how the session is used";
+        var follows = crossOrigin ? "it takes those its page takes" : "it reads it as its page declares";
         var misplaced = _kind switch
         {
-            WebLingoTemplateKind.Layout => "A layout cannot declare how the session is used: it reads it as its page declares.",
-            WebLingoTemplateKind.Component => "A component cannot declare how the session is used: it reads it as its page declares.",
-            _ when _including.Count > 1 => "A template a page includes cannot declare how the session is used: it reads it as its page declares.",
+            WebLingoTemplateKind.Layout => $"A layout cannot declare {what}: {follows}.",
+            WebLingoTemplateKind.Component => $"A component cannot declare {what}: {follows}.",
+            _ when _including.Count > 1 => $"A template a page includes cannot declare {what}: {follows}.",
             _ when _blocks.Count > 0 || _parentheses > 0 || _lastCode is not (WebLingoTokenKind.Semicolon or WebLingoTokenKind.CloseBrace) =>
-                "'session readonly;' is a statement of its own, at the page's top level, not inside another.",
-            _ when _readOnlySession is not null => "A page declares that it only reads its session once.",
+                $"'{(crossOrigin ? "crossorigin allowed" : "session readonly")};' is a statement of its own, at the page's top level, not inside another.",
+            _ when (crossOrigin ? _crossOrigin : _readOnlySession) is not null =>
+                crossOrigin ? "A page declares once that it takes requests other sites send." : "A page declares that it only reads its session once.",
             _ => null
         };
-        if (misplaced is null) _readOnlySession = span;
-        else Report(WebLingoDiagnosticCodes.MisplacedSession, misplaced, span);
+        if (misplaced is not null)
+        {
+            Report(crossOrigin ? WebLingoDiagnosticCodes.MisplacedCrossOrigin : WebLingoDiagnosticCodes.MisplacedSession, misplaced, span);
+        }
+        else if (crossOrigin)
+        {
+            _crossOrigin = span;
+        }
+        else
+        {
+            _readOnlySession = span;
+        }
         return next - 1;
     }
 

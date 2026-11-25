@@ -15,7 +15,7 @@ namespace WebLingo.Hosting;
 /// What a request came to: a page's response, or a route handler's, a file the host serves as it is, no route, a handler
 /// that does not answer its method, or a 500; or, not yet ended, a request that waits (specification, section 6.6).
 /// </summary>
-public enum WebLingoRequestOutcomeKind { Page, File, NotFound, Failed, Handler, MethodNotAllowed, Waiting, TooLarge }
+public enum WebLingoRequestOutcomeKind { Page, File, NotFound, Failed, Handler, MethodNotAllowed, Waiting, TooLarge, Forbidden }
 
 /// <summary>A request's outcome; for <see cref="WebLingoRequestOutcomeKind.File"/>, the file, from the application's root.</summary>
 public sealed record WebLingoRequestOutcome(WebLingoRequestOutcomeKind Kind, string? File = null)
@@ -132,7 +132,8 @@ public sealed class WebLingoApplication
                 return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.TooLarge);
             case { Kind: WebLingoRouteKind.Page } page:
                 var compiled = generation.Page(worker, page.File, this);
-                return Run(compiled, request, response, worker, cancellation, scheduler, WebLingoRequestOutcomeKind.Page, compiled.ReadOnly);
+                return Run(compiled, request, response, worker, cancellation, scheduler, WebLingoRequestOutcomeKind.Page, compiled.ReadOnly,
+                    compiled.CrossOrigin);
             case { Kind: WebLingoRouteKind.Handler } handler:
                 return Handler(generation, handler.File, request, response, worker, cancellation, scheduler);
             default:
@@ -172,7 +173,7 @@ public sealed class WebLingoApplication
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.MethodNotAllowed);
         }
         return Run(generation.Handler(worker, file, function, this), request, response, worker, cancellation, scheduler,
-            WebLingoRequestOutcomeKind.Handler, handler?.ReadOnly);
+            WebLingoRequestOutcomeKind.Handler, handler?.ReadOnly, handler?.CrossOrigin ?? false);
     }
 
     /// <summary>The largest body a site's request may have (section 6.12, "Uploaded files"), which its hosts let through.</summary>
@@ -195,7 +196,9 @@ public sealed class WebLingoApplication
     /// <summary>
     /// What a <c>.wlg</c> exports, read from its text, or null if it does not parse: the names, and where it declares that
     /// it only reads its session, <c>export const session = "readonly";</c>, or its error, a <c>session</c> export that is not
-    /// that (section 6.12, "Sessions and cookies").
+    /// that (section 6.12, "Sessions and cookies"); and whether it takes requests other sites send,
+    /// <c>export const crossorigin = "allowed";</c>, a <c>crossorigin</c> export that is not that its error (section 6.12,
+    /// "Cross-site request forgery").
     /// </summary>
     private HandlerExports? ExportsOf(string file)
     {
@@ -207,6 +210,7 @@ public sealed class WebLingoApplication
         }
         var names = new HashSet<string>(StringComparer.Ordinal);
         string? readOnly = null, error = null;
+        var crossOrigin = false;
         var source = new WebLingoSourceText(text, file);
         foreach (var statement in tree.Root.Statements)
         {
@@ -219,9 +223,22 @@ public sealed class WebLingoApplication
                 _ => null
             };
             if (name is not null) names.Add(name);
-            if (name != SessionExport) continue;
+            if (name is not (SessionExport or CrossOriginExport)) continue;
             var at = source.GetLocation(export.Span.Start);
             var where = $"{file}({at.Line},{at.Column})";
+            if (name == CrossOriginExport)
+            {
+                if (export.Declaration is WebLingoVariableDeclarationSyntax { Kind: WebLingoDeclarationKind.Const, Initializer: WebLingoStringLiteralSyntax { Value: "allowed" } })
+                {
+                    crossOrigin = true;
+                }
+                else
+                {
+                    error = $"{where}: error {WebLingoDiagnosticCodes.MisplacedCrossOrigin}: A handler's 'crossorigin' export declares that it "
+                            + "takes requests other sites send, 'export const crossorigin = \"allowed\";', and is nothing else.";
+                }
+                continue;
+            }
             if (export.Declaration is WebLingoVariableDeclarationSyntax { Kind: WebLingoDeclarationKind.Const, Initializer: WebLingoStringLiteralSyntax { Value: "readonly" } })
             {
                 readOnly = $"'export const session = \"readonly\";' at {where}";
@@ -232,14 +249,17 @@ public sealed class WebLingoApplication
                         + "its session, 'export const session = \"readonly\";', and is nothing else.";
             }
         }
-        return new HandlerExports(names, readOnly, error);
+        return new HandlerExports(names, readOnly, error, crossOrigin);
     }
 
     /// <summary>The export that declares how a handler uses its session.</summary>
     private const string SessionExport = "session";
 
+    /// <summary>The export that declares that a handler takes requests other sites send.</summary>
+    private const string CrossOriginExport = "crossorigin";
+
     /// <summary>A handler's exports, where it declares that it only reads its session, and what is wrong with its declaration.</summary>
-    private sealed record HandlerExports(HashSet<string> Names, string? ReadOnly, string? Error);
+    private sealed record HandlerExports(HashSet<string> Names, string? ReadOnly, string? Error, bool CrossOrigin);
 
     /// <summary>
     /// A page run, or a handler's, its session opened first, waiting for its lock where another request holds it:
@@ -247,9 +267,15 @@ public sealed class WebLingoApplication
     /// the handler declares that it only reads its session, null where it does not.
     /// </summary>
     private WebLingoRequestOutcome Run(CompiledPage page, IWebLingoHttpRequest request, IWebLingoHttpResponse response, WebLingoWorkerId worker,
-        WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler, WebLingoRequestOutcomeKind done, string? readOnly = null)
+        WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler, WebLingoRequestOutcomeKind done, string? readOnly = null,
+        bool crossOrigin = false)
     {
         if (page.Module is null) return Failed(response, page.Errors);
+        if (!crossOrigin && CrossSite(request) is { } why)
+        {
+            WebLingoErrorPages.Forbidden(response, _options.Mode, [why]);
+            return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Forbidden);
+        }
         // A client that takes nothing for too long cancels the request, as a client that goes does.
         cancellation ??= new WebLingoCancellationSignal();
         var host = scheduler ?? _options.Scheduler?.Invoke();
@@ -271,6 +297,29 @@ public sealed class WebLingoApplication
             return start();
         }
         return WaitForSession(scheduler, () => arrived, session, start);
+    }
+
+    /// <summary>
+    /// Why a request that may change things, any method but GET, HEAD and OPTIONS, is another site's, refused as a cross-site
+    /// request forgery may be, as Go's <c>CrossOriginProtection</c> refuses one (section 6.12, "Cross-site request forgery";
+    /// the owner's answer, 24 November 2026, A1 (b)): by its <c>Sec-Fetch-Site</c> where it has one, anything but
+    /// <c>same-origin</c> or <c>none</c>; else by its <c>Origin</c>, where it has one, naming a host other than the request's;
+    /// null where it is the site's own, or says neither, as no browser that sends a cookie leaves out both.
+    /// </summary>
+    private static string? CrossSite(IWebLingoHttpRequest request)
+    {
+        if (request.Method is "GET" or "HEAD" or "OPTIONS") return null;
+        var refused = $"A {request.Method} from another site was refused, as a cross-site request forgery may be: ";
+        var allow = "; 'crossorigin allowed;' lets a page take one, and 'export const crossorigin = \"allowed\";' a handler.";
+        if (request.Headers.Get("Sec-Fetch-Site") is { } fetch)
+        {
+            return fetch is "same-origin" or "none" ? null : $"{refused}its Sec-Fetch-Site is '{fetch}'{allow}";
+        }
+        if (request.Headers.Get("Origin") is not { } origin) return null;
+        var scheme = origin.IndexOf("://", StringComparison.Ordinal);
+        var host = scheme < 0 ? null : origin[(scheme + 3)..];
+        if (host is not null && host.Length > 0 && host.Equals(request.Host, StringComparison.OrdinalIgnoreCase)) return null;
+        return $"{refused}its Origin, '{origin}', is not this site's, '{request.Host}'{allow}";
     }
 
     /// <summary>
@@ -455,6 +504,7 @@ public sealed class WebLingoApplication
         }
         var result = compiler.Compile(text);
         page.Module = result.Module;
+        page.CrossOrigin = compiler.CrossOriginAllowed is not null;
         if (compiler.ReadOnlySession is { } declared)
         {
             var at = text.GetLocation(declared.Start);
@@ -547,6 +597,9 @@ public sealed class WebLingoApplication
 
         /// <summary>Whether its file could not be read when it was compiled, so that its worker does not keep it.</summary>
         public bool Unread { get; set; }
+
+        /// <summary>Whether it declares that it takes requests other sites send, <c>crossorigin allowed;</c>.</summary>
+        public bool CrossOrigin { get; set; }
 
         /// <summary>What finds and compiles a module the page imports while it runs (section 3.9).</summary>
         public WebLingoModuleLoader Modules { get; } = imports;

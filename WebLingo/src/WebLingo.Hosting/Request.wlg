@@ -1,0 +1,5 @@
+async checkCsrf(token = null) {
+  if (token == null && this.headers.has("X-CSRF-Token")) token = this.headers["X-CSRF-Token"];
+  if (token == null && this.__readsForm()) token = (await this.form())?["csrfToken"];
+  return this.__checkCsrf(token);
+}
