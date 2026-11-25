@@ -38,7 +38,11 @@ Part 3, conditional breakpoints, is built: the session reads a condition where i
 names against its line's scope once the file is compiled, and the VM evaluates it at each visit (`TryTest`, outside
 `Run`), never running the program's code: the built-in classes' read-only methods of strings, arrays, maps and sets,
 and native properties, allowed. Tested by `DebugAdapterTests.ABreakpointsConditionStopsOnlyWhereItHolds` and
-`WaspDebugTests.AConditionStopsOnlyTheRequestsItNames`. Part 4 waits for Visual Studio installed here.
+`WaspDebugTests.AConditionStopsOnlyTheRequestsItNames`. Part 4, another client, is documentation only (`2e27309`):
+`Editors/README.md`, "Any debugger: the launch settings", and Visual Studio Community 2026 debugging a page through its
+Debug Adapter Host, `DebugAdapterHost.Launch`, with no extension, tried by hand. An extension of Visual Studio's, so that
+F5 starts the debugger, is the task "Visual Studio Debug Adapter", answered (its A3 (a): a launch provider in C#,
+compiled by a script of ours with the compiler and assemblies Visual Studio installs), not begun.
 
 ## Windows local installation
 
@@ -305,8 +309,44 @@ ignores (`WebLingo/tests/WebLingo.Conformance.Tests/DatabaseServer.cs`, shared b
 `DotNetDatabases`: a date went to MySQL as its time in UTC and came back as one on the server's clocks; and Npgsql's
 messages broke their lines as the platform does, a provider's message's line breaks now LF everywhere.
 
-Next: "Extensive WASP Example", its prerequisites done, waits for them installed (its A3 to A5); debugging's part 4
-waits for Visual Studio installed here, as "Visual Studio Debug Adapter" does.
+## WebLingo Forum
+
+The forum written in WASP, `Examples.wasp/WebLingoForum`, the task "Extensive WASP Example", is designed in
+`Documents/weblingo-forum.md` (`c05087f`), its ten parts in its section 6, each a task of `TO-DO.md`. Parts 1 and 2 have
+landed. Its foundations (`cdfa20a`): the schema, `site/lib/schema.wlg`, made on SQLite, SQL Server, MySQL and PostgreSQL
+through `site/lib/sql.wlg`; `setup/setup.wlg`, run with `weblingo`, making the database and its first administrator, or
+upgrading it; and the front page, boards and topics, paged. Its members (`ae49457`): sign-up confirmed by mail, signing
+in and out, a password reset, a limit on failed sign-ins for each account, WASP giving no client's address, profiles and
+the member list. Its modules' own tests, `tests/*.wlg`, run by `weblingo test`; `ForumTests` (`WebLingo.Templates.Tests`)
+runs them, then serves the forum on each database, its mail through `SmtpTestServer`, and walks a member's pages: its 5
+tests passed on Windows, MySQL and PostgreSQL from the `Databases` downloads. The forum's pages read their own line
+breaks, since a Windows checkout gives its files CRLF, so the tests compare pages with their line breaks made LF.
+
+Part 3, writing, was stopped at the owner's request, half done, on the branch `claude/forum-writing`: uncommitted and not
+pushed, so that only the working copy it was written in has it.
+
+- `site/lib/markdown.wlg`, new: the forum's Markdown, `render(text, options)`: paragraphs, emphasis, strong, struck text
+  and code; headings from `<h3>`; fenced code; quotes, nested; lists; rules; links to http, https, mailto and the
+  forum's own paths only, `rel="nofollow ugc noopener"`; images only given `{ images: true }`, else links; everything
+  else escaped. Nesting stops at 12 levels, and every search is bounded, so that a post renders in time linear in its
+  length.
+- `tests/markdown-tests.wlg`, new: 10 tests, passing, a pathological post among them, rendered in 0.4 s.
+- `site/lib/schema.wlg`: version 3, with `topic_reads` and `topic_watches`; `tests/accounts-tests.wlg` expects it.
+
+Left of part 3: a module of posts, a new topic, a reply, a quote, editing and deleting one's own, and the counts; what a
+member has read and the topics they watch, unread markers, a link to the first unread post, and a watch's mail; the
+pages for a new topic, a reply, an edit and a deletion, and a watch's handler; the post component rendering Markdown and
+the signature; a setting for images; and `ForumTests`' walk of writing. Version 3 breaks `ForumTests` until its two
+expectations of `version 2`, after running `setup.wlg`, say `version 3`. Then the design document kept to what is built.
+
+Found while writing it: in WebLingo, `s[i]` takes time in proportion to `i`, a string's characters being found from its
+start, 20,000 lookups 683 ms against 2 ms by `foreach`; so a scanner reads an array of a string's characters
+(`charsOf` in `markdown.wlg`). It is not a task of `TO-DO.md` yet.
+
+Next: "WebLingo Forum, Part 3: Writing", above, then parts 4 to 7 and 10; parts 8 and 9 each wait for an answer in
+`TO-DO.md`. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to be written
+as tasks and into the specification's roadmap; neither is begun.
 
 The last full suite, on Windows, in Release (25 November 2026, MySQL's and PostgreSQL's tests among them): 3,642 tests
-passing, none skipped. Linux not tried since the last push.
+passing, none skipped, before the forum's parts, whose `ForumTests` ran for each. Linux not tried since `2e27309`: the
+forum's design, the build number and the forum's parts 1 and 2 were tried on Windows only.
