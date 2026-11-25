@@ -322,8 +322,9 @@ runs them, then serves the forum on each database, its mail through `SmtpTestSer
 tests passed on Windows, MySQL and PostgreSQL from the `Databases` downloads. The forum's pages read their own line
 breaks, since a Windows checkout gives its files CRLF, so the tests compare pages with their line breaks made LF.
 
-Part 3, writing, was stopped at the owner's request, half done, on the branch `claude/forum-writing`: uncommitted and not
-pushed, so that only the working copy it was written in has it.
+Part 3, writing, was stopped at the owner's request, half done: committed, unfinished, on the branch
+`claude/forum-writing`, which is pushed to GitHub and has not landed on `main`. On that branch `ForumTests` fails until
+the change to its expectations below is made.
 
 - `site/lib/markdown.wlg`, new: the forum's Markdown, `render(text, options)`: paragraphs, emphasis, strong, struck text
   and code; headings from `<h3>`; fenced code; quotes, nested; lists; rules; links to http, https, mailto and the
