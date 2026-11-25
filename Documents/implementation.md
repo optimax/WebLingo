@@ -237,7 +237,10 @@ For Linux, run `Installers/Linux/package.sh` on Linux, with the .NET 10 SDK, GNU
 recorded in the installation's `links` for its `uninstall.sh`; the Debian package installs the same files in
 `/opt/weblingo`, linked from `/usr/bin`, depending on the libraries a self-contained .NET program needs. CI's job
 `linux-installer` (`.github/workflows/build.yml`) makes the x64 packages on `ubuntu-latest` and runs
-`Installers/Linux/tests/test.sh` on them on every push: the only place they are made and tried, since publishing for
+`Installers/Linux/tests/test.sh` on them on every push, then `Installers/Linux/tests/serve.sh`, which serves
+`Examples.wasp/example1` from WebLingo installed by the archive, through `wasp fastcgi` behind nginx and Apache httpd's
+`mod_proxy_fcgi`, and through `mod_fcgid`, the distribution's packages, as the WASP User Manual's section 18 configures
+them: the only place they are made and tried, since publishing for
 Linux on Windows restores .NET's Linux runtime packs from NuGet, which this machine does not have.
 
 On Windows, double-click `build.bat` in the repository root to publish and install the current checkout, including

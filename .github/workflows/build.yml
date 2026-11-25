@@ -32,3 +32,5 @@ jobs:
           dotnet-version: '10.0.x'
       - run: bash Installers/Linux/package.sh --architecture x64 --destination "$RUNNER_TEMP/packages"
       - run: bash Installers/Linux/tests/test.sh "$RUNNER_TEMP/packages"
+      # Examples.wasp/example1 served through nginx and Apache httpd, as the WASP User Manual's section 18 configures them.
+      - run: bash Installers/Linux/tests/serve.sh "$RUNNER_TEMP/packages"
