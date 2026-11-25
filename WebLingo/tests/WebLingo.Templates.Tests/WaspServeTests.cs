@@ -231,7 +231,7 @@ public sealed class WaspServeTests : IDisposable
 
     /// <summary>
     /// Sessions in SQL Server, on the machine's own, in a database of the test's own, dropped after it: the table made by
-    /// <c>wasp sessions create</c>, as the user running the tests, and a session kept in it by <c>wasp serve</c>.
+    /// <c>wasp sessions create</c>, as the user running the tests, and a session kept and locked in it by <c>wasp serve</c>.
     /// </summary>
     [SqlServerFact]
     public async Task SessionsAreKeptInSqlServer()
@@ -243,25 +243,7 @@ public sealed class WaspServeTests : IDisposable
         using (var master = server.Open("master")) master.Execute($"CREATE DATABASE [{database}]", [], 300);
         try
         {
-            Write("wasp.config", "{ \"databases\": { \"main\": \"" + SqlServerFactAttribute.ConnectionString(database) + "\" }, "
-                                 + "\"sessions\": { \"store\": \"database\", \"database\": \"main\", \"table\": \"sessions\" } }");
-            Write("count.wasp", "<% param request; var n = (request.session?[\"n\"] ?? 0) + 1; request.session[\"n\"] = n; %><%= n %>");
-            Assert.Equal((WebLingoCommandLine.Success, "WASP made the table of sessions 'sessions' in the database 'main', its schema 1.\n", ""),
-                Sessions("create", "--root", _root));
-            var site = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
-            Assert.True(site is not null, error);
-            await site.StartAsync();
-            try
-            {
-                var address = site.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
-                using var client = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(address) };
-                Assert.Equal("1", await client.GetStringAsync("/count"));
-                Assert.Equal("2", await client.GetStringAsync("/count"));
-            }
-            finally
-            {
-                await site.StopAsync();
-            }
+            await SessionsAreKeptAndLockedInAsync(SqlServerFactAttribute.ConnectionString(database));
         }
         finally
         {
@@ -269,6 +251,81 @@ public sealed class WaspServeTests : IDisposable
             using var master = server.Open("master");
             master.Execute($"IF DB_ID(N'{database}') IS NOT NULL BEGIN ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; "
                            + $"DROP DATABASE [{database}]; END", [], 300);
+        }
+    }
+
+    /// <summary>
+    /// Sessions in MySQL, on the server the tests run from its download (<see cref="DatabaseServer"/>), in a database of the
+    /// test's own, dropped after it, as in SQL Server.
+    /// </summary>
+    [MySqlFact]
+    public async Task SessionsAreKeptInMySql()
+    {
+        var database = DatabaseServer.MySql.MakeDatabase();
+        try
+        {
+            await SessionsAreKeptAndLockedInAsync(DatabaseServer.MySql.ConnectionString(database));
+        }
+        finally
+        {
+            DatabaseServer.MySql.DropDatabase(database);
+        }
+    }
+
+    /// <summary>
+    /// Sessions in PostgreSQL, on the server the tests run from its download (<see cref="DatabaseServer"/>), in a database of
+    /// the test's own, dropped after it, as in SQL Server.
+    /// </summary>
+    [PostgreSqlFact]
+    public async Task SessionsAreKeptInPostgreSql()
+    {
+        var database = DatabaseServer.PostgreSql.MakeDatabase();
+        try
+        {
+            await SessionsAreKeptAndLockedInAsync(DatabaseServer.PostgreSql.ConnectionString(database));
+        }
+        finally
+        {
+            DatabaseServer.PostgreSql.DropDatabase(database);
+        }
+    }
+
+    /// <summary>
+    /// A site whose sessions are in the database <paramref name="connection"/> names: its table made by <c>wasp sessions
+    /// create</c>, which says, run again, that it is there; a value kept from one request to the next by <c>wasp serve</c>;
+    /// and a request of the session that comes while another holds it waiting for it, reading what the other wrote last.
+    /// </summary>
+    private async Task SessionsAreKeptAndLockedInAsync(string connection)
+    {
+        Write("wasp.config", "{ \"databases\": { \"main\": \"" + connection + "\" }, "
+                             + "\"sessions\": { \"store\": \"database\", \"database\": \"main\", \"table\": \"sessions\" } }");
+        Write("count.wasp", "<% param request; var n = (request.session?[\"n\"] ?? 0) + 1; request.session[\"n\"] = n; %><%= n %>");
+        Write("slow.wasp", "<% param request; import { delay } from \"std:system\"; request.session[\"step\"] = \"begun\"; await delay(700);\n"
+                           + "request.session[\"step\"] = \"ended\"; %>slow");
+        Write("step.wasp", "<% param request; %><%= request.session[\"step\"] %>");
+        Assert.Equal((WebLingoCommandLine.Success, "WASP made the table of sessions 'sessions' in the database 'main', its schema 1.\n", ""),
+            Sessions("create", "--root", _root));
+        Assert.Equal((WebLingoCommandLine.Success, "The database 'main' has its table of sessions 'sessions' already, its schema 1.\n", ""),
+            Sessions("create", "--root", _root));
+        var site = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        Assert.True(site is not null, error);
+        await site.StartAsync();
+        try
+        {
+            var address = site.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            using var client = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(address) };
+            Assert.Equal("1", await client.GetStringAsync("/count"));
+            Assert.Equal("2", await client.GetStringAsync("/count"));
+            var slow = client.GetStringAsync("/slow");
+            await Task.Delay(200);
+            // Sent while the slow request holds the session's lock, it waits for it, and reads what the slow one wrote last.
+            Assert.Equal("ended", await client.GetStringAsync("/step"));
+            Assert.Equal("slow", await slow);
+            Assert.Equal("3", await client.GetStringAsync("/count"));
+        }
+        finally
+        {
+            await site.StopAsync();
         }
     }
 

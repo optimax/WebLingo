@@ -273,10 +273,20 @@ platform's `IWebLingoDatabases`, its table's statements in `CreateStatements`, w
 (`WebLingo/src/WebLingo.Wasp.Cli/WebLingoWaspSessions.cs`) runs or prints; the store's contract gained a failure for
 opening and a close done off the worker (`WebLingoApplication.Ended` waits for it before the response ends). Tested by
 `DatabaseSessionTests` (`WebLingo.Hosting.Tests`, which references `WebLingo.Data.DotNet` for it, on SQLite),
-`WaspServeTests.SessionsAreKeptInTheSitesDatabase` and `SessionsAreKeptInSqlServer`; MySQL's and PostgreSQL's SQL is not
-tried, no server of theirs being here.
+`WaspServeTests.SessionsAreKeptInTheSitesDatabase`, `SessionsAreKeptInSqlServer`, `SessionsAreKeptInMySql` and
+`SessionsAreKeptInPostgreSql`, the last three a session kept and locked.
+
+## MySQL and PostgreSQL
+
+`std:db`'s MySQL and PostgreSQL are tried by `MySqlTests` and `PostgreSqlTests` (`WebLingo.Conformance.Tests`), and
+sessions in each by `WaspServeTests`, on servers the tests run from the repository's `Databases` downloads, which git
+ignores (`WebLingo/tests/WebLingo.Conformance.Tests/DatabaseServer.cs`, shared by `WebLingo.Templates.Tests`;
+`Documents/implementation.md`, "Trying MySQL and PostgreSQL"), skipped where they are not there. What they found, fixed in
+`DotNetDatabases`: a date went to MySQL as its time in UTC and came back as one on the server's clocks; and Npgsql's
+messages broke their lines as the platform does, a provider's message's line breaks now LF everywhere.
 
 Next: "Extensive WASP Example", its prerequisites done, waits for them installed (its A3 to A5); debugging's part 4
 waits for Visual Studio installed here, as "Visual Studio Debug Adapter" does.
 
-The last full suite, on Windows, in Release: 3,525 tests passing. Linux not tried since the last push.
+The last full suite, on Windows, in Release (25 November 2026, MySQL's and PostgreSQL's tests among them): 3,642 tests
+passing, none skipped. Linux not tried since the last push.

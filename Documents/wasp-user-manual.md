@@ -806,7 +806,7 @@ INSERT INTO wasp_sessions (id, data, used, locked_until) VALUES ('schema', '{"sc
 - The row `schema` gives the table's schema: a later WASP, whose schema is another, says so, with the command that
   upgrades the table, and never changes the table itself.
 - A session that has ended is removed by a request that comes after it, once a minute at most.
-- The SQL for MySQL and PostgreSQL has not been tried on their servers yet; SQLite's and SQL Server's have.
+- WASP's tests try each database's SQL, a session kept and locked, on SQLite, SQL Server, MySQL 8.4 and PostgreSQL 19.
 
 A page run by `wasp run` has no request: there, a page's parameters are values given on the command line
 ([section 16](#16-the-wasp-command-line)), and a page that declares `request` fails.

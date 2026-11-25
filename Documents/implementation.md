@@ -310,6 +310,17 @@ the machine's, shared; run it on an otherwise idle machine. Its numbers are in t
 
 Apache Lounge's build needs Microsoft's Visual C++ Redistributable for Visual Studio 2017–2026, 14.52 or later. A console's httpd stops on Ctrl+C alone, Ctrl+Break restarting it, and no other process can send it Ctrl+C: the tests stop it by force, with what it started, `mod_fcgid`'s `wasp` among them; nginx stops by `nginx -s stop`.
 
+### Trying MySQL and PostgreSQL
+
+`MySqlTests` and `PostgreSqlTests` (`WebLingo.Conformance.Tests`) run `std:db`'s tests that SQL Server has, and `WaspServeTests.SessionsAreKeptInMySql` and `SessionsAreKeptInPostgreSql` (`WebLingo.Templates.Tests`) a site's sessions in each, their table made by `wasp sessions create`, a session kept and locked, as in SQL Server, on servers the tests run themselves (`DatabaseServer`, which both projects share), on Windows: a test process unpacks a server's own files from its download into a folder of its own, under `weblingo-database-servers` in the system's temporary folder, makes a cluster there, its administrator without a password, MySQL's `root` and PostgreSQL's `postgres`, and starts the server once, when a test first needs it, on a port of the system's choosing, listening on 127.0.0.1 only, in a few seconds; each test makes a database of its own on it and drops it after. The server is in a job object of the test process's, which ends its processes when it closes, so that it ends with the process, however the process ends; and the process holds a lock file in the server's folder while it runs. The test host is ended before its cleanup at its end has removed the folder, so that the next test process to start a server removes the folders earlier ones left, each once no process holds its lock file: a run's, some 320 MB for each test project that started both servers, 650 MB for the whole suite's, stays until then. The downloads are kept in the repository's `Databases` folder, which git ignores, the one zip file of each in a folder of its own; a test whose download is not there is skipped, and so is each on another platform, CI's among them. Those tried (the owner's go-ahead, 25 November 2026), to download again, the same files, for the same results:
+
+| Folder | File | From | Bytes | SHA-256 |
+|---|---|---|---:|---|
+| `Databases/mysql` | `mysql-8.4.13.1-winx64.zip` | `https://cdn.mysql.com/Downloads/MySQL-8.4/mysql-8.4.13.1-winx64.zip` | 281,355,352 | `b96b13299bd0e74deaf543ae77d7aea5dac57bfae24ae30902d8899912a43382` |
+| `Databases/postgresql` | `postgresql-19.0-2-windows-x64-binaries.zip` | `https://get.enterprisedb.com/postgresql/postgresql-19.0-2-windows-x64-binaries.zip` | 68,546,952 | `a8f9cf38f72c403f31bf3ef9db0c441924fae0cada0d61850afa590d5eca55a1` |
+
+MySQL Community Server 8.4.13.1, its LTS release, from dev.mysql.com's page for 8.4, which gives its MD5, `d05e97a33b1bb0f49d88f09447bc3f9c`, which it has; PostgreSQL 19.0's binaries for Windows, from EnterpriseDB's page of them, which gives no checksum. Of MySQL's, the tests unpack `mysqld.exe`, the libraries beside it but the debug builds', and `share`, some 90 MB of its 1.3 GB; of PostgreSQL's, `bin`, `lib` and `share`. PostgreSQL's server refuses to run with an administrator's rights, its documentation says, so that its tests run from a terminal that is not elevated, as a developer's is not.
+
 ## A Finished Task's Checks
 
 These checks apply at task completion and on `main` after landing. Test selection and reuse follow `AGENTS.md`, sections 7 and 11.

@@ -76,7 +76,7 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
         catch (Exception exception) when (exception is DbException or InvalidOperationException or IOException or UnauthorizedAccessException)
         {
             opened.Dispose();
-            throw new WebLingoDatabaseException(WebLingoDatabaseErrorKind.Failed, $"the database cannot be opened: {exception.Message}");
+            throw new WebLingoDatabaseException(WebLingoDatabaseErrorKind.Failed, $"the database cannot be opened: {Said(exception)}");
         }
     }
 
@@ -201,6 +201,12 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
 
     private static WebLingoDatabaseException Invalid(string message) => new(WebLingoDatabaseErrorKind.Invalid, message);
 
+    /// <summary>
+    /// A provider's message, its line breaks LF on every platform: Npgsql's, which adds its error's position, and any
+    /// detail, on lines of their own, breaks them as the platform does, so that a script would read another text on Windows.
+    /// </summary>
+    private static string Said(Exception exception) => exception.Message.ReplaceLineEndings("\n");
+
     /// <summary>An open connection: one operation at a time, a transaction at most, each command given it.</summary>
     private sealed class Connection(string provider, DbConnection connection) : IWebLingoStreamingDatabaseConnection
     {
@@ -311,7 +317,7 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
                 }
                 catch (DbException exception)
                 {
-                    throw new WebLingoDatabaseException(WebLingoDatabaseErrorKind.Failed, exception.Message);
+                    throw new WebLingoDatabaseException(WebLingoDatabaseErrorKind.Failed, Said(exception));
                 }
                 catch (Exception exception) when (exception is InvalidOperationException or ArgumentException or FormatException
                                                   or InvalidCastException or OverflowException)
@@ -378,10 +384,16 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
             {
                 var parameter = command.CreateParameter();
                 parameter.ParameterName = "@" + name;
-                // Npgsql sends a date with an offset as timestamptz, which accepts DateTimeOffset values in UTC.
-                parameter.Value = provider == "postgresql" && value is DateTimeOffset date
-                    ? date.ToUniversalTime()
-                    : value ?? DBNull.Value;
+                parameter.Value = value switch
+                {
+                    // Npgsql sends a date with an offset as timestamptz, which accepts DateTimeOffset values in UTC.
+                    DateTimeOffset date when provider == "postgresql" => date.ToUniversalTime(),
+                    // MySQL's DATETIME, DATE and TIMESTAMP hold no offset, and are read as a time on the server's clocks
+                    // (Value): a date goes in so, where MySqlConnector would send its time in UTC.
+                    DateTimeOffset date when provider == "mysql" => date.LocalDateTime,
+                    null => DBNull.Value,
+                    _ => value
+                };
                 command.Parameters.Add(parameter);
             }
             return command;
