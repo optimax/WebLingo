@@ -780,6 +780,37 @@ Elsewhere, nothing failed: `wasp serve` gave 2,300 to 31,000 requests a second o
 and its working set grew from 66 MB to 250 MB over the run, its handles from 520 to 1,580, which the soak (part 2)
 follows.
 
+**The soak** (part 2, 25 November 2026), `WebLingo.Benchmarks --load --soak 8 --clients 16`, from `adf45f6`, on part 1's
+machine, the clients on it too: `hello`, `compute`, `sqlite`, `sqlserver`, `large`, `session` and `upload` asked for in
+turn by 16 clients for 8 hours under `wasp serve`, the server's process sampled every 10 minutes, each row the 10 minutes
+before it. 43,625,022 requests, every answer checked, none wrong or failed. The machine was not idle throughout: for the
+run's first three hours it also built and tested the solution and made its packages, and a test host an earlier run had
+left spinning took one of its eight processors until it was stopped, 3 hours and 1 minute in; its last 20 minutes were
+faster again, with the machine no idler than before, why not looked into. Each hour, and the samples beside those
+changes:
+
+| Elapsed | Requests | Requests a second | Median | 99% under | Errors | Working set | Private bytes | Handles | Threads |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 00:10 | 693,250 | 1,155 | 8.2 ms | 66.6 ms | 0 | 108 MB | 44 MB | 928 | 36 |
+| 01:00 | 3,952,208 | 1,183 | 8.1 ms | 63.4 ms | 0 | 112 MB | 48 MB | 953 | 35 |
+| 02:00 | 8,134,504 | 1,111 | 8.4 ms | 71.6 ms | 0 | 112 MB | 47 MB | 938 | 30 |
+| 03:00 | 12,171,003 | 1,128 | 8.5 ms | 64.2 ms | 0 | 112 MB | 48 MB | 940 | 32 |
+| 03:10 | 13,189,860 | 1,698 | 5.9 ms | 40.1 ms | 0 | 114 MB | 49 MB | 937 | 32 |
+| 04:00 | 18,271,889 | 1,693 | 5.9 ms | 40.3 ms | 0 | 113 MB | 47 MB | 944 | 31 |
+| 05:00 | 24,375,777 | 1,700 | 5.9 ms | 39.7 ms | 0 | 113 MB | 47 MB | 937 | 31 |
+| 06:00 | 30,474,874 | 1,696 | 5.9 ms | 39.9 ms | 0 | 114 MB | 48 MB | 940 | 30 |
+| 07:00 | 36,580,843 | 1,697 | 5.9 ms | 39.8 ms | 0 | 113 MB | 48 MB | 941 | 31 |
+| 07:50 | 41,781,514 | 1,889 | 5.1 ms | 40.1 ms | 0 | 116 MB | 54 MB | 943 | 31 |
+| 08:00 | 43,625,022 | 3,114 | 2.7 ms | 29.5 ms | 0 | 114 MB | 51 MB | 934 | 32 |
+
+Over the first three hours, 1,002 to 1,263 requests a second, their median 7.6 to 9.1 ms and 99% under 60 to 90 ms; from
+then until 7 hours and 40 minutes in, 1,687 to 1,700, 5.9 to 6.0 ms and 39.7 to 40.3 ms. Nothing grew with time: the
+working set stayed between 108 MB and 116 MB, the handles between 909 and 967 and the threads between 30 and 36, from the
+first sample to the last, so that part 1's growth, from 66 MB to 250 MB and from 520 handles to 1,580, came with its
+clients, up to 256 at once, rather than with time, as far as 16 clients show. Its private bytes, 44 MB at the first sample
+and 45 to 49 MB until 7 hours and 10 minutes in, were 50 to 54 MB from 7 hours and 20 minutes on, 51 MB at the end: a rise too
+small, and too late in one run, to call a leak. Nothing failed or leaked, so that no task came of it.
+
 ### 5.7 Local source debugging
 
 On 19 November 2026, the owner approved local `.wlg` launches on the default register VM in VS Code.
