@@ -1883,7 +1883,7 @@ These items should be explicitly tracked rather than silently treated as approve
 10. **Native ABI:** finalize versioning, calling convention, callback threading, ownership and error structures.
 11. **Database API:** settle synchronous versus asynchronous connection establishment, transactions and streaming rows.
 12. **Native C# readiness:** track compiler/RTL capabilities and identify adapter replacements in CI.
-13. **Security:** specify concrete capability resolution and sandbox limitations; logical isolation is not a security boundary equivalent to separate processes. A site's files decided and built (17 November 2026, §7.13, "File capabilities").
+13. **Security:** specify concrete capability resolution and sandbox limitations; logical isolation is not a security boundary equivalent to separate processes. A site's files decided and built (17 November 2026, §7.13, "File capabilities"). What a site's configuration limits, and what it does not, its native modules, its COM objects and its process's account, and the operating system's isolation of one site from another, a process and an account for each, written into the WASP User Manual, section 19, "Sites sharing a server" (25 November 2026, the task "Isolating Sites, Documented"); each `wasp` serving one site as built.
 14. **Scheduler fairness:** choose instruction quantum, cancellation safe points and bounded blocking pools.
 15. **Initial test infrastructure:** xUnit adopted as the M0.6 default; implementation and CI configuration remain to be generated.
 
@@ -1932,7 +1932,7 @@ Tradeoff: MIT does not require third parties to contribute improvements back. If
 4. **Specification and compatibility:** Publish versioned language, WLBC, PAL/WLHI and extension contracts; state compatibility and deprecation policies.
 5. **Community governance:** Establish contribution rules, code review and maintainer authority, a security disclosure process, and a code of conduct before accepting substantial public contributions.
 6. **Trademark and naming:** Conduct a fresh name/trademark and ecosystem-confusion check for **WebLingo** before public launch; the MIT software license does not establish availability of the name or rights to a logo.
-7. **Security:** Document the limitations of capability-based logical isolation and the need for OS-level process isolation in hostile multi-tenant deployments.
+7. **Security:** Document the limitations of capability-based logical isolation and the need for OS-level process isolation in hostile multi-tenant deployments. Documented (25 November 2026): the WASP User Manual, section 19, "Sites sharing a server".
 
 ### 12.4 Proposed public repository files
 

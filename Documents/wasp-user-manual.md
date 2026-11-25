@@ -11,7 +11,7 @@ that, and the WebLingo Standard Library Reference, `Documents/weblingo-standard-
 built-in classes and the standard modules have.
 
 Everything here works as described, and every example in this manual was run and gave the output
-shown, but names and details may still change before a first release. [What is not there yet](#19-what-is-not-there-yet)
+shown, but names and details may still change before a first release. [What is not there yet](#20-what-is-not-there-yet)
 lists what is missing.
 
 ## Contents
@@ -34,7 +34,8 @@ lists what is missing.
 16. [The `wasp` command line](#16-the-wasp-command-line)
 17. [Deploying to IIS](#17-deploying-to-iis)
 18. [Serving through nginx or Apache: FastCGI](#18-serving-through-nginx-or-apache-fastcgi)
-19. [What is not there yet](#19-what-is-not-there-yet)
+19. [Sites sharing a server](#19-sites-sharing-a-server)
+20. [What is not there yet](#20-what-is-not-there-yet)
 
 ---
 
@@ -1450,7 +1451,56 @@ site anew, so the first request to each is slower than the rest.
 
 ---
 
-## 19. What is not there yet
+## 19. Sites sharing a server
+
+A server may serve many sites, each its own folder and its `wasp.config`, as it serves many PHP sites. Each `wasp`
+serves one site: under IIS, the ASP.NET Core Module starts a `wasp.exe` for each; under FastCGI, each `wasp fastcgi`
+serves the site its `--root` names. What keeps one site from another is in two places, and only one of them is a wall.
+
+**What a site's configuration limits.** WASP checks what a site's pages and handlers reach through WebLingo's standard
+modules against its `wasp.config` ([section 14](#14-configuration-waspconfig)): the folders `std:fs` reads and writes,
+`"files"`; the hosts `std:http` and `std:net` reach, `"network"`; the COM objects `windows:com` makes, `"com"`; what
+`std:env` reads, `"env"`; and its databases. A page that tries for more gets an error, a `FilePermissionError` or
+another of its kind, and nothing reaches the machine. These checks are WASP's own, made in the site's process: a
+page's WebLingo code reaches nothing past them, a page with a mistake in it or one a visitor's input leads astray
+included, but they do not keep what runs as the process itself.
+
+**What they do not limit.** Whatever runs as the process's own code reaches what its account may, beyond any of
+`wasp.config`'s lists:
+
+- **Native modules.** A module a site's schemes name, `"schemes": { "native": "…" }`, is .NET code loaded into the
+  site's process and trusted as WebLingo's own standard modules are: it reaches every file, host and program the
+  account may.
+- **COM objects** `"com"` allows reach the machine as the account does: `WScript.Shell` runs programs, and
+  `Scripting.FileSystemObject` reads and writes any file the account may, whatever `"files"` says.
+- **A database** reached with the account's own credentials, SQL Server's `Integrated Security`, is reached as the
+  account, which may reach other sites' databases too.
+- **Its `wasp.config` itself.** Whoever writes a site's configuration decides what its pages reach, its native modules
+  and its COM objects included: it is trusted as the site's code is.
+
+So the wall between sites is the operating system's: each site's process, under an account of its own, which reaches
+its own folders and nothing else.
+
+- **Under IIS**, give each site an application pool of its own. Each pool's `wasp.exe` runs as the pool's identity,
+  `IIS AppPool\<pool>`: give it read access to its site's folder and write access only to the folders its site writes,
+  its log's and its uploads' among them, and nothing of another site's. Sites in one pool run as one account, and so
+  reach each other's files through anything the account may do.
+- **Under FastCGI**, run each site's `wasp fastcgi` as a user of its own: a service of its own for each, with its own
+  user (systemd's `User=`), or, under `mod_fcgid`, a virtual host for each site whose `FcgidWrapper` starts `wasp` as
+  that site's user, through Apache's `suexec` on Linux.
+- **Each site's temporary files** in a folder of its own, `"uploads": { "folder": "…" }`, where the system's temporary
+  folder is shared.
+- **WebLingo itself**, installed once, is shared by every site, read only: no site's account may write its folder, or
+  a site could change what every other site runs.
+
+**Sites you do not trust**, other people's, as a host's customers' are, each run in a process of its own, under an
+account of its own, as above, with no schemes but WebLingo's own `std`, no `"com"`, and the account allowed nothing
+but its own site's folders: WASP's checks keep the site's pages to its configuration, and the operating system keeps
+the site to its account.
+
+---
+
+## 20. What is not there yet
 
 These are not there yet, and are planned or being designed:
 
