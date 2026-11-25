@@ -185,6 +185,24 @@ public sealed class FastCgiTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// A path the web server gives, decoded, found as it is among the routes, so that no <c>..</c>, however written, reaches a
+    /// file outside them, nor a page by its own name (25 November 2026, "Security Review of WASP's Request Path").
+    /// </summary>
+    [Theory]
+    [InlineData("/%2e%2e/wasp.config")]
+    [InlineData("/css/%2e%2e/broken.wasp")]
+    [InlineData("/..%2f..%2fwindows/win.ini")]
+    [InlineData("/css/..%5c..%5cwasp.config")]
+    [InlineData("/broken.wasp")]
+    [InlineData("/BROKEN.WASP")]
+    public async Task APathThatIsNoRouteIs404(string uri)
+    {
+        using var connection = await Connect();
+        var (head, _, status) = await RequestAsync(connection, 1, Get(uri), []);
+        Assert.Equal(("Status: 404 Not Found", 0), (head[0], status));
+    }
+
     [Fact]
     public async Task ManagementRecordsAreAnswered()
     {

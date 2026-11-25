@@ -13,9 +13,13 @@ public sealed record WebLingoRoute(WebLingoRouteKind Kind, string File);
 /// root: a page or a <c>.wlg</c> by its path without its extension, <c>/products</c> for <c>products.wasp</c>, a folder's
 /// <c>index</c> by the folder's path, <c>/</c> and <c>/docs/</c> (and <c>/docs</c>, when nothing else is that), and any
 /// other file by its own path. A path is compared as it is, its case included, on every platform. Never routed: files
-/// and folders whose names start with <c>.</c>, WLBC files, and, in the root, whatever their names' case, since
+/// and folders whose names start with <c>.</c>, WLBC files, and, in any folder, whatever their names' case, since
 /// Windows finds them so, the site's configuration (<c>wasp.config</c>), a script's (<c>weblingo.config</c>), and IIS's
-/// <c>web.config</c>; nor, as files served as they are, a page or a <c>.wlg</c> by its own name.
+/// <c>web.config</c>, which IIS reads in a site's folders too; nor, as files served as they are, a page or a <c>.wlg</c> by
+/// its own name, nor one whose extension has another case, <c>DB.WLG</c>, which Windows imports as <c>db.wlg</c>, and which
+/// is no route of its own, a page or a handler routed only by <c>.wasp</c> and <c>.wlg</c> as written (until 25 November
+/// 2026, "Security Review of WASP's Request Path", such a file was served as it is, its source with it, and so was a
+/// folder's <c>web.config</c>).
 /// </summary>
 public sealed class WebLingoRouteTable
 {
@@ -84,11 +88,13 @@ public sealed class WebLingoRouteTable
                 Add(files, root, file, ref error);
                 continue;
             }
-            if (folder.Length == 0 && IsUnrouted(name)) continue;
+            if (IsUnrouted(name)) continue;
             var dot = name.LastIndexOf('.');
             var extension = dot > 0 ? name[dot..] : "";
-            if (WebLingoBytecodeFile.IsBytecodeExtension(extension)) continue;
-            if (extension is not (".wasp" or ".wlg"))
+            if (WebLingoBytecodeFile.IsBytecodeExtension(extension.ToLowerInvariant())) continue;
+            var source = extension.Equals(".wasp", StringComparison.OrdinalIgnoreCase) || extension.Equals(".wlg", StringComparison.OrdinalIgnoreCase);
+            if (source && extension is not (".wasp" or ".wlg")) continue; // Source, never served, nor a route.
+            if (!source)
             {
                 // A page or a handler of the same path is the route, whichever is listed first.
                 _routes.TryAdd("/" + file, new WebLingoRoute(WebLingoRouteKind.File, file));

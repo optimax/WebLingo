@@ -50,6 +50,16 @@ public sealed class ApplicationTests
     [InlineData("/web.config")]
     [InlineData("/.git/config")]
     [InlineData("/../site/index")]
+    [InlineData("/lib/DB.WLG")]
+    [InlineData("/lib/DB")]
+    [InlineData("/Page.WASP")]
+    [InlineData("/Page")]
+    [InlineData("/admin/web.config")]
+    [InlineData("/admin/WASP.CONFIG")]
+    [InlineData("/%2e%2e/site/index")]
+    [InlineData("/css/../wasp.config")]
+    [InlineData("/wasp.config.")]
+    [InlineData("/wasp.config::$DATA")]
     public void APathWithoutARouteIs404(string path)
     {
         var app = Load(Site());
@@ -174,7 +184,12 @@ public sealed class ApplicationTests
         .Add("/site/wasp.config", "{ }")
         .Add("/site/weblingo.config", "{ }")
         .Add("/site/Web.config", "<configuration/>")
-        .Add("/site/.git/config", "secret");
+        .Add("/site/.git/config", "secret")
+        // Neither served as it is, its source with it, nor a route (25 November 2026, "Security Review of WASP's Request Path").
+        .Add("/site/lib/DB.WLG", "export const password = \"secret\";")
+        .Add("/site/Page.WASP", "<% var secret = 1; %>")
+        .Add("/site/admin/web.config", "<configuration><connectionStrings/></configuration>")
+        .Add("/site/admin/WASP.CONFIG", "{ }");
 
     [Fact]
     public void APageThatCannotBeReadJustNowIsA500_ReadAgainOnItsNextRequest()
