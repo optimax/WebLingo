@@ -71,6 +71,8 @@ BenchmarkDotNet.Artifacts/
 *.tmp
 *.temp
 *.log
+# std:log's project, whose folder's name *.log matches where names' case is ignored, as on Windows.
+!/WebLingo/src/WebLingo.StdLib.Log/
 *.bak
 *.old
 *.orig

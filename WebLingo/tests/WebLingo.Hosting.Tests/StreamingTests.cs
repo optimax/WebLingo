@@ -49,7 +49,7 @@ public sealed class StreamingTests
             .Handle(new WebLingoBufferedRequest("GET", "/"), response, new WebLingoWorkerId(0));
         Assert.Equal((500, false), (response.StatusCode, response.Aborted));
         Assert.DoesNotContain("xxx", Encoding.UTF8.GetString(response.BodyBytes));
-        Assert.Empty(log);
+        Assert.Contains("error WL3005", Assert.Single(log)); // Its error in the log, as every 500's (section 6.12, "Logging").
     }
 
     [Theory]
@@ -170,7 +170,7 @@ public sealed class StreamingTests
         {
             WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry()),
             Mode = environment,
-            Log = log is null ? null : log.Add,
+            Log = log is null ? null : new ListLog(log),
             SendTimeout = sendTimeout ?? TimeSpan.FromSeconds(30)
         }, out var error);
         Assert.True(app is not null, error);

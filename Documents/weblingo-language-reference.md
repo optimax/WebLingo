@@ -2259,6 +2259,12 @@ text: "…" })`, a task of the message's `Message-ID`, through a server the conf
 TLS. Every key of a message is checked, one it does not have WL3001, naming the one it may have meant, and a message
 that cannot be sent is a `MailError`, WL3023. The Standard Library Reference describes the module.
 
+### `std:log`
+
+A log, `import log from "std:log";`: `log.debug(text)`, `log.info(text)`, `log.warn(text)` and `log.error(text)`, each
+a line of its level, its time in UTC, its level and its text: under `weblingo` on the standard error, under `wasp` in
+the site's log, with its request. The Standard Library Reference describes the module.
+
 ### Native modules
 
 A native module is code compiled for .NET, an assembly that extends what scripts can use, as Python's C extensions do.

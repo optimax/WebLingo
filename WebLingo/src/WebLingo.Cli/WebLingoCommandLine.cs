@@ -582,7 +582,11 @@ public static partial class WebLingoCommandLine
         IWebLingoMail Mail, IWebLingoFileSystem Files,
         IReadOnlyDictionary<string, IReadOnlyList<string>> Allowed, IWebLingoEnvironment Environment, IWebLingoConsoleInput? ConsoleInput,
         IWebLingoConsole? Console,
-        IWebLingoProcessRunner? Processes);
+        IWebLingoProcessRunner? Processes)
+    {
+        /// <summary>The program's log, <c>std:log</c>'s, its standard error, every level written (section 6.12, "Logging").</summary>
+        public IWebLingoLogWriter? Log { get; init; }
+    }
 
     /// <summary>
     /// The host for the file <paramref name="path"/>, whose program's own file is named <paramref name="mainName"/>: its
@@ -601,7 +605,7 @@ public static partial class WebLingoCommandLine
         var folder = Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".";
         if (program.Root is { } root && Path.GetFullPath(root) != folder
             && !WebLingoSchemes.TryLoadFolder(root, program.Configuration, givenSchemes, out _, out _, out _, out _, out _,
-                out _, out _, out _, out _, out _, out _, out _, out wrongConfiguration))
+                out _, out _, out _, out _, out _, out _, out _, out _, out wrongConfiguration))
         {
             error.WriteLine(wrongConfiguration);
             return null;
@@ -643,7 +647,10 @@ public static partial class WebLingoCommandLine
             // All of the machine's environment for a script's, what its configuration's "env" allows for a page's (section 7.15).
             program.ReachesAllEnvironment ? new DotNetEnvironment() : new DotNetEnvironment(env.MachineName, env.Variables, env.Platform),
             // The console itself, which std:console's Console controls: a script's, never a site's (section 3.9).
-            input, program.HasConsole ? new DotNetConsole() : null, program.AllowsProcesses ? new DotNetProcessRunner() : null);
+            input, program.HasConsole ? new DotNetConsole() : null, program.AllowsProcesses ? new DotNetProcessRunner() : null)
+        {
+            Log = new DotNetLog(error, WebLingoLogLevel.Debug)
+        };
     }
 
     private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters,
@@ -669,6 +676,7 @@ public static partial class WebLingoCommandLine
             Databases = host.Databases,
             Mail = host.Mail,
             Processes = host.Processes,
+            Log = host.Log,
             SchedulerHost = new DotNetSchedulerHost()
         };
 

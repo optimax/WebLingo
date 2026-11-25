@@ -1011,6 +1011,48 @@ that computes without waiting holds that worker until it is stopped. Under the d
 request stopped at a breakpoint waiting for you. Under IIS, its ASP.NET Core Module gives a request two minutes too,
 its `web.config`'s `requestTimeout`, which a site whose `"requestTimeout"` is longer raises with it.
 
+### The log
+
+A page or a handler writes to its site's log with `std:log`, at one of four levels, `log.debug(text)`,
+`log.info(text)`, `log.warn(text)` and `log.error(text)`, each a string:
+
+```html
+<% param request; %>
+<% import log from "std:log"; %>
+<% var name = request.query?["name"] ?? "nobody"; %>
+<% log.info("Greeted " + name); %>
+<p>Hello, <%= name %>.</p>
+```
+
+Each line is its time, in UTC, its level, its request, as the debugger names it, its method, its path and its number,
+and its text; asked for as `/greet?name=Anna`, then as `/greet`:
+
+```text
+2026-11-25T08:24:43.520Z INFO GET /greet #3 Greeted Anna
+2026-11-25T08:24:43.595Z INFO GET /greet #4 Greeted nobody
+```
+
+A request is numbered when it first writes to the log, so that every line of one request has its number. WASP writes
+there too: a request's errors, at `error`, whatever the mode, those a 500 or a 503 shows in development and hides in
+production, `ERROR GET /greet #1 greet.wasp(2,4): error WL1001: …`; a request refused as another site's
+([section 9](#requests-from-other-sites)) at `warn`; and its reloads at `info`. A text is kept to one line, a line break
+in it written `\n`, so that no value a client sent makes a line of its own.
+
+Where the log goes: under `wasp serve`, the terminal; under FastCGI, the standard error, which a service manager's
+journal keeps, and Apache's error log under `mod_fcgid`; under IIS, its `stdout` log, which is for finding why a site
+does not start, not for a site in production. There, name a file, `wasp.config`'s `"log"`
+([section 14](#14-configuration-waspconfig)):
+
+```json
+{ "log": { "file": "C:/inetpub/logs/WebLingo/mysite.log", "level": "info" } }
+```
+
+WASP writes a file a day, the day's date in its name, `mysite-2026-11-25.log`, the folder made where it is not there.
+The file is outside the site, or the site does not start: in it, the file would be served, and the site reloaded at each
+line. WASP writes it itself, as the host, so that the site's pages need no permission to write it and cannot change
+it; its process's account, an application pool's under IIS, writes the folder. `"level"` is the lowest level written,
+`info` unless it says otherwise, a line below it left out.
+
 ---
 
 ## 13. How a page's output is sent
@@ -1050,6 +1092,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"maxBodySize"` | the largest body a request may have, in bytes, a larger one a 413 (section 9, "Uploaded files") | 30,000,000 |
 | `"uploads"` | what a form's files may be: `{ "inMemory": 65536, "maxSize": 20000000, "folder": "../tmp" }`, how many bytes of a file are kept in memory, the rest in a temporary file, the most its files may take in all, and the folder their temporary files are made in, outside the site | 64 KB, `"maxBodySize"`, the system's temporary folder |
 | `"sessions"` | where the site keeps its sessions, and how long: `{ "store": "database", "database": "main", "table": "wasp_sessions", "create": false, "timeout": 20, "lockTimeout": 30 }`, the server's memory, `"memory"`, or a table of a database `"databases"` names, `"database"`, the table made where it is missing where `"create"` is `true`; the minutes a session lasts once no request uses it, and the seconds a request waits for a session another has (section 9, "Sessions" and "Sessions in a database") | the server's memory, `wasp_sessions`, `false`, 20 minutes, 30 seconds |
+| `"log"` | the site's log, each optional: `{ "file": "C:/inetpub/logs/WebLingo/mysite.log", "level": "info" }`, a file a day, outside the site, from this file's folder, and the lowest level written, `"debug"`, `"info"`, `"warn"` or `"error"` (section 12, "The log") | the host's own log, `"info"` |
 | `"limits"` | a request's limits, each optional: `{ "requestTimeout": 60, "requestInstructions": 1000000000, "requestMemory": 128 }`, the seconds it may take, its waits included, more than 0, the instructions it may run, and the megabytes of strings it may hold, 1 to 1,048,576; one passed a 503, WL3003 (section 12, "A request's limits") | 60 seconds, 1,000,000,000 instructions, 128 MB |
 | `"mail"` | the mail servers the site's pages and handlers send through, with `std:mail`, each a name and its settings: `{ "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": { "env": "SMTP_PASSWORD" } } }` | none |
 
@@ -1273,11 +1316,12 @@ For each site:
 IIS then gives every request to the ASP.NET Core Module, which starts `wasp.exe serve` in the site's folder and passes
 the requests to it. If WebLingo is installed elsewhere, change `processPath` to match.
 
-- **What `wasp` writes**, its errors when it cannot start included, and pages that fail after their output was sent,
-  goes to IIS's log of it when `stdoutLogEnabled` is `true`: to `C:\inetpub\logs\WebLingo`, outside the site, in files
-  whose names start with the site's. Create that folder first, and give the site's application pool
-  (`IIS AppPool\<pool>`) write access to it. Keep the log outside the site: in it, it would be served, and every line
-  written to it would reload the site.
+- **What `wasp` writes**, its errors when it cannot start included, and the site's log, unless `wasp.config` names a
+  file for it ([section 12](#the-log)), goes to IIS's log of it when `stdoutLogEnabled` is `true`: to
+  `C:\inetpub\logs\WebLingo`, outside the site, in files whose names start with the site's. Create that folder first,
+  and give the site's application pool (`IIS AppPool\<pool>`) write access to it. Keep the log outside the site: in
+  it, it would be served, and every line written to it would reload the site. IIS's log of it is for finding why a site
+  does not start: a site in production names its own, `"log": { "file": "C:/inetpub/logs/WebLingo/mysite.log" }`.
 - **Updating WebLingo** updates every site at once. A running `wasp.exe` keeps its files in use, so stop the sites'
   application pools, or IIS (`iisreset /stop`), before copying the new version over the old, and start them again
   after.

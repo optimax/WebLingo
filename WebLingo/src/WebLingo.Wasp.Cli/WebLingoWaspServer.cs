@@ -10,6 +10,7 @@ using WebLingo.Cli;
 using WebLingo.Data.DotNet;
 using WebLingo.Hosting;
 using WebLingo.Hosting.AspNetCore;
+using WebLingo.Platform.Abstractions;
 using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
 using WebLingo.VM;
@@ -72,7 +73,8 @@ public static class WebLingoWaspServer
         var server = builder.Build();
         var pool = new WebLingoWorkerPool(workers);
         server.Lifetime.ApplicationStopped.Register(pool.Dispose);
-        var reloader = Reloader(application, full, log);
+        server.Lifetime.ApplicationStopped.Register(() => (application.Log as IDisposable)?.Dispose()); // Its log's file closed.
+        var reloader = Reloader(application, full);
         server.Lifetime.ApplicationStopping.Register(reloader.Dispose);
         server.UseWebLingo(application, full, pool);
         return server;
@@ -113,11 +115,16 @@ public static class WebLingoWaspServer
         return WebLingoCommandLine.Success;
     }
 
-    /// <summary>What watches an application's files, and reloads it, each reload told to <paramref name="log"/> (section 6.5).</summary>
-    internal static WebLingoReloader Reloader(WebLingoApplication application, string full, TextWriter? log) =>
-        new(application, full, (generation, why) => log?.WriteLine(why is null
-            ? $"WASP reloaded the application: generation {generation}."
-            : $"WASP cannot reload the application, and serves generation {generation} still: {why}."));
+    /// <summary>
+    /// What watches an application's files, and reloads it (section 6.5), each reload told to its log (section 6.12,
+    /// "Logging"), a reload at <c>info</c>, one that fails at <c>error</c>.
+    /// </summary>
+    internal static WebLingoReloader Reloader(WebLingoApplication application, string full) =>
+        new(application, full, (generation, why) =>
+        {
+            if (why is null) application.Log?.Write(WebLingoLogLevel.Info, null, $"WASP reloaded the application: generation {generation}.");
+            else application.Log?.Write(WebLingoLogLevel.Error, null, $"WASP cannot reload the application, and serves generation {generation} still: {why}.");
+        });
 
     /// <summary>
     /// The application at <paramref name="full"/>, as <c>wasp serve</c> and <c>wasp fastcgi</c> load it: its configuration,
@@ -132,7 +139,7 @@ public static class WebLingoWaspServer
         (workers, mode) = (Math.Max(1, Environment.ProcessorCount), defaultMode);
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
             out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out var env, out var mail,
-            out var uploads, out var sessions, out var limits, out error)) return null;
+            out var uploads, out var sessions, out var limits, out var logging, out error)) return null;
         if (configured is not null) mode = configured == "production" ? WebLingoMode.Production : WebLingoMode.Development;
 
         // std:system, loaded once here to fail early, then by each worker on its own.
@@ -151,11 +158,21 @@ public static class WebLingoWaspServer
             error = $"{Path.Combine(full, WebLingoRouteTable.ConfigurationFile)}: \"sessions\"'s \"database\" names '{named}', which \"databases\" does not.";
             return null;
         }
+        // Its log: the host's own, log, or a file a day where wasp.config names one, outside the site, which would serve it
+        // and reload at each line (section 6.12, "Logging").
+        if (logging.File is { } logFile && IsWithin(logFile, full))
+        {
+            error = $"{Path.Combine(full, WebLingoRouteTable.ConfigurationFile)}: \"log\"'s \"file\", {logFile}, is in the site's folder, "
+                    + "where it would be served and the site reloaded at each line: name a file outside it.";
+            return null;
+        }
+        DotNetLog? siteLog = logging.File is { } named2 ? new DotNetLog(named2, logging.Level, log)
+            : log is null ? null : new DotNetLog(log, logging.Level);
         // Its sessions in the process's memory, kept while it reloads, or in a database (section 6.12, "Sessions and cookies").
         var (timeout, lockTimeout) = (TimeSpan.FromMinutes(sessions.TimeoutMinutes), TimeSpan.FromSeconds(sessions.LockTimeoutSeconds));
         IWebLingoSessionStore store = sessions.Database is { } database
             ? new WebLingoDatabaseSessions(siteDatabases, database, sessions.Table ?? WebLingoDatabaseSessions.DefaultTable, sessions.Create, timeout,
-                lockTimeout, log is null ? null : log.WriteLine)
+                lockTimeout, siteLog is null ? null : (Action<string>)(text => siteLog.Write(WebLingoLogLevel.Error, null, text)))
             : new WebLingoMemorySessions(timeout, lockTimeout);
         var application = WebLingoApplication.Load(new WebLingoApplicationOptions(full, new DotNetFileSystem())
         {
@@ -179,7 +196,7 @@ public static class WebLingoWaspServer
                 new DotNetTemporaryFiles(uploads.Folder)),
             Sessions = store,
             Scheduler = () => new DotNetSchedulerHost(),
-            Log = log is null ? null : log.WriteLine,
+            Log = siteLog,
             SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30),
             // A request's limits, wasp.config's or the defaults; its time none under a debugger, whose stops it must not
             // count (section 6.12, "Limits"; section 5.7, "Debugging WASP pages").
@@ -189,8 +206,20 @@ public static class WebLingoWaspServer
             MaxHeapUnits = limits.MemoryMegabytes is { } megabytes ? megabytes * 512 * 1024 : WebLingoHeap.DefaultMaxUnits,
             Debugger = debugger
         }, out error);
-        if (application is null) error = $"{full}: {error}.";
+        if (application is null)
+        {
+            error = $"{full}: {error}.";
+            siteLog?.Dispose();
+        }
         return application;
+    }
+
+    /// <summary>Whether <paramref name="path"/> is in <paramref name="folder"/> or below it, as the file system compares names.</summary>
+    private static bool IsWithin(string path, string folder)
+    {
+        var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)) + Path.DirectorySeparatorChar;
+        return Path.GetFullPath(path).StartsWith(root, comparison);
     }
 
     /// <summary>

@@ -40,6 +40,7 @@ This reference describes the standard library in the current release and shows w
 29. [`std:process`](#29-stdprocess)
 30. [`std:test`](#30-stdtest)
 31. [`std:mail`](#31-stdmail)
+32. [`std:log`](#32-stdlog)
 
 ---
 
@@ -1683,3 +1684,36 @@ true
 
 What is not there yet: addresses that are not ASCII (SMTPUTF8), signing a message (DKIM), reading mail (IMAP, POP3),
 and a class of messages, `MailMessage`.
+
+## 32. `std:log`
+
+A log, `import log from "std:log";`: each function writes a line of its level, the levels from the lowest `debug`,
+`info`, `warn` and `error`, giving `null`.
+
+| Function | What it does |
+|---|---|
+| `debug(text)`, `info(text)`, `warn(text)`, `error(text)` | writes `text`, a string, as a line of that level; anything else WL3001, `$"{value}"` making a string of a value |
+
+A line is its time, in UTC, to the millisecond, its level and its text, kept to one line, a line break in it written
+`\n`, a carriage return `\r` and any other control character but a tab `\u{…}`. Under `weblingo` it goes to the
+standard error, every level; under `wasp` to the site's log, its request named after its level, `GET /cart #12`, from
+the level its `wasp.config`'s `"log"` gives on, `info` unless it says otherwise (the WASP User Manual, section 12, "The
+log").
+
+```javascript
+import log from "std:log";
+import { writeLn } from "std:console";
+log.info("Starting");
+writeLn("working");
+log.warn($"{3} items left");
+log.debug("each line its time in UTC");
+```
+
+```text
+2026-11-25T08:24:05.902Z INFO Starting
+working
+2026-11-25T08:24:05.905Z WARN 3 items left
+2026-11-25T08:24:05.905Z DEBUG each line its time in UTC
+```
+
+The output and the log are written to the terminal as they come; the log alone, `weblingo run script.wlg 2> log.txt`.

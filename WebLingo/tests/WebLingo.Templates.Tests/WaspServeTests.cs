@@ -590,6 +590,64 @@ public sealed class WaspServeTests : IDisposable
     }
 
     /// <summary>
+    /// A site's log, <c>wasp.config</c>'s <c>"log"</c> (section 6.12, "Logging"): a file a day, outside the site, from its
+    /// level on, each line its time, its level, its request and its text, what a page logs with <c>std:log</c> and a
+    /// request's failure, in production too; a file in the site, a level it does not know, and a setting it does not have,
+    /// each refused.
+    /// </summary>
+    [Fact]
+    public async Task ASitesLogIsTheFileItsConfigurationNames()
+    {
+        var logs = _root + "-logs";
+        try
+        {
+            Write("wasp.config", "{ \"mode\": \"production\", \"log\": { \"file\": \"" + Path.Combine(logs, "site.log").Replace('\\', '/')
+                                 + "\", \"level\": \"info\" } }");
+            Write("logs.wasp", "<% import log from \"std:log\"; log.debug(\"hidden\"); log.info(\"shown\"); log.warn(\"also\"); %>ok");
+            Write("fail.wasp", "<% throw \"no tea\"; %>");
+            var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+            Assert.True(server is not null, error);
+            await server.StartAsync();
+            try
+            {
+                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                using var client = new HttpClient { BaseAddress = new Uri(address) };
+                Assert.Equal("ok", await client.GetStringAsync("/logs"));
+                using var failed = await client.GetAsync("/fail");
+                Assert.Equal(HttpStatusCode.InternalServerError, failed.StatusCode);
+                Assert.DoesNotContain("no tea", await failed.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+            }
+            finally
+            {
+                await server.StopAsync();
+            }
+            var lines = Directory.GetFiles(logs, "site-*.log").OrderBy(file => file, StringComparer.Ordinal)
+                .SelectMany(File.ReadAllLines).Select(line => line[(line.IndexOf(' ', StringComparison.Ordinal) + 1)..]).ToArray();
+            Assert.Equal(["INFO GET /logs #1 shown", "WARN GET /logs #1 also",
+                          "ERROR GET /fail #2 fail.wasp(1,4): error WL3008: An exception was thrown and not caught: no tea"], lines);
+        }
+        finally
+        {
+            if (Directory.Exists(logs)) Directory.Delete(logs, recursive: true);
+        }
+
+        Write("wasp.config", "{ \"log\": { \"file\": \"logs/site.log\" } }");
+        Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var inside, out _));
+        Assert.Contains("\"log\"'s \"file\", ", inside, StringComparison.Ordinal);
+        Assert.EndsWith(", is in the site's folder, where it would be served and the site reloaded at each line: name a file outside it.", inside);
+        const string Says = "\"log\" is an object, { \"file\": \"../logs/shop.log\", \"level\": \"info\" }, each optional, \"file\" a file "
+                            + "outside the site, a file a day written with the day's date before its extension, and \"level\" the lowest written, "
+                            + "\"debug\", \"info\", \"warn\" or \"error\".";
+        foreach (var setting in new[] { "\"../site.log\"", "{ \"level\": \"verbose\" }", "{ \"level\": \"INFO\" }", "{ \"file\": \"\" }",
+                                         "{ \"file\": 5 }", "{ \"days\": 7 }" })
+        {
+            Write("wasp.config", "{ \"log\": " + setting + " }");
+            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _));
+            Assert.EndsWith(Says, error);
+        }
+    }
+
+    /// <summary>
     /// A page replaced while it is served, as a deployment replaces it, written beside it and moved over it: each answer
     /// one version's whole (section 6.5, WL-H004). Until 24 November 2026, a page read while it was being replaced failed
     /// to be read, and was compiled as an empty page, which its worker served until the next reload, 5% of the answers
@@ -691,7 +749,7 @@ public sealed class WaspServeTests : IDisposable
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
         Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"mode\", "
                         + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
-                        + "\"sessions\" and \"limits\".", error);
+                        + "\"sessions\", \"limits\" and \"log\".", error);
 
         Write("wasp.config", "{ \"sendTimeout\": 5 }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));

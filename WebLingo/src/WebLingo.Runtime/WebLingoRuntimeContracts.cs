@@ -110,6 +110,13 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     public WebLingo.Platform.Abstractions.IWebLingoEnvironment? Environment { get; init; }
 
     /// <summary>
+    /// The execution's log, which <c>std:log</c> writes to through the heap (<see cref="WebLingoHeap.Log"/>, section 6.12,
+    /// "Logging"): its host's, for its request, under <c>wasp</c>, the standard error under <c>weblingo</c>; none by
+    /// default, its lines then written nowhere.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoLogWriter? Log { get; init; }
+
+    /// <summary>
     /// The console's input, which <c>std:console</c>'s <c>readLine</c> and the others read through the heap
     /// (<see cref="WebLingoHeap.ConsoleInput"/>); none by default, their reads then an <c>IOError</c>.
     /// </summary>

@@ -88,6 +88,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         heap.Allowed = context.Allowed;
         heap.Crypto = context.Crypto;
         heap.Environment = context.Environment;
+        heap.Log = context.Log;
         heap.ConsoleInput = context.ConsoleInput;
         heap.ErrorOutput = context.ErrorOutput;
         heap.Console = context.Console;

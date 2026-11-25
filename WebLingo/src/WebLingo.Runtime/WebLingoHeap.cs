@@ -126,6 +126,9 @@ public sealed class WebLingoHeap
     /// <summary>The machine's environment (<see cref="WebLingoExecutionContext.Environment"/>), for <c>std:env</c>'s members (section 7.15).</summary>
     public WebLingo.Platform.Abstractions.IWebLingoEnvironment? Environment { get; set; }
 
+    /// <summary>The execution's log (<see cref="WebLingoExecutionContext.Log"/>), for <c>std:log</c>'s functions (section 6.12, "Logging").</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoLogWriter? Log { get; set; }
+
     /// <summary>The console's input (<see cref="WebLingoExecutionContext.ConsoleInput"/>), for <c>std:console</c>'s <c>readLine</c> and the others.</summary>
     public WebLingo.Platform.Abstractions.IWebLingoConsoleInput? ConsoleInput { get; set; }
 

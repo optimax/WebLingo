@@ -128,10 +128,12 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     }
 
     /// <summary>
-    /// Where the application reports what no response can show, a line at a time, from any worker: a page that fails after
-    /// its output was first sent (section 6.12, "Streaming"); nowhere by default.
+    /// The application's log, its host's, from any worker (section 6.12, "Logging"): what a script writes with <c>std:log</c>,
+    /// and what no response can show, each line for its request, <c>GET /cart #12</c>: a request's errors, its 500's and its
+    /// 503's, whatever the mode, a page that fails after its output was first sent (section 6.12, "Streaming"), at
+    /// <c>error</c>, and a request refused as another site's at <c>warn</c>; nowhere by default.
     /// </summary>
-    public Action<string>? Log { get; init; }
+    public WebLingo.Platform.Abstractions.IWebLingoLog? Log { get; init; }
 
     /// <summary>
     /// How long a page waits for a client that has not taken its output before its request is cancelled (section 6.12,

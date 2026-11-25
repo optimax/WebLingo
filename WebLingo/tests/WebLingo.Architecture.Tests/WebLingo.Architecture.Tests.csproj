@@ -19,6 +19,7 @@
     <ProjectReference Include="../../src/WebLingo.StdLib.Db/WebLingo.StdLib.Db.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib.Crypto/WebLingo.StdLib.Crypto.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib.Env/WebLingo.StdLib.Env.csproj" />
+    <ProjectReference Include="../../src/WebLingo.StdLib.Log/WebLingo.StdLib.Log.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib.Math/WebLingo.StdLib.Math.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib.Mail/WebLingo.StdLib.Mail.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib.Path/WebLingo.StdLib.Path.csproj" />

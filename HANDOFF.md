@@ -93,6 +93,18 @@ WL3003. The hosting core reports a cancellation whose signal says it passed a li
 and the FastCGI host start for each request, and which wakes a waiting request as a gone client does. No time limit
 under the debugger. Specification, section 6.12, "A request's limits"; WASP User Manual, section 12.
 
+## Logging
+
+`std:log` (`WebLingo.StdLib.Log`, `std/log.dll`): `log.debug/info/warn/error(text)` through the execution's
+`IWebLingoLogWriter`; under `weblingo` and `wasp run` the standard error, every level (`DotNetLog`, given by
+`WebLingoCommandLine`'s host). Under `wasp`, `WebLingoWaspServer.Load` makes the site's `DotNetLog` from `wasp.config`'s
+`"log"` (`WebLingoSchemes.TryReadLog`, `WebLingoLogSettings`): the host's writer, or a file a day outside the site; the
+application's `Log` (`IWebLingoLog`), each request's lines through a `WebLingoRequestLog`, numbered when it first
+writes. The hosting core logs a 500's and a 503's errors, in every mode, and failures while sending at `error`, a
+cross-site refusal at `warn`; reloads at `info`. `wasp fastcgi`'s log is now always its standard error. Specification,
+section 6.12, "Logging" and its parts; WASP User Manual, section 12, "The log"; `LogTests`, `LogModuleTests`,
+`WaspServeTests.ASitesLogIsTheFileItsConfigurationNames`. Part 2, a runtime error's stack, is still to do.
+
 ## Cross-site request forgery
 
 A POST, PUT, PATCH or DELETE another site sent is a 403 before its page runs (`WebLingoApplication.CrossSite`, called in

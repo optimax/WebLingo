@@ -300,7 +300,7 @@ public sealed class SessionTests
             Sessions = store,
             Crypto = new DotNetCrypto(),
             Clock = clock,
-            Log = log is null ? null : log.Add
+            Log = log is null ? null : new ListLog(log)
         }, out var error);
         Assert.True(app is not null, error);
         return app;

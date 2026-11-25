@@ -151,7 +151,7 @@ public sealed class WebLingoApplication
         WebLingoWorkerId worker, WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler)
     {
         var handler = generation.Exports(worker, file, this);
-        if (handler?.Error is { } wrong) return Failed(response, [wrong]);
+        if (handler?.Error is { } wrong) return Failed(response, [wrong], LogFor(request));
         var exports = handler?.Names;
         string? function = null;
         var allowed = new List<string>();
@@ -175,6 +175,13 @@ public sealed class WebLingoApplication
         return Run(generation.Handler(worker, file, function, this), request, response, worker, cancellation, scheduler,
             WebLingoRequestOutcomeKind.Handler, handler?.ReadOnly, handler?.CrossOrigin ?? false);
     }
+
+    /// <summary>The request's log, the application's for it, <c>GET /cart</c>, its number given when it first writes; none without one.</summary>
+    private WebLingoRequestLog? LogFor(IWebLingoHttpRequest request) =>
+        _options.Log is { } log ? new WebLingoRequestLog(log, WebLingoLogText.OneLine(request.Method + " " + request.Path)) : null;
+
+    /// <summary>The application's log, its host's (section 6.12, "Logging"), where its host writes what it does too; none without one.</summary>
+    public IWebLingoLog? Log => _options.Log;
 
     /// <summary>The largest body a site's request may have (section 6.12, "Uploaded files"), which its hosts let through.</summary>
     public long MaxBodySize => _options.Uploads.MaxBodySize;
@@ -270,9 +277,11 @@ public sealed class WebLingoApplication
         WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler, WebLingoRequestOutcomeKind done, string? readOnly = null,
         bool crossOrigin = false)
     {
-        if (page.Module is null) return Failed(response, page.Errors);
+        var log = LogFor(request);
+        if (page.Module is null) return Failed(response, page.Errors, log);
         if (!crossOrigin && CrossSite(request) is { } why)
         {
+            log?.Write(WebLingoLogLevel.Warn, WebLingoLogText.OneLine(why));
             WebLingoErrorPages.Forbidden(response, _options.Mode, [why]);
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Forbidden);
         }
@@ -280,7 +289,7 @@ public sealed class WebLingoApplication
         cancellation ??= new WebLingoCancellationSignal();
         var host = scheduler ?? _options.Scheduler?.Invoke();
         var session = _options.Sessions is { } store ? new WebLingoSession(store, request, response, _options.Crypto, readOnly) : null;
-        var start = () => Start(page, request, response, worker, cancellation, scheduler, host, done, session);
+        var start = () => Start(page, request, response, worker, cancellation, scheduler, host, done, session, log);
         if (session?.Id is not { } id) return start();
         WebLingoSessionOpening? arrived = null;
         var opening = session.Store.Open(id, readOnly is null, later => host?.Post(() => arrived = later));
@@ -342,7 +351,7 @@ public sealed class WebLingoApplication
     /// <summary>A page run, or a handler's, once its session is open: <paramref name="done"/> once it has run, unless it fails, or waits.</summary>
     private WebLingoRequestOutcome Start(CompiledPage page, IWebLingoHttpRequest request, IWebLingoHttpResponse response, WebLingoWorkerId worker,
         WebLingoCancellationSignal cancellation, IWebLingoSchedulerHost? scheduler, IWebLingoSchedulerHost? host, WebLingoRequestOutcomeKind done,
-        WebLingoSession? session)
+        WebLingoSession? session, WebLingoRequestLog? log)
     {
         // Under a debugger, the request a thread of its, which its stops resume through the scheduler host (section 5.7).
         var thread = scheduler is null ? null : _options.Debugger?.Begin(request.Method + " " + request.Path, page.Locate, scheduler);
@@ -368,24 +377,25 @@ public sealed class WebLingoApplication
             InstructionBudget = _options.InstructionBudget,
             Resources = WebLingoResourceBudget.Default with { MaxHeapUnits = _options.MaxHeapUnits },
             Cancellation = cancellation,
-            Lines = page.LineOf
+            Lines = page.LineOf,
+            Log = log
         };
         var vm = new WebLingoVirtualMachine { Loader = page.Modules, Components = page.Components, Debugger = thread };
         return Ended(vm.Execute(page.Module!, context), vm.Resume, page, output, response, done, ending, thread, session, scheduler, host,
-            cancellation);
+            cancellation, log);
     }
 
     /// <summary>What a run came to: <paramref name="done"/>, a failure, or a wait, which its host resumes.</summary>
     private WebLingoRequestOutcome Ended(WebLingoExecutionResult result, Func<WebLingoExecutionResult> resume, CompiledPage page,
         WebLingoResponseText output, IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done, IDisposable ending,
         IWebLingoDebuggerThread? thread, WebLingoSession? session, IWebLingoSchedulerHost? scheduler, IWebLingoSchedulerHost? host,
-        WebLingoCancellationSignal cancellation)
+        WebLingoCancellationSignal cancellation, WebLingoRequestLog? log)
     {
         if (result.Waiting)
         {
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Waiting)
             {
-                Resume = () => Ended(resume(), resume, page, output, response, done, ending, thread, session, scheduler, host, cancellation),
+                Resume = () => Ended(resume(), resume, page, output, response, done, ending, thread, session, scheduler, host, cancellation, log),
                 WaitMilliseconds = result.WaitMilliseconds
             };
         }
@@ -400,13 +410,13 @@ public sealed class WebLingoApplication
         // request its client sends next finds them (section 6.12, "Sessions and cookies"): at once, or, where the store
         // writes them off the worker, once it has, the request waiting meanwhile.
         var closed = false;
-        if (session is null || session.End(() => host?.Post(() => closed = true))) return Finished(result, page, output, response, done);
+        if (session is null || session.End(() => host?.Post(() => closed = true))) return Finished(result, page, output, response, done, log);
         if (scheduler is null)
         {
             while (!closed && host is not null) host.RunPosted(-1);
-            return Finished(result, page, output, response, done);
+            return Finished(result, page, output, response, done, log);
         }
-        return WaitForClose(scheduler, () => closed, () => Finished(result, page, output, response, done));
+        return WaitForClose(scheduler, () => closed, () => Finished(result, page, output, response, done, log));
     }
 
     /// <summary>A request that waits for its session to be written, resumed once the store has posted that it is, then finished.</summary>
@@ -425,14 +435,14 @@ public sealed class WebLingoApplication
     /// its limits (section 6.12, "Limits"), WL3003, a 500 otherwise.
     /// </summary>
     private WebLingoRequestOutcome Finished(WebLingoExecutionResult result, CompiledPage page, WebLingoResponseText output,
-        IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done)
+        IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done, WebLingoRequestLog? log)
     {
         if (!result.Succeeded)
         {
             var error = page.Describe(result.Error!);
-            if (output.Sending) return FailedWhileSending(output, response, error);
-            if (result.Error!.Code != WebLingoDiagnosticCodes.BudgetExceeded) return Failed(response, [error]);
-            _options.Log?.Invoke("A request passed one of its limits: " + error);
+            if (output.Sending) return FailedWhileSending(output, response, error, log);
+            if (result.Error!.Code != WebLingoDiagnosticCodes.BudgetExceeded) return Failed(response, [error], log);
+            log?.Write(WebLingoLogLevel.Error, WebLingoLogText.OneLine("A request passed one of its limits: " + error));
             WebLingoErrorPages.Limited(response, _options.Mode, [error]);
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
         }
@@ -446,26 +456,30 @@ public sealed class WebLingoApplication
     /// its error in the host's log and, in development, at the end of what was sent; or, cancelled because its client took
     /// nothing for longer than the send timeout, its response ended, the timeout in the log.
     /// </summary>
-    private WebLingoRequestOutcome FailedWhileSending(WebLingoResponseText output, IWebLingoHttpResponse response, string error)
+    private WebLingoRequestOutcome FailedWhileSending(WebLingoResponseText output, IWebLingoHttpResponse response, string error,
+        WebLingoRequestLog? log)
     {
         if (output.TimedOut)
         {
             // Its client has taken nothing for too long: nothing more is sent.
             var seconds = _options.SendTimeout.TotalSeconds;
-            _options.Log?.Invoke($"A page's client took nothing of its output for {seconds.ToString(System.Globalization.CultureInfo.InvariantCulture)} "
-                                 + (seconds == 1 ? "second" : "seconds") + ", and its request was cancelled: " + error);
+            log?.Write(WebLingoLogLevel.Error, WebLingoLogText.OneLine(
+                $"A page's client took nothing of its output for {seconds.ToString(System.Globalization.CultureInfo.InvariantCulture)} "
+                + (seconds == 1 ? "second" : "seconds") + ", and its request was cancelled: " + error));
             response.Abort();
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
         }
-        _options.Log?.Invoke("A page failed after its response was sent: " + error);
+        log?.Write(WebLingoLogLevel.Error, WebLingoLogText.OneLine("A page failed after its response was sent: " + error));
         if (_options.Mode == WebLingoMode.Development) output.Write("\n<pre>" + WebLingoTemplateWriteFunction.Escape(error) + "\n</pre>\n");
         output.Send(); // What it wrote before it failed.
         response.Abort();
         return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
     }
 
-    private WebLingoRequestOutcome Failed(IWebLingoHttpResponse response, IReadOnlyList<string> errors)
+    private WebLingoRequestOutcome Failed(IWebLingoHttpResponse response, IReadOnlyList<string> errors, WebLingoRequestLog? log)
     {
+        // Its errors in the log, whatever the mode, a production page showing none (section 6.12, "Logging").
+        foreach (var error in errors) log?.Write(WebLingoLogLevel.Error, WebLingoLogText.OneLine(error));
         WebLingoErrorPages.Failed(response, _options.Mode, errors);
         return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
     }

@@ -105,7 +105,7 @@ public sealed class CookieTests
         {
             WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry()),
             Mode = WebLingoMode.Development,
-            Log = log is null ? null : log.Add
+            Log = log is null ? null : new ListLog(log)
         }, out var error);
         Assert.True(app is not null, error);
         return app;

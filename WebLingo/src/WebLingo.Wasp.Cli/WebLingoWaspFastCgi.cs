@@ -68,7 +68,9 @@ public static class WebLingoWaspFastCgi
         }
         // Started by a web server, its socket or pipe on standard input, as mod_fcgid starts PHP, unless told where to listen.
         stdin |= port is null && socketPath is null && FromWebServer();
-        var log = stdin ? error : output; // A web server's process writes its standard output nowhere it reads.
+        // Its log the standard error, which a service manager's journal keeps, and a web server that starts it reads,
+        // where wasp.config names no file (section 6.12, "Logging").
+        var log = error;
         var full = Path.GetFullPath(root ?? ".");
         var application = WebLingoWaspServer.Load(full, schemes, WebLingoMode.Production, log, out var workers, out var environment, out var why);
         if (application is null)
@@ -77,7 +79,8 @@ public static class WebLingoWaspFastCgi
             return WebLingoCommandLine.FileUnreadable;
         }
         using var pool = new WebLingoWorkerPool(workers);
-        using var reloader = WebLingoWaspServer.Reloader(application, full, log);
+        using var siteLog = application.Log as IDisposable; // Its log's file closed as it ends.
+        using var reloader = WebLingoWaspServer.Reloader(application, full);
         var server = new WebLingoFastCgiServer(application, full, pool, log.WriteLine);
         using var stopping = CancellationTokenSource.CreateLinkedTokenSource(stop);
         ConsoleCancelEventHandler cancel = (_, e) =>

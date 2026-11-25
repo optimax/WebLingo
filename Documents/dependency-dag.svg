@@ -74,14 +74,15 @@
       <text x="42" y="419">Env</text>
       <text x="42" y="437">Fs</text>
       <text x="42" y="455">Http</text>
-      <text x="42" y="473">Test</text>
+      <text x="42" y="473">Log</text>
       <text x="137" y="347">Math</text>
       <text x="137" y="365">Net</text>
       <text x="137" y="383">Path</text>
       <text x="137" y="401">Process</text>
       <text x="137" y="419">Random</text>
       <text x="137" y="437">Tasks</text>
-      <text x="137" y="455">Url</text>
+      <text x="137" y="455">Test</text>
+      <text x="137" y="473">Url</text>
     </g>
     <path d="M42 483 H217" fill="none" stroke="#d8c8aa"/>
     <text x="42" y="499" font-size="14" font-weight="650">Windows.Com</text>

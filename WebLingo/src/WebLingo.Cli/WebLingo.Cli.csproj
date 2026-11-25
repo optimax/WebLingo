@@ -20,6 +20,7 @@
     <ProjectReference Include="../WebLingo.StdLib.Db/WebLingo.StdLib.Db.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Crypto/WebLingo.StdLib.Crypto.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Env/WebLingo.StdLib.Env.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../WebLingo.StdLib.Log/WebLingo.StdLib.Log.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Math/WebLingo.StdLib.Math.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Mail/WebLingo.StdLib.Mail.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../WebLingo.StdLib.Path/WebLingo.StdLib.Path.csproj" ReferenceOutputAssembly="false" />
@@ -51,6 +52,8 @@
     <None Include="../WebLingo.StdLib.Crypto/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Crypto.dll" Link="std/crypto.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.StdLib.Env/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Env.dll" Link="std/env.dll"
+          CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="../WebLingo.StdLib.Log/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Log.dll" Link="std/log.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />
     <None Include="../WebLingo.StdLib.Math/bin/$(Configuration)/$(TargetFramework)/WebLingo.StdLib.Math.dll" Link="std/math.dll"
           CopyToOutputDirectory="PreserveNewest" Visible="false" />

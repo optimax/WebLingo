@@ -63,7 +63,7 @@ public static class WebLingoSchemes
         out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed, out WebLingoEnvSettings env,
         out IReadOnlyDictionary<string, WebLingoMailServer> mail, out string? error) =>
         TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
-            out databases, out files, out allowed, out env, out mail, out _, out _, out _, out error);
+            out databases, out files, out allowed, out env, out mail, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
@@ -73,7 +73,7 @@ public static class WebLingoSchemes
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out string? error) =>
         TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out _, out _, out _, out _, out _, out _, out _,
-            out _, out _, out error);
+            out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, its databases,
@@ -83,20 +83,21 @@ public static class WebLingoSchemes
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out string? error) =>
         TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out allowedHosts, out databases, out files,
-            out _, out _, out _, out _, out _, out _, out error);
+            out _, out _, out _, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name, and what its
     /// scripts may read of the machine's environment, nothing when it says nothing, its mail servers, none when it names
-    /// none, what it says of a request's body, where it keeps its sessions, and a request's limits.
+    /// none, what it says of a request's body, where it keeps its sessions, a request's limits, and its log, a site's only.
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
         out WebLingoEnvSettings env, out IReadOnlyDictionary<string, WebLingoMailServer> mail, out WebLingoUploadSettings uploads,
-        out WebLingoSessionSettings sessions, out WebLingoLimitSettings limits, out string? error)
+        out WebLingoSessionSettings sessions, out WebLingoLimitSettings limits, out WebLingoLogSettings log, out string? error)
     {
         limits = WebLingoLimitSettings.Default;
+        log = WebLingoLogSettings.Default;
         var servers = new Dictionary<string, WebLingoMailServer>(StringComparer.Ordinal);
         mail = servers;
         uploads = WebLingoUploadSettings.Default;
@@ -121,7 +122,7 @@ public static class WebLingoSchemes
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
         if (File.Exists(file) && !TryRead(file, folder, schemes, ref mode, ref sendTimeout, hosts, named, read, write,
-            allowing, ref env, servers, ref uploads, ref sessions, ref limits, out error))
+            allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, out error))
         {
             return false;
         }
@@ -235,6 +236,37 @@ public static class WebLingoSchemes
             else if (entry.Name == "requestMemory" && number && entry.Value.TryGetInt64(out var megabytes) && megabytes is >= 1 and <= 1_048_576)
             {
                 limits = limits with { MemoryMegabytes = megabytes };
+            }
+            else
+            {
+                return false;
+            }
+        }
+        error = null;
+        return true;
+    }
+
+    /// <summary>
+    /// <c>"log": { "file": "../logs/shop.log", "level": "info" }</c>, each optional (section 6.12, "Logging"): the file its
+    /// log is written to, a file a day, from the file's folder, the host's own log where it names none; and the lowest
+    /// level written, <c>"debug"</c>, <c>"info"</c>, <c>"warn"</c> or <c>"error"</c>, <c>"info"</c> where it names none.
+    /// </summary>
+    private static bool TryReadLog(string file, string folder, JsonElement setting, ref WebLingoLogSettings log, out string? error)
+    {
+        error = $"{file}: \"log\" is an object, {{ \"file\": \"../logs/shop.log\", \"level\": \"info\" }}, each optional, \"file\" a file "
+                + "outside the site, a file a day written with the day's date before its extension, and \"level\" the lowest written, "
+                + "\"debug\", \"info\", \"warn\" or \"error\".";
+        if (setting.ValueKind != JsonValueKind.Object) return false;
+        foreach (var entry in setting.EnumerateObject())
+        {
+            var text = entry.Value.ValueKind == JsonValueKind.String ? entry.Value.GetString() : null;
+            if (entry.Name == "file" && !string.IsNullOrEmpty(text))
+            {
+                log = log with { File = Path.GetFullPath(Path.Combine(folder, text)) };
+            }
+            else if (entry.Name == "level" && WebLingoLogText.TryParse(text, out var level))
+            {
+                log = log with { Level = level };
             }
             else
             {
@@ -415,7 +447,8 @@ public static class WebLingoSchemes
     private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? mode, ref double? sendTimeout,
         List<string> hosts, Dictionary<string, WebLingoSecret> databases, List<string> read, List<string> write,
         Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, Dictionary<string, WebLingoMailServer> mail,
-        ref WebLingoUploadSettings uploads, ref WebLingoSessionSettings sessions, ref WebLingoLimitSettings limits, out string? error)
+        ref WebLingoUploadSettings uploads, ref WebLingoSessionSettings sessions, ref WebLingoLimitSettings limits, ref WebLingoLogSettings log,
+        out string? error)
     {
         error = null;
         try
@@ -549,6 +582,12 @@ public static class WebLingoSchemes
                     if (!TryReadSessions(file, setting.Value, ref sessions, out error)) return false;
                     continue;
                 }
+                if (setting.Name == "log")
+                {
+                    // Where its log is written, and its lowest level (section 6.12, "Logging").
+                    if (!TryReadLog(file, folder, setting.Value, ref log, out error)) return false;
+                    continue;
+                }
                 if (setting.Name == "limits")
                 {
                     // How long a request may take, how many instructions it may run, and its heap's memory (section 6.12, "Limits").
@@ -571,7 +610,7 @@ public static class WebLingoSchemes
                 {
                     error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"mode\", "
                             + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
-                            + "\"sessions\" and \"limits\".";
+                            + "\"sessions\", \"limits\" and \"log\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)
@@ -610,6 +649,16 @@ public sealed record WebLingoLimitSettings(double? TimeoutSeconds, long? Instruc
 {
     /// <summary>What a configuration that says nothing of them means: the host's defaults.</summary>
     public static WebLingoLimitSettings Default { get; } = new(null, null, null);
+}
+
+/// <summary>
+/// A site's log, <c>wasp.config</c>'s <c>"log"</c> (specification, section 6.12, "Logging"): the file it is written to, a
+/// file a day, a full path, or null for the host's own log; and the lowest level written.
+/// </summary>
+public sealed record WebLingoLogSettings(string? File, WebLingoLogLevel Level)
+{
+    /// <summary>What a configuration that says nothing of it means: the host's log, from <c>info</c> on.</summary>
+    public static WebLingoLogSettings Default { get; } = new(null, WebLingoLogLevel.Info);
 }
 
 /// <summary>
