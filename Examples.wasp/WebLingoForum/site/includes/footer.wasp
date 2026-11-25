@@ -1,0 +1,3 @@
+<footer class="site">
+  <p><%= site.t("forum.poweredBy") %></p>
+</footer>

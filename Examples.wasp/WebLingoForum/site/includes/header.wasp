@@ -1,0 +1,6 @@
+<header class="site">
+  <div class="bar">
+    <a class="name" href="/"><%= site.settings["name"] %></a>
+    <span class="description"><%= site.settings["description"] %></span>
+  </div>
+</header>

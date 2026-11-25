@@ -1,0 +1,97 @@
+// The forum's tables, described once and written as each database's own DDL (Documents/weblingo-forum.md, section 3.3).
+// setup.wlg makes them, and a later version of the forum upgrades a database to its version, step by step.
+
+import { columnType } from "./sql.wlg";
+
+// The schema's version, which the table schema_version holds.
+export const version = 1;
+
+function id() { return { name: "id", type: "id", nullable: false }; }
+function integer(name) { return { name: name, type: "integer", nullable: false }; }
+function boolean(name) { return { name: name, type: "boolean", nullable: false }; }
+function string(name, size) { return { name: name, type: "string", size: size, nullable: false }; }
+function text(name) { return { name: name, type: "text", nullable: false }; }
+function date(name) { return { name: name, type: "date", nullable: false }; }
+function optional(column) { return { ...column, nullable: true }; }
+
+// Each table, in the order they are made, a table after those it refers to: its columns; its key, where it is not an
+// identity's; the tables its columns refer to; and its indexes.
+export const tables = [
+    { name: "schema_version", columns: [integer("version")] },
+    { name: "settings", columns: [string("name", 100), text("value")], key: ["name"] },
+    { name: "users", columns: [
+        id(), string("name", 40), string("name_key", 40), string("email", 254), string("email_key", 254),
+        string("password_hash", 200), date("created_at"), optional(date("confirmed_at")), optional(string("time_zone", 64)),
+        optional(string("language", 16)), optional(text("signature")), integer("post_count"), optional(date("last_seen_at"))],
+      indexes: [{ name: "users_name_key", columns: ["name_key"], unique: true },
+                { name: "users_email_key", columns: ["email_key"], unique: true }] },
+    { name: "member_groups", columns: [id(), string("name", 60), optional(string("kind", 20))] },
+    { name: "group_members", columns: [integer("group_id"), integer("user_id")], key: ["group_id", "user_id"],
+      references: { "group_id": "member_groups", "user_id": "users" },
+      indexes: [{ name: "group_members_user", columns: ["user_id"], unique: false }] },
+    { name: "categories", columns: [id(), string("name", 100), integer("sort_order")] },
+    { name: "boards", columns: [
+        id(), integer("category_id"), string("name", 100), optional(string("description", 500)), integer("sort_order"),
+        integer("topic_count"), integer("post_count"), optional(integer("last_post_id"))],
+      references: { "category_id": "categories" },
+      indexes: [{ name: "boards_category", columns: ["category_id", "sort_order"], unique: false }] },
+    { name: "topics", columns: [
+        id(), integer("board_id"), integer("user_id"), string("title", 200), date("created_at"), integer("post_count"),
+        integer("view_count"), optional(integer("last_post_id")), date("last_post_at"), boolean("pinned"), boolean("locked"),
+        boolean("deleted")],
+      references: { "board_id": "boards", "user_id": "users" },
+      indexes: [{ name: "topics_board", columns: ["board_id", "pinned", "last_post_at"], unique: false }] },
+    { name: "posts", columns: [
+        id(), integer("topic_id"), integer("user_id"), text("body"), date("created_at"), optional(date("edited_at")),
+        optional(integer("edited_by")), boolean("deleted")],
+      references: { "topic_id": "topics", "user_id": "users" },
+      indexes: [{ name: "posts_topic", columns: ["topic_id", "id"], unique: false },
+                { name: "posts_user", columns: ["user_id"], unique: false }] }
+];
+
+// The statements that make a table and its indexes in the provider's DDL.
+export function createTable(provider, table) {
+    var parts = [];
+    foreach (var column in table["columns"]) {
+        var type = columnType(provider, column["type"], column?["size"]);
+        parts.push(column["type"] == "id" ? $"{column['name']} {type}"
+                                         : $"{column['name']} {type} {(column['nullable'] ? 'NULL' : 'NOT NULL')}");
+    }
+    if (table.has("key")) {
+        parts.push($"PRIMARY KEY ({', '.join(table['key'])})");
+    }
+    if (table.has("references")) {
+        foreach (var (name, target) in table["references"]) {
+            parts.push($"FOREIGN KEY ({name}) REFERENCES {target} (id)");
+        }
+    }
+    var statements = [$"CREATE TABLE {table['name']} ({', '.join(parts)})"];
+    if (table.has("indexes")) {
+        foreach (var index in table["indexes"]) {
+            var unique = index["unique"] ? "UNIQUE " : "";
+            statements.push($"CREATE {unique}INDEX {index['name']} ON {table['name']} ({', '.join(index['columns'])})");
+        }
+    }
+    return statements;
+}
+
+// Every statement that makes the schema, in order, in the provider's DDL.
+export function create(provider) {
+    var statements = [];
+    foreach (var table in tables) {
+        foreach (var statement in createTable(provider, table)) {
+            statements.push(statement);
+        }
+    }
+    return statements;
+}
+
+// The version of the schema a database holds: 0 where it holds none of the forum's tables.
+export async function versionOf(db) {
+    try {
+        var rows = await db.query("SELECT version FROM schema_version");
+        return rows.length == 0 ? 0 : rows[0]["version"];
+    } catch (DatabaseError e) {
+        return 0;
+    }
+}

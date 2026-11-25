@@ -1,0 +1,49 @@
+// The forum's tables, written as each database's DDL (site/lib/schema.wlg). weblingo test schema-tests.wlg
+
+import { assertEqual, assertContains } from "std:test";
+import { Database } from "std:db";
+import schema from "../site/lib/schema.wlg";
+import { providers } from "../site/lib/sql.wlg";
+
+export class SchemaTests {
+    testATableIsWrittenInEachDatabasesDdl() {
+        assertEqual(schema.create("sqlite")[0], "CREATE TABLE schema_version (version INTEGER NOT NULL)");
+        var members = null;
+        foreach (var table in schema.tables) {
+            if (table["name"] == "group_members") {
+                members = table;
+            }
+        }
+        // Its foreign keys come in the order of a map's entries, which is not defined.
+        var statements = schema.createTable("sqlserver", members);
+        assertEqual(statements.length, 2);
+        assertContains(statements[0], "CREATE TABLE group_members (group_id BIGINT NOT NULL, user_id BIGINT NOT NULL, ");
+        assertContains(statements[0], "PRIMARY KEY (group_id, user_id)");
+        assertContains(statements[0], "FOREIGN KEY (group_id) REFERENCES member_groups (id)");
+        assertContains(statements[0], "FOREIGN KEY (user_id) REFERENCES users (id)");
+        assertEqual(statements[1], "CREATE INDEX group_members_user ON group_members (user_id)");
+    }
+
+    testEachDatabaseGetsTheSameStatements() {
+        var count = schema.create("sqlite").length;
+        foreach (var provider in providers) {
+            assertEqual(schema.create(provider).length, count);
+        }
+        var users = schema.create("mysql").find(s => s.startsWith("CREATE TABLE users "));
+        assertContains(users, "id BIGINT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(40) NOT NULL");
+        assertContains(users, "confirmed_at DATETIME(3) NULL");
+        assertContains(schema.create("postgresql"), "CREATE UNIQUE INDEX users_name_key ON users (name_key)");
+    }
+
+    async testTheSchemaIsMadeAndItsVersionRead() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            assertEqual(await schema.versionOf(db), 0);
+            foreach (var statement in schema.create(db.provider)) {
+                await db.execute(statement);
+            }
+            assertEqual(await schema.versionOf(db), 0);
+            await db.execute("INSERT INTO schema_version (version) VALUES (@version)", { version: schema.version });
+            assertEqual(await schema.versionOf(db), schema.version);
+        }
+    }
+}

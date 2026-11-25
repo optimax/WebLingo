@@ -1,0 +1,42 @@
+// The forum's categories and boards, as the database holds them.
+
+// The categories, in order, each with its boards in order, each board with its latest post: its id, its time, its
+// topic's id and title, and its author's name.
+export async function index(db) {
+    var rows = await db.query("""
+        SELECT c.id AS category_id, c.name AS category_name, b.id, b.name, b.description, b.topic_count, b.post_count,
+               p.id AS last_post_id, p.created_at AS last_post_at, t.id AS last_topic_id, t.title AS last_topic_title,
+               u.name AS last_post_by
+        FROM categories c
+        LEFT JOIN boards b ON b.category_id = c.id
+        LEFT JOIN posts p ON p.id = b.last_post_id
+        LEFT JOIN topics t ON t.id = p.topic_id
+        LEFT JOIN users u ON u.id = p.user_id
+        ORDER BY c.sort_order, c.id, b.sort_order, b.id
+        """);
+    var categories = [];
+    var category = null;
+    foreach (var row in rows) {
+        if (category == null || category["id"] != row["category_id"]) {
+            category = { id: row["category_id"], name: row["category_name"], boards: [] };
+            categories.push(category);
+        }
+        if (row["id"] != null) {
+            category["boards"].push(row);
+        }
+    }
+    return categories;
+}
+
+// A board, with its category's id and name, or null where there is none of that id.
+export async function one(db, id) {
+    if (id == null) {
+        return null;
+    }
+    var rows = await db.query("""
+        SELECT b.id, b.name, b.description, b.topic_count, b.post_count, c.id AS category_id, c.name AS category_name
+        FROM boards b JOIN categories c ON c.id = b.category_id
+        WHERE b.id = @id
+        """, { id: id });
+    return rows.length == 0 ? null : rows[0];
+}

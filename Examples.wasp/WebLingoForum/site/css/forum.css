@@ -1,0 +1,49 @@
+/* WebLingo Forum's look. Its colours are custom properties, which the layout sets from the forum's settings
+   (Documents/weblingo-forum.md, section 3.5); these are their defaults. */
+:root {
+  --accent: #2a6f97; --accent-text: #ffffff; --background: #f6f7f9; --surface: #ffffff;
+  --text: #1d232a; --muted: #5c6670; --border: #d9dee3;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--background); }
+a { color: var(--accent); }
+main { max-width: 64rem; margin: 0 auto; padding: 1rem; }
+h1 { font-size: 1.6rem; margin: 0.5rem 0 1rem; }
+h2 { font-size: 1.15rem; margin: 0; padding: 0.5rem 0.75rem; color: var(--accent-text); background: var(--accent); border-radius: 6px 6px 0 0; }
+
+header.site { background: var(--accent); color: var(--accent-text); }
+header.site .bar { max-width: 64rem; margin: 0 auto; padding: 0.75rem 1rem; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; align-items: baseline; }
+header.site .name { color: var(--accent-text); font-size: 1.35rem; font-weight: 600; text-decoration: none; }
+header.site .description { opacity: 0.85; }
+footer.site { max-width: 64rem; margin: 2rem auto; padding: 0 1rem; color: var(--muted); font-size: 0.875rem; }
+
+.crumbs { font-size: 0.9rem; color: var(--muted); margin-bottom: 0.5rem; }
+.note { color: var(--muted); font-size: 0.875rem; margin: 0.15rem 0 0; }
+.notice { padding: 0.5rem 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.tag { display: inline-block; font-size: 0.75rem; padding: 0 0.4rem; border-radius: 4px; color: var(--accent-text); background: var(--muted); }
+
+.category { margin-bottom: 1.5rem; }
+table.list { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); }
+table.list td { padding: 0.6rem 0.75rem; border-top: 1px solid var(--border); vertical-align: top; }
+table.list td.count { width: 9rem; color: var(--muted); font-size: 0.875rem; }
+table.list td.last { width: 16rem; }
+table.list a.board, table.list a.topic { font-weight: 600; }
+table.list tr.pinned { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+
+.post { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 1rem; }
+.post .author { width: 11rem; flex-shrink: 0; padding: 0.75rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.post .author .name { font-weight: 600; }
+.post .content { padding: 0.75rem; min-width: 0; flex: 1; }
+.post .body { margin-top: 0.5rem; overflow-wrap: anywhere; }
+.post .body.text { white-space: pre-wrap; }
+
+.pages { margin: 0.75rem 0; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.pages a, .pages strong { padding: 0.1rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); text-decoration: none; }
+.pages strong { color: var(--accent-text); background: var(--accent); border-color: var(--accent); }
+
+@media (max-width: 40rem) {
+  table.list td.count, table.list td.last { display: none; }
+  .post { flex-direction: column; }
+  .post .author { width: auto; border-right: none; border-bottom: 1px solid var(--border); flex-direction: row; flex-wrap: wrap; gap: 0 0.75rem; }
+}

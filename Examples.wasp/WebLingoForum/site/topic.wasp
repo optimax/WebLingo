@@ -1,0 +1,18 @@
+<% param request; param response; import { topicPage } from "/lib/pages.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await topicPage(request)).title, crumbs: (await topicPage(request)).crumbs }; %>
+<% var view = await topicPage(request); var site = view.site; %>
+<% if (view.topic == null) { response.status = 404; %>
+<h1><%= site.t("topic.notFound") %></h1>
+<p><%= site.t("forum.notFoundText") %> <a href="/"><%= site.t("forum.goHome") %></a>.</p>
+<% } else { var topic = view.topic; var base = $"/topic?id={topic['id']}"; %>
+<h1><%= topic["title"] %></h1>
+<% if (topic["locked"]) { %>
+<p class="notice"><%= site.t("topic.locked") %></p>
+<% } %>
+<% await renderComponent("/components/pages.wasp", { site: site, base: base, page: view.page, pages: view.pages }); %>
+<% var number = view.first; %>
+<% foreach (var post in view.posts) { number++; %>
+<% await renderComponent("/components/post.wasp", { site: site, post: post, number: number }); %>
+<% } %>
+<% await renderComponent("/components/pages.wasp", { site: site, base: base, page: view.page, pages: view.pages }); %>
+<% } %>

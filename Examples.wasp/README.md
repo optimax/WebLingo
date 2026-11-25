@@ -293,3 +293,9 @@ To use another SQL Server, change the server in both configurations, `database/w
 reached over a network should have a certificate its clients trust, in place of `TrustServerCertificate=true`. Under
 IIS, the site reaches the database as its application pool's account, which needs a login on that server, and the
 rights to read and change the database, which `Scripts/add-sql-server-login.wlg` gives it (`Scripts/README.md`).
+
+## WebLingoForum: WebLingo Forum, a discussion forum
+
+A discussion forum written in WASP, on SQLite, SQL Server, MySQL or PostgreSQL, built in parts, as
+`Documents/weblingo-forum.md` designs it: its categories, boards and topics so far, read from its database, made by its
+`setup/setup.wlg`. Its own `README.md` says how to run it.

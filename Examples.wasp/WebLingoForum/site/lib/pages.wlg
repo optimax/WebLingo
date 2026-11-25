@@ -1,0 +1,81 @@
+// What each of the forum's pages shows, read from the database once for each request, so that a page and its layout
+// share it: its title, the trail of links above it, and its own data, as an object's fields.
+
+import { begin, open, idOf, pageOf, pagesOf } from "./forum.wlg";
+import boards from "./boards.wlg";
+import topics from "./topics.wlg";
+
+function view(site, title, crumbs) {
+    var made = new Object();
+    made.site = site;
+    made.title = title;
+    made.crumbs = crumbs;
+    return made;
+}
+
+// The page a query asks for, within the pages there are.
+function pageWithin(request, pages) {
+    var page = pageOf(request.query?["page"]);
+    return page > pages ? pages : page;
+}
+
+// The front page: the categories and their boards.
+export async function indexPage(request) {
+    var site = await begin(request);
+    return await site.once("index", async () => {
+        var page = view(site, site.t("index.title"), []);
+        using (var db = await open()) {
+            page.categories = await boards.index(db);
+        }
+        return page;
+    });
+}
+
+// A board's page, /board?id=3&page=2: the board, a page of its topics, and the page numbers; its board null where the
+// query names none.
+export async function boardPage(request) {
+    var site = await begin(request);
+    return await site.once("board", async () => {
+        using (var db = await open()) {
+            var board = await boards.one(db, idOf(request.query?["id"]));
+            if (board == null) {
+                var missing = view(site, site.t("board.notFound"), []);
+                missing.board = null;
+                return missing;
+            }
+            var page = view(site, board["name"], [[board["category_name"], $"/#category-{board['category_id']}"]]);
+            var perPage = site.settings["topicsPerPage"];
+            page.board = board;
+            page.pages = pagesOf(await topics.countOnBoard(db, board["id"]), perPage);
+            page.page = pageWithin(request, page.pages);
+            page.topics = await topics.onBoard(db, board["id"], (page.page - 1) * perPage, perPage);
+            return page;
+        }
+    });
+}
+
+// A topic's page, /topic?id=42&page=2: the topic, a page of its posts, and the page numbers, its view counted; its topic
+// null where the query names none.
+export async function topicPage(request) {
+    var site = await begin(request);
+    return await site.once("topic", async () => {
+        using (var db = await open()) {
+            var topic = await topics.one(db, idOf(request.query?["id"]));
+            if (topic == null) {
+                var missing = view(site, site.t("topic.notFound"), []);
+                missing.topic = null;
+                return missing;
+            }
+            var page = view(site, topic["title"], [[topic["category_name"], $"/#category-{topic['category_id']}"],
+                                                   [topic["board_name"], $"/board?id={topic['board_id']}"]]);
+            var perPage = site.settings["postsPerPage"];
+            page.topic = topic;
+            page.pages = pagesOf(await topics.countOfPosts(db, topic["id"]), perPage);
+            page.page = pageWithin(request, page.pages);
+            page.first = (page.page - 1) * perPage;
+            page.posts = await topics.posts(db, topic["id"], page.first, perPage);
+            await topics.viewed(db, topic["id"]);
+            return page;
+        }
+    });
+}

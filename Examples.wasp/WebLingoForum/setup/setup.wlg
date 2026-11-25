@@ -1,0 +1,106 @@
+// Makes WebLingo Forum's database in the database weblingo.config names "forum": SQLite's file ../data/forum.db, as it
+// comes, or a database of SQL Server's, MySQL's or PostgreSQL's, made empty by its administrator, whose connection string
+// this folder's weblingo.config and the site's wasp.config both give instead (Documents/weblingo-forum.md, section 3.3).
+// A new database gets the forum's tables, its groups, its first administrator, and a first category, board and topic; a
+// database the forum's version made already is left as it is. Run it from this folder:
+//
+//   weblingo run setup.wlg
+//   weblingo run setup.wlg name=Anna email=anna@example.com
+//
+// It asks for what its parameters do not give: the administrator's name, address and password, the password unseen.
+
+param name = null;
+param email = null;
+param password = null;
+param database = "forum";
+
+import { write, writeLn, prompt, readPassword } from "std:console";
+import { DateTime } from "std:datetime";
+import { Database } from "std:db";
+import schema from "../site/lib/schema.wlg";
+import { insert } from "../site/lib/sql.wlg";
+import users from "../site/lib/users.wlg";
+import { load } from "../site/lib/texts.wlg";
+
+var texts = await load("en");
+
+// A value its parameter gives, or the one asked for, checked by problem, which gives the name of a text that says what is
+// wrong with it, or null.
+async function given(value, question, problem, unseen) {
+    var answer = value;
+    while (true) {
+        if (answer == null) {
+            if (unseen) {
+                write(question);
+                answer = await readPassword();
+            } else {
+                answer = await prompt(question);
+            }
+            if (answer == null) {
+                throw new Error("The input ended before the administrator was given.");
+            }
+        }
+        var wrong = problem(answer);
+        if (wrong == null) {
+            return answer.trim() == answer || unseen ? answer : answer.trim();
+        }
+        if (value != null) {
+            throw new Error(texts.get(wrong));
+        }
+        writeLn(texts.get(wrong));
+        answer = null;
+    }
+}
+
+// The forum's tables, its groups, its administrator, and its first category, board, topic and post.
+async function make(db, admin) {
+    foreach (var statement in schema.create(db.provider)) {
+        await db.execute(statement);
+    }
+    await db.execute("INSERT INTO schema_version (version) VALUES (@version)", { version: schema.version });
+    var now = DateTime.utcNow();
+    var groups = {};
+    foreach (var group in [["guests", "Guests"], ["members", "Members"], ["moderators", "Moderators"], ["administrators", "Administrators"]]) {
+        groups[group[0]] = await insert(db, "member_groups", { name: group[1], kind: group[0] });
+    }
+    var user = await users.make(db, admin["name"], admin["email"], admin["password"], now, now);
+    foreach (var kind in ["members", "administrators"]) {
+        await db.execute("INSERT INTO group_members (group_id, user_id) VALUES (@group, @user)", { group: groups[kind], user: user });
+    }
+    var category = await insert(db, "categories", { name: "General", sort_order: 1 });
+    var board = await insert(db, "boards", {
+        category_id: category, name: "Welcome", description: "Introductions, and news of the forum.", sort_order: 1,
+        topic_count: 1, post_count: 1, last_post_id: null });
+    var topic = await insert(db, "topics", {
+        board_id: board, user_id: user, title: "Welcome to the forum", created_at: now, post_count: 1, view_count: 0,
+        last_post_id: null, last_post_at: now, pinned: true, locked: false, deleted: false });
+    var post = await insert(db, "posts", {
+        topic_id: topic, user_id: user, created_at: now, edited_at: null, edited_by: null, deleted: false,
+        body: "This is the forum's first post. Introduce yourself here, and read the forum's news." });
+    await db.execute("UPDATE topics SET last_post_id = @post WHERE id = @topic", { post: post, topic: topic });
+    await db.execute("UPDATE boards SET last_post_id = @post WHERE id = @board", { post: post, board: board });
+    await db.execute("UPDATE users SET post_count = 1 WHERE id = @user", { user: user });
+}
+
+using (var db = await Database.open(database)) {
+    var version = await schema.versionOf(db);
+    if (version == schema.version) {
+        writeLn($"The forum's database '{database}' is at version {version} already: nothing to do.");
+    } else if (version != 0) {
+        throw new Error($"The forum's database '{database}' is at version {version}, which this setup cannot upgrade to {schema.version}.");
+    } else {
+        var admin = {
+            name: await given(name, "The administrator's name: ", users.nameProblem, false),
+            email: await given(email, "The administrator's address: ", users.emailProblem, false),
+            password: await given(password, "The administrator's password: ", users.passwordProblem, true)
+        };
+        // Made in one transaction where the database takes DDL in one, so that a failure leaves nothing behind; MySQL
+        // commits each statement of DDL as it runs it.
+        if (db.provider == "mysql") {
+            await make(db, admin);
+        } else {
+            await db.transaction(async () => { await make(db, admin); });
+        }
+        writeLn($"Made the forum's database '{database}' on {db.provider}, version {schema.version}, with its administrator {admin['name'].trim()}.");
+    }
+}

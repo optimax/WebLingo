@@ -1,0 +1,17 @@
+<% param request; import { indexPage } from "/lib/pages.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await indexPage(request)).title }; %>
+<% var view = await indexPage(request); var site = view.site; %>
+<h1><%= site.settings["name"] %></h1>
+<% if (view.categories.length == 0) { %>
+<p class="note"><%= site.t("index.empty") %></p>
+<% } %>
+<% foreach (var category in view.categories) { %>
+<section class="category" id="category-<%= category["id"] %>">
+  <h2><%= category["name"] %></h2>
+  <table class="list">
+<% foreach (var board in category["boards"]) { %>
+<% await renderComponent("/components/board-row.wasp", { site: site, board: board }); %>
+<% } %>
+  </table>
+</section>
+<% } %>

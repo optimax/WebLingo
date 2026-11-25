@@ -1,0 +1,50 @@
+// The forum's texts in English. A text of several forms, an array, is chosen by plural(count), the language's rule; a
+// hole, {name}, is filled with a value of that name.
+
+export function plural(count) {
+    return count == 1 ? 0 : 1;
+}
+
+export const texts = {
+    "forum.home": "Home",
+    "forum.poweredBy": "Powered by WebLingo Forum",
+    "forum.notFound": "Not found",
+    "forum.notFoundText": "There is nothing here: it may have been moved or removed.",
+    "forum.goHome": "Back to the forum's front page",
+    "forum.pages": "Pages",
+    "forum.previous": "Previous",
+    "forum.next": "Next",
+
+    "index.title": "Boards",
+    "index.empty": "There are no boards yet.",
+
+    "board.board": "Board",
+    "board.topic": "Topic",
+    "board.topics": ["{count} topic", "{count} topics"],
+    "board.posts": ["{count} post", "{count} posts"],
+    "board.replies": ["{count} reply", "{count} replies"],
+    "board.views": ["{count} view", "{count} views"],
+    "board.lastPost": "Last post",
+    "board.lastPostBy": "by {name}, {time}",
+    "board.noPosts": "No posts yet",
+    "board.noTopics": "There are no topics on this board yet.",
+    "board.notFound": "No such board",
+    "board.pinned": "Pinned",
+    "board.locked": "Locked",
+
+    "topic.notFound": "No such topic",
+    "topic.startedBy": "Started by {name}, {time}",
+    "topic.postedAt": "Posted {time}",
+    "topic.editedAt": "Edited {time}",
+    "topic.locked": "This topic is locked: it takes no more replies.",
+
+    "user.nameTooShort": "A name has at least 2 letters or digits.",
+    "user.nameTooLong": "A name has at most 40 characters.",
+    "user.nameCharacters": "A name is letters and digits, with single spaces, dots, hyphens and underscores between them.",
+    "user.emailInvalid": "That is not an email address.",
+    "user.passwordTooShort": "A password has at least 8 characters.",
+    "user.passwordTooLong": "A password has at most 200 characters.",
+    "user.joined": "Joined {time}",
+    "user.posts": ["{count} post", "{count} posts"],
+    "user.deleted": "A former member"
+};

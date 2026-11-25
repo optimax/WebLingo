@@ -98,6 +98,10 @@ $RECYCLE.BIN/
 # The fish store example's database, which its setup.wlg makes (Examples.wasp/README.md)
 Examples.wasp/example2/database/fish.db
 
+# WebLingo Forum's data, its database and its members' files, which its setup.wlg and its members make
+Examples.wasp/WebLingoForum/data/*
+!Examples.wasp/WebLingoForum/data/README.md
+
 # Local configuration / secrets
 appsettings.Local.json
 appsettings.Development.local.json

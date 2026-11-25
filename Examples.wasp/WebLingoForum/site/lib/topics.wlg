@@ -1,0 +1,62 @@
+// The forum's topics and their posts, as the database holds them.
+
+import { page } from "./sql.wlg";
+
+// How many topics a board shows, those deleted left out.
+export async function countOnBoard(db, board) {
+    return (await db.query("SELECT COUNT(*) AS n FROM topics WHERE board_id = @board AND deleted = @deleted",
+                           { board: board, deleted: false }))[0]["n"];
+}
+
+// A page of a board's topics, the pinned first, then those whose latest post is the latest, each with its author's name
+// and its latest post's author's.
+export async function onBoard(db, board, skip, count) {
+    return await db.query($"""
+        SELECT t.id, t.title, t.post_count, t.view_count, t.pinned, t.locked, t.created_at, t.last_post_at,
+               u.name AS user_name, l.name AS last_post_by
+        FROM topics t
+        LEFT JOIN users u ON u.id = t.user_id
+        LEFT JOIN posts p ON p.id = t.last_post_id
+        LEFT JOIN users l ON l.id = p.user_id
+        WHERE t.board_id = @board AND t.deleted = @deleted
+        ORDER BY t.pinned DESC, t.last_post_at DESC, t.id DESC
+        {page(db.provider)}
+        """, { board: board, deleted: false, skip: skip, count: count });
+}
+
+// A topic, with its board's and its category's ids and names, or null where there is none of that id, or it is deleted.
+export async function one(db, id) {
+    if (id == null) {
+        return null;
+    }
+    var rows = await db.query("""
+        SELECT t.id, t.title, t.post_count, t.view_count, t.pinned, t.locked, t.created_at, t.user_id,
+               b.id AS board_id, b.name AS board_name, c.id AS category_id, c.name AS category_name
+        FROM topics t JOIN boards b ON b.id = t.board_id JOIN categories c ON c.id = b.category_id
+        WHERE t.id = @id AND t.deleted = @deleted
+        """, { id: id, deleted: false });
+    return rows.length == 0 ? null : rows[0];
+}
+
+// How many posts a topic shows, those deleted left out.
+export async function countOfPosts(db, topic) {
+    return (await db.query("SELECT COUNT(*) AS n FROM posts WHERE topic_id = @topic AND deleted = @deleted",
+                           { topic: topic, deleted: false }))[0]["n"];
+}
+
+// A page of a topic's posts, in order, each with its author's name, when they joined, and how many posts they have.
+export async function posts(db, topic, skip, count) {
+    return await db.query($"""
+        SELECT p.id, p.body, p.created_at, p.edited_at, p.user_id,
+               u.name AS user_name, u.created_at AS user_joined, u.post_count AS user_posts
+        FROM posts p LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.topic_id = @topic AND p.deleted = @deleted
+        ORDER BY p.id
+        {page(db.provider)}
+        """, { topic: topic, deleted: false, skip: skip, count: count });
+}
+
+// Counts a topic's view.
+export async function viewed(db, topic) {
+    await db.execute("UPDATE topics SET view_count = view_count + 1 WHERE id = @id", { id: topic });
+}

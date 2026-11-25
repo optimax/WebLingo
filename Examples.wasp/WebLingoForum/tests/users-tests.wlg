@@ -1,0 +1,57 @@
+// Members' names, addresses and passwords (site/lib/users.wlg), and the numbers a query gives a page
+// (site/lib/forum.wlg). weblingo test users-tests.wlg
+
+import { assertEqual } from "std:test";
+import users from "../site/lib/users.wlg";
+import { idOf, pageOf, pagesOf } from "../site/lib/forum.wlg";
+
+export class UsersTests {
+    testANamesCharacters() {
+        assertEqual(users.nameProblem("Anna"), null);
+        assertEqual(users.nameProblem("Zoë O'Neil"), "user.nameCharacters");
+        assertEqual(users.nameProblem("Zoë_O-Neil.2"), null);
+        assertEqual(users.nameProblem("Łucja Wąs"), null);
+        assertEqual(users.nameProblem("名前"), null);
+        assertEqual(users.nameProblem("A"), "user.nameTooShort");
+        assertEqual(users.nameProblem("  "), "user.nameTooShort");
+        assertEqual(users.nameProblem("a".repeat(41)), "user.nameTooLong");
+        assertEqual(users.nameProblem("-Anna"), "user.nameCharacters");
+        assertEqual(users.nameProblem("Anna  Lee"), "user.nameCharacters");
+        assertEqual(users.nameProblem("<b>Anna</b>"), "user.nameCharacters");
+        assertEqual(users.nameProblem(null), "user.nameTooShort");
+    }
+
+    testAnAddress() {
+        assertEqual(users.emailProblem("anna@example.com"), null);
+        assertEqual(users.emailProblem("anna@localhost"), "user.emailInvalid");
+        assertEqual(users.emailProblem("anna@@example.com"), "user.emailInvalid");
+        assertEqual(users.emailProblem("@example.com"), "user.emailInvalid");
+        assertEqual(users.emailProblem("anna lee@example.com"), "user.emailInvalid");
+        assertEqual(users.emailProblem("anna@example."), "user.emailInvalid");
+    }
+
+    testAPassword() {
+        assertEqual(users.passwordProblem("correct-horse"), null);
+        assertEqual(users.passwordProblem("short"), "user.passwordTooShort");
+        assertEqual(users.passwordProblem("x".repeat(201)), "user.passwordTooLong");
+    }
+
+    testANameOrAnAddressIsUniqueWhateverItsCase() {
+        assertEqual(users.keyOf(" Anna@Example.COM "), "anna@example.com");
+    }
+
+    testAQuerysNumbers() {
+        assertEqual(idOf("42"), 42);
+        assertEqual(idOf("0"), null);
+        assertEqual(idOf("-1"), null);
+        assertEqual(idOf("4x"), null);
+        assertEqual(idOf(""), null);
+        assertEqual(idOf(null), null);
+        assertEqual(idOf("9".repeat(19)), null);
+        assertEqual(pageOf(null), 1);
+        assertEqual(pageOf("3"), 3);
+        assertEqual(pagesOf(0, 20), 1);
+        assertEqual(pagesOf(20, 20), 1);
+        assertEqual(pagesOf(21, 20), 2);
+    }
+}

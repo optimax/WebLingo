@@ -1,0 +1,63 @@
+// The forum's members: what a name, an address and a password must be, and making a member.
+
+import crypto from "std:crypto";
+import { Regex } from "std:regex";
+import { insert } from "./sql.wlg";
+
+// A name: 2 to 40 letters and digits of any script, with spaces, dots, hyphens and underscores between them.
+const namePattern = new Regex("^[\\p{L}\\p{N}](?:[\\p{L}\\p{N} ._-]*[\\p{L}\\p{N}])?$");
+
+// The key a name or an address is unique by, whatever its case: two names that differ only by case are one name.
+export function keyOf(text) {
+    return text.trim().toLower();
+}
+
+// Why a name cannot be a member's, a text's name, or null where it can.
+export function nameProblem(name) {
+    if (!(name is String) || name.trim().length < 2) {
+        return "user.nameTooShort";
+    }
+    if (name.trim().length > 40) {
+        return "user.nameTooLong";
+    }
+    if (!namePattern.test(name.trim()) || name.trim().contains("  ")) {
+        return "user.nameCharacters";
+    }
+    return null;
+}
+
+// Why an address cannot be a member's, a text's name, or null where it can: one @, something on either side of it, a
+// dot after it, no spaces, at most 254 characters.
+export function emailProblem(email) {
+    if (!(email is String)) {
+        return "user.emailInvalid";
+    }
+    var text = email.trim();
+    var at = text.indexOf("@");
+    if (text.length > 254 || at < 1 || at != text.lastIndexOf("@") || text.contains(" ")
+        || !text.slice(at + 1).contains(".") || text.endsWith(".")) {
+        return "user.emailInvalid";
+    }
+    return null;
+}
+
+// Why a password cannot be a member's, a text's name, or null where it can: 8 to 200 characters.
+export function passwordProblem(password) {
+    if (!(password is String) || password.length < 8) {
+        return "user.passwordTooShort";
+    }
+    if (password.length > 200) {
+        return "user.passwordTooLong";
+    }
+    return null;
+}
+
+// Makes a member, its name, address and password checked by the caller, and gives its id; its password kept only as its
+// hash. confirmed is when its address was confirmed, or null.
+export async function make(db, name, email, password, now, confirmed) {
+    return await insert(db, "users", {
+        name: name.trim(), name_key: keyOf(name), email: email.trim(), email_key: keyOf(email),
+        password_hash: await crypto.hashPasswordAsync(password), created_at: now, confirmed_at: confirmed,
+        time_zone: null, language: null, signature: null, post_count: 0, last_seen_at: null
+    });
+}

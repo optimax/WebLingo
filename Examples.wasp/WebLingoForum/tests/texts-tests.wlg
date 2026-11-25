@@ -1,0 +1,65 @@
+// The forum's texts, and its settings (site/lib/texts.wlg, site/lib/settings.wlg). weblingo test texts-tests.wlg
+
+import { assertEqual } from "std:test";
+import { Database } from "std:db";
+import { load, isLanguage } from "../site/lib/texts.wlg";
+import settings from "../site/lib/settings.wlg";
+import schema from "../site/lib/schema.wlg";
+
+export class TextsTests {
+    async testATextIsFoundAndFilledIn() {
+        var texts = await load("en");
+        assertEqual(texts.language, "en");
+        assertEqual(texts.get("forum.home"), "Home");
+        assertEqual(texts.format("board.lastPostBy", { name: "Anna", time: "today" }), "by Anna, today");
+        assertEqual(texts.get("no.such.text"), "no.such.text");
+    }
+
+    async testATextOfSeveralFormsTakesItsCountsForm() {
+        var texts = await load("en");
+        assertEqual(texts.format("board.replies", { count: 0 }), "0 replies");
+        assertEqual(texts.format("board.replies", { count: 1 }), "1 reply");
+        assertEqual(texts.format("board.replies", { count: 2 }), "2 replies");
+        assertEqual(texts.get("board.replies"), "{count} reply");
+    }
+
+    async testOnlyALanguagesNameLoadsItsModule() {
+        assertEqual(isLanguage("en"), true);
+        assertEqual(isLanguage("pt-BR"), true);
+        assertEqual(isLanguage("EN"), false);
+        assertEqual(isLanguage("../lib/sql"), false);
+        assertEqual(isLanguage("pt_BR"), false);
+        assertEqual(isLanguage(null), false);
+        assertEqual((await load("../lib/sql")).language, "en");
+    }
+}
+
+export class SettingsTests {
+    testAColourIsSixHexadecimalDigits() {
+        assertEqual(settings.isColor("#2a6F97"), true);
+        assertEqual(settings.isColor("#2a6f9"), false);
+        assertEqual(settings.isColor("2a6f977"), false);
+        assertEqual(settings.isColor("#2a6f9g"), false);
+        assertEqual(settings.isColor("red;}"), false);
+        assertEqual(settings.isColor(5), false);
+    }
+
+    async testTheDatabasesSettingsReplaceTheDefaults() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            foreach (var statement in schema.create(db.provider)) {
+                await db.execute(statement);
+            }
+            assertEqual((await settings.load(db))["name"], "WebLingo Forum");
+            await db.execute("INSERT INTO settings (name, value) VALUES ('name', '\"Tea Talk\"'), ('postsPerPage', '10'), "
+                             + "('colors', '{\"accent\": \"#aa0000\", \"text\": \"black;}\", \"unknown\": \"#000000\"}'), ('unknown', '1')");
+            var values = await settings.load(db);
+            assertEqual(values["name"], "Tea Talk");
+            assertEqual(values["postsPerPage"], 10);
+            assertEqual(values["colors"]["accent"], "#aa0000");
+            assertEqual(values["colors"]["text"], "#1d232a");
+            assertEqual(values["colors"].has("unknown"), false);
+            assertEqual(values.has("unknown"), false);
+            assertEqual(settings.defaults["colors"]["accent"], "#2a6f97");
+        }
+    }
+}

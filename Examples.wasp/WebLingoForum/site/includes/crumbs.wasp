@@ -1,0 +1,3 @@
+<nav class="crumbs" aria-label="Trail">
+  <a href="/"><%= site.t("forum.home") %></a><% foreach (var crumb in crumbs) { %> › <a href="<%= crumb[1] %>"><%= crumb[0] %></a><% } %>
+</nav>

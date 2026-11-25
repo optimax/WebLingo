@@ -1,0 +1,18 @@
+<% param site; param board; %>
+<tr>
+  <td class="what">
+    <a class="board" href="/board?id=<%= board["id"] %>"><%= board["name"] %></a>
+<% if (board["description"] != null) { %>
+    <p class="note"><%= board["description"] %></p>
+<% } %>
+  </td>
+  <td class="count"><%= site.f("board.topics", { count: board["topic_count"] }) %><br><%= site.f("board.posts", { count: board["post_count"] }) %></td>
+  <td class="last">
+<% if (board["last_post_id"] == null) { %>
+    <span class="note"><%= site.t("board.noPosts") %></span>
+<% } else { %>
+    <a href="/topic?id=<%= board["last_topic_id"] %>"><%= board["last_topic_title"] %></a><br>
+    <span class="note"><%= site.f("board.lastPostBy", { name: board["last_post_by"] ?? site.t("user.deleted"), time: site.time(board["last_post_at"]) }) %></span>
+<% } %>
+  </td>
+</tr>

@@ -1,0 +1,59 @@
+// The forum's texts, every word it shows, from a module of each language, texts/en.wlg, which exports them as a map
+// from a text's name to its words, and its plural rule (Documents/weblingo-forum.md, section 3.6).
+
+// A language's texts, and how a text takes values.
+export class Texts {
+    constructor(language, words, plural) {
+        this.language = language;
+        this.words = words;
+        this.plural = plural;
+    }
+
+    // A text by its name; its name itself, where the language has no such text, so that a missing one shows.
+    get(name) {
+        var words = this.words?[name];
+        if (words == null) {
+            return name;
+        }
+        return words is Array ? words[0] : words;
+    }
+
+    // A text with its holes, {name}, filled from a map of values; a text of several forms takes the one its count's
+    // plural rule gives.
+    format(name, values) {
+        var words = this.words?[name];
+        if (words == null) {
+            return name;
+        }
+        if (words is Array) {
+            words = words[this.plural(values["count"])];
+        }
+        foreach (var (key, value) in values) {
+            words = words.replace("{" + key + "}", $"{value}");
+        }
+        return words;
+    }
+}
+
+// Whether a text names a language as the forum's modules are named: en, or pt-BR.
+export function isLanguage(text) {
+    if (!(text is String) || (text.length != 2 && text.length != 5)) {
+        return false;
+    }
+    foreach (var c in text.slice(0, 2)) {
+        if (!"abcdefghijklmnopqrstuvwxyz".contains(c)) {
+            return false;
+        }
+    }
+    if (text.length == 2) {
+        return true;
+    }
+    return text[2] == "-" && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(text[3]) && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(text[4]);
+}
+
+// The texts of a language, from its module, English's where the name is not a language's.
+export async function load(language) {
+    var name = isLanguage(language) ? language : "en";
+    var module = await Module.import("../texts/" + name + ".wlg");
+    return new Texts(name, module.texts, module.plural);
+}

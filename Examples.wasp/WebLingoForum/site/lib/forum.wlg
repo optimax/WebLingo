@@ -1,0 +1,74 @@
+// The forum as a request sees it: its settings, its texts and the time zone its dates are shown in, read once for each
+// request, since a module runs once for each request that imports it (the WASP User Manual, section 8).
+
+import { Database } from "std:db";
+import settings from "./settings.wlg";
+import { load } from "./texts.wlg";
+
+export class Forum {
+    constructor(values, texts) {
+        this.settings = values;
+        this.texts = texts;
+        this.zone = values["timeZone"];
+        this.kept = {};
+    }
+
+    // A text by its name, and a text with values, in the forum's language.
+    t(name) { return this.texts.get(name); }
+    f(name, values) { return this.texts.format(name, values); }
+
+    // A date as the forum shows it, in its time zone.
+    time(date) {
+        return date == null ? "" : date.toZone(this.zone).format("d MMMM yyyy, HH:mm");
+    }
+
+    // What work gives, the first time a request asks for it by its name; the same again after, so that a page and its
+    // layout ask the database once.
+    async once(name, work) {
+        if (!this.kept.has(name)) {
+            this.kept[name] = await work();
+        }
+        return this.kept[name];
+    }
+}
+
+var current = null;
+
+// The request's forum.
+export async function begin(request) {
+    if (current == null) {
+        var values = null;
+        using (var db = await open()) {
+            values = await settings.load(db);
+        }
+        current = new Forum(values, await load(values["language"]));
+    }
+    return current;
+}
+
+// The forum's database, which wasp.config names "forum".
+export async function open() {
+    return await Database.open("forum");
+}
+
+// A positive integer from a query's text, or null where it is not one.
+export function idOf(text) {
+    if (text == null || text.length == 0 || text.length > 18) {
+        return null;
+    }
+    foreach (var c in text) {
+        if (!"0123456789".contains(c)) {
+            return null;
+        }
+    }
+    var value = Integer.parse(text);
+    return value > 0 ? value : null;
+}
+
+// The page a query asks for, from 1, and the number of pages a count of items fills.
+export function pageOf(text) {
+    return idOf(text) ?? 1;
+}
+export function pagesOf(count, perPage) {
+    return count == 0 ? 1 : (count + perPage - 1) \ perPage;
+}

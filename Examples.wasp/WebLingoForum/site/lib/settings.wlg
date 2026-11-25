@@ -1,0 +1,49 @@
+// The forum's settings: its defaults, and what its administrator changed, kept in the table settings, each a name and
+// its value as JSON (Documents/weblingo-forum.md, section 2, "Administration").
+
+import { Json } from "std:json";
+
+// Every setting, with its default.
+export const defaults = {
+    "name": "WebLingo Forum",
+    "description": "A forum written in WASP.",
+    "language": "en",
+    "timeZone": "UTC",
+    "topicsPerPage": 25,
+    "postsPerPage": 20,
+    "colors": { "accent": "#2a6f97", "accentText": "#ffffff", "background": "#f6f7f9", "surface": "#ffffff",
+                "text": "#1d232a", "muted": "#5c6670", "border": "#d9dee3" }
+};
+
+// The settings: each default, replaced by the value the database keeps for it, a colour by a colour.
+export async function load(db) {
+    var values = { ...defaults };
+    values["colors"] = { ...defaults["colors"] };
+    foreach (var row in await db.query("SELECT name, value FROM settings")) {
+        var name = row["name"];
+        var value = Json.parse(row["value"]);
+        if (name == "colors") {
+            foreach (var (color, hex) in value) {
+                if (values["colors"].has(color) && isColor(hex)) {
+                    values["colors"][color] = hex;
+                }
+            }
+        } else if (defaults.has(name)) {
+            values[name] = value;
+        }
+    }
+    return values;
+}
+
+// Whether a value is a colour as the settings keep one, #rrggbb.
+export function isColor(value) {
+    if (!(value is String) || value.length != 7 || !value.startsWith("#")) {
+        return false;
+    }
+    foreach (var c in value.slice(1).toLower()) {
+        if (!"0123456789abcdef".contains(c)) {
+            return false;
+        }
+    }
+    return true;
+}

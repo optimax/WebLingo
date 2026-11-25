@@ -1,0 +1,16 @@
+<% param site; param post; param number; %>
+<article class="post" id="post-<%= post["id"] %>">
+  <aside class="author">
+<% if (post["user_name"] == null) { %>
+    <span class="name"><%= site.t("user.deleted") %></span>
+<% } else { %>
+    <span class="name"><%= post["user_name"] %></span>
+    <span class="note"><%= site.f("user.posts", { count: post["user_posts"] }) %></span>
+    <span class="note"><%= site.f("user.joined", { time: site.time(post["user_joined"]) }) %></span>
+<% } %>
+  </aside>
+  <div class="content">
+    <p class="note"><a href="#post-<%= post["id"] %>">#<%= number %></a> · <%= site.f("topic.postedAt", { time: site.time(post["created_at"]) }) %><% if (post["edited_at"] != null) { %> · <%= site.f("topic.editedAt", { time: site.time(post["edited_at"]) }) %><% } %></p>
+    <div class="body text"><%= post["body"] %></div>
+  </div>
+</article>

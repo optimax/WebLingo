@@ -1,0 +1,13 @@
+<% param site; param topic; %>
+<tr<% if (topic["pinned"]) { %> class="pinned"<% } %>>
+  <td class="what">
+<% if (topic["pinned"]) { %>    <span class="tag"><%= site.t("board.pinned") %></span><% } %>
+<% if (topic["locked"]) { %>    <span class="tag"><%= site.t("board.locked") %></span><% } %>
+    <a class="topic" href="/topic?id=<%= topic["id"] %>"><%= topic["title"] %></a>
+    <p class="note"><%= site.f("topic.startedBy", { name: topic["user_name"] ?? site.t("user.deleted"), time: site.time(topic["created_at"]) }) %></p>
+  </td>
+  <td class="count"><%= site.f("board.replies", { count: topic["post_count"] - 1 }) %><br><%= site.f("board.views", { count: topic["view_count"] }) %></td>
+  <td class="last">
+    <span class="note"><%= site.f("board.lastPostBy", { name: topic["last_post_by"] ?? site.t("user.deleted"), time: site.time(topic["last_post_at"]) }) %></span>
+  </td>
+</tr>
