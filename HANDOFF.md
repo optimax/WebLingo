@@ -84,6 +84,16 @@ An open WebLingo script window can keep the old executable in use after its scri
 double-click `build.bat` again. The VS Code extension uses the installed CLI when its debugger setting is `weblingo`
 and the installation folder is on PATH.
 
+## Linux installation
+
+`Installers/Linux/package.sh`, run on Linux, makes a self-contained archive with `install.sh` and a Debian package for
+x64 and arm64, each holding `weblingo`, `wasp` and the standard modules in `/opt/weblingo`; its `readme.md` is a user's
+steps, and `Documents/implementation.md`, section 8, how it is built. A script's first line `#!/usr/bin/env weblingo` is
+skipped by the lexer, so that an executable `.wlg` runs by its name. Nothing of it was made or run on this machine,
+which has no Linux and no Linux runtime packs: CI's job `linux-installer` makes the x64 packages and installs, runs and
+removes them with `Installers/Linux/tests/test.sh` on every push, so it is first tried by the push after it lands. The
+arm64 packages are made by `package.sh` but tried nowhere.
+
 ## The console module
 
 `std:console` holds the console's writing and reading, `write`, `writeLn`, `writeError`, `writeErrorLn`, `readLine`,

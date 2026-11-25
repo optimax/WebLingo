@@ -22,3 +22,13 @@ jobs:
       - run: dotnet restore WebLingo.slnx
       - run: dotnet build WebLingo.slnx --no-restore -c Release
       - run: dotnet test WebLingo.slnx --no-build -c Release
+  # The installers for Linux on x64, made, then installed, run and removed, each way (Installers/Linux/readme.md).
+  linux-installer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - run: bash Installers/Linux/package.sh --architecture x64 --destination "$RUNNER_TEMP/packages"
+      - run: bash Installers/Linux/tests/test.sh "$RUNNER_TEMP/packages"

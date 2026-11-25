@@ -112,5 +112,8 @@ secrets.json
 # Web servers downloaded to try the FastCGI host with (Documents/implementation.md, "Trying FastCGI with nginx and Apache")
 WebServers/
 
-# The installers' zips, which Installers/Windows/package.ps1 makes into Installers
+# The installers' zips, which Installers/Windows/package.ps1 makes into Installers, and Installers/Linux/package.sh's
+# archives and Debian packages
 Installers/*.zip
+Installers/*.tar.gz
+Installers/*.deb

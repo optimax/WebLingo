@@ -2,6 +2,7 @@
   "name": "WebLingo",
   "scopeName": "source.weblingo",
   "patterns": [
+    { "name": "comment.line.shebang.weblingo", "match": "\\A#!.*$" },
     { "include": "#comments" },
     { "include": "#strings" },
     { "include": "#numbers" },

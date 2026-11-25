@@ -58,7 +58,9 @@ powershell -ExecutionPolicy Bypass -File publish.ps1
 
 which puts `wasp`, `weblingo` and the standard modules into one folder, `WebLingo/publish/WebLingo`, from which you run
 `wasp` (section 17 installs that folder on a server). `-ExecutionPolicy Bypass` lets this one script run, without
-changing the machine's policy, where Windows's default runs no script.
+changing the machine's policy, where Windows's default runs no script. On Linux, WebLingo's installers, in the
+repository's `Installers/Linux`, install `wasp`, `weblingo` and the standard modules, with .NET's runtime, in
+`/opt/weblingo`, as their `readme.md` says.
 
 ### Your first page
 
@@ -1276,7 +1278,8 @@ server {
 
 `fastcgi_params`, which comes with nginx, gives `wasp` the request's method, path, query and headers. On a Unix socket,
 `fastcgi_pass unix:/run/wasp/mysite.sock;`. On Linux, a systemd service keeps `wasp` running, for example
-`/etc/systemd/system/wasp-mysite.service`, with WebLingo installed in `/opt/weblingo`:
+`/etc/systemd/system/wasp-mysite.service`, with WebLingo installed in `/opt/weblingo`, where its installers for Linux
+install it:
 
 ```ini
 [Unit]

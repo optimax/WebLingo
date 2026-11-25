@@ -20,7 +20,7 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
     private readonly bool _interpolation;
     private readonly int _nesting;
     private int _depth;
-    private int _position;
+    private int _position = AfterInterpreterLine(source);
 
     /// <summary>
     /// A lexer of the code that starts at <paramref name="start"/> and ends where <paramref name="end"/> stands as a token
@@ -46,6 +46,20 @@ public sealed class WebLingoLexer(string source) : IWebLingoLexer
     }
 
     public IReadOnlyList<WebLingoDiagnostic> Diagnostics => _diagnostics;
+
+    /// <summary>
+    /// Where a script's code begins: after its first line where that line begins with <c>#!</c>, as
+    /// <c>#!/usr/bin/env weblingo</c> does, which Linux reads to run a script made executable by its name (specification,
+    /// the register's "A script run by its name"); its line break left to the lexer, so that each line keeps its number.
+    /// A lexer that starts elsewhere, a template's block's or an interpolation's, starts where it is told.
+    /// </summary>
+    private static int AfterInterpreterLine(string source)
+    {
+        if (!source.StartsWith("#!", StringComparison.Ordinal)) return 0;
+        var end = 2;
+        while (end < source.Length && source[end] is not ('\r' or '\n')) end++;
+        return end;
+    }
 
     /// <summary>All the tokens of a source text, ending with its <see cref="WebLingoTokenKind.EndOfFile"/>.</summary>
     public static IReadOnlyList<WebLingoToken> Tokenize(string source, out IReadOnlyList<WebLingoDiagnostic> diagnostics)

@@ -349,6 +349,21 @@ public sealed class BytecodeCommandLineTests : IDisposable
     }
 
     [Fact]
+    public void AScriptsInterpreterLineIsSkipped()
+    {
+        // #!/usr/bin/env weblingo first, which Linux reads to run an executable script by its name (the owner's answer,
+        // 18 November 2026, "Minimal WebLingo Installer: Linux", Q1): skipped, each line keeping its number.
+        var main = Write("tool.wlg", "#!/usr/bin/env weblingo\r\nimport { writeLn } from \"std:console\";\nwriteLn(1 + 1);\nwriteLn(nope);\n");
+        var (exit, output, error) = Weblingo("check", main);
+        Assert.Equal((WebLingoCommandLine.CompilationFailed, ""), (exit, output));
+        Assert.StartsWith(main + "(4,9): ERROR WL2001", error, StringComparison.Ordinal);
+        File.WriteAllText(main, "#!/usr/bin/env weblingo\nimport { writeLn } from \"std:console\";\nwriteLn(1 + 1);\n");
+        Assert.Equal((WebLingoCommandLine.Success, "2\n", ""), Weblingo(main));
+        Assert.Equal(WebLingoCommandLine.Success, Weblingo("compile", main).Exit);
+        Assert.Equal((WebLingoCommandLine.Success, "2\n", ""), Weblingo(Path.ChangeExtension(main, ".wlb")));
+    }
+
+    [Fact]
     public void TheUsageNamesTheBytecodesCommands()
     {
         var output = new StringWriter();

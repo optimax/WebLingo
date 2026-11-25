@@ -463,6 +463,37 @@ public sealed class LexerTests
         Assert.Empty(d);
     }
 
+    [Theory]
+    [InlineData("#!/usr/bin/env weblingo\na")]
+    [InlineData("#!/usr/bin/env weblingo\r\na")]
+    [InlineData("#!/usr/bin/env weblingo\ra")]
+    [InlineData("#!\na")]
+    public void AnInterpreterLineFirstIsSkipped(string text)
+    {
+        // A script's first line, #!/usr/bin/env weblingo, which Linux reads to run it by its name.
+        var tokens = WebLingoLexer.Tokenize(text, out var diagnostics);
+        Assert.Empty(diagnostics);
+        Assert.Equal(new[] { WebLingoTokenKind.Identifier, WebLingoTokenKind.EndOfFile }, tokens.Select(t => t.Kind));
+        Assert.Equal(new WebLingoSourceSpan(text.Length - 1, 1), tokens[0].Span);
+    }
+
+    [Fact]
+    public void AnInterpreterLineMayBeTheWholeFile()
+    {
+        Assert.Equal(new[] { WebLingoTokenKind.EndOfFile }, Kinds("#!/usr/bin/env weblingo", out var d));
+        Assert.Empty(d);
+    }
+
+    [Theory]
+    [InlineData("a\n#!/usr/bin/env weblingo", 2)]
+    [InlineData(" #!/usr/bin/env weblingo", 1)]
+    public void AnInterpreterLineAnywhereButFirstIsAnInvalidCharacter(string text, int at)
+    {
+        WebLingoLexer.Tokenize(text, out var diagnostics);
+        var diagnostic = diagnostics[0];
+        Assert.Equal((WebLingoDiagnosticCodes.InvalidCharacter, new WebLingoSourceSpan(at, 1)), (diagnostic.Code, diagnostic.Span));
+    }
+
     [Fact]
     public void ASingleSlashIsDivision()
     {

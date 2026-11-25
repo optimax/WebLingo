@@ -80,6 +80,17 @@ there, and waits for nothing. `weblingow`, beside it, is `weblingo` as a Windows
 for a script that imports `std:console`, on every Windows. Where neither has a console, a script that fails, to compile
 or while it runs, shows its errors in a message box.
 
+On Linux, a script whose first line is
+
+```text
+#!/usr/bin/env weblingo
+```
+
+runs by its name once it is executable, `chmod +x hello.wlg`, then `./hello.wlg`, as a Python script does. `weblingo`
+skips a first line that begins with `#!`, on every platform, so that the same script runs everywhere; `#!` anywhere else
+is an error. WebLingo's installers for Linux, in the repository's `Installers/Linux`, install `weblingo` in
+`/opt/weblingo`, linked from `/usr/local/bin`.
+
 `weblingo run` of a `.wlg` compiles it in memory, and writes no file; `weblingo compile` writes one, `.wlb`, which
 `weblingo run hello.wlb` runs without compiling anything, and `weblingo disasm hello.wlb` shows as text, what the compiler
 made. A `.wlbr` or a `.wlbc`, which earlier builds wrote, runs as a `.wlb` does.
@@ -121,7 +132,8 @@ WASP's `.wasp` pages, and its `README.md` says how to install it.
 ## 2. Lexical structure
 
 - **Statements end with `;`.** There is no automatic semicolon insertion. A block, `{ … }`, has none after its `}`.
-- **Comments.** `//` runs to the end of the line; `/* … */` may span lines, and does not nest.
+- **Comments.** `//` runs to the end of the line; `/* … */` may span lines, and does not nest. A script's first line
+  may begin with `#!`, as `#!/usr/bin/env weblingo` does, and is then skipped ([section 1](#1-running-programs)).
 - **Names** are ASCII letters, digits and `_`, not starting with a digit, and case matters: `count` and `Count` are two
   names.
 - **Numbers** are written in decimal, `42`, `3.5`, `1e21` and the decimal `1.5m`; an integer in hexadecimal too,
