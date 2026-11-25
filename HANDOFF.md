@@ -103,7 +103,10 @@ application's `Log` (`IWebLingoLog`), each request's lines through a `WebLingoRe
 writes. The hosting core logs a 500's and a 503's errors, in every mode, and failures while sending at `error`, a
 cross-site refusal at `warn`; reloads at `info`. `wasp fastcgi`'s log is now always its standard error. Specification,
 section 6.12, "Logging" and its parts; WASP User Manual, section 12, "The log"; `LogTests`, `LogModuleTests`,
-`WaspServeTests.ASitesLogIsTheFileItsConfigurationNames`. Part 2, a runtime error's stack, is still to do.
+`WaspServeTests.ASitesLogIsTheFileItsConfigurationNames`. A runtime error's stack (part 2): the VM keeps the calls an
+error is raised in (`KeepStack`, through `Raised` and `Thrown`), an uncaught one's `WebLingoDiagnostic.Stack`, which the
+hosting core logs after the error, each `  at f in file(line,col)` (`CompiledPage.DescribeStack`); tests
+`VirtualMachineTests.AnErrorNothingCaughtHasTheCallsItWasRaisedIn`, `LogTests.ARequestsErrorIsLoggedWithTheCallsItWasRaisedIn`.
 
 ## Cross-site request forgery
 

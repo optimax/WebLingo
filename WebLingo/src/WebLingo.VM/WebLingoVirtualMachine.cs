@@ -994,7 +994,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         case WebLingoOpCode.Throw:
                             _thrown = registers[ins.A];
                             _thrownError = null;
-                            _origin = OriginOf(frame.Function, pc);
+                            _origin = Thrown(frames, depth, pc);
                             goto throwing;
                         case WebLingoOpCode.Rethrow:
                             // 'throw;', or a finally's end: the exception again, from where it was first thrown.
@@ -1448,7 +1448,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     }
                     _thrown = WebLingoValue.Null;
                     _thrownError = error;
-                    _origin = RaisedAt(frames, depth, pc);
+                    _origin = Raised(frames, depth, pc);
 
                 throwing:
                     // An exception, raised at pc: the first handler around it in this frame catches it; a disposal it
@@ -2219,6 +2219,11 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         private WebLingoValue _thrown;
         private WebLingoRuntimeError? _thrownError;
         private long _origin;
+
+        // The calls the last exception was raised or thrown in, each an origin, the innermost first, and that exception's
+        // origin, so that one nothing catches is reported with them (section 6.12, "Logging, parts", part 2).
+        private long[]? _raisedStack;
+        private long _raisedOrigin = WebLingoExceptions.Nowhere;
 
         /// <summary>The class Error, once the module has made it, which a caught runtime error becomes (section 3.7); a root.</summary>
         private readonly WebLingoValue[] _errorClass = new WebLingoValue[1];
@@ -3200,7 +3205,67 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             return OriginOf(frames[depth].Function, pc);
         }
 
-        /// <summary>An exception that nothing caught: the program stops, reporting it where it was first thrown.</summary>
+        /// <summary>
+        /// A runtime error raised at <paramref name="pc"/> in the frame at <paramref name="depth"/>: where it is reported
+        /// (<see cref="RaisedAt"/>), the calls it was raised in kept with it. Kept out of <c>Run</c>, as its callers are.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private long Raised(Frame[] frames, int depth, int pc)
+        {
+            var origin = RaisedAt(frames, depth, pc);
+            KeepStack(frames, depth, pc, origin);
+            return origin;
+        }
+
+        /// <summary>A value thrown at <paramref name="pc"/> in the frame at <paramref name="depth"/>: where, the calls it was thrown in kept with it.</summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private long Thrown(Frame[] frames, int depth, int pc)
+        {
+            var origin = OriginOf(frames[depth].Function, pc);
+            KeepStack(frames, depth, pc, origin);
+            return origin;
+        }
+
+        /// <summary>
+        /// The calls an exception raised at <paramref name="origin"/> is raised in, each where its frame is, its callers' at
+        /// their calls, the innermost first; a native class's member, which only calls its built-in, left out, its caller
+        /// standing for it, as <see cref="RaisedAt"/> reports one, and one the scheduler resumed, which has no caller below
+        /// it, at where it was called. An asynchronous function resumed has no caller below it either: its stack begins
+        /// with its resumption.
+        /// </summary>
+        private void KeepStack(Frame[] frames, int depth, int pc, long origin)
+        {
+            var stack = new List<long>(depth + 1);
+            for (var at = depth; at >= 0; at--)
+            {
+                var frame = frames[at];
+                if (frame.Function.IsNative)
+                {
+                    if (at == 0 && frame.CalledFrom != WebLingoExceptions.Nowhere) stack.Add(frame.CalledFrom);
+                    continue;
+                }
+                stack.Add(OriginOf(frame.Function, at == depth ? pc : frame.Pc - 1));
+            }
+            (_raisedStack, _raisedOrigin) = (stack.ToArray(), origin);
+        }
+
+        /// <summary>The calls the exception at <see cref="_origin"/> was raised in, where they were kept for it; null otherwise.</summary>
+        private List<WebLingoStackFrame>? StackOfOrigin()
+        {
+            if (_raisedStack is not { } kept || _raisedOrigin != _origin) return null;
+            var stack = new List<WebLingoStackFrame>(kept.Length);
+            foreach (var origin in kept)
+            {
+                if (OwnerOfOrigin(origin) is not { } owner) continue;
+                var (function, _) = WebLingoExceptions.FromOrigin(origin);
+                var body = function == 0; // The program's top level, or a file's it imports.
+                foreach (var unit in module.Units) body |= unit.Function == function - 1;
+                stack.Add(new WebLingoStackFrame(body ? null : owner.Name, owner.Source, SpanOfOrigin(origin)));
+            }
+            return stack;
+        }
+
+        /// <summary>An exception that nothing caught: the program stops, reporting it where it was first thrown, with the calls it was thrown in.</summary>
         private WebLingoExecutionResult Uncaught(long executed)
         {
             string? exceptionClass = null;
@@ -3210,7 +3275,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             var failure = Failure(code, message, SpanOfOrigin(_origin)) with { Instructions = executed };
             return failure with
             {
-                Error = failure.Error! with { Source = OwnerOfOrigin(_origin)?.Source, ExceptionClass = exceptionClass }
+                Error = failure.Error! with { Source = OwnerOfOrigin(_origin)?.Source, ExceptionClass = exceptionClass, Stack = StackOfOrigin() }
             };
         }
 

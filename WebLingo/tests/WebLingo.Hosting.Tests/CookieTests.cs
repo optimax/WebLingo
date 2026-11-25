@@ -95,7 +95,7 @@ public sealed class CookieTests
         var app = Load(("/site/index.wasp", "<% param response; %>" + new string('x', 70 * 1024) + "<% response.setCookie(\"late\", \"1\"); %>"), log);
         var response = new WebLingoBufferedResponse();
         app.Handle(new WebLingoBufferedRequest("GET", "/"), response, new WebLingoWorkerId(0));
-        Assert.Contains("error WL3001: The cookie 'late' cannot be set: the response has been sent.", Assert.Single(log));
+        Assert.Contains("error WL3001: The cookie 'late' cannot be set: the response has been sent.", ListLog.Error(log));
         Assert.Empty(response.Headers.GetValues("Set-Cookie"));
     }
 

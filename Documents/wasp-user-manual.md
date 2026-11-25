@@ -1036,7 +1036,19 @@ and its text; asked for as `/greet?name=Anna`, then as `/greet`:
 A request is numbered when it first writes to the log, so that every line of one request has its number. WASP writes
 there too: a request's errors, at `error`, whatever the mode, those a 500 or a 503 shows in development and hides in
 production, `ERROR GET /greet #1 greet.wasp(2,4): error WL1001: …`; a request refused as another site's
-([section 9](#requests-from-other-sites)) at `warn`; and its reloads at `info`. A text is kept to one line, a line break
+([section 9](#requests-from-other-sites)) at `warn`; and its reloads at `info`. A runtime error nothing caught is
+followed by the calls it was raised in, the innermost first, each a line of its own, in the file it is in, a page's
+top level named so; a page, `cart.wasp`, that adds up prices with a module's `total`, given an item without one:
+
+```text
+2026-11-25T08:46:34.592Z ERROR GET /cart #1 lib/prices.wlg(2,12): error WL3007: The map has no key "price".
+2026-11-25T08:46:34.594Z ERROR GET /cart #1   at priceOf in lib/prices.wlg(2,12)
+2026-11-25T08:46:34.594Z ERROR GET /cart #1   at total in lib/prices.wlg(7,40)
+2026-11-25T08:46:34.594Z ERROR GET /cart #1   at the top level of cart.wasp(2,15)
+```
+
+An asynchronous function resumed after an `await` begins its calls again: an error raised after one names the calls
+from that function on. A text is kept to one line, a line break
 in it written `\n`, so that no value a client sent makes a line of its own.
 
 Where the log goes: under `wasp serve`, the terminal; under FastCGI, the standard error, which a service manager's

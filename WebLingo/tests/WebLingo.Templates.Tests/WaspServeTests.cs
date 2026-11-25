@@ -624,7 +624,8 @@ public sealed class WaspServeTests : IDisposable
             var lines = Directory.GetFiles(logs, "site-*.log").OrderBy(file => file, StringComparer.Ordinal)
                 .SelectMany(File.ReadAllLines).Select(line => line[(line.IndexOf(' ', StringComparison.Ordinal) + 1)..]).ToArray();
             Assert.Equal(["INFO GET /logs #1 shown", "WARN GET /logs #1 also",
-                          "ERROR GET /fail #2 fail.wasp(1,4): error WL3008: An exception was thrown and not caught: no tea"], lines);
+                          "ERROR GET /fail #2 fail.wasp(1,4): error WL3008: An exception was thrown and not caught: no tea",
+                          "ERROR GET /fail #2   at the top level of fail.wasp(1,4)"], lines);
         }
         finally
         {

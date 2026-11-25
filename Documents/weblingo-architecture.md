@@ -1280,6 +1280,20 @@ a page that fails while it is sent, its reloads at `info`, and one that fails at
 another site's at `warn`. `wasp fastcgi`'s log is its standard error whether it listens or a web server starts it,
 `wasp serve`'s its standard output, as before.
 
+As built (part 2, 25 November 2026; Proposed where it says more): where a runtime error is raised or a value thrown, the
+VM keeps the calls it is raised in (`KeepStack`, called by `Raised` and `Thrown`, helpers of `Run`'s, kept out of it),
+each a frame's function and its position, the innermost first, its callers at their calls, a native class's member left
+out for its caller, as an error's position is, and one the scheduler resumed at where it was called; an error nothing
+catches is reported with them (`WebLingoDiagnostic.Stack`, `WebLingoStackFrame`), the calls of the exception last raised,
+where it is the one reported, so that `throw;` keeps those it was first thrown in. An asynchronous function the scheduler
+resumes has no caller below it, so that an error raised after its `await` names the calls from it on, as JavaScript's
+stacks do; an error that cannot be caught, a request's limit or a cancellation, has none. The hosting core writes each,
+after the error, as a line of the request's log at `error`, located as the error is, in the file it is in:
+`  at priceOf in lib/prices.wlg(2,12)`, `  at a function in …` for one without a name, `  at the top level of
+cart.wasp(2,15)` for a file's own, the host's call of a handler (`file#function`) left out; a 500's, a 503's and a
+page's that fails while it is sent. Its page in development, and `weblingo`'s report of an uncaught error, show the
+error as before, without the calls.
+
 **As built** (M0.14.2, 16 November 2026; Proposed, §15.2, "The host's core"): `WebLingo.Hosting`'s `WebLingoApplication` loads an application from its root through the platform's files, its routes made then (`WebLingoRouteTable`), and serves a request on the worker its host gives: a page compiled when first requested, once on each worker, and kept for the generation's life with the components it renders, its output kept until it has run, then written to the response as UTF-8 (from M0.14.7.1, kept until it reaches 64 KB, then sent as it is written, §15.2, "Output sent as it is written"); a file that is not a page's, nor a handler's, left to the host to serve (`WebLingoRequestOutcomeKind.File`); and a 404 for a path without a route. The host gives its built-ins, its native modules, its workers' count and the environment.
 
 **As built** (M0.14.3, 16 November 2026; Proposed, §15.2, "The request and the response in scripts"): a page's `param request;` and `param response;` are instances of the host's native classes `Request` and `Response`, their headers of `Headers`: a request's `method`, `path`, `scheme`, `host`, `query`, a map, and `headers`; a response's `status` and `headers`; a header read and set by indexing, and `has`, `add` and `remove`. A `.wlg`'s route runs its function for the request's method, `get`, `post` and so on, called with the request and the response, and awaited; `HEAD` calls `get` when there is no `head`; another method is a 405, and a `.wlg` exporting no method's function a 404.

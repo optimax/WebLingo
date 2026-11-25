@@ -52,6 +52,41 @@ public sealed class VirtualMachineTests
         Assert.Equal(source.IndexOf("big + 1", StringComparison.Ordinal), result.Error.Span.Start);
     }
 
+    /// <summary>
+    /// An error nothing caught, with the calls it was raised or thrown in, the innermost first, a file's top level named
+    /// by none, one without a name <c>function</c> (specification, section 6.12, "Logging, parts", part 2); one caught
+    /// leaving nothing to the next.
+    /// </summary>
+    [Theory]
+    [InlineData("function inner(x) { return x.missing; }\nvar f = (a) => inner(a);\nfunction outer() { return f(5); }\nouter();",
+        "inner x.missing|function inner(a)|outer f(5)|- outer();")]
+    [InlineData("class Cart { total() { throw \"none\"; } }\nfunction pay() { new Cart().total(); }\npay();",
+        "total throw|pay new Cart().total()|- pay();")]
+    [InlineData("try { var x = 5; x.missing; } catch (e) { }\nfunction later() { throw \"later\"; }\nlater();", "later throw|- later();")]
+    [InlineData("var sorted = [3, 1].sort((a, b) => a.missing);", "function a.missing|- [3, 1].sort(")]
+    public void AnErrorNothingCaughtHasTheCallsItWasRaisedIn(string source, string calls)
+    {
+        var (result, _) = Run(source);
+        Assert.False(result.Succeeded);
+        var expected = calls.Split('|').Select(call =>
+        {
+            var space = call.IndexOf(' ', StringComparison.Ordinal);
+            var name = call[..space];
+            return (name == "-" ? null : name, source.IndexOf(call[(space + 1)..], StringComparison.Ordinal));
+        });
+        Assert.Equal(expected, result.Error!.Stack!.Select(frame => (frame.Function, frame.Span.Start)));
+        Assert.All(result.Error.Stack!, frame => Assert.Null(frame.Source));
+    }
+
+    [Fact]
+    public void AnErrorThatCannotBeCaughtHasNoStack()
+    {
+        var result = new WebLingoVirtualMachine().Execute(Compile("function f() { while (true) { } }\nf();"),
+            Context(new WebLingoCollectedOutput()) with { InstructionBudget = 1_000 });
+        Assert.Equal(WebLingoDiagnosticCodes.BudgetExceeded, result.Error!.Code);
+        Assert.Null(result.Error.Stack);
+    }
+
     [Fact]
     public void AnInstructionBudgetStopsTheProgram()
     {

@@ -271,7 +271,7 @@ public sealed class SessionTests
         var app = Load(Store(), null, log, ("/site/index.wasp", "<% param request; %>" + new string('x', 70 * 1024) + "<% request.session[\"late\"] = 1; %>"));
         var response = new WebLingoBufferedResponse();
         app.Handle(new WebLingoBufferedRequest("GET", "/"), response, new WebLingoWorkerId(0));
-        Assert.Contains("error WL3001: The session cannot be made: the response has been sent, and the session's cookie with it.", Assert.Single(log));
+        Assert.Contains("error WL3001: The session cannot be made: the response has been sent, and the session's cookie with it.", ListLog.Error(log));
         Assert.Empty(response.Headers.GetValues("Set-Cookie"));
     }
 

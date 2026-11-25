@@ -49,7 +49,7 @@ public sealed class StreamingTests
             .Handle(new WebLingoBufferedRequest("GET", "/"), response, new WebLingoWorkerId(0));
         Assert.Equal((500, false), (response.StatusCode, response.Aborted));
         Assert.DoesNotContain("xxx", Encoding.UTF8.GetString(response.BodyBytes));
-        Assert.Contains("error WL3005", Assert.Single(log)); // Its error in the log, as every 500's (section 6.12, "Logging").
+        Assert.Contains("error WL3005", ListLog.Error(log)); // Its error in the log, as every 500's (section 6.12, "Logging").
     }
 
     [Theory]
@@ -65,7 +65,7 @@ public sealed class StreamingTests
         Assert.Equal((200, true), (response.StatusCode, response.Aborted));
         var body = Encoding.UTF8.GetString(response.BodyBytes);
         Assert.StartsWith(new string('x', 70 * 1024), body);
-        var error = Assert.Single(log);
+        var error = ListLog.Error(log);
         Assert.StartsWith("A page failed after its response was sent: index.wasp(2,", error);
         Assert.Contains("error WL3005:", error);
         if (environment == WebLingoMode.Development)
@@ -86,7 +86,7 @@ public sealed class StreamingTests
         Load(new MemoryFileSystem().Add("/site/index.wasp", "<% param response; %>" + Page(65, "<% response.status = 404; %>")), log: log)
             .Handle(new WebLingoBufferedRequest("GET", "/"), response, new WebLingoWorkerId(0));
         Assert.Equal((200, true), (response.StatusCode, response.Aborted));
-        Assert.Contains("error WL3001: The response's status cannot be set: it has been sent.", Assert.Single(log));
+        Assert.Contains("error WL3001: The response's status cannot be set: it has been sent.", ListLog.Error(log));
     }
 
     [Theory]
@@ -130,7 +130,7 @@ public sealed class StreamingTests
         Assert.Equal(1, host.Posted);
         outcome = outcome.Resume!();
         Assert.Equal((WebLingoRequestOutcomeKind.Failed, true), (outcome.Kind, response.Inner.Aborted));
-        Assert.StartsWith("A page's client took nothing of its output for 0.05 seconds, and its request was cancelled: index.wasp", Assert.Single(log));
+        Assert.StartsWith("A page's client took nothing of its output for 0.05 seconds, and its request was cancelled: index.wasp", ListLog.Error(log));
         Assert.Contains("error WL3004:", log[0]);
         Assert.DoesNotContain("end", Encoding.UTF8.GetString(response.Inner.BodyBytes));
     }

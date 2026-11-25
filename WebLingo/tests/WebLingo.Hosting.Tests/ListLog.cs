@@ -15,6 +15,17 @@ internal sealed class ListLog(List<string> lines, WebLingoLogLevel level = WebLi
 
     public List<(WebLingoLogLevel Level, string? Request, string Text)> Entries { get; } = [];
 
+    /// <summary>
+    /// The one error <paramref name="lines"/> hold, the first, the others the calls it was raised in, each <c>  at …</c>
+    /// (section 6.12, "Logging, parts", part 2).
+    /// </summary>
+    public static string Error(List<string> lines)
+    {
+        Xunit.Assert.NotEmpty(lines);
+        Xunit.Assert.All(lines.Skip(1), line => Xunit.Assert.StartsWith("  at ", line));
+        return lines[0];
+    }
+
     public WebLingoLogLevel Level => level;
 
     public long NextRequest() => Interlocked.Increment(ref _requests);

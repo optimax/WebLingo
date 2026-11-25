@@ -176,6 +176,12 @@ public sealed class WebLingoApplication
             WebLingoRequestOutcomeKind.Handler, handler?.ReadOnly, handler?.CrossOrigin ?? false);
     }
 
+    /// <summary>An error's stack, each call a line of the request's log at <c>error</c>, after the error's own.</summary>
+    private static void WriteStack(WebLingoRequestLog? log, IReadOnlyList<string> stack)
+    {
+        foreach (var call in stack) log?.Write(WebLingoLogLevel.Error, call);
+    }
+
     /// <summary>The request's log, the application's for it, <c>GET /cart</c>, its number given when it first writes; none without one.</summary>
     private WebLingoRequestLog? LogFor(IWebLingoHttpRequest request) =>
         _options.Log is { } log ? new WebLingoRequestLog(log, WebLingoLogText.OneLine(request.Method + " " + request.Path)) : null;
@@ -440,9 +446,12 @@ public sealed class WebLingoApplication
         if (!result.Succeeded)
         {
             var error = page.Describe(result.Error!);
-            if (output.Sending) return FailedWhileSending(output, response, error, log);
-            if (result.Error!.Code != WebLingoDiagnosticCodes.BudgetExceeded) return Failed(response, [error], log);
+            // The calls it was raised in, each a line of the log after its own (section 6.12, "Logging, parts", part 2).
+            var stack = page.DescribeStack(result.Error!);
+            if (output.Sending) return FailedWhileSending(output, response, error, log, stack);
+            if (result.Error!.Code != WebLingoDiagnosticCodes.BudgetExceeded) return Failed(response, [error], log, stack);
             log?.Write(WebLingoLogLevel.Error, WebLingoLogText.OneLine("A request passed one of its limits: " + error));
+            WriteStack(log, stack);
             WebLingoErrorPages.Limited(response, _options.Mode, [error]);
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
         }
@@ -457,7 +466,7 @@ public sealed class WebLingoApplication
     /// nothing for longer than the send timeout, its response ended, the timeout in the log.
     /// </summary>
     private WebLingoRequestOutcome FailedWhileSending(WebLingoResponseText output, IWebLingoHttpResponse response, string error,
-        WebLingoRequestLog? log)
+        WebLingoRequestLog? log, IReadOnlyList<string> stack)
     {
         if (output.TimedOut)
         {
@@ -466,20 +475,24 @@ public sealed class WebLingoApplication
             log?.Write(WebLingoLogLevel.Error, WebLingoLogText.OneLine(
                 $"A page's client took nothing of its output for {seconds.ToString(System.Globalization.CultureInfo.InvariantCulture)} "
                 + (seconds == 1 ? "second" : "seconds") + ", and its request was cancelled: " + error));
+            WriteStack(log, stack);
             response.Abort();
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
         }
         log?.Write(WebLingoLogLevel.Error, WebLingoLogText.OneLine("A page failed after its response was sent: " + error));
+        WriteStack(log, stack);
         if (_options.Mode == WebLingoMode.Development) output.Write("\n<pre>" + WebLingoTemplateWriteFunction.Escape(error) + "\n</pre>\n");
         output.Send(); // What it wrote before it failed.
         response.Abort();
         return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
     }
 
-    private WebLingoRequestOutcome Failed(IWebLingoHttpResponse response, IReadOnlyList<string> errors, WebLingoRequestLog? log)
+    private WebLingoRequestOutcome Failed(IWebLingoHttpResponse response, IReadOnlyList<string> errors, WebLingoRequestLog? log,
+        IReadOnlyList<string>? stack = null)
     {
         // Its errors in the log, whatever the mode, a production page showing none (section 6.12, "Logging").
         foreach (var error in errors) log?.Write(WebLingoLogLevel.Error, WebLingoLogText.OneLine(error));
+        if (stack is not null) WriteStack(log, stack);
         WebLingoErrorPages.Failed(response, _options.Mode, errors);
         return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
     }
@@ -506,7 +519,7 @@ public sealed class WebLingoApplication
             ? new WebLingoSourceText(read ?? "", file)
             : new WebLingoSourceText("<% param request; param response; import handler from \"/" + Escaped(file) + "\"; await handler."
                                      + function + "(request, response); %>", file + "#" + function);
-        var page = new CompiledPage(text, compiler, modules, new WebLingoModuleLoader(options));
+        var page = new CompiledPage(text, compiler, modules, new WebLingoModuleLoader(options)) { CallsHandler = function is not null };
         if (function is null && read is null)
         {
             // Its route found, its file not read just now, as one being replaced may not be: a 500, not an empty page, and
@@ -612,6 +625,9 @@ public sealed class WebLingoApplication
         /// <summary>Whether its file could not be read when it was compiled, so that its worker does not keep it.</summary>
         public bool Unread { get; set; }
 
+        /// <summary>Whether it is a page the host made to call a handler, <c>file#function</c>, whose text is none of the site's.</summary>
+        public bool CallsHandler { get; init; }
+
         /// <summary>Whether it declares that it takes requests other sites send, <c>crossorigin allowed;</c>.</summary>
         public bool CrossOrigin { get; set; }
 
@@ -628,6 +644,35 @@ public sealed class WebLingoApplication
             var file = FileOf(located);
             var location = file.GetLocation(located.Span.Start);
             return $"{file.Name}({location.Line},{location.Column}): error {located.Code}: {located.Message}";
+        }
+
+        /// <summary>
+        /// The calls an error nothing caught was raised in, the innermost first, each located as the error is, in the file it
+        /// is in, an include's, a layout's or a component's: <c>  at total in cart.wlg(12,5)</c>, <c>  at a function in …</c>
+        /// for one without a name, <c>  at the top level of page.wasp(3,1)</c> for a file's own (section 6.12, "Logging,
+        /// parts", part 2); none where the VM kept none.
+        /// </summary>
+        public List<string> DescribeStack(WebLingoDiagnostic diagnostic)
+        {
+            var lines = new List<string>();
+            foreach (var call in diagnostic.Stack ?? [])
+            {
+                var located = compiler.Sources.Locate(new WebLingoDiagnostic(diagnostic.Code, WebLingoDiagnosticSeverity.Error, "", call.Span)
+                {
+                    Source = call.Source
+                });
+                var file = FileOf(located);
+                if (CallsHandler && ReferenceEquals(file, text)) continue; // The host's call of the handler, no file of the site's.
+                var location = file.GetLocation(located.Span.Start);
+                var where = $"{file.Name}({location.Line},{location.Column})";
+                lines.Add(call.Function switch
+                {
+                    null => "  at the top level of " + where,
+                    "function" => "  at a function in " + where,
+                    var name => $"  at {name} in {where}"
+                });
+            }
+            return lines;
         }
 
         /// <summary>A position's line, in the file it is in, located as an error is, for a message that names it (section 3.8).</summary>

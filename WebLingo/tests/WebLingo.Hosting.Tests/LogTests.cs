@@ -30,16 +30,38 @@ public sealed class LogTests : IDisposable
         var (status, body) = Get(app, "/fail");
         Assert.Equal(500, status);
         Assert.DoesNotContain("WL3008", body);
-        var (level, request, text) = Assert.Single(log.Entries);
-        Assert.Equal((WebLingoLogLevel.Error, "GET /fail #1"), (level, request));
-        Assert.Equal("fail.wasp(1,4): error WL3008: An exception was thrown and not caught: no tea", text);
+        Assert.Equal([(WebLingoLogLevel.Error, "GET /fail #1", "fail.wasp(1,4): error WL3008: An exception was thrown and not caught: no tea"),
+                      (WebLingoLogLevel.Error, "GET /fail #1", "  at the top level of fail.wasp(1,4)")], log.Entries);
 
         // A page that does not compile, its errors each a line of the request's; a request that fails nothing not logged.
         Assert.Equal(500, Get(app, "/broken").Status);
         Assert.Equal(200, Get(app, "/fine").Status);
-        Assert.True(log.Entries.Count > 2);
-        Assert.All(log.Entries.Skip(1), entry => Assert.Equal((WebLingoLogLevel.Error, "GET /broken #2"), (entry.Level, entry.Request)));
-        Assert.All(log.Entries.Skip(1), entry => Assert.StartsWith("broken.wasp(1,", entry.Text));
+        Assert.True(log.Entries.Count > 3);
+        Assert.All(log.Entries.Skip(2), entry => Assert.Equal((WebLingoLogLevel.Error, "GET /broken #2"), (entry.Level, entry.Request)));
+        Assert.All(log.Entries.Skip(2), entry => Assert.StartsWith("broken.wasp(1,", entry.Text));
+    }
+
+    /// <summary>
+    /// A request's runtime error logged with the calls it was raised in, each a line of its own after it, located as the
+    /// error is, in the file each is in, an include's among them (section 6.12, "Logging, parts", part 2).
+    /// </summary>
+    [Theory]
+    [InlineData("/deep", "lib.wasp(1,38): error WL3006: The integer 5 has no member 'missing'.",
+        "  at a function in lib.wasp(1,38)|  at inner in lib.wasp(1,56)|  at outer in deep.wasp(1,51)|  at the top level of deep.wasp(2,5)")]
+    // A handler's, its caller the host's, which is none of the site's files.
+    [InlineData("/api/boom", "api/boom.wlg(1,21): error WL3008: An error was thrown and not caught: boom",
+        "  at helper in api/boom.wlg(1,21)|  at get in api/boom.wlg(2,42)")]
+    // An asynchronous function resumed has no caller below it: its stack begins with its resumption.
+    [InlineData("/later", "later.wasp(1,55): error WL3006: The integer 5 has no member 'missing'.", "  at late in later.wasp(1,55)")]
+    // Thrown again, from where it was first thrown, with the calls it was first thrown in.
+    [InlineData("/again", "again.wasp(1,36): error WL3006: The integer 5 has no member 'missing'.",
+        "  at f in again.wasp(1,36)|  at the top level of again.wasp(1,72)")]
+    public void ARequestsErrorIsLoggedWithTheCallsItWasRaisedIn(string path, string error, string calls)
+    {
+        var log = new ListLog();
+        Assert.Equal(500, Get(Load(log, WebLingoMode.Production), path).Status);
+        Assert.Equal([error, .. calls.Split('|')], log.Entries.Select(entry => entry.Text));
+        Assert.All(log.Entries, entry => Assert.Equal((WebLingoLogLevel.Error, "GET " + path + " #1"), (entry.Level, entry.Request)));
     }
 
     [Fact]
@@ -67,7 +89,8 @@ public sealed class LogTests : IDisposable
         var response = new WebLingoBufferedResponse();
         app.Handle(new WebLingoBufferedRequest("POST", "/fine", headers: [("Sec-Fetch-Site", "cross-site")]), response, new WebLingoWorkerId(0));
         Assert.Equal(500, Get(app, "/fail").Status);
-        Assert.Equal([(WebLingoLogLevel.Error, "GET /fail #1")], log.Entries.Select(entry => (entry.Level, entry.Request)));
+        Assert.Equal([(WebLingoLogLevel.Error, "GET /fail #1"), (WebLingoLogLevel.Error, "GET /fail #1")],
+            log.Entries.Select(entry => (entry.Level, entry.Request)));
     }
 
     [Fact]
@@ -144,7 +167,12 @@ public sealed class LogTests : IDisposable
             .Add("/site/fail.wasp", "<% throw \"no tea\"; %>")
             .Add("/site/broken.wasp", "<% var = ; %><% if %>")
             .Add("/site/fine.wasp", "fine")
-            .Add("/site/api/wrong.wlg", "export const crossorigin = 1;\nexport function get(request, response) { }"))
+            .Add("/site/api/wrong.wlg", "export const crossorigin = 1;\nexport function get(request, response) { }")
+            .Add("/site/deep.wasp", "<% include \"/lib.wasp\"; function outer() { return inner(); } %>\n<%= outer() %>")
+            .Add("/site/lib.wasp", "<% function inner() { var f = (x) => x.missing; return f(5); } %>")
+            .Add("/site/api/boom.wlg", "function helper() { throw new Error(\"boom\"); }\nexport function get(request, response) { helper(); }")
+            .Add("/site/later.wasp", "<% async function late() { await 1; var x = 5; return x.missing; } await late(); %>")
+            .Add("/site/again.wasp", "<% function f() { try { var x = 5; x.missing; } catch (e) { throw; } } f(); %>"))
         {
             WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry()),
             Scheduler = () => new DotNetSchedulerHost(),
