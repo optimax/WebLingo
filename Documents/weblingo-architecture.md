@@ -1292,7 +1292,10 @@ after the error, as a line of the request's log at `error`, located as the error
 `  at priceOf in lib/prices.wlg(2,12)`, `  at a function in …` for one without a name, `  at the top level of
 cart.wasp(2,15)` for a file's own, the host's call of a handler (`file#function`) left out; a 500's, a 503's and a
 page's that fails while it is sent. Its page in development, and `weblingo`'s report of an uncaught error, show the
-error as before, without the calls.
+error as before, without the calls. Two lines of `Run` changed, its runtime error's origin and its `throw`'s, each a call of
+a helper .NET does not inline: on the benchmark against `main` (`b873543`), every workload, 16 rounds alternately, each
+round's order the last's reversed, on an idle machine, no workload slower by a rank test (Mann-Whitney's, none with p
+below 0.05), the medians from 3% faster (`async`) to 3% slower (`objects`, p 0.71), `calls` 1% slower (p 0.10).
 
 **As built** (M0.14.2, 16 November 2026; Proposed, §15.2, "The host's core"): `WebLingo.Hosting`'s `WebLingoApplication` loads an application from its root through the platform's files, its routes made then (`WebLingoRouteTable`), and serves a request on the worker its host gives: a page compiled when first requested, once on each worker, and kept for the generation's life with the components it renders, its output kept until it has run, then written to the response as UTF-8 (from M0.14.7.1, kept until it reaches 64 KB, then sent as it is written, §15.2, "Output sent as it is written"); a file that is not a page's, nor a handler's, left to the host to serve (`WebLingoRequestOutcomeKind.File`); and a 404 for a path without a route. The host gives its built-ins, its native modules, its workers' count and the environment.
 
