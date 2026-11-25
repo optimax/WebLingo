@@ -44,9 +44,11 @@ public sealed class WebServerTests : IDisposable
                 Directory.Delete(_folder, recursive: true);
                 return;
             }
-            catch (IOException) when (attempt < 20)
+            catch (Exception failure) when (failure is IOException or UnauthorizedAccessException && attempt < 20)
             {
-                Thread.Sleep(250); // A server's process may hold its files a moment after it has gone.
+                // A server's process may hold its files a moment after it has gone: a program's own file, httpd.exe, is
+                // then refused as a file in use is not (25 November 2026, under the soak's load).
+                Thread.Sleep(250);
             }
         }
     }
