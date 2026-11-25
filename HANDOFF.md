@@ -276,6 +276,15 @@ opening and a close done off the worker (`WebLingoApplication.Ended` waits for i
 `WaspServeTests.SessionsAreKeptInTheSitesDatabase`, `SessionsAreKeptInSqlServer`, `SessionsAreKeptInMySql` and
 `SessionsAreKeptInPostgreSql`, the last three a session kept and locked.
 
+## License and notices
+
+WebLingo is under the MIT License, `LICENSE`, its copyright The WebLingo Authors'; `SECURITY.md` has vulnerabilities
+reported through GitHub's private vulnerability reporting, which the owner turns on in the repository's settings; and
+`THIRD_PARTY_NOTICES.md` lists the packages the programs ship, with their licenses' texts and Microsoft's notices for
+.NET, which `ThirdPartyNoticesTests` (`WebLingo.Architecture.Tests`) checks against the programs' `.deps.json` files: a
+package added, upgraded or removed updates it (`Documents/implementation.md`, section 10). Both files ship in every
+installer's package (`Installers/Windows/package.ps1`, `Installers/Linux/package.sh`).
+
 ## MySQL and PostgreSQL
 
 `std:db`'s MySQL and PostgreSQL are tried by `MySqlTests` and `PostgreSqlTests` (`WebLingo.Conformance.Tests`), and

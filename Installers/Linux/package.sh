@@ -69,10 +69,12 @@ for architecture in "${architectures[@]}"; do
   cp "$here/install.sh" "$root/install.sh"
   cp "$here/uninstall.sh" "$root/WebLingo/uninstall.sh"
   cp "$here/readme.md" "$root/readme.md"
-  # The MIT License, which every copy of WebLingo carries, installed with it (specification, section 12).
+  # The MIT License, which every copy of WebLingo carries, installed with it (specification, section 12), and the
+  # licenses and notices of the packages it ships, which their licenses ask every copy to carry.
   cp "$repository/LICENSE" "$root/WebLingo/LICENSE"
+  cp "$repository/THIRD_PARTY_NOTICES.md" "$root/WebLingo/THIRD_PARTY_NOTICES.md"
   chmod 755 "$root/install.sh" "$root/WebLingo/uninstall.sh"
-  chmod 644 "$root/readme.md" "$root/WebLingo/LICENSE"
+  chmod 644 "$root/readme.md" "$root/WebLingo/LICENSE" "$root/WebLingo/THIRD_PARTY_NOTICES.md"
   tar --owner=0 --group=0 --numeric-owner -czf "$destination/$name.tar.gz" -C "$staging" "$name"
   echo "Made $destination/$name.tar.gz, $(du -h "$destination/$name.tar.gz" | cut -f1)"
 
@@ -82,6 +84,7 @@ for architecture in "${architectures[@]}"; do
   mkdir -p "$package/DEBIAN" "$package/opt" "$package/usr/bin"
   cp -R "$published" "$package/opt/weblingo"
   install -m 644 "$repository/LICENSE" "$package/opt/weblingo/LICENSE"
+  install -m 644 "$repository/THIRD_PARTY_NOTICES.md" "$package/opt/weblingo/THIRD_PARTY_NOTICES.md"
   ln -s /opt/weblingo/weblingo "$package/usr/bin/weblingo"
   ln -s /opt/weblingo/wasp "$package/usr/bin/wasp"
   # What a self-contained .NET program needs of the system (Microsoft's ".NET dependencies" for Debian and Ubuntu): ICU

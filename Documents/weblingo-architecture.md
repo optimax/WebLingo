@@ -29,7 +29,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | Command lines | `weblingo` is strictly the scripts' runner (`run`, `check`, `compile`, `disasm`); `wasp` is the web handler: its pages, and serving applications, locally and under IIS (§8.4, §6.9) | Approved (16 November 2026) |
 | M0.14, hosting's design | A page's request and response are values its parameters take, `param request;` and `param response;`, instances of two built-in classes, `Request` and `Response`, read and changed through their members; a `.wlg` route handler is a module exporting a function for each HTTP method it answers, `get(request, response)`, any other method a 405; a request's path finds its file without the extension, `/` and a folder's path their `index`; a runtime error is a 500, its page showing the error in development and not in production; the host's core is a portable project of its own, `WebLingo.Hosting`; and an application's configuration, as a script's, is `weblingo.config`, in place of `weblingo.json` (§6.12), a site's renamed `wasp.config` the same day (below) | Approved (16 November 2026) |
 | Configuration's names | A site's configuration, in its root, and a page's folder's under `wasp`, is `wasp.config`, in lower case, for Linux's sake, since it configures the WASP site, not the language; a script's folder's, under `weblingo`, stays `weblingo.config`; a site's `weblingo.config` is not read, nothing being kept for backward compatibility (§6.12) | Approved (16 November 2026) |
-| WL-G001 | Free and open-source project direction; release timing and scope; the MIT License, now, with a `LICENSE` file and a security policy, `SECURITY.md` (§12) | Direction confirmed; MIT approved (24 November 2026, "A License and a Security Policy", A1 (b)); release timing and scope proposed |
+| WL-G001 | Free and open-source project direction; release timing and scope; the MIT License, now, with a `LICENSE` file, its copyright The WebLingo Authors', a security policy, `SECURITY.md`, vulnerabilities reported through GitHub's private vulnerability reporting, and the third-party packages' notices, `THIRD_PARTY_NOTICES.md` (§12) | Direction confirmed; MIT approved (24 November 2026, "A License and a Security Policy", A1 (b)), its copyright holder, the reporting and the notices 25 November 2026 (A2 to A4); release timing and scope proposed |
 | Implementation | C#/.NET 10 initially, later Native C# compilation | Approved |
 | WL-017 | Native C# portability contract and replaceable adapters | Approved |
 | WL-002.3 | `var` mutable, `const` immutable; both block-scoped, in scope from their declaration to the end of the block; no `let` declaration keyword | Approved |
@@ -1962,7 +1962,7 @@ These items should be explicitly tracked rather than silently treated as approve
 
 ## 12. WL-G001 — Open-Source Distribution and Governance (proposed)
 
-**Decision status:** WebLingo is free and open source, under the MIT License, chosen by the owner on 24 November 2026 ("A License and a Security Policy", A1 (b), now rather than at the public release), with a `LICENSE` file at the repository's root and `SECURITY.md`, which says how to report a vulnerability. The public-release milestone and the release's scope remain proposals.
+**Decision status:** WebLingo is free and open source, under the MIT License, chosen by the owner on 24 November 2026 ("A License and a Security Policy", A1 (b), now rather than at the public release), with a `LICENSE` file at the repository's root and `SECURITY.md`, which says how to report a vulnerability; on 25 November 2026 (A2 to A4), `LICENSE`'s copyright holder "The WebLingo Authors", as Go's names "The Go Authors"; a vulnerability reported through GitHub's private vulnerability reporting, the repository's Security tab, which the owner turns on in its settings; and `THIRD_PARTY_NOTICES.md`, the third-party packages WebLingo ships, their licenses and their notices, now, at the root, shipped in the installers' packages. The public-release milestone and the release's scope remain proposals.
 
 ### 12.1 Release objective and timing
 
@@ -1982,7 +1982,7 @@ Tradeoff: MIT does not require third parties to contribute improvements back. If
 ### 12.3 Open-source readiness requirements (proposed)
 
 1. **Ownership and provenance:** Track copyright holders, contributors, third-party code, assets, and generated content; verify that the project has the rights necessary to publish each component.
-2. **Dependency review:** Maintain a software bill of materials or equivalent dependency inventory; verify redistribution compatibility, required notices, and transitive dependencies. Avoid introducing restrictive dependencies into the portable core.
+2. **Dependency review:** Maintain a software bill of materials or equivalent dependency inventory; verify redistribution compatibility, required notices, and transitive dependencies. Avoid introducing restrictive dependencies into the portable core. Built (25 November 2026, A4 (a)): `THIRD_PARTY_NOTICES.md`, each package the programs ship, its dependencies included, its version, license and copyright, the runtimes the self-contained packages carry, the licenses' texts and Microsoft's notices for .NET's libraries and runtimes, every installer's package carrying it, `ThirdPartyNoticesTests` checking its packages against the programs' (`Documents/implementation.md`, section 10).
 3. **Reproducible releases:** Provide versioned source tags, documented builds, release artifacts, checksums, and automated Windows/Linux conformance tests.
 4. **Specification and compatibility:** Publish versioned language, WLBC, PAL/WLHI and extension contracts; state compatibility and deprecation policies.
 5. **Community governance:** Establish contribution rules, code review and maintainer authority, a security disclosure process, and a code of conduct before accepting substantial public contributions.
@@ -1998,7 +1998,7 @@ CONTRIBUTING.md
 CODE_OF_CONDUCT.md
 SECURITY.md
 NOTICE.md                # Only if needed for third-party notices
-THIRD_PARTY_NOTICES.md   # If required by dependencies
+THIRD_PARTY_NOTICES.md   # The packages WebLingo ships, their licenses and notices (25 November 2026)
 CHANGELOG.md
  docs/                   # Versioned language and runtime specifications
  src/
@@ -2006,7 +2006,7 @@ CHANGELOG.md
  samples/
 ```
 
-The actual `LICENSE` file must identify the correct copyright holder and year(s). `LICENSE` and `SECURITY.md` are there (25 November 2026); the others are not yet.
+The actual `LICENSE` file must identify the correct copyright holder and year(s). `LICENSE`, `SECURITY.md` and `THIRD_PARTY_NOTICES.md` are there (25 November 2026); the others are not yet.
 
 ### 12.5 Questions reserved for later approval
 

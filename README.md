@@ -35,5 +35,6 @@ dotnet run --project src/WebLingo.Cli -- run samples/HelloWorld/hello.wlg
 
 ## License
 
-WebLingo is free and open source, under the [MIT License](LICENSE). To report a vulnerability, see the
+WebLingo is free and open source, under the [MIT License](LICENSE). The packages it ships, their licenses and their
+notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). To report a vulnerability, see the
 [security policy](SECURITY.md).
