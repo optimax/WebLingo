@@ -32,3 +32,8 @@ dotnet run --project src/WebLingo.Cli -- run samples/HelloWorld/hello.wlg
 - [Testing WebLingo code](Documents/weblingo-standard-library-reference.md#30-stdtest)
 - [WASP user manual](Documents/wasp-user-manual.md) and [example sites](Examples.wasp/)
 - [Build and test instructions](WebLingo/README.md)
+
+## License
+
+WebLingo is free and open source, under the [MIT License](LICENSE). To report a vulnerability, see the
+[security policy](SECURITY.md).

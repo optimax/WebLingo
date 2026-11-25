@@ -127,6 +127,8 @@ try {
             Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Uninstall WebLingo.bat') -Destination $runtime
             Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'uninstall.ps1') -Destination $runtime
             Copy-Item (Join-Path $PSScriptRoot 'readme.md') $root
+            # The MIT License, which every copy of WebLingo carries, installed with it (specification, section 12).
+            Copy-Item -LiteralPath (Join-Path $repository 'LICENSE') -Destination $runtime
 
             # WASP's: what wasp's own publish has that WebLingo's has not, or has otherwise, such as ASP.NET Core's
             # libraries, newer than the packages weblingo takes; and the hashes of the files of WebLingo's it shares.
@@ -163,6 +165,7 @@ try {
                 Copy-Item (Join-Path $repository "Scripts/$script") $waspRoot
             }
             Copy-Item (Join-Path $PSScriptRoot 'wasp-readme.md') (Join-Path $waspRoot 'readme.md')
+            Copy-Item -LiteralPath (Join-Path $repository 'LICENSE') -Destination $waspRoot
             New-Zip $waspRoot (Join-Path $Destination "$waspName.zip")
         }
     }

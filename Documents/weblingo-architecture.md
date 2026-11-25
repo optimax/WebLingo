@@ -29,7 +29,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | Command lines | `weblingo` is strictly the scripts' runner (`run`, `check`, `compile`, `disasm`); `wasp` is the web handler: its pages, and serving applications, locally and under IIS (§8.4, §6.9) | Approved (16 November 2026) |
 | M0.14, hosting's design | A page's request and response are values its parameters take, `param request;` and `param response;`, instances of two built-in classes, `Request` and `Response`, read and changed through their members; a `.wlg` route handler is a module exporting a function for each HTTP method it answers, `get(request, response)`, any other method a 405; a request's path finds its file without the extension, `/` and a folder's path their `index`; a runtime error is a 500, its page showing the error in development and not in production; the host's core is a portable project of its own, `WebLingo.Hosting`; and an application's configuration, as a script's, is `weblingo.config`, in place of `weblingo.json` (§6.12), a site's renamed `wasp.config` the same day (below) | Approved (16 November 2026) |
 | Configuration's names | A site's configuration, in its root, and a page's folder's under `wasp`, is `wasp.config`, in lower case, for Linux's sake, since it configures the WASP site, not the language; a script's folder's, under `weblingo`, stays `weblingo.config`; a site's `weblingo.config` is not read, nothing being kept for backward compatibility (§6.12) | Approved (16 November 2026) |
-| WL-G001 | Free and open-source project direction; release timing, scope, and MIT licensing proposal | Direction confirmed; release and licensing details proposed |
+| WL-G001 | Free and open-source project direction; release timing and scope; the MIT License, now, with a `LICENSE` file and a security policy, `SECURITY.md` (§12) | Direction confirmed; MIT approved (24 November 2026, "A License and a Security Policy", A1 (b)); release timing and scope proposed |
 | Implementation | C#/.NET 10 initially, later Native C# compilation | Approved |
 | WL-017 | Native C# portability contract and replaceable adapters | Approved |
 | WL-002.3 | `var` mutable, `const` immutable; both block-scoped, in scope from their declaration to the end of the block; no `let` declaration keyword | Approved |
@@ -1962,7 +1962,7 @@ These items should be explicitly tracked rather than silently treated as approve
 
 ## 12. WL-G001 — Open-Source Distribution and Governance (proposed)
 
-**Decision status:** WebLingo is intended to be free and open source. The public-release milestone, release scope, and MIT License remain proposals.
+**Decision status:** WebLingo is free and open source, under the MIT License, chosen by the owner on 24 November 2026 ("A License and a Security Policy", A1 (b), now rather than at the public release), with a `LICENSE` file at the repository's root and `SECURITY.md`, which says how to report a vulnerability. The public-release milestone and the release's scope remain proposals.
 
 ### 12.1 Release objective and timing
 
@@ -1971,9 +1971,9 @@ These items should be explicitly tracked rather than silently treated as approve
 - The independent Native C# compiler is a build-time toolchain, **not** a required component of the WebLingo runtime distribution; whether its own source code is published is a separate decision.
 - Publish language semantics, WLBC bytecode documentation, host interfaces, build instructions, and conformance tests sufficient for independent evaluation and interoperability.
 
-### 12.2 Candidate license: MIT
+### 12.2 License: MIT
 
-**MIT is the preferred candidate under consideration, not yet selected.** Subject to rights and third-party-license review, MIT would generally permit commercial and noncommercial use, redistribution, modification, embedding in proprietary products, and proprietary forks, while requiring preservation of copyright and license notices in copies or substantial portions of the licensed software. MIT does **not** require downstream applications or modifications to be open-sourced.
+**MIT is WebLingo's license** (the owner's answer, 24 November 2026; until then the preferred candidate). As built (25 November 2026; Proposed where it says more): `LICENSE` covers the whole repository, the documentation included, and ships in every installer's package. Subject to rights and third-party-license review, MIT generally permits commercial and noncommercial use, redistribution, modification, embedding in proprietary products, and proprietary forks, while requiring preservation of copyright and license notices in copies or substantial portions of the licensed software. MIT does **not** require downstream applications or modifications to be open-sourced.
 
 Tradeoff: MIT does not require third parties to contribute improvements back. If reciprocal publication of changes becomes a goal, reconsider alternatives such as MPL 2.0 before the public release. MIT also does not expressly grant trademark rights; project branding and names must be handled separately.
 
@@ -1992,7 +1992,7 @@ Tradeoff: MIT does not require third parties to contribute improvements back. If
 ### 12.4 Proposed public repository files
 
 ```text
-LICENSE                 # Standard MIT text, if MIT is finally approved
+LICENSE                 # Standard MIT text (approved 24 November 2026)
 README.md
 CONTRIBUTING.md
 CODE_OF_CONDUCT.md
@@ -2006,11 +2006,10 @@ CHANGELOG.md
  samples/
 ```
 
-The actual `LICENSE` file must identify the correct copyright holder and year(s). Do not present MIT as the project's operative license until the owner expressly selects it and the repository is licensed accordingly.
+The actual `LICENSE` file must identify the correct copyright holder and year(s). `LICENSE` and `SECURITY.md` are there (25 November 2026); the others are not yet.
 
 ### 12.5 Questions reserved for later approval
 
-- Confirm **MIT versus another license**.
 - Decide the **components covered** and documentation license.
 - Decide **public repository timing**, governance, and contribution licensing (including whether a CLA or DCO is needed).
 - Clear the **WebLingo** name and determine whether a trademark/brand policy is appropriate.
