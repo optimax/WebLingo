@@ -32,6 +32,7 @@ The current state (specification, sections 9 and 15): a compiler and a VM, a reg
 - `Documents/M0.6.1-status.md` records what the current milestone delivered and what it does not implement.
 - `Documents/production-readiness.md` assesses whether WebLingo and WASP are ready for production use, as of 24 November 2026, and recommends what it would take, each recommendation a task of `TO-DO.md`. It is an assessment at one date, not kept current.
 - `Documents/security-review.md` reviews WASP's request path for security, as of 25 November 2026, against the OWASP Top 10 and OWASP's ASVS: its findings, each fixed with a test, what holds, and its recommendations, each a task of `TO-DO.md`. A review at one date, not kept current.
+- `Documents/weblingo-forum.md` is the design of WebLingo Forum, the forum written in WASP, `Examples.wasp/WebLingoForum`: what the owner asked for, how it is built, what it needs of WASP, how it is tested, and its parts, each a task of `TO-DO.md`. As the forum is built, it is kept to what is built, its guesses replaced by the owner's answers.
 - `Documents/native-compatibility.md` is the inventory of .NET facilities and how the portable core may use each (section 6).
 - `HANDOFF.md` at the root, when present, records the current state of the work and its next steps.
 - `TO-DO.md`, `TO-DO-INSTRUCTIONS.md` and `DONE.md` at the root hold the tasks, how to work them, and the tasks that are done.
