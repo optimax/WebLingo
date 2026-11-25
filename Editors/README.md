@@ -169,3 +169,48 @@ methods of strings, arrays, maps and sets that only read, `startsWith`, `contain
 property or a method written in WebLingo, an assignment or a call of a function cannot be in one. A condition that cannot
 be one, or that reads a name not in scope on its line, leaves its breakpoint unverified, its marker saying why; one
 that fails as it runs, or gives anything but a Boolean, stops there, the **Debug Console** saying why.
+
+## Any debugger: the launch settings
+
+`weblingo --debug-adapter` and `wasp --debug-adapter` speak the Debug Adapter Protocol on their standard input and output,
+so that any debugger that speaks it debugs a script, a page or a site with them, VS Code's extension being one. A
+debugger starts the adapter, then sends its `launch` request with these arguments, the protocol's own `noDebug` and the
+adapter's; nothing else in a launch configuration, VS Code's `type`, `name` or `serverReadyAction`, reaches the adapter:
+
+| Argument | What it is | Default |
+|---|---|---|
+| `program` | the script, a `.wlg`, for `weblingo`, or the page, a `.wasp`, for `wasp`; for `wasp`, left out to debug a site | none: a script's and a page's launch needs it |
+| `cwd` | the folder the program runs in, from which a relative `program` and `root` are found | the program's own folder, or the site's root |
+| `args` | the program's parameters, an array of `name=value` strings, as on the command line | none |
+| `stopOnEntry` | `true` to stop at the program's first statement | `false` |
+| `noDebug` | `true` to run without stopping | `false` |
+| `root` | for `wasp`, the site's root, from which a path that starts with `/` is found, as `wasp run --root` gives it; without `program`, the site to serve | the page's folder |
+| `port` | for `wasp`, without `program`: the port of this machine the site is served on, 0 for one the system chooses | 8080 |
+
+Breakpoints, their conditions, stepping, the call stack and the variables are the protocol's own requests, and a
+breakpoint may stand in any `.wlg` or `.wasp` file the program is made of.
+
+### Visual Studio, without an extension
+
+Visual Studio's own Debug Adapter Host starts any adapter from a launch file whose `$adapter` and `$adapterArgs` name it,
+the rest the arguments above:
+
+```json
+{
+  "$adapter": "C:\\Program Files\\WebLingo\\wasp.exe",
+  "$adapterArgs": "--debug-adapter",
+  "request": "launch",
+  "program": "C:\\Sites\\shop\\index.wasp",
+  "root": "C:\\Sites\\shop",
+  "args": ["name=Anna"]
+}
+```
+
+Open the page in Visual Studio, set its breakpoints in the margin, and in the **Command Window** (**View**, **Other
+Windows**) run `DebugAdapterHost.Launch /LaunchJson:"C:\Sites\shop\launch.json"`; or start Visual Studio with it,
+`devenv /Command "DebugAdapterHost.Launch /LaunchJson:C:\Sites\shop\launch.json"`. The page stops at a breakpoint in
+it, an include, a layout, a component or a module, with its call stack, **Locals**, stepping and **Continue**; its output
+goes to the **Output** window, **Debug**. Visual Studio goes on at once from a stop on entry, so that `stopOnEntry` does
+not stop there: set a breakpoint on the first statement instead. **Autos** stays empty, Visual Studio having no
+language service for WebLingo. `DebugAdapterHost.Logging /On /OutputWindow` shows what Visual Studio and the adapter say
+to each other.

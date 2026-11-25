@@ -1285,7 +1285,8 @@ scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run
   browser sends stops at a breakpoint, alone, each request a thread of the debugger's, `GET /cart #12`, while the site
   serves the others; the debugger's pause stops every request until it goes on. A breakpoint's condition stops only
   the requests it names, `request.path == "/cart"`, read without running the page's code. VS Code starts `wasp
-  --debug-adapter` for either; the `Editors/` folder's `README.md` says how to set it up.
+  --debug-adapter` for either; the `Editors/` folder's `README.md` says how to set it up, and how any other debugger
+  that speaks the Debug Adapter Protocol starts it, Visual Studio's own Debug Adapter Host among them, with no extension.
 
 ---
 

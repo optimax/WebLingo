@@ -860,7 +860,18 @@ once, besides VS Code, through a client of another kind, without an extension of
 3. **Conditional breakpoints.** The protocol's `condition`, an expression of WebLingo's evaluated in the stopped
    frame's scope, for scripts, pages and sites alike, a breakpoint stopping only where it gives `true`.
 4. **Another client.** The launch settings documented, the protocol's own, and pages' debugging tried through a client
-   without an extension of its own, nvim-dap or Visual Studio's `DebugAdapterHost.Launch`.
+   without an extension of its own, nvim-dap or Visual Studio's `DebugAdapterHost.Launch`. Done (25 November 2026; Proposed
+   where it says more): the launch's arguments, `program`, `cwd`, `args`, `stopOnEntry`, `noDebug`, `root` and `port`,
+   documented as the protocol's `launch` request takes them, for any client (`Editors/README.md`, "Any debugger: the launch
+   settings"); and a page debugged in Visual Studio Community 2026 (18.12), through its own Debug Adapter Host's generic
+   engine, `DebugAdapterHost.Launch` given a launch file whose `$adapter` is `wasp` and `$adapterArgs` `--debug-adapter`,
+   with no extension: its requests, `initialize` (its `clientID` `visualstudio`), `launch`, `setBreakpoints` for a
+   breakpoint set in its editor while the page ran, its path's drive in lower case, `configurationDone`, `threads`,
+   `stackTrace`, `scopes`, `variables`, an array's elements among them, `next`, `continue` and `disconnect`, each answered
+   as VS Code's are, the page stopping at its breakpoints, its call stack and locals shown, stepped and continued, nothing
+   in the adapter changed. Visual Studio answers a stop whose reason is `entry` with `continue` at once, so that
+   `stopOnEntry` does not stop there, a breakpoint on the first statement doing it; and its **Autos** stays empty, there
+   being no language service for WebLingo.
 
 **A page under the debugger, as built** (part 1, 24 November 2026; Proposed where it says more than part 1 above):
 `wasp --debug-adapter` runs `weblingo`'s session, `WebLingoDebugSession`, given the command line's program
