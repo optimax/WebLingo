@@ -303,13 +303,19 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
             }
         }
 
-        /// <summary>A request ended: the next may begin, or, if the web server did not ask to keep the connection, it is closed.</summary>
-        public void Ended(Request request)
+        /// <summary>A request done with the connection, though its end is not yet written: the next may begin.</summary>
+        public void Let(Request request)
         {
             lock (_gate)
             {
                 if (_current == request) _current = null;
             }
+        }
+
+        /// <summary>A request ended: the next may begin, or, if the web server did not ask to keep the connection, it is closed.</summary>
+        public void Ended(Request request)
+        {
+            Let(request);
             if (!request.Keep) Close();
         }
 
@@ -415,6 +421,11 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
             }
             if (outcome is { Kind: WebLingoRequestOutcomeKind.File, File: { } file }) await SendFileAsync(sink, file);
             await connection.WriteAsync(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.Stdout, request.Id, []));
+            // Let go before its end is written: a web server that keeps the connection sends its next FCGI_BEGIN_REQUEST as
+            // soon as it reads FCGI_END_REQUEST, which until 25 November 2026 could come in while this request still held
+            // the connection, the next then refused as a second at once, FCGI_CANT_MPX_CONN, nginx's 502 ("FastCGI Behind
+            // nginx Under Load").
+            connection.Let(request);
             await connection.WriteAsync(WebLingoFastCgiRecords.EndRequest(request.Id, WebLingoFastCgiRecords.RequestComplete));
             connection.Ended(request);
         }

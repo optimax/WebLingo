@@ -74,11 +74,16 @@ http {
     proxy_temp_path $work/nginx/proxy;
     uwsgi_temp_path $work/nginx/uwsgi;
     scgi_temp_path $work/nginx/scgi;
+    upstream wasp {
+        server 127.0.0.1:$waspport;
+        keepalive 16;
+    }
     server {
         listen 127.0.0.1:$port;
         location / {
             include /etc/nginx/fastcgi_params;
-            fastcgi_pass 127.0.0.1:$waspport;
+            fastcgi_keep_conn on;
+            fastcgi_pass wasp;
         }
     }
 }

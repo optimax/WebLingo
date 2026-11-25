@@ -64,11 +64,16 @@ public sealed class WebServerTests : IDisposable
             events { worker_connections 64; }
             http {
                 access_log off;
+                upstream wasp {
+                    server 127.0.0.1:{{waspPort}};
+                    keepalive 16;
+                }
                 server {
                     listen 127.0.0.1:{{port}};
                     location / {
                         include fastcgi_params;
-                        fastcgi_pass 127.0.0.1:{{waspPort}};
+                        fastcgi_keep_conn on;
+                        fastcgi_pass wasp;
                     }
                 }
             }

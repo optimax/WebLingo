@@ -1292,18 +1292,27 @@ service below.
 With `wasp fastcgi --root /var/www/mysite --port 9000` running:
 
 ```nginx
+upstream wasp {
+    server 127.0.0.1:9000;
+    keepalive 16;
+}
+
 server {
     listen 80;
     server_name example.com;
 
     location / {
         include fastcgi_params;
-        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_keep_conn on;
+        fastcgi_pass wasp;
     }
 }
 ```
 
-`fastcgi_params`, which comes with nginx, gives `wasp` the request's method, path, query and headers. On a Unix socket,
+`fastcgi_params`, which comes with nginx, gives `wasp` the request's method, path, query and headers. `fastcgi_keep_conn`
+and the upstream's `keepalive` keep nginx's connections to `wasp` from one request to the next, so that a request need not
+open one of its own: on Windows, nginx served six times as many requests a second so, the clients 16 at once, as with a
+connection for each request, `fastcgi_pass 127.0.0.1:9000;` alone, which works too. On a Unix socket,
 `fastcgi_pass unix:/run/wasp/mysite.sock;`. On Linux, a systemd service keeps `wasp` running, for example
 `/etc/systemd/system/wasp-mysite.service`, with WebLingo installed in `/opt/weblingo`, where its installers for Linux
 install it:

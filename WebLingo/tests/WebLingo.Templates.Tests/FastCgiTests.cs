@@ -169,6 +169,23 @@ public sealed class FastCgiTests : IDisposable
     }
 
     [Fact]
+    public async Task AKeptConnectionsNextRequestMayBeginAsSoonAsTheLastHasEnded()
+    {
+        // As nginx with fastcgi_keep_conn sends it, the moment FCGI_END_REQUEST comes: never refused as a second request at
+        // once, as it was when it came in before the last request had let the connection go (25 November 2026, "FastCGI
+        // Behind nginx Under Load").
+        using var connection = await Connect();
+        var stream = connection.GetStream();
+        for (var i = 0; i < 1000; i++)
+        {
+            await stream.WriteAsync(Begin(1, keep: true));
+            await stream.WriteAsync(Records(1, Get("/made"), []));
+            var (head, body, status) = await ReadResponseAsync(stream, 1);
+            Assert.True((head.FirstOrDefault(), body, status) == ("Status: 201 Created", "made", 0), $"request {i}: {head.FirstOrDefault()}, {status}");
+        }
+    }
+
+    [Fact]
     public async Task ManagementRecordsAreAnswered()
     {
         using var connection = await Connect();

@@ -766,7 +766,13 @@ What it found, each a task of its own:
   second, where 567 were, and at 256 924, 99% under 404 ms, where 453 were, 99% under 7,147 ms.
 - **FastCGI behind nginx serves about 1,000 requests a second**, whatever the page and the clients, a fifth to a
   thirtieth of `wasp serve`'s, and at 256 clients 1% of its requests take 3 s, as long as a refused connection's retry takes,
-  and 13 s on the pages that send most ("FastCGI Behind nginx Under Load").
+  and 13 s on the pages that send most ("FastCGI Behind nginx Under Load"). Found (25 November 2026): a connection from nginx
+  to `wasp` for each request, the manual's configuration then, is the cost; nginx keeping its connections,
+  `fastcgi_keep_conn on` and an upstream's `keepalive`, served `hello` 3,729 times a second at 16 clients where a connection
+  for each request served it 556 times, and nginx proxying HTTP to `wasp serve` 3,069, nginx for Windows' own limit at 64,
+  measured beside the soak; and so kept, a request's next sometimes came in before the last had let the connection go, and
+  was refused as a second at once, `FCGI_CANT_MPX_CONN`, nginx's 502, 3 of some 17,000, since fixed, none of 59,000. The
+  manual's nginx keeps its connections since, as the tests' and the benchmark's do.
 
 Elsewhere, nothing failed: `wasp serve` gave 2,300 to 31,000 requests a second on the pages that compute little,
 1,000 to 6,000 on those that compute or read SQLite, 450 for a page of a megabyte, and 1,100 uploads of 100 KB a second,

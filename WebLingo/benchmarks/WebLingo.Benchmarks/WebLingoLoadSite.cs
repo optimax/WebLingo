@@ -57,11 +57,16 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
                 http {
                     access_log off;
                     client_max_body_size 30m;
+                    upstream wasp {
+                        server 127.0.0.1:{{waspPort}};
+                        keepalive 16;
+                    }
                     server {
                         listen 127.0.0.1:{{port}};
                         location / {
                             include fastcgi_params;
-                            fastcgi_pass 127.0.0.1:{{waspPort}};
+                            fastcgi_keep_conn on;
+                            fastcgi_pass wasp;
                         }
                     }
                 }
