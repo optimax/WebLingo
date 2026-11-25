@@ -10,6 +10,8 @@
     <EmbeddedResource Include="Workloads/*.wasp" LogicalName="Workloads/%(Filename)%(Extension)" />
     <!-- The comparison's programs, in each language, run where they are copied (WebLingoComparison). -->
     <None Include="Comparative/*" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The load site, which the load command serves, copied for each run (WebLingoLoad; specification, section 5.6, "Under load"). -->
+    <None Include="LoadSite/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/WebLingo.Compiler/WebLingo.Compiler.csproj" />
@@ -18,5 +20,7 @@
     <ProjectReference Include="../../src/WebLingo.Templates/WebLingo.Templates.csproj" />
     <!-- Its native modules' loader, the .NET platform, and std/ beside it, std:fs among them (section 3.9). -->
     <ProjectReference Include="../../src/WebLingo.Cli/WebLingo.Cli.csproj" />
+    <!-- wasp beside it, which the load command starts to serve the load site, as a process of its own. -->
+    <ProjectReference Include="../../src/WebLingo.Wasp.Cli/WebLingo.Wasp.Cli.csproj" />
   </ItemGroup>
 </Project>

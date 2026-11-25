@@ -1,0 +1,4 @@
+<% param request; %>
+<% var visits = (request.session?["visits"] ?? 0) + 1; %>
+<% request.session["visits"] = visits; %>
+<p>Visits: <%= visits %>.</p>

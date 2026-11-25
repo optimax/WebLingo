@@ -1,0 +1,4 @@
+<% param request; %>
+<% var file = (await request.files())["file"][0]; %>
+<% var bytes = await file.bytes(); %>
+<p>Received: <%= file.size %> <%= bytes.length %>.</p>

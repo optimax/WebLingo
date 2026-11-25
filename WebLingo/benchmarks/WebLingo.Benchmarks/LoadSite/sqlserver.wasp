@@ -1,0 +1,5 @@
+<% import { Database } from "std:db"; %>
+<% using (var db = await Database.open("server")) { %>
+<% var rows = await db.query("SELECT TOP 10 object_id, name FROM sys.all_objects ORDER BY object_id"); %>
+<ul><% foreach (var row in rows) { %><li><%= row["object_id"] %> <%= row["name"] %></li><% } %></ul>
+<% } %>

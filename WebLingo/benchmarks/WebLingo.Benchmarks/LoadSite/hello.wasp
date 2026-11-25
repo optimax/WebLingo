@@ -1,0 +1,1 @@
+<% param request; %><p>Hello, <%= request.query?["name"] ?? "load" %>.</p>

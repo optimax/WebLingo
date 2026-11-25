@@ -282,6 +282,21 @@ The benchmark (section 3) writes a Markdown table: each workload's median and fa
 
 `WebLingo.Benchmarks --compare` runs each program of `benchmarks/WebLingo.Benchmarks/Comparative/` as a process of its runtime's: `weblingo`, the one built beside the benchmark, from source and compiled, in a copy of the programs, in the system's temporary folder, removed after; and `node`, `node --jitless`, `python` and `lua`, found on the PATH, or where `--node`, `--python` and `--lua` name them, and `--weblingo` another `weblingo`. A runtime that is not found is left out, and said so; `--program` and `--runtime` choose what it runs, `empty` always, since its second table takes each runtime's start-up away. A program in each language writes the same one line, which the comparison checks; a new program is added in all four, with its line in `WebLingoComparison.Programs`, and its numbers in the specification's section 5.6. `ComparisonTests` (`WebLingo.VM.Tests`) checks that each program is written in every language, runs WebLingo's, and runs the command on WebLingo alone, so that no test reaches another language's runtime installed on the machine. Those measured (23 November 2026), installed by the owner for the whole machine, found on the PATH: Node.js 26.13.1, its current LTS, from nodejs.org's installer, `node-v26.13.1-x64.msi`, 36,564,992 bytes, SHA-256 `0398ced8446e119478c724d1aa37c5afd6aa1a76fceab12787eb9714c5ed8b45`; Python 3.14.10; and Lua 5.4.6, PUC-Rio's, as `lua -v` names it.
 
+### Measuring WASP under load
+
+`WebLingo.Benchmarks --load` (`WebLingoLoad`, `WebLingoLoadSite`) serves the load site, `benchmarks/WebLingo.Benchmarks/LoadSite`,
+copied with a SQLite database of its own into the system's temporary folder, by the `wasp` built beside the benchmark, which
+it references for that, `wasp serve` or, with `--host fastcgi`, `wasp fastcgi` behind nginx, unpacked from the repository's
+`WebServers` folder, each stopped and the copy removed after; or the site at `--url`, as IIS serves it. Clients, each with a
+connection and cookies of its own, ask for each page at once, 1, 4, 16, 64 and 256 of them unless `--clients` says, for 10 s
+after 3 s of warming up (`--seconds`, `--warm-up`), every answer checked; it writes a Markdown table of each page's throughput
+and latency and the server's working set and handles, and exits 1 where an answer was wrong. `--reload SECONDS` replaces
+`hello.wasp` every quarter of a second while clients ask for it, every answer one version's whole; `--soak HOURS` asks for the
+pages in turn, a row every `--sample` minutes, 10 by default. `sqlserver.wasp` reads the machine's SQL Server, `localhost`,
+`master`, a page it cannot answer left out. The clients run on the same machine as the server, so that its numbers are
+the machine's, shared; run it on an otherwise idle machine. Its numbers are in the specification's section 5.6, "Under load".
+`LoadTests` (`WebLingo.VM.Tests`) checks its pages and its options, not the load.
+
 ### Trying FastCGI with nginx and Apache
 
 `WebServerTests` (`WebLingo.Templates.Tests`) runs `wasp fastcgi` behind nginx, and behind Apache httpd through `mod_proxy_fcgi` and through `mod_fcgid`, as the WASP User Manual's section 18 configures them, on Windows, each unpacked from its download into a folder of its own, listening on 127.0.0.1 only, and stopped. The downloads are kept in the repository's `WebServers` folder, which git ignores, the one zip file of each in a folder of its own; a test whose download is not there is skipped, and so is each on another platform. Those tried (the owner's go-ahead, 17 November 2026), to download again, the same files, for the same results:

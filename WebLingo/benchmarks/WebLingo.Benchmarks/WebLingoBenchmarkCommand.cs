@@ -5,7 +5,8 @@ namespace WebLingo.Benchmarks;
 /// <summary>
 /// The benchmark's command line: <c>[--runs N] [--warm-ups N] [--workload NAME]… [--vm NAME]…</c>. It measures every
 /// workload, or the ones named, on every VM, or the ones named, and writes the results as a Markdown table; or, with
-/// <c>--compare</c> first, compares WebLingo with other languages (<see cref="WebLingoComparison"/>). Exit codes: 0
+/// <c>--compare</c> first, compares WebLingo with other languages (<see cref="WebLingoComparison"/>); or, with <c>--load</c>
+/// first, measures WASP under load (<see cref="WebLingoLoad"/>). Exit codes: 0
 /// success, 1 a workload that failed or gave the wrong output, 2 a usage error.
 /// </summary>
 public static class WebLingoBenchmarkCommand
@@ -19,6 +20,7 @@ public static class WebLingoBenchmarkCommand
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
         if (args is ["--compare", .. var rest]) return WebLingoComparison.Run(rest, output, error);
+        if (args is ["--load", .. var loading]) return WebLingoLoad.Run(loading, output, error);
         var runs = 7;
         var warmUps = 3;
         var names = new List<string>();
@@ -86,6 +88,7 @@ public static class WebLingoBenchmarkCommand
     {
         error.WriteLine("Usage: WebLingo.Benchmarks [--runs N] [--warm-ups N] [--workload NAME]... [--vm NAME]...");
         error.WriteLine("       WebLingo.Benchmarks --compare ..., which --compare --help describes");
+        error.WriteLine("       WebLingo.Benchmarks --load ..., which --load --help describes");
         error.WriteLine($"  workloads: {string.Join(", ", WebLingoWorkloads.All.Select(workload => workload.Name))}");
         error.WriteLine($"  VMs: {string.Join(", ", Engines.Select(engine => engine.Name))}");
         return UsageError;

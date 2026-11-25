@@ -715,6 +715,62 @@ As a user runs them, the comparison, its 5 timed runs after a warm-up, in millis
 
 ---
 
+**Under load, parts** (Proposed, 24 November 2026, for the task "Load and Soak Tests for WASP", `Documents/production-readiness.md`'s recommendation 6), each a task of its own:
+
+1. **Throughput, latency and a reload.** A load generator of the solution's own, `WebLingo.Benchmarks --load`, with no package, and a load site of its own, `benchmarks/WebLingo.Benchmarks/LoadSite`, whose pages compute, read SQLite and SQL Server, write about a megabyte, keep a session and receive an upload of 100 KB; each page asked for by 1 to 256 clients at once, each client with its own connection and cookies, every answer checked, its throughput and latency written, under `wasp serve` and under `wasp fastcgi` behind nginx; and a page replaced every quarter of a second while clients ask for it, every answer one generation's whole.
+2. **The soak.** The pages asked for in turn for 8 hours under `wasp serve`, the server's memory, handles and threads sampled every 10 minutes, `--soak 8`.
+3. **Under IIS.** Part 1's measurements of the load site served by IIS, the owner having added it with the repository's `Scripts` and installed WebLingo from the checkout with `build.bat`, both as administrator, `--url` naming it.
+4. **On Linux.** Part 1's measurements on Linux, once "A WASP Site Served on Linux" has a Linux here.
+
+**Under load** (part 1, 24 November 2026), `WebLingo.Benchmarks --load`, on one Windows development machine (x64, 8
+logical processors, .NET 10.0.15, Release), the clients on the same machine, one run of each host: each page asked for by
+that many clients at once, for 10 s after 3 s of warming up, each cell its requests a second and the time 99% of them
+took at most; every answer checked, an error a wrong or failed one. A test host that an earlier run left spinning took
+one of the eight processors throughout. Under `wasp serve`, on Kestrel, its 8 workers one for each processor:
+
+| Page | 1 at once | 4 at once | 16 at once | 64 at once | 256 at once | Errors |
+|---|---:|---:|---:|---:|---:|---:|
+| `hello` | 2,508/s, 1.0 ms | 8,387/s, 1.3 ms | 19,472/s, 2.9 ms | 31,304/s, 3.9 ms | 20,049/s, 31.5 ms | 0 |
+| `compute` | 1,064/s, 1.4 ms | 4,091/s, 2.1 ms | 5,524/s, 7.0 ms | 5,743/s, 20.7 ms | 5,716/s, 60.6 ms | 0 |
+| `sqlite` | 1,023/s, 1.6 ms | 3,818/s, 2.2 ms | 5,960/s, 6.2 ms | 6,126/s, 22.0 ms | 3,953/s, 116.6 ms | 0 |
+| `sqlserver` | 607/s, 2.4 ms | 1,908/s, 7.5 ms | 2,550/s, 22.5 ms | 708/s, 222.7 ms | 403/s, 13560.7 ms | 0 |
+| `large` | 252/s, 14.7 ms | 472/s, 25.5 ms | 501/s, 75.8 ms | 450/s, 332.2 ms | 430/s, 935.2 ms | 0 |
+| `session` | 2,267/s, 1.5 ms | 8,266/s, 1.5 ms | 12,048/s, 3.6 ms | 15,050/s, 8.6 ms | 14,565/s, 39.2 ms | 0 |
+| `upload` | 425/s, 4.0 ms | 907/s, 13.3 ms | 1,186/s, 35.1 ms | 1,203/s, 100.5 ms | 1,117/s, 317.0 ms | 0 |
+
+Under `wasp fastcgi` behind nginx 1.30.6 for Windows, configured as the WASP User Manual's section 18 configures it, a
+connection from nginx to `wasp` for each request:
+
+| Page | 1 at once | 4 at once | 16 at once | 64 at once | 256 at once | Errors |
+|---|---:|---:|---:|---:|---:|---:|
+| `hello` | 560/s, 13.0 ms | 1,219/s, 5.7 ms | 1,066/s, 22.0 ms | 1,050/s, 83.9 ms | 1,038/s, 3025.1 ms | 0 |
+| `compute` | 538/s, 2.6 ms | 1,038/s, 6.5 ms | 1,085/s, 22.0 ms | 1,080/s, 84.4 ms | 1,008/s, 3234.1 ms | 0 |
+| `sqlite` | 504/s, 4.1 ms | 1,059/s, 6.5 ms | 1,092/s, 23.6 ms | 1,017/s, 92.6 ms | 975/s, 3099.2 ms | 0 |
+| `sqlserver` | 363/s, 4.8 ms | 885/s, 18.7 ms | 864/s, 44.4 ms | 761/s, 162.0 ms | 0/s, 17452.0 ms | 15 |
+| `large` | 155/s, 24.0 ms | 206/s, 34.7 ms | 196/s, 107.3 ms | 197/s, 364.3 ms | 183/s, 13332.8 ms | 0 |
+| `session` | 699/s, 2.4 ms | 1,175/s, 5.4 ms | 1,068/s, 22.2 ms | 1,007/s, 88.0 ms | 979/s, 3228.3 ms | 0 |
+| `upload` | 95/s, 314.0 ms | 293/s, 26.9 ms | 293/s, 86.7 ms | 298/s, 311.3 ms | 291/s, 13445.2 ms | 0 |
+
+What it found, each a task of its own:
+
+- **A page replaced while it is served is sometimes served empty.** `hello.wasp` replaced, whole, every quarter of a
+  second for 30 s, written beside it and moved over it, while 16 clients asked for it under `wasp serve`: 19,732 of
+  371,351 answers, 5%, were a 200 with an empty body, neither version's, where every one should be one version's whole
+  (WL-H004); and the move was refused 10 times while `wasp` read the page, which it opens without sharing its deletion
+  ("A Page Replaced While WASP Reads It").
+- **SQL Server's pages stall under many clients.** From 64 clients, `sqlserver`'s throughput falls below a third of 16
+  clients', and at 256 some of its requests wait 13 s under `wasp serve` and 15 to 17 s behind nginx, where 15 were a 500,
+  each request opening a connection of SqlClient's pool, 100 at most, by blocking a thread of .NET's pool, as all of a
+  script's work off its worker does (§6.6) ("SQL Server Pages Under Many Clients").
+- **FastCGI behind nginx serves about 1,000 requests a second**, whatever the page and the clients, a fifth to a
+  thirtieth of `wasp serve`'s, and at 256 clients 1% of its requests take 3 s, as long as a refused connection's retry takes,
+  and 13 s on the pages that send most ("FastCGI Behind nginx Under Load").
+
+Elsewhere, nothing failed: `wasp serve` gave 2,300 to 31,000 requests a second on the pages that compute little,
+1,000 to 6,000 on those that compute or read SQLite, 450 for a page of a megabyte, and 1,100 uploads of 100 KB a second,
+and its working set grew from 66 MB to 250 MB over the run, its handles from 520 to 1,580, which the soak (part 2)
+follows.
+
 ### 5.7 Local source debugging
 
 On 19 November 2026, the owner approved local `.wlg` launches on the default register VM in VS Code.
