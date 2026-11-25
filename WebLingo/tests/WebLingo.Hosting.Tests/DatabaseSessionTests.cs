@@ -114,15 +114,28 @@ public sealed class DatabaseSessionTests : IDisposable
     [Fact]
     public void ALockAProcessThatEndedHeldEndsWithinAMinute()
     {
+        const string id = "0123456789abcdef0123456789abcdef";
         long now = 1_000_000;
-        var (gone, store) = (Store(create: true, now: () => now), Store(create: true, now: () => now));
-        Assert.True(gone.Create("0123456789abcdef0123456789abcdef")); // Its process ends holding it, never closing it.
-        Assert.Equal(WebLingoSessionOpened.Waiting, Open(store, "0123456789abcdef0123456789abcdef", locked: true, TimeSpan.FromMilliseconds(250)).Kind);
-        now += (long)WebLingoDatabaseSessions.LockLife.TotalMilliseconds + 1;
-        Assert.Equal(WebLingoSessionOpened.Found, Open(store, "0123456789abcdef0123456789abcdef", locked: true, TimeSpan.FromSeconds(1)).Kind);
+        var gone = Store(create: true, now: () => now);
+        var store = Store(create: true, TimeSpan.FromSeconds(1), () => now);
+        Assert.True(gone.Create(id)); // Its process ends holding it, never closing it.
+
+        // While the lock's life lasts, a request waits for it, reading the table again every 100 ms, until its own lock
+        // timeout passes: awaited here, so that none of its reading is left running after the test, as it was on
+        // windows-latest, which then could not remove the database (24 November 2026).
+        WebLingoSessionOpening? waited = null;
+        Assert.Equal(WebLingoSessionOpened.Waiting, store.Open(id, true, given => waited = given).Kind);
+        Assert.False(SpinWait.SpinUntil(() => waited is not null, TimeSpan.FromMilliseconds(250)));
+        now += 1_000;
+        Assert.True(SpinWait.SpinUntil(() => waited is not null, TimeSpan.FromSeconds(10)));
+        Assert.Equal(WebLingoSessionOpened.TimedOut, waited!.Kind);
+
+        // Once its life has passed, the lock is free.
+        now += (long)WebLingoDatabaseSessions.LockLife.TotalMilliseconds;
+        Assert.Equal(WebLingoSessionOpened.Found, Open(store, id, locked: true, TimeSpan.FromSeconds(1)).Kind);
         // Each store lets go of what it holds, its renewals ended with it.
-        store.Remove("0123456789abcdef0123456789abcdef");
-        gone.Remove("0123456789abcdef0123456789abcdef");
+        store.Remove(id);
+        gone.Remove(id);
     }
 
     [Fact]
