@@ -1495,7 +1495,8 @@ A nonzero exit code is returned in the map. `options` may contain either of thes
 
 A timeout raises `TimeoutError` (WL3010). A launch failure or an exceeded output limit raises `IOError` (WL3011).
 On Windows and Linux, a timeout or exceeded output limit stops the launched program and its descendants in the
-same job or process group, including when the original program has already exited.
+same job or process group, including when the original program has already exited. On Windows, the error is raised
+only once they have ended, so that a script may remove the files they had open at once.
 WASP returns `IOError` for subprocess calls.
 
 ```javascript

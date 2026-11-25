@@ -101,8 +101,9 @@ public sealed class ConsoleTextTests : IDisposable
         var (launcher, arguments) = OperatingSystem.IsWindows()
             ? MakeWindowsLauncher(marker, overflow)
             : MakeLinuxLauncher(marker, overflow);
-        // The timeout covers the launcher's start and the descendant's, on Windows two PowerShells and Add-Type's
-        // compilation, which took more than 6 s on GitHub's windows-latest runner; without an overflow, the test lasts it.
+        // The timeout covers the launcher's start and the descendant's, on Windows two PowerShells, the launcher no longer
+        // compiling C# with Add-Type, with which they once took more than 20 s on GitHub's windows-latest runner
+        // (24 November 2026); without an overflow, the test lasts it.
         var script = Write("run.wlg", """
             param executable;
             param launchArgs;
@@ -128,13 +129,17 @@ public sealed class ConsoleTextTests : IDisposable
         var pid = int.Parse(File.ReadAllText(marker), System.Globalization.CultureInfo.InvariantCulture);
         try
         {
+            // On Windows, process.run fails only once the job's processes have ended, their files closed (a script may
+            // remove them at once); on Linux, a descendant killed may still be ending, and its files do not stop that.
+            var ended = OperatingSystem.IsWindows()
+                ? !IsRunning(pid)
+                : SpinWait.SpinUntil(() => !IsRunning(pid), TimeSpan.FromSeconds(3));
             var expected = overflow ? "WL3011 Process output exceeded 4096 bytes.\n"
                 : "WL3010 The process exceeded its 20000 ms timeout.\n";
-            var observed = File.Exists(marker + ".output") ? File.ReadAllText(marker + ".output") : "no output log";
             Assert.True((WebLingoCommandLine.Success, expected, "") == (exit, output.ToString(), error.ToString()),
-                $"Expected {expected.TrimEnd()}, got {exit}: {output}{error}. Descendant: {observed}.");
-            Assert.True(SpinWait.SpinUntil(() => !IsRunning(pid), TimeSpan.FromSeconds(3)),
-                $"Descendant {pid} survived capture cleanup.");
+                $"Expected {expected.TrimEnd()}, got {exit}: {output}{error}. Descendant: {DescendantLog(marker)}.");
+            Assert.True(ended,
+                $"Descendant {pid} was still running when process.run failed. Descendant: {DescendantLog(marker)}.");
         }
         finally
         {
@@ -150,6 +155,13 @@ public sealed class ConsoleTextTests : IDisposable
                 catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) { }
             }
         }
+    }
+
+    /// <summary>What the descendant wrote about writing its output, which the test only reports.</summary>
+    private static string DescendantLog(string marker)
+    {
+        try { return File.Exists(marker + ".output") ? File.ReadAllText(marker + ".output") : "no output log"; }
+        catch (IOException exception) { return "its log unreadable, " + exception.Message; }
     }
 
     private static (string Program, string[] Arguments) MakeWindowsLauncher(string marker, bool overflow)
@@ -174,45 +186,11 @@ public sealed class ConsoleTextTests : IDisposable
             Start-Sleep -Seconds 60
             '@ -replace 'PARENT_ID', [string]$PID
             $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($child))
-            Add-Type @'
-            using System;
-            using System.ComponentModel;
-            using System.Runtime.InteropServices;
-            using System.Text;
-
-            public static class TestLauncher {
-                [StructLayout(LayoutKind.Sequential)]
-                struct Startup {
-                    public int Size;
-                    public IntPtr Reserved, Desktop, Title;
-                    public int X, Y, XSize, YSize, Columns, Rows, Fill, Flags;
-                    public short Show, ReservedLength;
-                    public IntPtr ReservedBytes, Input, Output, Error;
-                }
-                [StructLayout(LayoutKind.Sequential)]
-                struct Child {
-                    public IntPtr Process, Thread;
-                    public int ProcessId, ThreadId;
-                }
-                [DllImport("kernel32")] static extern IntPtr GetStdHandle(int kind);
-                [DllImport("kernel32")] static extern bool CloseHandle(IntPtr handle);
-                [DllImport("kernel32", CharSet = CharSet.Unicode, SetLastError = true)]
-                static extern bool CreateProcess(string path, StringBuilder args, IntPtr ps, IntPtr ts,
-                    bool inherit, uint flags, IntPtr environment, IntPtr directory, ref Startup startup, out Child child);
-
-                public static void Start(string path, string args) {
-                    var info = new Startup { Size = Marshal.SizeOf(typeof(Startup)), Flags = 0x100,
-                        Input = GetStdHandle(-10), Output = GetStdHandle(-11), Error = GetStdHandle(-12) };
-                    Child child;
-                    if (!CreateProcess(path, new StringBuilder("\"" + path + "\" " + args),
-                        IntPtr.Zero, IntPtr.Zero, true, 0x08000000, IntPtr.Zero, IntPtr.Zero, ref info, out child))
-                        throw new Win32Exception();
-                    CloseHandle(child.Thread);
-                    CloseHandle(child.Process);
-                }
-            }
-            '@
-            [TestLauncher]::Start('{{shell.Replace("'", "''")}}', "-NoProfile -NonInteractive -EncodedCommand $encoded")
+            # Not redirected, the descendant shares the launcher's console and inherits its standard handles, the pipes.
+            $arguments = "-NoProfile -NonInteractive -EncodedCommand $encoded"
+            $start = New-Object Diagnostics.ProcessStartInfo '{{shell.Replace("'", "''")}}', $arguments
+            $start.UseShellExecute = $false
+            [void][Diagnostics.Process]::Start($start)
             """;
         return (shell, ["-NoProfile", "-NonInteractive", "-EncodedCommand",
             Convert.ToBase64String(Encoding.Unicode.GetBytes(launcher))]);

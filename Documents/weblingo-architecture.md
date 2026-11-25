@@ -1326,7 +1326,9 @@ The owner approved the following order on 19 November 2026 after the path, URL a
   `IWebLingoProcessRunner`. The adapter passes an argument array directly, closes stdin, and reads stdout and
   stderr concurrently. The task returns the exit code and both streams as UTF-8 text. The default deadline is
   30 seconds and the default combined output limit is 1 MiB. A deadline or an output overflow stops capture
-  and requests termination of the running child and its process tree. WASP has no subprocess runner.
+  and requests termination of the running child and its process tree. On Windows, the task fails only once the
+  job's processes have ended, waited for 5 seconds at most, so that a script may remove the files they had open
+  (24 November 2026, Proposed). WASP has no subprocess runner.
 
 ---
 

@@ -15,6 +15,11 @@ internal sealed class WindowsProcessCapture(SafeWaitHandle job, SafeWaitHandle p
     private const uint WaitTimeout = 258;
     private const nuint HandleList = 0x00020002;
     private const nuint JobList = 0x0002000D;
+    private const int BasicProcessIdList = 3;
+    private const int MoreData = 234;
+    private const uint Synchronize = 0x00100000;
+    private const uint QueryLimitedInformation = 0x1000;
+    private const int StopWaitMilliseconds = 5000;
 
     public Stream Output { get; } = output;
     public Stream Error { get; } = error;
@@ -113,8 +118,55 @@ internal sealed class WindowsProcessCapture(SafeWaitHandle job, SafeWaitHandle p
 
     public void Stop()
     {
-        // Job membership persists even if the launcher has exited and its descendants are orphaned.
-        if (TerminateJobObject(job, 1)) _ = WaitForSingleObject(process, 1000);
+        // Job membership persists even if the launcher has exited and its descendants are orphaned. Windows ends a
+        // process TerminateJobObject terminates after it returns, its files open until then: so each of the job's
+        // processes is opened before and waited for after, StopWaitMilliseconds in all, so that a script may remove
+        // the files they had open as soon as process.run fails.
+        var members = OpenMembers();
+        try
+        {
+            if (!TerminateJobObject(job, 1)) return;
+            var deadline = Environment.TickCount64 + StopWaitMilliseconds;
+            _ = WaitForSingleObject(process, Remaining(deadline));
+            foreach (var member in members) _ = WaitForSingleObject(member, Remaining(deadline));
+        }
+        finally
+        {
+            foreach (var member in members) member.Dispose();
+        }
+    }
+
+    private static uint Remaining(long deadline) => (uint)Math.Max(0, deadline - Environment.TickCount64);
+
+    /// <summary>The job's processes, opened to wait for; one outside the job that took a listed ID left out.</summary>
+    private List<SafeWaitHandle> OpenMembers()
+    {
+        var members = new List<SafeWaitHandle>();
+        for (var capacity = 64; capacity <= 4096; capacity *= 4)
+        {
+            var size = 2 * sizeof(uint) + capacity * IntPtr.Size;
+            var list = Marshal.AllocHGlobal(size);
+            try
+            {
+                if (!QueryInformationJobObject(job, BasicProcessIdList, list, (uint)size, 0))
+                {
+                    if (Marshal.GetLastPInvokeError() == MoreData) continue;
+                    return members;
+                }
+                var (assigned, listed) = (Marshal.ReadInt32(list, 0), Marshal.ReadInt32(list, sizeof(uint)));
+                if (listed < assigned && capacity < 4096) continue;
+                for (var index = 0; index < listed; index++)
+                {
+                    var id = (uint)Marshal.ReadIntPtr(list, 2 * sizeof(uint) + index * IntPtr.Size);
+                    var member = OpenProcess(Synchronize | QueryLimitedInformation, false, id);
+                    if (!member.IsInvalid && IsProcessInJob(member, job, out var inJob) && inJob) members.Add(member);
+                    else member.Dispose();
+                }
+                return members;
+            }
+            finally { Marshal.FreeHGlobal(list); }
+        }
+        return members;
     }
 
     public void Dispose()
@@ -205,6 +257,16 @@ internal sealed class WindowsProcessCapture(SafeWaitHandle job, SafeWaitHandle p
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool TerminateJobObject(SafeWaitHandle job, uint code);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool QueryInformationJobObject(SafeWaitHandle job, int informationClass, nint information,
+        uint length, nint returned);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern SafeWaitHandle OpenProcess(uint access, bool inherit, uint processId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool IsProcessInJob(SafeWaitHandle process, SafeWaitHandle job, out bool result);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern uint WaitForSingleObject(SafeWaitHandle handle, uint timeout);
