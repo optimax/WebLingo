@@ -84,6 +84,15 @@ An open WebLingo script window can keep the old executable in use after its scri
 double-click `build.bat` again. The VS Code extension uses the installed CLI when its debugger setting is `weblingo`
 and the installation folder is on PATH.
 
+## Request limits
+
+A request under `wasp` is stopped once it passes its time, 60 s, its instructions, 1,000,000,000, or its heap's memory,
+128 MB of strings, each `wasp.config`'s `"limits"` (`WebLingoSchemes.TryReadLimits`, `WebLingoWaspServer.Load`), a 503,
+WL3003. The hosting core reports a cancellation whose signal says it passed a limit
+(`WebLingoCancellationSignal.Exceeded`) as WL3003; the time is kept by `WebLingoRequestTimer`, which ASP.NET Core's host
+and the FastCGI host start for each request, and which wakes a waiting request as a gone client does. No time limit
+under the debugger. Specification, section 6.12, "A request's limits"; WASP User Manual, section 12.
+
 ## Linux installation
 
 `Installers/Linux/package.sh`, run on Linux, makes a self-contained archive with `install.sh` and a Debian package for

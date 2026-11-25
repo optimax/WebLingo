@@ -2310,7 +2310,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | **WL3xxx** | **the program fails as it runs** |
 | WL3001 | an operation on values it does not take |
 | WL3002 | an integer result that does not fit in 64 bits |
-| WL3003 | the execution's limits exceeded: instructions, memory or call depth |
+| WL3003 | the execution's limits exceeded: instructions, memory or call depth, and, under `wasp`, a request's time |
 | WL3004 | the execution cancelled by its host |
 | WL3005 | an index outside an array or a string |
 | WL3006 | a member a value does not have |

@@ -178,6 +178,15 @@ public sealed class WebLingoApplication
     /// <summary>The largest body a site's request may have (section 6.12, "Uploaded files"), which its hosts let through.</summary>
     public long MaxBodySize => _options.Uploads.MaxBodySize;
 
+    /// <summary>
+    /// How long a request may take, which its host keeps, the portable core having no timers, telling the request's
+    /// cancellation signal <see cref="TimeLimitMessage"/> once it has passed (section 6.12, "Limits"); null for none.
+    /// </summary>
+    public TimeSpan? RequestTimeout => _options.RequestTimeout;
+
+    /// <summary>What a request its time limit stopped is told, its error's message.</summary>
+    public string TimeLimitMessage => _options.TimeLimitMessage;
+
     /// <summary>Whether a request says its body is larger than the site takes, by its <c>Content-Length</c>, before it is read.</summary>
     private bool TooLarge(IWebLingoHttpRequest request) =>
         long.TryParse(request.Headers.Get("Content-Length"), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture,
@@ -308,25 +317,33 @@ public sealed class WebLingoApplication
             SchedulerHost = host,
             Suspends = scheduler is not null,
             InstructionBudget = _options.InstructionBudget,
+            Resources = WebLingoResourceBudget.Default with { MaxHeapUnits = _options.MaxHeapUnits },
             Cancellation = cancellation,
             Lines = page.LineOf
         };
         var vm = new WebLingoVirtualMachine { Loader = page.Modules, Components = page.Components, Debugger = thread };
-        return Ended(vm.Execute(page.Module!, context), vm.Resume, page, output, response, done, ending, thread, session, scheduler, host);
+        return Ended(vm.Execute(page.Module!, context), vm.Resume, page, output, response, done, ending, thread, session, scheduler, host,
+            cancellation);
     }
 
     /// <summary>What a run came to: <paramref name="done"/>, a failure, or a wait, which its host resumes.</summary>
     private WebLingoRequestOutcome Ended(WebLingoExecutionResult result, Func<WebLingoExecutionResult> resume, CompiledPage page,
         WebLingoResponseText output, IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done, IDisposable ending,
-        IWebLingoDebuggerThread? thread, WebLingoSession? session, IWebLingoSchedulerHost? scheduler, IWebLingoSchedulerHost? host)
+        IWebLingoDebuggerThread? thread, WebLingoSession? session, IWebLingoSchedulerHost? scheduler, IWebLingoSchedulerHost? host,
+        WebLingoCancellationSignal cancellation)
     {
         if (result.Waiting)
         {
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Waiting)
             {
-                Resume = () => Ended(resume(), resume, page, output, response, done, ending, thread, session, scheduler, host),
+                Resume = () => Ended(resume(), resume, page, output, response, done, ending, thread, session, scheduler, host, cancellation),
                 WaitMilliseconds = result.WaitMilliseconds
             };
+        }
+        // A request its host stopped for a limit, its time, failed as the VM's own limits fail it, WL3003, not as cancelled.
+        if (result is { Succeeded: false, Error: { Code: WebLingoDiagnosticCodes.Cancelled } cancelled } && cancellation.Limit is { } limit)
+        {
+            result = result with { Error = cancelled with { Code = WebLingoDiagnosticCodes.BudgetExceeded, Message = limit } };
         }
         thread?.Dispose(); // Its debugger's thread ended with it.
         ending.Dispose(); // Its uploads' temporary files removed (section 6.12, "Uploaded files").
@@ -354,15 +371,21 @@ public sealed class WebLingoApplication
             }
         };
 
-    /// <summary>A run that has ended, its session closed: <paramref name="done"/>, or a failure.</summary>
+    /// <summary>
+    /// A run that has ended, its session closed: <paramref name="done"/>, or a failure, a 503 where the request passed one of
+    /// its limits (section 6.12, "Limits"), WL3003, a 500 otherwise.
+    /// </summary>
     private WebLingoRequestOutcome Finished(WebLingoExecutionResult result, CompiledPage page, WebLingoResponseText output,
         IWebLingoHttpResponse response, WebLingoRequestOutcomeKind done)
     {
         if (!result.Succeeded)
         {
             var error = page.Describe(result.Error!);
-            if (!output.Sending) return Failed(response, [error]);
-            return FailedWhileSending(output, response, error);
+            if (output.Sending) return FailedWhileSending(output, response, error);
+            if (result.Error!.Code != WebLingoDiagnosticCodes.BudgetExceeded) return Failed(response, [error]);
+            _options.Log?.Invoke("A request passed one of its limits: " + error);
+            WebLingoErrorPages.Limited(response, _options.Mode, [error]);
+            return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
         }
         output.Send();
         response.Complete();

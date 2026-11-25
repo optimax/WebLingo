@@ -88,8 +88,44 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// <summary>The host's side of an execution's scheduler, a new one for each request, or none.</summary>
     public Func<IWebLingoSchedulerHost>? Scheduler { get; init; }
 
-    /// <summary>How many instructions a request may run before it is stopped (WL3003); no limit by default.</summary>
-    public long InstructionBudget { get; init; } = long.MaxValue;
+    /// <summary>
+    /// How many instructions a request may run before it is stopped, a 503, WL3003 (section 6.12, "Limits"): the
+    /// configuration's <c>"limits"</c>' <c>"requestInstructions"</c>, <see cref="DefaultInstructionBudget"/> by default.
+    /// </summary>
+    public long InstructionBudget { get; init; } = DefaultInstructionBudget;
+
+    /// <summary>
+    /// How many of its heap's units a request may hold, a unit two bytes of a string (section 6.12, "Limits"): the
+    /// configuration's <c>"requestMemory"</c>, in megabytes, <see cref="WebLingoHeap.DefaultMaxUnits"/>, about 128 MB, by
+    /// default.
+    /// </summary>
+    public long MaxHeapUnits { get; init; } = WebLingoHeap.DefaultMaxUnits;
+
+    /// <summary>
+    /// How long a request may take, from when its host began it, its waits included, before its host stops it, a 503,
+    /// WL3003 (section 6.12, "Limits"): the configuration's <c>"requestTimeout"</c>, <see cref="DefaultRequestTimeout"/> by
+    /// default; none, as under a debugger, whose stops a request's time must not count. The host keeps the time, the
+    /// portable core having no timers, and stops the request through its cancellation signal's
+    /// <see cref="WebLingoCancellationSignal.Exceeded"/>, with <see cref="TimeLimitMessage"/>.
+    /// </summary>
+    public TimeSpan? RequestTimeout { get; init; } = DefaultRequestTimeout;
+
+    /// <summary>A request's instructions by default, 4 to 14 s of computing on a development machine (section 6.12, "Limits").</summary>
+    public const long DefaultInstructionBudget = 1_000_000_000;
+
+    /// <summary>A request's time by default, as IIS's request timeout is (section 6.12, "Limits").</summary>
+    public static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>What a request stopped by its time limit is told, its host giving it to its cancellation signal.</summary>
+    public string TimeLimitMessage =>
+        $"The request took longer than {Seconds(RequestTimeout ?? TimeSpan.Zero)}, its site's limit, \"limits\"' \"requestTimeout\" in "
+        + "wasp.config, and was stopped.";
+
+    private static string Seconds(TimeSpan time)
+    {
+        var seconds = time.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return seconds == "1" ? "1 second" : seconds + " seconds";
+    }
 
     /// <summary>
     /// Where the application reports what no response can show, a line at a time, from any worker: a page that fails after

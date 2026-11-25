@@ -543,6 +543,52 @@ public sealed class WaspServeTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// A request's limits from <c>wasp.config</c>'s <c>"limits"</c> (specification, section 6.12, "Limits"): a page that loops
+    /// stopped by its time, a 503, and one that counts by its instructions; every setting checked where the configuration is
+    /// read, a wrong one an error that says what each is.
+    /// </summary>
+    [Fact]
+    public async Task ARequestsLimitsAreTheConfigurations()
+    {
+        Write("wasp.config", "{ \"mode\": \"development\", \"limits\": { \"requestTimeout\": 0.5, \"requestInstructions\": 50000, "
+                             + "\"requestMemory\": 16 } }");
+        Write("loops.wasp", "<% import { delay } from \"std:system\"; while (true) { await delay(10); } %>never");
+        Write("counts.wasp", "<% var sum = 0; for (var i = 0; i < 100000; i++) { sum += i; } %><%= sum %>");
+        Write("quick.wasp", "quick");
+        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        Assert.True(server is not null, error);
+        await server.StartAsync();
+        try
+        {
+            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            using var client = new HttpClient { BaseAddress = new Uri(address) };
+            Assert.Equal("quick", await client.GetStringAsync("/quick"));
+            using var loops = await client.GetAsync("/loops");
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, loops.StatusCode);
+            Assert.Contains("error WL3003: The request took longer than 0.5 seconds", await loops.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+            using var counts = await client.GetAsync("/counts");
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, counts.StatusCode);
+            Assert.Contains("error WL3003: The program ran 50000 instructions", await counts.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            await server.StopAsync();
+        }
+
+        const string Says = "\"limits\" is an object, { \"requestTimeout\": 60, \"requestInstructions\": 1000000000, \"requestMemory\": 128 }, "
+                            + "each optional, \"requestTimeout\" a number of seconds more than 0, \"requestInstructions\" an integer more than 0, and "
+                            + "\"requestMemory\" a number of megabytes from 1 to 1048576.";
+        foreach (var setting in new[] { "[]", "{ \"requestTimeout\": 0 }", "{ \"requestTimeout\": \"60\" }", "{ \"requestInstructions\": 1.5 }",
+                                         "{ \"requestInstructions\": 0 }", "{ \"requestMemory\": 0 }", "{ \"requestMemory\": 2000000 }",
+                                         "{ \"time\": 60 }" })
+        {
+            Write("wasp.config", "{ \"limits\": " + setting + " }");
+            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+            Assert.EndsWith(Says, error);
+        }
+    }
+
     [Fact]
     public void UnderIisTheSiteIsTheFolderTheModuleStartsWaspIn()
     {
@@ -577,8 +623,8 @@ public sealed class WaspServeTests : IDisposable
         Write("wasp.config", "{ \"environment\": \"production\" }");
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
         Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"mode\", "
-                        + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\" "
-                        + "and \"sessions\".", error);
+                        + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
+                        + "\"sessions\" and \"limits\".", error);
 
         Write("wasp.config", "{ \"sendTimeout\": 5 }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));

@@ -47,6 +47,8 @@ public static class WebLingoAspNetCore
             gone.Cancel();
         }
         using var aborted = context.RequestAborted.Register(Cancel);
+        // Its time limit, which stops it too, resumed if it waits (section 6.12, "Limits").
+        using var timer = WebLingoRequestTimer.Start(application, cancellation, gone);
         var run = workers.Serve((worker, scheduler) => application.Handle(request, response, worker, cancellation, scheduler), gone.Token,
             response.End);
         try

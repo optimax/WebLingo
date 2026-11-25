@@ -398,7 +398,10 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
         var response = new WebLingoStreamingResponse(request.Going.Token);
         var cancellation = new WebLingoCancellationSignal();
         using var cancelled = request.Going.Token.Register(cancellation.Cancel);
-        var run = workers.Serve((worker, scheduler) => application.Handle(translated, response, worker, cancellation, scheduler), request.Going.Token,
+        // Woken, where it waits, by the web server's going, or by its time limit, which stops it too (section 6.12, "Limits").
+        using var wake = CancellationTokenSource.CreateLinkedTokenSource(request.Going.Token);
+        using var timer = WebLingoRequestTimer.Start(application, cancellation, wake);
+        var run = workers.Serve((worker, scheduler) => application.Handle(translated, response, worker, cancellation, scheduler), wake.Token,
             response.End);
         var sink = new Sink(connection, request.Id);
         try

@@ -280,6 +280,33 @@ public sealed class FastCgiTests : IDisposable
         Assert.Contains("wasp fastcgi listens on one of --port, --socket and --stdin.", error.ToString(), StringComparison.Ordinal);
     }
 
+    /// <summary>A request's time, kept by the FastCGI host as by ASP.NET Core's (section 6.12, "Limits"): a page that loops, stopped, a 503.</summary>
+    [Fact]
+    public async Task APageThatPassesItsTimeIsStopped()
+    {
+        var site = Path.Combine(_root, "limited");
+        Directory.CreateDirectory(site);
+        File.WriteAllText(Path.Combine(site, "wasp.config"), "{ \"limits\": { \"requestTimeout\": 0.3 } }");
+        File.WriteAllText(Path.Combine(site, "loops.wasp"), "<% var i = 0; while (true) { i = i + 1; } %>never");
+        var application = WebLingoWaspServer.Load(site, new Dictionary<string, string>(), WebLingoMode.Production, null, out _, out _, out var error);
+        Assert.True(application is not null, error);
+        using var stop = new CancellationTokenSource();
+        using var listener = WebLingoWaspFastCgi.Listen(0, null, out _);
+        _ = new WebLingoFastCgiServer(application, site, _workers).ServeAsync(listener, stop.Token);
+        try
+        {
+            using var connection = new TcpClient();
+            await connection.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndPoint!).Port);
+            var (head, body, _) = await RequestAsync(connection, 1, Get("/loops"), []);
+            Assert.Equal("Status: 503 Service Unavailable", head[0]);
+            Assert.DoesNotContain("never", body, StringComparison.Ordinal);
+        }
+        finally
+        {
+            stop.Cancel();
+        }
+    }
+
     private async Task<TcpClient> Connect()
     {
         var client = new TcpClient();

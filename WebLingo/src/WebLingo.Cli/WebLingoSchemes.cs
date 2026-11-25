@@ -63,7 +63,7 @@ public static class WebLingoSchemes
         out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed, out WebLingoEnvSettings env,
         out IReadOnlyDictionary<string, WebLingoMailServer> mail, out string? error) =>
         TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
-            out databases, out files, out allowed, out env, out mail, out _, out _, out error);
+            out databases, out files, out allowed, out env, out mail, out _, out _, out _, out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
@@ -73,7 +73,7 @@ public static class WebLingoSchemes
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out string? error) =>
         TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out _, out _, out _, out _, out _, out _, out _,
-            out _, out error);
+            out _, out _, out error);
 
     /// <summary>
     /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, its databases,
@@ -83,19 +83,20 @@ public static class WebLingoSchemes
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out string? error) =>
         TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out allowedHosts, out databases, out files,
-            out _, out _, out _, out _, out _, out error);
+            out _, out _, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name, and what its
     /// scripts may read of the machine's environment, nothing when it says nothing, its mail servers, none when it names
-    /// none, what it says of a request's body, and where it keeps its sessions.
+    /// none, what it says of a request's body, where it keeps its sessions, and a request's limits.
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
         out WebLingoEnvSettings env, out IReadOnlyDictionary<string, WebLingoMailServer> mail, out WebLingoUploadSettings uploads,
-        out WebLingoSessionSettings sessions, out string? error)
+        out WebLingoSessionSettings sessions, out WebLingoLimitSettings limits, out string? error)
     {
+        limits = WebLingoLimitSettings.Default;
         var servers = new Dictionary<string, WebLingoMailServer>(StringComparer.Ordinal);
         mail = servers;
         uploads = WebLingoUploadSettings.Default;
@@ -120,7 +121,7 @@ public static class WebLingoSchemes
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
         if (File.Exists(file) && !TryRead(file, folder, schemes, ref mode, ref sendTimeout, hosts, named, read, write,
-            allowing, ref env, servers, ref uploads, ref sessions, out error))
+            allowing, ref env, servers, ref uploads, ref sessions, ref limits, out error))
         {
             return false;
         }
@@ -202,6 +203,43 @@ public static class WebLingoSchemes
                 return false;
             }
             mail[server.Name] = new WebLingoMailServer(host, port ?? WebLingoMailServer.DefaultPort(tls), tls, user, password, thumbprint);
+        }
+        error = null;
+        return true;
+    }
+
+    /// <summary>
+    /// <c>"limits": { "requestTimeout": 60, "requestInstructions": 1000000000, "requestMemory": 128 }</c>, each optional: how
+    /// many seconds a request may take, its waits included, a number more than 0; how many instructions it may run, an
+    /// integer more than 0; and how many megabytes of strings its heap may hold, an integer from 1 to 1,048,576 (section
+    /// 6.12, "Limits"). Each it does not give is its host's default.
+    /// </summary>
+    private static bool TryReadLimits(string file, JsonElement setting, ref WebLingoLimitSettings limits, out string? error)
+    {
+        error = $"{file}: \"limits\" is an object, {{ \"requestTimeout\": 60, \"requestInstructions\": 1000000000, \"requestMemory\": 128 }}, "
+                + "each optional, \"requestTimeout\" a number of seconds more than 0, \"requestInstructions\" an integer more than 0, and "
+                + "\"requestMemory\" a number of megabytes from 1 to 1048576.";
+        if (setting.ValueKind != JsonValueKind.Object) return false;
+        foreach (var entry in setting.EnumerateObject())
+        {
+            var number = entry.Value.ValueKind == JsonValueKind.Number;
+            if (entry.Name == "requestTimeout" && number && entry.Value.TryGetDouble(out var seconds) && seconds > 0
+                && seconds <= TimeSpan.MaxValue.TotalSeconds / 2)
+            {
+                limits = limits with { TimeoutSeconds = seconds };
+            }
+            else if (entry.Name == "requestInstructions" && number && entry.Value.TryGetInt64(out var instructions) && instructions > 0)
+            {
+                limits = limits with { Instructions = instructions };
+            }
+            else if (entry.Name == "requestMemory" && number && entry.Value.TryGetInt64(out var megabytes) && megabytes is >= 1 and <= 1_048_576)
+            {
+                limits = limits with { MemoryMegabytes = megabytes };
+            }
+            else
+            {
+                return false;
+            }
         }
         error = null;
         return true;
@@ -377,7 +415,7 @@ public static class WebLingoSchemes
     private static bool TryRead(string file, string folder, Dictionary<string, string> schemes, ref string? mode, ref double? sendTimeout,
         List<string> hosts, Dictionary<string, WebLingoSecret> databases, List<string> read, List<string> write,
         Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, Dictionary<string, WebLingoMailServer> mail,
-        ref WebLingoUploadSettings uploads, ref WebLingoSessionSettings sessions, out string? error)
+        ref WebLingoUploadSettings uploads, ref WebLingoSessionSettings sessions, ref WebLingoLimitSettings limits, out string? error)
     {
         error = null;
         try
@@ -511,6 +549,12 @@ public static class WebLingoSchemes
                     if (!TryReadSessions(file, setting.Value, ref sessions, out error)) return false;
                     continue;
                 }
+                if (setting.Name == "limits")
+                {
+                    // How long a request may take, how many instructions it may run, and its heap's memory (section 6.12, "Limits").
+                    if (!TryReadLimits(file, setting.Value, ref limits, out error)) return false;
+                    continue;
+                }
                 if (setting.Name == "mail")
                 {
                     // Its mail servers, each a name a script sends through it by, and its settings (section 7.17).
@@ -526,8 +570,8 @@ public static class WebLingoSchemes
                 if (setting.Name != "schemes")
                 {
                     error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"mode\", "
-                            + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\" "
-                            + "and \"sessions\".";
+                            + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
+                            + "\"sessions\" and \"limits\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)
@@ -555,6 +599,17 @@ public static class WebLingoSchemes
             return false;
         }
     }
+}
+
+/// <summary>
+/// What a site's configuration says of a request's limits (specification, section 6.12, "Limits"): how many seconds it may
+/// take, its waits included; how many instructions it may run; and how many megabytes of strings its heap may hold, two
+/// bytes a unit. Each null where it says nothing of it, its host's default then.
+/// </summary>
+public sealed record WebLingoLimitSettings(double? TimeoutSeconds, long? Instructions, long? MemoryMegabytes)
+{
+    /// <summary>What a configuration that says nothing of them means: the host's defaults.</summary>
+    public static WebLingoLimitSettings Default { get; } = new(null, null, null);
 }
 
 /// <summary>

@@ -4,9 +4,10 @@ namespace WebLingo.Hosting;
 
 /// <summary>
 /// The responses an application gives when it cannot give a page's (specification, section 6.12, "Errors"): 404 for a path
-/// with no route, 405 for a method a route handler does not answer, and 500 for a page that does not compile or fails while
-/// it runs, its errors, each <c>file(line,column): error CODE: message</c>, shown only in development, every one escaped as
-/// HTML. Each has only the headers it sets, any a page set before it failed removed.
+/// with no route, 405 for a method a route handler does not answer, 500 for a page that does not compile or fails while it
+/// runs, and 503 for one stopped by one of its request's limits ("Limits"), its errors, each
+/// <c>file(line,column): error CODE: message</c>, shown only in development, every one escaped as HTML. Each has only the
+/// headers it sets, any a page set before it failed removed.
 /// </summary>
 internal static class WebLingoErrorPages
 {
@@ -22,6 +23,10 @@ internal static class WebLingoErrorPages
 
     public static void Failed(IWebLingoHttpResponse response, WebLingoMode mode, IReadOnlyList<string> errors) =>
         Write(response, 500, "Internal Server Error", mode == WebLingoMode.Development ? errors : []);
+
+    /// <summary>A 503, a request its time, its instructions or its memory stopped (section 6.12, "Limits").</summary>
+    public static void Limited(IWebLingoHttpResponse response, WebLingoMode mode, IReadOnlyList<string> errors) =>
+        Write(response, 503, "Service Unavailable", mode == WebLingoMode.Development ? errors : []);
 
     private static void Write(IWebLingoHttpResponse response, int status, string reason, IReadOnlyList<string> errors, string? allow = null)
     {

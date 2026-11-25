@@ -154,8 +154,23 @@ public sealed record WebLingoResourceBudget(int MaxRegisters, long MaxHeapUnits 
 public sealed class WebLingoCancellationSignal
 {
     private volatile bool _requested;
+    private volatile string? _limit;
     public bool IsCancellationRequested => _requested;
+
+    /// <summary>
+    /// The limit the execution passed, where it was asked to stop for one, its host's words for it, which the host reports
+    /// as WL3003, a limit's, rather than the WL3004 the VM stops with; null where it was cancelled otherwise, or not at all.
+    /// </summary>
+    public string? Limit => _limit;
+
     public void Cancel() => _requested = true;
+
+    /// <summary>Asks the execution to stop because it passed a limit, <paramref name="limit"/> saying which, the first kept.</summary>
+    public void Exceeded(string limit)
+    {
+        _limit ??= limit;
+        _requested = true;
+    }
 }
 
 /// <summary>A host built-in function, such as <c>write</c>.</summary>

@@ -132,7 +132,7 @@ public static class WebLingoWaspServer
         (workers, mode) = (Math.Max(1, Environment.ProcessorCount), defaultMode);
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
             out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out var env, out var mail,
-            out var uploads, out var sessions, out error)) return null;
+            out var uploads, out var sessions, out var limits, out error)) return null;
         if (configured is not null) mode = configured == "production" ? WebLingoMode.Production : WebLingoMode.Development;
 
         // std:system, loaded once here to fail early, then by each worker on its own.
@@ -181,6 +181,12 @@ public static class WebLingoWaspServer
             Scheduler = () => new DotNetSchedulerHost(),
             Log = log is null ? null : log.WriteLine,
             SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30),
+            // A request's limits, wasp.config's or the defaults; its time none under a debugger, whose stops it must not
+            // count (section 6.12, "Limits"; section 5.7, "Debugging WASP pages").
+            RequestTimeout = debugger is not null ? null
+                : limits.TimeoutSeconds is { } limit ? TimeSpan.FromSeconds(limit) : WebLingoApplicationOptions.DefaultRequestTimeout,
+            InstructionBudget = limits.Instructions ?? WebLingoApplicationOptions.DefaultInstructionBudget,
+            MaxHeapUnits = limits.MemoryMegabytes is { } megabytes ? megabytes * 512 * 1024 : WebLingoHeap.DefaultMaxUnits,
             Debugger = debugger
         }, out error);
         if (application is null) error = $"{full}: {error}.";

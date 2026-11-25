@@ -949,8 +949,31 @@ Each error has a code, `WL` and four digits, whose first digit says what kind it
 |---|---|---|
 | WL1xxx | the text does not parse | a missing `}` |
 | WL2xxx | the code does not make sense | WL2001, a name that is not defined; WL2016, a parameter not given |
-| WL3xxx | the program fails as it runs | WL3005, an index out of range; WL3006, a member a value does not have; WL3007, a key a map does not have; WL3004, a request cancelled |
+| WL3xxx | the program fails as it runs | WL3005, an index out of range; WL3006, a member a value does not have; WL3007, a key a map does not have; WL3003, a request past one of its limits; WL3004, a request cancelled |
 | WL5xxx | templates | a file that cannot be included; WL5003, an include that includes itself |
+
+### A request's limits
+
+A request is stopped once it passes one of its limits, so that a page that loops for ever, or keeps growing a string,
+does not keep its server busy:
+
+- **its time:** 60 seconds from when the server began it, its waits for a database, a client or a lock included, as
+  IIS's request timeout counts them;
+- **its instructions:** 1,000,000,000, some seconds of computing, a waiting request running none;
+- **its memory:** 128 MB of strings, its values all counted as strings are, by their size.
+
+A request stopped so is a **503 Service Unavailable**, its error WL3003, shown in its page in development only and written
+to the server's log; a page cannot catch it. `wasp.config`'s `"limits"` gives others ([section 14](#14-configuration-waspconfig)):
+
+```json
+{ "limits": { "requestTimeout": 120, "requestInstructions": 5000000000, "requestMemory": 512 } }
+```
+
+A request stopped by its time stops at once where it computes, and where it waits, once its wait gives way, a wait for
+a session another request holds once that wait ends. While its server runs other requests on the same worker, a page
+that computes without waiting holds that worker until it is stopped. Under the debugger, its time is not counted, a
+request stopped at a breakpoint waiting for you. Under IIS, its ASP.NET Core Module gives a request two minutes too,
+its `web.config`'s `requestTimeout`, which a site whose `"requestTimeout"` is longer raises with it.
 
 ---
 
@@ -991,6 +1014,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"maxBodySize"` | the largest body a request may have, in bytes, a larger one a 413 (section 9, "Uploaded files") | 30,000,000 |
 | `"uploads"` | what a form's files may be: `{ "inMemory": 65536, "maxSize": 20000000, "folder": "../tmp" }`, how many bytes of a file are kept in memory, the rest in a temporary file, the most its files may take in all, and the folder their temporary files are made in, outside the site | 64 KB, `"maxBodySize"`, the system's temporary folder |
 | `"sessions"` | where the site keeps its sessions, and how long: `{ "store": "database", "database": "main", "table": "wasp_sessions", "create": false, "timeout": 20, "lockTimeout": 30 }`, the server's memory, `"memory"`, or a table of a database `"databases"` names, `"database"`, the table made where it is missing where `"create"` is `true`; the minutes a session lasts once no request uses it, and the seconds a request waits for a session another has (section 9, "Sessions" and "Sessions in a database") | the server's memory, `wasp_sessions`, `false`, 20 minutes, 30 seconds |
+| `"limits"` | a request's limits, each optional: `{ "requestTimeout": 60, "requestInstructions": 1000000000, "requestMemory": 128 }`, the seconds it may take, its waits included, more than 0, the instructions it may run, and the megabytes of strings it may hold, 1 to 1,048,576; one passed a 503, WL3003 (section 12, "A request's limits") | 60 seconds, 1,000,000,000 instructions, 128 MB |
 | `"mail"` | the mail servers the site's pages and handlers send through, with `std:mail`, each a name and its settings: `{ "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": { "env": "SMTP_PASSWORD" } } }` | none |
 
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
