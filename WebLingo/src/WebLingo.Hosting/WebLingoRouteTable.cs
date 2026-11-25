@@ -19,7 +19,8 @@ public sealed record WebLingoRoute(WebLingoRouteKind Kind, string File);
 /// its own name, nor one whose extension has another case, <c>DB.WLG</c>, which Windows imports as <c>db.wlg</c>, and which
 /// is no route of its own, a page or a handler routed only by <c>.wasp</c> and <c>.wlg</c> as written (until 25 November
 /// 2026, "Security Review of WASP's Request Path", such a file was served as it is, its source with it, and so was a
-/// folder's <c>web.config</c>).
+/// folder's <c>web.config</c>); nor a file whose extension is one of <see cref="Sensitive"/>, whatever its case, unless the
+/// site serves that extension (section 6.12, "Sensitive files"), so that a request for it is a 404.
 /// </summary>
 public sealed class WebLingoRouteTable
 {
@@ -28,7 +29,22 @@ public sealed class WebLingoRouteTable
 
     private static readonly string[] Unrouted = [ConfigurationFile, "weblingo.config", "web.config"];
 
+    /// <summary>
+    /// The extensions of files a site never serves as they are unless its configuration's <c>"serve"</c> allows them (the
+    /// owner's answer, 25 November 2026, "Security Headers and Sensitive Files in WASP", A2 (a)), each with its dot, in lower
+    /// case: databases, <c>.db</c>, <c>.db3</c>, <c>.sqlite</c>, <c>.sqlite3</c>, <c>.mdb</c>, <c>.accdb</c>, <c>.mdf</c> and
+    /// <c>.ldf</c>; SQL, <c>.sql</c>; backups and an editor's copies, <c>.bak</c>, <c>.backup</c>, <c>.old</c>, <c>.orig</c>,
+    /// <c>.swp</c> and <c>.tmp</c>; logs, <c>.log</c>; environments and configurations, <c>.env</c>, <c>.config</c> and
+    /// <c>.ini</c>; and keys and their stores, <c>.pfx</c>, <c>.p12</c>, <c>.pem</c> and <c>.key</c>.
+    /// </summary>
+    public static readonly IReadOnlyList<string> Sensitive =
+    [
+        ".db", ".db3", ".sqlite", ".sqlite3", ".mdb", ".accdb", ".mdf", ".ldf", ".sql", ".bak", ".backup", ".old", ".orig", ".swp", ".tmp",
+        ".log", ".env", ".config", ".ini", ".pfx", ".p12", ".pem", ".key"
+    ];
+
     private readonly Dictionary<string, WebLingoRoute> _routes = new(StringComparer.Ordinal);
+    private IReadOnlyList<string> _served = [];
 
     private WebLingoRouteTable() { }
 
@@ -38,10 +54,13 @@ public sealed class WebLingoRouteTable
     /// <summary>The route of a request's path, or null if it has none.</summary>
     public WebLingoRoute? Find(string path) => _routes.TryGetValue(path, out var route) ? route : null;
 
-    /// <summary>The routes of the files under <paramref name="root"/>; null, with why, if two files are one route or the root cannot be read.</summary>
-    public static WebLingoRouteTable? Make(IWebLingoFileSystem files, string root, out string? error)
+    /// <summary>
+    /// The routes of the files under <paramref name="root"/>, a file whose extension is <see cref="Sensitive"/> routed only
+    /// where <paramref name="served"/> has it; null, with why, if two files are one route or the root cannot be read.
+    /// </summary>
+    public static WebLingoRouteTable? Make(IWebLingoFileSystem files, string root, IReadOnlyList<string> served, out string? error)
     {
-        var table = new WebLingoRouteTable();
+        var table = new WebLingoRouteTable { _served = served };
         error = null;
         try
         {
@@ -65,6 +84,19 @@ public sealed class WebLingoRouteTable
             }
         }
         return error is null ? table : null;
+    }
+
+    /// <summary>Whether a file of <paramref name="extension"/>, in lower case, is one a site does not serve, <see cref="Sensitive"/>'s and not served.</summary>
+    private bool IsRefused(string extension)
+    {
+        var sensitive = false;
+        foreach (var refused in Sensitive) sensitive |= refused == extension;
+        if (!sensitive) return false;
+        foreach (var allowed in _served)
+        {
+            if (allowed == extension) return false;
+        }
+        return true;
     }
 
     private static bool IsUnrouted(string name)
@@ -96,6 +128,7 @@ public sealed class WebLingoRouteTable
             if (source && extension is not (".wasp" or ".wlg")) continue; // Source, never served, nor a route.
             if (!source)
             {
+                if (IsRefused(extension.ToLowerInvariant())) continue; // A database, a log, a key: never served (section 6.12).
                 // A page or a handler of the same path is the route, whichever is listed first.
                 _routes.TryAdd("/" + file, new WebLingoRoute(WebLingoRouteKind.File, file));
                 continue;

@@ -69,7 +69,7 @@ public static class WebLingoAspNetCore
             await run;
             throw;
         }
-        if (await run is { Kind: WebLingoRequestOutcomeKind.File, File: { } file }) await SendFile(context, root, file);
+        if (await run is { Kind: WebLingoRequestOutcomeKind.File, File: { } file }) await SendFile(context, root, file, application.Headers);
     }
 
     /// <summary>
@@ -117,8 +117,10 @@ public static class WebLingoAspNetCore
         }
     }
 
-    private static async Task SendFile(HttpContext context, string root, string file)
+    private static async Task SendFile(HttpContext context, string root, string file, IReadOnlyList<KeyValuePair<string, string>> site)
     {
+        // The site's headers, X-Content-Type-Options and its kin, a file's too (section 6.12, "Security headers").
+        foreach (var (name, value) in site) context.Response.Headers[name] = value;
         if (!ContentTypes.TryGetContentType(file, out var type))
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;

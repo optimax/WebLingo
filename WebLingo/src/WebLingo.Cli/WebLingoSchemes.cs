@@ -63,7 +63,7 @@ public static class WebLingoSchemes
         out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed, out WebLingoEnvSettings env,
         out IReadOnlyDictionary<string, WebLingoMailServer> mail, out string? error) =>
         TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
-            out databases, out files, out allowed, out env, out mail, out _, out _, out _, out _, out error);
+            out databases, out files, out allowed, out env, out mail, out _, out _, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
@@ -73,7 +73,7 @@ public static class WebLingoSchemes
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out string? error) =>
         TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out _, out _, out _, out _, out _, out _, out _,
-            out _, out _, out _, out error);
+            out _, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, its databases,
@@ -83,21 +83,26 @@ public static class WebLingoSchemes
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out string? error) =>
         TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out allowedHosts, out databases, out files,
-            out _, out _, out _, out _, out _, out _, out _, out error);
+            out _, out _, out _, out _, out _, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name, and what its
     /// scripts may read of the machine's environment, nothing when it says nothing, its mail servers, none when it names
-    /// none, what it says of a request's body, where it keeps its sessions, a request's limits, and its log, a site's only.
+    /// none, what it says of a request's body, where it keeps its sessions, a request's limits, its log, the headers its
+    /// responses have, and the extensions of the files it serves that a site does not by default, a site's only.
     /// </summary>
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
         out WebLingoEnvSettings env, out IReadOnlyDictionary<string, WebLingoMailServer> mail, out WebLingoUploadSettings uploads,
-        out WebLingoSessionSettings sessions, out WebLingoLimitSettings limits, out WebLingoLogSettings log, out string? error)
+        out WebLingoSessionSettings sessions, out WebLingoLimitSettings limits, out WebLingoLogSettings log, out WebLingoHeaderSettings headers,
+        out IReadOnlyList<string> served, out string? error)
     {
         limits = WebLingoLimitSettings.Default;
         log = WebLingoLogSettings.Default;
+        headers = WebLingoHeaderSettings.Default;
+        var serving = new List<string>();
+        served = serving;
         var servers = new Dictionary<string, WebLingoMailServer>(StringComparer.Ordinal);
         mail = servers;
         uploads = WebLingoUploadSettings.Default;
@@ -122,7 +127,7 @@ public static class WebLingoSchemes
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
         if (File.Exists(file) && !TryRead(file, folder, schemes, ref mode, ref sendTimeout, hosts, named, read, write,
-            allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, out error))
+            allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, ref headers, serving, out error))
         {
             return false;
         }
@@ -240,6 +245,103 @@ public static class WebLingoSchemes
             else
             {
                 return false;
+            }
+        }
+        error = null;
+        return true;
+    }
+
+    /// <summary>The policies <c>Referrer-Policy</c> takes (W3C's Referrer Policy, section 3).</summary>
+    private static readonly string[] ReferrerPolicies =
+    [
+        "no-referrer", "no-referrer-when-downgrade", "origin", "origin-when-cross-origin", "same-origin", "strict-origin",
+        "strict-origin-when-cross-origin", "unsafe-url"
+    ];
+
+    /// <summary>
+    /// <c>"headers": { "nosniff": true, "referrerPolicy": "strict-origin-when-cross-origin", "frameAncestors": ["self"] }</c>,
+    /// each optional, each given its default where it is not (section 6.12, "Security headers"): whether its responses say
+    /// <c>X-Content-Type-Options: nosniff</c>; their <c>Referrer-Policy</c>, or <c>null</c> for none; and the sites that may
+    /// show its pages in a frame, <c>Content-Security-Policy: frame-ancestors</c>'s sources, <c>"self"</c> and
+    /// <c>"none"</c> written without its quotes, <c>"none"</c> alone, or <c>null</c> for no limit.
+    /// </summary>
+    private static bool TryReadHeaders(string file, JsonElement setting, ref WebLingoHeaderSettings headers, out string? error)
+    {
+        error = $"{file}: \"headers\" is an object, {{ \"nosniff\": true, \"referrerPolicy\": \"strict-origin-when-cross-origin\", "
+                + "\"frameAncestors\": [\"self\"] }, each optional, \"nosniff\" a Boolean, \"referrerPolicy\" \"no-referrer\", "
+                + "\"no-referrer-when-downgrade\", \"origin\", \"origin-when-cross-origin\", \"same-origin\", \"strict-origin\", "
+                + "\"strict-origin-when-cross-origin\", \"unsafe-url\" or null for none, and \"frameAncestors\" the sites that may show its "
+                + "pages in a frame, \"self\", \"none\" alone, or a scheme or a host, \"https://partner.example\", or null for any.";
+        if (setting.ValueKind != JsonValueKind.Object) return false;
+        foreach (var entry in setting.EnumerateObject())
+        {
+            var value = entry.Value;
+            if (entry.Name == "nosniff" && value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                headers = headers with { NoSniff = value.GetBoolean() };
+            }
+            else if (entry.Name == "referrerPolicy" && (value.ValueKind == JsonValueKind.Null
+                     || value.ValueKind == JsonValueKind.String && Array.IndexOf(ReferrerPolicies, value.GetString()) >= 0))
+            {
+                headers = headers with { ReferrerPolicy = value.ValueKind == JsonValueKind.Null ? null : value.GetString() };
+            }
+            else if (entry.Name == "frameAncestors" && value.ValueKind == JsonValueKind.Null)
+            {
+                headers = headers with { FrameAncestors = null };
+            }
+            else if (entry.Name == "frameAncestors" && TryReadAncestors(value, out var ancestors))
+            {
+                headers = headers with { FrameAncestors = ancestors };
+            }
+            else
+            {
+                return false;
+            }
+        }
+        error = null;
+        return true;
+    }
+
+    /// <summary>
+    /// <c>frame-ancestors</c>' sources: <c>"self"</c> and <c>"none"</c> as CSP quotes them, <c>"none"</c> alone, and a scheme
+    /// or a host, its scheme and its port optional, as written, of the characters a URL's scheme, host and port have, so that
+    /// none ends the header's directive or the header itself.
+    /// </summary>
+    private static bool TryReadAncestors(JsonElement value, out List<string> ancestors)
+    {
+        ancestors = [];
+        if (value.ValueKind != JsonValueKind.Array) return false;
+        foreach (var entry in value.EnumerateArray())
+        {
+            var text = entry.ValueKind == JsonValueKind.String ? entry.GetString()! : "";
+            if (text is "self" or "none")
+            {
+                ancestors.Add("'" + text + "'");
+                continue;
+            }
+            if (text.Length == 0 || text.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('-' or '.' or ':' or '/' or '*' or '+'))) return false;
+            ancestors.Add(text);
+        }
+        return ancestors.Count > 0 && (ancestors.Count == 1 || !ancestors.Contains("'none'"));
+    }
+
+    /// <summary>
+    /// <c>"serve": { "allow": [".log"] }</c> (section 6.12, "Sensitive files"): the extensions, each with its dot, of the files
+    /// a site does not serve by default that it serves, in lower case; its host checks that each is one of those.
+    /// </summary>
+    private static bool TryReadServe(string file, JsonElement setting, List<string> served, out string? error)
+    {
+        error = $"{file}: \"serve\" is an object, {{ \"allow\": [\".log\"] }}, the extensions, each with its dot, of the files a site "
+                + "does not serve by default that it serves.";
+        if (setting.ValueKind != JsonValueKind.Object) return false;
+        foreach (var entry in setting.EnumerateObject())
+        {
+            if (entry.Name != "allow" || entry.Value.ValueKind != JsonValueKind.Array) return false;
+            foreach (var extension in entry.Value.EnumerateArray())
+            {
+                var text = extension.ValueKind == JsonValueKind.String ? extension.GetString()! : "";
+                if (text.Length < 2 || text[0] != '.' || text.IndexOfAny(['.', '/', '\\'], 1) >= 0) return false;
+                served.Add(text.ToLowerInvariant());
             }
         }
         error = null;
@@ -448,7 +550,7 @@ public static class WebLingoSchemes
         List<string> hosts, Dictionary<string, WebLingoSecret> databases, List<string> read, List<string> write,
         Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, Dictionary<string, WebLingoMailServer> mail,
         ref WebLingoUploadSettings uploads, ref WebLingoSessionSettings sessions, ref WebLingoLimitSettings limits, ref WebLingoLogSettings log,
-        out string? error)
+        ref WebLingoHeaderSettings headers, List<string> served, out string? error)
     {
         error = null;
         try
@@ -588,6 +690,18 @@ public static class WebLingoSchemes
                     if (!TryReadLog(file, folder, setting.Value, ref log, out error)) return false;
                     continue;
                 }
+                if (setting.Name == "headers")
+                {
+                    // The headers its every response has unless a page changes them (section 6.12, "Security headers").
+                    if (!TryReadHeaders(file, setting.Value, ref headers, out error)) return false;
+                    continue;
+                }
+                if (setting.Name == "serve")
+                {
+                    // The extensions of files a site does not serve by default that it does (section 6.12, "Sensitive files").
+                    if (!TryReadServe(file, setting.Value, served, out error)) return false;
+                    continue;
+                }
                 if (setting.Name == "limits")
                 {
                     // How long a request may take, how many instructions it may run, and its heap's memory (section 6.12, "Limits").
@@ -610,7 +724,7 @@ public static class WebLingoSchemes
                 {
                     error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"mode\", "
                             + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
-                            + "\"sessions\", \"limits\" and \"log\".";
+                            + "\"sessions\", \"limits\", \"log\", \"headers\" and \"serve\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)
@@ -649,6 +763,36 @@ public sealed record WebLingoLimitSettings(double? TimeoutSeconds, long? Instruc
 {
     /// <summary>What a configuration that says nothing of them means: the host's defaults.</summary>
     public static WebLingoLimitSettings Default { get; } = new(null, null, null);
+}
+
+/// <summary>
+/// The headers a site's every response has unless its page changes them, <c>wasp.config</c>'s <c>"headers"</c>
+/// (specification, section 6.12, "Security headers"): <c>X-Content-Type-Options: nosniff</c>, where <see cref="NoSniff"/>;
+/// its <c>Referrer-Policy</c>, where it has one; and <c>Content-Security-Policy: frame-ancestors</c> with its sources, where
+/// it has them, and <c>X-Frame-Options</c> beside it, for browsers without <c>frame-ancestors</c>, <c>SAMEORIGIN</c> for
+/// <c>'self'</c> alone and <c>DENY</c> for <c>'none'</c>, none for other sources, which it cannot name.
+/// </summary>
+public sealed record WebLingoHeaderSettings(bool NoSniff, string? ReferrerPolicy, IReadOnlyList<string>? FrameAncestors)
+{
+    /// <summary>
+    /// What a configuration that says nothing of them means (the owner's answer, 25 November 2026, "Security Headers and
+    /// Sensitive Files in WASP", A1 (b)): all four, <c>nosniff</c>, <c>strict-origin-when-cross-origin</c>, and frames of
+    /// the site's own pages only.
+    /// </summary>
+    public static WebLingoHeaderSettings Default { get; } = new(true, "strict-origin-when-cross-origin", ["'self'"]);
+
+    /// <summary>The headers, each a name and its value, in the order above.</summary>
+    public IReadOnlyList<KeyValuePair<string, string>> Headers()
+    {
+        var headers = new List<KeyValuePair<string, string>>();
+        if (NoSniff) headers.Add(new("X-Content-Type-Options", "nosniff"));
+        if (ReferrerPolicy is { } policy) headers.Add(new("Referrer-Policy", policy));
+        if (FrameAncestors is not { } ancestors) return headers;
+        headers.Add(new("Content-Security-Policy", "frame-ancestors " + string.Join(' ', ancestors)));
+        if (ancestors is ["'self'"]) headers.Add(new("X-Frame-Options", "SAMEORIGIN"));
+        else if (ancestors is ["'none'"]) headers.Add(new("X-Frame-Options", "DENY"));
+        return headers;
+    }
 }
 
 /// <summary>

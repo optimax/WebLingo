@@ -1181,7 +1181,7 @@ again before the piece it gives has come.
 | Member | What it is |
 |---|---|
 | `response.status` | its status, an integer, 200 until set; one outside 100 to 999 WL3001 |
-| `response.headers` | its headers, a `Headers`, which can be changed until the response is sent |
+| `response.headers` | its headers, a `Headers`, which can be changed until the response is sent; the site's own when the page begins, `X-Content-Type-Options` and its kin (the WASP User Manual, section 9, "Security headers") |
 | `response.write(value)` | writes a value's text to its body, as `write` writes it, `null` as `null`, giving `null` |
 | `response.writeLn(value)` | the same, then a line break |
 | `response.setCookie(name, value, options)` | sets a cookie, its value a string, giving `null`; `options`, a map, or `null` |

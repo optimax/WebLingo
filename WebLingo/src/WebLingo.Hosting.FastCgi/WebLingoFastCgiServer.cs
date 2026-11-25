@@ -442,6 +442,8 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
     private async Task SendFileAsync(Sink sink, string file)
     {
         var headers = new WebLingoHeaderList();
+        // The site's headers, X-Content-Type-Options and its kin, a file's too (section 6.12, "Security headers").
+        foreach (var (name, value) in application.Headers) headers.Set(name, value);
         if (!ContentTypes.TryGetContentType(file, out var type))
         {
             await sink.StartAsync(404, headers, 0);

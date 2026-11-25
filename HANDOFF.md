@@ -276,6 +276,17 @@ opening and a close done off the worker (`WebLingoApplication.Ended` waits for i
 `WaspServeTests.SessionsAreKeptInTheSitesDatabase`, `SessionsAreKeptInSqlServer`, `SessionsAreKeptInMySql` and
 `SessionsAreKeptInPostgreSql`, the last three a session kept and locked.
 
+## Security headers and sensitive files
+
+Every response a site gives has `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
+`Content-Security-Policy: frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN`, from `wasp.config`'s `"headers"`
+(`WebLingoHeaderSettings`, `WebLingo/src/WebLingo.Cli/WebLingoSchemes.cs`), which `WebLingoApplicationOptions.Headers`
+carries: set on a page's response before it runs (`WebLingoApplication.Handle`), again on an error page's
+(`WebLingoErrorPages`), and on a file's by its host (`WebLingoAspNetCore.SendFile`, `WebLingoFastCgiServer.SendFileAsync`).
+A file whose extension is `WebLingoRouteTable.Sensitive`'s, a database, a log, a key, has no route unless `"serve"` allows
+it. Tested by `ApplicationTests` (`WebLingo.Hosting.Tests`), `WaspServeTests.EveryResponseHasTheSecurityHeadersWaspConfigChanges`
+and `FastCgiTests.AStatusAHeaderAndErrorsAreCgis`.
+
 ## License and notices
 
 WebLingo is under the MIT License, `LICENSE`, its copyright The WebLingo Authors'; `SECURITY.md` has vulnerabilities

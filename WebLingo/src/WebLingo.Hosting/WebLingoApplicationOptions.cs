@@ -142,6 +142,19 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     public TimeSpan SendTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    /// The headers every response of the application's has unless its page or its handler changes them (section 6.12,
+    /// "Security headers"): its pages', its handlers', its error pages', which give them back after a page that failed, and
+    /// its files', which its host sends; <c>wasp</c>'s from <c>wasp.config</c>'s <c>"headers"</c>; none by default.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, string>> Headers { get; init; } = [];
+
+    /// <summary>
+    /// The extensions of <see cref="WebLingoRouteTable.Sensitive"/> whose files the application serves nonetheless, each with
+    /// its dot, in lower case (section 6.12, "Sensitive files"): <c>wasp.config</c>'s <c>"serve"</c>; none by default.
+    /// </summary>
+    public IReadOnlyList<string> Served { get; init; } = [];
+
+    /// <summary>
     /// The debugger the application's requests run under (specification, section 5.7, "Debugging WASP pages, parts", part
     /// 2), each a thread of its own, named for its method and its path, its pages compiled for a debugger; none by default.
     /// A request is debugged only where its host gives it a scheduler host, through which a stopped request is resumed.

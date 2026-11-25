@@ -60,6 +60,14 @@ public sealed class ApplicationTests
     [InlineData("/css/../wasp.config")]
     [InlineData("/wasp.config.")]
     [InlineData("/wasp.config::$DATA")]
+    [InlineData("/data/shop.db")]
+    [InlineData("/data/shop.SQLITE")]
+    [InlineData("/backup/site.sql")]
+    [InlineData("/backup/index.wasp.bak")]
+    [InlineData("/logs/app.log")]
+    [InlineData("/prod.env")]
+    [InlineData("/keys/site.pfx")]
+    [InlineData("/keys/site.key")]
     public void APathWithoutARouteIs404(string path)
     {
         var app = Load(Site());
@@ -189,7 +197,70 @@ public sealed class ApplicationTests
         .Add("/site/lib/DB.WLG", "export const password = \"secret\";")
         .Add("/site/Page.WASP", "<% var secret = 1; %>")
         .Add("/site/admin/web.config", "<configuration><connectionStrings/></configuration>")
-        .Add("/site/admin/WASP.CONFIG", "{ }");
+        .Add("/site/admin/WASP.CONFIG", "{ }")
+        // Never served as they are, whatever their case, unless the site's configuration serves their extension (the owner's
+        // answer, 25 November 2026, "Security Headers and Sensitive Files in WASP", A2 (a)).
+        .Add("/site/data/shop.db", "SQLite format 3")
+        .Add("/site/data/shop.SQLITE", "SQLite format 3")
+        .Add("/site/backup/site.sql", "INSERT INTO Users VALUES ('admin', 'secret');")
+        .Add("/site/backup/index.wasp.bak", "<% var secret = 1; %>")
+        .Add("/site/logs/app.log", "a request's error")
+        .Add("/site/prod.env", "PASSWORD=secret")
+        .Add("/site/keys/site.pfx", "key")
+        .Add("/site/keys/site.key", "key");
+
+    /// <summary>
+    /// A sensitive file is served as it is only where the site serves its extension (section 6.12, "Sensitive files"),
+    /// written in lower case, whatever the file's own case; the others stay 404s.
+    /// </summary>
+    [Fact]
+    public void ASensitiveFileIsServedOnlyWhereTheSiteServesItsExtension()
+    {
+        var app = WebLingoApplication.Load(new WebLingoApplicationOptions(Root, Site().Add("/site/logs/OLD.LOG", "older")) { Served = [".log"] },
+            out var error);
+        Assert.True(app is not null, error);
+        Assert.Equal(new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.File, "logs/app.log"),
+            app.Handle(Request("/logs/app.log"), new WebLingoBufferedResponse(), new WebLingoWorkerId(0)));
+        Assert.Equal(WebLingoRequestOutcomeKind.File, app.Handle(Request("/logs/OLD.LOG"), new WebLingoBufferedResponse(), new WebLingoWorkerId(0)).Kind);
+        Assert.Equal(WebLingoRequestOutcomeKind.NotFound, app.Handle(Request("/data/shop.db"), new WebLingoBufferedResponse(), new WebLingoWorkerId(0)).Kind);
+    }
+
+    /// <summary>
+    /// The site's headers (section 6.12, "Security headers") on every response it gives: a page's, which may change or
+    /// remove each, its own <c>Content-Security-Policy</c> replacing the site's; a 404's; and a page's that failed after
+    /// changing them, its error page's, which has the site's again. A file's its host gives it, from <c>Headers</c>.
+    /// </summary>
+    [Fact]
+    public void EveryResponseHasTheSitesHeadersWhichAPageMayChange()
+    {
+        IReadOnlyList<KeyValuePair<string, string>> site =
+        [
+            new("X-Content-Type-Options", "nosniff"), new("Content-Security-Policy", "frame-ancestors 'self'"), new("X-Frame-Options", "SAMEORIGIN")
+        ];
+        var files = Site()
+            .Add("/site/own.wasp", "<% param response; response.headers[\"Content-Security-Policy\"] = \"default-src 'self'\"; "
+                                   + "response.headers.remove(\"X-Content-Type-Options\"); %>own")
+            .Add("/site/fails.wasp", "<% param response; response.headers.remove(\"X-Frame-Options\"); var x = [1][2]; %>");
+        var app = WebLingoApplication.Load(new WebLingoApplicationOptions(Root, files)
+        {
+            WorkerServices = _ => new WebLingoWorkerServices(new WebLingoBuiltinRegistry(new WebLingoDelayFunction())),
+            Headers = site
+        }, out var error);
+        Assert.True(app is not null, error);
+        Assert.Equal(site, app.Headers);
+
+        (string?, string?, string?) Of(string path, int status)
+        {
+            var response = new WebLingoBufferedResponse();
+            app.Handle(Request(path), response, new WebLingoWorkerId(0));
+            Assert.Equal(status, response.StatusCode);
+            return (response.Headers.Get("X-Content-Type-Options"), response.Headers.Get("Content-Security-Policy"), response.Headers.Get("X-Frame-Options"));
+        }
+        Assert.Equal(("nosniff", "frame-ancestors 'self'", "SAMEORIGIN"), Of("/", 200));
+        Assert.Equal((null, "default-src 'self'", "SAMEORIGIN"), Of("/own", 200));
+        Assert.Equal(("nosniff", "frame-ancestors 'self'", "SAMEORIGIN"), Of("/missing", 404));
+        Assert.Equal(("nosniff", "frame-ancestors 'self'", "SAMEORIGIN"), Of("/fails", 500));
+    }
 
     [Fact]
     public void APageThatCannotBeReadJustNowIsA500_ReadAgainOnItsNextRequest()

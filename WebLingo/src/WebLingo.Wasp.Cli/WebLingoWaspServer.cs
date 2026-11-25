@@ -139,8 +139,16 @@ public static class WebLingoWaspServer
         (workers, mode) = (Math.Max(1, Environment.ProcessorCount), defaultMode);
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
             out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out var env, out var mail,
-            out var uploads, out var sessions, out var limits, out var logging, out error)) return null;
+            out var uploads, out var sessions, out var limits, out var logging, out var headers, out var served, out error)) return null;
         if (configured is not null) mode = configured == "production" ? WebLingoMode.Production : WebLingoMode.Development;
+        // The files a site does not serve by default it serves only by their extensions, each one of those (section 6.12).
+        foreach (var extension in served)
+        {
+            if (WebLingoRouteTable.Sensitive.Contains(extension)) continue;
+            error = $"{Path.Combine(full, WebLingoRouteTable.ConfigurationFile)}: \"serve\"'s \"allow\" names '{extension}', which a site serves "
+                    + $"by default: it names those it does not, {string.Join(", ", WebLingoRouteTable.Sensitive)}.";
+            return null;
+        }
 
         // std:system, loaded once here to fail early, then by each worker on its own.
         var importer = Path.Combine(full, "index.wasp");
@@ -197,6 +205,9 @@ public static class WebLingoWaspServer
             Sessions = store,
             Scheduler = () => new DotNetSchedulerHost(),
             Log = siteLog,
+            // Its headers, nosniff and its kin unless wasp.config says otherwise, and the sensitive files it serves (section 6.12).
+            Headers = headers.Headers(),
+            Served = served,
             SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30),
             // A request's limits, wasp.config's or the defaults; its time none under a debugger, whose stops it must not
             // count (section 6.12, "Limits"; section 5.7, "Debugging WASP pages").

@@ -133,15 +133,28 @@ public sealed class FastCgiTests : IDisposable
         var (head, body, _) = await RequestAsync(connection, 1, Get("/made"), [], keep: true);
         Assert.Equal(("Status: 201 Created", "made"), (head[0], body));
         Assert.Contains("X-Tea: Sencha", head);
+        HasTheSecurityHeaders(head);
         (head, _, _) = await RequestAsync(connection, 2, Get("/nowhere"), [], keep: true);
         Assert.Equal("Status: 404 Not Found", head[0]);
+        HasTheSecurityHeaders(head);
         (head, body, _) = await RequestAsync(connection, 3, Get("/broken"), [], keep: true);
         Assert.Equal("Status: 500 Internal Server Error", head[0]);
         Assert.DoesNotContain("broken.wasp", body, StringComparison.Ordinal); // Production shows no error's details.
+        HasTheSecurityHeaders(head);
         (head, body, _) = await RequestAsync(connection, 4, Get("/css/site.css"), []);
         Assert.Equal(("Status: 200 OK", "h1 { }"), (head[0], body));
         Assert.Contains("Content-Type: text/css", head);
         Assert.Contains("Content-Length: 6", head);
+        HasTheSecurityHeaders(head);
+    }
+
+    /// <summary>The headers a site's every response has by default, a file's too (section 6.12, "Security headers").</summary>
+    private static void HasTheSecurityHeaders(IReadOnlyList<string> head)
+    {
+        Assert.Contains("X-Content-Type-Options: nosniff", head);
+        Assert.Contains("Referrer-Policy: strict-origin-when-cross-origin", head);
+        Assert.Contains("Content-Security-Policy: frame-ancestors 'self'", head);
+        Assert.Contains("X-Frame-Options: SAMEORIGIN", head);
     }
 
     [Fact]

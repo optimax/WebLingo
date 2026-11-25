@@ -54,7 +54,7 @@ public static class WebLingoWaspSessions
         var full = Path.GetFullPath(root ?? ".");
         var configuration = Path.Combine(full, WebLingoRouteTable.ConfigurationFile);
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, new Dictionary<string, string>(), out _, out _, out _,
-                out _, out var databases, out _, out _, out _, out _, out _, out var sessions, out _, out _, out var why))
+                out _, out var databases, out _, out _, out _, out _, out _, out var sessions, out _, out _, out _, out _, out var why))
         {
             error.WriteLine(why);
             return WebLingoCommandLine.FileUnreadable;

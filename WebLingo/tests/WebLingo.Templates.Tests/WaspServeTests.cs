@@ -329,6 +329,103 @@ public sealed class WaspServeTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// The security headers under <c>wasp serve</c> (the owner's answers, 25 November 2026, "Security Headers and Sensitive Files
+    /// in WASP"; specification, section 6.12): <c>nosniff</c>, <c>Referrer-Policy</c>, <c>frame-ancestors 'self'</c> and
+    /// <c>X-Frame-Options</c> on every response, a page's, a file's, a 404's and a 500's, a page's own
+    /// <c>Content-Security-Policy</c> in place of WASP's; each changed or removed by <c>wasp.config</c>'s <c>"headers"</c>,
+    /// whose every setting is checked; and a sensitive file a 404 unless <c>"serve"</c> allows its extension.
+    /// </summary>
+    [Fact]
+    public async Task EveryResponseHasTheSecurityHeadersWaspConfigChanges()
+    {
+        Write("own.wasp", "<% param response; response.headers[\"Content-Security-Policy\"] = \"default-src 'self'\"; %>own");
+        Write("logs/app.log", "a line");
+        Write("keys/site.pfx", "key");
+        Write("data/shop.db", "SQLite format 3");
+
+        async Task<Dictionary<string, (int Status, string? NoSniff, string? Referrer, string? Policy, string? Frames)>> Serve(params string[] paths)
+        {
+            var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+            Assert.True(server is not null, error);
+            await server.StartAsync();
+            try
+            {
+                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                using var client = new HttpClient { BaseAddress = new Uri(address) };
+                var answers = new Dictionary<string, (int, string?, string?, string?, string?)>();
+                foreach (var path in paths)
+                {
+                    var response = await client.GetAsync(path);
+                    string? Header(string name) => response.Headers.TryGetValues(name, out var values) ? string.Join(", ", values) : null;
+                    answers[path] = ((int)response.StatusCode, Header("X-Content-Type-Options"), Header("Referrer-Policy"),
+                        Header("Content-Security-Policy"), Header("X-Frame-Options"));
+                }
+                return answers;
+            }
+            finally
+            {
+                await server.StopAsync();
+            }
+        }
+
+        var all = (NoSniff: "nosniff", Referrer: "strict-origin-when-cross-origin", Policy: "frame-ancestors 'self'", Frames: "SAMEORIGIN");
+        var answers = await Serve("/", "/css/site.css", "/missing", "/broken", "/own", "/logs/app.log", "/keys/site.pfx", "/data/shop.db");
+        Assert.Equal((200, all.NoSniff, all.Referrer, all.Policy, all.Frames), answers["/"]);
+        Assert.Equal((200, all.NoSniff, all.Referrer, all.Policy, all.Frames), answers["/css/site.css"]);
+        Assert.Equal((404, all.NoSniff, all.Referrer, all.Policy, all.Frames), answers["/missing"]);
+        Assert.Equal((500, all.NoSniff, all.Referrer, all.Policy, all.Frames), answers["/broken"]);
+        Assert.Equal((200, all.NoSniff, all.Referrer, "default-src 'self'", all.Frames), answers["/own"]);
+        Assert.Equal((404, all.NoSniff, all.Referrer, all.Policy, all.Frames), answers["/logs/app.log"]);
+        Assert.Equal((404, all.NoSniff, all.Referrer, all.Policy, all.Frames), answers["/keys/site.pfx"]);
+        Assert.Equal((404, all.NoSniff, all.Referrer, all.Policy, all.Frames), answers["/data/shop.db"]);
+
+        Write("wasp.config", "{ \"headers\": { \"nosniff\": false, \"referrerPolicy\": null, \"frameAncestors\": [\"self\", \"https://partner.example\"] }, "
+                             + "\"serve\": { \"allow\": [\".PFX\", \".log\"] } }");
+        answers = await Serve("/", "/keys/site.pfx", "/logs/app.log", "/data/shop.db");
+        Assert.Equal((200, null, null, "frame-ancestors 'self' https://partner.example", null), answers["/"]);
+        Assert.Equal((200, null, null, "frame-ancestors 'self' https://partner.example", null), answers["/keys/site.pfx"]);
+        // Served, but, as any file, only where its extension has a content type the host knows, which .log has not.
+        Assert.Equal((404, null, null, "frame-ancestors 'self' https://partner.example", null), answers["/logs/app.log"]);
+        Assert.Equal(404, answers["/data/shop.db"].Status);
+        Write("wasp.config", "{ \"headers\": { \"referrerPolicy\": \"no-referrer\", \"frameAncestors\": [\"none\"] } }");
+        Assert.Equal((200, all.NoSniff, "no-referrer", "frame-ancestors 'none'", "DENY"), (await Serve("/"))["/"]);
+        Write("wasp.config", "{ \"headers\": { \"frameAncestors\": null } }");
+        Assert.Equal((200, all.NoSniff, all.Referrer, null, null), (await Serve("/"))["/"]);
+
+        var headers = "\"headers\" is an object, { \"nosniff\": true, \"referrerPolicy\": \"strict-origin-when-cross-origin\", "
+                      + "\"frameAncestors\": [\"self\"] }, each optional, \"nosniff\" a Boolean, \"referrerPolicy\" \"no-referrer\", "
+                      + "\"no-referrer-when-downgrade\", \"origin\", \"origin-when-cross-origin\", \"same-origin\", \"strict-origin\", "
+                      + "\"strict-origin-when-cross-origin\", \"unsafe-url\" or null for none, and \"frameAncestors\" the sites that may show its "
+                      + "pages in a frame, \"self\", \"none\" alone, or a scheme or a host, \"https://partner.example\", or null for any.";
+        var serve = "\"serve\" is an object, { \"allow\": [\".log\"] }, the extensions, each with its dot, of the files a site does not "
+                    + "serve by default that it serves.";
+        foreach (var (setting, message) in new[]
+                 {
+                     ("{ \"headers\": [] }", headers),
+                     ("{ \"headers\": { \"nosniff\": \"yes\" } }", headers),
+                     ("{ \"headers\": { \"referrerPolicy\": \"never\" } }", headers),
+                     ("{ \"headers\": { \"frameAncestors\": \"self\" } }", headers),
+                     ("{ \"headers\": { \"frameAncestors\": [] } }", headers),
+                     ("{ \"headers\": { \"frameAncestors\": [\"none\", \"self\"] } }", headers),
+                     ("{ \"headers\": { \"frameAncestors\": [\"https://a.example; script-src *\"] } }", headers),
+                     ("{ \"headers\": { \"frameAncestors\": [\"'self'\"] } }", headers),
+                     ("{ \"headers\": { \"xFrameOptions\": \"DENY\" } }", headers),
+                     ("{ \"serve\": [\".log\"] }", serve),
+                     ("{ \"serve\": { \"allow\": [\"log\"] } }", serve),
+                     ("{ \"serve\": { \"allow\": [\".log/x\"] } }", serve),
+                     ("{ \"serve\": { \"deny\": [\".css\"] } }", serve),
+                     ("{ \"serve\": { \"allow\": [\".css\"] } }", "\"serve\"'s \"allow\" names '.css', which a site serves by default: it names "
+                                                                + "those it does not, .db, .db3, .sqlite, .sqlite3, .mdb, .accdb, .mdf, .ldf, .sql, .bak, "
+                                                                + ".backup, .old, .orig, .swp, .tmp, .log, .env, .config, .ini, .pfx, .p12, .pem, .key.")
+                 })
+        {
+            Write("wasp.config", setting);
+            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _));
+            Assert.EndsWith("wasp.config: " + message, error);
+        }
+    }
+
     /// <summary><c>wasp sessions …</c>, run in the test's process: its exit code, what it wrote, and its errors, line breaks LF.</summary>
     private static (int Exit, string Output, string Error) Sessions(params string[] args)
     {
@@ -807,7 +904,7 @@ public sealed class WaspServeTests : IDisposable
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
         Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"mode\", "
                         + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
-                        + "\"sessions\", \"limits\" and \"log\".", error);
+                        + "\"sessions\", \"limits\", \"log\", \"headers\" and \"serve\".", error);
 
         Write("wasp.config", "{ \"sendTimeout\": 5 }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));

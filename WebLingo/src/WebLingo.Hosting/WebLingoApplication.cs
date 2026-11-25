@@ -85,7 +85,7 @@ public sealed class WebLingoApplication
             error = "an application needs a worker or more";
             return null;
         }
-        var routes = WebLingoRouteTable.Make(options.FileSystem, options.Root, out error);
+        var routes = WebLingoRouteTable.Make(options.FileSystem, options.Root, options.Served, out error);
         return routes is null ? null : new WebLingoApplication(options, new Generation(routes, options.Workers));
     }
 
@@ -104,7 +104,7 @@ public sealed class WebLingoApplication
     /// </summary>
     public bool TryReload(out string? error)
     {
-        var routes = WebLingoRouteTable.Make(_options.FileSystem, _options.Root, out error);
+        var routes = WebLingoRouteTable.Make(_options.FileSystem, _options.Root, _options.Served, out error);
         if (routes is null) return false;
         _current = new Generation(routes, _options.Workers) { Number = _current.Number + 1 };
         return true;
@@ -123,12 +123,15 @@ public sealed class WebLingoApplication
         WebLingoCancellationSignal? cancellation = null, IWebLingoSchedulerHost? scheduler = null)
     {
         var generation = _current;
-        switch (generation.Routes.Find(request.Path))
+        var route = generation.Routes.Find(request.Path);
+        if (route is { Kind: WebLingoRouteKind.File } file) return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.File, file.File);
+        // The site's headers, X-Content-Type-Options and its kin, on every response it gives, before its page runs, which may
+        // change each (section 6.12, "Security headers"); a file's its host gives it (Headers).
+        foreach (var (name, value) in _options.Headers) response.Headers.Set(name, value);
+        switch (route)
         {
-            case { Kind: WebLingoRouteKind.File } file:
-                return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.File, file.File);
             case { Kind: WebLingoRouteKind.Page or WebLingoRouteKind.Handler } when TooLarge(request):
-                WebLingoErrorPages.TooLarge(response);
+                WebLingoErrorPages.TooLarge(response, _options.Headers);
                 return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.TooLarge);
             case { Kind: WebLingoRouteKind.Page } page:
                 var compiled = generation.Page(worker, page.File, this);
@@ -137,7 +140,7 @@ public sealed class WebLingoApplication
             case { Kind: WebLingoRouteKind.Handler } handler:
                 return Handler(generation, handler.File, request, response, worker, cancellation, scheduler);
             default:
-                WebLingoErrorPages.NotFound(response);
+                WebLingoErrorPages.NotFound(response, _options.Headers);
                 return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.NotFound);
         }
     }
@@ -164,12 +167,12 @@ public sealed class WebLingoApplication
         }
         if (allowed.Count == 0)
         {
-            WebLingoErrorPages.NotFound(response);
+            WebLingoErrorPages.NotFound(response, _options.Headers);
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.NotFound);
         }
         if (function is null)
         {
-            WebLingoErrorPages.MethodNotAllowed(response, string.Join(", ", allowed));
+            WebLingoErrorPages.MethodNotAllowed(response, _options.Headers, string.Join(", ", allowed));
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.MethodNotAllowed);
         }
         return Run(generation.Handler(worker, file, function, this), request, response, worker, cancellation, scheduler,
@@ -188,6 +191,9 @@ public sealed class WebLingoApplication
 
     /// <summary>The application's log, its host's (section 6.12, "Logging"), where its host writes what it does too; none without one.</summary>
     public IWebLingoLog? Log => _options.Log;
+
+    /// <summary>The site's headers (<see cref="WebLingoApplicationOptions.Headers"/>), which its host gives a file it sends, and its 404 for one it cannot.</summary>
+    public IReadOnlyList<KeyValuePair<string, string>> Headers => _options.Headers;
 
     /// <summary>The largest body a site's request may have (section 6.12, "Uploaded files"), which its hosts let through.</summary>
     public long MaxBodySize => _options.Uploads.MaxBodySize;
@@ -288,7 +294,7 @@ public sealed class WebLingoApplication
         if (!crossOrigin && CrossSite(request) is { } why)
         {
             log?.Write(WebLingoLogLevel.Warn, WebLingoLogText.OneLine(why));
-            WebLingoErrorPages.Forbidden(response, _options.Mode, [why]);
+            WebLingoErrorPages.Forbidden(response, _options.Headers, _options.Mode, [why]);
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Forbidden);
         }
         // A client that takes nothing for too long cancels the request, as a client that goes does.
@@ -452,7 +458,7 @@ public sealed class WebLingoApplication
             if (result.Error!.Code != WebLingoDiagnosticCodes.BudgetExceeded) return Failed(response, [error], log, stack);
             log?.Write(WebLingoLogLevel.Error, WebLingoLogText.OneLine("A request passed one of its limits: " + error));
             WriteStack(log, stack);
-            WebLingoErrorPages.Limited(response, _options.Mode, [error]);
+            WebLingoErrorPages.Limited(response, _options.Headers, _options.Mode, [error]);
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
         }
         output.Send();
@@ -493,7 +499,7 @@ public sealed class WebLingoApplication
         // Its errors in the log, whatever the mode, a production page showing none (section 6.12, "Logging").
         foreach (var error in errors) log?.Write(WebLingoLogLevel.Error, WebLingoLogText.OneLine(error));
         if (stack is not null) WriteStack(log, stack);
-        WebLingoErrorPages.Failed(response, _options.Mode, errors);
+        WebLingoErrorPages.Failed(response, _options.Headers, _options.Mode, errors);
         return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
     }
 

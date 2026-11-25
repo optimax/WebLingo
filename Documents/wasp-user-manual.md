@@ -132,7 +132,11 @@ Some files are never sent, whatever their path:
 - compiled WebLingo (`.wlb` files, and earlier builds' `.wlbr`, `.wlbs` and `.wlbc`);
 - the site's configuration, `wasp.config`, and IIS's, `web.config`;
 - a page or a route handler whose name holds `\`, `:` or a control character, which a file's name on Windows cannot have, and whose includes and imports could not be found;
-- every file and folder whose name starts with `.`, such as `.git`.
+- every file and folder whose name starts with `.`, such as `.git`;
+- a database, SQL, a backup or an editor's copy, a log, an environment's or a configuration's settings, or a key, by its
+  extension, whatever its case: `.db`, `.db3`, `.sqlite`, `.sqlite3`, `.mdb`, `.accdb`, `.mdf`, `.ldf`, `.sql`, `.bak`, `.backup`, `.old`, `.orig`, `.swp`, `.tmp`, `.log`, `.env`, `.config`, `.ini`, `.pfx`, `.p12`, `.pem` and `.key`, unless `wasp.config`'s `"serve"` allows its extension,
+  `"serve": { "allow": [".pfx"] }` (section 14), the server then sending it as any other file, where it knows its type.
+  Keep such files outside the site all the same: this only stops a copy left in it being sent.
 
 A typical site:
 
@@ -847,6 +851,52 @@ in development, its 403 says why, `A POST from another site was refused, as a cr
 Origin, 'https://attacker.example', is not this site's, 'localhost:8080'; …`, and in production only `403 Forbidden`.
 `request.checkCsrf(token)` checks a token the page read itself, `await request.checkCsrf(form["t"])`.
 
+### Security headers
+
+Every response a site gives, a page's, a route handler's, a file's and an error's, has four headers WASP gives it:
+
+```text
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Content-Security-Policy: frame-ancestors 'self'
+X-Frame-Options: SAMEORIGIN
+```
+
+`nosniff` keeps a browser from taking a file for what it is not, an uploaded text file for a script; the referrer policy
+sends another site only this site's address, never a page's path and query; and `frame-ancestors 'self'`, with
+`X-Frame-Options` for browsers that do not know it, lets only this site's own pages show its pages in a frame, against a
+page of another site that hides one of this site's under its own buttons (clickjacking).
+
+A page changes them for itself, through `response.headers`, which has them before it runs:
+`response.headers["Referrer-Policy"] = "no-referrer";`, `response.headers.remove("X-Frame-Options");`. A page's own
+`Content-Security-Policy` replaces WASP's, so that a page with a policy of its own writes `frame-ancestors` in it where it
+wants it. A page that fails has an error page, which has the site's four again.
+
+A site changes them for all its responses in `wasp.config`, `"headers"`, each optional:
+
+```json
+{
+  "headers": {
+    "nosniff": true,
+    "referrerPolicy": "strict-origin-when-cross-origin",
+    "frameAncestors": ["self", "https://partner.example"]
+  }
+}
+```
+
+`"nosniff": false` leaves out `X-Content-Type-Options`; `"referrerPolicy"` is one of the policies browsers know,
+`"no-referrer"`, `"no-referrer-when-downgrade"`, `"origin"`, `"origin-when-cross-origin"`, `"same-origin"`,
+`"strict-origin"`, `"strict-origin-when-cross-origin"` or `"unsafe-url"`, or `null` for none; and `"frameAncestors"` lists
+the sites whose pages may show the site's in a frame, `"self"` for its own, a scheme, a host, or both, as
+`Content-Security-Policy`'s `frame-ancestors` names them, `["none"]` for none at all, or `null` for no limit. With the
+settings above, a response says `Content-Security-Policy: frame-ancestors 'self' https://partner.example`, and no
+`X-Frame-Options`, which can only name the site itself, `SAMEORIGIN` for `["self"]`, or no site, `DENY` for `["none"]`.
+
+A site whose web server adds a `Content-Security-Policy` of its own, IIS's `customHeaders` in its `web.config` or nginx's
+`add_header`, says `"frameAncestors": null`, or writes `frame-ancestors` in its own: WASP's is sent beside it otherwise,
+and a browser keeps every policy it is sent. `Strict-Transport-Security`, and a full `Content-Security-Policy`, are each
+site's own, which a page sets, or its web server.
+
 ---
 
 ## 10. Route handlers
@@ -1105,6 +1155,8 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"maxBodySize"` | the largest body a request may have, in bytes, a larger one a 413 (section 9, "Uploaded files") | 30,000,000 |
 | `"uploads"` | what a form's files may be: `{ "inMemory": 65536, "maxSize": 20000000, "folder": "../tmp" }`, how many bytes of a file are kept in memory, the rest in a temporary file, the most its files may take in all, and the folder their temporary files are made in, outside the site | 64 KB, `"maxBodySize"`, the system's temporary folder |
 | `"sessions"` | where the site keeps its sessions, and how long: `{ "store": "database", "database": "main", "table": "wasp_sessions", "create": false, "timeout": 20, "lockTimeout": 30 }`, the server's memory, `"memory"`, or a table of a database `"databases"` names, `"database"`, the table made where it is missing where `"create"` is `true`; the minutes a session lasts once no request uses it, and the seconds a request waits for a session another has (section 9, "Sessions" and "Sessions in a database") | the server's memory, `wasp_sessions`, `false`, 20 minutes, 30 seconds |
+| `"headers"` | the headers every response has, each optional: `{ "nosniff": true, "referrerPolicy": "strict-origin-when-cross-origin", "frameAncestors": ["self"] }`, `X-Content-Type-Options: nosniff`, the `Referrer-Policy`, or `null` for none, and the sites whose pages may show the site's in a frame, `"self"`, `"none"`, a scheme or a host, or `null` for any (section 9, "Security headers") | all four headers, as shown |
+| `"serve"` | the extensions of files WASP does not send by default that the site sends: `{ "allow": [".pfx"] }`, each with its dot, of those section 2 lists | none |
 | `"log"` | the site's log, each optional: `{ "file": "C:/inetpub/logs/WebLingo/mysite.log", "level": "info" }`, a file a day, outside the site, from this file's folder, and the lowest level written, `"debug"`, `"info"`, `"warn"` or `"error"` (section 12, "The log") | the host's own log, `"info"` |
 | `"limits"` | a request's limits, each optional: `{ "requestTimeout": 60, "requestInstructions": 1000000000, "requestMemory": 128 }`, the seconds it may take, its waits included, more than 0, the instructions it may run, and the megabytes of strings it may hold, 1 to 1,048,576; one passed a 503, WL3003 (section 12, "A request's limits") | 60 seconds, 1,000,000,000 instructions, 128 MB |
 | `"mail"` | the mail servers the site's pages and handlers send through, with `std:mail`, each a name and its settings: `{ "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": { "env": "SMTP_PASSWORD" } } }` | none |
