@@ -15,11 +15,17 @@
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
   <!-- The build number, which weblingo and wasp print after the version, and every assembly's file version: the build's
-       local time, yyyy.MM.dd.HHmm, as MaxPad makes it (the owner's request, 21 November 2026), read from the sortable
-       format, the invariant culture's whatever the machine's; a build given one, -p:BuildStamp=…, gives it every assembly. -->
+       local time, its year, month, day, and hour and minute, as MaxPad makes it (the owner's request, 21 November 2026),
+       each part a number without a leading zero, 2027.1.5.7 for 00:07 on 5 January 2027 (the owner's request,
+       25 November 2026, "Build Number"); read from the sortable format, the invariant culture's whatever the machine's,
+       taken once so that its parts agree; a build given one, -p:BuildStamp=…, gives it every assembly. -->
   <PropertyGroup Condition="'$(BuildStamp)' == ''">
     <BuildTime>$([System.DateTime]::Now.ToString("s"))</BuildTime>
-    <BuildStamp>$(BuildTime.Substring(0, 10).Replace('-', '.')).$(BuildTime.Substring(11, 5).Replace(':', ''))</BuildStamp>
+    <BuildYear>$([System.Int32]::Parse('$(BuildTime.Substring(0, 4))'))</BuildYear>
+    <BuildMonth>$([System.Int32]::Parse('$(BuildTime.Substring(5, 2))'))</BuildMonth>
+    <BuildDay>$([System.Int32]::Parse('$(BuildTime.Substring(8, 2))'))</BuildDay>
+    <BuildHourMinute>$([System.Int32]::Parse('$(BuildTime.Substring(11, 2))$(BuildTime.Substring(14, 2))'))</BuildHourMinute>
+    <BuildStamp>$(BuildYear).$(BuildMonth).$(BuildDay).$(BuildHourMinute)</BuildStamp>
   </PropertyGroup>
   <PropertyGroup>
     <FileVersion>$(BuildStamp)</FileVersion>

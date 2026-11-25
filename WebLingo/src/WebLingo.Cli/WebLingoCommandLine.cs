@@ -40,7 +40,8 @@ public static partial class WebLingoCommandLine
 
     /// <summary>
     /// The build number, the build's local time, <c>2026.11.21.2330</c>, as MaxPad makes it, every assembly's file version
-    /// (<c>Directory.Build.props</c>; the owner's request, 21 November 2026).
+    /// (<c>Directory.Build.props</c>; the owner's request, 21 November 2026), each part without a leading zero,
+    /// <c>2027.1.5.7</c> for 00:07 on 5 January 2027 (the owner's request, 25 November 2026).
     /// </summary>
     public static string BuildNumber { get; } =
         typeof(WebLingoCommandLine).Assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version ?? "0";
