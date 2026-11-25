@@ -1,0 +1,511 @@
+// Markdown, as members write their posts, signatures and messages, rendered as HTML by the forum's own renderer
+// (Documents/weblingo-forum.md, section 3.7): a subset of CommonMark. Every text it writes is escaped and every tag it
+// writes is its own, so that nothing a member writes becomes markup of theirs; a page writes what it gives raw.
+//
+// Blocks: paragraphs, a line break in one kept; headings, # to ######, written as h3 to h6, below the page's own;
+// fenced code, ``` or ~~~; block quotes, >; lists, -, * or + and 1. or 1); and rules, ---. Within them: code spans,
+// `x`; strong, **x** or __x__; emphasis, *x* or _x_; struck text, ~~x~~; links, [text](https://…), <https://…> and
+// bare http and https addresses, which get rel="nofollow ugc noopener"; images, ![alt](https://…), only where options
+// allow them, else links; and escapes, \*.
+
+import { Html } from "std:html";
+
+// How deep quotes, lists and inline markup nest before the rest is taken as text, so that no input nests without end.
+const maxDepth = 12;
+
+const punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+// Markdown's text as HTML; options a map, { images: true } letting images be images.
+export function render(text, options = null) {
+    var images = options?["images"] ?? false;
+    var lines = (text ?? "").replace("\r\n", "\n").replace("\r", "\n").replace("\t", "    ").split("\n");
+    return blocks(lines, 0, images);
+}
+
+// ---- Blocks ----
+
+function indentOf(line) {
+    return line.length - line.trimStart().length;
+}
+
+// The fence a line opens a code block with, ``` or ~~~ or longer, or null.
+function fenceOf(line) {
+    if (indentOf(line) > 3) {
+        return null;
+    }
+    var t = line.trim();
+    if (!t.startsWith("```") && !t.startsWith("~~~")) {
+        return null;
+    }
+    var n = t.length - t.trimStart(t[0]).length;
+    if (t[0] == "`" && t.slice(n).contains("`")) {
+        return null;
+    }
+    return t.slice(0, n);
+}
+
+function closes(line, fence) {
+    var t = line.trim();
+    return t.length >= fence.length && t == fence[0].repeat(t.length);
+}
+
+// A fence's language, letters, digits and -+_#. only, or "".
+function languageOf(info) {
+    var word = info.trim().split(" ")[0];
+    foreach (var c in word) {
+        if (!letters.contains(c) && !"-+_#.".contains(c)) {
+            return "";
+        }
+    }
+    return word.length > 30 ? "" : word;
+}
+
+// A heading's level, 1 to 6, and its text, or null.
+function headingOf(line) {
+    if (indentOf(line) > 3) {
+        return null;
+    }
+    var t = line.trim();
+    var level = 0;
+    while (level < t.length && level < 7 && t[level] == "#") {
+        level++;
+    }
+    if (level == 0 || level > 6 || (level < t.length && t[level] != " ")) {
+        return null;
+    }
+    var words = t.slice(level).trim();
+    var bare = words.trimEnd("#");
+    if (bare == "" || bare.endsWith(" ")) {
+        words = bare.trim();
+    }
+    return { level: level, text: words };
+}
+
+function isRule(line) {
+    if (indentOf(line) > 3) {
+        return false;
+    }
+    var t = line.trim().replace(" ", "");
+    return t.length >= 3 && "-*_".contains(t[0]) && t == t[0].repeat(t.length);
+}
+
+function isQuote(line) {
+    return indentOf(line) <= 3 && line.trim().startsWith(">");
+}
+
+function unquote(line) {
+    var t = line.trimStart().slice(1);
+    return t.startsWith(" ") ? t.slice(1) : t;
+}
+
+// A list item's marker, or null: whether it is ordered, the number it starts at, where its marker is, where its text
+// begins, and its text.
+function markerOf(line) {
+    var indent = indentOf(line);
+    if (indent > 3 + 4 * maxDepth || line.trim() == "") {
+        return null;
+    }
+    // Read from the marker's few characters, never by indexing far into a long line.
+    var length = line.length;
+    var head = line.slice(indent, indent + 12 < length ? indent + 12 : length);
+    var at = 0;
+    var ordered = false;
+    var start = 1;
+    if ("-*+".contains(head[0])) {
+        at = 1;
+    } else {
+        while (at < head.length && at < 9 && "0123456789".contains(head[at])) {
+            at++;
+        }
+        if (at == 0 || at >= head.length || !".)".contains(head[at])) {
+            return null;
+        }
+        start = Integer.parse(head.slice(0, at));
+        ordered = true;
+        at++;
+    }
+    if (at < head.length && head[at] != " ") {
+        return null;
+    }
+    var rest = line.slice(indent + at);
+    var spaces = rest.length - rest.trimStart().length;
+    var width = indent + at + (spaces == 0 || spaces > 4 ? 1 : spaces);
+    return { ordered: ordered, start: start, indent: indent, width: width, text: rest.trimStart() };
+}
+
+// Whether a line begins a block other than a paragraph, which ends the paragraph before it.
+function starts(line) {
+    return fenceOf(line) != null || headingOf(line) != null || isRule(line) || isQuote(line) || markerOf(line) != null;
+}
+
+function blocks(lines, depth, images) {
+    var out = [];
+    var i = 0;
+    while (i < lines.length) {
+        var line = lines[i];
+        if (line.trim() == "") {
+            i++;
+            continue;
+        }
+        var fence = fenceOf(line);
+        if (fence != null) {
+            var language = languageOf(line.trim().slice(fence.length));
+            var code = [];
+            i++;
+            while (i < lines.length && !closes(lines[i], fence)) {
+                code.push(lines[i]);
+                i++;
+            }
+            i++;
+            var kind = language == "" ? "" : $" class=\"language-{language}\"";
+            var body = code.length == 0 ? "" : Html.escape("\n".join(code)) + "\n";
+            out.push($"<pre><code{kind}>{body}</code></pre>");
+            continue;
+        }
+        var heading = headingOf(line);
+        if (heading != null) {
+            var level = heading["level"] + 2 > 6 ? 6 : heading["level"] + 2;
+            out.push($"<h{level}>{inline(heading['text'], depth, images, true)}</h{level}>");
+            i++;
+            continue;
+        }
+        if (isRule(line)) {
+            out.push("<hr>");
+            i++;
+            continue;
+        }
+        if (isQuote(line) && depth < maxDepth) {
+            var quoted = [];
+            while (i < lines.length && lines[i].trim() != "" && (isQuote(lines[i]) || !starts(lines[i]))) {
+                quoted.push(isQuote(lines[i]) ? unquote(lines[i]) : lines[i]);
+                i++;
+            }
+            out.push("<blockquote>\n" + blocks(quoted, depth + 1, images) + "</blockquote>");
+            continue;
+        }
+        if (markerOf(line) != null && depth < maxDepth) {
+            i = list(lines, i, depth, images, out);
+            continue;
+        }
+        var paragraph = [inline(line.trim(), depth, images, true)];
+        i++;
+        while (i < lines.length && lines[i].trim() != "" && !starts(lines[i])) {
+            paragraph.push(inline(lines[i].trim(), depth, images, true));
+            i++;
+        }
+        out.push("<p>" + "<br>\n".join(paragraph) + "</p>");
+    }
+    return out.length == 0 ? "" : "\n".join(out) + "\n";
+}
+
+// A list from its first item at lines[i]: its items written to out; gives the line after it.
+function list(lines, i, depth, images, out) {
+    var first = markerOf(lines[i]);
+    var ordered = first["ordered"];
+    var items = [];
+    var current = null;
+    var width = 0;
+    var blank = false;
+    var loose = false;
+    while (i < lines.length) {
+        var line = lines[i];
+        if (current != null && line.trim() != "" && indentOf(line) >= width) {
+            current.push(line.slice(width));
+            loose = loose || blank;
+            blank = false;
+            i++;
+            continue;
+        }
+        var marker = markerOf(line);
+        if (marker != null && marker["ordered"] == ordered && (current == null || marker["indent"] < width) && !isRule(line)) {
+            if (current != null) {
+                items.push(current);
+                loose = loose || blank;
+            }
+            current = [marker["text"]];
+            width = marker["width"];
+            blank = false;
+            i++;
+            continue;
+        }
+        if (line.trim() == "") {
+            blank = true;
+            current.push("");
+            i++;
+            continue;
+        }
+        if (!blank && !starts(line)) {
+            current.push(line.trim());
+            i++;
+            continue;
+        }
+        break;
+    }
+    items.push(current);
+    var open = !ordered ? "<ul>" : first["start"] == 1 ? "<ol>" : $"<ol start=\"{first['start']}\">";
+    var written = [open];
+    foreach (var item in items) {
+        var html = blocks(item, depth + 1, images);
+        // A tight list's item: its first paragraph without its <p>.
+        if (!loose && html.startsWith("<p>")) {
+            var end = html.indexOf("</p>");
+            html = html.slice(3, end) + html.slice(end + 4);
+        }
+        written.push("<li>" + html.trimEnd() + "</li>");
+    }
+    written.push(!ordered ? "</ul>" : "</ol>");
+    out.push("\n".join(written));
+    return i;
+}
+
+// ---- Inline ----
+//
+// A line's characters are read from an array of them, since a string's character at a position is found from its
+// start; and no search goes on past what one construct may hold, or twice where it found nothing, so that a post of
+// any length renders in time linear in its length.
+
+// The longest a link's address, or an autolink, may be.
+const longestAddress = 2000;
+
+function charsOf(text) {
+    var chars = [];
+    foreach (var c in text) {
+        chars.push(c);
+    }
+    return chars;
+}
+
+function part(chars, from, to) {
+    return "".join(chars.slice(from, to));
+}
+
+// How many of a character run from i.
+function runOf(chars, i, c) {
+    var n = 0;
+    while (i + n < chars.length && chars[i + n] == c) {
+        n++;
+    }
+    return n;
+}
+
+function isSpace(c) {
+    return c == " " || c == "\n";
+}
+
+// Where a character is from i, before limit, or -1.
+function find(chars, c, from, limit) {
+    var end = limit < chars.length ? limit : chars.length;
+    for (var j = from; j < end; j++) {
+        if (chars[j] == c) {
+            return j;
+        }
+    }
+    return -1;
+}
+
+// A link's address as a page may use it: http, https and mailto, or a path of the forum's; else null.
+function addressOf(url) {
+    var lower = url.toLower();
+    if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("mailto:")
+        || (url.startsWith("/") && !url.startsWith("//")) || url.startsWith("#")) {
+        return url;
+    }
+    return null;
+}
+
+function link(href, html) {
+    return $"<a href=\"{Html.escape(Html.url(href))}\" rel=\"nofollow ugc noopener\">{html}</a>";
+}
+
+// Each [ that a ] closes, its brackets counted, an escaped one not: closes[i] the ]'s position, or -1.
+function brackets(chars) {
+    var closes = [];
+    var open = [];
+    var i = 0;
+    while (i < chars.length) {
+        closes.push(-1);
+        var c = chars[i];
+        if (c == "\\" && i + 1 < chars.length) {
+            closes.push(-1);
+            i += 2;
+            continue;
+        }
+        if (c == "[") {
+            open.push(i);
+        } else if (c == "]" && open.length > 0) {
+            closes[open.pop()] = i;
+        }
+        i++;
+    }
+    return closes;
+}
+
+// The inline markup of one line, as HTML; links false inside a link's text, where no link may be.
+function inline(text, depth, images, links) {
+    var chars = charsOf(text);
+    var n = chars.length;
+    var closes = brackets(chars);
+    // Where a search for an emphasis's closing delimiter, or a code span's run of backticks, found none, from: a later
+    // search for it from there on finds none either.
+    var none = {};
+    var out = [];
+    var from = 0;
+    var i = 0;
+
+    // Where a closing delimiter of emphasis is from start: after text that does not end with a space, and, for _, not
+    // before a letter; or -1.
+    function closer(delimiter, start) {
+        if (none.has(delimiter) && start >= none[delimiter]) {
+            return -1;
+        }
+        var size = delimiter.length;
+        for (var at = start + 1; at + size <= n; at++) {
+            if (chars[at] == delimiter[0] && (size == 1 || chars[at + 1] == delimiter[0]) && !isSpace(chars[at - 1])
+                && (delimiter[0] != "_" || at + size >= n || !letters.contains(chars[at + size]))) {
+                return at;
+            }
+        }
+        none[delimiter] = start;
+        return -1;
+    }
+
+    // Where a run of exactly ticks backticks is from start, or -1.
+    function ticksFrom(ticks, start) {
+        var key = $"`{ticks}";
+        if (none.has(key) && start >= none[key]) {
+            return -1;
+        }
+        var at = start;
+        while (at < n) {
+            if (chars[at] == "`") {
+                var run = runOf(chars, at, "`");
+                if (run == ticks) {
+                    return at;
+                }
+                at += run;
+            } else {
+                at++;
+            }
+        }
+        none[key] = start;
+        return -1;
+    }
+
+    while (i < n) {
+        var c = chars[i];
+        if (c == "\\" && i + 1 < n && punctuation.contains(chars[i + 1])) {
+            out.push(Html.escape(part(chars, from, i)));
+            out.push(Html.escape(chars[i + 1]));
+            i += 2;
+            from = i;
+            continue;
+        }
+        if (c == "`") {
+            var ticks = runOf(chars, i, "`");
+            var end = ticksFrom(ticks, i + ticks);
+            if (end < 0) {
+                i += ticks;
+                continue;
+            }
+            var code = part(chars, i + ticks, end).replace("\n", " ");
+            if (code.length > 2 && code.startsWith(" ") && code.endsWith(" ") && code.trim() != "") {
+                code = code.slice(1, code.length - 1);
+            }
+            out.push(Html.escape(part(chars, from, i)));
+            out.push("<code>" + Html.escape(code) + "</code>");
+            i = end + ticks;
+            from = i;
+            continue;
+        }
+        if (depth < maxDepth && links && c == "<") {
+            var close = find(chars, ">", i + 1, i + 1 + longestAddress);
+            var inside = close < 0 ? "" : part(chars, i + 1, close);
+            if (inside != "" && !inside.contains(" ") && !inside.contains("<") && !inside.startsWith("/") && !inside.startsWith("#")
+                && addressOf(inside) != null) {
+                out.push(Html.escape(part(chars, from, i)));
+                out.push(link(inside, Html.escape(inside)));
+                i = close + 1;
+                from = i;
+                continue;
+            }
+        }
+        if (depth < maxDepth && links && (c == "[" || (c == "!" && i + 1 < n && chars[i + 1] == "["))) {
+            var image = c == "!";
+            var open = image ? i + 1 : i;
+            var bracket = closes[open];
+            if (bracket > 0 && bracket + 1 < n && chars[bracket + 1] == "(") {
+                var shut = find(chars, ")", bracket + 2, bracket + 2 + longestAddress);
+                var target = shut < 0 ? "" : part(chars, bracket + 2, shut).trim();
+                if (target.contains(" ")) {
+                    target = target.slice(0, target.indexOf(" "));
+                }
+                var address = target == "" ? null : addressOf(target);
+                if (address != null) {
+                    var label = part(chars, open + 1, bracket);
+                    out.push(Html.escape(part(chars, from, i)));
+                    var lower = address.toLower();
+                    if (image && images && (lower.startsWith("https://") || lower.startsWith("http://"))) {
+                        out.push($"<img src=\"{Html.escape(Html.url(address))}\" alt=\"{Html.escape(label)}\" loading=\"lazy\">");
+                    } else {
+                        out.push(link(address, inline(label, depth + 1, images, false)));
+                    }
+                    i = shut + 1;
+                    from = i;
+                    continue;
+                }
+            }
+        }
+        if (c == "*" || c == "_" || c == "~") {
+            var run = runOf(chars, i, c);
+            var size = c == "~" ? 2 : (run >= 2 ? 2 : 1);
+            var opens = depth < maxDepth && run <= 3 && (c != "~" || run == 2) && i + run < n && !isSpace(chars[i + run])
+                        && (c != "_" || i == 0 || !letters.contains(chars[i - 1]));
+            if (opens) {
+                var delimiter = c.repeat(size);
+                var at = closer(delimiter, i + size);
+                if (at > i + size) {
+                    // Strong whose text holds an emphasis left open ends at the last of a longer run, ***, so that its
+                    // emphasis closes first.
+                    var after = runOf(chars, at, c);
+                    var inner = part(chars, i + size, at);
+                    if (size == 2 && after > 2 && (inner.length - inner.replace(c, "").length) % 2 == 1) {
+                        at = at + after - 2;
+                        inner = part(chars, i + size, at);
+                    }
+                    var tag = c == "~" ? "del" : size == 2 ? "strong" : "em";
+                    out.push(Html.escape(part(chars, from, i)));
+                    out.push($"<{tag}>{inline(inner, depth + 1, images, links)}</{tag}>");
+                    i = at + size;
+                    from = i;
+                    continue;
+                }
+            }
+            i += run;
+            continue;
+        }
+        if (links && c == "h" && (i == 0 || isSpace(chars[i - 1]) || chars[i - 1] == "(")) {
+            var head = part(chars, i, i + 8 < n ? i + 8 : n).toLower();
+            if (head.startsWith("http://") || head == "https://") {
+                var stop = i;
+                while (stop < n && stop < i + longestAddress && !isSpace(chars[stop]) && chars[stop] != "<") {
+                    stop++;
+                }
+                while (stop > i && ".,;:!?)'\"".contains(chars[stop - 1])) {
+                    stop--;
+                }
+                if (stop - i > 8) {
+                    var url = part(chars, i, stop);
+                    out.push(Html.escape(part(chars, from, i)));
+                    out.push(link(url, Html.escape(url)));
+                    i = stop;
+                    from = i;
+                    continue;
+                }
+            }
+        }
+        i++;
+    }
+    out.push(Html.escape(part(chars, from, n)));
+    return "".join(out);
+}

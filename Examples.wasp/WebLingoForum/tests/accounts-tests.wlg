@@ -69,13 +69,14 @@ export class AccountsTests {
     }
 
     async testTheFirstVersionIsUpgradedToThisOne() {
-        assertEqual(schema.version, 2);
+        assertEqual(schema.version, 3);
         var upgraded = schema.create("postgresql", 1);
         foreach (var statement in schema.upgrade("postgresql", 1)) {
             upgraded.push(statement);
         }
         assertDeepEqual(upgraded, schema.create("postgresql"));
-        assertEqual(schema.upgrade("mysql", 2).length, 0);
+        assertEqual(schema.upgrade("mysql", 3).length, 0);
+        assertEqual(schema.upgrade("mysql", 2).length, 3);
         using (var db = await Database.open("sqlite::memory:")) {
             foreach (var statement in schema.create(db.provider, 1)) {
                 await db.execute(statement);
