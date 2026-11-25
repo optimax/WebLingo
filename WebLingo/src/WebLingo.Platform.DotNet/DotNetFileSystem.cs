@@ -247,15 +247,16 @@ public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = n
 }
 
 /// <summary>
-/// An execution's scheduler host on .NET (section 7.8): blocking work on .NET's thread pool, and work posted back held in a
-/// queue, which the worker runs, waiting on an event when it is empty. Adapter-only (section 7.14).
+/// An execution's scheduler host on .NET (section 7.8): blocking work on WebLingo's own threads (<see cref="DotNetBlockingPool"/>),
+/// and work posted back held in a queue, which the worker runs, waiting on an event when it is empty. Adapter-only (section
+/// 7.14).
 /// </summary>
 public sealed class DotNetSchedulerHost : IWebLingoSchedulerHost
 {
     private readonly Queue<Action> _posted = new();
     private readonly object _gate = new();
 
-    public void RunBlocking(Action work) => ThreadPool.UnsafeQueueUserWorkItem(_ => work(), null);
+    public void RunBlocking(Action work) => DotNetBlockingPool.Run(work);
 
     public void Post(Action work)
     {

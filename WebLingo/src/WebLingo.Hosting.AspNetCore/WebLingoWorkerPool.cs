@@ -197,15 +197,16 @@ public sealed class WebLingoWorkerPool : IDisposable
     }
 
     /// <summary>
-    /// A request's scheduler host (section 7.8): blocking work on .NET's thread pool, and work posted back held for its
-    /// worker, which it wakes to resume the request.
+    /// A request's scheduler host (section 7.8): blocking work on WebLingo's own threads (<c>DotNetBlockingPool</c>), never
+    /// .NET's pool, which ASP.NET Core's requests need, and work posted back held for its worker, which it wakes to resume
+    /// the request.
     /// </summary>
     private sealed class Scheduler(WebLingoWorkerPool pool, int worker, Item item) : IWebLingoSchedulerHost
     {
         private readonly ConcurrentQueue<Action> _posted = new();
         private readonly SemaphoreSlim _signal = new(0);
 
-        public void RunBlocking(Action work) => ThreadPool.UnsafeQueueUserWorkItem(_ => work(), null);
+        public void RunBlocking(Action work) => WebLingo.Platform.DotNet.DotNetBlockingPool.Run(work);
 
         public void Post(Action work)
         {

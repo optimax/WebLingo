@@ -761,7 +761,9 @@ What it found, each a task of its own:
 - **SQL Server's pages stall under many clients.** From 64 clients, `sqlserver`'s throughput falls below a third of 16
   clients', and at 256 some of its requests wait 13 s under `wasp serve` and 15 to 17 s behind nginx, where 15 were a 500,
   each request opening a connection of SqlClient's pool, 100 at most, by blocking a thread of .NET's pool, as all of a
-  script's work off its worker does (§6.6) ("SQL Server Pages Under Many Clients").
+  script's work off its worker does (§6.6) ("SQL Server Pages Under Many Clients"). Fixed (24 November 2026): that work on
+  threads of WebLingo's own (§6.10), measured beside the soak, which shared the machine: at 64 clients 989 requests a
+  second, where 567 were, and at 256 924, 99% under 404 ms, where 453 were, 99% under 7,147 ms.
 - **FastCGI behind nginx serves about 1,000 requests a second**, whatever the page and the clients, a fifth to a
   thirtieth of `wasp serve`'s, and at 256 clients 1% of its requests take 3 s, as long as a refused connection's retry takes,
   and 13 s on the pages that send most ("FastCGI Behind nginx Under Load").
@@ -1065,7 +1067,11 @@ User Manual's section 18 configures it.
 - Bounded VM worker pool.
 - Execution contexts are **worker-affine** and resume on their owning worker.
 - Platform I/O completion may happen on another host thread but must post work to the owner.
-- Instruction-quantum yielding and bounded blocking-operation pools are recommended.
+- Instruction-quantum yielding and bounded blocking-operation pools are recommended. As built (24 November 2026, "SQL
+  Server Pages Under Many Clients"; Proposed): work off the worker that blocks, a database's, a file's, a subprocess's, a
+  mail server's, runs on threads of WebLingo's own, `DotNetBlockingPool`, made as work comes and none waits, up to 256, never
+  on .NET's thread pool, which ASP.NET Core's requests and every completion need, and which work blocking its threads had
+  starved, a site on SQL Server stalling at 64 clients and waiting 13 s at 256 (§5.6, "Under load").
 - Work stealing or migration is deferred until supported by explicit safe-transfer semantics.
 
 ### 6.11 Security and diagnostics

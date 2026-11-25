@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using WebLingo.Platform.Abstractions;
+using WebLingo.Platform.DotNet;
 namespace WebLingo.Hosting.AspNetCore;
 
 /// <summary>
@@ -142,7 +143,8 @@ public sealed class WebLingoDatabaseSessions : IWebLingoSessionStore
     public WebLingoSessionOpening Open(string id, bool locked, Action<WebLingoSessionOpening> later)
     {
         var deadline = _now() + (long)LockTimeout.TotalMilliseconds;
-        ThreadPool.UnsafeQueueUserWorkItem(_ => Try(id, locked, deadline, later), null);
+        // Its database's work on WebLingo's own threads, as a script's is, never .NET's pool (DotNetBlockingPool).
+        DotNetBlockingPool.Run(() => Try(id, locked, deadline, later));
         return WebLingoSessionOpening.Waiting;
     }
 
@@ -168,7 +170,8 @@ public sealed class WebLingoDatabaseSessions : IWebLingoSessionStore
             later(WebLingoSessionOpening.TimedOut);
             return;
         }
-        Task.Delay(Poll).ContinueWith(_ => Try(id, locked, deadline, later), TaskScheduler.Default);
+        // Its next try on the blocking pool too, the timer's continuation only handing it on.
+        Task.Delay(Poll).ContinueWith(_ => DotNetBlockingPool.Run(() => Try(id, locked, deadline, later)), TaskScheduler.Default);
     }
 
     private WebLingoSessionOpening TryOpen(string id, bool locked) => Run(connection =>
@@ -216,7 +219,7 @@ public sealed class WebLingoDatabaseSessions : IWebLingoSessionStore
     public bool Close(string id, IReadOnlyDictionary<string, string>? values, Action done)
     {
         Let(id);
-        ThreadPool.UnsafeQueueUserWorkItem(_ =>
+        DotNetBlockingPool.Run(() =>
         {
             try
             {
@@ -230,7 +233,7 @@ public sealed class WebLingoDatabaseSessions : IWebLingoSessionStore
                 _log?.Invoke($"A session could not be written back: {failure.Message}.");
             }
             done();
-        }, null);
+        });
         return false;
     }
 
