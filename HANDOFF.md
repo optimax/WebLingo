@@ -132,7 +132,7 @@ which has no Linux and no Linux runtime packs: CI's job `linux-installer` makes 
 removes them with `Installers/Linux/tests/test.sh` on every push, so it is first tried by the push after it lands. The
 arm64 packages are made by `package.sh` but tried nowhere. `Installers/Linux/tests/serve.sh`, its next step, failed on
 every push from `2e27309` to `b79f11e`, taking nginx's 502 for the site being served before `wasp fastcgi` listened;
-`eef7703` waits for a success instead, not yet tried by a push. The build and its tests passed on `ubuntu-latest` and
+`eef7703` waits for a success instead, and CI's run #95 (`c275684`) passed, its three jobs. The build and its tests passed on `ubuntu-latest` and
 `windows-latest` on each of those pushes.
 
 ## The console module
