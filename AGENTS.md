@@ -80,6 +80,7 @@ The design of a project, and who decided what, is recorded in its design documen
 - Implement what the owner has approved. Do not change an approved decision, or work around it, without the owner's explicit approval.
 - Do not treat a proposal, a recommendation, or a deliberately open question as decided: not in code, in tests, in comments, or in documents. Where a task needs one settled, ask (`TO-DO-INSTRUCTIONS.md` says how). Until it is answered, build so that the choice stays easy to change, and say which choice you made.
 - Where the design documents are silent and the work needs a decision that users or other components will depend on (semantics, file and wire formats, protocols, public interfaces), do not invent it: ask. Record a choice made only to unblock work as a proposal, where `Documents/implementation.md` says.
+- Before asking which way to do something, check that it can be done at all: walk each option through every host, platform and mode the project supports, and against what its platforms fix (what is decided only when a process starts, what is shared between sites or users). Where the premise itself fails, say so in the question, why, and offer what would work instead, as one of its options, rather than options that each fail.
 - When the owner approves a decision, record it in the design documents in the same change, with the date.
 
 ------

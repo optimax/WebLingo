@@ -28,6 +28,8 @@ A task too large to land in one piece is split into tasks of its own, one per pa
 
 Do not hesitate to ask the user any questions when something is unclear, or when you are faced with a design decision. A task that needs a decision the design documents leave open, as a proposal, as deliberately undecided, or by not making it at all, needs the user's answer: do not settle it yourself (`AGENTS.md`, section 3). When you need to ask the user a clarifying question, do not pop a modal blocking dialog in the interactive chat. Ask it by placing it in `TO-DO.md`, underneath the relevant task description, formatted in **bold**, and continue with other TO-DOs in the meantime, while waiting for the user's answers. When an answer approves a decision, record it in the design documents as part of that task.
 
+Make each question answerable on its own: say what problem it solves, what each option means in plain words and its main tradeoffs, and which option you recommend, and why, so that the user can answer with "(a)" or "yes" without asking you to explain. Do not ask a question whose recommendation would be none of its options: ask instead about what would work, or whether its premise should be dropped (`AGENTS.md`, section 3).
+
 When working on a task, create and work in a temporary git branch off of `main`, named `claude/` followed by a name whose relation to the task is obvious (`AGENTS.md`, section 16).
 
 Have at most four subagents at work at the same time. Every build and check shares the machine's cores and memory, and more work at once makes each task's checks slower, so finish and land work before starting more.
