@@ -1845,3 +1845,11 @@ writeLn(await Task.all(counts));
 ```text
 [1229, 2262, 3245, 4203]
 ```
+
+A script's `weblingo.config` limits its workers in `"limits"`, as a site's `wasp.config` limits its requests: `{
+"limits": { "workers": 8, "workerTimeout": 60, "workerInstructions": 1000000000, "workerMemory": 128 } }`, each optional.
+`"workers"` is how many may run at once, the script's own, its workers' and its pools' together, from 1 to 1,024, the
+machine's processors by default: a `new Worker` beyond them is WL3001 where it is made, and a pool's call waits for one
+to end. Each worker's seconds, `"workerTimeout"`, a pool's worker's for each call, its instructions, `"workerInstructions"`,
+and its megabytes of strings, `"workerMemory"`, are none, none and 128 by default. A worker past one is stopped, and
+its parent's next `receive()`, or the pool's call, throws an `Error` whose code is WL3003, its message saying which.

@@ -349,7 +349,7 @@ public static partial class WebLingoCommandLine
         // The VM imports modules with the same resolver the compiler used (section 3.9).
         // A script's workers, std:workers', where its command line runs them (section 9, "M0.26 parts", part 2).
         var workers = program.RunsWorkers
-            ? new Workers(new Workers.Settings(program, path, givenSchemes, output, error, input, console, regexTimeout), null)
+            ? new Workers(WorkersSettings(program, path, givenSchemes, output, error, input, console, regexTimeout), null)
             : null;
         var context = Context(source.Host, parameters, source.LineOf, regexTimeout) with { Workers = workers };
         var loader = new WebLingoModuleLoader(source.Options);
@@ -493,7 +493,7 @@ public static partial class WebLingoCommandLine
         var loader = new WebLingoModuleLoader(host.Options);
         // Its workers' modules compiled from their source, as a script's are (section 9, "M0.26 parts", part 2).
         var workers = program.RunsWorkers
-            ? new Workers(new Workers.Settings(program, path, givenSchemes, output, error, input, console, regexTimeout), null)
+            ? new Workers(WorkersSettings(program, path, givenSchemes, output, error, input, console, regexTimeout), null)
             : null;
         var context = Context(host, parameters, LineOf, regexTimeout) with { Workers = workers };
         var result = OnVm(register, loader, null, context);
@@ -665,6 +665,19 @@ public static partial class WebLingoCommandLine
         };
     }
 
+    /// <summary>
+    /// What a run's workers share (section 9, "M0.26 parts", parts 2 and 4): the program and its writers, and its
+    /// configuration's limits, read again here, which its host has checked, and the count of its workers running, at most
+    /// <c>"limits"</c>' <c>"workers"</c>, the machine's processors by default.
+    /// </summary>
+    private static Workers.Settings WorkersSettings(WebLingoCommandLineProgram program, string path, IReadOnlyDictionary<string, string> givenSchemes,
+        TextWriter output, TextWriter error, IWebLingoConsoleInput? input, Action? console, int regexTimeout)
+    {
+        if (!WebLingoSchemes.TryLoadLimits(path, program.Configuration, givenSchemes, out var limits, out _)) limits = WebLingoLimitSettings.Default;
+        return new Workers.Settings(program, path, givenSchemes, output, error, input, console, regexTimeout, limits,
+            new Workers.Running(limits.Workers ?? Environment.ProcessorCount));
+    }
+
     private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters,
         Func<string?, int, int> lines, int regexTimeout) =>
         new(new WebLingoWorkerId(0))
@@ -833,8 +846,15 @@ public static partial class WebLingoCommandLine
     /// The clock an execution's timers (<c>delay</c>) wait on (specification, section 3.8): the platform's monotonic clock,
     /// in milliseconds, the thread sleeping while the execution has nothing else to run.
     /// </summary>
-    private sealed class SystemClock(IWebLingoClock clock) : IWebLingoExecutionClock
+    private sealed class SystemClock(IWebLingoClock clock, WebLingoCancellationSignal? cancellation = null) : IWebLingoExecutionClock
     {
+        /// <summary>
+        /// How long it sleeps at a time while it waits for an execution that may be cancelled, a worker's (section 9, "M0.26
+        /// parts", parts 2 and 4), which its wait then ends early, its VM looking at the cancellation before the timer's task
+        /// resumes.
+        /// </summary>
+        private const int Slice = 20;
+
         public long Milliseconds
         {
             get
@@ -846,9 +866,9 @@ public static partial class WebLingoCommandLine
 
         public void WaitUntil(long milliseconds)
         {
-            for (var now = Milliseconds; now < milliseconds; now = Milliseconds)
+            for (var now = Milliseconds; now < milliseconds && cancellation?.IsCancellationRequested != true; now = Milliseconds)
             {
-                Thread.Sleep((int)Math.Min(milliseconds - now, int.MaxValue));
+                Thread.Sleep((int)Math.Min(milliseconds - now, cancellation is null ? int.MaxValue : Slice));
             }
         }
     }

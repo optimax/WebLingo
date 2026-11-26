@@ -66,6 +66,15 @@ public static class WebLingoSchemes
             out databases, out files, out allowed, out env, out mail, out _, out _, out _, out _, out _, out _, out _, out error);
 
     /// <summary>
+    /// The limits the configuration beside <paramref name="program"/> gives, its file <paramref name="configuration"/>, a
+    /// script's workers' among them (section 9, "M0.26 parts", part 4); false, with why, where it cannot be read.
+    /// </summary>
+    public static bool TryLoadLimits(string program, string configuration, IReadOnlyDictionary<string, string> given,
+        out WebLingoLimitSettings limits, out string? error) =>
+        TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out _, out _, out _, out _, out _, out _,
+            out _, out _, out _, out _, out _, out limits, out _, out _, out _, out _, out error);
+
+    /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
     /// line's given over them, its mode, <c>development</c>, <c>production</c>, or null if it names none, and its send
     /// timeout, in seconds, or null if it gives none; false, with why, otherwise.
@@ -319,11 +328,12 @@ public static class WebLingoSchemes
     private static bool TryReadLimits(string file, JsonElement setting, ref WebLingoLimitSettings limits, out string? error)
     {
         error = $"{file}: \"limits\" is an object, {{ \"requestTimeout\": 60, \"requestInstructions\": 1000000000, \"requestMemory\": 128, "
-                + "\"drain\": 60, \"requestLine\": 8192, \"requestHeaders\": 32768, \"requestArrival\": 30, \"keepAlive\": 130 }, each optional, "
-                + "\"requestTimeout\" a number of seconds more than 0, or null for none, \"requestInstructions\" an integer more than 0, "
-                + "\"requestMemory\" a number of megabytes from 1 to 1048576, \"drain\", \"requestArrival\" and \"keepAlive\" numbers of seconds "
-                + "more than 0, and \"requestLine\" and \"requestHeaders\" numbers of bytes from 1 to 1048576, each number of seconds at most "
-                + $"{MaxSeconds}.";
+                + "\"drain\": 60, \"requestLine\": 8192, \"requestHeaders\": 32768, \"requestArrival\": 30, \"keepAlive\": 130, \"workers\": 8, "
+                + "\"workerTimeout\": 60, \"workerInstructions\": 1000000000, \"workerMemory\": 128 }, each optional, \"requestTimeout\" and "
+                + "\"workerTimeout\" numbers of seconds more than 0, or null for none, \"requestInstructions\" and \"workerInstructions\" integers "
+                + "more than 0, \"workerInstructions\" null for none too, \"requestMemory\" and \"workerMemory\" numbers of megabytes from 1 to "
+                + "1048576, \"workers\" an integer from 1 to 1024, \"drain\", \"requestArrival\" and \"keepAlive\" numbers of seconds more than 0, "
+                + $"and \"requestLine\" and \"requestHeaders\" numbers of bytes from 1 to 1048576, each number of seconds at most {MaxSeconds}.";
         if (setting.ValueKind != JsonValueKind.Object) return false;
         foreach (var entry in setting.EnumerateObject())
         {
@@ -363,6 +373,31 @@ public static class WebLingoSchemes
             else if (entry.Name == "requestMemory" && number && entry.Value.TryGetInt64(out var megabytes) && megabytes is >= 1 and <= 1_048_576)
             {
                 limits = limits with { MemoryMegabytes = megabytes };
+            }
+            // A script's workers' limits, weblingo's (section 9, "M0.26 parts", part 4).
+            else if (entry.Name == "workers" && number && entry.Value.TryGetInt32(out var workers) && workers is >= 1 and <= 1024)
+            {
+                limits = limits with { Workers = workers };
+            }
+            else if (entry.Name == "workerTimeout" && number && entry.Value.TryGetDouble(out var workerSeconds) && workerSeconds is > 0 and <= MaxSeconds)
+            {
+                limits = limits with { WorkerTimeoutSeconds = workerSeconds };
+            }
+            else if (entry.Name == "workerTimeout" && entry.Value.ValueKind == JsonValueKind.Null)
+            {
+                limits = limits with { WorkerTimeoutSeconds = null };
+            }
+            else if (entry.Name == "workerInstructions" && number && entry.Value.TryGetInt64(out var workerInstructions) && workerInstructions > 0)
+            {
+                limits = limits with { WorkerInstructions = workerInstructions };
+            }
+            else if (entry.Name == "workerInstructions" && entry.Value.ValueKind == JsonValueKind.Null)
+            {
+                limits = limits with { WorkerInstructions = null };
+            }
+            else if (entry.Name == "workerMemory" && number && entry.Value.TryGetInt64(out var workerMegabytes) && workerMegabytes is >= 1 and <= 1_048_576)
+            {
+                limits = limits with { WorkerMemoryMegabytes = workerMegabytes };
             }
             else
             {
@@ -922,6 +957,19 @@ public sealed record WebLingoLimitSettings(double? TimeoutSeconds, long? Instruc
     public double? RequestArrivalSeconds { get; init; }
 
     public double? KeepAliveSeconds { get; init; }
+
+    /// <summary>
+    /// A script's workers' limits under <c>weblingo</c> (section 9, "M0.26 parts", part 4): how many may run at once,
+    /// <c>"workers"</c>; and each one's seconds, <c>"workerTimeout"</c>, instructions, <c>"workerInstructions"</c>, and
+    /// megabytes of strings, <c>"workerMemory"</c>; each null where it gives none, the host's default then.
+    /// </summary>
+    public int? Workers { get; init; }
+
+    public double? WorkerTimeoutSeconds { get; init; }
+
+    public long? WorkerInstructions { get; init; }
+
+    public long? WorkerMemoryMegabytes { get; init; }
 
     /// <summary>What a configuration that says nothing of them means: the host's defaults.</summary>
     public static WebLingoLimitSettings Default { get; } = new(null, null, null);

@@ -821,11 +821,12 @@ public class WaspServeTests : IDisposable
         }
 
         const string Says = "\"limits\" is an object, { \"requestTimeout\": 60, \"requestInstructions\": 1000000000, \"requestMemory\": 128, "
-                            + "\"drain\": 60, \"requestLine\": 8192, \"requestHeaders\": 32768, \"requestArrival\": 30, \"keepAlive\": 130 }, "
-                            + "each optional, \"requestTimeout\" a number of seconds more than 0, or null for none, \"requestInstructions\" an integer "
-                            + "more than 0, \"requestMemory\" a number of megabytes from 1 to 1048576, \"drain\", \"requestArrival\" and \"keepAlive\" "
-                            + "numbers of seconds more than 0, and \"requestLine\" and \"requestHeaders\" numbers of bytes from 1 to 1048576, each number "
-                            + "of seconds at most 4294967.";
+                            + "\"drain\": 60, \"requestLine\": 8192, \"requestHeaders\": 32768, \"requestArrival\": 30, \"keepAlive\": 130, \"workers\": 8, "
+                            + "\"workerTimeout\": 60, \"workerInstructions\": 1000000000, \"workerMemory\": 128 }, each optional, \"requestTimeout\" and "
+                            + "\"workerTimeout\" numbers of seconds more than 0, or null for none, \"requestInstructions\" and \"workerInstructions\" integers "
+                            + "more than 0, \"workerInstructions\" null for none too, \"requestMemory\" and \"workerMemory\" numbers of megabytes from 1 to "
+                            + "1048576, \"workers\" an integer from 1 to 1024, \"drain\", \"requestArrival\" and \"keepAlive\" numbers of seconds more than 0, "
+                            + "and \"requestLine\" and \"requestHeaders\" numbers of bytes from 1 to 1048576, each number of seconds at most 4294967.";
         foreach (var setting in new[] { "[]", "{ \"requestTimeout\": 0 }", "{ \"requestTimeout\": \"60\" }", "{ \"requestInstructions\": 1.5 }",
                                          "{ \"requestInstructions\": 0 }", "{ \"requestMemory\": 0 }", "{ \"requestMemory\": 2000000 }",
                                          "{ \"time\": 60 }", "{ \"requestTimeout\": 5000000 }", "{ \"drain\": 0 }", "{ \"drain\": null }",

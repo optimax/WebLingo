@@ -162,7 +162,10 @@ and copies an uncaught exception into `WebLingoExecutionResult.Thrown` (`CopyThr
 The CLI's `TextWriterOutput` locks its writer, workers sharing it. Part 3, the pool: `workers.run(path, name, args)`
 through `IWebLingoWorkers.TryPool`; the CLI's `Pool` parses the module's exports (`Pool.Exports`), writes a driver
 (`Pool.Driver`, a `switch` over them, never on disk), and runs it on part 2's workers, one call at a time each, an
-exception ending that worker; part 4's limits go there and in `Launch`.
+exception ending that worker. Part 4, the limits: `"limits"`' `"workers"` and the `"worker…"` three, in
+`WebLingoLimitSettings`; `Workers.Running` counts the program's workers (`Launch` takes one, `Body`'s end gives it
+back, telling the pools, whose waiting calls `Retry`); a worker's `Timer` sets its cancellation's limit, each call's for
+a pool's (`Time`, `Untime`); its clock waits in slices so that a cancellation ends a `delay`.
 
 ## The work off the workers
 

@@ -2102,8 +2102,23 @@ owner has not decided is a question of its task's, and Proposed here until it is
    alone, part 4's limits counting all; `WorkersTests`.
 4. **Its limits** (A3 (b)). The workers a script may run at once, and each one's time, instructions and memory,
    `weblingo.config`'s, a worker past one stopped as a request past its limits is, so that a site's own limits can later
-   be given the same way. Their settings' names and defaults are the task's question (Proposed: in `"limits"`, as
-   `wasp.config` names a request's).
+   be given the same way. Their settings (the owner's answer, 26 November 2026, A1 (a) of "M0.26, Part 4: Its Limits"):
+   in `"limits"`, as `wasp.config` names a request's, `"workers": 8`, at most that many at once, the machine's
+   processors by default, a `new Worker` beyond them an error where it is made, the pool keeping within them; each
+   worker's `"workerTimeout"`, in seconds, and `"workerInstructions"`, none by default, as a script under `weblingo` has
+   none, and `"workerMemory"`, 128 megabytes of strings by default, a script's own; a worker past one stopped, its
+   parent's next `receive()` its error. Built (26 November 2026; Proposed where it says more): `WebLingoLimitSettings`'
+   `Workers`, `WorkerTimeoutSeconds`, `WorkerInstructions` and `WorkerMemoryMegabytes`, read by the configurations' one
+   reader, so that `wasp.config` takes them too, its pages not using them; `"workers"` from 1 to 1,024, counting every
+   worker of the program, its own, its workers' and its pools', the CLI's `Workers.Running`; a `new Worker` beyond them
+   WL3001, `This program runs 2 workers at once, the most "limits"' "workers" in weblingo.config allows: one must end
+   before another starts.`, a pool's call beyond them waiting until one ends; a worker's time its life's, a pool's
+   worker's each call's, its instructions and its memory its life's for both, the VM's instruction budget and heap; a
+   worker past its time stopped as a request is, by its cancellation's limit, its error an `Error` of code WL3003, `The
+   worker took longer than 0.5 seconds, its limit, "limits"' "workerTimeout" in weblingo.config.`, `call` for a pool's;
+   past its instructions or its memory the VM's own WL3003; and a worker's clock waiting in slices of 20 ms, so that its
+   cancellation, its disposal or its time, ends a `delay` it waits for, which the clock otherwise slept through;
+   `WorkersTests`.
 5. **Measured.** A program that computes, split across workers, against the same on one; and a message's copying by its
    size; their numbers in §5.6.
 

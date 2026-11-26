@@ -330,6 +330,85 @@ public sealed class WorkersTests : IDisposable
             """.ReplaceLineEndings("\n"), output);
     }
 
+    [Fact]
+    public void AsManyWorkersRunAsTheLimitsAllow_ThePoolWithinThem()
+    {
+        // Section 9, "M0.26 parts", part 4: "limits"' "workers", a Worker beyond them an error where it is made.
+        Write("weblingo.config", "{ \"limits\": { \"workers\": 2 } }");
+        Write("waits.wlg", Imports + "await parent.receive();");
+        Write("maths.wlg", Maths);
+        var (output, error) = Run("""
+            import { writeLn } from "std:console";
+            import { Worker, run } from "std:workers";
+            var a = new Worker("waits.wlg");
+            var b = new Worker("waits.wlg");
+            try { new Worker("waits.wlg"); } catch (e) { writeLn($"{e.code} {e.message}"); }
+            b.post(null);
+            writeLn(await b.receive());
+            // One worker left for the pool, which runs its calls on it one after another.
+            var calls = [];
+            for (var i = 0; i < 6; i++) calls.push(run("maths.wlg", "later", [i, 5]));
+            writeLn(await Task.all(calls));
+            """);
+        Assert.Equal("", error);
+        Assert.Equal("WL3001 This program runs 2 workers at once, the most \"limits\"' \"workers\" in weblingo.config allows: one must end "
+                     + "before another starts.\nnull\nmaths runs\n[1, 2, 3, 4, 5, 6]\n", output);
+    }
+
+    [Fact]
+    public void AWorkerPastItsLimitsIsStopped_ItsErrorItsParentsNextReceive()
+    {
+        Write("weblingo.config", "{ \"limits\": { \"workerTimeout\": 0.5, \"workerInstructions\": 5000000, \"workerMemory\": 1 } }");
+        Write("waits.wlg", "await delay(100000);");
+        Write("loops.wlg", "var i = 0;\nwhile (true) { i++; }");
+        Write("grows.wlg", "var s = \"x\";\nwhile (true) s = s + s;");
+        Write("maths.wlg", Maths + "\nexport function spin(n) { var i = 0; while (i < n) i++; return i; }");
+        var watch = Stopwatch.StartNew();
+        var (output, error) = Run("""
+            import { writeLn } from "std:console";
+            import { Worker, run } from "std:workers";
+            foreach (var path in ["waits.wlg", "loops.wlg", "grows.wlg"]) {
+                try { await new Worker(path).receive(); } catch (e) { writeLn($"{e.code} {e.message}"); }
+            }
+            // A pool's worker's time is each call's, its instructions and its memory its life's.
+            try { await run("maths.wlg", "later", [1, 2000]); } catch (e) { writeLn($"{e.code} {e.message}"); }
+            writeLn(await run("maths.wlg", "later", [1, 10]));
+            try { await run("maths.wlg", "spin", [100000000]); } catch (e) { writeLn($"{e.code} {e.message}"); }
+            writeLn(await run("maths.wlg", "spin", [1000]));
+            """);
+        Assert.Equal("", error);
+        Assert.Equal("""
+            WL3003 The worker took longer than 0.5 seconds, its limit, "limits"' "workerTimeout" in weblingo.config.
+            WL3003 The program ran 5000000 instructions, its whole budget, and was stopped.
+            WL3003 A string of 524288 characters does not fit in the memory this execution may use.
+            maths runs
+            WL3003 The call took longer than 0.5 seconds, its limit, "limits"' "workerTimeout" in weblingo.config.
+            maths runs
+            2
+            WL3003 The program ran 5000000 instructions, its whole budget, and was stopped.
+            maths runs
+            1000
+
+            """.ReplaceLineEndings("\n"), output);
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30), $"{watch.Elapsed}");
+    }
+
+    [Theory]
+    [InlineData("{ \"workers\": 0 }")]
+    [InlineData("{ \"workers\": 1025 }")]
+    [InlineData("{ \"workerTimeout\": 0 }")]
+    [InlineData("{ \"workerInstructions\": 0 }")]
+    [InlineData("{ \"workerMemory\": 0 }")]
+    [InlineData("{ \"workers\": \"8\" }")]
+    public void WorkersLimitsAreChecked(string limits)
+    {
+        Write("weblingo.config", "{ \"limits\": " + limits + " }");
+        var (exit, _, error) = Weblingo("run", Main("var x = 1;"));
+        Assert.Equal(WebLingoCommandLine.FileUnreadable, exit);
+        Assert.Contains("weblingo.config: \"limits\" is an object, { \"requestTimeout\": 60,", error, StringComparison.Ordinal);
+        Assert.Contains("\"workers\" an integer from 1 to 1024", error, StringComparison.Ordinal);
+    }
+
     /// <summary>The worker's first line, which it writes on a thread of its own, put first, so that the test does not depend on when it runs.</summary>
     private static string Sorted(string output)
     {

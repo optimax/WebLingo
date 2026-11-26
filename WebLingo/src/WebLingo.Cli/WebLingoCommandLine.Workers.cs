@@ -1,7 +1,9 @@
+using System.Globalization;
 using WebLingo.Compiler;
 using WebLingo.Core;
 using WebLingo.Language;
 using WebLingo.Platform.Abstractions;
+using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
 namespace WebLingo.Cli;
 
@@ -18,9 +20,54 @@ public static partial class WebLingoCommandLine
     /// </summary>
     private sealed class Workers(Workers.Settings run, IWebLingoWorkerLink? parent) : IWebLingoWorkers
     {
-        /// <summary>What a run of a program gives each of its workers: its program, its file, its schemes, its writers and its input.</summary>
+        /// <summary>
+        /// What a run of a program gives each of its workers: its program, its file, its schemes, its writers and its input;
+        /// its configuration's limits, and the count of its workers running, which all of them share (section 9, "M0.26
+        /// parts", part 4).
+        /// </summary>
         public sealed record Settings(WebLingoCommandLineProgram Program, string MainPath, IReadOnlyDictionary<string, string> GivenSchemes,
-            TextWriter Output, TextWriter Error, IWebLingoConsoleInput? Input, Action? Console, int RegexTimeout);
+            TextWriter Output, TextWriter Error, IWebLingoConsoleInput? Input, Action? Console, int RegexTimeout, WebLingoLimitSettings Limits,
+            Running Count);
+
+        /// <summary>
+        /// How many of a program's workers run at once, its own, its workers' and its pools' alike, and the most that may,
+        /// <c>"limits"</c>' <c>"workers"</c> (section 9, "M0.26 parts", part 4), the machine's processors by default; each pool
+        /// told when one ends, so that a call it keeps waiting may start one.
+        /// </summary>
+        public sealed class Running(int most)
+        {
+            private readonly object _gate = new();
+            private readonly List<Action> _told = [];
+            private int _count;
+
+            public int Most => most;
+
+            public bool TryTake()
+            {
+                lock (_gate)
+                {
+                    if (_count >= most) return false;
+                    _count++;
+                    return true;
+                }
+            }
+
+            public void Give()
+            {
+                Action[] told;
+                lock (_gate)
+                {
+                    _count--;
+                    told = [.. _told];
+                }
+                foreach (var tell in told) tell();
+            }
+
+            public void WhenOneEnds(Action tell)
+            {
+                lock (_gate) _told.Add(tell);
+            }
+        }
 
         private readonly List<Worker> _started = [];
         private readonly Dictionary<string, Pool> _pools = new(StringComparer.Ordinal);
@@ -42,10 +89,8 @@ public static partial class WebLingoCommandLine
             }
             // Its warnings where the program's are written.
             _run.Error.Write(diagnostics.ToString());
-            worker = Launch(source, path);
-            if (worker is not null) return true;
-            error = Ended();
-            return false;
+            worker = Launch(source, path, perCall: false, out error, out _);
+            return worker is not null;
         }
 
         public bool TryPool(string path, out IWebLingoWorkerPool? pool, out WebLingoRuntimeError? error)
@@ -107,6 +152,15 @@ public static partial class WebLingoCommandLine
         private static WebLingoRuntimeError Ended() =>
             new(WebLingoDiagnosticCodes.InvalidOperation, "The program has ended: it starts no more workers.");
 
+        private static WebLingoRuntimeError TooMany(int most) =>
+            new(WebLingoDiagnosticCodes.InvalidOperation, $"This program runs {most} {(most == 1 ? "worker" : "workers")} at once, the most "
+                + "\"limits\"' \"workers\" in weblingo.config allows: one must end before another starts.");
+
+        /// <summary>A worker's time, or a pool's call's, passed: what it is stopped with, as a request past its time is.</summary>
+        private static string TimedOut(string what, double seconds) =>
+            $"The {what} took longer than {seconds.ToString(CultureInfo.InvariantCulture)} {(seconds == 1 ? "second" : "seconds")}, its limit, "
+            + "\"limits\"' \"workerTimeout\" in weblingo.config.";
+
         /// <summary>A program for a worker, its text given, compiled with the program's configuration, its diagnostics written; null where it does not compile.</summary>
         private SourceRun? Prepare(string name, string text, TextWriter diagnostics)
         {
@@ -118,15 +172,21 @@ public static partial class WebLingoCommandLine
             return compilation.Result.Module is null ? null : prepared;
         }
 
-        /// <summary>A worker started, running the program compiled; null once its program has ended, which starts no more.</summary>
-        private Worker? Launch(SourceRun source, string path)
+        /// <summary>
+        /// A worker started, running the program compiled, its time each call's where <paramref name="perCall"/>, a pool's;
+        /// null, with why, once its program has ended, which starts no more, or where as many run as may, <paramref name="tooMany"/>.
+        /// </summary>
+        private Worker? Launch(SourceRun source, string path, bool perCall, out WebLingoRuntimeError? error, out bool tooMany)
         {
-            var worker = new Worker(this, source, path);
+            (error, tooMany) = (null, false);
+            var worker = new Worker(this, source, path, perCall);
             lock (_started)
             {
-                if (_ended) return null;
-                _started.Add(worker);
+                if (_ended) error = Ended();
+                else if (!_run.Count.TryTake()) (error, tooMany) = (TooMany(_run.Count.Most), true);
+                else _started.Add(worker);
             }
+            if (error is not null) return null;
             worker.Start();
             return worker;
         }
@@ -160,6 +220,7 @@ public static partial class WebLingoCommandLine
             private readonly Queue<(WebLingoMessage Call, Action<WebLingoWorkerReceipt> Done)> _waiting = new();
             private SourceRun? _first = first;
             private int _count;
+            private bool _told;
 
             /// <summary>
             /// What a module exports that a call may name: each function with the arguments it takes, the least and the
@@ -228,30 +289,63 @@ public static partial class WebLingoCommandLine
                         _count++;
                     }
                 }
-                worker ??= Start(done);
-                if (worker is not null) Give(worker, call, done);
+                if (worker is null && (worker = Start(call, done)) is null) return;
+                Give(worker, call, done);
             }
 
-            /// <summary>A new worker of the pool, its driver compiled anew but for the first; null, the call given why, where it cannot be had.</summary>
-            private Worker? Start(Action<WebLingoWorkerReceipt> done)
+            /// <summary>
+            /// A new worker of the pool, its driver compiled anew but for the first; null where it cannot be had, the call
+            /// then kept waiting where as many workers run as may, until one ends, or given why.
+            /// </summary>
+            private Worker? Start(WebLingoMessage call, Action<WebLingoWorkerReceipt> done)
             {
                 var source = Interlocked.Exchange(ref _first, null);
                 var diagnostics = new StringWriter();
                 source ??= workers.Prepare(driver, driverText, diagnostics);
-                var worker = source is null ? null : workers.Launch(source, path);
+                WebLingoRuntimeError? error = null;
+                var tooMany = false;
+                var worker = source is null ? null : workers.Launch(source, path, perCall: true, out error, out tooMany);
                 if (worker is not null) return worker;
-                lock (_gate) _count--;
-                var why = source is null ? NotCompiled("pool's", path, diagnostics).Message : Ended().Message;
+                if (source is not null) _first = source; // Compiled, kept for the next.
+                var tell = false;
+                lock (_gate)
+                {
+                    _count--;
+                    if (tooMany)
+                    {
+                        // Waiting for a worker of its own, or, told when any ends, for one it may start (section 9, part 4).
+                        _waiting.Enqueue((call, done));
+                        tell = !_told;
+                        _told = true;
+                    }
+                }
+                if (tell) workers._run.Count.WhenOneEnds(Retry);
+                if (tooMany) return null;
+                var why = source is null ? NotCompiled("pool's", path, diagnostics).Message : error!.Message;
                 done(new WebLingoWorkerReceipt(WebLingoMessage.OfError("TypeError", why, WebLingoDiagnosticCodes.InvalidOperation, null), true));
                 return null;
             }
 
-            /// <summary>The call given the worker, and its answer to the call's caller: the worker then free, or, ended, gone.</summary>
+            /// <summary>A worker of the program's ended: a call kept waiting given a new worker of the pool's, where it may start one.</summary>
+            private void Retry()
+            {
+                (WebLingoMessage Call, Action<WebLingoWorkerReceipt> Done) next;
+                lock (_gate)
+                {
+                    if (_count >= Most || !_waiting.TryDequeue(out next)) return;
+                    _count++;
+                }
+                if (Start(next.Call, next.Done) is { } worker) Give(worker, next.Call, next.Done);
+            }
+
+            /// <summary>The call given the worker, its time its own, and its answer to the call's caller: the worker then free, or, ended, gone.</summary>
             private void Give(Worker worker, WebLingoMessage call, Action<WebLingoWorkerReceipt> done)
             {
+                worker.Time();
                 worker.Post(call);
                 worker.Receive(receipt =>
                 {
+                    worker.Untime();
                     if (!receipt.Failed && receipt.Message is not null)
                     {
                         done(receipt);
@@ -291,7 +385,7 @@ public static partial class WebLingoCommandLine
                         return;
                     }
                 }
-                if (Start(next.Done) is { } worker) Give(worker, next.Call, next.Done);
+                if (Start(next.Call, next.Done) is { } worker) Give(worker, next.Call, next.Done);
             }
         }
 
@@ -299,12 +393,24 @@ public static partial class WebLingoCommandLine
         /// A worker, as its parent holds it: its thread, its cancellation, and the two queues, what its parent posts it and
         /// what it posts back.
         /// </summary>
-        private sealed class Worker(Workers workers, SourceRun source, string path) : IWebLingoWorkerLink
+        private sealed class Worker(Workers workers, SourceRun source, string path, bool perCall) : IWebLingoWorkerLink
         {
             private readonly Mailbox _toWorker = new();
             private readonly Mailbox _fromWorker = new();
             private readonly WebLingoCancellationSignal _cancellation = new();
             private Thread? _thread;
+            private Timer? _timer;
+
+            /// <summary>Its time begun, <c>"workerTimeout"</c>'s, where it has one: a pool's worker's for each call, another's for its life.</summary>
+            public void Time()
+            {
+                if (workers._run.Limits.WorkerTimeoutSeconds is not { } seconds) return;
+                var limit = TimedOut(perCall ? "call" : "worker", seconds);
+                _timer = new Timer(_ => _cancellation.Exceeded(limit), null, TimeSpan.FromSeconds(seconds), Timeout.InfiniteTimeSpan);
+            }
+
+            /// <summary>A call's time ended, it having answered.</summary>
+            public void Untime() => Interlocked.Exchange(ref _timer, null)?.Dispose();
 
             public void Start()
             {
@@ -331,14 +437,23 @@ public static partial class WebLingoCommandLine
             private void Body()
             {
                 var own = new Workers(workers._run, new ParentEnd(_toWorker, _fromWorker));
+                var limits = workers._run.Limits;
                 WebLingoExecutionResult result;
+                if (!perCall) Time();
                 try
                 {
+                    // Its instructions and its heap's memory, "workerInstructions" and "workerMemory" (section 9, part 4).
                     var context = Context(source.Host, new Dictionary<string, string>(), source.LineOf, workers._run.RegexTimeout) with
                     {
                         Cancellation = _cancellation,
+                        // Its timers' waits ended where it is cancelled, disposed or past its time.
+                        Clock = new SystemClock(new DotNetClock(), _cancellation),
                         Workers = own,
-                        IsWorker = true
+                        IsWorker = true,
+                        InstructionBudget = limits.WorkerInstructions ?? long.MaxValue,
+                        Resources = limits.WorkerMemoryMegabytes is { } megabytes
+                            ? WebLingoResourceBudget.Default with { MaxHeapUnits = megabytes * 512 * 1024 }
+                            : WebLingoResourceBudget.Default
                     };
                     result = OnVm(source.Compilation.Result.Module!, new WebLingoModuleLoader(source.Options), source.Compilation.Components, context);
                 }
@@ -349,10 +464,17 @@ public static partial class WebLingoCommandLine
                 }
                 finally
                 {
+                    Untime();
                     own.End(); // Its own workers end with it.
                 }
-                if (result.Succeeded || _cancellation.IsCancellationRequested) _fromWorker.End(new WebLingoWorkerReceipt(null, false));
+                // Stopped past its time, as a request is, WL3003; else ended, cancelled, or by an exception nothing caught.
+                if (_cancellation.Limit is { } limit && result.Error is { } stopped)
+                {
+                    _fromWorker.End(new WebLingoWorkerReceipt(WebLingoMessage.OfError("Error", limit, WebLingoDiagnosticCodes.BudgetExceeded, At(stopped)), true));
+                }
+                else if (result.Succeeded || _cancellation.IsCancellationRequested) _fromWorker.End(new WebLingoWorkerReceipt(null, false));
                 else _fromWorker.End(new WebLingoWorkerReceipt(Thrown(result), true));
+                workers._run.Count.Give(); // No longer one of its program's workers running.
             }
 
             /// <summary>
@@ -361,13 +483,19 @@ public static partial class WebLingoCommandLine
             /// </summary>
             private WebLingoMessage Thrown(WebLingoExecutionResult result)
             {
-                var located = source.Compilation.Locate(result.Error!);
-                var text = source.TextOf(located);
-                var at = text.GetLocation(located.Span.Start);
-                var thrownAt = $"{text.Name}({at.Line},{at.Column})";
+                var thrownAt = At(result.Error!);
                 if (result.Thrown is { } thrown) return thrown.ThrownAt(thrownAt);
                 var code = result.Error!.Code;
                 return WebLingoMessage.OfError(result.Error.ExceptionClass ?? WebLingoErrorClasses.NameOf(code) ?? "Error", result.Error.Message, code, thrownAt);
+            }
+
+            /// <summary>Where a report stands, as the worker's host locates it, <c>work.wlg(12,5)</c>.</summary>
+            private string At(WebLingoDiagnostic reported)
+            {
+                var located = source.Compilation.Locate(reported);
+                var text = source.TextOf(located);
+                var at = text.GetLocation(located.Span.Start);
+                return $"{text.Name}({at.Line},{at.Column})";
             }
         }
 
