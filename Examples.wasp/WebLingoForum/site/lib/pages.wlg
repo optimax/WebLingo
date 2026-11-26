@@ -111,7 +111,9 @@ export async function topicPage(request, response) {
             page.first = (page.page - 1) * perPage;
             page.posts = await topics.posts(db, topic["id"], page.first, perPage);
             page.attachments = await uploads.ofPosts(db, page.posts.map(post => post["id"]));
-            await topics.viewed(db, topic["id"]);
+            if (topics.counts(site.settings, request, response, topic)) {
+                await topics.viewed(db, topic["id"]);
+            }
             if (site.user != null && page.posts.length > 0) {
                 await reading.saw(db, site.user["id"], topic["id"], page.posts[page.posts.length - 1]["id"]);
             }

@@ -290,7 +290,14 @@ public sealed class ForumTests
                 Assert.Contains("Post 45 of topic 1, &lt;b&gt;not bold&lt;/b&gt;", topic);
                 Assert.Contains("<span class=\"note\">75 posts</span>", topic);
                 Assert.Contains("<a rel=\"prev\" href=\"/topic?id=2&amp;page=2\">Previous</a>", topic);
+                // Counted once for each reader, the topics its browser has had counted kept in a cookie of the forum's own.
                 await Page("/topic?id=2");
+                Assert.Contains("<td class=\"count\">44 replies<br>1 view</td>", await Page("/board?id=1&page=2"));
+                using (var another = new HttpClient { BaseAddress = new Uri(address) })
+                {
+                    using var viewed = await another.GetAsync("/topic?id=2");
+                    Assert.Contains("viewed=2; Path=/topic; HttpOnly; SameSite=Lax", viewed.Headers.GetValues("Set-Cookie"));
+                }
                 Assert.Contains("<td class=\"count\">44 replies<br>2 views</td>", await Page("/board?id=1&page=2"));
                 Assert.Contains("This topic is locked: it takes no more replies.", await Page("/topic?id=31"));
 

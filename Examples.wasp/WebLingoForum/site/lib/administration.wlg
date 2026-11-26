@@ -129,6 +129,15 @@ export async function saveSettings(db, values) {
     });
 }
 
+// Whether a board's topics' views are counted, kept in the forum's setting boardsWithoutViews.
+export async function setBoardViews(db, values, board, counted) {
+    var without = values["boardsWithoutViews"].filter(id => id != board);
+    if (!counted) {
+        without.push(board);
+    }
+    await saveSettings(db, { boardsWithoutViews: without });
+}
+
 // Why a name cannot be a category's, a board's or a group's, a text's name, or null where it can.
 export function nameProblem(name) {
     return name == "" || name.length > longestName ? "admin.badName" : null;

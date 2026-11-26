@@ -206,6 +206,7 @@ export const texts = {
     "admin.categoryName": "Category",
     "admin.boardName": "Board",
     "admin.order": "Order",
+    "admin.boardViews": "Count its topics' views",
     "admin.remove": "Remove",
     "admin.rename": "Rename",
     "admin.addBoard": "Add a board",

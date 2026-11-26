@@ -20,6 +20,8 @@ export const defaults = {
     // address each request came to, which a request's Host header gives: set it where the forum is reached by its name.
     // The largest avatar a member may upload, and the largest attachment, in kilobytes, 0 for none; how many files a post
     // may have; and the forum's logo, an upload's id, or null for its name alone.
+    // The boards whose topics' views are not counted, by id, each board's own choice in its administration.
+    "boardsWithoutViews": [],
     "avatarSize": 256,
     "attachmentSize": 2048,
     "attachments": 5,

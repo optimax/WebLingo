@@ -26,7 +26,7 @@
 <% } else { %>
 <table class="list">
 <% foreach (var topic in view.topics) { %>
-<% await renderComponent("/components/topic-row.wasp", { site: site, topic: topic }); %>
+<% await renderComponent("/components/topic-row.wasp", { site: site, topic: topic, views: !site.settings["boardsWithoutViews"].contains(board["id"]) }); %>
 <% } %>
 </table>
 <% } %>

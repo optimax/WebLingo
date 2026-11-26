@@ -221,7 +221,7 @@ export async function boardPage(request, response) {
             }
             page.board = board;
             page.values = { name: board["name"], description: board["description"] ?? "", category: board["category_id"],
-                            order: board["sort_order"] };
+                            order: board["sort_order"], views: !site.settings["boardsWithoutViews"].contains(board["id"]) };
             page.categories = await db.query("SELECT id, name FROM categories ORDER BY sort_order, id");
             page.saved = request.method == "GET" && request.query?["saved"] == "1";
             var form = await posted(page, request, response);
@@ -230,13 +230,15 @@ export async function boardPage(request, response) {
                 if (action == "board") {
                     var category = idOf(form?["category"]);
                     var order = orderOf(form?["order"]);
-                    page.values = { name: field(form, "name"), description: field(form, "description"), category: category, order: form?["order"] };
+                    page.values = { name: field(form, "name"), description: field(form, "description"), category: category, order: form?["order"],
+                                    views: form?["views"] != null };
                     var known = page.categories.any(c => c["id"] == category);
                     if (!problems(page, response, [admin.nameProblem(page.values["name"]), known ? null : "admin.noCategory",
                                                    order == null ? "admin.badOrder" : null,
                                                    page.values["description"].length > admin.longestDescription ? "admin.badDescription" : null])) {
                         await admin.changeBoard(db, board["id"], category, page.values["name"],
                                                 page.values["description"] == "" ? null : page.values["description"], order);
+                        await admin.setBoardViews(db, site.settings, board["id"], page.values["views"]);
                         return done(page, response, here + "&saved=1");
                     }
                 } else if (action == "permissions") {

@@ -65,3 +65,61 @@ export async function posts(db, topic, skip, count) {
 export async function viewed(db, topic) {
     await db.execute("UPDATE topics SET view_count = view_count + 1 WHERE id = @id", { id: topic });
 }
+
+// The cookie of the forum's own that holds the topics a reader's browser has had a view counted of, their ids, the oldest
+// first, a session cookie, its path the topic pages', so that a reader's session stays read only on a topic's page.
+export const viewsCookie = "viewed";
+
+// How many topics the cookie remembers, the oldest forgotten first.
+export const viewsRemembered = 300;
+
+// The most its value may hold, so that the cookie stays under the 4,096 bytes a browser keeps of one (RFC 6265, section 6.1).
+export const viewsLength = 3800;
+
+// Words a known crawler's User-Agent has, compared without case: Googlebot's and Bingbot's, Yahoo's Slurp, AdSense's, and
+// what fetches a link's preview for Facebook.
+const crawlers = ["bot", "crawler", "spider", "slurp", "mediapartners", "facebookexternalhit"];
+
+// Whether a request is a known crawler's, by its User-Agent.
+export function isCrawler(request) {
+    var agent = request.headers.has("User-Agent") ? request.headers["User-Agent"].toLower() : "";
+    return crawlers.any(word => agent.contains(word));
+}
+
+// The topics a request's cookie says have had a view counted, the oldest first; what is not a topic's id left out, the
+// cookie being unsigned, so that a changed or a cleared one only counts a view again, or not at all.
+export function counted(request) {
+    var seen = [];
+    foreach (var part in (request.cookies?[viewsCookie] ?? "").split(".")) {
+        try {
+            var id = Integer.parse(part);
+            if (id > 0 && !seen.contains(id)) {
+                seen.push(id);
+            }
+        } catch (e) {
+            // Not a topic's id.
+        }
+    }
+    return seen;
+}
+
+// Whether a request's view of a topic is counted (Documents/weblingo-forum.md, section 2, "Reading"): its board counts
+// views, the request is no known crawler's, and its reader's browser has not had a view of the topic counted yet, which
+// the cookie remembers then, so that a reader reading a topic again writes nothing.
+export function counts(settings, request, response, topic) {
+    if (settings["boardsWithoutViews"].contains(topic["board_id"]) || isCrawler(request)) {
+        return false;
+    }
+    var seen = counted(request);
+    if (seen.contains(topic["id"])) {
+        return false;
+    }
+    seen.push(topic["id"]);
+    var text = seen.map(id => id.toString()).join(".");
+    while (seen.length > viewsRemembered || text.length > viewsLength) {
+        seen = seen.slice(1, seen.length);
+        text = seen.map(id => id.toString()).join(".");
+    }
+    response.setCookie(viewsCookie, text, { path: "/topic" });
+    return true;
+}

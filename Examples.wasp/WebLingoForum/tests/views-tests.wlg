@@ -1,0 +1,137 @@
+// A topic's views (site/lib/topics.wlg, "counts"): once for each reader and topic, the topics counted kept in a cookie of
+// the forum's own, so that a topic's page reads its session only; a known crawler's not counted, nor a board's that does
+// not count them; and a board's choice kept (site/lib/administration.wlg). weblingo test views-tests.wlg
+
+import { assert, assertEqual, assertDeepEqual } from "std:test";
+import { Database } from "std:db";
+import schema from "../site/lib/schema.wlg";
+import settings from "../site/lib/settings.wlg";
+import topics from "../site/lib/topics.wlg";
+import admin from "../site/lib/administration.wlg";
+
+// A request as the forum reads one: its cookies, a map, and its headers.
+class Request {
+    constructor(cookies, agent) {
+        this.cookies = cookies;
+        this.headers = agent == null ? {} : { "User-Agent": agent };
+    }
+}
+
+// A response as the forum writes one: the cookies set on it, each its value and its options.
+class Response {
+    constructor() {
+        this.cookies = {};
+    }
+
+    setCookie(name, value, options) {
+        this.cookies[name] = { value: value, options: options };
+    }
+}
+
+// A reader's browser: its cookies, sent with each request, and those each response sets, kept.
+class Reader {
+    constructor(agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)") {
+        this.agent = agent;
+        this.cookies = {};
+    }
+
+    views(values, topic) {
+        var response = new Response();
+        var counted = topics.counts(values, new Request({ ...this.cookies }, this.agent), response, topic);
+        foreach (var (name, cookie) in response.cookies) {
+            this.cookies[name] = cookie["value"];
+        }
+        return counted;
+    }
+}
+
+function topic(id, board = 1) {
+    return { id: id, board_id: board };
+}
+
+export class ViewsTests {
+    testAViewIsCountedOnceForEachReaderAndTopic() {
+        var values = { ...settings.defaults };
+        var reader = new Reader();
+        assertEqual(reader.views(values, topic(7)), true);
+        assertEqual(reader.views(values, topic(7)), false);
+        assertEqual(reader.views(values, topic(8)), true);
+        assertEqual(reader.cookies[topics.viewsCookie], "7.8");
+        // Another reader's counted, and a reader's whose browser keeps no cookie, each time.
+        assertEqual(new Reader().views(values, topic(7)), true);
+        assertEqual(topics.counts(values, new Request({}, null), new Response(), topic(7)), true);
+        assertEqual(topics.counts(values, new Request({}, null), new Response(), topic(7)), true);
+    }
+
+    testTheCookieIsTheTopicPagesSessionCookie() {
+        var response = new Response();
+        topics.counts({ ...settings.defaults }, new Request({}, null), response, topic(7));
+        var cookie = response.cookies[topics.viewsCookie];
+        assertEqual(cookie["value"], "7");
+        // Its path the topic pages', no lifetime of its own, WASP's own defaults, HttpOnly and SameSite=Lax, for the rest.
+        assertDeepEqual(cookie["options"], { path: "/topic" });
+    }
+
+    testTheCookieRemembersItsLastTopicsOnly_UnderFourKilobytes() {
+        var values = { ...settings.defaults };
+        var reader = new Reader();
+        for (var id = 1; id <= topics.viewsRemembered + 1; id++) {
+            assertEqual(reader.views(values, topic(id)), true);
+        }
+        assertEqual(reader.cookies[topics.viewsCookie].split(".").length, topics.viewsRemembered);
+        assertEqual(reader.views(values, topic(1)), true);
+        assertEqual(reader.views(values, topic(topics.viewsRemembered + 1)), false);
+        // Long ids, fewer of them, the cookie still within its length.
+        var long = new Reader();
+        for (var id = 1; id <= 400; id++) {
+            long.views(values, topic(1_000_000_000_000 + id));
+        }
+        var text = long.cookies[topics.viewsCookie];
+        assert(text.length <= topics.viewsLength);
+        assert(text.endsWith("1000000000400"));
+    }
+
+    testAChangedCookieOnlyCountsAViewAgainOrNot() {
+        var values = { ...settings.defaults };
+        var reader = new Reader();
+        reader.cookies[topics.viewsCookie] = "tea.7.-3.0.99999999999999999999999.8.7";
+        assertDeepEqual(topics.counted(new Request(reader.cookies, null)), [7, 8]);
+        assertEqual(reader.views(values, topic(7)), false);
+        assertEqual(reader.views(values, topic(9)), true);
+        assertEqual(reader.cookies[topics.viewsCookie], "7.8.9");
+        reader.cookies = {};
+        assertEqual(reader.views(values, topic(7)), true);
+    }
+
+    testACrawlersViewIsNotCounted() {
+        var values = { ...settings.defaults };
+        foreach (var agent in ["Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+                               "Mozilla/5.0 (compatible; bingbot/2.0)", "Mozilla/5.0 (compatible; Yahoo! Slurp)",
+                               "facebookexternalhit/1.1", "Mediapartners-Google", "SomeCrawler/1.0", "a Spider"]) {
+            var crawler = new Reader(agent);
+            assertEqual(crawler.views(values, topic(7)), false);
+            assertEqual(crawler.cookies.has(topics.viewsCookie), false);
+        }
+        assertEqual(new Reader(null).views(values, topic(7)), true);
+    }
+
+    testABoardThatDoesNotCountViewsCountsNone() {
+        var values = { ...settings.defaults, boardsWithoutViews: [2] };
+        assertEqual(new Reader().views(values, topic(7, 2)), false);
+        assertEqual(new Reader().views(values, topic(7, 1)), true);
+    }
+
+    async testABoardsChoiceIsKept() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            foreach (var statement in schema.create(db.provider)) {
+                await db.execute(statement);
+            }
+            await admin.setBoardViews(db, await settings.load(db), 3, false);
+            await admin.setBoardViews(db, await settings.load(db), 5, false);
+            assertDeepEqual((await settings.load(db))["boardsWithoutViews"], [3, 5]);
+            await admin.setBoardViews(db, await settings.load(db), 3, true);
+            assertDeepEqual((await settings.load(db))["boardsWithoutViews"], [5]);
+            assertDeepEqual(settings.defaults["boardsWithoutViews"], []);
+        }
+    }
+}

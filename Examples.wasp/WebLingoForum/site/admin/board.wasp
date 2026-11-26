@@ -18,6 +18,7 @@
   <label><%= site.t("admin.boardName") %> <input name="name" value="<%= values["name"] %>" required maxlength="100"></label>
   <label><%= site.t("admin.description") %> <input name="description" value="<%= values["description"] %>" maxlength="500"></label>
   <label><%= site.t("admin.order") %> <input type="number" name="order" value="<%= values["order"] %>" min="0" required></label>
+  <label class="check"><input type="checkbox" name="views" value="1"<% if (values["views"]) { %> checked<% } %>> <%= site.t("admin.boardViews") %></label>
   <button name="action" value="board"><%= site.t("form.save") %></button>
 </form>
 <h2 class="plain"><%= site.t("admin.permissions") %></h2>
