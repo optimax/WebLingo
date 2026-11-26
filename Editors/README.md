@@ -222,22 +222,29 @@ Visual Studio opens (**File**, **Open**, **Folder**) with F5, and `launch.vs.jso
 `weblingo`. `build.ps1` builds it, `bin/WebLingo.VisualStudio.vsix`, with the C# compiler Visual Studio installs and no
 package: `WebLingoLaunch.cs`, its launch targets, compiled for .NET Framework 4.8 against Visual Studio's own assemblies,
 which it references and never ships; `WebLingo.pkgdef`, which registers `weblingo --debug-adapter` and
-`wasp --debug-adapter` with Visual Studio's Debug Adapter Host as engines of its own, WebLingo and WASP; and
-`extension.vsixmanifest`. Install it by opening the `.vsix`, Visual Studio closed.
+`wasp --debug-adapter` with Visual Studio's Debug Adapter Host as engines of its own, WebLingo and WASP;
+`extension.vsixmanifest`; and `manifest.json` and `catalog.json`, which `build.ps1` writes from the manifest, as Visual
+Studio's SDK does, Visual Studio's installer refusing a VSIX without them as "not a valid VSIX package". Install it by
+opening the `.vsix`, Visual Studio closed, or from a command line, `VSIXInstaller.exe /quiet WebLingo.VisualStudio.vsix`,
+`VSIXInstaller.exe` in Visual Studio's `Common7\IDE`.
 
-In the folder, a `.wlg` or a `.wasp` file chosen as the startup item, by its context menu's **Set as Startup Item**, is
-what F5 debugs, a script with `weblingo`'s adapter, a page with `wasp`'s, each found on the PATH, as WebLingo's
-installer puts it there, else in `Program Files\WebLingo`. A configuration of `launch.vs.json`, by its `type`,
-`"weblingo"`, takes the launch settings above; one without `program` serves a site:
+In the folder, a `.wlg` or a `.wasp` file chosen as the startup item, by its context menu's **Set as Startup Item**, or
+the file in front with **Current Document** chosen on the toolbar, is what F5 debugs, a script with `weblingo`'s adapter,
+a page with `wasp`'s, each found on the PATH, as WebLingo's installer puts it there, else in `Program Files\WebLingo`.
+A configuration of `launch.vs.json`, in the folder's `.vs`, by its `type`, `"weblingo"`, takes the launch settings above,
+a relative path in them from the folder; Visual Studio lists a configuration only with the file its `project` names, so
+that each names one, and one without `program` serves a site:
 
 ```json
 {
   "version": "0.2.1",
   "configurations": [
-    { "type": "weblingo", "name": "The shop", "program": "${workspaceRoot}\\index.wasp", "root": "${workspaceRoot}" },
-    { "type": "weblingo", "name": "The shop, served", "root": "${workspaceRoot}", "port": 8080 }
+    { "type": "weblingo", "name": "The shop", "project": "index.wasp", "program": "index.wasp" },
+    { "type": "weblingo", "name": "The shop, served", "project": "index.wasp", "root": "${workspaceRoot}", "port": 8080 }
   ]
 }
 ```
 
-Built here, it has not been tried yet: installing it needs Visual Studio closed.
+Tried with Visual Studio Community 2026 (18.12), installed by `VSIXInstaller.exe`: a script's configuration of
+`launch.vs.json`, stopped on entry, at a breakpoint and with its locals; F5 on a page in front, at a breakpoint in its
+loop, with its locals, its output in the Debug output; and a page's configuration with a relative `program`.

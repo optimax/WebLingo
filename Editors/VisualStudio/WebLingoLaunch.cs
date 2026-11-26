@@ -6,12 +6,14 @@
 
 using System;
 using System.Collections;
+using System.ComponentModel.Composition;
 using System.IO;
 using System.Text;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Workspace;
 using Microsoft.VisualStudio.Workspace.Debug;
 using Microsoft.VisualStudio.Workspace.Extensions.VS.Debug;
+using Microsoft.VisualStudio.Workspace.VSIntegration.Contracts;
 
 namespace WebLingo.VisualStudio
 {
@@ -33,13 +35,19 @@ namespace WebLingo.VisualStudio
         }
 
         // The launch's settings, a launch.vs.json's configuration, or those F5 on a file makes, made the adapter's launch
-        // request (Editors/README.md, "Any debugger: the launch settings"), which the Debug Adapter Host gives it.
-        public static Target Prepare(DebugLaunchActionContext context)
+        // request (Editors/README.md, "Any debugger: the launch settings"), which the Debug Adapter Host gives it; a path
+        // in them from the folder Visual Studio opened, workspace, as Visual Studio gives a file's, F5's own among them.
+        public static Target Prepare(DebugLaunchActionContext context, string workspace)
         {
             var settings = context.LaunchConfiguration;
-            var program = Text(settings, "program") ?? Text(settings, LaunchConfigurationConstants.ProjectKey);
-            var root = Text(settings, "root");
-            var cwd = Text(settings, "cwd") ?? (program != null && Path.IsPathRooted(program) ? Path.GetDirectoryName(program) : null);
+            var file = context.ProjectFileContext?.FilePath;
+            var project = Text(settings, LaunchConfigurationConstants.ProjectKey);
+            var folder = workspace ?? FolderOf(file, project);
+            file = Absolute(file, folder);
+            var program = Absolute(Text(settings, "program") ?? file ?? project, folder);
+            var root = Absolute(Text(settings, "root"), folder);
+            var cwd = Absolute(Text(settings, "cwd"), folder)
+                      ?? (program != null && Path.IsPathRooted(program) ? Path.GetDirectoryName(program) : folder);
             var page = program == null || program.EndsWith(".wasp", StringComparison.OrdinalIgnoreCase);
             var json = new StringBuilder("{");
             var adapter = Find(page ? "wasp.exe" : "weblingo.exe");
@@ -81,6 +89,44 @@ namespace WebLingo.VisualStudio
             return new Target { Engine = page ? PageEngine : ScriptEngine, Exe = program ?? root ?? cwd ?? "WASP", Folder = cwd,
                                 Options = json.ToString() };
         }
+
+        // The folder Visual Studio opened, its folder workspace's location, read by reflection, so that this assembly names
+        // no type of Visual Studio's threading library, which a workspace's members name and whose version changes with
+        // Visual Studio's own; null where there is none.
+        public static string FolderOpened(object workspaces)
+        {
+            try
+            {
+                var workspace = workspaces == null ? null
+                    : typeof(Microsoft.VisualStudio.Workspace.VSIntegration.IVsWorkspaceFactory).GetProperty("CurrentWorkspace")?.GetValue(workspaces);
+                return workspace == null ? null : typeof(IWorkspace).GetProperty("Location")?.GetValue(workspace) as string;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        // The folder Visual Studio opened: the file's full path less the project's path from the folder, where it ends with
+        // it; else the file's own folder; null without a file.
+        private static string FolderOf(string file, string project)
+        {
+            if (string.IsNullOrEmpty(file) || !Path.IsPathRooted(file))
+            {
+                return null;
+            }
+            var relative = project?.Replace('/', '\\').TrimStart('\\');
+            if (!string.IsNullOrEmpty(relative) && !Path.IsPathRooted(relative)
+                && file.EndsWith("\\" + relative, StringComparison.OrdinalIgnoreCase))
+            {
+                return file.Substring(0, file.Length - relative.Length - 1);
+            }
+            return Path.GetDirectoryName(file);
+        }
+
+        // A path made full from the folder, where it is relative and there is one; as it is otherwise.
+        private static string Absolute(string path, string folder) =>
+            path == null || folder == null || Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(folder, path));
 
         // A setting's value, or null.
         private static object Value(IPropertySettings settings, string key)
@@ -159,9 +205,13 @@ namespace WebLingo.VisualStudio
     {
         public const string ProviderType = "F9412734-CB2D-40D4-A984-07AF1DC49E60";
 
+        // The folder Visual Studio opened, which a file's path is given from.
+        [Import(typeof(IVsFolderWorkspaceService), AllowDefault = true)]
+        private object Workspaces { get; set; }
+
         public void SetupDebugTargetInfo(ref VsDebugTargetInfo vsDebugTargetInfo, DebugLaunchActionContext debugLaunchContext)
         {
-            var target = WebLingoLaunch.Prepare(debugLaunchContext);
+            var target = WebLingoLaunch.Prepare(debugLaunchContext, WebLingoLaunch.FolderOpened(Workspaces));
             vsDebugTargetInfo.dlo = DEBUG_LAUNCH_OPERATION.DLO_CreateProcess;
             vsDebugTargetInfo.clsidCustom = target.Engine;
             vsDebugTargetInfo.bstrExe = target.Exe;
@@ -176,13 +226,17 @@ namespace WebLingo.VisualStudio
     {
         public const string ProviderType = "C603F526-890B-4ABD-A3DD-5F5EA8EA28CE";
 
+        // The folder Visual Studio opened, which a configuration's relative paths are from.
+        [Import(typeof(IVsFolderWorkspaceService), AllowDefault = true)]
+        private object Workspaces { get; set; }
+
         public void UpdateContext(DebugLaunchActionContext debugLaunchContext)
         {
         }
 
         public void SetupDebugTargetInfo(ref VsDebugTargetInfo4 vsDebugTargetInfo, DebugLaunchActionContext debugLaunchContext)
         {
-            var target = WebLingoLaunch.Prepare(debugLaunchContext);
+            var target = WebLingoLaunch.Prepare(debugLaunchContext, WebLingoLaunch.FolderOpened(Workspaces));
             vsDebugTargetInfo.dlo = (uint)DEBUG_LAUNCH_OPERATION.DLO_CreateProcess;
             vsDebugTargetInfo.guidLaunchDebugEngine = target.Engine;
             vsDebugTargetInfo.bstrExe = target.Exe;

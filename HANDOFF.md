@@ -294,6 +294,18 @@ A file whose extension is `WebLingoRouteTable.Sensitive`'s, a database, a log, a
 it. Tested by `ApplicationTests` (`WebLingo.Hosting.Tests`), `WaspServeTests.EveryResponseHasTheSecurityHeadersWaspConfigChanges`
 and `FastCgiTests.AStatusAHeaderAndErrorsAreCgis`.
 
+## Visual Studio's extension
+
+`Editors/VisualStudio` (the README's "Visual Studio, with WebLingo's extension") debugs a script or a page in a folder
+Visual Studio opens: `WebLingoLaunch.cs`, launch targets for F5 on a `.wlg` or a `.wasp` file and for `launch.vs.json`'s
+configurations of the type `weblingo`, a path in them from the folder, `IVsFolderWorkspaceService`'s location, read by
+reflection so that the assembly names no type of Visual Studio's threading library; `WebLingo.pkgdef`, the adapters as
+engines of the Debug Adapter Host; and `build.ps1`, which compiles it with Visual Studio's own compiler and assemblies and
+packs it, `manifest.json` and `catalog.json` among its files, which Visual Studio's installer requires. Tried with Visual
+Studio Community 2026, installed by `VSIXInstaller.exe /quiet`, driven by clicks: a script's configuration, a page by
+F5, and a relative `program`, each stopping at its breakpoints with its locals. A site's configuration, without
+`program`, was not tried.
+
 ## Files sent
 
 `response.write(bytes)` writes bytes as they are, and `await response.sendFile(path, type, { download })` makes a file the

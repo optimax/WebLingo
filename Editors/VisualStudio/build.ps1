@@ -26,6 +26,7 @@ $references = @(
     (Join-Path $ide 'CommonExtensions\Microsoft\OpenFolder\Microsoft.VisualStudio.Workspace.dll'),
     (Join-Path $ide 'CommonExtensions\Microsoft\OpenFolder\Microsoft.VisualStudio.Workspace.Extensions.dll'),
     (Join-Path $ide 'CommonExtensions\Microsoft\OpenFolder\Microsoft.VisualStudio.Workspace.Extensions.VS.dll'),
+    (Join-Path $ide 'CommonExtensions\Microsoft\OpenFolder\Microsoft.VisualStudio.Workspace.VSIntegration.Contracts.dll'),
     (Join-Path $ide 'PublicAssemblies\Microsoft.VisualStudio.Interop.dll')
 )
 foreach ($reference in $references) {
@@ -51,8 +52,38 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'extension.vsixmanifest') -Desti
   <Default Extension="vsixmanifest" ContentType="text/xml"/>
   <Default Extension="pkgdef" ContentType="text/plain"/>
   <Default Extension="dll" ContentType="application/octet-stream"/>
+  <Default Extension="json" ContentType="application/json"/>
 </Types>
 '@ | Set-Content -LiteralPath (Join-Path $folder '[Content_Types].xml') -Encoding UTF8
+
+# What Visual Studio's installer reads of a VSIX since Visual Studio 2017, without which it refuses one as "not a valid VSIX
+# package": manifest.json, its files and the size they take, and catalog.json, the package as its setup engine knows it:
+# the extension a component of Visual Studio's, which its setup engine asks for, and its VSIX, in the form Visual Studio's
+# SDK writes them.
+$manifest = [xml](Get-Content -LiteralPath (Join-Path $PSScriptRoot 'extension.vsixmanifest') -Raw)
+$vsixId = $manifest.PackageManifest.Metadata.Identity.Id
+$version = $manifest.PackageManifest.Metadata.Identity.Version
+$id = $vsixId
+# A text as a JSON string's content, its backslashes and quotes escaped.
+function Escaped([string]$text) { $text.Replace('\', '\\').Replace('"', '\"') }
+$title = Escaped $manifest.PackageManifest.Metadata.DisplayName
+$description = Escaped $manifest.PackageManifest.Metadata.Description.'#text'
+$directory = '[installdir]\\Common7\\IDE\\Extensions\\WebLingo'
+$files = @('extension.vsixmanifest', 'WebLingo.VisualStudio.dll', 'WebLingo.pkgdef')
+$size = ($files | ForEach-Object { (Get-Item (Join-Path $folder $_)).Length } | Measure-Object -Sum).Sum
+$listed = ($files | ForEach-Object { '{"fileName":"/' + $_ + '","sha256":null}' }) -join ','
+$editor = $manifest.PackageManifest.Prerequisites.Prerequisite.Version
+[IO.File]::WriteAllText((Join-Path $folder 'manifest.json'),
+    "{""id"":""$id"",""version"":""$version"",""type"":""Vsix"",""vsixId"":""$vsixId"",""extensionDir"":""$directory"",""files"":[$listed]," +
+    """installSizes"":{""targetDrive"":$size},""dependencies"":{""Microsoft.VisualStudio.Component.CoreEditor"":""$editor""}}")
+[IO.File]::WriteAllText((Join-Path $folder 'catalog.json'),
+    "{""manifestVersion"":""1.1"",""info"":{""id"":""$id,version=$version"",""manifestType"":""Extension""},""packages"":[" +
+    "{""component"":true,""id"":""$id"",""version"":""$version"",""type"":""Component"",""extension"":true,""dependencies"":{" +
+    """$id"":""$version"",""Microsoft.VisualStudio.Component.CoreEditor"":""$editor""},""localizedResources"":[{""language"":""en-US""," +
+    """title"":""$title"",""description"":""$description""}]}," +
+    "{""id"":""$id"",""version"":""$version""," +
+    """type"":""Vsix"",""payloads"":[{""fileName"":""WebLingo.VisualStudio.vsix"",""size"":$size}],""vsixId"":""$vsixId""," +
+    """extensionDir"":""$directory"",""installSizes"":{""targetDrive"":$size}}]}")
 
 # The folder's files zipped, each entry named with forward slashes, as the zip format has them.
 $vsix = Join-Path $bin 'WebLingo.VisualStudio.vsix'
