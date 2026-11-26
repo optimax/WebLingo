@@ -348,8 +348,9 @@ public static partial class WebLingoCommandLine
                     worker.Untime();
                     if (!receipt.Failed && receipt.Message is not null)
                     {
-                        done(receipt);
+                        // Free before its caller is answered, so that the call it makes next finds it free.
                         Free(worker);
+                        done(receipt);
                         return;
                     }
                     // It ended, by the call's exception, or with the program, before it answered.

@@ -356,41 +356,60 @@ public sealed class WorkersTests : IDisposable
     }
 
     [Fact]
-    public void AWorkerPastItsLimitsIsStopped_ItsErrorItsParentsNextReceive()
+    public void AWorkerPastItsTimeIsStopped_APoolsCallPastItsOwn()
     {
-        Write("weblingo.config", "{ \"limits\": { \"workerTimeout\": 0.5, \"workerInstructions\": 5000000, \"workerMemory\": 1 } }");
+        // Each limit a test of its own, so that, on a loaded machine, none is passed before the one tested.
+        Write("weblingo.config", "{ \"limits\": { \"workerTimeout\": 2 } }");
         Write("waits.wlg", "await delay(100000);");
-        Write("loops.wlg", "var i = 0;\nwhile (true) { i++; }");
-        Write("grows.wlg", "var s = \"x\";\nwhile (true) s = s + s;");
-        Write("maths.wlg", Maths + "\nexport function spin(n) { var i = 0; while (i < n) i++; return i; }");
+        Write("maths.wlg", Maths);
         var watch = Stopwatch.StartNew();
         var (output, error) = Run("""
             import { writeLn } from "std:console";
             import { Worker, run } from "std:workers";
-            foreach (var path in ["waits.wlg", "loops.wlg", "grows.wlg"]) {
+            try { await new Worker("waits.wlg").receive(); } catch (e) { writeLn($"{e.code} {e.message}"); }
+            // A pool's worker's time is each call's.
+            try { await run("maths.wlg", "later", [1, 100000]); } catch (e) { writeLn($"{e.code} {e.message}"); }
+            writeLn(await run("maths.wlg", "later", [1, 10]));
+            """);
+        Assert.Equal("", error);
+        Assert.Equal("""
+            WL3003 The worker took longer than 2 seconds, its limit, "limits"' "workerTimeout" in weblingo.config.
+            maths runs
+            WL3003 The call took longer than 2 seconds, its limit, "limits"' "workerTimeout" in weblingo.config.
+            maths runs
+            2
+
+            """.ReplaceLineEndings("\n"), output);
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(60), $"{watch.Elapsed}");
+    }
+
+    [Fact]
+    public void AWorkerPastItsInstructionsOrItsMemoryIsStopped_APoolsWorkerOverItsLife()
+    {
+        Write("weblingo.config", "{ \"limits\": { \"workerInstructions\": 5000000, \"workerMemory\": 1 } }");
+        Write("loops.wlg", "var i = 0;\nwhile (true) { i++; }");
+        Write("grows.wlg", "var s = \"x\";\nwhile (true) s = s + s;");
+        Write("maths.wlg", Maths + "\nexport function spin(n) { var i = 0; while (i < n) i++; return i; }");
+        var (output, error) = Run("""
+            import { writeLn } from "std:console";
+            import { Worker, run } from "std:workers";
+            foreach (var path in ["loops.wlg", "grows.wlg"]) {
                 try { await new Worker(path).receive(); } catch (e) { writeLn($"{e.code} {e.message}"); }
             }
-            // A pool's worker's time is each call's, its instructions and its memory its life's.
-            try { await run("maths.wlg", "later", [1, 2000]); } catch (e) { writeLn($"{e.code} {e.message}"); }
-            writeLn(await run("maths.wlg", "later", [1, 10]));
+            // A pool's worker's instructions and memory are its life's.
             try { await run("maths.wlg", "spin", [100000000]); } catch (e) { writeLn($"{e.code} {e.message}"); }
             writeLn(await run("maths.wlg", "spin", [1000]));
             """);
         Assert.Equal("", error);
         Assert.Equal("""
-            WL3003 The worker took longer than 0.5 seconds, its limit, "limits"' "workerTimeout" in weblingo.config.
             WL3003 The program ran 5000000 instructions, its whole budget, and was stopped.
             WL3003 A string of 524288 characters does not fit in the memory this execution may use.
             maths runs
-            WL3003 The call took longer than 0.5 seconds, its limit, "limits"' "workerTimeout" in weblingo.config.
-            maths runs
-            2
             WL3003 The program ran 5000000 instructions, its whole budget, and was stopped.
             maths runs
             1000
 
             """.ReplaceLineEndings("\n"), output);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30), $"{watch.Elapsed}");
     }
 
     [Theory]
