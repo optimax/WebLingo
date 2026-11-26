@@ -228,6 +228,14 @@ unchanged, .NET's JIT at work: its remedy is the
 deferred task "`weblingo` and `wasp` Published ReadyToRun". The benchmark's `io` measures .NET's thread pool more than
 the VM, and falls at about 1.1 s or 2.7 s by build.
 
+M0.21 is in three parts (the specification's section 9, "M0.21 parts"), each a task of `TO-DO.md`. Part 1, the call's
+own cost, landed: a call reads what it checks from the VM's own `Callable`, fields, since past `Run`'s switch .NET has
+spent its budget of inlining and every property's getter is a call; a frame keeps the function, code and cells it holds
+already; a return clears its registers in a loop. `calls` 22 percent faster, `closures` 10, `objects` 4, none slower
+(section 5.6, "The call's own cost"). `DOTNET_JitDisasm=Run` on the benchmark prints `Run`'s machine code, which is how
+it was found (`Documents/implementation.md`, "A VM's Dispatch Method Is Sensitive to Its Locals"). Parts 2 and 3, fixed
+places for a class's fields and a member's cache, are next.
+
 A young generation for the collector (the specification, section 4.2, "A young generation") was built on a branch,
 measured, and dropped by the owner (24 November 2026): about 1.7 times as fast where much is live, but four of the
 benchmark's workloads 1 to 3 percent slower. Its design stays in the specification, Proposed; nothing of it is on `main`.

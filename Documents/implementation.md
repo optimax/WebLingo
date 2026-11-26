@@ -404,6 +404,20 @@ The VM's `Run` is one large method, which keeps the running frame's state in loc
 stop resumed in the loop's resuming branch, six lines assigning the running frame's locals, made `closures` 9 percent
 slower, and nothing measurable once it moved to `Run`'s prologue (24 November 2026).
 
+What .NET made of `Run` says where its time goes: the JIT prints a method's code with `DOTNET_JitDisasm=Run`, its
+shipping build too, `WebLingo.Benchmarks --workload calls --runs 1 --warm-ups 0` running it once (25 November 2026,
+M0.21's part 1, the specification's section 9, "M0.21 parts"). .NET inlines into a method until a budget of its own is
+spent, then inlines nothing more, a property's getter included: `Run` spends it within its switch, so that past it, at
+`call:` and the labels after it, every getter is a call, `function.ParameterCount` five times on a call's way, until the
+call read what it checks from fields, the VM's own `Callable`, made for each function when its module is loaded or
+joined, in place of `WebLingoFunction`'s properties; so code there reads a field where the listing shows a getter
+called. A library call on every return, `Array.Clear` of the frame's registers, cost more than a loop, which the JIT
+checks once. And a local that `Run`'s `catch` reads, its frame, its pc and its count of instructions, which its one
+handler, for bytecode the verifier cannot judge, reads for its message, is kept in memory and read from there on every
+instruction: the handler reading the execution's fields instead (`_frames[_depth]`, `_executed`) put them in registers,
+which made `calls` and `closures` 3 percent faster still, and `imports` 8 percent slower, since every case that calls a
+helper then reloads them after it, as `imports`' calls of built-ins do, so that the handler reads them as before.
+
 ### .NET Loads an Assembly When It Compiles a Method Naming One of Its Types
 
 Referencing a project does not load its assembly: .NET loads it when it first compiles a method that names one of its types, whether or not that line runs. So a method naming the VM loads it, even where that line does not run: a host that should load it only to run names it in a method of its own, marked `[MethodImpl(MethodImplOptions.NoInlining)]`, so that inlining does not bring the name back into the caller (`WebLingoCommandLine.OnVm`). A type a command uses without running anything belongs to an assembly the VM references, the runtime's (`WebLingoExecutionResult`).

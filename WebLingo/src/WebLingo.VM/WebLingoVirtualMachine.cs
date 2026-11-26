@@ -230,6 +230,23 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         public int AwaitDestination; // -1 drops what it gives, as a using's await of its disposal does.
     }
 
+    /// <summary>
+    /// A function as a call reads it: its code, and what its call checks, as fields. The dispatch method reads them without
+    /// a call, where a property's getter, which .NET inlines into it until its budget of inlining is spent, is a call of its
+    /// own once it is, as it is by its label <c>call:</c>, where every call goes (specification, section 5.6).
+    /// </summary>
+    private sealed class Callable(WebLingoFunction function, WebLingoInstruction[] code)
+    {
+        public readonly WebLingoFunction Function = function;
+        public readonly WebLingoInstruction[] Code = code;
+        public readonly int ParameterCount = function.ParameterCount;
+        public readonly int OptionalCount = function.OptionalCount;
+        public readonly int RegisterCount = function.RegisterCount;
+        public readonly int NativeBuiltin = function.NativeBuiltin;
+        public readonly bool HasThis = function.HasThis;
+        public readonly bool IsAsync = function.IsAsync;
+    }
+
     /// <summary>What a frame's caller waits for it to give: a text being built, or a built-in's work.</summary>
     private abstract class Waiter
     {
@@ -271,6 +288,21 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         WebLingoValue[] constants, WebLingoMemberName[] names, IWebLingoBuiltinFunction[] builtins, WebLingoExecutionContext context, WebLingoHeap heap)
         : IWebLingoRootSource, IWebLingoDebugScope
     {
+        /// <summary>
+        /// The module's functions, by their indices, as a call reads them (<see cref="Callable"/>); grown with the module
+        /// when a module is joined to it.
+        /// </summary>
+        private Callable[] _callables = Callables(module.Functions, codes, 0, []);
+
+        private static Callable[] Callables(IReadOnlyList<WebLingoFunction> functions, WebLingoInstruction[][] codes, int first,
+            Callable[] made)
+        {
+            var array = new Callable[functions.Count];
+            Array.Copy(made, array, first);
+            for (var i = first; i < array.Length; i++) array[i] = new Callable(functions[i], codes[i]);
+            return array;
+        }
+
         /// <summary>
         /// The depth of the frame that runs, which <c>Run</c> writes where its own changes, and below which every frame of
         /// <see cref="_frames"/> runs, or waits for a call it made, or is null, its task holding it while it awaits.
@@ -1007,7 +1039,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         {
                             var result = ins.OpCode == WebLingoOpCode.ReturnValue ? registers[ins.A] : WebLingoValue.Null;
                             if (depth == 0 && frame.Task.Kind != WebLingoValueKind.Task) return Finish(executed);
-                            Array.Clear(registers, 0, frame.Function.RegisterCount); // So that nothing stays reachable.
+                            for (var i = frame.Function.RegisterCount - 1; i >= 0; i--) registers[i] = default; // So that nothing stays reachable.
                             if (frame.DisposeChain is not null) goto disposed;
                             if (frame.Task.Kind == WebLingoValueKind.Task)
                             {
@@ -1100,11 +1132,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     }
                     {
                         var (index, closureCells) = heap.GetClosure(callee);
-                        var function = module.Functions[index];
-                        var withThis = function.HasThis && self.Kind != WebLingoValueKind.Missing ? 1 : 0; // A receiver, if the call has one.
-                        if (function.ParameterCount != argumentCount + withThis
-                            && (argumentCount + withThis > function.ParameterCount
-                                || argumentCount + withThis < function.ParameterCount - function.OptionalCount))
+                        var callable = _callables[index];
+                        var function = callable.Function;
+                        var withThis = callable.HasThis && self.Kind != WebLingoValueKind.Missing ? 1 : 0; // A receiver, if the call has one.
+                        if (callable.ParameterCount != argumentCount + withThis
+                            && (argumentCount + withThis > callable.ParameterCount
+                                || argumentCount + withThis < callable.ParameterCount - callable.OptionalCount))
                         {
                             // Too many arguments for any function but one with a rest parameter, which gathers those after
                             // its parameters into an array before the frame is made (section 3.5).
@@ -1117,7 +1150,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             if (!TryGatherRest(function, withThis, arguments, firstArgument, argumentCount, out error)) goto failed;
                             argumentCount = function.ParameterCount - withThis;
                         }
-                        if (function.NativeBuiltin >= 0 && TryCallNative(function, self, withThis, arguments, firstArgument, argumentCount,
+                        if (callable.NativeBuiltin >= 0 && TryCallNative(function, self, withThis, arguments, firstArgument, argumentCount,
                                 registers, resultRegister, constructed, frames, depth, out error))
                         {
                             // A native member that only calls its built-in: the built-in at once, without its frame (section 3.9).
@@ -1132,27 +1165,31 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             goto failed;
                         }
 
-                        if (function.IsAsync && !TryMakeTask(frames, depth, out error)) goto failed;
+                        if (callable.IsAsync && !TryMakeTask(frames, depth, out error)) goto failed;
                         frame.Pc = pc + 1;
                         if ((_depth = ++depth) == frames.Length) frames = Deeper(frames);
                         var called = frames[depth] ??= new Frame();
-                        if (called.Registers.Length < function.RegisterCount)
+                        if (called.Registers.Length < callable.RegisterCount)
                         {
-                            called.Registers = new WebLingoValue[function.RegisterCount];
+                            called.Registers = new WebLingoValue[callable.RegisterCount];
                         }
                         var calledRegisters = called.Registers;
                         if (withThis == 1) calledRegisters[0] = self;
                         for (var i = 0; i < argumentCount; i++) calledRegisters[withThis + i] = arguments[firstArgument + i];
                         // The parameters left out are missing, until the function's code gives them their defaults.
-                        for (var i = withThis + argumentCount; i < function.ParameterCount; i++) calledRegisters[i] = WebLingoValue.Missing;
-                        called.Function = function;
+                        for (var i = withThis + argumentCount; i < callable.ParameterCount; i++) calledRegisters[i] = WebLingoValue.Missing;
+                        if (!ReferenceEquals(called.Function, function))
+                        {
+                            // A frame that ran the same function last keeps its code: no write to it, nor .NET's barrier.
+                            called.Function = function;
+                            called.Code = callable.Code;
+                        }
                         if (debugger is not null) called.DebugActivation = 0;
-                        called.Code = codes[index];
-                        called.Cells = closureCells;
+                        if (!ReferenceEquals(called.Cells, closureCells)) called.Cells = closureCells;
                         called.Closure[0] = callee;
                         called.ResultRegister = resultRegister;
                         called.Constructed = constructed;
-                        if (function.IsAsync) Started(called);
+                        if (callable.IsAsync) Started(called);
 
                         frame = called;
                         code = called.Code;
@@ -1214,7 +1251,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     {
                         var next = frame.DisposeChain![frame.DisposeNext++];
                         var (nextIndex, nextCells) = heap.GetClosure(next);
-                        var nextFunction = module.Functions[nextIndex];
+                        var nextFunction = _callables[nextIndex].Function;
                         if (registers.Length < nextFunction.RegisterCount)
                         {
                             frame.Registers = registers = new WebLingoValue[nextFunction.RegisterCount];
@@ -2672,6 +2709,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 ErrorClasses = errorClasses
             };
             (constants, names, builtins, codes) = (constants2, names2, builtins2, codes2);
+            _callables = Callables(functions, codes, _callables.Length, _callables);
             _texts = TextBuiltins(builtins);
             _builtin = BuiltinClasses(module);
             _madeAlready = madeAlready;

@@ -729,6 +729,41 @@ As a user runs them, the comparison, its 5 timed runs after a warm-up, in millis
 
 **A string read by its index** (25 November 2026, the task "Indexing a String in Constant Time"). A string's `length`, `s[i]`, `slice`, `indexOf`, `lastIndexOf`, `padStart` and `padEnd` counted its Unicode scalar values from its start each time, so that a loop over a string by its index took time in proportion to its length's square: 20,000 lookups in a string of 20,000 characters took 700 ms, against 5 ms visiting it with `foreach`. Each string's count is now kept with it, and, for a string with a surrogate pair, where each of its scalar values starts (§15.2, "Heap"). The benchmark's workload `indexing` reads each of 20,000 characters by its index, and slices and searches at 2,000 places, in a string without surrogate pairs and in one with them: measured against `main` (`23fa1fd`), six rounds run alternately, then `closures`, `objects` and `strings`, which allocate and free most, sixteen, its median fell from 1,981 ms to 7.7 ms, about 250 times as fast; the other workloads were within the machine's noise, none slower by a rank test (`closures` 20.1 ms against 24.6, `strings` 14.2 against 17.7, `objects` 65.6 against 63.3, U from 22.5 to 36.5 of 64).
 
+**The call's own cost** (25 November 2026, M0.21's part 1, §9, "M0.21 parts"). Each operation first measured alone, a
+million turns of a loop, in one process, the median of 9 timed runs after 3 warm-ups, on `main` (`7bfbc3e`): the loop
+itself, `s += i;`, 10.7 ns a turn; with a call of `function f(x) { return x; }`, `s += f(i);`, 31.8, so that its
+argument's move, the call and its return took 21.1 ns; with a method's, `c.m(i)`, 49.0; with a field's read, `c.v`, 21.5.
+What .NET made of the dispatch method, its JIT's listing of `Run` (`Documents/implementation.md`, "A VM's Dispatch
+Method Is Sensitive to Its Locals"), showed where a call's time went: past the switch, where .NET had spent its budget
+of inlining, each property of the function that the call read was a call of its own, ten on a function's call; the
+function was found through the module's list, an interface; the frame was given its function, its code and its cells
+on every call, each with .NET's write barrier, though a frame had most often run the same function last; and the return
+cleared the frame's registers by a call of .NET's library, `Array.Clear`. So, since: a call reads what it checks from
+the VM's own record of each function, `Callable`, as fields, made when its module is loaded or joined; a frame keeps
+the function, the code and the cells it holds already; and the return clears the registers in a loop. Against `main`,
+twelve rounds run alternately, every workload in one process, by a rank test:
+
+| Workload | `main` | Part 1 | Part 1 ÷ `main` | p |
+|---|---:|---:|---:|---:|
+| calls | 9.90 ms | 7.70 ms | 0.78 | < 0.0001 |
+| closures | 12.00 ms | 10.80 ms | 0.90 | 0.0005 |
+| objects | 35.55 ms | 34.00 ms | 0.96 | 0.0004 |
+| loops | 17.70 ms | 17.60 ms | 0.99 | 0.03 |
+| indexing | 5.10 ms | 5.00 ms | 0.98 | 0.004 |
+| collections | 4.10 ms | 4.00 ms | 0.98 | 0.05 |
+| imports, strings, bytes, async, templates, io | | | 0.99 to 1.02 | 0.56 to 1.0 |
+
+None slower. A function's call and its return, its argument's move with it, take 16.0 ns where they took 21.1, and a
+method's 32.5 where they took 38.3, the loop's own 10.4 ns a turn taken away; `fib(25)`'s 242,785 calls 31.7 ns each,
+its comparison, subtractions and addition among them, where they took 40.8. Tried and not kept: the dispatch method's one
+`catch`, for bytecode the verifier cannot judge, reading the execution's fields in place of its loop's frame, pc and
+count of instructions, which .NET then kept in registers rather than in memory, made `calls` and `closures` 3 percent
+faster still but `imports` 8 percent slower, each call of a built-in reloading them after it; the debugger's test, made
+on every instruction, folded into the budget's, within the machine's noise; and `WebLingoValue.Kind` a field in place of a
+property, so that reading it past the budget is no call, within the noise too, a public member changed for nothing.
+What is left of a call is mostly what every instruction costs, about 3.5 ns of dispatch each, the call and its return
+two of them, and the method's lookup by name, which parts 2 and 3 address.
+
 **Under load** (part 1, 24 November 2026), `WebLingo.Benchmarks --load`, on one Windows development machine (x64, 8
 logical processors, .NET 10.0.15, Release), the clients on the same machine, one run of each host: each page asked for by
 that many clients at once, for 10 s after 3 s of warming up, each cell its requests a second and the time 99% of them
@@ -1966,7 +2001,8 @@ change to the VM's dispatch method:
 
 1. **The call's own cost** (A1 (c)). A call and its return, about 26 ns for a function and 43 for a method after the
    remedies of §5.6, where Lua's take 10 to 15: what each does measured, and what can be done once, or not at all, done
-   so.
+   so. Built (25 November 2026; §5.6, "The call's own cost"): a function's call and its return 16.0 ns where they took
+   21.1, `calls` 22 percent faster, no workload slower.
 2. **Fixed places for a class's fields** (A2 (b)). The fields a class's constructor assigns, and those its other methods
    assign to `this`, given fixed places when the class is made, a base's first, in the same places in each class
    extending it; `this.x` in a class's own methods compiled to its place; any other access by the class's table of
