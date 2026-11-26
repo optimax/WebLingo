@@ -62,6 +62,13 @@ form.form button.secondary { color: var(--accent); background: var(--surface); b
 .preview h2.plain { margin-top: 0; }
 #reply { margin-top: 1.5rem; }
 
+details.moderation { margin: 0.5rem 0; padding: 0.5rem 0.75rem; background: var(--surface); border: 1px dashed var(--border); border-radius: 6px; }
+details.moderation summary { cursor: pointer; font-weight: 600; }
+button.secondary { font: inherit; padding: 0.3rem 0.8rem; color: var(--accent); background: var(--surface); border: 1px solid var(--accent); border-radius: 4px; cursor: pointer; }
+article.report { margin-bottom: 1rem; padding: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+article.report .reason { font-weight: 600; }
+table.log td form { display: inline; margin-left: 0.5rem; }
+
 .pages { margin: 0.75rem 0; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
 .pages a, .pages strong { padding: 0.1rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); text-decoration: none; }
 .pages strong { color: var(--accent-text); background: var(--accent); border-color: var(--accent); }

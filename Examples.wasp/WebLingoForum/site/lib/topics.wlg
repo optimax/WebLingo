@@ -25,17 +25,18 @@ export async function onBoard(db, board, user, skip, count) {
         """, { board: board, user: user, deleted: false, skip: skip, count: count });
 }
 
-// A topic, with its board's and its category's ids and names, or null where there is none of that id, or it is deleted.
-export async function one(db, id) {
+// A topic, with its board's and its category's ids and names, or null where there is none of that id, or it is deleted,
+// unless deleted is true.
+export async function one(db, id, deleted = false) {
     if (id == null) {
         return null;
     }
-    var rows = await db.query("""
+    var rows = await db.query($"""
         SELECT t.id, t.title, t.post_count, t.view_count, t.pinned, t.locked, t.created_at, t.user_id, t.last_post_id,
-               t.last_post_at,
+               t.last_post_at, t.deleted,
                b.id AS board_id, b.name AS board_name, c.id AS category_id, c.name AS category_name
         FROM topics t JOIN boards b ON b.id = t.board_id JOIN categories c ON c.id = b.category_id
-        WHERE t.id = @id AND t.deleted = @deleted
+        WHERE t.id = @id{(deleted ? "" : " AND t.deleted = @deleted")}
         """, { id: id, deleted: false });
     return rows.length == 0 ? null : rows[0];
 }

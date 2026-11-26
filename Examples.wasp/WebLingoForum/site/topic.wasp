@@ -7,6 +7,9 @@
 <p><%= site.t("forum.notFoundText") %> <a href="/"><%= site.t("forum.goHome") %></a>.</p>
 <% } else { var topic = view.topic; var base = $"/topic?id={topic['id']}"; %>
 <h1><%= topic["title"] %></h1>
+<% if (topic["deleted"]) { %>
+<p class="notice"><%= site.t("topic.deleted") %></p>
+<% } %>
 <% if (topic["locked"]) { %>
 <p class="notice"><%= site.t("topic.locked") %></p>
 <% } %>
@@ -14,7 +17,7 @@
 <% if (site.user == null) { %>
   <a href="/account/sign-in?back=<%= base %>"><%= site.t("topic.signInToReply") %></a>
 <% } else { %>
-<% if (posts.mayReply(site.user, topic)) { %>
+<% if (posts.mayReply(site, topic)) { %>
   <a class="button" href="#reply"><%= site.t("topic.reply") %></a>
 <% } %>
   <form method="post" action="/post/watch">
@@ -25,13 +28,40 @@
   </form>
 <% } %>
 </div>
+<% if (view.moderates) { %>
+<details class="moderation">
+  <summary><%= site.t("mod.tools") %></summary>
+  <div class="tools">
+<% foreach (var action in [topic["locked"] ? "unlock" : "lock", topic["pinned"] ? "unpin" : "pin", topic["deleted"] ? "restore" : "delete"]) { %>
+    <form method="post" action="/mod/topic">
+      <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+      <input type="hidden" name="topic" value="<%= topic["id"] %>">
+      <button name="action" value="<%= action %>" class="secondary"><%= site.t("mod." + action) %></button>
+    </form>
+<% } %>
+<% if (view.boards.length > 1) { %>
+    <form method="post" action="/mod/topic">
+      <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+      <input type="hidden" name="topic" value="<%= topic["id"] %>">
+      <label><%= site.t("mod.move") %>
+        <select name="board">
+<% foreach (var board in view.boards) { %><% if (board["id"] != topic["board_id"]) { %>
+          <option value="<%= board["id"] %>"><%= board["category_name"] %> › <%= board["name"] %></option>
+<% } %><% } %>
+        </select></label>
+      <button name="action" value="move" class="secondary"><%= site.t("mod.moveButton") %></button>
+    </form>
+<% } %>
+  </div>
+</details>
+<% } %>
 <% await renderComponent("/components/pages.wasp", { site: site, base: base, page: view.page, pages: view.pages }); %>
 <% var number = view.first; %>
 <% foreach (var post in view.posts) { number++; %>
 <% await renderComponent("/components/post.wasp", { site: site, post: post, number: number, topic: topic, first: view.firstPost }); %>
 <% } %>
 <% await renderComponent("/components/pages.wasp", { site: site, base: base, page: view.page, pages: view.pages }); %>
-<% if (posts.mayReply(site.user, topic)) { %>
+<% if (posts.mayReply(site, topic)) { %>
 <section id="reply">
   <h2 class="plain"><%= site.t("topic.yourReply") %></h2>
 <% await renderComponent("/components/post-form.wasp", { site: site, token: request.csrfToken, action: $"/post/reply?topic={topic['id']}",

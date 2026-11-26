@@ -4,8 +4,9 @@ A discussion forum written in WASP, on SQLite, SQL Server, MySQL or PostgreSQL. 
 are in `Documents/weblingo-forum.md`; this is what is built so far: its foundations, a forum's boards and topics read
 from its database; its members, who sign up, confirm their address by mail, sign in and out, reset a forgotten password
 and keep a profile; and writing, in Markdown: topics started, replies, quotes, one's own posts edited and deleted, with a
-preview first, what is new to each member, and topics watched, their replies mailed. Moderation and the rest come in the
-parts after them.
+preview first, what is new to each member, and topics watched, their replies mailed; and each board's permissions for
+each group, and moderation: topics locked, pinned, moved, deleted and restored, others' posts edited and deleted, posts
+reported, members banned, and a log of it all. Administration and the rest come in the parts after them.
 
 ```text
 WebLingoForum/
@@ -15,12 +16,15 @@ WebLingoForum/
     index.wasp  /                 the categories and their boards
     board.wasp  /board?id=1       a board's topics, 25 a page, the pinned first
     topic.wasp  /topic?id=1       a topic's posts, 20 a page, and a reply's form; &unread=1 its first new post
-    post/       writing: new.wasp, a new topic, reply.wasp, a reply, edit.wasp and delete.wasp, one's own post, and
-                watch.wlg, watching a topic or not
+    post/       writing: new.wasp, a new topic, reply.wasp, a reply, edit.wasp and delete.wasp, a post, report.wasp, a
+                post reported, and watch.wlg, watching a topic or not
+    mod/        moderation: reports.wasp, the reports, log.wasp, the log, ban.wasp, a member's ban, and topic.wlg and
+                post.wlg, a moderator's actions
     account/    signing up, confirming an address, signing in and out, a forgotten password, the member's profile
     members/    /members, the members by name, and /members/member?id=1, a member's page
     lib/        the forum's modules: the database's SQL, its schema, settings, texts, members, their mail and tokens,
-                posts, what each member has read and watches, the Markdown, and what each page shows and does
+                posts, what each member has read and watches, the Markdown, permissions, moderation, and what each
+                page shows and does
     texts/      the forum's texts, a module for each language: en.wlg
     layouts/, includes/, components/, css/    its look, each piece a file of its own
   tests/        the forum's modules' own tests, run by weblingo test
@@ -45,7 +49,7 @@ earlier version of the forum made, it adds the tables this version adds.
 The forum's own tests, from `tests`:
 
 ```bash
-weblingo test accounts-tests.wlg markdown-tests.wlg schema-tests.wlg sql-tests.wlg texts-tests.wlg users-tests.wlg writing-tests.wlg
+weblingo test accounts-tests.wlg markdown-tests.wlg moderation-tests.wlg schema-tests.wlg sql-tests.wlg texts-tests.wlg users-tests.wlg writing-tests.wlg
 ```
 
 ## Mail, and members

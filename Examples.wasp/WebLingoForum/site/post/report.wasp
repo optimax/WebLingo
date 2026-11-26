@@ -1,0 +1,21 @@
+<% param request; param response; import { reportPage } from "/lib/moderating.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await reportPage(request, response)).title, crumbs: (await reportPage(request, response)).crumbs }; %>
+<% var view = await reportPage(request, response); var site = view.site; %>
+<% if (view.refused != null) { %>
+<h1><%= view.title %></h1>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null) { %>
+<h1><%= view.title %></h1>
+<% if (view.done) { %>
+<p class="notice" role="status"><%= view.notice %></p>
+<% } else { %>
+<p><%= site.t("report.intro") %></p>
+<div class="quoted body"><%- view.html %></div>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems }); %>
+<form method="post" class="form" action="<%= view.action %>">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <label><%= site.t("report.reason") %> <textarea name="reason" rows="4" required maxlength="500"><%= view.values["reason"] %></textarea></label>
+  <button><%= site.t("report.submit") %></button>
+</form>
+<% } %>
+<% } %>

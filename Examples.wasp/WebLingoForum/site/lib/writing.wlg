@@ -4,11 +4,12 @@
 // anything is written, so that a page sent on, or refused, shows so.
 
 import { DateTime } from "std:datetime";
-import { begin, open, viewOf, formOf, redirect, idOf } from "./forum.wlg";
+import { begin, open, viewOf, formOf, redirect, idOf, boardCrumbs, topicCrumbs, refuse, signInFirst } from "./forum.wlg";
 import boards from "./boards.wlg";
 import topics from "./topics.wlg";
 import posts from "./posts.wlg";
 import reading from "./reading.wlg";
+import moderation from "./moderation.wlg";
 import { render, escape, quote } from "./markdown.wlg";
 import { sendReplies } from "./mail.wlg";
 
@@ -22,36 +23,6 @@ function view(site, title, crumbs) {
     page.refused = null;
     page.done = false;
     return page;
-}
-
-// The trail of links above a page of a board's: its category, then the board.
-function boardCrumbs(board) {
-    return [[board["category_name"], $"/#category-{board['category_id']}"], [board["name"], $"/board?id={board['id']}"]];
-}
-
-// The trail of links above a page of a topic's: its category, its board, then the topic.
-function topicCrumbs(topic) {
-    return [[topic["category_name"], $"/#category-{topic['category_id']}"], [topic["board_name"], $"/board?id={topic['board_id']}"],
-            [topic["title"], $"/topic?id={topic['id']}"]];
-}
-
-// A page refused, with its status and why, a text's name, and its title, where it has another.
-function refuse(page, response, status, why, title = null) {
-    response.status = status;
-    if (title != null) {
-        page.title = page.site.t(title);
-    }
-    page.refused = why;
-    return page;
-}
-
-// Sends a reader not signed in to sign in first, then back to a path; gives whether it did.
-function signInFirst(site, response, back) {
-    if (site.user != null) {
-        return false;
-    }
-    redirect(response, "/account/sign-in?back=" + back);
-    return true;
 }
 
 // A post's text as HTML, its images as the forum's settings allow them.
@@ -84,18 +55,26 @@ async function postedTo(page, request, response, titled) {
     return form;
 }
 
-// /post/new?board=1: a new topic on a board, its title and its first post, which its author then watches.
+// /post/new?board=1: a new topic on a board whose groups let the member start one, its title and its first post, which
+// its author then watches.
 export async function newTopicPage(request, response) {
     var site = await begin(request);
     return await site.once("newTopic", async () => {
         using (var db = await open()) {
             var board = await boards.one(db, idOf(request.query?["board"]));
             var page = view(site, site.t("post.newTopic"), board == null ? [] : boardCrumbs(board));
-            if (board == null) {
+            if (board == null || !site.can(board["id"], "see")) {
+                page.crumbs = [];
                 return refuse(page, response, 404, "forum.notFoundText", "board.notFound");
             }
             page.action = $"/post/new?board={board['id']}";
-            if (signInFirst(site, response, page.action) || request.method != "POST") {
+            if (signInFirst(site, response, page.action)) {
+                return page;
+            }
+            if (!posts.mayStart(site, board["id"])) {
+                return refuse(page, response, 403, "post.mayNotStart");
+            }
+            if (request.method != "POST") {
                 return page;
             }
             var form = await postedTo(page, request, response, true);
@@ -112,13 +91,16 @@ export async function newTopicPage(request, response) {
     });
 }
 
-// /post/reply?topic=42, and &quote=7 to begin with a post quoted: a reply to a topic that is not locked, mailed to those
-// who watch it.
+// /post/reply?topic=42, and &quote=7 to begin with a post quoted: a reply to a topic, by a member whose groups may reply
+// on its board, while it is not locked, unless they moderate the board; mailed to those who watch it.
 export async function replyPage(request, response) {
     var site = await begin(request);
     return await site.once("reply", async () => {
         using (var db = await open()) {
             var topic = await topics.one(db, idOf(request.query?["topic"]));
+            if (topic != null && !site.can(topic["board_id"], "read")) {
+                topic = null;
+            }
             var page = view(site, site.t("post.reply"), topic == null ? [] : topicCrumbs(topic));
             page.topic = topic;
             if (topic == null) {
@@ -128,8 +110,8 @@ export async function replyPage(request, response) {
             if (signInFirst(site, response, $"/topic?id={topic['id']}")) {
                 return page;
             }
-            if (!posts.mayReply(site.user, topic)) {
-                return refuse(page, response, 403, "topic.locked");
+            if (!posts.mayReply(site, topic)) {
+                return refuse(page, response, 403, site.can(topic["board_id"], "reply") ? "topic.locked" : "post.mayNotReply");
             }
             if (request.method != "POST") {
                 var quoted = await posts.one(db, idOf(request.query?["quote"]));
@@ -153,11 +135,14 @@ export async function replyPage(request, response) {
     });
 }
 
-// A post a page changes, /post/edit?id=7 or /post/delete?id=7, and its topic; refused where there is none, or where the
-// reader may not change it.
+// A post a page changes, /post/edit?id=7 or /post/delete?id=7, and its topic; refused where there is none the reader may
+// read, or where they may not change it: their own, as their groups let them, or another's on a board they moderate.
 async function changed(db, site, request, response, page, action) {
     var post = await posts.one(db, idOf(request.query?["id"]));
     var topic = post == null ? null : await topics.one(db, post["topic_id"]);
+    if (topic != null && !site.can(topic["board_id"], "read")) {
+        topic = null;
+    }
     page.post = post;
     page.topic = topic;
     if (topic == null) {
@@ -170,18 +155,23 @@ async function changed(db, site, request, response, page, action) {
         return false;
     }
     page.first = await posts.firstOf(db, topic["id"]);
-    if (topic["locked"]) {
-        refuse(page, response, 403, "post.locked");
-        return false;
+    if (action == "edit" ? posts.mayEdit(site, topic, post) : posts.mayDelete(site, topic, post, page.first)) {
+        return true;
     }
-    if (post["user_id"] != site.user["id"]) {
-        refuse(page, response, 403, "post.notYours");
-        return false;
+    var why = "post.notAllowed";
+    if (action == "delete" && post["id"] == page.first && topic["post_count"] > 1) {
+        why = "post.firstWithReplies";
+    } else if (post["user_id"] != site.user["id"]) {
+        why = "post.notYours";
+    } else if (topic["locked"]) {
+        why = "post.locked";
     }
-    return true;
+    refuse(page, response, 403, why);
+    return false;
 }
 
-// /post/edit?id=7: a member's own post, its text, and its topic's title where it is the topic's first.
+// /post/edit?id=7: a post, its text, and its topic's title where it is the topic's first; a moderator's edit of another's
+// post logged.
 export async function editPage(request, response) {
     var site = await begin(request);
     return await site.once("edit", async () => {
@@ -199,7 +189,11 @@ export async function editPage(request, response) {
             if (form == null || page.preview != null || page.problems.length > 0) {
                 return page;
             }
-            await posts.edit(db, page.post, page.values["body"], page.titled ? page.values["title"] : null, site.user["id"], DateTime.utcNow());
+            var now = DateTime.utcNow();
+            await posts.edit(db, page.post, page.values["body"], page.titled ? page.values["title"] : null, site.user["id"], now);
+            if (page.post["user_id"] != site.user["id"]) {
+                await moderation.log(db, site.user["id"], "editPost", { topic: page.topic["id"], post: page.post["id"] }, now);
+            }
             page.done = true;
             redirect(response, await posts.linkOf(db, page.topic["id"], page.post["id"], site.settings["postsPerPage"]));
             return page;
@@ -207,8 +201,8 @@ export async function editPage(request, response) {
     });
 }
 
-// /post/delete?id=7: a member's own post, deleted once they say so; a topic's first only where it is its only one, the
-// topic deleted with it.
+// /post/delete?id=7: a post, deleted once the reader says so; a topic's first only where it is its only one, the topic
+// deleted with it; a moderator's deletion of another's post logged.
 export async function deletePage(request, response) {
     var site = await begin(request);
     return await site.once("delete", async () => {
@@ -216,9 +210,6 @@ export async function deletePage(request, response) {
             var page = view(site, site.t("post.delete"), []);
             if (!(await changed(db, site, request, response, page, "delete"))) {
                 return page;
-            }
-            if (!posts.mayDelete(site.user, page.topic, page.post, page.first)) {
-                return refuse(page, response, 403, "post.firstWithReplies");
             }
             page.html = htmlOf(site, page.post["body"]);
             page.alone = page.topic["post_count"] == 1;
@@ -231,6 +222,9 @@ export async function deletePage(request, response) {
                 return page;
             }
             var gone = await posts.remove(db, page.post, page.topic);
+            if (page.post["user_id"] != site.user["id"]) {
+                await moderation.log(db, site.user["id"], "deletePost", { topic: page.topic["id"], post: page.post["id"] }, DateTime.utcNow());
+            }
             page.done = true;
             redirect(response, gone ? $"/board?id={page.topic['board_id']}" : $"/topic?id={page.topic['id']}");
             return page;
@@ -245,7 +239,8 @@ export async function watchPosted(request, response) {
     var topic = idOf(form?["topic"]);
     if (site.user != null && topic != null) {
         using (var db = await open()) {
-            if (await topics.one(db, topic) != null) {
+            var row = await topics.one(db, topic);
+            if (row != null && site.can(row["board_id"], "read")) {
                 if (form?["action"] == "unwatch") {
                     await reading.unwatch(db, site.user["id"], topic);
                 } else {

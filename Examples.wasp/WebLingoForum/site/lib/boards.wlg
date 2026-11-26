@@ -28,6 +28,14 @@ export async function index(db) {
     return categories;
 }
 
+// Every board, in order, with its category's name.
+export async function all(db) {
+    return await db.query("""
+        SELECT b.id, b.name, c.name AS category_name FROM boards b JOIN categories c ON c.id = b.category_id
+        ORDER BY c.sort_order, c.id, b.sort_order, b.id
+        """);
+}
+
 // A board, with its category's id and name, or null where there is none of that id.
 export async function one(db, id) {
     if (id == null) {

@@ -1,0 +1,8 @@
+// /mod/topic, posted by a topic's moderation tools: the topic locked or unlocked, pinned or unpinned, moved, deleted or
+// restored, by a moderator of its board, where the form's token against cross-site request forgery is the browser's.
+
+import { topicPosted } from "../lib/moderating.wlg";
+
+export async function post(request, response) {
+    await topicPosted(request, response);
+}

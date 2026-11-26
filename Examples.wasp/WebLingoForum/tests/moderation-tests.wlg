@@ -1,0 +1,170 @@
+// Each board's permissions for each group, and what moderators do (site/lib/permissions.wlg, site/lib/moderation.wlg).
+// weblingo test moderation-tests.wlg
+
+import { assertEqual, assertDeepEqual } from "std:test";
+import { Database } from "std:db";
+import { DateTime } from "std:datetime";
+import schema from "../site/lib/schema.wlg";
+import { insert } from "../site/lib/sql.wlg";
+import users from "../site/lib/users.wlg";
+import topics from "../site/lib/topics.wlg";
+import posts from "../site/lib/posts.wlg";
+import permissions from "../site/lib/permissions.wlg";
+import moderation from "../site/lib/moderation.wlg";
+
+const now = DateTime.utc(2026, 11, 25, 12, 0);
+
+// A database of the forum's in memory: its four groups; Anna, 1, an administrator, Bob, 2, a member, and Carol, 3, a
+// moderator; and two boards, Welcome, 1, and Staff, 2, each with its groups' permissions by default.
+async function forum(db) {
+    foreach (var statement in schema.create(db.provider)) {
+        await db.execute(statement);
+    }
+    foreach (var group in [["guests", "Guests"], ["members", "Members"], ["moderators", "Moderators"], ["administrators", "Administrators"]]) {
+        await insert(db, "member_groups", { name: group[1], kind: group[0] });
+    }
+    foreach (var member in [["Anna", "administrators"], ["Bob", "members"], ["Carol", "moderators"]]) {
+        var id = await users.make(db, member[0], member[0].toLower() + "@example.com", "no hash", now, now);
+        await users.join(db, id, "members");
+        if (member[1] != "members") {
+            await users.join(db, id, member[1]);
+        }
+    }
+    var category = await insert(db, "categories", { name: "General", sort_order: 1 });
+    foreach (var name in ["Welcome", "Staff"]) {
+        var board = await insert(db, "boards", { category_id: category, name: name, description: null, sort_order: 1,
+                                                 topic_count: 0, post_count: 0, last_post_id: null });
+        await permissions.giveDefaults(db, board);
+    }
+}
+
+async function boardCounts(db, board) {
+    var row = (await db.query("SELECT topic_count, post_count, last_post_id FROM boards WHERE id = @id", { id: board }))[0];
+    return [row["topic_count"], row["post_count"], row["last_post_id"]];
+}
+
+export class PermissionsTests {
+    async testEachKindOfGroupGetsItsDefaultsOnABoard() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            var guests = await permissions.of(db, null);
+            assertDeepEqual([guests.has(1, "see"), guests.has(1, "read"), guests.has(1, "start"), guests.moderates()], [true, true, false, false]);
+            var bob = await permissions.of(db, 2);
+            assertDeepEqual([bob.has(2, "start"), bob.has(2, "delete"), bob.has(2, "moderate"), bob.has(3, "see")], [true, true, false, false]);
+            assertDeepEqual(bob.moderated(), []);
+            var carol = await permissions.of(db, 3);
+            assertEqual(carol.has(1, "moderate"), true);
+            assertEqual(carol.moderated().length, 2);
+            assertEqual(carol.moderates(), true);
+            var anna = await permissions.of(db, 1);
+            assertDeepEqual([anna.admin, anna.has(99, "moderate"), anna.moderated(), anna.moderates()], [true, true, null, true]);
+
+            // A group's permissions on a board changed, and the defaults given again leaving them as they are.
+            var values = { board_id: 2, group_id: 1 };
+            foreach (var name in permissions.names) {
+                values["can_" + name] = false;
+            }
+            await permissions.put(db, values);
+            await permissions.giveDefaults(db, 2);
+            assertEqual((await permissions.of(db, null)).has(2, "see"), false);
+            assertEqual((await db.query("SELECT COUNT(*) AS n FROM board_permissions"))[0]["n"], 8);
+            assertEqual(await permissions.isAdministrator(db, 1), true);
+            assertEqual(await permissions.isAdministrator(db, 3), false);
+        }
+    }
+}
+
+export class ModerationTests {
+    async testATopicIsLockedPinnedMovedDeletedAndRestoredEachLogged() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            var made = await posts.start(db, 1, 2, "Tea", "Tea, please.", now);
+            var reply = await posts.reply(db, await topics.one(db, made["topic"]), 1, "Coffee.", now.addMinutes(1));
+            var topic = await topics.one(db, made["topic"]);
+            await moderation.lock(db, 3, topic, true, now);
+            await moderation.pin(db, 3, topic, true, now);
+            topic = await topics.one(db, made["topic"]);
+            assertDeepEqual([topic["locked"], topic["pinned"]], [true, true]);
+
+            await moderation.move(db, 3, topic, 2, now);
+            assertDeepEqual(await boardCounts(db, 1), [0, 0, null]);
+            assertDeepEqual(await boardCounts(db, 2), [1, 2, reply]);
+            topic = await topics.one(db, made["topic"]);
+            assertEqual(topic["board_name"], "Staff");
+
+            await moderation.deleteTopic(db, 3, topic, now);
+            assertEqual(await topics.one(db, made["topic"]), null);
+            assertEqual((await topics.one(db, made["topic"], true))["deleted"], true);
+            assertDeepEqual(await boardCounts(db, 2), [0, 0, null]);
+            await moderation.restoreTopic(db, 3, topic, now);
+            assertDeepEqual(await boardCounts(db, 2), [1, 2, reply]);
+
+            assertEqual(await moderation.count(db), 5);
+            var entries = await moderation.entries(db, 0, 10);
+            assertDeepEqual(entries.map(entry => entry["action"]), ["restoreTopic", "deleteTopic", "move", "pin", "lock"]);
+            assertDeepEqual([entries[2]["details"], entries[2]["user_name"], entries[2]["topic_title"]], ["Welcome", "Carol", "Tea"]);
+            assertEqual((await moderation.entries(db, 4, 10)).length, 1);
+        }
+    }
+
+    async testADeletedPostIsRestoredWithItsCounts() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            var made = await posts.start(db, 1, 2, "Tea", "Tea, please.", now);
+            var topic = await topics.one(db, made["topic"]);
+            var reply = await posts.reply(db, topic, 2, "And cake.", now.addMinutes(1));
+            await posts.remove(db, await posts.one(db, reply), await topics.one(db, made["topic"]));
+            assertDeepEqual(await boardCounts(db, 1), [1, 1, made["post"]]);
+            assertEqual(await moderation.restorePost(db, 3, await posts.one(db, reply, true), now), true);
+            assertEqual(await moderation.restorePost(db, 3, await posts.one(db, reply, true), now), false);
+            assertDeepEqual(await boardCounts(db, 1), [1, 2, reply]);
+            assertEqual((await users.byId(db, 2))["post_count"], 2);
+
+            // A topic left without posts is deleted with its last; restoring the post restores the topic.
+            var alone = await posts.start(db, 1, 2, "Alone", "Soon gone.", now.addMinutes(2));
+            await posts.remove(db, await posts.one(db, alone["post"]), await topics.one(db, alone["topic"]));
+            assertEqual(await topics.one(db, alone["topic"]), null);
+            await moderation.restorePost(db, 3, await posts.one(db, alone["post"], true), now);
+            assertEqual((await topics.one(db, alone["topic"]))["post_count"], 1);
+            assertDeepEqual(await boardCounts(db, 1), [2, 3, alone["post"]]);
+            assertEqual((await moderation.entries(db, 0, 1))[0]["action"], "restorePost");
+        }
+    }
+
+    async testABanLastsUntilItEndsOrIsLifted() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            assertEqual(await moderation.banOf(db, 2, now), null);
+            await moderation.ban(db, 3, 2, now.addHours(24), "Too much tea.", now);
+            var ban = await moderation.banOf(db, 2, now.addHours(1));
+            assertDeepEqual([ban["ends_at"], ban["reason"]], [now.addHours(24), "Too much tea."]);
+            assertEqual(await moderation.banOf(db, 2, now.addHours(25)), null);
+            await moderation.ban(db, 3, 2, null, null, now);
+            assertEqual((await moderation.banOf(db, 2, now.addHours(1000)))["ends_at"], null);
+            assertEqual((await db.query("SELECT COUNT(*) AS n FROM bans WHERE lifted_at IS NULL"))[0]["n"], 1);
+            await moderation.lift(db, 3, 2, now);
+            assertEqual(await moderation.banOf(db, 2, now), null);
+            var entries = await moderation.entries(db, 0, 10);
+            assertDeepEqual(entries.map(entry => entry["action"]), ["lift", "ban", "ban"]);
+            assertEqual(entries[2]["member_name"], "Bob");
+        }
+    }
+
+    async testAReportIsOpenUntilAModeratorResolvesIt() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            var made = await posts.start(db, 1, 1, "Tea", "Tea, please.", now);
+            await moderation.report(db, 2, made["post"], "Rude.", now);
+            var open = await moderation.openReports(db, null);
+            assertDeepEqual([open.length, open[0]["reason"], open[0]["reporter_name"], open[0]["author_name"], open[0]["topic_title"]],
+                            [1, "Rude.", "Bob", "Anna", "Tea"]);
+            assertEqual((await moderation.openReports(db, [2])).length, 0);
+            assertEqual((await moderation.openReports(db, [1])).length, 1);
+            var report = await moderation.openReport(db, open[0]["id"]);
+            await moderation.resolve(db, 3, report, now);
+            assertEqual((await moderation.openReports(db, null)).length, 0);
+            assertEqual(await moderation.openReport(db, open[0]["id"]), null);
+            assertEqual((await moderation.entries(db, 0, 1))[0]["details"], "Rude.");
+        }
+    }
+}

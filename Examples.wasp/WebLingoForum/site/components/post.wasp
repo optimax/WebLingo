@@ -15,14 +15,19 @@
 <% if (post["user_signature"] != null) { %>
     <div class="signature"><%- render(post["user_signature"]) %></div>
 <% } %>
-<% if (posts.mayReply(site.user, topic)) { %>
+<% if (site.user != null) { %>
     <p class="actions">
+<% if (posts.mayReply(site, topic)) { %>
       <a href="<%= $"/post/reply?topic={topic['id']}&quote={post['id']}" %>"><%= site.t("topic.quote") %></a>
-<% if (posts.mayEdit(site.user, topic, post)) { %>
+<% } %>
+<% if (posts.mayEdit(site, topic, post)) { %>
       <a href="/post/edit?id=<%= post["id"] %>"><%= site.t("topic.edit") %></a>
 <% } %>
-<% if (posts.mayDelete(site.user, topic, post, first)) { %>
+<% if (posts.mayDelete(site, topic, post, first)) { %>
       <a href="/post/delete?id=<%= post["id"] %>"><%= site.t("topic.delete") %></a>
+<% } %>
+<% if (posts.mayReport(site, topic, post)) { %>
+      <a href="/post/report?id=<%= post["id"] %>"><%= site.t("topic.report") %></a>
 <% } %>
     </p>
 <% } %>

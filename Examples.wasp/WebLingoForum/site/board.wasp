@@ -1,5 +1,5 @@
 <% session readonly; %>
-<% param request; param response; import { boardPage } from "/lib/pages.wlg"; %>
+<% param request; param response; import { boardPage } from "/lib/pages.wlg"; import posts from "/lib/posts.wlg"; %>
 <% layout "/layouts/main.wasp", { title: (await boardPage(request)).title, crumbs: (await boardPage(request)).crumbs }; %>
 <% var view = await boardPage(request); var site = view.site; %>
 <% if (view.board == null) { response.status = 404; %>
@@ -12,11 +12,14 @@
 <% } %>
 <div class="tools">
 <% if (site.user == null) { %>
-  <a href="/account/sign-in?back=<%= base %>"><%= site.t("board.signInToStart") %></a>
-<% } else { %>
+  <a href="/account/sign-in?back=<%= base %>"><%= site.t(view.readable ? "board.signInToStart" : "board.signInToRead") %></a>
+<% } else if (posts.mayStart(site, board["id"])) { %>
   <a class="button" href="/post/new?board=<%= board["id"] %>"><%= site.t("board.newTopic") %></a>
 <% } %>
 </div>
+<% if (!view.readable) { response.status = 403; %>
+<p class="notice"><%= site.t("board.mayNotRead") %></p>
+<% } else { %>
 <% await renderComponent("/components/pages.wasp", { site: site, base: base, page: view.page, pages: view.pages }); %>
 <% if (view.topics.length == 0) { %>
 <p class="note"><%= site.t("board.noTopics") %></p>
@@ -28,4 +31,5 @@
 </table>
 <% } %>
 <% await renderComponent("/components/pages.wasp", { site: site, base: base, page: view.page, pages: view.pages }); %>
+<% } %>
 <% } %>

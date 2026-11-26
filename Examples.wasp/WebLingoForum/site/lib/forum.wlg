@@ -1,19 +1,28 @@
-// The forum as a request sees it: its settings, its texts, the member signed in, and the time zone its dates are shown
-// in, read once for each request, since a module runs once for each request that imports it (the WASP User Manual,
-// section 8); and what its pages share: their forms, their redirects, and the member a session keeps.
+// The forum as a request sees it: its settings, its texts, the member signed in, what they may do on each board, and
+// the time zone its dates are shown in, read once for each request, since a module runs once for each request that
+// imports it (the WASP User Manual, section 8); and what its pages share: their forms, their redirects, and the member a
+// session keeps.
 
 import { Database } from "std:db";
 import { DateTime } from "std:datetime";
 import settings from "./settings.wlg";
 import { load } from "./texts.wlg";
+import permissions from "./permissions.wlg";
+import { banOf } from "./moderation.wlg";
 
 export class Forum {
-    constructor(values, texts, user) {
+    constructor(values, texts, user, can) {
         this.settings = values;
         this.texts = texts;
         this.user = user;
+        this.permissions = can;
         this.zone = user?["time_zone"] ?? values["timeZone"];
         this.kept = {};
+    }
+
+    // Whether the reader has a permission on a board: see, read, start, reply, edit, delete or moderate.
+    can(board, name) {
+        return this.permissions.has(board, name);
     }
 
     // A text by its name, and a text with values, in the reader's language.
@@ -42,17 +51,19 @@ export async function begin(request) {
     if (current == null) {
         var values = null;
         var user = null;
+        var can = null;
         using (var db = await open()) {
             values = await settings.load(db);
             user = await signedIn(db, request);
+            can = await permissions.of(db, user?["id"]);
         }
-        current = new Forum(values, await load(user?["language"] ?? values["language"]), user);
+        current = new Forum(values, await load(user?["language"] ?? values["language"]), user, can);
     }
     return current;
 }
 
-// The member the request's session keeps, whose address is confirmed, with when they joined, or null; when they were
-// last seen kept, to five minutes.
+// The member the request's session keeps, whose address is confirmed, with when they joined, or null, as for a member
+// banned; when they were last seen kept, to five minutes.
 async function signedIn(db, request) {
     var id = request.session?["user"];
     if (!(id is Integer)) {
@@ -62,10 +73,10 @@ async function signedIn(db, request) {
         SELECT id, name, email, time_zone, language, signature, created_at, last_seen_at FROM users
         WHERE id = @id AND confirmed_at IS NOT NULL
         """, { id: id });
-    if (rows.length == 0) {
+    var now = DateTime.utcNow();
+    if (rows.length == 0 || await banOf(db, id, now) != null) {
         return null;
     }
-    var now = DateTime.utcNow();
     if (rows[0]["last_seen_at"] == null || now - rows[0]["last_seen_at"] > 5 * 60 * 1000) {
         await db.execute("UPDATE users SET last_seen_at = @now WHERE id = @id", { now: now, id: id });
     }
@@ -104,6 +115,36 @@ export async function formOf(request) {
 // A field of a form, trimmed, or "" where it is not there.
 export function fieldOf(form, name) {
     return (form?[name] ?? "").trim();
+}
+
+// The trail of links above a page of a board's: its category, then the board.
+export function boardCrumbs(board) {
+    return [[board["category_name"], $"/#category-{board['category_id']}"], [board["name"], $"/board?id={board['id']}"]];
+}
+
+// The trail of links above a page of a topic's: its category, its board, then the topic.
+export function topicCrumbs(topic) {
+    return [[topic["category_name"], $"/#category-{topic['category_id']}"], [topic["board_name"], $"/board?id={topic['board_id']}"],
+            [topic["title"], $"/topic?id={topic['id']}"]];
+}
+
+// A page refused, with its status and why, a text's name, and its title, where it has another.
+export function refuse(page, response, status, why, title = null) {
+    response.status = status;
+    if (title != null) {
+        page.title = page.site.t(title);
+    }
+    page.refused = why;
+    return page;
+}
+
+// Sends a reader not signed in to sign in first, then back to a path; gives whether it did.
+export function signInFirst(site, response, back) {
+    if (site.user != null) {
+        return false;
+    }
+    redirect(response, "/account/sign-in?back=" + back);
+    return true;
 }
 
 // Sends the browser on to a path, 303 See Other, as a form's answer does.

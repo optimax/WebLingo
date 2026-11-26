@@ -1,0 +1,271 @@
+// What the moderators' pages do, and show (Documents/weblingo-forum.md, section 2, "Moderation"; section 6, part 4): a
+// topic's tools, a deleted post restored, a post reported by a member, the reports, the moderation log, and a member's
+// ban. Each page's work runs once for each request, from its layout's values, before anything is written.
+
+import { DateTime } from "std:datetime";
+import { begin, open, viewOf, formOf, redirect, idOf, pageOf, pagesOf, topicCrumbs, refuse, signInFirst } from "./forum.wlg";
+import boards from "./boards.wlg";
+import topics from "./topics.wlg";
+import posts from "./posts.wlg";
+import users from "./users.wlg";
+import moderation from "./moderation.wlg";
+import { isAdministrator } from "./permissions.wlg";
+import { render } from "./markdown.wlg";
+
+// The log's entries on a page.
+export const entriesPerPage = 50;
+
+// How long a ban lasts, in days, by the name a form gives it; for good, null.
+export const banLengths = { "day": 1, "week": 7, "month": 30, "good": null };
+
+function view(site, title, crumbs) {
+    var page = viewOf(site, title, crumbs);
+    page.problems = [];
+    page.notice = null;
+    page.refused = null;
+    page.done = false;
+    return page;
+}
+
+// A handler's answer where it is refused: its status, and why, as text.
+function refused(site, response, status, why) {
+    response.status = status;
+    response.write(site.t(why));
+}
+
+// /mod/topic, posted by a topic's moderation tools: the topic locked or unlocked, pinned or unpinned, moved to another
+// board the moderator moderates, deleted or restored, by a moderator of its board; who is sent back to the topic, or to
+// its board where it is deleted.
+export async function topicPosted(request, response) {
+    var site = await begin(request);
+    var form = await formOf(request);
+    if (form == null) {
+        return refused(site, response, 400, "form.expired");
+    }
+    using (var db = await open()) {
+        var topic = await topics.one(db, idOf(form?["topic"]), true);
+        if (topic == null || !site.can(topic["board_id"], "moderate")) {
+            return refused(site, response, 403, "mod.notModerator");
+        }
+        var user = site.user["id"];
+        var now = DateTime.utcNow();
+        var action = form?["action"];
+        if (action == "lock" || action == "unlock") {
+            await moderation.lock(db, user, topic, action == "lock", now);
+        } else if (action == "pin" || action == "unpin") {
+            await moderation.pin(db, user, topic, action == "pin", now);
+        } else if (action == "move") {
+            var board = idOf(form?["board"]);
+            if (board != null && board != topic["board_id"] && site.can(board, "moderate") && await boards.one(db, board) != null) {
+                await moderation.move(db, user, topic, board, now);
+            }
+        } else if (action == "delete" && !topic["deleted"]) {
+            await moderation.deleteTopic(db, user, topic, now);
+            return redirect(response, $"/board?id={topic['board_id']}");
+        } else if (action == "restore" && topic["deleted"]) {
+            await moderation.restoreTopic(db, user, topic, now);
+        }
+        redirect(response, $"/topic?id={topic['id']}");
+    }
+}
+
+// /mod/post, posted by the log's button: a deleted post restored by a moderator of its board, who is sent to it.
+export async function postPosted(request, response) {
+    var site = await begin(request);
+    var form = await formOf(request);
+    if (form == null) {
+        return refused(site, response, 400, "form.expired");
+    }
+    using (var db = await open()) {
+        var post = await posts.one(db, idOf(form?["post"]), true);
+        var topic = post == null ? null : await topics.one(db, post["topic_id"], true);
+        if (topic == null || !site.can(topic["board_id"], "moderate")) {
+            return refused(site, response, 403, "mod.notModerator");
+        }
+        if (form?["action"] == "restore") {
+            await moderation.restorePost(db, site.user["id"], post, DateTime.utcNow());
+        }
+        redirect(response, await posts.linkOf(db, topic["id"], post["id"], site.settings["postsPerPage"]));
+    }
+}
+
+// /post/report?id=7: a post reported to its board's moderators, and why, by a member who may read it and did not write
+// it.
+export async function reportPage(request, response) {
+    var site = await begin(request);
+    return await site.once("report", async () => {
+        using (var db = await open()) {
+            var post = await posts.one(db, idOf(request.query?["id"]));
+            var topic = post == null ? null : await topics.one(db, post["topic_id"]);
+            if (topic != null && !site.can(topic["board_id"], "read")) {
+                topic = null;
+            }
+            var page = view(site, site.t("report.title"), topic == null ? [] : topicCrumbs(topic));
+            page.values = { reason: "" };
+            if (topic == null) {
+                return refuse(page, response, 404, "forum.notFoundText", "post.notFound");
+            }
+            page.action = $"/post/report?id={post['id']}";
+            page.post = post;
+            page.html = render(post["body"]);
+            if (signInFirst(site, response, page.action)) {
+                return page;
+            }
+            if (!posts.mayReport(site, topic, post)) {
+                return refuse(page, response, 403, "report.notAllowed");
+            }
+            if (request.method != "POST") {
+                return page;
+            }
+            var form = await formOf(request);
+            if (form == null) {
+                response.status = 400;
+                page.problems.push("form.expired");
+                return page;
+            }
+            var reason = posts.bodyOf(form?["reason"]);
+            page.values = { reason: reason };
+            if (reason == "" || reason.length > 500) {
+                response.status = 400;
+                page.problems.push(reason == "" ? "report.noReason" : "report.tooLong");
+                return page;
+            }
+            await moderation.report(db, site.user["id"], post["id"], reason, DateTime.utcNow());
+            page.done = true;
+            page.notice = site.t("report.sent");
+            return page;
+        }
+    });
+}
+
+// A moderators' page refused where the reader is not signed in, sent to sign in first, or moderates no board; gives
+// whether it was.
+function notForThem(site, page, response, back) {
+    if (signInFirst(site, response, back)) {
+        return true;
+    }
+    if (!site.permissions.moderates()) {
+        refuse(page, response, 403, "mod.notModerator");
+        return true;
+    }
+    return false;
+}
+
+// /mod/reports: the reports not yet resolved on the boards the reader moderates, each with its post; one posted, resolved.
+export async function reportsPage(request, response) {
+    var site = await begin(request);
+    return await site.once("reports", async () => {
+        var page = view(site, site.t("mod.reports"), []);
+        page.reports = [];
+        if (notForThem(site, page, response, "/mod/reports")) {
+            return page;
+        }
+        using (var db = await open()) {
+            if (request.method == "POST") {
+                var form = await formOf(request);
+                if (form == null) {
+                    response.status = 400;
+                    page.problems.push("form.expired");
+                } else {
+                    var report = await moderation.openReport(db, idOf(form?["report"]));
+                    if (report != null && site.can(report["board_id"], "moderate")) {
+                        await moderation.resolve(db, site.user["id"], report, DateTime.utcNow());
+                    }
+                    page.done = true;
+                    redirect(response, "/mod/reports");
+                    return page;
+                }
+            }
+            foreach (var report in await moderation.openReports(db, site.permissions.moderated())) {
+                report["html"] = render(report["body"]);
+                report["link"] = await posts.linkOf(db, report["topic_id"], report["post_id"], site.settings["postsPerPage"]);
+                page.reports.push(report);
+            }
+        }
+        return page;
+    });
+}
+
+// /mod/log?page=2: the moderators' actions, the latest first, a page of them, with the page numbers.
+export async function logPage(request, response) {
+    var site = await begin(request);
+    return await site.once("log", async () => {
+        var page = view(site, site.t("log.title"), [[site.t("mod.reports"), "/mod/reports"]]);
+        page.entries = [];
+        page.pages = 1;
+        page.page = 1;
+        if (notForThem(site, page, response, "/mod/log")) {
+            return page;
+        }
+        using (var db = await open()) {
+            page.pages = pagesOf(await moderation.count(db), entriesPerPage);
+            var number = pageOf(request.query?["page"]);
+            page.page = number > page.pages ? page.pages : number;
+            page.entries = await moderation.entries(db, (page.page - 1) * entriesPerPage, entriesPerPage);
+        }
+        return page;
+    });
+}
+
+// /mod/ban?member=2: a member banned by a moderator, for a day, a week, 30 days or for good, and why, which they are shown
+// when they sign in; or the ban they are under lifted. Never an administrator, nor the moderator themselves.
+export async function banPage(request, response) {
+    var site = await begin(request);
+    return await site.once("ban", async () => {
+        using (var db = await open()) {
+            var member = await users.byId(db, idOf(request.query?["member"]));
+            if (member != null && member["confirmed_at"] == null) {
+                member = null;
+            }
+            var page = view(site, member == null ? site.t("member.notFound") : site.f("ban.title", { name: member["name"] }),
+                            member == null ? [] : [[site.t("members.title"), "/members"], [member["name"], $"/members/member?id={member['id']}"]]);
+            page.member = member;
+            page.ban = null;
+            page.lengths = ["day", "week", "month", "good"];
+            page.values = { length: "day", reason: "" };
+            if (member == null) {
+                return refuse(page, response, 404, "forum.notFoundText");
+            }
+            page.action = $"/mod/ban?member={member['id']}";
+            if (notForThem(site, page, response, page.action)) {
+                return page;
+            }
+            if (member["id"] == site.user["id"]) {
+                return refuse(page, response, 403, "ban.self");
+            }
+            if (await isAdministrator(db, member["id"])) {
+                return refuse(page, response, 403, "ban.administrator");
+            }
+            var now = DateTime.utcNow();
+            page.ban = await moderation.banOf(db, member["id"], now);
+            if (request.method != "POST") {
+                return page;
+            }
+            var form = await formOf(request);
+            if (form == null) {
+                response.status = 400;
+                page.problems.push("form.expired");
+                return page;
+            }
+            if (form?["action"] == "lift") {
+                await moderation.lift(db, site.user["id"], member["id"], now);
+                page.notice = site.f("ban.lifted", { name: member["name"] });
+            } else {
+                var length = form?["length"] ?? "";
+                var reason = posts.titleOf(form?["reason"]);
+                page.values = { length: length, reason: reason };
+                if (!banLengths.has(length) || reason.length > 500) {
+                    response.status = 400;
+                    page.problems.push(banLengths.has(length) ? "ban.reasonTooLong" : "ban.badLength");
+                    return page;
+                }
+                var days = banLengths[length];
+                await moderation.ban(db, site.user["id"], member["id"], days == null ? null : now.addHours(24 * days),
+                                     reason == "" ? null : reason, now);
+                page.notice = site.f("ban.done", { name: member["name"] });
+            }
+            page.ban = await moderation.banOf(db, member["id"], now);
+            return page;
+        }
+    });
+}

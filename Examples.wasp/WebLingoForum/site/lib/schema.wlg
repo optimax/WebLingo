@@ -4,8 +4,9 @@
 import { columnType } from "./sql.wlg";
 
 // The schema's version, which the table schema_version holds: 1, the forum's first part's; 2, its members' tokens and
-// failed sign-ins; 3, what each member has read, and the topics they watch.
-export const version = 3;
+// failed sign-ins; 3, what each member has read, and the topics they watch; 4, each board's permissions for each group,
+// bans, reports and the moderation log.
+export const version = 4;
 
 function id() { return { name: "id", type: "id", nullable: false }; }
 function integer(name) { return { name: name, type: "integer", nullable: false }; }
@@ -64,7 +65,31 @@ export const tables = [
     // A topic a member watches, mailed of its next reply; notified until they read it again, so that they get one mail.
     { name: "topic_watches", since: 3, columns: [integer("user_id"), integer("topic_id"), boolean("notified")],
       key: ["user_id", "topic_id"], references: { "user_id": "users", "topic_id": "topics" },
-      indexes: [{ name: "topic_watches_topic", columns: ["topic_id"], unique: false }] }
+      indexes: [{ name: "topic_watches_topic", columns: ["topic_id"], unique: false }] },
+    // What a group may do on a board: see it, read it, start topics, reply, edit and delete its members' own posts, and
+    // moderate it.
+    { name: "board_permissions", since: 4, columns: [
+        integer("board_id"), integer("group_id"), boolean("can_see"), boolean("can_read"), boolean("can_start"),
+        boolean("can_reply"), boolean("can_edit"), boolean("can_delete"), boolean("can_moderate")],
+      key: ["board_id", "group_id"], references: { "board_id": "boards", "group_id": "member_groups" } },
+    // A member banned by a moderator, until a time, or for good where it has none, and why; lifted, where it ended early.
+    { name: "bans", since: 4, columns: [
+        id(), integer("user_id"), optional(date("ends_at")), optional(string("reason", 500)), date("created_at"),
+        integer("created_by"), optional(date("lifted_at"))],
+      references: { "user_id": "users" },
+      indexes: [{ name: "bans_user", columns: ["user_id"], unique: false }] },
+    // A post a member reported to the moderators, and why; resolved, where a moderator dealt with it.
+    { name: "reports", since: 4, columns: [
+        id(), integer("post_id"), integer("user_id"), string("reason", 500), date("created_at"), optional(date("resolved_at")),
+        optional(integer("resolved_by"))],
+      references: { "post_id": "posts", "user_id": "users" },
+      indexes: [{ name: "reports_post", columns: ["post_id"], unique: false }] },
+    // Each of a moderator's actions: who, what, on which topic, post or member, with what, and when.
+    { name: "moderation_log", since: 4, columns: [
+        id(), integer("user_id"), string("action", 30), optional(integer("topic_id")), optional(integer("post_id")),
+        optional(integer("member_id")), optional(string("details", 500)), date("created_at")],
+      references: { "user_id": "users" },
+      indexes: [{ name: "moderation_log_time", columns: ["created_at"], unique: false }] }
 ];
 
 // The schema's version that added a table.

@@ -22,6 +22,7 @@ import schema from "../site/lib/schema.wlg";
 import { insert } from "../site/lib/sql.wlg";
 import users from "../site/lib/users.wlg";
 import { load } from "../site/lib/texts.wlg";
+import permissions from "../site/lib/permissions.wlg";
 
 var texts = await load("en");
 
@@ -72,6 +73,7 @@ async function make(db, admin) {
     var board = await insert(db, "boards", {
         category_id: category, name: "Welcome", description: "Introductions, and news of the forum.", sort_order: 1,
         topic_count: 1, post_count: 1, last_post_id: null });
+    await permissions.giveDefaults(db, board);
     var topic = await insert(db, "topics", {
         board_id: board, user_id: user, title: "Welcome to the forum", created_at: now, post_count: 1, view_count: 0,
         last_post_id: null, last_post_at: now, pinned: true, locked: false, deleted: false });
@@ -90,10 +92,16 @@ using (var db = await Database.open(database)) {
     } else if (version > schema.version) {
         throw new Error($"The forum's database '{database}' is at version {version}, later than this forum's, {schema.version}.");
     } else if (version != 0) {
-        // The tables added since, and the version, in one transaction where the database takes DDL in one.
+        // The tables added since, what they hold at first, and the version, in one transaction where the database takes DDL
+        // in one: from version 4, each board's permissions for each group, its defaults.
         async function upgrade() {
             foreach (var statement in schema.upgrade(db.provider, version)) {
                 await db.execute(statement);
+            }
+            if (version < 4) {
+                foreach (var board in await db.query("SELECT id FROM boards")) {
+                    await permissions.giveDefaults(db, board["id"]);
+                }
             }
             await db.execute("UPDATE schema_version SET version = @version", { version: schema.version });
         }

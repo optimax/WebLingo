@@ -1,0 +1,52 @@
+<% param request; param response; import { logPage } from "/lib/moderating.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await logPage(request, response)).title, crumbs: (await logPage(request, response)).crumbs }; %>
+<% var view = await logPage(request, response); var site = view.site; %>
+<% if (view.refused != null) { %>
+<h1><%= view.title %></h1>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null) { %>
+<h1><%= view.title %></h1>
+<% if (view.entries.length == 0) { %>
+<p class="note"><%= site.t("log.empty") %></p>
+<% } else { %>
+<% await renderComponent("/components/pages.wasp", { site: site, base: "/mod/log", page: view.page, pages: view.pages }); %>
+<table class="list log">
+  <tr><th><%= site.t("log.when") %></th><th><%= site.t("log.who") %></th><th><%= site.t("log.what") %></th><th><%= site.t("log.on") %></th><th><%= site.t("log.details") %></th></tr>
+<% foreach (var entry in view.entries) { %>
+  <tr>
+    <td class="note"><%= site.time(entry["created_at"]) %></td>
+    <td><%= entry["user_name"] ?? site.t("user.deleted") %></td>
+    <td><%= site.t("log." + entry["action"]) %></td>
+    <td>
+<% if (entry["member_id"] != null) { %>
+      <a href="/members/member?id=<%= entry["member_id"] %>"><%= entry["member_name"] ?? site.t("user.deleted") %></a>
+<% } else if (entry["topic_id"] != null) { %>
+      <a href="<%= $"/topic?id={entry['topic_id']}" + (entry["post_id"] == null ? "" : $"#post-{entry['post_id']}") %>"><%= entry["topic_title"] %></a>
+<% } %>
+    </td>
+    <td>
+<% if (entry["action"] == "move") { %>
+      <%= site.f("log.movedFrom", { board: entry["details"] }) %>
+<% } else if (entry["details"] != null) { %>
+      <%= entry["details"] %>
+<% } %>
+<% if (entry["action"] == "deletePost" && entry["post_deleted"]) { %>
+      <form method="post" action="/mod/post">
+        <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+        <input type="hidden" name="post" value="<%= entry["post_id"] %>">
+        <button name="action" value="restore" class="secondary"><%= site.t("mod.restorePost") %></button>
+      </form>
+<% } else if (entry["action"] == "deleteTopic" && entry["topic_deleted"]) { %>
+      <form method="post" action="/mod/topic">
+        <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+        <input type="hidden" name="topic" value="<%= entry["topic_id"] %>">
+        <button name="action" value="restore" class="secondary"><%= site.t("mod.restore") %></button>
+      </form>
+<% } %>
+    </td>
+  </tr>
+<% } %>
+</table>
+<% await renderComponent("/components/pages.wasp", { site: site, base: "/mod/log", page: view.page, pages: view.pages }); %>
+<% } %>
+<% } %>

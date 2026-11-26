@@ -18,26 +18,33 @@ function pageWithin(request, pages) {
     return page > pages ? pages : page;
 }
 
-// The front page: the categories and their boards.
+// The front page: the categories and the boards the reader may see, a category without one left out.
 export async function indexPage(request) {
     var site = await begin(request);
     return await site.once("index", async () => {
         var page = view(site, site.t("index.title"), []);
+        page.categories = [];
         using (var db = await open()) {
-            page.categories = await boards.index(db);
+            foreach (var category in await boards.index(db)) {
+                category["boards"] = category["boards"].filter(board => site.can(board["id"], "see"));
+                if (category["boards"].length > 0) {
+                    page.categories.push(category);
+                }
+            }
         }
         return page;
     });
 }
 
 // A board's page, /board?id=3&page=2: the board, a page of its topics, each marked where it has posts new to the
-// member, and the page numbers; its board null where the query names none.
+// member, and the page numbers; its board null where the query names none the reader may see, and its topics none where
+// they may not read it.
 export async function boardPage(request) {
     var site = await begin(request);
     return await site.once("board", async () => {
         using (var db = await open()) {
             var board = await boards.one(db, idOf(request.query?["id"]));
-            if (board == null) {
+            if (board == null || !site.can(board["id"], "see")) {
                 var missing = view(site, site.t("board.notFound"), []);
                 missing.board = null;
                 return missing;
@@ -45,6 +52,13 @@ export async function boardPage(request) {
             var page = view(site, board["name"], [[board["category_name"], $"/#category-{board['category_id']}"]]);
             var perPage = site.settings["topicsPerPage"];
             page.board = board;
+            page.readable = site.can(board["id"], "read");
+            if (!page.readable) {
+                page.pages = 1;
+                page.page = 1;
+                page.topics = [];
+                return page;
+            }
             page.pages = pagesOf(await topics.countOnBoard(db, board["id"]), perPage);
             page.page = pageWithin(request, page.pages);
             page.topics = await topics.onBoard(db, board["id"], site.user?["id"] ?? 0, (page.page - 1) * perPage, perPage);
@@ -58,13 +72,14 @@ export async function boardPage(request) {
 
 // A topic's page, /topic?id=42&page=2: the topic, its first post's id, whether the member watches it, a page of its posts,
 // and the page numbers, its view counted, and its posts kept as seen by the member; its topic null where the query names
-// none. With &unread=1, the member is sent on to the first post new to them, or to its last.
+// none the reader may read, a deleted one read by its board's moderators alone. For them, the boards they may move it
+// to. With &unread=1, the member is sent on to the first post new to them, or to its last.
 export async function topicPage(request, response) {
     var site = await begin(request);
     return await site.once("topic", async () => {
         using (var db = await open()) {
-            var topic = await topics.one(db, idOf(request.query?["id"]));
-            if (topic == null) {
+            var topic = await topics.one(db, idOf(request.query?["id"]), true);
+            if (topic == null || !site.can(topic["board_id"], "read") || (topic["deleted"] && !site.can(topic["board_id"], "moderate"))) {
                 var missing = view(site, site.t("topic.notFound"), []);
                 missing.topic = null;
                 return missing;
@@ -75,6 +90,8 @@ export async function topicPage(request, response) {
             page.topic = topic;
             page.firstPost = await posts.firstOf(db, topic["id"]);
             page.watching = site.user != null && await reading.isWatching(db, site.user["id"], topic["id"]);
+            page.moderates = site.can(topic["board_id"], "moderate");
+            page.boards = page.moderates ? (await boards.all(db)).filter(board => site.can(board["id"], "moderate")) : [];
             page.pages = 1;
             page.page = 1;
             page.first = 0;

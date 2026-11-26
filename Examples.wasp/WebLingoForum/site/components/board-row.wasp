@@ -8,7 +8,8 @@
   </td>
   <td class="count"><%= site.f("board.topics", { count: board["topic_count"] }) %><br><%= site.f("board.posts", { count: board["post_count"] }) %></td>
   <td class="last">
-<% if (board["last_post_id"] == null) { %>
+<% if (!site.can(board["id"], "read")) { %>
+<% } else if (board["last_post_id"] == null) { %>
     <span class="note"><%= site.t("board.noPosts") %></span>
 <% } else { %>
     <a href="/topic?id=<%= board["last_topic_id"] %>"><%= board["last_topic_title"] %></a><br>

@@ -10,6 +10,9 @@
 <% } else { %>
       <a href="/members/member?id=<%= site.user["id"] %>"><%= site.user["name"] %></a>
       <a href="/account/profile"><%= site.t("nav.profile") %></a>
+<% if (site.permissions.moderates()) { %>
+      <a href="/mod/reports"><%= site.t("nav.moderation") %></a>
+<% } %>
       <form method="post" action="/account/sign-out">
         <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
         <button class="link"><%= site.t("nav.signOut") %></button>

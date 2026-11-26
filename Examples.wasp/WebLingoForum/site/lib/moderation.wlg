@@ -1,0 +1,155 @@
+// What moderators do (Documents/weblingo-forum.md, section 2, "Moderation"): a topic locked, pinned, moved, deleted and
+// restored; a post restored; a member banned, and the ban lifted; the posts members report, resolved; each logged, by
+// whom and when, and the log read.
+
+import { insert, page } from "./sql.wlg";
+import posts from "./posts.wlg";
+
+// Logs a moderator's action, values a map of what it was done to, its topic, post and member, and its details.
+export async function log(db, user, action, values, now) {
+    await insert(db, "moderation_log", {
+        user_id: user, action: action, topic_id: values?["topic"], post_id: values?["post"], member_id: values?["member"],
+        details: values?["details"], created_at: now });
+}
+
+// Locks a topic, so that it takes no replies, or unlocks it.
+export async function lock(db, user, topic, locked, now) {
+    await db.execute("UPDATE topics SET locked = @locked WHERE id = @id", { locked: locked, id: topic["id"] });
+    await log(db, user, locked ? "lock" : "unlock", { topic: topic["id"] }, now);
+}
+
+// Pins a topic, so that it comes first on its board, or unpins it.
+export async function pin(db, user, topic, pinned, now) {
+    await db.execute("UPDATE topics SET pinned = @pinned WHERE id = @id", { pinned: pinned, id: topic["id"] });
+    await log(db, user, pinned ? "pin" : "unpin", { topic: topic["id"] }, now);
+}
+
+// Moves a topic to another board, both boards' counts and latest posts made again; logged with the board it came from.
+export async function move(db, user, topic, board, now) {
+    await db.transaction(async () => {
+        await db.execute("UPDATE topics SET board_id = @board WHERE id = @id", { board: board, id: topic["id"] });
+        await posts.recountBoard(db, topic["board_id"]);
+        await posts.recountBoard(db, board);
+    });
+    await log(db, user, "move", { topic: topic["id"], details: topic["board_name"] }, now);
+}
+
+// Deletes a topic: kept, marked deleted, with its posts, so that it may be restored; its board's counts made again.
+export async function deleteTopic(db, user, topic, now) {
+    await db.transaction(async () => {
+        await db.execute("UPDATE topics SET deleted = @deleted WHERE id = @id", { deleted: true, id: topic["id"] });
+        await posts.recountBoard(db, topic["board_id"]);
+    });
+    await log(db, user, "deleteTopic", { topic: topic["id"] }, now);
+}
+
+// Restores a deleted topic, and its board's counts.
+export async function restoreTopic(db, user, topic, now) {
+    await db.transaction(async () => {
+        await db.execute("UPDATE topics SET deleted = @deleted WHERE id = @id", { deleted: false, id: topic["id"] });
+        await posts.recountBoard(db, topic["board_id"]);
+    });
+    await log(db, user, "restoreTopic", { topic: topic["id"] }, now);
+}
+
+// Restores a deleted post, a row of posts.one's, its author's, its topic's and its board's counts with it; and its
+// topic, where deleting the post left the topic without posts. Gives whether it was deleted.
+export async function restorePost(db, user, post, now) {
+    var restored = await db.transaction(async () => {
+        var empty = !(await posts.recountTopic(db, post["topic_id"]));
+        if (await db.execute("UPDATE posts SET deleted = @no WHERE id = @id AND deleted = @yes", { no: false, yes: true, id: post["id"] }) == 0) {
+            return false;
+        }
+        await db.execute("UPDATE users SET post_count = post_count + 1 WHERE id = @user", { user: post["user_id"] });
+        await posts.recountTopic(db, post["topic_id"]);
+        if (empty) {
+            await db.execute("UPDATE topics SET deleted = @deleted WHERE id = @id", { deleted: false, id: post["topic_id"] });
+        }
+        var board = (await db.query("SELECT board_id FROM topics WHERE id = @id", { id: post["topic_id"] }))[0]["board_id"];
+        await posts.recountBoard(db, board);
+        return true;
+    });
+    if (restored) {
+        await log(db, user, "restorePost", { topic: post["topic_id"], post: post["id"] }, now);
+    }
+    return restored;
+}
+
+// The ban a member is under at a time, or null: its id, when it ends, null for good, and why.
+export async function banOf(db, member, now) {
+    var rows = await db.query($"""
+        SELECT id, ends_at, reason FROM bans
+        WHERE user_id = @member AND lifted_at IS NULL AND (ends_at IS NULL OR ends_at > @now)
+        ORDER BY id DESC {page(db.provider)}
+        """, { member: member, now: now, skip: 0, count: 1 });
+    return rows.length == 0 ? null : rows[0];
+}
+
+// Bans a member until a time, or for good where ends is null, for a reason, or null; a ban they were under lifted.
+export async function ban(db, user, member, ends, reason, now) {
+    await db.transaction(async () => {
+        await db.execute("UPDATE bans SET lifted_at = @now WHERE user_id = @member AND lifted_at IS NULL", { now: now, member: member });
+        await insert(db, "bans", { user_id: member, ends_at: ends, reason: reason, created_at: now, created_by: user, lifted_at: null });
+    });
+    await log(db, user, "ban", { member: member, details: reason }, now);
+}
+
+// Lifts the ban a member is under.
+export async function lift(db, user, member, now) {
+    await db.execute("UPDATE bans SET lifted_at = @now WHERE user_id = @member AND lifted_at IS NULL", { now: now, member: member });
+    await log(db, user, "lift", { member: member }, now);
+}
+
+// A member reports a post to the moderators, for a reason.
+export async function report(db, user, post, reason, now) {
+    await insert(db, "reports", { post_id: post, user_id: user, reason: reason, created_at: now, resolved_at: null, resolved_by: null });
+}
+
+const reportColumns = """
+    r.id, r.reason, r.created_at, r.post_id, p.body, p.deleted AS post_deleted, p.topic_id, t.title AS topic_title, t.board_id,
+    p.user_id AS author_id, a.name AS author_name, r.user_id AS reporter_id, u.name AS reporter_name
+    FROM reports r JOIN posts p ON p.id = r.post_id JOIN topics t ON t.id = p.topic_id
+    LEFT JOIN users a ON a.id = p.user_id LEFT JOIN users u ON u.id = r.user_id
+    """;
+
+// The reports not yet resolved, oldest first, on the boards a moderator moderates, null for every board: each with its
+// post, the post's topic and author, and who reported it.
+export async function openReports(db, boards) {
+    var rows = await db.query($"SELECT {reportColumns} WHERE r.resolved_at IS NULL ORDER BY r.id");
+    return boards == null ? rows : rows.filter(row => boards.contains(row["board_id"]));
+}
+
+// A report not yet resolved, or null.
+export async function openReport(db, id) {
+    if (id == null) {
+        return null;
+    }
+    var rows = await db.query($"SELECT {reportColumns} WHERE r.id = @id AND r.resolved_at IS NULL", { id: id });
+    return rows.length == 0 ? null : rows[0];
+}
+
+// Resolves a report: the moderator has dealt with it.
+export async function resolve(db, user, report, now) {
+    await db.execute("UPDATE reports SET resolved_at = @now, resolved_by = @user WHERE id = @id AND resolved_at IS NULL",
+                     { now: now, user: user, id: report["id"] });
+    await log(db, user, "resolve", { topic: report["topic_id"], post: report["post_id"], details: report["reason"] }, now);
+}
+
+// How many actions the log holds, and a page of them, the latest first, each with its moderator's name, its topic's
+// title, its member's name, and whether its topic and its post are deleted now.
+export async function count(db) {
+    return (await db.query("SELECT COUNT(*) AS n FROM moderation_log"))[0]["n"];
+}
+export async function entries(db, skip, count) {
+    return await db.query($"""
+        SELECT l.id, l.action, l.topic_id, l.post_id, l.member_id, l.details, l.created_at, u.name AS user_name,
+               t.title AS topic_title, t.deleted AS topic_deleted, p.deleted AS post_deleted, m.name AS member_name
+        FROM moderation_log l
+        LEFT JOIN users u ON u.id = l.user_id
+        LEFT JOIN topics t ON t.id = l.topic_id
+        LEFT JOIN posts p ON p.id = l.post_id
+        LEFT JOIN users m ON m.id = l.member_id
+        ORDER BY l.id DESC
+        {page(db.provider)}
+        """, { skip: skip, count: count });
+}

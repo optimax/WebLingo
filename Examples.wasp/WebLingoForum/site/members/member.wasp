@@ -14,6 +14,9 @@
 <% } %>
   <li><%= site.f("user.posts", { count: member["post_count"] }) %></li>
 </ul>
+<% if (site.user != null && site.permissions.moderates() && member["id"] != site.user["id"]) { %>
+<div class="tools"><a href="/mod/ban?member=<%= member["id"] %>"><%= site.t("member.ban") %></a></div>
+<% } %>
 <% if (member["signature"] != null) { %>
 <h2 class="plain"><%= site.t("member.signature") %></h2>
 <div class="body"><%- render(member["signature"]) %></div>

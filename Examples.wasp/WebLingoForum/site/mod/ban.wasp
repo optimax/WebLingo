@@ -1,0 +1,31 @@
+<% param request; param response; import { banPage } from "/lib/moderating.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await banPage(request, response)).title, crumbs: (await banPage(request, response)).crumbs }; %>
+<% var view = await banPage(request, response); var site = view.site; %>
+<% if (view.refused != null) { %>
+<h1><%= view.title %></h1>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null) { var member = view.member; %>
+<h1><%= view.title %></h1>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems, notice: view.notice }); %>
+<% if (view.ban == null) { %>
+<p><%= site.f("ban.none", { name: member["name"] }) %></p>
+<% } else { %>
+<p class="notice"><%= view.ban["ends_at"] == null ? site.f("ban.forGood", { name: member["name"] }) : site.f("ban.until", { name: member["name"], time: site.time(view.ban["ends_at"]) }) %><% if (view.ban["reason"] != null) { %> <%= site.f("ban.reasonWas", { reason: view.ban["reason"] }) %><% } %></p>
+<form method="post" class="form" action="<%= view.action %>">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <button name="action" value="lift"><%= site.t("ban.lift") %></button>
+</form>
+<% } %>
+<h2 class="plain"><%= site.t("ban.submit") %></h2>
+<form method="post" class="form" action="<%= view.action %>">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <label><%= site.t("ban.length") %>
+    <select name="length">
+<% foreach (var length in view.lengths) { %>
+      <option value="<%= length %>"<% if (view.values["length"] == length) { %> selected<% } %>><%= site.t("ban." + length) %></option>
+<% } %>
+    </select></label>
+  <label><%= site.t("ban.reason") %> <input name="reason" value="<%= view.values["reason"] %>" maxlength="500"></label>
+  <button name="action" value="ban"><%= site.t("ban.submit") %></button>
+</form>
+<% } %>

@@ -10,6 +10,8 @@ import users from "../site/lib/users.wlg";
 import topics from "../site/lib/topics.wlg";
 import posts from "../site/lib/posts.wlg";
 import reading from "../site/lib/reading.wlg";
+import { Forum } from "../site/lib/forum.wlg";
+import { Permissions } from "../site/lib/permissions.wlg";
 
 const joined = DateTime.utc(2026, 11, 25, 12, 0);
 
@@ -45,23 +47,41 @@ export class WritingTests {
         assertEqual(posts.titleProblem("Tea"), null);
     }
 
-    testOnlyItsAuthorChangesAPostAndNotInALockedTopic() {
-        var anna = { id: 1 };
-        var bob = { id: 2 };
-        var topic = { locked: false, post_count: 2 };
+    testWhoWritesWhatFollowsTheirGroupsPermissions() {
+        // A request's forum for a member, with their permissions on board 1, or every permission everywhere.
+        function siteOf(user, can, admin = false) {
+            var boards = {};
+            boards[1] = can;
+            return new Forum({ timeZone: "UTC" }, null, user, new Permissions(boards, admin));
+        }
+        var member = { see: true, read: true, start: true, reply: true, edit: true, delete: true, moderate: false };
+        var readOnly = { ...member, start: false, reply: false, edit: false, delete: false };
+        var anna = siteOf({ id: 1 }, member);
+        var bob = siteOf({ id: 2 }, member);
+        var guest = siteOf(null, readOnly);
+        var reader = siteOf({ id: 4 }, readOnly);
+        var moderator = siteOf({ id: 3 }, { ...member, moderate: true });
+        var admin = siteOf({ id: 5 }, readOnly, true);
+        var topic = { board_id: 1, locked: false, post_count: 2 };
         var first = { id: 10, user_id: 1 };
         var reply = { id: 11, user_id: 1 };
-        assertEqual(posts.mayReply(null, topic), false);
-        assertEqual(posts.mayReply(bob, topic), true);
-        assertEqual(posts.mayEdit(anna, topic, reply), true);
-        assertEqual(posts.mayEdit(bob, topic, reply), false);
-        assertEqual(posts.mayDelete(anna, topic, reply, 10), true);
-        assertEqual(posts.mayDelete(anna, topic, first, 10), false);
-        assertEqual(posts.mayDelete(anna, { locked: false, post_count: 1 }, first, 10), true);
-        var locked = { locked: true, post_count: 2 };
-        assertEqual(posts.mayReply(anna, locked), false);
-        assertEqual(posts.mayEdit(anna, locked, reply), false);
-        assertEqual(posts.mayDelete(anna, locked, reply, 10), false);
+        assertDeepEqual([posts.mayStart(anna, 1), posts.mayStart(reader, 1), posts.mayStart(guest, 1), posts.mayStart(anna, 2)],
+                        [true, false, false, false]);
+        assertDeepEqual([posts.mayReply(guest, topic), posts.mayReply(bob, topic), posts.mayReply(reader, topic)], [false, true, false]);
+        assertDeepEqual([posts.mayEdit(anna, topic, reply), posts.mayEdit(bob, topic, reply), posts.mayEdit(moderator, topic, reply)],
+                        [true, false, true]);
+        assertDeepEqual([posts.mayDelete(anna, topic, reply, 10), posts.mayDelete(anna, topic, first, 10),
+                         posts.mayDelete(moderator, topic, first, 10), posts.mayDelete(moderator, topic, reply, 10),
+                         posts.mayDelete(anna, { ...topic, post_count: 1 }, first, 10)],
+                        [true, false, false, true, true]);
+        assertDeepEqual([posts.mayReport(bob, topic, reply), posts.mayReport(anna, topic, reply), posts.mayReport(guest, topic, reply)],
+                        [true, false, false]);
+        // A locked topic: its posts changed, and replied to, by its board's moderators alone.
+        var locked = { ...topic, locked: true };
+        assertDeepEqual([posts.mayReply(anna, locked), posts.mayEdit(anna, locked, reply), posts.mayDelete(anna, locked, reply, 10)],
+                        [false, false, false]);
+        assertDeepEqual([posts.mayReply(moderator, locked), posts.mayEdit(moderator, locked, reply)], [true, true]);
+        assertDeepEqual([posts.mayEdit(admin, locked, reply), posts.mayStart(admin, 7)], [true, true]);
     }
 
     async testATopicsPostsKeepItsBoardsAndAuthorsCounts() {

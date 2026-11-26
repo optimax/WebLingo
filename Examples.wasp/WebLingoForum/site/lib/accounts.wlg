@@ -8,6 +8,7 @@ import { languages } from "./texts.wlg";
 import users from "./users.wlg";
 import tokens from "./tokens.wlg";
 import { sendConfirmation, sendReset } from "./mail.wlg";
+import { banOf } from "./moderation.wlg";
 
 // Failed sign-ins to one account that make the next wait, and for how long, in minutes.
 export const failuresAllowed = 5;
@@ -116,7 +117,8 @@ export async function confirmPage(request, response) {
 }
 
 // /account/sign-in?back=…: a name or an address, and a password; the member signed in and sent back, unless too many
-// sign-ins to the account failed lately, or their address is not confirmed, when they are mailed a new link.
+// sign-ins to the account failed lately, or they are banned, when they are told until when and why, or their address is
+// not confirmed, when they are mailed a new link.
 export async function signInPage(request, response) {
     var site = await begin(request);
     return await site.once("signIn", async () => {
@@ -157,6 +159,15 @@ export async function signInPage(request, response) {
                 return page;
             }
             await db.execute("DELETE FROM sign_in_failures WHERE user_id = @user", { user: user["id"] });
+            var ban = await banOf(db, user["id"], now);
+            if (ban != null) {
+                response.status = 403;
+                page.notice = ban["ends_at"] == null ? site.t("signIn.bannedForGood") : site.f("signIn.banned", { time: site.time(ban["ends_at"]) });
+                if (ban["reason"] != null) {
+                    page.notice = page.notice + " " + site.f("signIn.banReason", { reason: ban["reason"] });
+                }
+                return page;
+            }
             if (user["confirmed_at"] == null) {
                 await sendConfirmation(db, site, request, user, now);
                 page.notice = site.f("signIn.unconfirmed", { email: user["email"] });

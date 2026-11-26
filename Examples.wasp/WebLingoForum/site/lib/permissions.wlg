@@ -1,0 +1,126 @@
+// Each board's permissions for each group (Documents/weblingo-forum.md, section 2, "Groups and permissions"): to see a
+// board, read it, start topics, reply, edit and delete one's own posts, and moderate it. A member has every permission
+// any of their groups gives on a board, a reader not signed in the guests' group's, and an administrator every
+// permission on every board.
+
+// The permissions, each a column of board_permissions, can_ and its name.
+export const names = ["see", "read", "start", "reply", "edit", "delete", "moderate"];
+
+// What each kind of group may do on a new board: guests see and read it; members start topics and reply, and edit and
+// delete their own posts; moderators moderate it too; and administrators may do everything everywhere.
+export const defaults = {
+    "guests": ["see", "read"],
+    "members": ["see", "read", "start", "reply", "edit", "delete"],
+    "moderators": ["see", "read", "start", "reply", "edit", "delete", "moderate"],
+    "administrators": ["see", "read", "start", "reply", "edit", "delete", "moderate"]
+};
+
+// Permissions, each given or not.
+function given(each) {
+    var made = {};
+    foreach (var name in names) {
+        made[name] = each;
+    }
+    return made;
+}
+
+// What a member may do: on each board, and whether they are an administrator.
+export class Permissions {
+    constructor(boards, admin) {
+        this.boards = boards;
+        this.admin = admin;
+    }
+
+    // A board's permissions, a map from each permission's name to whether the member has it.
+    on(board) {
+        return this.admin ? given(true) : this.boards?[board] ?? given(false);
+    }
+
+    // Whether the member has a permission on a board.
+    has(board, name) {
+        return this.on(board)[name];
+    }
+
+    // The boards the member moderates; every board, null, for an administrator.
+    moderated() {
+        if (this.admin) {
+            return null;
+        }
+        var boards = [];
+        foreach (var (board, can) in this.boards) {
+            if (can["moderate"]) {
+                boards.push(board);
+            }
+        }
+        return boards;
+    }
+
+    // Whether the member moderates any board, so that they may ban a member, read the reports and the moderation log.
+    moderates() {
+        var boards = this.moderated();
+        return boards == null || boards.length > 0;
+    }
+}
+
+// What a member may do, or, for null, a reader not signed in.
+export async function of(db, user) {
+    var rows = null;
+    var columns = "p.board_id, p.can_see, p.can_read, p.can_start, p.can_reply, p.can_edit, p.can_delete, p.can_moderate";
+    if (user == null) {
+        rows = await db.query($"SELECT {columns} FROM board_permissions p JOIN member_groups g ON g.id = p.group_id WHERE g.kind = @kind",
+                              { kind: "guests" });
+    } else {
+        rows = await db.query($"SELECT {columns} FROM board_permissions p JOIN group_members m ON m.group_id = p.group_id WHERE m.user_id = @user",
+                              { user: user });
+    }
+    var boards = {};
+    foreach (var row in rows) {
+        var board = row["board_id"];
+        if (!boards.has(board)) {
+            boards[board] = given(false);
+        }
+        foreach (var name in names) {
+            boards[board][name] = boards[board][name] || row["can_" + name];
+        }
+    }
+    return new Permissions(boards, user != null && await isAdministrator(db, user));
+}
+
+// Whether a member is in the administrators' group.
+export async function isAdministrator(db, user) {
+    return (await db.query("""
+        SELECT 1 AS n FROM group_members m JOIN member_groups g ON g.id = m.group_id WHERE m.user_id = @user AND g.kind = @kind
+        """, { user: user, kind: "administrators" })).length > 0;
+}
+
+// Gives a board each kind of group's permissions by default, where it has none of that group's yet.
+export async function giveDefaults(db, board) {
+    foreach (var group in await db.query("SELECT id, kind FROM member_groups ORDER BY id")) {
+        var kind = group["kind"];
+        if (kind == null || !defaults.has(kind)
+            || (await db.query("SELECT 1 AS n FROM board_permissions WHERE board_id = @board AND group_id = @group",
+                               { board: board, group: group["id"] })).length > 0) {
+            continue;
+        }
+        var values = { board_id: board, group_id: group["id"] };
+        foreach (var name in names) {
+            values["can_" + name] = defaults[kind].contains(name);
+        }
+        await put(db, values);
+    }
+}
+
+// Sets a group's permissions on a board, values a map of board_id, group_id and each can_ column.
+export async function put(db, values) {
+    await db.execute("DELETE FROM board_permissions WHERE board_id = @board_id AND group_id = @group_id",
+                     { board_id: values["board_id"], group_id: values["group_id"] });
+    var columns = ["board_id", "group_id"];
+    foreach (var name in names) {
+        columns.push("can_" + name);
+    }
+    var holes = [];
+    foreach (var column in columns) {
+        holes.push("@" + column);
+    }
+    await db.execute($"INSERT INTO board_permissions ({', '.join(columns)}) VALUES ({', '.join(holes)})", values);
+}

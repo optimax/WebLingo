@@ -1,0 +1,27 @@
+<% param request; param response; import { reportsPage } from "/lib/moderating.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await reportsPage(request, response)).title, crumbs: (await reportsPage(request, response)).crumbs }; %>
+<% var view = await reportsPage(request, response); var site = view.site; %>
+<% if (view.refused != null) { %>
+<h1><%= view.title %></h1>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null && !view.done) { %>
+<h1><%= view.title %></h1>
+<div class="tools"><a href="/mod/log"><%= site.t("log.title") %></a></div>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems }); %>
+<% if (view.reports.length == 0) { %>
+<p class="note"><%= site.t("mod.noReports") %></p>
+<% } %>
+<% foreach (var report in view.reports) { %>
+<article class="report">
+  <p class="note"><%= site.f("mod.reportedBy", { name: report["reporter_name"] ?? site.t("user.deleted"), time: site.time(report["created_at"]) }) %></p>
+  <p class="reason"><%= report["reason"] %></p>
+  <p><%= site.f("mod.postBy", { name: report["author_name"] ?? site.t("user.deleted") }) %> <a href="<%= report["link"] %>"><%= report["topic_title"] %></a></p>
+  <div class="quoted body"><%- report["html"] %></div>
+  <form method="post" action="/mod/reports">
+    <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+    <input type="hidden" name="report" value="<%= report["id"] %>">
+    <button class="secondary"><%= site.t("mod.resolve") %></button>
+  </form>
+</article>
+<% } %>
+<% } %>

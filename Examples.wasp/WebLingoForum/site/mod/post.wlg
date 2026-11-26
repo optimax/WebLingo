@@ -1,0 +1,8 @@
+// /mod/post, posted by the moderation log's button: a deleted post restored by a moderator of its board, where the form's
+// token against cross-site request forgery is the browser's.
+
+import { postPosted } from "../lib/moderating.wlg";
+
+export async function post(request, response) {
+    await postPosted(request, response);
+}

@@ -1,6 +1,6 @@
 // The forum's posts as members write them (Documents/weblingo-forum.md, sections 2 and 6, part 3): a topic started, a
 // reply, an edit and a deletion, each keeping the counts and the latest posts of its topic, its board and its author; and
-// who may change a post, until each board's permissions for each group come (part 4).
+// who may write what, by each board's permissions for the reader's groups (part 4).
 
 import { insert, page } from "./sql.wlg";
 
@@ -34,31 +34,49 @@ export function titleProblem(title) {
     return title.length > longestTitle ? "post.titleTooLong" : null;
 }
 
-// Whether a member may reply to a topic: any member signed in, while the topic is not locked.
-export function mayReply(user, topic) {
-    return user != null && !topic["locked"];
+// Whether the reader, a request's forum, may start a topic on a board: a member signed in whose groups may.
+export function mayStart(site, board) {
+    return site.user != null && site.can(board, "start");
 }
 
-// Whether a member may edit a post: its author, while its topic is not locked.
-export function mayEdit(user, topic, post) {
-    return mayReply(user, topic) && post["user_id"] == user["id"];
+// Whether the reader may reply to a topic: a member whose groups may, while the topic is not locked, unless they
+// moderate its board.
+export function mayReply(site, topic) {
+    var board = topic["board_id"];
+    return site.user != null && site.can(board, "reply") && (!topic["locked"] || site.can(board, "moderate"));
 }
 
-// Whether a member may delete a post: its author, while its topic is not locked; a topic's first post only where it is
-// the topic's only one, the topic then deleted with it.
-export function mayDelete(user, topic, post, first) {
-    return mayEdit(user, topic, post) && (post["id"] != first || topic["post_count"] == 1);
+// Whether the reader may edit a post: its author, where their groups may, while its topic is not locked; or a moderator of
+// its board.
+export function mayEdit(site, topic, post) {
+    var board = topic["board_id"];
+    return site.user != null
+           && (site.can(board, "moderate") || (post["user_id"] == site.user["id"] && site.can(board, "edit") && !topic["locked"]));
 }
 
-// A post, with its author's name, or null where there is none of that id, or it is deleted.
-export async function one(db, id) {
+// Whether the reader may delete a post: its author, where their groups may, while its topic is not locked; or a moderator
+// of its board. A topic's first post only where it is the topic's only one, the topic then deleted with it: a moderator
+// deletes a topic with replies as a topic.
+export function mayDelete(site, topic, post, first) {
+    var board = topic["board_id"];
+    return site.user != null && (post["id"] != first || topic["post_count"] == 1)
+           && (site.can(board, "moderate") || (post["user_id"] == site.user["id"] && site.can(board, "delete") && !topic["locked"]));
+}
+
+// Whether the reader may report a post to the moderators: a member who may read its board, and did not write it.
+export function mayReport(site, topic, post) {
+    return site.user != null && post["user_id"] != site.user["id"] && site.can(topic["board_id"], "read");
+}
+
+// A post, with its author's name, or null where there is none of that id, or it is deleted, unless deleted is true.
+export async function one(db, id, deleted = false) {
     if (id == null) {
         return null;
     }
-    var rows = await db.query("""
-        SELECT p.id, p.topic_id, p.user_id, p.body, p.created_at, p.edited_at, u.name AS user_name
+    var rows = await db.query($"""
+        SELECT p.id, p.topic_id, p.user_id, p.body, p.created_at, p.edited_at, p.deleted, u.name AS user_name
         FROM posts p LEFT JOIN users u ON u.id = p.user_id
-        WHERE p.id = @id AND p.deleted = @deleted
+        WHERE p.id = @id{(deleted ? "" : " AND p.deleted = @deleted")}
         """, { id: id, deleted: false });
     return rows.length == 0 ? null : rows[0];
 }
@@ -127,20 +145,28 @@ export async function remove(db, post, topic) {
     return await db.transaction(async () => {
         await db.execute("UPDATE posts SET deleted = @deleted WHERE id = @id", { deleted: true, id: post["id"] });
         await db.execute("UPDATE users SET post_count = post_count - 1 WHERE id = @user AND post_count > 0", { user: post["user_id"] });
-        var left = await db.query($"""
-            SELECT id, created_at FROM posts WHERE topic_id = @topic AND deleted = @deleted ORDER BY id DESC {page(db.provider)}
-            """, { topic: topic["id"], deleted: false, skip: 0, count: 1 });
-        if (left.length == 0) {
+        var left = await recountTopic(db, topic["id"]);
+        if (!left) {
             await db.execute("UPDATE topics SET deleted = @deleted WHERE id = @topic", { deleted: true, topic: topic["id"] });
-        } else {
-            var count = (await db.query("SELECT COUNT(*) AS n FROM posts WHERE topic_id = @topic AND deleted = @deleted",
-                                        { topic: topic["id"], deleted: false }))[0]["n"];
-            await db.execute("UPDATE topics SET post_count = @count, last_post_id = @last, last_post_at = @at WHERE id = @topic",
-                             { count: count, last: left[0]["id"], at: left[0]["created_at"], topic: topic["id"] });
         }
         await recountBoard(db, topic["board_id"]);
-        return left.length == 0;
+        return !left;
     });
+}
+
+// A topic's count of posts and its latest post, made again from its posts, where it has any; gives whether it has.
+export async function recountTopic(db, topic) {
+    var last = await db.query($"""
+        SELECT id, created_at FROM posts WHERE topic_id = @topic AND deleted = @deleted ORDER BY id DESC {page(db.provider)}
+        """, { topic: topic, deleted: false, skip: 0, count: 1 });
+    if (last.length == 0) {
+        return false;
+    }
+    var count = (await db.query("SELECT COUNT(*) AS n FROM posts WHERE topic_id = @topic AND deleted = @deleted",
+                                { topic: topic, deleted: false }))[0]["n"];
+    await db.execute("UPDATE topics SET post_count = @count, last_post_id = @last, last_post_at = @at WHERE id = @topic",
+                     { count: count, last: last[0]["id"], at: last[0]["created_at"], topic: topic });
+    return true;
 }
 
 // A board's counts of topics and posts, and its latest post, made again from its topics.

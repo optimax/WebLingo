@@ -123,17 +123,19 @@ public sealed class ForumTests
                 ["mail"] = new Dictionary<string, object> { ["default"] = new Dictionary<string, object> { ["host"] = "127.0.0.1", ["port"] = smtp.Port, ["tls"] = "none" } }
             }));
             var setup = Path.Combine(copy, "setup", "setup.wlg");
-            Assert.Equal((WebLingoCommandLine.Success, $"Made the forum's database 'forum' on {provider}, version 3, with its administrator Anna.\n", ""),
+            Assert.Equal((WebLingoCommandLine.Success, $"Made the forum's database 'forum' on {provider}, version 4, with its administrator Anna.\n", ""),
                 Run("run", setup, "name=Anna", "email=anna@example.com", "password=correct-horse"));
-            Assert.Equal((WebLingoCommandLine.Success, "The forum's database 'forum' is at version 3 already: nothing to do.\n", ""),
+            Assert.Equal((WebLingoCommandLine.Success, "The forum's database 'forum' is at version 4 already: nothing to do.\n", ""),
                 Run("run", setup));
 
-            // 30 topics, each of one post but the first, of 45, on 2 January 2026 and the day before, the last locked.
+            // 30 topics, each of one post but the first, of 45, on 2 January 2026 and the day before, the last locked; and a
+            // second board, the staff's, which guests do not see, and members read only.
             var more = Path.Combine(copy, "setup", "more.wlg");
             File.WriteAllText(more, """
                 import { Database } from "std:db";
                 import { DateTime } from "std:datetime";
                 import { insert } from "../site/lib/sql.wlg";
+                import permissions from "../site/lib/permissions.wlg";
                 using (var db = await Database.open("forum")) {
                     var start = DateTime.utc(2026, 1, 1);
                     var last = 0;
@@ -151,6 +153,14 @@ public sealed class ForumTests
                     }
                     await db.execute("UPDATE boards SET topic_count = 31, post_count = 75, last_post_id = @post WHERE id = 1", { post: last });
                     await db.execute("UPDATE users SET post_count = 75 WHERE id = 1");
+                    var staff = await insert(db, "boards", { category_id: 1, name: "Staff", description: "For the forum's staff.",
+                        sort_order: 2, topic_count: 0, post_count: 0, last_post_id: null });
+                    await permissions.giveDefaults(db, staff);
+                    var kind = "SELECT id FROM member_groups WHERE kind = @kind";
+                    await db.execute($"UPDATE board_permissions SET can_see = @no, can_read = @no WHERE board_id = @board AND group_id IN ({kind})",
+                        { no: false, board: staff, kind: "guests" });
+                    await db.execute("UPDATE board_permissions SET can_start = @no, can_reply = @no, can_edit = @no, can_delete = @no "
+                        + $"WHERE board_id = @board AND group_id IN ({kind})", { no: false, board: staff, kind: "members" });
                 }
                 """);
             Assert.Equal((WebLingoCommandLine.Success, "", ""), Run("run", more));
@@ -221,7 +231,8 @@ public sealed class ForumTests
                 await Page("/lib/sql.wlg", HttpStatusCode.NotFound);
 
                 using var bob = await MembersAsync(address, smtp);
-                await WritingAsync(address, smtp, bob);
+                using var anna = await WritingAsync(address, smtp, bob);
+                await ModerationAsync(address, anna, bob);
             }
             finally
             {
@@ -397,9 +408,10 @@ public sealed class ForumTests
     /// Writing, as Bob and Anna write: a topic started after its preview; a quote, replies, and the mail a watcher gets of
     /// them, once until they read the topic again; what is new to a member, and their first new post; a post and a title
     /// edited, a reply deleted, and a topic deleted with its only post, every count kept; and what a guest, a locked topic,
-    /// another's post and a form from elsewhere are refused. Bob signed in, as the members' walk leaves him.
+    /// another's post and a form from elsewhere are refused. Bob signed in, as the members' walk leaves him; gives Anna's
+    /// browser, Anna signed in.
     /// </summary>
-    private static async Task WritingAsync(string address, SmtpTestServer smtp, Browser bob)
+    private static async Task<Browser> WritingAsync(string address, SmtpTestServer smtp, Browser bob)
     {
         string Mail(int message) => smtp.Messages[message].Replace("=\r\n", "").Replace("=3D", "=");
 
@@ -439,7 +451,7 @@ public sealed class ForumTests
         Assert.Contains("<a href=\"/topic?id=32\">Tea or coffee</a><br>\n    <span class=\"note\">by Bob,", home);
 
         // Anna finds the topic new, and is taken to its first new post; then it is new no more.
-        using var anna = new Browser(address);
+        var anna = new Browser(address);
         (status, body, at) = await anna.Post("/account/sign-in", ("name", "Anna"), ("password", "correct-horse"));
         Assert.Equal((HttpStatusCode.OK, "/"), (status, at));
         (_, body) = await anna.Get("/board?id=1");
@@ -523,6 +535,132 @@ public sealed class ForumTests
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
         Assert.Contains("This form has expired: send it again.", await refused.Content.ReadAsStringAsync());
         Assert.Contains("<td class=\"count\">32 topics<br>79 posts</td>", (await bob.Get("/")).Item2);
+        return anna;
+    }
+
+    /// <summary>
+    /// Permissions and moderation: the staff's board, which a guest does not see and Bob reads but may not write on; a post
+    /// Bob reports, and Anna, an administrator, resolves; his topic locked, pinned, unlocked, moved and back, deleted and
+    /// restored; his post edited, and a reply of his deleted and restored from the log; and Bob banned, which keeps him from
+    /// signing in, and the ban lifted. Each of Anna's actions in the moderation log.
+    /// </summary>
+    private static async Task ModerationAsync(string address, Browser anna, Browser bob)
+    {
+        // What each may see and do: the staff's board hidden from a guest; Bob reads it, but may not start a topic there;
+        // Anna, an administrator, may, and moderates.
+        using (var guest = new Browser(address))
+        {
+            Assert.DoesNotContain(">Staff</a>", (await guest.Get("/")).Item2);
+            Assert.Equal(HttpStatusCode.NotFound, (await guest.Get("/board?id=2")).Item1);
+        }
+        var (status, body) = await bob.Get("/board?id=2");
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.DoesNotContain("/post/new?board=2", body);
+        Assert.DoesNotContain(">Moderation</a>", body);
+        (status, body) = await bob.Get("/post/new?board=2");
+        Assert.Equal(HttpStatusCode.Forbidden, status);
+        Assert.Contains("Your groups may not start topics on this board.", body);
+        Assert.Equal(HttpStatusCode.Forbidden, (await bob.Get("/mod/reports")).Item1);
+        Assert.Contains("<a class=\"button\" href=\"/post/new?board=2\">New topic</a>", (await anna.Get("/board?id=2")).Item2);
+        Assert.Contains("<a href=\"/mod/reports\">Moderation</a>", (await anna.Get("/")).Item2);
+
+        // Bob reports Anna's post; Anna finds the report, and resolves it.
+        (status, body, var at) = await bob.Post("/post/report?id=77", ("reason", "Coffee? Really?"));
+        Assert.True(status == HttpStatusCode.OK, body);
+        Assert.Contains("Thank you: the moderators will look at it.", body);
+        (_, body) = await anna.Get("/mod/reports");
+        Assert.Contains("<p class=\"reason\">Coffee? Really?</p>", body);
+        Assert.Contains("Reported by Bob,", body);
+        var report = Regex.Match(body, "name=\"report\" value=\"(\\d+)\"").Groups[1].Value;
+        (status, body, at) = await anna.Post("/mod/reports", ("report", report));
+        Assert.Equal((HttpStatusCode.OK, "/mod/reports"), (status, at));
+        Assert.Contains("There are no reports to deal with.", body);
+
+        // Anna locks Bob's topic: Bob may no longer reply, nor edit his post; Anna, its moderator, still may. Pinned, it comes
+        // first on its board; then unlocked.
+        (status, body, at) = await anna.Post("/mod/topic", ("topic", "32"), ("action", "lock"));
+        Assert.Equal((HttpStatusCode.OK, "/topic?id=32"), (status, at));
+        Assert.Contains("This topic is locked: it takes no more replies.", body);
+        Assert.Contains("<button name=\"action\" value=\"unlock\" class=\"secondary\">Unlock</button>", body);
+        Assert.Equal(HttpStatusCode.Forbidden, (await bob.Get("/post/reply?topic=32")).Item1);
+        (status, body) = await bob.Get("/post/edit?id=76");
+        Assert.Equal(HttpStatusCode.Forbidden, status);
+        Assert.Contains("This topic is locked: its posts cannot be changed.", body);
+        Assert.Equal(HttpStatusCode.OK, (await anna.Get("/post/edit?id=76")).Item1);
+        await anna.Post("/mod/topic", ("topic", "32"), ("action", "pin"));
+        await anna.Post("/mod/topic", ("topic", "32"), ("action", "unlock"));
+        (_, body) = await bob.Get("/board?id=1");
+        Assert.True(body.IndexOf(">Tea, or coffee?<", StringComparison.Ordinal) is > 0 and var tea
+                    && tea < body.IndexOf(">Welcome to the forum<", StringComparison.Ordinal), body);
+
+        // Anna edits Bob's post.
+        (status, body, at) = await anna.Post("/post/edit?id=76", ("title", "Tea, or coffee?"), ("body", "Tea, *of course*. (Edited.)"), ("action", "post"));
+        Assert.True(status == HttpStatusCode.OK && at == "/topic?id=32", at + "\n" + body);
+        Assert.Contains("<p>Tea, <em>of course</em>. (Edited.)</p>", body);
+
+        // Anna moves the topic to the staff's board, where Bob reads it but may not reply, and back; each board's counts
+        // move with it.
+        (status, body, at) = await anna.Post("/mod/topic", ("topic", "32"), ("action", "move"), ("board", "2"));
+        Assert.Equal((HttpStatusCode.OK, "/topic?id=32"), (status, at));
+        Assert.Contains("› <a href=\"/board?id=2\">Staff</a>", body);
+        var home = (await anna.Get("/")).Item2;
+        Assert.Contains("<td class=\"count\">31 topics<br>75 posts</td>", home);
+        Assert.Contains("<td class=\"count\">1 topic<br>4 posts</td>", home);
+        (status, body) = await bob.Get("/topic?id=32");
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.DoesNotContain("id=\"reply\"", body);
+        Assert.DoesNotContain("/post/edit?id=76", body);
+        await anna.Post("/mod/topic", ("topic", "32"), ("action", "move"), ("board", "1"));
+        Assert.Contains("<td class=\"count\">32 topics<br>79 posts</td>", (await anna.Get("/")).Item2);
+
+        // Anna deletes the topic, which then only its moderators see, and restores it.
+        (status, body, at) = await anna.Post("/mod/topic", ("topic", "32"), ("action", "delete"));
+        Assert.Equal((HttpStatusCode.OK, "/board?id=1"), (status, at));
+        Assert.Equal(HttpStatusCode.NotFound, (await bob.Get("/topic?id=32")).Item1);
+        Assert.Contains("This topic is deleted: only its board&#39;s moderators see it.", (await anna.Get("/topic?id=32")).Item2);
+        Assert.Contains("<td class=\"count\">31 topics<br>75 posts</td>", (await anna.Get("/")).Item2);
+        await anna.Post("/mod/topic", ("topic", "32"), ("action", "restore"));
+        Assert.Equal(HttpStatusCode.OK, (await bob.Get("/topic?id=32")).Item1);
+
+        // Anna deletes a reply of Bob's, then restores it from the moderation log.
+        (status, body, at) = await bob.Post("/post/reply?topic=32", ("body", "Tea!"), ("action", "post"));
+        Assert.True(status == HttpStatusCode.OK && at == "/topic?id=32", at + "\n" + body);
+        (status, body, at) = await anna.Post("/post/delete?id=82");
+        Assert.Equal((HttpStatusCode.OK, "/topic?id=32"), (status, at));
+        Assert.DoesNotContain("<p>Tea!</p>", body);
+        Assert.Contains("<input type=\"hidden\" name=\"post\" value=\"82\">", (await anna.Get("/mod/log")).Item2);
+        (status, body, at) = await anna.Post("/mod/post", ("post", "82"), ("action", "restore"));
+        Assert.Equal((HttpStatusCode.OK, "/topic?id=32"), (status, at));
+        Assert.Contains("<p>Tea!</p>", body);
+        Assert.Contains("<td class=\"count\">32 topics<br>80 posts</td>", (await anna.Get("/")).Item2);
+
+        // Anna bans Bob for a day: he is signed out, and may not sign in, told until when and why, until she lifts it. No
+        // one but a moderator bans, and no one an administrator.
+        Assert.Equal(HttpStatusCode.Forbidden, (await bob.Get("/mod/ban?member=1")).Item1);
+        Assert.Contains("Bob is not banned.", (await anna.Get("/mod/ban?member=2")).Item2);
+        (status, body, at) = await anna.Post("/mod/ban?member=2", ("length", "day"), ("reason", "Too much tea."), ("action", "ban"));
+        Assert.True(status == HttpStatusCode.OK, body);
+        Assert.Contains("Bob is banned until ", body);
+        Assert.Contains(">Sign in</a>", (await bob.Get("/")).Item2);
+        (status, body, _) = await bob.Post("/account/sign-in", ("name", "Bob"), ("password", "new-password"));
+        Assert.Equal(HttpStatusCode.Forbidden, status);
+        Assert.Contains("This account is banned until ", body);
+        Assert.Contains("The reason given: Too much tea.", body);
+        (_, body, _) = await anna.Post("/mod/ban?member=2", ("action", "lift"));
+        Assert.Contains("Bob is not banned.", body);
+        (status, body, at) = await bob.Post("/account/sign-in", ("name", "Bob"), ("password", "new-password"));
+        Assert.Equal((HttpStatusCode.OK, "/"), (status, at));
+        Assert.Contains(">Bob</a>", body);
+
+        // The moderation log: each of Anna's actions, the latest first.
+        (_, body) = await anna.Get("/mod/log");
+        var actions = Regex.Matches(body, "<td>(Locked|Pinned|Unlocked|Edited a post|Moved|Deleted the topic|Restored the topic|"
+                                          + "Deleted a post|Restored a post|Banned|Lifted the ban of|Resolved a report)</td>")
+            .Select(m => m.Groups[1].Value).Reverse().ToArray();
+        Assert.Equal(["Resolved a report", "Locked", "Pinned", "Unlocked", "Edited a post", "Moved", "Moved", "Deleted the topic",
+                      "Restored the topic", "Deleted a post", "Restored a post", "Banned", "Lifted the ban of"], actions);
+        Assert.Contains("from Welcome", body);
+        Assert.Contains("from Staff", body);
     }
 
     private static (int, string, string) Run(params string[] arguments)
