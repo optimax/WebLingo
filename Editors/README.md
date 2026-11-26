@@ -214,3 +214,30 @@ goes to the **Output** window, **Debug**. Visual Studio goes on at once from a s
 not stop there: set a breakpoint on the first statement instead. **Autos** stays empty, Visual Studio having no
 language service for WebLingo. `DebugAdapterHost.Logging /On /OutputWindow` shows what Visual Studio and the adapter say
 to each other.
+
+### Visual Studio, with WebLingo's extension
+
+`Editors/VisualStudio` is an extension of Visual Studio 2022 and 2026's, which debugs a script or a page in a folder
+Visual Studio opens (**File**, **Open**, **Folder**) with F5, and `launch.vs.json`'s configurations of the type
+`weblingo`. `build.ps1` builds it, `bin/WebLingo.VisualStudio.vsix`, with the C# compiler Visual Studio installs and no
+package: `WebLingoLaunch.cs`, its launch targets, compiled for .NET Framework 4.8 against Visual Studio's own assemblies,
+which it references and never ships; `WebLingo.pkgdef`, which registers `weblingo --debug-adapter` and
+`wasp --debug-adapter` with Visual Studio's Debug Adapter Host as engines of its own, WebLingo and WASP; and
+`extension.vsixmanifest`. Install it by opening the `.vsix`, Visual Studio closed.
+
+In the folder, a `.wlg` or a `.wasp` file chosen as the startup item, by its context menu's **Set as Startup Item**, is
+what F5 debugs, a script with `weblingo`'s adapter, a page with `wasp`'s, each found on the PATH, as WebLingo's
+installer puts it there, else in `Program Files\WebLingo`. A configuration of `launch.vs.json`, by its `type`,
+`"weblingo"`, takes the launch settings above; one without `program` serves a site:
+
+```json
+{
+  "version": "0.2.1",
+  "configurations": [
+    { "type": "weblingo", "name": "The shop", "program": "${workspaceRoot}\\index.wasp", "root": "${workspaceRoot}" },
+    { "type": "weblingo", "name": "The shop, served", "root": "${workspaceRoot}", "port": 8080 }
+  ]
+}
+```
+
+Built here, it has not been tried yet: installing it needs Visual Studio closed.

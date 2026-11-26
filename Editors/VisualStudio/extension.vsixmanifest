@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
+  <Metadata>
+    <Identity Id="WebLingo.VisualStudio.77CF6EB6-FE61-422C-9415-F8DFDCCCBF41" Version="0.1.0" Language="en-US" Publisher="WebLingo" />
+    <DisplayName>WebLingo</DisplayName>
+    <Description xml:space="preserve">Debugs WebLingo scripts, WASP pages and WASP sites in a folder Visual Studio opens: F5 on a .wlg or a .wasp file, and launch.vs.json's configurations of the type "weblingo", with the debug adapters WebLingo installs.</Description>
+  </Metadata>
+  <Installation>
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0,19.0)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+  </Installation>
+  <Prerequisites>
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,19.0)" DisplayName="Visual Studio core editor" />
+  </Prerequisites>
+  <Assets>
+    <Asset Type="Microsoft.VisualStudio.VsPackage" Path="WebLingo.pkgdef" />
+    <Asset Type="Microsoft.VisualStudio.MefComponent" Path="WebLingo.VisualStudio.dll" />
+  </Assets>
+</PackageManifest>
