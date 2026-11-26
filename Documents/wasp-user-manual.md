@@ -1108,6 +1108,23 @@ to the server's log; a page cannot catch it. `wasp.config`'s `"limits"` gives ot
 { "limits": { "requestTimeout": 120, "requestInstructions": 5000000000, "requestMemory": 512 } }
 ```
 
+`"requestTimeout": null` gives a site's requests no time limit at all, for pages that are meant to stay open; their
+instructions and their memory are still limited, and a reload still ends them, as below. A limit of time is at most
+4,294,967 seconds, about 49 days.
+
+**When the site changes.** A request already running when the site's files change, and it loads them anew
+([section 15](#15-while-you-work)), finishes on the site as it was, but only for so long: once the **drain** has passed
+since the change, 60 seconds or the site's `"requestTimeout"`, whichever is longer, it is stopped as a request past its
+time is, a 503, WL3003, the log saying that a reload ended it, so that the old version of the site is gone within the
+drain. By default, then, a change stops no request its time limit would not. `"limits"`' `"drain"` gives another, in
+seconds, which stops even a request with no time limit:
+
+```json
+{ "limits": { "requestTimeout": null, "drain": 30 } }
+```
+
+A request stopped at a breakpoint is not stopped so while it is: the time it waits for you does not count.
+
 A request stopped by its time stops at once where it computes, and where it waits, once its wait gives way, a wait for
 a session another request holds once that wait ends. While its server runs other requests on the same worker, a page
 that computes without waiting holds that worker until it is stopped. Under the debugger, its time is not counted, a
@@ -1210,7 +1227,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"headers"` | the headers every response has, each optional: `{ "nosniff": true, "referrerPolicy": "strict-origin-when-cross-origin", "frameAncestors": ["self"] }`, `X-Content-Type-Options: nosniff`, the `Referrer-Policy`, or `null` for none, and the sites whose pages may show the site's in a frame, `"self"`, `"none"`, a scheme or a host, or `null` for any (section 9, "Security headers") | all four headers, as shown |
 | `"serve"` | the extensions of files WASP does not send by default that the site sends: `{ "allow": [".pfx"] }`, each with its dot, of those section 2 lists | none |
 | `"log"` | the site's log, each optional: `{ "file": "C:/inetpub/logs/WebLingo/mysite.log", "level": "info" }`, a file a day, outside the site, from this file's folder, and the lowest level written, `"debug"`, `"info"`, `"warn"` or `"error"` (section 12, "The log") | the host's own log, `"info"` |
-| `"limits"` | a request's limits, each optional: `{ "requestTimeout": 60, "requestInstructions": 1000000000, "requestMemory": 128 }`, the seconds it may take, its waits included, more than 0, the instructions it may run, and the megabytes of strings it may hold, 1 to 1,048,576; one passed a 503, WL3003 (section 12, "A request's limits") | 60 seconds, 1,000,000,000 instructions, 128 MB |
+| `"limits"` | a request's limits, each optional: `{ "requestTimeout": 60, "requestInstructions": 1000000000, "requestMemory": 128, "drain": 60 }`, the seconds it may take, its waits included, more than 0, or `null` for no time limit, the instructions it may run, the megabytes of strings it may hold, 1 to 1,048,576, and the seconds it may go on running on the site as it was before its files changed, more than 0; seconds at most 4,294,967; one passed a 503, WL3003 (section 12, "A request's limits") | 60 seconds, 1,000,000,000 instructions, 128 MB, and a drain of 60 seconds or `"requestTimeout"`, whichever is longer |
 | `"mail"` | the mail servers the site's pages and handlers send through, with `std:mail`, each a name and its settings: `{ "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": { "env": "SMTP_PASSWORD" } } }` | none |
 | `"base"` | the folder of the site this one lies over, from this file's folder: `"C:/WebLingoForum/site"`, its files taken where this site has none of its own, its `wasp.config`'s settings where this one gives none ([A site over a base](#a-site-over-a-base)) | none |
 
@@ -1347,7 +1364,8 @@ C:\Clients\acme\site\        Acme's: web.config, wasp.config, and only the files
 
 - **Changes are served at once.** `wasp serve` watches the site's folder. When files change, it waits until they have
   stopped changing for a quarter of a second, then loads the site anew; requests already running finish on the old
-  version. A change that breaks the site's routes, such as a page and a route handler for one path, leaves the old
+  version, or are stopped once its drain has passed, 60 seconds by default ([section 12](#a-requests-limits)). A change
+  that breaks the site's routes, such as a page and a route handler for one path, leaves the old
   version served, and `wasp serve` says why. A change that breaks a page makes that page a 500 until it is fixed.
 - **Development shows errors.** Run locally, the site is in development unless `wasp.config` says otherwise
   ([section 12](#12-errors)).

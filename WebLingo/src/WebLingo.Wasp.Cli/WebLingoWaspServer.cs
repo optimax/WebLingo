@@ -185,6 +185,10 @@ public static class WebLingoWaspServer
             ? new WebLingoDatabaseSessions(siteDatabases, database, sessions.Table ?? WebLingoDatabaseSessions.DefaultTable, sessions.Create, timeout,
                 lockTimeout, siteLog is null ? null : (Action<string>)(text => siteLog.Write(WebLingoLogLevel.Error, null, text)))
             : new WebLingoMemorySessions(timeout, lockTimeout);
+        // A request's time limit, none where wasp.config says null, and the drain after a reload, 60 seconds or that limit by
+        // default, whichever is longer (section 6.12, "Limits" and "Reloading").
+        TimeSpan? requestTimeout = limits.NoTimeout ? null
+            : limits.TimeoutSeconds is { } limit ? TimeSpan.FromSeconds(limit) : WebLingoApplicationOptions.DefaultRequestTimeout;
         var application = WebLingoApplication.Load(new WebLingoApplicationOptions(full, new DotNetFileSystem())
         {
             ScriptFileSystem = new DotNetFileSystem(files),
@@ -215,8 +219,8 @@ public static class WebLingoWaspServer
             SendTimeout = sendTimeout is { } seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromSeconds(30),
             // A request's limits, wasp.config's or the defaults; its time none under a debugger, whose stops it must not
             // count (section 6.12, "Limits"; section 5.7, "Debugging WASP pages").
-            RequestTimeout = debugger is not null ? null
-                : limits.TimeoutSeconds is { } limit ? TimeSpan.FromSeconds(limit) : WebLingoApplicationOptions.DefaultRequestTimeout,
+            RequestTimeout = debugger is not null ? null : requestTimeout,
+            Drain = limits.DrainSeconds is { } drain ? TimeSpan.FromSeconds(drain) : WebLingoApplicationOptions.DefaultDrain(requestTimeout),
             InstructionBudget = limits.Instructions ?? WebLingoApplicationOptions.DefaultInstructionBudget,
             MaxHeapUnits = limits.MemoryMegabytes is { } megabytes ? megabytes * 512 * 1024 : WebLingoHeap.DefaultMaxUnits,
             Debugger = debugger

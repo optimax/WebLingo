@@ -127,6 +127,27 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
         $"The request took longer than {Seconds(RequestTimeout ?? TimeSpan.Zero)}, its site's limit, \"limits\"' \"requestTimeout\" in "
         + "wasp.config, and was stopped.";
 
+    /// <summary>
+    /// How long a request may go on running on an older generation once a reload has published a newer one, before its host
+    /// stops it, as its time limit stops it, a 503, WL3003, the log saying that a reload ended it (section 6.12,
+    /// "Reloading"; the owner's answer, 26 November 2026, A1 (c) of "M0.22, Part 1: The Drain"): the configuration's
+    /// <c>"limits"</c>' <c>"drain"</c>, by default <see cref="DefaultDrain"/>'s for its time limit, so that by default a
+    /// reload ends no request its own limit would not. A request its debugger has stopped is not stopped so while it is.
+    /// </summary>
+    public TimeSpan Drain { get; init; } = DefaultDrain(DefaultRequestTimeout);
+
+    /// <summary>
+    /// The drain when a site's configuration gives none: 60 seconds, or <paramref name="requestTimeout"/> where that is
+    /// longer, 60 seconds where a request has no time limit.
+    /// </summary>
+    public static TimeSpan DefaultDrain(TimeSpan? requestTimeout) =>
+        requestTimeout is { } limit && limit > TimeSpan.FromSeconds(60) ? limit : TimeSpan.FromSeconds(60);
+
+    /// <summary>What a request the drain stopped is told, its host giving it to its cancellation signal.</summary>
+    public string DrainMessage =>
+        $"The site was reloaded, and the request, still running on its files as they were before, was stopped {Seconds(Drain)} after, "
+        + "its site's limit, \"limits\"' \"drain\" in wasp.config.";
+
     private static string Seconds(TimeSpan time)
     {
         var seconds = time.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);

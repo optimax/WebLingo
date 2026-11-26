@@ -4,8 +4,10 @@ namespace WebLingo.Hosting.AspNetCore;
 /// Reloads an application when its files change (specification, section 6.5, WL-T007; section 9, "M0.14 parts", part 6):
 /// its root watched, folders below it included, and its base's (section 6.12, "A site over a base"), where it has one,
 /// and, once its files have stopped changing for <see cref="Quiet"/>, a new
-/// generation made, one for a burst of changes, never two at once; <paramref name="reloaded"/> told of each, with the
-/// generation's number, or why it could not be made, the generation served then unchanged. Disposed, it stops watching.
+/// generation made, one for a burst of changes, never two at once; the application's drain told of each, which stops the
+/// requests still running on an older generation once the site's drain has passed (section 6.12, "Reloading"); and
+/// <paramref name="reloaded"/> told of each, with the generation's number, or why it could not be made, the generation
+/// served then unchanged. Disposed, it stops watching.
 /// </summary>
 public sealed class WebLingoReloader : IDisposable
 {
@@ -47,6 +49,7 @@ public sealed class WebLingoReloader : IDisposable
         lock (_reloading)
         {
             var reloaded = _application.TryReload(out var error);
+            if (reloaded) WebLingoDrain.Of(_application).Reloaded(_application.GenerationNumber);
             _reloaded(_application.GenerationNumber, reloaded ? null : error);
         }
     }

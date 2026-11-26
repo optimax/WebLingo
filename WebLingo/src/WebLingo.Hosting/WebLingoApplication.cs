@@ -129,11 +129,15 @@ public sealed class WebLingoApplication
     /// rather than hold its worker's thread (section 6.6), and its host calls its <see cref="WebLingoRequestOutcome.Resume"/>
     /// on the same worker once the scheduler host has been posted work, its wait is over, or it is cancelled; without one,
     /// the request runs to its end, its scheduler host the options' (<see cref="WebLingoApplicationOptions.Scheduler"/>).
+    /// <paramref name="watch"/>, where given, is told the generation it is served from before any of its code runs, and its
+    /// debugger's thread, where it has one, so that its host can end it once a reload has left it on an older generation for
+    /// the site's drain (section 6.12, "Reloading").
     /// </summary>
     public WebLingoRequestOutcome Handle(IWebLingoHttpRequest request, IWebLingoHttpResponse response, WebLingoWorkerId worker,
-        WebLingoCancellationSignal? cancellation = null, IWebLingoSchedulerHost? scheduler = null)
+        WebLingoCancellationSignal? cancellation = null, IWebLingoSchedulerHost? scheduler = null, IWebLingoRequestWatch? watch = null)
     {
         var generation = _current;
+        watch?.Serving(generation.Number);
         var route = generation.Routes.Find(request.Path);
         if (route is { Kind: WebLingoRouteKind.File } file) return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.File, file.File);
         // The site's headers, X-Content-Type-Options and its kin, on every response it gives, before its page runs, which may
@@ -147,9 +151,9 @@ public sealed class WebLingoApplication
             case { Kind: WebLingoRouteKind.Page } page:
                 var compiled = generation.Page(worker, page.File, this);
                 return Run(compiled, request, response, worker, cancellation, scheduler, WebLingoRequestOutcomeKind.Page, compiled.ReadOnly,
-                    compiled.CrossOrigin);
+                    compiled.CrossOrigin, watch);
             case { Kind: WebLingoRouteKind.Handler } handler:
-                return Handler(generation, handler.File, request, response, worker, cancellation, scheduler);
+                return Handler(generation, handler.File, request, response, worker, cancellation, scheduler, watch);
             default:
                 WebLingoErrorPages.NotFound(response, _options.Headers);
                 return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.NotFound);
@@ -162,7 +166,7 @@ public sealed class WebLingoApplication
     /// that does not parse being a handler's, so that its errors are the 500's.
     /// </summary>
     private WebLingoRequestOutcome Handler(Generation generation, string file, IWebLingoHttpRequest request, IWebLingoHttpResponse response,
-        WebLingoWorkerId worker, WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler)
+        WebLingoWorkerId worker, WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler, IWebLingoRequestWatch? watch)
     {
         var handler = generation.Exports(worker, file, this);
         if (handler?.Error is { } wrong) return Failed(response, [wrong], LogFor(request));
@@ -187,7 +191,7 @@ public sealed class WebLingoApplication
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.MethodNotAllowed);
         }
         return Run(generation.Handler(worker, file, function, this), request, response, worker, cancellation, scheduler,
-            WebLingoRequestOutcomeKind.Handler, handler?.ReadOnly, handler?.CrossOrigin ?? false);
+            WebLingoRequestOutcomeKind.Handler, handler?.ReadOnly, handler?.CrossOrigin ?? false, watch);
     }
 
     /// <summary>An error's stack, each call a line of the request's log at <c>error</c>, after the error's own.</summary>
@@ -226,6 +230,15 @@ public sealed class WebLingoApplication
 
     /// <summary>What a request its time limit stopped is told, its error's message.</summary>
     public string TimeLimitMessage => _options.TimeLimitMessage;
+
+    /// <summary>
+    /// How long a request may go on running on an older generation once a reload has published a newer one, before its host
+    /// stops it, as its time limit would (section 6.12, "Reloading"): <see cref="WebLingoApplicationOptions.Drain"/>.
+    /// </summary>
+    public TimeSpan Drain => _options.Drain;
+
+    /// <summary>What a request the drain stopped is told, its error's message, which says that a reload ended it.</summary>
+    public string DrainMessage => _options.DrainMessage;
 
     /// <summary>Whether a request says its body is larger than the site takes, by its <c>Content-Length</c>, before it is read.</summary>
     private bool TooLarge(IWebLingoHttpRequest request) =>
@@ -307,7 +320,7 @@ public sealed class WebLingoApplication
     /// </summary>
     private WebLingoRequestOutcome Run(CompiledPage page, IWebLingoHttpRequest request, IWebLingoHttpResponse response, WebLingoWorkerId worker,
         WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler, WebLingoRequestOutcomeKind done, string? readOnly = null,
-        bool crossOrigin = false)
+        bool crossOrigin = false, IWebLingoRequestWatch? watch = null)
     {
         var log = LogFor(request);
         if (page.Module is null) return Failed(response, page.Errors, log);
@@ -321,7 +334,7 @@ public sealed class WebLingoApplication
         cancellation ??= new WebLingoCancellationSignal();
         var host = scheduler ?? _options.Scheduler?.Invoke();
         var session = _options.Sessions is { } store ? new WebLingoSession(store, request, response, _options.Crypto, readOnly) : null;
-        var start = () => Start(page, request, response, worker, cancellation, scheduler, host, done, session, log);
+        var start = () => Start(page, request, response, worker, cancellation, scheduler, host, done, session, log, watch);
         if (session?.Id is not { } id) return start();
         WebLingoSessionOpening? arrived = null;
         var opening = session.Store.Open(id, readOnly is null, later => host?.Post(() => arrived = later));
@@ -383,10 +396,12 @@ public sealed class WebLingoApplication
     /// <summary>A page run, or a handler's, once its session is open: <paramref name="done"/> once it has run, unless it fails, or waits.</summary>
     private WebLingoRequestOutcome Start(CompiledPage page, IWebLingoHttpRequest request, IWebLingoHttpResponse response, WebLingoWorkerId worker,
         WebLingoCancellationSignal cancellation, IWebLingoSchedulerHost? scheduler, IWebLingoSchedulerHost? host, WebLingoRequestOutcomeKind done,
-        WebLingoSession? session, WebLingoRequestLog? log)
+        WebLingoSession? session, WebLingoRequestLog? log, IWebLingoRequestWatch? watch)
     {
-        // Under a debugger, the request a thread of its, which its stops resume through the scheduler host (section 5.7).
+        // Under a debugger, the request a thread of its, which its stops resume through the scheduler host (section 5.7);
+        // its host told of it, whose drain does not end the request while it is stopped (section 6.12, "Reloading").
         var thread = scheduler is null ? null : _options.Debugger?.Begin(request.Method + " " + request.Path, page.Locate, scheduler);
+        if (thread is not null) watch?.Debugged(thread);
         var output = new WebLingoResponseText(response, _options.SendTimeout, cancellation.Cancel, thread);
         var made = _http.For(request, response, output, _options.Uploads, session, out var ending);
         var context = new WebLingoExecutionContext(worker)

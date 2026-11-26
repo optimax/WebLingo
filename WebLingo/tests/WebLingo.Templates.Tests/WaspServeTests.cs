@@ -806,16 +806,58 @@ public sealed class WaspServeTests : IDisposable
             await server.StopAsync();
         }
 
-        const string Says = "\"limits\" is an object, { \"requestTimeout\": 60, \"requestInstructions\": 1000000000, \"requestMemory\": 128 }, "
-                            + "each optional, \"requestTimeout\" a number of seconds more than 0, \"requestInstructions\" an integer more than 0, and "
-                            + "\"requestMemory\" a number of megabytes from 1 to 1048576.";
+        const string Says = "\"limits\" is an object, { \"requestTimeout\": 60, \"requestInstructions\": 1000000000, \"requestMemory\": 128, "
+                            + "\"drain\": 60 }, each optional, \"requestTimeout\" a number of seconds more than 0, or null for none, "
+                            + "\"requestInstructions\" an integer more than 0, \"requestMemory\" a number of megabytes from 1 to 1048576, and "
+                            + "\"drain\" a number of seconds more than 0, each number of seconds at most 4294967.";
         foreach (var setting in new[] { "[]", "{ \"requestTimeout\": 0 }", "{ \"requestTimeout\": \"60\" }", "{ \"requestInstructions\": 1.5 }",
                                          "{ \"requestInstructions\": 0 }", "{ \"requestMemory\": 0 }", "{ \"requestMemory\": 2000000 }",
-                                         "{ \"time\": 60 }" })
+                                         "{ \"time\": 60 }", "{ \"requestTimeout\": 5000000 }", "{ \"drain\": 0 }", "{ \"drain\": null }",
+                                         "{ \"drain\": \"60\" }", "{ \"drain\": 4294968 }" })
         {
             Write("wasp.config", "{ \"limits\": " + setting + " }");
             Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
             Assert.EndsWith(Says, error);
+        }
+    }
+
+    /// <summary>
+    /// The drain (section 6.12, "Reloading"; the owner's answer, 26 November 2026, A1 (c) of "M0.22, Part 1: The Drain"):
+    /// <c>wasp.config</c>'s <c>"limits"</c>' <c>"drain"</c>, a request with no time limit, <c>"requestTimeout": null</c>,
+    /// still running on the site's files as they were once its page has changed, stopped when the drain has passed since the
+    /// reload, a 503, the log saying that a reload ended it; the page then served as it is now.
+    /// </summary>
+    [Fact]
+    public async Task AReloadEndsARequestStillRunningOnTheSiteAsItWas_OnceItsDrainHasPassed()
+    {
+        Write("wasp.config", "{ \"mode\": \"development\", \"limits\": { \"requestTimeout\": null, \"drain\": 0.5 } }");
+        Write("waits.wasp", "<% import { delay } from \"std:system\"; while (true) { await delay(10); } %>never");
+        var log = new StringWriter();
+        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _, TextWriter.Synchronized(log));
+        Assert.True(server is not null, error);
+        await server.StartAsync();
+        try
+        {
+            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            using var client = new HttpClient { BaseAddress = new Uri(address) };
+            var waiting = client.GetAsync("/waits");
+            // It runs on the site as it is, then the page changes, and the site reloads a quarter of a second after.
+            await Task.Delay(1000);
+            Write("waits.wasp", "quick");
+            using var drained = await waiting;
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, drained.StatusCode);
+            Assert.Contains("error WL3003: The site was reloaded, and the request, still running on its files as they were before, was stopped "
+                            + "0.5 seconds after", await drained.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+            Assert.Equal("quick", await client.GetStringAsync("/waits"));
+            var written = log.ToString();
+            Assert.Contains("WASP reloaded the application: generation 2.", written, StringComparison.Ordinal);
+            Assert.Contains("GET /waits", written, StringComparison.Ordinal);
+            Assert.Contains("The site was reloaded, and the request, still running on its files as they were before, was stopped", written,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            await server.StopAsync();
         }
     }
 

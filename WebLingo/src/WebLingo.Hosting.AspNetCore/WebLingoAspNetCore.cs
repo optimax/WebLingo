@@ -46,8 +46,10 @@ public static class WebLingoAspNetCore
         using var aborted = context.RequestAborted.Register(Cancel);
         // Its time limit, which stops it too, resumed if it waits (section 6.12, "Limits").
         using var timer = WebLingoRequestTimer.Start(application, cancellation, gone);
-        var run = workers.Serve((worker, scheduler) => application.Handle(request, response, worker, cancellation, scheduler), gone.Token,
-            response.End);
+        // A reload's drain, which stops it too where a reload leaves it on an older generation (section 6.12, "Reloading").
+        using var drained = WebLingoDrain.Of(application).Begin(cancellation, gone);
+        var run = workers.Serve((worker, scheduler) => application.Handle(request, response, worker, cancellation, scheduler, drained),
+            gone.Token, response.End);
         try
         {
             await response.SendAsync(context);

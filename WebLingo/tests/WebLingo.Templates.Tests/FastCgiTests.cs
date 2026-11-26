@@ -356,6 +356,43 @@ public sealed class FastCgiTests : IDisposable
     }
 
     /// <summary>
+    /// The drain, kept by the FastCGI host as by ASP.NET Core's (section 6.12, "Reloading"): a request with no time limit
+    /// still running on an older generation once a reload has published a newer one, stopped when the drain has passed, a 503.
+    /// </summary>
+    [Fact]
+    public async Task ARequestOnAnOlderGenerationIsStoppedWhenTheDrainHasPassed()
+    {
+        var site = Path.Combine(_root, "drained");
+        Directory.CreateDirectory(site);
+        File.WriteAllText(Path.Combine(site, "wasp.config"), "{ \"limits\": { \"requestTimeout\": null, \"drain\": 0.3 } }");
+        File.WriteAllText(Path.Combine(site, "waits.wasp"), "<% import { delay } from \"std:system\"; while (true) { await delay(10); } %>never");
+        var application = WebLingoWaspServer.Load(site, new Dictionary<string, string>(), WebLingoMode.Production, null, out _, out _, out var error);
+        Assert.True(application is not null, error);
+        Assert.Null(application.RequestTimeout);
+        using var stop = new CancellationTokenSource();
+        using var listener = WebLingoWaspFastCgi.Listen(0, null, out _);
+        _ = new WebLingoFastCgiServer(application, _workers).ServeAsync(listener, stop.Token);
+        try
+        {
+            using var connection = new TcpClient();
+            await connection.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndPoint!).Port);
+            var waiting = RequestAsync(connection, 1, Get("/waits"), []);
+            var drain = WebLingoDrain.Of(application);
+            for (var waited = 0; drain.Running == 0 && waited < 30_000; waited += 10) await Task.Delay(10);
+            Assert.Equal(1, drain.Running);
+            Assert.True(application.TryReload(out error), error);
+            drain.Reloaded(application.GenerationNumber);
+            var (head, body, _) = await waiting;
+            Assert.Equal("Status: 503 Service Unavailable", head[0]);
+            Assert.DoesNotContain("never", body, StringComparison.Ordinal);
+        }
+        finally
+        {
+            stop.Cancel();
+        }
+    }
+
+    /// <summary>
     /// A file a page sends, through FastCGI (specification, section 6.12, "Files sent"): with the page's status and headers,
     /// its tag, a 304 for a client that has it, and one range of it, as CGI's <c>HTTP_</c> variables ask; and a site's own
     /// file in part too.

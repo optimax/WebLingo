@@ -97,6 +97,17 @@ WL3003. The hosting core reports a cancellation whose signal says it passed a li
 and the FastCGI host start for each request, and which wakes a waiting request as a gone client does. No time limit
 under the debugger. Specification, section 6.12, "A request's limits"; WASP User Manual, section 12.
 
+M0.22's part 1, the drain: a request still running on an older generation once a reload has published a newer one is
+stopped when `"limits"`' `"drain"` has passed since the reload, 60 s or `"requestTimeout"` by default, whichever is
+longer, as its time limit stops it, WL3003, its message saying a reload ended it. `WebLingoDrain` (the ASP.NET Core
+adapter's, one for each application, `WebLingoDrain.Of`) keeps it: each host's request begins its part, given to
+`WebLingoApplication.Handle` as an `IWebLingoRequestWatch`, which `Handle` tells the generation and the debugger's
+thread; `WebLingoReloader` tells it of each reload. A thread whose `Stops` changed, or is odd, has its drain begun anew.
+`"requestTimeout": null` turns a site's time limit off. Not built: a page's or handler's declaration of no time limit,
+and `finally` and disposal on cancellation, which no cancellation runs; both questions in `TO-DO.md`. Tests:
+`RequestLimitTests`, `WaspServeTests.AReloadEndsARequestStillRunningOnTheSiteAsItWas_OnceItsDrainHasPassed`,
+`FastCgiTests.ARequestOnAnOlderGenerationIsStoppedWhenTheDrainHasPassed`.
+
 ## Logging
 
 `std:log` (`WebLingo.StdLib.Log`, `std/log.dll`): `log.debug/info/warn/error(text)` through the execution's

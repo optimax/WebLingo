@@ -307,24 +307,34 @@ public static class WebLingoSchemes
     }
 
     /// <summary>
-    /// <c>"limits": { "requestTimeout": 60, "requestInstructions": 1000000000, "requestMemory": 128 }</c>, each optional: how
-    /// many seconds a request may take, its waits included, a number more than 0; how many instructions it may run, an
-    /// integer more than 0; and how many megabytes of strings its heap may hold, an integer from 1 to 1,048,576 (section
-    /// 6.12, "Limits"). Each it does not give is its host's default.
+    /// <c>"limits": { "requestTimeout": 60, "requestInstructions": 1000000000, "requestMemory": 128, "drain": 60 }</c>, each
+    /// optional: how many seconds a request may take, its waits included, a number more than 0, or <c>null</c> for no time
+    /// limit; how many instructions it may run, an integer more than 0; how many megabytes of strings its heap may hold, an
+    /// integer from 1 to 1,048,576 (section 6.12, "Limits"); and how many seconds a request may go on running on the site's
+    /// files as they were before a reload, a number more than 0 (section 6.12, "Reloading"). Each it does not give is its
+    /// host's default. A number of seconds is at most <see cref="MaxSeconds"/>, the longest a .NET timer keeps.
     /// </summary>
     private static bool TryReadLimits(string file, JsonElement setting, ref WebLingoLimitSettings limits, out string? error)
     {
-        error = $"{file}: \"limits\" is an object, {{ \"requestTimeout\": 60, \"requestInstructions\": 1000000000, \"requestMemory\": 128 }}, "
-                + "each optional, \"requestTimeout\" a number of seconds more than 0, \"requestInstructions\" an integer more than 0, and "
-                + "\"requestMemory\" a number of megabytes from 1 to 1048576.";
+        error = $"{file}: \"limits\" is an object, {{ \"requestTimeout\": 60, \"requestInstructions\": 1000000000, \"requestMemory\": 128, "
+                + "\"drain\": 60 }, each optional, \"requestTimeout\" a number of seconds more than 0, or null for none, \"requestInstructions\" "
+                + "an integer more than 0, \"requestMemory\" a number of megabytes from 1 to 1048576, and \"drain\" a number of seconds more "
+                + $"than 0, each number of seconds at most {MaxSeconds}.";
         if (setting.ValueKind != JsonValueKind.Object) return false;
         foreach (var entry in setting.EnumerateObject())
         {
             var number = entry.Value.ValueKind == JsonValueKind.Number;
-            if (entry.Name == "requestTimeout" && number && entry.Value.TryGetDouble(out var seconds) && seconds > 0
-                && seconds <= TimeSpan.MaxValue.TotalSeconds / 2)
+            if (entry.Name == "requestTimeout" && number && entry.Value.TryGetDouble(out var seconds) && seconds is > 0 and <= MaxSeconds)
             {
-                limits = limits with { TimeoutSeconds = seconds };
+                limits = limits with { TimeoutSeconds = seconds, NoTimeout = false };
+            }
+            else if (entry.Name == "requestTimeout" && entry.Value.ValueKind == JsonValueKind.Null)
+            {
+                limits = limits with { TimeoutSeconds = null, NoTimeout = true };
+            }
+            else if (entry.Name == "drain" && number && entry.Value.TryGetDouble(out var drain) && drain is > 0 and <= MaxSeconds)
+            {
+                limits = limits with { DrainSeconds = drain };
             }
             else if (entry.Name == "requestInstructions" && number && entry.Value.TryGetInt64(out var instructions) && instructions > 0)
             {
@@ -342,6 +352,9 @@ public static class WebLingoSchemes
         error = null;
         return true;
     }
+
+    /// <summary>The most seconds a limit of time may be, 49.7 days, the longest a .NET timer keeps, 4,294,967,294 ms.</summary>
+    private const double MaxSeconds = 4_294_967;
 
     /// <summary>The policies <c>Referrer-Policy</c> takes (W3C's Referrer Policy, section 3).</summary>
     private static readonly string[] ReferrerPolicies =
@@ -850,11 +863,19 @@ public static class WebLingoSchemes
 
 /// <summary>
 /// What a site's configuration says of a request's limits (specification, section 6.12, "Limits"): how many seconds it may
-/// take, its waits included; how many instructions it may run; and how many megabytes of strings its heap may hold, two
-/// bytes a unit. Each null where it says nothing of it, its host's default then.
+/// take, its waits included, or, where <see cref="NoTimeout"/>, no time limit at all; how many instructions it may run; and
+/// how many megabytes of strings its heap may hold, two bytes a unit; and how many seconds it may go on running on the
+/// site's files as they were before a reload (section 6.12, "Reloading"), <see cref="DrainSeconds"/>. Each null where it
+/// says nothing of it, its host's default then.
 /// </summary>
 public sealed record WebLingoLimitSettings(double? TimeoutSeconds, long? Instructions, long? MemoryMegabytes)
 {
+    /// <summary>Whether it says that a request has no time limit, <c>"requestTimeout": null</c>.</summary>
+    public bool NoTimeout { get; init; }
+
+    /// <summary>The drain, in seconds, <c>"drain"</c>; null where it gives none.</summary>
+    public double? DrainSeconds { get; init; }
+
     /// <summary>What a configuration that says nothing of them means: the host's defaults.</summary>
     public static WebLingoLimitSettings Default { get; } = new(null, null, null);
 }

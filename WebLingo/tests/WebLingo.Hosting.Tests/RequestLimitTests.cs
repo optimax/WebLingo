@@ -1,17 +1,22 @@
 using System.Diagnostics;
 using System.Text;
 using Microsoft.AspNetCore.Http;
+using WebLingo.Bytecode;
 using WebLingo.Hosting.AspNetCore;
+using WebLingo.Platform.Abstractions;
 using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
 using WebLingo.StdLib;
+using WebLingo.VM;
 using Xunit;
 namespace WebLingo.Hosting.Tests;
 
 /// <summary>
 /// A request's limits (specification, section 6.12, "Limits"; the owner's answer, 24 November 2026, "Request Limits in
 /// WASP", A1 (c)): its time, its waits included, kept by its host, the ASP.NET Core adapter here; its instructions; and its
-/// heap's memory. A request that passes one is stopped, a 503, WL3003, its error shown in development only.
+/// heap's memory. A request that passes one is stopped, a 503, WL3003, its error shown in development only. And the drain
+/// (section 6.12, "Reloading"; the owner's answer, 26 November 2026, A1 (c) of "M0.22, Part 1: The Drain"): a request still
+/// running on an older generation once a reload has published a newer one stopped so too, once the drain has passed.
 /// </summary>
 public sealed class RequestLimitTests : IDisposable
 {
@@ -89,6 +94,112 @@ public sealed class RequestLimitTests : IDisposable
     }
 
     [Fact]
+    public void TheDrainIsSixtySecondsOrTheTimeLimitWhereThatIsLonger()
+    {
+        Assert.Equal(TimeSpan.FromSeconds(60), new WebLingoApplicationOptions(_root, new DotNetFileSystem()).Drain);
+        Assert.Equal(TimeSpan.FromSeconds(60), WebLingoApplicationOptions.DefaultDrain(null));
+        Assert.Equal(TimeSpan.FromSeconds(60), WebLingoApplicationOptions.DefaultDrain(TimeSpan.FromSeconds(20)));
+        Assert.Equal(TimeSpan.FromSeconds(300), WebLingoApplicationOptions.DefaultDrain(TimeSpan.FromSeconds(300)));
+        Assert.Equal("The site was reloaded, and the request, still running on its files as they were before, was stopped 60 seconds "
+                     + "after, its site's limit, \"limits\"' \"drain\" in wasp.config.",
+            new WebLingoApplicationOptions(_root, new DotNetFileSystem()).DrainMessage);
+    }
+
+    [Fact]
+    public async Task TheDrainStopsARequestStillRunningOnAnOlderGeneration_ALaterOneRunningOn()
+    {
+        var log = new StringWriter();
+        var application = Load(noTimeout: true, drain: TimeSpan.FromMilliseconds(300),
+            log: new DotNetLog(TextWriter.Synchronized(log), WebLingoLogLevel.Info));
+        var drain = WebLingoDrain.Of(application);
+        var clock = Stopwatch.StartNew();
+        var waiting = Get(application, "/waits");
+        await Until(() => drain.Running == 1);
+        Write("hello.wasp", "<p>Hello again.</p>");
+        Assert.True(application.TryReload(out var error), error);
+        drain.Reloaded(application.GenerationNumber);
+        var (status, body) = await waiting;
+        Assert.Equal(503, status);
+        Assert.Contains("error WL3003: The site was reloaded, and the request, still running on its files as they were before, was stopped "
+                        + "0.3 seconds after, its site&#39;s limit, &quot;limits&quot;&#39; &quot;drain&quot; in wasp.config.", body,
+            StringComparison.Ordinal);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(30), clock.Elapsed.ToString());
+        Assert.Contains("GET /waits", log.ToString(), StringComparison.Ordinal);
+        Assert.Contains("The site was reloaded, and the request, still running on its files as they were before, was stopped", log.ToString(),
+            StringComparison.Ordinal);
+        Assert.Equal(0, drain.Running);
+        // A request begun on the generation now served waits past the drain, which ends none of its requests.
+        Write("second.wasp", "<% import { delay } from \"std:system\"; await delay(1000); %>waited");
+        Assert.True(application.TryReload(out error), error);
+        drain.Reloaded(application.GenerationNumber);
+        Assert.Equal((200, "waited"), await Get(application, "/second"));
+        Assert.Equal((200, "<p>Hello again.</p>"), await Get(application, "/hello"));
+    }
+
+    [Fact]
+    public async Task ARequestOnTheGenerationServedIsNotDrained_NorOneThatHasEnded()
+    {
+        var application = Load(drain: TimeSpan.FromMilliseconds(100));
+        var drain = WebLingoDrain.Of(application);
+        var (current, ended) = (new WebLingoCancellationSignal(), new WebLingoCancellationSignal());
+        using var wake = new CancellationTokenSource();
+        using var running = drain.Begin(current, wake);
+        var done = drain.Begin(ended, wake);
+        done.Serving(application.GenerationNumber);
+        Assert.True(application.TryReload(out var error), error);
+        running.Serving(application.GenerationNumber);
+        done.Dispose();
+        drain.Reloaded(application.GenerationNumber);
+        await Task.Delay(500);
+        Assert.False(current.IsCancellationRequested);
+        Assert.False(ended.IsCancellationRequested);
+        Assert.False(wake.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task ARequestItsDebuggerHasStoppedIsNotDrainedWhileItIsStopped()
+    {
+        var application = Load(drain: TimeSpan.FromMilliseconds(150));
+        var drain = WebLingoDrain.Of(application);
+        var cancellation = new WebLingoCancellationSignal();
+        using var wake = new CancellationTokenSource();
+        var thread = new Thread { Stops = 1 };
+        using var request = drain.Begin(cancellation, wake);
+        request.Serving(application.GenerationNumber);
+        request.Debugged(thread);
+        Assert.True(application.TryReload(out var error), error);
+        drain.Reloaded(application.GenerationNumber);
+        // Stopped, for more than its drain, three times over.
+        await Task.Delay(600);
+        Assert.False(cancellation.IsCancellationRequested);
+        // Gone on: stopped since its drain began, which begins anew, then ends it.
+        thread.Stops = 2;
+        await Until(() => cancellation.IsCancellationRequested);
+        Assert.Equal(application.DrainMessage, cancellation.Limit);
+        Assert.True(wake.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task TheLongestTimeAConfigurationGivesIsOneATimerKeeps()
+    {
+        // 4,294,967 seconds, wasp.config's most for "requestTimeout" and "drain": a request's timer made with it, and its drain's.
+        var longest = TimeSpan.FromSeconds(4_294_967);
+        var application = Load(timeout: longest, drain: longest);
+        var drain = WebLingoDrain.Of(application);
+        using var gone = new CancellationTokenSource();
+        var waiting = Get(application, "/waits", gone.Token);
+        await Until(() => drain.Running == 1);
+        Assert.True(application.TryReload(out var error), error);
+        drain.Reloaded(application.GenerationNumber);
+        Assert.Equal((200, "<p>Hello.</p>"), await Get(application, "/hello"));
+        Assert.False(waiting.IsCompleted);
+        // Its client gone, it ends.
+        gone.Cancel();
+        await waiting;
+        Assert.Equal(0, drain.Running);
+    }
+
+    [Fact]
     public async Task APageWithinItsLimitsIsServed()
     {
         var application = Load(timeout: TimeSpan.FromSeconds(30), instructions: 1_000_000, units: 1_000_000);
@@ -97,8 +208,10 @@ public sealed class RequestLimitTests : IDisposable
     }
 
     private WebLingoApplication Load(TimeSpan? timeout = null, long instructions = WebLingoApplicationOptions.DefaultInstructionBudget,
-        long units = WebLingoHeap.DefaultMaxUnits, WebLingoMode mode = WebLingoMode.Development)
+        long units = WebLingoHeap.DefaultMaxUnits, WebLingoMode mode = WebLingoMode.Development, bool noTimeout = false, TimeSpan? drain = null,
+        IWebLingoLog? log = null)
     {
+        timeout = noTimeout ? null : timeout ?? WebLingoApplicationOptions.DefaultRequestTimeout;
         var application = WebLingoApplication.Load(new WebLingoApplicationOptions(_root, new DotNetFileSystem())
         {
             Workers = _workers.Count,
@@ -106,22 +219,55 @@ public sealed class RequestLimitTests : IDisposable
             Clock = new WebLingoExecutionClock(new DotNetClock()),
             Scheduler = () => new DotNetSchedulerHost(),
             Mode = mode,
-            RequestTimeout = timeout ?? WebLingoApplicationOptions.DefaultRequestTimeout,
+            RequestTimeout = timeout,
             InstructionBudget = instructions,
-            MaxHeapUnits = units
+            MaxHeapUnits = units,
+            Drain = drain ?? WebLingoApplicationOptions.DefaultDrain(timeout),
+            Log = log
         }, out var error);
         Assert.True(application is not null, error);
         return application;
     }
 
-    private async Task<(int Status, string Body)> Get(WebLingoApplication application, string path)
+    private async Task<(int Status, string Body)> Get(WebLingoApplication application, string path, CancellationToken gone = default)
     {
-        var context = new DefaultHttpContext();
+        var context = new DefaultHttpContext { RequestAborted = gone };
         context.Request.Method = "GET";
         context.Request.Path = path;
         context.Response.Body = new MemoryStream();
         await WebLingoAspNetCore.Serve(context, application, _workers);
         return (context.Response.StatusCode, Encoding.UTF8.GetString(((MemoryStream)context.Response.Body).ToArray()));
+    }
+
+    /// <summary>Waits for <paramref name="condition"/>, 30 seconds at most, for a loaded machine.</summary>
+    private static async Task Until(Func<bool> condition)
+    {
+        for (var waited = 0; !condition() && waited < 30_000; waited += 10) await Task.Delay(10);
+        Assert.True(condition());
+    }
+
+    /// <summary>A debugger's thread, which a test says is stopped, or not, by its count of stops, odd while it is.</summary>
+    private sealed class Thread : IWebLingoDebuggerThread
+    {
+        private volatile int _stops;
+
+        public int Stops
+        {
+            get => _stops;
+            set => _stops = value;
+        }
+
+        public void ModuleLoaded(WebLingoCompiledModule module)
+        {
+        }
+
+        public bool ShouldStop(WebLingoDebugPoint point, IWebLingoDebugScope scope) => false;
+        public bool Stopped(IReadOnlyList<WebLingoDebugFrame> frames) => true;
+        public bool Waits => false;
+
+        public void Dispose()
+        {
+        }
     }
 
     private void Write(string relative, string text)
