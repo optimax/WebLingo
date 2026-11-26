@@ -1,4 +1,5 @@
-write(value) { this.__write(value == null ? "null" : $"{value}"); }
-writeLn(value) { this.__write((value == null ? "null" : $"{value}") + "\n"); }
+write(value) { if (!this.__writeBytes(value)) this.__write(value == null ? "null" : $"{value}"); }
+writeLn(value) { if (this.__writeBytes(value)) this.__write("\n"); else this.__write((value == null ? "null" : $"{value}") + "\n"); }
+sendFile(path, type = null, options = null) { return this.__sendFile(path, type, options); }
 setCookie(name, value, options = null) { this.__setCookie(name, value, options); }
 deleteCookie(name, options = null) { this.__deleteCookie(name, options); }

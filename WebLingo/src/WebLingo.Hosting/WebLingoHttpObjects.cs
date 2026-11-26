@@ -45,7 +45,9 @@ internal sealed class WebLingoHttpObjects
     /// <c>response.write(value)</c> and <c>response.writeLn(value)</c>, written in WebLingo, so that a value's text is the
     /// text <c>write</c> writes, an instance's <c>toString()</c> run, as an interpolation runs it, <c>null</c> as
     /// <c>null</c>; the text then given to the response's own <c>__write</c>, a name a program's members are unlikely to
-    /// take (the owner's answer, 20 November 2026, "Console Module", A2).
+    /// take (the owner's answer, 20 November 2026, "Console Module", A2), and bytes, which its <c>__writeBytes</c> writes as
+    /// they are; and <c>response.sendFile(path, type, options)</c>, its type and options optional, which its own
+    /// <c>__sendFile</c> does (section 6.12, "Files sent").
     /// </summary>
     private const string WritingSource = WebLingoSources.Response;
 
@@ -102,6 +104,8 @@ internal sealed class WebLingoHttpObjects
             .DeclareProperty("status", Status, SetStatus)
             .DeclareProperty("headers", (a, heap, out r, out e) => ResponseHeaders(a, heap, out r, out e))
             .DeclareMethod("__write", 1, WriteText)
+            .DeclareMethod("__writeBytes", 1, WriteBytes)
+            .DeclareMethod("__sendFile", 3, SendFile)
             .DeclareMethod("__setCookie", 3, SetCookie)
             .DeclareMethod("__deleteCookie", 2, DeleteCookie)
             .DeclareWebLingoMethods(WritingSource);
@@ -962,6 +966,155 @@ internal sealed class WebLingoHttpObjects
             return false;
         }
         state.Output.Write(heap.GetString(a[1]));
+        return true;
+    }
+
+    /// <summary>
+    /// The response's <c>__writeBytes(value)</c>: bytes, or an instance holding them, written as they are, in order with the
+    /// text before and after them, giving true; any other value nothing written, giving false, for <c>write</c> to write
+    /// its text (section 6.12, "Files sent").
+    /// </summary>
+    private bool WriteBytes(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.FromBoolean(false);
+        if (!_response.TryGetHostObject<ResponseState>(a[0], heap, out var state, out error)) return false;
+        var value = heap.Held(a[1]);
+        if (value.Kind != WebLingoValueKind.Bytes) return true;
+        if (state.Output is not WebLingoResponseText output)
+        {
+            error = Invalid("This response writes no bytes.");
+            return false;
+        }
+        output.WriteBytes(heap.GetBytes(value));
+        result = WebLingoValue.FromBoolean(true);
+        return true;
+    }
+
+    /// <summary>
+    /// <c>response.sendFile(path, type, options)</c> (section 6.12, "Files sent"): a task that finds the file at
+    /// <paramref name="a"/>[1]'s path through the script's files, off the worker, checked as <c>std:fs</c>'s are (section
+    /// 7.13, "File capabilities"), and makes it the response, its host sending it with the response's status and headers,
+    /// what the page wrote, before and after, not sent; <c>null</c> once it is. Its type, <paramref name="a"/>[2], a
+    /// media type, or <c>null</c> for the one its extension gives; its options, <paramref name="a"/>[3], a map, or
+    /// <c>null</c>: <c>download</c>, the name a browser saves it under, or <c>true</c> for its own, <c>false</c> or
+    /// <c>null</c> for it shown. A file that is not there, or is a folder, an <c>IOError</c>; one the site may not read a
+    /// <c>FilePermissionError</c>; and one sent once the response's output is being sent WL3001.
+    /// </summary>
+    private bool SendFile(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (!_response.TryGetHostObject<ResponseState>(a[0], heap, out var state, out error)) return false;
+        var given = heap.Held(a[1]);
+        if (given.Kind != WebLingoValueKind.String || heap.GetString(given).Length == 0)
+        {
+            error = new WebLingoArgument("sendFile", 0, 3, "the path", "a file's path, a string").Wrong(given, heap);
+            return false;
+        }
+        var path = heap.GetString(given);
+        if (!TrySentType(a[2], heap, out var type, out error) || !TrySentOptions(a[3], heap, path, out var download, out error)) return false;
+        if (state.Output is not WebLingoResponseText output)
+        {
+            error = Invalid("This response sends no files.");
+            return false;
+        }
+        if (output.Sending)
+        {
+            error = Invalid($"'{path}' cannot be sent: the response's output is being sent already.");
+            return false;
+        }
+        if (heap.FileSystem is not { } files || heap.Scheduler is not { } scheduler)
+        {
+            error = Invalid("This host gives scripts no files.");
+            return false;
+        }
+        return scheduler.TryRunOffWorker(() => Readable(files, path), (string full, WebLingoHeap h, out WebLingoValue made,
+            out WebLingoRuntimeError? failed) =>
+        {
+            made = WebLingoValue.Null;
+            failed = output.TrySendFile(new WebLingoSentFile(full, type, download), out var why) ? null : Invalid($"'{path}' cannot be sent: {why}.");
+            return failed is null;
+        }, exception => exception is WebLingo.Platform.Abstractions.WebLingoFileSystemException failure
+            ? new WebLingoRuntimeError(failure.Kind == WebLingo.Platform.Abstractions.WebLingoFileErrorKind.NotAllowed
+                ? WebLingoDiagnosticCodes.FilePermissionDenied
+                : WebLingoDiagnosticCodes.IOFailure, $"'{path}' cannot be sent: {failure.Message}.")
+            : null, out result, out error);
+    }
+
+    /// <summary>Off the worker: the full path of the file to send, one the site may read, there and not a folder.</summary>
+    private static string Readable(WebLingo.Platform.Abstractions.IWebLingoFileSystem files, string path)
+    {
+        var full = files.ReadablePath(path);
+        if (files.IsFolder(path))
+        {
+            throw new WebLingo.Platform.Abstractions.WebLingoFileSystemException(WebLingo.Platform.Abstractions.WebLingoFileErrorKind.Other,
+                "it is a folder");
+        }
+        if (!files.Exists(path))
+        {
+            throw new WebLingo.Platform.Abstractions.WebLingoFileSystemException(WebLingo.Platform.Abstractions.WebLingoFileErrorKind.NotFound,
+                "it is not there");
+        }
+        return full;
+    }
+
+    /// <summary><c>sendFile</c>'s type: <c>null</c>, or a media type, <c>type/subtype</c>, its parameters after it, in ASCII.</summary>
+    private static bool TrySentType(WebLingoValue given, WebLingoHeap heap, out string? type, out WebLingoRuntimeError? error)
+    {
+        (type, error) = (null, null);
+        given = heap.Held(given);
+        if (given.Kind == WebLingoValueKind.Null) return true;
+        var argument = new WebLingoArgument("sendFile", 1, 3, "the type", "a media type, \"type/subtype\", or null for the one its extension gives");
+        if (given.Kind == WebLingoValueKind.String && heap.GetString(given) is var text && WebLingoSentFile.IsMediaType(text))
+        {
+            type = text;
+            return true;
+        }
+        error = given.Kind == WebLingoValueKind.String ? argument.Wrong(WebLingoValueFormatter.Quote(heap.GetString(given))) : argument.Wrong(given, heap);
+        return false;
+    }
+
+    /// <summary>
+    /// <c>sendFile</c>'s options, a map, or <c>null</c> for none: <c>download</c>, the name a browser saves the file under, a
+    /// string without control characters, <c>true</c> for the file's own name, or <c>false</c> or <c>null</c> for it shown.
+    /// </summary>
+    private static bool TrySentOptions(WebLingoValue given, WebLingoHeap heap, string path, out string? download, out WebLingoRuntimeError? error)
+    {
+        (download, error) = (null, null);
+        given = heap.Held(given);
+        if (given.Kind == WebLingoValueKind.Null) return true;
+        var argument = new WebLingoArgument("sendFile", 2, 3, "the options", "a map of the file's options");
+        if (given.Kind != WebLingoValueKind.Map)
+        {
+            error = argument.Wrong(given, heap);
+            return false;
+        }
+        string[] allowed = ["download"];
+        for (var i = 0; i < heap.MapCount(given); i++)
+        {
+            var (key, entry) = heap.MapEntryAt(given, i);
+            var name = key.Kind == WebLingoValueKind.String ? heap.GetString(key) : null;
+            if (name is null || Array.IndexOf(allowed, name) < 0)
+            {
+                var shown = name is null ? WebLingoValueFormatter.Describe(key, heap) : $"'{name}'";
+                error = Invalid($"{argument.Named} has {shown}, which is not an option of 'sendFile'{WebLingoCookies.Suggest(name, allowed)}");
+                return false;
+            }
+            var value = heap.Held(entry);
+            if (value.Kind == WebLingoValueKind.Null || value is { Kind: WebLingoValueKind.Boolean, AsBoolean: false }) continue;
+            if (value is { Kind: WebLingoValueKind.Boolean, AsBoolean: true })
+            {
+                download = WebLingoSentFile.FileName(path);
+                continue;
+            }
+            if (value.Kind == WebLingoValueKind.String && heap.GetString(value) is var saved && WebLingoSentFile.IsFileName(saved))
+            {
+                download = saved;
+                continue;
+            }
+            error = Invalid($"{argument.Named} must give download a file's name, a string without control characters, true for the file's own, "
+                + $"or false, not {WebLingoValueFormatter.Describe(value, heap)}.");
+            return false;
+        }
         return true;
     }
 

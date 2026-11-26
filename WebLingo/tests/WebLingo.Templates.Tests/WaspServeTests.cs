@@ -698,6 +698,82 @@ public sealed class WaspServeTests : IDisposable
     }
 
     /// <summary>
+    /// Files sent through Kestrel (specification, section 6.12, "Files sent"): a file a page sends, its path within the
+    /// folders <c>wasp.config</c> lets its scripts read, with the page's headers, its <c>ETag</c> and its time, a 304 for a
+    /// client that has it, one range of it a 206, a range beyond it a 416, a HEAD without its body, and a name to save it
+    /// under; a site's own file with its tag and ranges too; and bytes a handler writes, as they are.
+    /// </summary>
+    [Fact]
+    public async Task FilesAreSentWithTheirTagsRangesAndNames()
+    {
+        Write("wasp.config", "{ \"files\": { \"read\": [\"data\"] } }");
+        Write("data/report.pdf", string.Concat(Enumerable.Repeat("0123456789", 100)));
+        Write("report.wasp", "<% param request; param response; response.headers[\"Cache-Control\"] = \"private\"; %>not sent"
+            + "<% await response.sendFile(\"data/report.pdf\", null, { download: request.query?[\"name\"] }); %>");
+        Write("api/bytes.wlg", "import { Bytes } from \"std:bytes\";\n"
+            + "export function get(request, response) { response.write(\"a\"); response.write(Bytes.fromHex(\"00ff80\")); response.write(\"b\"); }");
+        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        Assert.True(server is not null, error);
+        await server.StartAsync();
+        try
+        {
+            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            using var client = new HttpClient { BaseAddress = new Uri(address) };
+            var whole = await client.GetAsync("/report");
+            Assert.Equal((HttpStatusCode.OK, "application/pdf", 1000L), (whole.StatusCode, whole.Content.Headers.ContentType?.MediaType,
+                whole.Content.Headers.ContentLength));
+            Assert.Equal(string.Concat(Enumerable.Repeat("0123456789", 100)), await whole.Content.ReadAsStringAsync());
+            var tag = whole.Headers.ETag!.Tag;
+            Assert.Equal(["bytes"], whole.Headers.AcceptRanges);
+            Assert.Equal("private", whole.Headers.CacheControl?.ToString());
+            Assert.Equal(["nosniff"], whole.Headers.GetValues("X-Content-Type-Options"));
+            Assert.Equal(File.GetLastWriteTimeUtc(Path.Combine(_root, "data/report.pdf")).ToString("r"),
+                whole.Content.Headers.LastModified?.ToString("r"));
+            Assert.False(whole.Content.Headers.Contains("Content-Disposition"));
+
+            using var cached = new HttpRequestMessage(HttpMethod.Get, "/report");
+            cached.Headers.TryAddWithoutValidation("If-None-Match", tag);
+            var notModified = await client.SendAsync(cached);
+            Assert.Equal((HttpStatusCode.NotModified, ""), (notModified.StatusCode, await notModified.Content.ReadAsStringAsync()));
+
+            using var ranged = new HttpRequestMessage(HttpMethod.Get, "/report");
+            ranged.Headers.TryAddWithoutValidation("Range", "bytes=13-22");
+            var part = await client.SendAsync(ranged);
+            Assert.Equal((HttpStatusCode.PartialContent, "3456789012"), (part.StatusCode, await part.Content.ReadAsStringAsync()));
+            Assert.Equal("bytes 13-22/1000", part.Content.Headers.ContentRange?.ToString());
+
+            using var beyond = new HttpRequestMessage(HttpMethod.Get, "/report");
+            beyond.Headers.TryAddWithoutValidation("Range", "bytes=1000-");
+            var unsatisfiable = await client.SendAsync(beyond);
+            Assert.Equal((HttpStatusCode.RequestedRangeNotSatisfiable, "bytes */1000"),
+                (unsatisfiable.StatusCode, unsatisfiable.Content.Headers.ContentRange?.ToString()));
+
+            var head = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/report"));
+            Assert.Equal((HttpStatusCode.OK, 1000L), (head.StatusCode, head.Content.Headers.ContentLength));
+            Assert.Empty(await head.Content.ReadAsByteArrayAsync());
+
+            var named = await client.GetAsync("/report?name=" + Uri.EscapeDataString("Raport \u017c.pdf"));
+            Assert.Equal("attachment; filename=\"Raport _.pdf\"; filename*=UTF-8''Raport%20%C5%BC.pdf",
+                string.Join(", ", named.Content.Headers.GetValues("Content-Disposition")));
+
+            var css = await client.GetAsync("/css/site.css");
+            Assert.Equal(["bytes"], css.Headers.AcceptRanges);
+            using var cachedCss = new HttpRequestMessage(HttpMethod.Get, "/css/site.css");
+            cachedCss.Headers.TryAddWithoutValidation("If-None-Match", css.Headers.ETag!.Tag);
+            Assert.Equal(HttpStatusCode.NotModified, (await client.SendAsync(cachedCss)).StatusCode);
+            using var cssPart = new HttpRequestMessage(HttpMethod.Get, "/css/site.css");
+            cssPart.Headers.TryAddWithoutValidation("Range", "bytes=0-1");
+            Assert.Equal("h1", await (await client.SendAsync(cssPart)).Content.ReadAsStringAsync());
+
+            Assert.Equal(new byte[] { 0x61, 0x00, 0xFF, 0x80, 0x62 }, await client.GetByteArrayAsync("/api/bytes"));
+        }
+        finally
+        {
+            await server.StopAsync();
+        }
+    }
+
+    /// <summary>
     /// A request's limits from <c>wasp.config</c>'s <c>"limits"</c> (specification, section 6.12, "Limits"): a page that loops
     /// stopped by its time, a 503, and one that counts by its instructions; every setting checked where the configuration is
     /// read, a wrong one an error that says what each is.

@@ -80,6 +80,8 @@ public sealed class DotNetFileSystem(IWebLingoFileCapabilities? capabilities = n
 
     public bool IsFolder(string path) => Translated(() => Directory.Exists(Reach(path, false)));
 
+    public string ReadablePath(string path) => Translated(() => Path.GetFullPath(Reach(path, false)));
+
     public void Remove(string path) => Translated(() =>
     {
         var reached = Reach(path, true);

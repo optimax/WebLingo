@@ -30,6 +30,10 @@ internal sealed class MemoryFileSystem : IWebLingoFileSystem
 
     public bool Exists(string path) => _files.ContainsKey(path) || IsFolder(path);
 
+    public string ReadablePath(string path) => path.StartsWith("secret/", StringComparison.Ordinal)
+        ? throw new WebLingoFileSystemException(WebLingoFileErrorKind.NotAllowed, "the site may not read it")
+        : "/memory/" + path;
+
     public bool IsFolder(string path) => _files.Keys.Any(file => file.StartsWith(path + "/", StringComparison.Ordinal));
 
     public IReadOnlyList<string> List(string path)

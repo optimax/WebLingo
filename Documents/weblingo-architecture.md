@@ -119,6 +119,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | Uploaded files in WASP | A form posted as `multipart/form-data`: `await request.form()` its fields, `await request.files()` its files, each input's name an array of `UploadedFile`s, each with `save(path)` within `"files"`; a file kept in memory up to 64 KB, then in a temporary file, removed when its request ends; the largest body 30,000,000 bytes, a larger one a 413, and the files' most in all, each configurable in `wasp.config` (§6.12, "Uploaded files") | Approved (23 November 2026); as built, Proposed where it says more |
 | A request's limits in WASP | Its time, waits included, 60 seconds by default, as IIS's; its instructions, 1,000,000,000 by default, measured; and its heap's memory, 128 MB of strings; each `wasp.config`'s `"limits"`, a request past one stopped, an error nothing catches (§6.12, "A request's limits") | Approved (24 November 2026, both limits, each with a default); as built, Proposed where it says more |
 | Security headers and sensitive files in WASP | `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `Content-Security-Policy: frame-ancestors 'self'` by default, with `X-Frame-Options: SAMEORIGIN` beside the last, on every response, a page's and a file's, each changed or removed by `wasp.config`'s `"headers"`, for a whole site, and by a page, for itself, WASP's `frame-ancestors` left out where a page or the site sends a policy of its own, `Strict-Transport-Security` and a full policy each site's own; and a file a site should not serve, a database, a log, a key, refused by its extension, a 404, `wasp.config`'s `"serve"` able to allow one (§6.12, "Security headers and sensitive files") | Approved (25 November 2026); as built, Proposed where it says more |
+| Files sent in WASP | `response.write(bytes)` writing bytes as they are, and `await response.sendFile(path, type)`, a file within the folders the site may read, its type by its extension or the one given; with `Content-Length`, `Last-Modified` and an `ETag`, a matching `If-None-Match` or `If-Modified-Since` a 304, as a site's own files; a `Range` a 206; and `sendFile(path, type, { download: "report.pdf" })` a `Content-Disposition: attachment` with the name, encoded for one that is not ASCII (§6.12, "Files sent") | Approved (25 November 2026); as built, Proposed where it says more |
 | Cross-site request forgery in WASP | Every POST, PUT, PATCH and DELETE another site sent refused, by its `Sec-Fetch-Site` where it has one, by its `Origin` where it has not, one with neither allowed, on by default, as Go's `CrossOriginProtection`; a page or a handler opting out by a declaration, for an API other sites call; and a token besides, `request.csrfToken` and its check, `request.checkCsrf()`, called where a page calls it, never required (§6.12, "Cross-site request forgery") | Approved (24 November 2026); as built, Proposed where it says more |
 | Mail, `std:mail` | A standard module sending mail by SMTP to a relay, a client and a MIME writer of WebLingo's own, in an adapter, on .NET's sockets and `SslStream`, with no package: STARTTLS on 587, TLS from the start on 465, AUTH PLAIN, LOGIN and XOAUTH2 with a script's token, text and HTML alternatives, attachments, headers that are not ASCII; named servers in the configuration, `"mail": { "default": { … } }`, a send naming none using `"default"` or the one listed, or a server of its own, under `wasp` one `"network"` allows; a message a map, `await mail.send({ from, to, subject, text, html })`, every key and value checked, a key it does not know an error naming the one it may have meant; TLS required, a server offering none refused unless its settings say `"tls": "none"`, its certificate checked or accepted by its thumbprint, TLS 1.2 at least, no password without TLS but to this machine; DKIM, SMTPUTF8, IMAP and POP3, and a class `MailMessage`, later (§7.17) | Approved (23 November 2026); `MailError`'s name and its code, WL3023, Proposed |
 | Secrets in a configuration | A secret of a configuration, a mail server's password or a database's connection string, given where it is kept, `{ "env": "NAME" }` or `{ "file": "path" }`, a file outside the site, read by the host, never a script; a script never seeing a server's password, and no error, nor the development error page, showing it; the operating system's secret store later (§7.17, "Secrets") | Approved (23 November 2026) |
@@ -1312,6 +1313,40 @@ error as before, without the calls. Two lines of `Run` changed, its runtime erro
 a helper .NET does not inline: on the benchmark against `main` (`b873543`), every workload, 16 rounds alternately, each
 round's order the last's reversed, on an idle machine, no workload slower by a rank test (Mann-Whitney's, none with p
 below 0.05), the medians from 3% faster (`async`) to 3% slower (`objects`, p 0.71), `calls` 1% slower (p 0.10).
+
+**Files sent** (the owner's answers, 25 November 2026, "Sending Files Back in WASP", a prerequisite of WebLingo Forum's
+part 8, A1 to A3 (a)). `response.write(bytes)` writes bytes as they are, and `await response.sendFile(path, type)` sends a
+file within the folders the site's scripts may read, its type by its extension unless the second, optional, parameter
+gives one; with its `Content-Length`, its `Last-Modified` and an `ETag`, a request whose `If-None-Match` or
+`If-Modified-Since` matches answered 304 with no body, as WASP serves a site's own files (A1 (a)); a `Range` request
+answered 206, with the bytes it asks for (A2 (a)); and a third, optional, parameter, `sendFile(path, type, { download:
+"report.pdf" })`, sending `Content-Disposition: attachment` with the name, encoded for a name that is not ASCII (A3 (a)).
+
+As built (25 November 2026; Proposed where it says more than the owner's answers): both in a page and in a handler.
+`response.write(value)` and `writeLn(value)` write `Bytes`, or an instance holding them, as they are, in order with the
+text before and after them, kept and sent as text is ("Streaming"), the response's type the one it has, a page's
+`text/html; charset=utf-8` unless it sets another. `sendFile(path, type = null, options = null)` is a task: its path a
+script's, found through the script's files off the worker, as `std:fs` finds one (§7.13), a path the site may not read a
+`FilePermissionError`, WL3016, a file that is not there, or a folder, an `IOError`, WL3011, each message naming the path as
+the script gave it; its type a media type, `type/subtype` and its parameters, in printable ASCII, WL3001 otherwise, or
+`null` for the response's `Content-Type` where the page set one, else the one its extension gives, as ASP.NET Core's
+static files have them, else `application/octet-stream`; its options a map or `null`, `download` the name a browser saves
+it under, a string that is not a path, without control characters, `true` for the file's own name, `false` or `null` for
+it shown, any other key WL3001, naming the one it may have meant. Once sent, the file is the response: what the page
+wrote before it, and writes after it, is not sent, in place of the guess that writing after it is an error; a file sent
+once the response's output is being sent, past its first 64 KB, is WL3001. The response is left uncommitted, its status
+and headers the page's, the site's security headers among them, for its host to send the file with them
+(`WebLingoRequestOutcome.Sent`, a `WebLingoSentFile`), read as it is sent, in pieces of 32 KB, never whole in memory; a
+file gone since it was found a 404. Both hosts, ASP.NET Core's and FastCGI's, send it, and a site's own files, by one plan
+(`WebLingoFileSending`, `WebLingo.Hosting.AspNetCore`): its `ETag` its length and its last write's time, in .NET's
+ticks, both in hexadecimal, `"47a6-8df4b6a3f875faa"` for 18,342 bytes, and its `Last-Modified`, unless the page set its own; and, for a GET or
+a HEAD answered 200 alone, `Accept-Ranges: bytes`, a 304 where the request's `If-None-Match` has `*` or a tag that
+matches, weakly, or, where it has none, its `If-Modified-Since` is no earlier than the file's time, to the second, and a
+206 for one range of its bytes, `bytes=0-99`, `bytes=100-` or `bytes=-100`, with its `Content-Range`, where the
+request's `If-Range`, if it has one, is the file's strong tag or its very time; a range beyond the file a 416, with
+`Content-Range: bytes */1000`; several ranges, or a `Range` that is not one, the file whole; a HEAD its `Content-Length`
+without its body; and a name to save it under `attachment; filename="…"`, in ASCII, any other character, a quote and a
+backslash written `_`, and, for a name that is not ASCII, `filename*=UTF-8''…` too (RFC 6266).
 
 **As built** (M0.14.2, 16 November 2026; Proposed, §15.2, "The host's core"): `WebLingo.Hosting`'s `WebLingoApplication` loads an application from its root through the platform's files, its routes made then (`WebLingoRouteTable`), and serves a request on the worker its host gives: a page compiled when first requested, once on each worker, and kept for the generation's life with the components it renders, its output kept until it has run, then written to the response as UTF-8 (from M0.14.7.1, kept until it reaches 64 KB, then sent as it is written, §15.2, "Output sent as it is written"); a file that is not a page's, nor a handler's, left to the host to serve (`WebLingoRequestOutcomeKind.File`); and a 404 for a path without a route. The host gives its built-ins, its native modules, its workers' count and the environment.
 

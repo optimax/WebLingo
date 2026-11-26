@@ -286,10 +286,25 @@ Every response a site gives has `X-Content-Type-Options: nosniff`, `Referrer-Pol
 `Content-Security-Policy: frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN`, from `wasp.config`'s `"headers"`
 (`WebLingoHeaderSettings`, `WebLingo/src/WebLingo.Cli/WebLingoSchemes.cs`), which `WebLingoApplicationOptions.Headers`
 carries: set on a page's response before it runs (`WebLingoApplication.Handle`), again on an error page's
-(`WebLingoErrorPages`), and on a file's by its host (`WebLingoAspNetCore.SendFile`, `WebLingoFastCgiServer.SendFileAsync`).
+(`WebLingoErrorPages`), and on a site's file by its host (`WebLingoFileSending.SendSiteFileAsync`).
 A file whose extension is `WebLingoRouteTable.Sensitive`'s, a database, a log, a key, has no route unless `"serve"` allows
 it. Tested by `ApplicationTests` (`WebLingo.Hosting.Tests`), `WaspServeTests.EveryResponseHasTheSecurityHeadersWaspConfigChanges`
 and `FastCgiTests.AStatusAHeaderAndErrorsAreCgis`.
+
+## Files sent
+
+`response.write(bytes)` writes bytes as they are, and `await response.sendFile(path, type, { download })` makes a file the
+response, in a page or a handler (the specification's section 6.12, "Files sent"; the WASP User Manual, section 9,
+"Sending a file"). The response's natives are `__writeBytes` and `__sendFile` (`WebLingo/src/WebLingo.Hosting/WebLingoHttpObjects.cs`,
+called by `Response.wlg`): the path found off the worker through the script's files, `IWebLingoFileSystem.ReadablePath`
+(`DotNetFileSystem`), the output kept as bytes and text in order (`WebLingoResponseText.WriteBytes`), and a file sent
+leaving the response uncommitted, its outcome's `Sent` a `WebLingoSentFile` (`WebLingoApplication.Finished`). Both hosts
+send it, and a site's own files, through `WebLingoFileSending` (`WebLingo/src/WebLingo.Hosting.AspNetCore/`), the plan its
+`Plan`: `ETag`, `Last-Modified`, 304, one range a 206, a 416, `Content-Disposition`. ASP.NET Core's sink
+(`WebLingoStreamingResponse.AspNetCoreSink`, internal now) takes the place of `SendFileAsync`. Tested by `SentFileTests`
+(`WebLingo.Hosting.Tests`), `WaspServeTests.FilesAreSentWithTheirTagsRangesAndNames` and
+`FastCgiTests.AFileAPageSendsIsSentWithItsTagAndRanges`; the manual's example tried with `wasp serve` and curl. Page text
+written around `sendFile` is not sent, where the task's guess had writing after it an error.
 
 ## License and notices
 
@@ -393,7 +408,7 @@ values counted from its start each time, so the renderer reads an array of a lin
 The branch `claude/forum-writing` on GitHub holds part 3 unfinished (`9093b78`), which `main` has whole, in one commit,
 instead: it may be deleted there.
 
-Next: "WebLingo Forum, Part 10: Deployment". Parts 8 and 9 wait for "Sending Files Back in WASP" and "Overlays in WASP",
+Next: "WebLingo Forum, Part 8: Avatars and Attachments", which WASP's files sent, above, let it build. Part 9 waits for "Overlays in WASP",
 and "WebLingo Forum: MarkdownEditor.Web in the Post Form" for its answers, each with questions in `TO-DO.md`. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to
 be written as tasks and into the specification's roadmap; neither is begun.
 

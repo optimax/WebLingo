@@ -2,7 +2,6 @@ using System.IO.Pipes;
 using Microsoft.Win32.SafeHandles;
 using System.Net.Sockets;
 using System.Text;
-using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.WebUtilities;
 using WebLingo.Hosting.Abstractions;
 using WebLingo.Hosting.AspNetCore;
@@ -25,8 +24,6 @@ namespace WebLingo.Hosting.FastCgi;
 /// </summary>
 public sealed class WebLingoFastCgiServer(WebLingoApplication application, string root, WebLingoWorkerPool workers, Action<string>? log = null)
 {
-    private static readonly FileExtensionContentTypeProvider ContentTypes = new();
-
     /// <summary>The most a request's <c>FCGI_PARAMS</c> may hold, so that a web server's mistake cannot take the host's memory.</summary>
     public const int MaxParams = 1024 * 1024;
 
@@ -419,7 +416,18 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
                 connection.Close();
                 return;
             }
-            if (outcome is { Kind: WebLingoRequestOutcomeKind.File, File: { } file }) await SendFileAsync(sink, file);
+            if (outcome is { Kind: WebLingoRequestOutcomeKind.File, File: { } file })
+            {
+                if (outcome.Sent is { } sent)
+                {
+                    await WebLingoFileSending.SendAsync(sink, translated.Method, translated.Headers, sent, response.StatusCode, response.Headers);
+                }
+                else
+                {
+                    await WebLingoFileSending.SendSiteFileAsync(sink, translated.Method, translated.Headers, Path.Combine(root, file),
+                        application.Headers);
+                }
+            }
             await connection.WriteAsync(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.Stdout, request.Id, []));
             // Let go before its end is written: a web server that keeps the connection sends its next FCGI_BEGIN_REQUEST as
             // soon as it reads FCGI_END_REQUEST, which until 25 November 2026 could come in while this request still held
@@ -436,25 +444,6 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
             await run;
             connection.Close();
         }
-    }
-
-    /// <summary>A file the application leaves to its host, sent as it is, with the content type its extension gives, a 404 for one with none.</summary>
-    private async Task SendFileAsync(Sink sink, string file)
-    {
-        var headers = new WebLingoHeaderList();
-        // The site's headers, X-Content-Type-Options and its kin, a file's too (section 6.12, "Security headers").
-        foreach (var (name, value) in application.Headers) headers.Set(name, value);
-        if (!ContentTypes.TryGetContentType(file, out var type))
-        {
-            await sink.StartAsync(404, headers, 0);
-            return;
-        }
-        var path = Path.Combine(root, file);
-        headers.Set("Content-Type", type);
-        await using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1, useAsync: true);
-        await sink.StartAsync(200, headers, source.Length);
-        var buffer = new byte[WebLingoFastCgiRecords.MaxContent];
-        for (int read; (read = await source.ReadAsync(buffer)) > 0;) await sink.WriteAsync(buffer[..read]);
     }
 
     /// <summary>

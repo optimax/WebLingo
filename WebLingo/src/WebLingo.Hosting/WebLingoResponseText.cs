@@ -26,6 +26,15 @@ internal sealed class WebLingoResponseText(IWebLingoHttpResponse response, TimeS
     private readonly StringBuilder _text = new();
     private int _bytes;
 
+    // The output kept before the text in _text, as bytes, where bytes were written: the text before them, encoded, and them.
+    private List<byte[]>? _kept;
+
+    /// <summary>
+    /// The file the page or the handler sent (specification, section 6.12, "Files sent"), or null: what it wrote, before and
+    /// after, never sent.
+    /// </summary>
+    public WebLingoSentFile? Sent { get; private set; }
+
     /// <summary>Whether the output is being sent: its response committed, and an error then too late for a 500.</summary>
     public bool Sending { get; private set; }
 
@@ -57,19 +66,60 @@ internal sealed class WebLingoResponseText(IWebLingoHttpResponse response, TimeS
 
     public void Write(string text)
     {
+        if (Sent is not null) return;
         _text.Append(text);
         _bytes += Encoded(text);
         if (_bytes >= (Sending ? Piece : Kept)) Send();
     }
 
+    /// <summary>Writes bytes as they are, after the text before them (specification, section 6.12, "Files sent").</summary>
+    public void WriteBytes(byte[] data)
+    {
+        if (Sent is not null || data.Length == 0) return;
+        _kept ??= [];
+        if (_text.Length > 0)
+        {
+            _kept.Add(Encode(_text.ToString()));
+            _text.Clear();
+        }
+        _kept.Add(data);
+        _bytes += data.Length;
+        if (_bytes >= (Sending ? Piece : Kept)) Send();
+    }
+
+    /// <summary>
+    /// The page's response to be a file, which its host sends: what was written, and what is written after, not sent; false,
+    /// with why, where its output is being sent already.
+    /// </summary>
+    public bool TrySendFile(WebLingoSentFile file, out string? why)
+    {
+        if (Sending)
+        {
+            why = "the response's output is being sent already";
+            return false;
+        }
+        why = null;
+        Sent = file;
+        _text.Clear();
+        _kept = null;
+        _bytes = 0;
+        return true;
+    }
+
     /// <summary>Sends the output kept, committing the response first if it is not.</summary>
     public void Send()
     {
+        if (Sent is not null) return;
         if (!Sending)
         {
             if (response.Headers.Get("Content-Type") is null) response.Headers.Set("Content-Type", WebLingoErrorPages.HtmlType);
             response.Commit();
             Sending = true;
+        }
+        if (_kept is { Count: > 0 })
+        {
+            foreach (var piece in _kept) response.Body.Write(piece, 0, piece.Length);
+            _kept.Clear();
         }
         // A surrogate whose pair a later write may give waits for it.
         var keep = _text.Length > 0 && char.IsHighSurrogate(_text[^1]) ? 1 : 0;
@@ -80,6 +130,13 @@ internal sealed class WebLingoResponseText(IWebLingoHttpResponse response, TimeS
 
     /// <summary>Writes <paramref name="text"/> to <paramref name="response"/>'s body as UTF-8.</summary>
     public static void WriteTo(IWebLingoHttpResponse response, string text)
+    {
+        var bytes = Encode(text);
+        if (bytes.Length > 0) response.Body.Write(bytes, 0, bytes.Length);
+    }
+
+    /// <summary><paramref name="text"/> as UTF-8, a surrogate without its pair as U+FFFD.</summary>
+    private static byte[] Encode(string text)
     {
         var bytes = new byte[Encoded(text)];
         var at = 0;
@@ -117,7 +174,7 @@ internal sealed class WebLingoResponseText(IWebLingoHttpResponse response, TimeS
                 bytes[at++] = (byte)(0x80 | (code & 0x3F));
             }
         }
-        if (bytes.Length > 0) response.Body.Write(bytes, 0, bytes.Length);
+        return bytes;
     }
 
     private static int Encoded(string text)

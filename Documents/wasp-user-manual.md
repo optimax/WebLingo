@@ -605,8 +605,9 @@ otherwise; `wasp.config` changes both (section 14), and under IIS the site's `we
 |---|---|
 | `response.status` | the status, 200 until set: `response.status = 404;` |
 | `response.headers` | the response's headers: `response.headers["Content-Type"] = "text/plain";` |
-| `response.write(value)` | writes a value's text to the response's body, as `write` writes it: `response.write("done");` |
+| `response.write(value)` | writes a value's text to the response's body, as `write` writes it: `response.write("done");`; bytes as they are |
 | `response.writeLn(value)` | the same, then a line break |
+| `await response.sendFile(path, type, options)` | sends a file as the response ([Sending a file](#sending-a-file)) |
 
 ```html
 <% param response; %>
@@ -622,6 +623,57 @@ otherwise; `wasp.config` changes both (section 14), and under IIS the site's `we
   not a string, is an error where it is set.
 - Status and headers can be set until the page's output starts being sent, after its first 64 KB
   ([section 13](#13-how-a-pages-output-is-sent)); after that, setting them is an error. Set them before writing much.
+
+### Sending a file
+
+`await response.sendFile(path)` sends a file as the response, a page's or a route handler's, its type by its extension,
+or the type given second; `{ download: "name" }`, third, has the browser save it under that name rather than show it,
+and `{ download: true }` under its own. The file must be in a folder `wasp.config`'s `"files"` lets the site's scripts
+read ([section 14](#14-configuration-waspconfig)), its path from the site's root, so that a site keeps such files
+outside its folder, where nothing serves them by itself, and its own code decides who may have them:
+
+```json
+{ "files": { "read": ["../reports"] } }
+```
+
+```javascript
+// report.wlg, answering /report
+export async function get(request, response) {
+    response.headers["Cache-Control"] = "private";
+    await response.sendFile("../reports/2026.pdf", null, { download: "Report 2026.pdf" });
+}
+```
+
+```text
+HTTP/1.1 200 OK
+Content-Length: 18342
+Content-Type: application/pdf
+Date: Thu, 26 Nov 2026 03:06:33 GMT
+Server: Kestrel
+Accept-Ranges: bytes
+Cache-Control: private
+ETag: "47a6-8df4b6a3f875faa"
+Last-Modified: Thu, 26 Nov 2026 03:06:21 GMT
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Content-Security-Policy: frame-ancestors 'self'
+X-Frame-Options: SAMEORIGIN
+Content-Disposition: attachment; filename="Report 2026.pdf"
+```
+
+- The response keeps its status and its headers, the site's security headers among them. The file comes with its
+  `Content-Length`, `Last-Modified` and `ETag`, so that a browser that has it already is answered 304, with no body, and
+  one that asks for part of it, as a video player or a resumed download does, 206, with that part. A site's own files,
+  its stylesheets and pictures, are sent the same way.
+- What the page wrote before `sendFile`, and writes after it, is not sent. Sending a file once the page's output has
+  started being sent, after its first 64 KB, is an error.
+- A path the site may not read is a `FilePermissionError`; a file that is not there, or a folder, an `IOError`.
+- A type given is a media type, `"application/pdf"` or `"text/csv; charset=utf-8"`. Without one, the file's type is the
+  response's `Content-Type`, where the page set one, else the one its extension gives, else `application/octet-stream`.
+- A name to save the file under that is not ASCII is sent as RFC 6266 has it, `filename*=UTF-8''…`, for every browser
+  of today.
+- `response.write(bytes)` writes bytes a script made as they are, in order with the text around them:
+  `response.headers["Content-Type"] = "image/png"; response.write(picture);`.
 
 ### Cookies
 

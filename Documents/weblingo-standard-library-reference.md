@@ -1182,8 +1182,9 @@ again before the piece it gives has come.
 |---|---|
 | `response.status` | its status, an integer, 200 until set; one outside 100 to 999 WL3001 |
 | `response.headers` | its headers, a `Headers`, which can be changed until the response is sent; the site's own when the page begins, `X-Content-Type-Options` and its kin (the WASP User Manual, section 9, "Security headers") |
-| `response.write(value)` | writes a value's text to its body, as `write` writes it, `null` as `null`, giving `null` |
+| `response.write(value)` | writes a value's text to its body, as `write` writes it, `null` as `null`, giving `null`; `Bytes` as they are |
 | `response.writeLn(value)` | the same, then a line break |
+| `response.sendFile(path, type, options)` | a task that makes the file at `path` the response, giving `null`; `type` and `options` may be left out |
 | `response.setCookie(name, value, options)` | sets a cookie, its value a string, giving `null`; `options`, a map, or `null` |
 | `response.deleteCookie(name, options)` | deletes a cookie, its `options` naming its `path` and `domain`, giving `null` |
 
@@ -1200,6 +1201,16 @@ A route handler writes its response's body with `response.write` and `response.w
 `response.write` and `response.writeLn` do, and need no `param response;`. A call of either as a statement waits for a
 slow client, as a page's writes do. A response is sent once its output reaches 64 KB (the WASP User Manual, section
 13): setting its status or a header after that is WL3001.
+
+`await response.sendFile(path, type, options)` sends a file as the response (the WASP User Manual, section 9, "Sending a
+file"): its path a script's, within the folders `wasp.config`'s `"files"` lets the site read, one it may not a
+`FilePermissionError`, WL3016, and a file that is not there, or a folder, an `IOError`, WL3011; `type` a media type,
+`"application/pdf"`, or `null` for the response's `Content-Type`, else the one its extension gives, else
+`application/octet-stream`; `options` a map, or `null`, whose `download` is the name a browser saves it under, `true`
+for its own, `false` or `null` for it shown. Any other value, or option, is WL3001, and so is a file sent once the
+response is being sent. The response keeps its status and headers; what was written before it, and after, is not sent.
+The file comes with its `ETag`, its `Last-Modified` and `Accept-Ranges: bytes`, a client that has it answered 304, and
+one range of it 206.
 
 ### `Session`
 

@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.StaticFiles;
 using WebLingo.Hosting.Abstractions;
 using WebLingo.Runtime;
 namespace WebLingo.Hosting.AspNetCore;
@@ -9,14 +8,13 @@ namespace WebLingo.Hosting.AspNetCore;
 /// The ASP.NET Core adapter (specification, section 6.1, WL-H009; section 9, "M0.14 parts", part 4), which serves a
 /// <see cref="WebLingoApplication"/>, under IIS through the ASP.NET Core Module, or on Kestrel: each request translated to
 /// WLHI's, its body read as it arrives, as a script asks for it, run on one of the pool's workers, and its response sent
-/// back as the worker writes it; a file the application leaves to its host sent as it is, with the content type its extension gives, and a 404 for an extension
+/// back as the worker writes it; a file the application leaves to its host, a site's own or one a page sent, sent as it is
+/// (<see cref="WebLingoFileSending"/>), a site's with the content type its extension gives, and a 404 for an extension
 /// ASP.NET Core does not know, as its own static files are served. Only HTTP is translated here: everything else is the
 /// host's core's (section 6.12).
 /// </summary>
 public static class WebLingoAspNetCore
 {
-    private static readonly FileExtensionContentTypeProvider ContentTypes = new();
-
     /// <summary>Serves <paramref name="application"/>, whose root is <paramref name="root"/>, on <paramref name="workers"/>, as the end of the pipeline.</summary>
     public static IApplicationBuilder UseWebLingo(this IApplicationBuilder builder, WebLingoApplication application, string root,
         WebLingoWorkerPool workers)
@@ -69,7 +67,23 @@ public static class WebLingoAspNetCore
             await run;
             throw;
         }
-        if (await run is { Kind: WebLingoRequestOutcomeKind.File, File: { } file }) await SendFile(context, root, file, application.Headers);
+        if (await run is not { Kind: WebLingoRequestOutcomeKind.File, File: { } file } outcome) return;
+        var sink = new WebLingoStreamingResponse.AspNetCoreSink(context, context.RequestAborted);
+        try
+        {
+            if (outcome.Sent is { } sent)
+            {
+                await WebLingoFileSending.SendAsync(sink, request.Method, request.Headers, sent, response.StatusCode, response.Headers);
+            }
+            else
+            {
+                await WebLingoFileSending.SendSiteFileAsync(sink, request.Method, request.Headers, Path.Combine(root, file), application.Headers);
+            }
+        }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // The client has gone: nothing more is sent.
+        }
     }
 
     /// <summary>
@@ -115,20 +129,5 @@ public static class WebLingoAspNetCore
             body.ReadAsync(buffer.AsMemory(offset, count), gone).AsTask().ContinueWith(read => done(read.IsCompletedSuccessfully ? read.Result : -1),
                 CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
         }
-    }
-
-    private static async Task SendFile(HttpContext context, string root, string file, IReadOnlyList<KeyValuePair<string, string>> site)
-    {
-        // The site's headers, X-Content-Type-Options and its kin, a file's too (section 6.12, "Security headers").
-        foreach (var (name, value) in site) context.Response.Headers[name] = value;
-        if (!ContentTypes.TryGetContentType(file, out var type))
-        {
-            context.Response.StatusCode = StatusCodes.Status404NotFound;
-            return;
-        }
-        var path = Path.Combine(root, file);
-        context.Response.ContentType = type;
-        context.Response.ContentLength = new FileInfo(path).Length;
-        await context.Response.SendFileAsync(path, context.RequestAborted);
     }
 }

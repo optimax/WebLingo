@@ -355,6 +355,53 @@ public sealed class FastCgiTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// A file a page sends, through FastCGI (specification, section 6.12, "Files sent"): with the page's status and headers,
+    /// its tag, a 304 for a client that has it, and one range of it, as CGI's <c>HTTP_</c> variables ask; and a site's own
+    /// file in part too.
+    /// </summary>
+    [Fact]
+    public async Task AFileAPageSendsIsSentWithItsTagAndRanges()
+    {
+        var site = Path.Combine(_root, "sending");
+        Directory.CreateDirectory(Path.Combine(site, "data"));
+        File.WriteAllText(Path.Combine(site, "wasp.config"), "{ \"files\": { \"read\": [\"data\"] } }");
+        File.WriteAllText(Path.Combine(site, "data", "teas.txt"), "Sencha, Gyokuro, Bancha");
+        File.WriteAllText(Path.Combine(site, "teas.wasp"), "<% param response; response.headers[\"X-Tea\"] = \"green\"; %>not sent"
+            + "<% await response.sendFile(\"data/teas.txt\", \"text/plain; charset=utf-8\", { download: true }); %>");
+        File.WriteAllText(Path.Combine(site, "site.css"), "h1 { }");
+        var application = WebLingoWaspServer.Load(site, new Dictionary<string, string>(), WebLingoMode.Production, null, out _, out _, out var error);
+        Assert.True(application is not null, error);
+        using var stop = new CancellationTokenSource();
+        using var listener = WebLingoWaspFastCgi.Listen(0, null, out _);
+        _ = new WebLingoFastCgiServer(application, site, _workers).ServeAsync(listener, stop.Token);
+        try
+        {
+            using var connection = new TcpClient();
+            await connection.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndPoint!).Port);
+            var (head, body, _) = await RequestAsync(connection, 1, Get("/teas"), [], keep: true);
+            Assert.Equal(("Status: 200 OK", "Sencha, Gyokuro, Bancha"), (head[0], body));
+            Assert.Contains("Content-Type: text/plain; charset=utf-8", head);
+            Assert.Contains("Content-Length: 23", head);
+            Assert.Contains("X-Tea: green", head);
+            Assert.Contains("Content-Disposition: attachment; filename=\"teas.txt\"", head);
+            Assert.Contains("Accept-Ranges: bytes", head);
+            HasTheSecurityHeaders(head);
+            var tag = head.Single(line => line.StartsWith("ETag: ", StringComparison.Ordinal))["ETag: ".Length..];
+            (head, body, _) = await RequestAsync(connection, 2, Get("/teas", ("HTTP_IF_NONE_MATCH", tag)), [], keep: true);
+            Assert.Equal(("Status: 304 Not Modified", ""), (head[0], body));
+            (head, body, _) = await RequestAsync(connection, 3, Get("/teas", ("HTTP_RANGE", "bytes=8-14")), [], keep: true);
+            Assert.Equal(("Status: 206 Partial Content", "Gyokuro"), (head[0], body));
+            Assert.Contains("Content-Range: bytes 8-14/23", head);
+            (head, body, _) = await RequestAsync(connection, 4, Get("/site.css", ("HTTP_RANGE", "bytes=-3")), []);
+            Assert.Equal(("Status: 206 Partial Content", "{ }"), (head[0], body));
+        }
+        finally
+        {
+            stop.Cancel();
+        }
+    }
+
     private async Task<TcpClient> Connect()
     {
         var client = new TcpClient();

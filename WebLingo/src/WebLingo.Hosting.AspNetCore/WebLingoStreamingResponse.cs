@@ -222,7 +222,7 @@ public sealed class WebLingoStreamingResponse : IWebLingoHttpResponse
     }
 
     /// <summary>ASP.NET Core's response as a sink: its status and headers set, its body written, an abort the connection's.</summary>
-    private sealed class AspNetCoreSink(HttpContext context, CancellationToken gone) : IWebLingoResponseSink
+    internal sealed class AspNetCoreSink(HttpContext context, CancellationToken gone) : IWebLingoResponseSink
     {
         public ValueTask StartAsync(int status, IWebLingoHeaderCollection headers, long? length)
         {

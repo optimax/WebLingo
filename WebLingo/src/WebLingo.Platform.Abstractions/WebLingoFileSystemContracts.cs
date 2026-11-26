@@ -29,6 +29,13 @@ public interface IWebLingoFileSystem
     /// <summary>Whether a file or a folder is there.</summary>
     bool Exists(string path);
 
+    /// <summary>
+    /// The full path a file to read is at, as its host opens it to send it (specification, section 6.12, "Files sent"): the
+    /// real path the capabilities allow, or the path itself, made full, without them; a <see cref="WebLingoFileSystemException"/>
+    /// of <see cref="WebLingoFileErrorKind.NotAllowed"/> where the site may not read it.
+    /// </summary>
+    string ReadablePath(string path);
+
     /// <summary>Whether a folder is there; a file is not one.</summary>
     bool IsFolder(string path);
 

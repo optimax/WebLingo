@@ -17,9 +17,16 @@ namespace WebLingo.Hosting;
 /// </summary>
 public enum WebLingoRequestOutcomeKind { Page, File, NotFound, Failed, Handler, MethodNotAllowed, Waiting, TooLarge, Forbidden }
 
-/// <summary>A request's outcome; for <see cref="WebLingoRequestOutcomeKind.File"/>, the file, from the application's root.</summary>
+/// <summary>
+/// A request's outcome; for <see cref="WebLingoRequestOutcomeKind.File"/>, the file, from the application's root, or, where a
+/// page or a handler sent it, <see cref="Sent"/>, its full path, the response left uncommitted for its host to send it with
+/// the page's status and headers.
+/// </summary>
 public sealed record WebLingoRequestOutcome(WebLingoRequestOutcomeKind Kind, string? File = null)
 {
+    /// <summary>The file a page or a handler sent, or null for a site's own file.</summary>
+    public WebLingoSentFile? Sent { get; init; }
+
     /// <summary>
     /// For a request that waits: goes on with it, on the worker it began on, giving its next outcome, once the scheduler
     /// host it was given has been posted work, or <see cref="WaitMilliseconds"/> have passed, or it is cancelled.
@@ -461,6 +468,8 @@ public sealed class WebLingoApplication
             WebLingoErrorPages.Limited(response, _options.Headers, _options.Mode, [error]);
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.Failed);
         }
+        // A file it sent: its response left uncommitted, for its host to send the file with its status and headers.
+        if (output.Sent is { } file) return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.File, file.Path) { Sent = file };
         output.Send();
         response.Complete();
         return new WebLingoRequestOutcome(done);
