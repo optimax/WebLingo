@@ -102,6 +102,33 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
     }
 
     /// <summary>
+    /// The site's <c>wasp.config</c> given a setting more, <paramref name="setting"/>, beside its own, the site then reloaded
+    /// and answering again, every request after it on the new configuration (section 9, "M0.24 parts", part 3).
+    /// </summary>
+    public async Task Configure(string setting)
+    {
+        if (_folder is null) throw new InvalidOperationException("--fair needs a site the benchmark serves itself.");
+        var original = await File.ReadAllTextAsync(Path.Combine(WebLingoLoad.SiteFolder, "wasp.config"));
+        var brace = original.IndexOf('{', StringComparison.Ordinal);
+        await Replace("wasp.config", original[..(brace + 1)] + "\n  " + setting + "," + original[(brace + 1)..]);
+        // The reload is seen by the next request: asked for until answered, then a moment more for the old generation's drain.
+        using var client = Client();
+        for (var tries = 0; tries < 100; tries++)
+        {
+            try
+            {
+                using var response = await client.GetAsync("/hello");
+                if (response.IsSuccessStatusCode) break;
+            }
+            catch (HttpRequestException)
+            {
+            }
+            await Task.Delay(100);
+        }
+        await Task.Delay(1000);
+    }
+
+    /// <summary>
     /// A page of the site replaced, whole, as a deployment replaces a file: written beside it, then moved over it, the move
     /// tried again every 10 ms where the server has the page open, as a deployment's tools try again; how many times it was
     /// refused so.

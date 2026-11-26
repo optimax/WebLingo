@@ -27,7 +27,9 @@ public sealed record WebLingoServerSample(long WorkingSet, long PrivateBytes, in
 /// its own cookies, as browsers do, every answer checked, until the time measured ends. It writes each page's throughput and
 /// latency at each number of clients, and its server's memory after; with <c>--reload</c>, a page replaced every quarter
 /// of a second while clients ask for it, every answer one version's whole; with <c>--soak</c>, the pages asked for in turn
-/// for hours, the server's memory and handles sampled as it goes. Exit codes: 0 every answer right, 1 one wrong or failed,
+/// for hours, the server's memory and handles sampled as it goes; with <c>--fair</c>, a page that computes for long asked
+/// for by a client for each of the server's workers while others ask for <c>hello</c>, under each quantum given (section 9,
+/// "M0.24 parts", part 3). Exit codes: 0 every answer right, 1 one wrong or failed,
 /// 2 a usage error.
 /// </summary>
 public static class WebLingoLoad
@@ -38,6 +40,12 @@ public static class WebLingoLoad
 
     private static readonly byte[] Upload = MakeUpload();
     private static readonly long ComputedSum = ComputeSum();
+
+    /// <summary><c>slow.wasp</c>'s sum, 20,000,000 numbers' remainders by 7, which <c>--fair</c> asks for beside <c>hello</c>.</summary>
+    private static readonly long SlowSum = SlowSumOf(20_000_000);
+
+    /// <summary>The page that computes for long, a second or so, which <c>--fair</c> asks for; not among the pages measured otherwise.</summary>
+    private static readonly WebLingoLoadPage Slow = new("slow", () => Get("/slow"), body => Has(body, $"<p>Slow: {SlowSum}.</p>"));
     private static readonly Regex Visits = new(@"<p>Visits: (\d+)\.</p>", RegexOptions.CultureInvariant);
 
     /// <summary>The load site's pages, each a kind of work a site does (the specification, section 5.6, "Under load").</summary>
@@ -101,6 +109,9 @@ public static class WebLingoLoad
         public int WarmUp { get; private set; } = 3;
         public int? Reload { get; private set; }
         public double? Soak { get; private set; }
+
+        /// <summary>The quanta <c>--fair</c> tries, null for none, each in turn; null where it is not asked for.</summary>
+        public List<long?>? Fair { get; private set; }
         public int Sample { get; private set; } = 10;
 
         public IReadOnlyList<WebLingoLoadPage> All => Site == "forum" ? ForumPages : WebLingoLoad.Pages;
@@ -144,6 +155,9 @@ public static class WebLingoLoad
                 case "--soak" when double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var hours) && hours > 0:
                     Soak = hours;
                     return true;
+                case "--fair" when TryQuanta(value, out var quanta):
+                    Fair = quanta;
+                    return true;
                 default:
                     return false;
             }
@@ -158,6 +172,7 @@ public static class WebLingoLoad
                          + "logical processors, the clients on the same machine.");
         output.WriteLine();
         if (settings.Reload is { } reload) return await Reload(site, settings.Clients.Max(), TimeSpan.FromSeconds(reload), output);
+        if (settings.Fair is { } fair) return await Fair(site, fair, settings, output);
         if (settings.Soak is { } hours)
         {
             var sample = TimeSpan.FromMinutes(settings.Sample);
@@ -409,6 +424,61 @@ public static class WebLingoLoad
     }
 
     /// <summary>What <c>compute.wasp</c> sums, computed as it computes it.</summary>
+    /// <summary>
+    /// <c>--fair</c> (section 9, "M0.24 parts", part 3): under each quantum, the site's <c>wasp.config</c> given it, a client
+    /// for each of the server's workers, the machine's processors, asking for <c>slow</c>, so that every worker computes, and
+    /// the most <c>--clients</c> gives asking for <c>hello</c> at once: <c>hello</c>'s latencies, which a worker held by a
+    /// slow page delays, and both pages' throughput.
+    /// </summary>
+    private static async Task<int> Fair(WebLingoLoadSite site, IReadOnlyList<long?> quanta, Settings settings, TextWriter output)
+    {
+        var (time, warmUp) = (TimeSpan.FromSeconds(settings.Seconds), TimeSpan.FromSeconds(settings.WarmUp));
+        var (slow, quick) = (Environment.ProcessorCount, settings.Clients.Max());
+        output.WriteLine($"`slow` asked for by {slow} clients, one for each of the server's workers, and `hello` by {quick} at once, "
+                         + $"for {settings.Seconds} s after {settings.WarmUp} s, under each quantum.");
+        output.WriteLine();
+        output.WriteLine("| Quantum | hello: requests/s | Median | 95% under | 99% under | slow: requests/s | Median | Errors |");
+        output.WriteLine("|---|---:|---:|---:|---:|---:|---:|---:|");
+        var wrong = 0;
+        foreach (var quantum in quanta)
+        {
+            var limit = quantum is { } given ? given.ToString(CultureInfo.InvariantCulture) : "null";
+            await site.Configure($"\"limits\": {{ \"quantum\": {limit} }}");
+            var hello = Pages[0];
+            var measured = await Task.WhenAll(Measure(site, Slow, slow, warmUp, time), Measure(site, hello, quick, warmUp, time));
+            var (slowResult, helloResult) = (measured[0], measured[1]);
+            var errors = slowResult.Errors + helloResult.Errors;
+            wrong += errors;
+            var first = helloResult.FirstError ?? slowResult.FirstError;
+            output.WriteLine($"| {(quantum is { } q ? Number(q) : "none")} | {Number(helloResult.PerSecond)} | {Milliseconds(helloResult.Median)} | "
+                             + $"{Milliseconds(helloResult.Slowest95)} | {Milliseconds(helloResult.Slowest99)} | "
+                             + $"{slowResult.PerSecond.ToString("0.0", CultureInfo.InvariantCulture)} | {Milliseconds(slowResult.Median)} | "
+                             + $"{errors}{(first is null ? "" : ": " + first)} |");
+            output.Flush();
+        }
+        return wrong == 0 ? Success : Failed;
+    }
+
+    /// <summary>The quanta <c>--fair</c> takes, <c>none,1000000,100000,10000</c>, each <c>none</c> or an integer more than 0.</summary>
+    private static bool TryQuanta(string text, out List<long?> quanta)
+    {
+        quanta = [];
+        foreach (var part in text.Split(','))
+        {
+            if (part == "none") quanta.Add(null);
+            else if (long.TryParse(part, NumberStyles.None, CultureInfo.InvariantCulture, out var quantum) && quantum > 0) quanta.Add(quantum);
+            else return false;
+        }
+        return quanta.Count > 0;
+    }
+
+    private static long SlowSumOf(long count)
+    {
+        long sum = 0;
+        for (long i = 0; i < count; i++) sum += i % 7;
+        return sum;
+    }
+
     private static long ComputeSum()
     {
         long sum = 0;
@@ -467,7 +537,8 @@ public static class WebLingoLoad
     {
         error.WriteLine("Usage: WebLingo.Benchmarks --load [--host serve|fastcgi | --url <url>] [--site load|forum] [--page NAME]...");
         error.WriteLine("                             [--clients 1,4,16,64,256]");
-        error.WriteLine("                             [--seconds N] [--warm-up N] [--reload SECONDS | --soak HOURS [--sample MINUTES]]");
+        error.WriteLine("                             [--seconds N] [--warm-up N] [--reload SECONDS | --soak HOURS [--sample MINUTES]");
+        error.WriteLine("                             | --fair none,1000000,100000,10000]");
         error.WriteLine($"  pages: {string.Join(", ", Pages.Select(page => page.Name))}");
         error.WriteLine($"  the forum's, --site forum, at --url: {string.Join(", ", ForumPages.Select(page => page.Name))}");
         return UsageError;
