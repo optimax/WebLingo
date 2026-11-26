@@ -384,7 +384,8 @@ the processors are busy: so work a test waits for, its own server's or client's,
 of its own (`SmtpTestServer`, `DebugAdapterSession`, whose pipes `ReadAsync` and `WriteAsync` reached through the pool),
 and code already running on a pool thread does not wait there for asynchronous work, which needs another of the pool's
 threads to complete: `WebLingoSmtpClient` connects and makes its TLS handshake synchronously. The product's own blocking
-work off the worker runs on threads of WebLingo's own, `DotNetBlockingPool`, never .NET's pool, which a site on SQL Server
+work off the worker runs on threads of WebLingo's own, `DotNetBlockingPool`, four for each processor at most, the rest
+queued, never .NET's pool, which a site on SQL Server
 starved under 64 clients and more (specification, section 6.10). Until 24 November 2026
 both did, and the suite, run under load ("Flaky Tests Found Under Load", two runs at once beside a process spinning on
 every processor), failed in five of its first six runs, on a mail test whose server waited 10 s for a TLS handshake, or a

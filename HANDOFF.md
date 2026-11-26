@@ -115,6 +115,14 @@ test built-in, `remember()`, given the heap); `FastCgiTests.OldGenerationsAreLet
 the FastCGI host and the real watcher, generations only. Nothing was found to fix; each fails with a leak put in on
 purpose. Rebuild a test project after such a trial: its build is what runs.
 
+## The work off the workers
+
+`DotNetBlockingPool` (`WebLingo.Platform.DotNet`) runs work that blocks, a database's, a file's, a subprocess's, a mail
+server's, on threads of its own: four for each processor at most (`MaxThreads`, M0.24's part 1), work beyond them queued
+in order. Its queue and its counts are under one lock, a waiting thread pulsed for each piece of work; before, a thread
+that had just taken work still counted as waiting, and work queued then waited with a thread to spare.
+`BlockingPoolTests` (`WebLingo.Conformance.Tests`) holds the process's threads for a moment only, other tests sharing them.
+
 ## Logging
 
 `std:log` (`WebLingo.StdLib.Log`, `std/log.dll`): `log.debug/info/warn/error(text)` through the execution's

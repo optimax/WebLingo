@@ -1194,9 +1194,15 @@ User Manual's section 18 configures it.
 - Platform I/O completion may happen on another host thread but must post work to the owner.
 - Instruction-quantum yielding and bounded blocking-operation pools are recommended. As built (24 November 2026, "SQL
   Server Pages Under Many Clients"; Proposed): work off the worker that blocks, a database's, a file's, a subprocess's, a
-  mail server's, runs on threads of WebLingo's own, `DotNetBlockingPool`, made as work comes and none waits, up to 256, never
+  mail server's, runs on threads of WebLingo's own, `DotNetBlockingPool`, made as work comes and none waits, never
   on .NET's thread pool, which ASP.NET Core's requests and every completion need, and which work blocking its threads had
-  starved, a site on SQL Server stalling at 64 clients and waiting 13 s at 256 (§5.6, "Under load").
+  starved, a site on SQL Server stalling at 64 clients and waiting 13 s at 256 (§5.6, "Under load"). Bounded (26 November
+  2026, the owner's answer, A2 (a) of "M0.24: Fair Workers"; §9, "M0.24 parts", part 1): four threads for each processor
+  at most, 32 on a machine of 8, in place of 256 on any machine, work beyond them queued and run in the order it came, by
+  the first thread free; its work and its threads' counts kept under one lock, a thread that waits woken for each piece of
+  work, where until then a thread that had just taken work still counted as waiting for a moment, so that work queued then
+  had no thread made for it and waited for one to come free, 15 of 16 pieces beginning at once, under load, where 16
+  should have (Proposed, as built).
 - Work stealing or migration is deferred until supported by explicit safe-transfer semantics.
 
 ### 6.11 Security and diagnostics
@@ -2070,7 +2076,9 @@ that the owner has not decided is a question of its task's, and Proposed here un
 1. **The work off the workers bounded** (A2 (a)). The threads that run work off the workers, a database's, a file's, a
    subprocess's or a mail server's (`DotNetBlockingPool`, §6.10), four for each processor at most by default, in place
    of 256 for any machine, work beyond them queued and run in the order it came, as threads come free; tested with more
-   work at once than threads.
+   work at once than threads. Built (26 November 2026; §6.10): `DotNetBlockingPool.MaxThreads`, four times the
+   processors, and its accounting under one lock, which found and fixed work left waiting with a thread to spare;
+   `BlockingPoolTests`. A site's pages under many clients at once, SQL Server's among them, are measured with part 3.
 2. **The quantum** (A1 (a)). A request that has run `wasp.config`'s `"limits"`' `"quantum"` of instructions, 100,000 by
    default, since it last waited or yielded, yields its worker: it waits as at an `await` that is already done, its
    worker running the other requests' ready work, then it goes on, never another task of its own execution meanwhile,
