@@ -12,7 +12,8 @@ search, by words, on a board and by an author. Avatars, attachments and the rest
 
 ```text
 WebLingoForum/
-  setup/        outside the site: setup.wlg, which makes the forum's database, and its weblingo.config
+  setup/        outside the site: setup.wlg, which makes the forum's database, and its weblingo.config;
+                copy-editor.wlg, which copies MarkdownEditor.Web, the Markdown editor, into site/js/markdown-editor
   data/         outside the site: forum.db, which setup.wlg makes, not in the repository
   site/         the site, and wasp's root
     index.wasp  /                 the categories and their boards

@@ -56,7 +56,7 @@ a.tag.new { background: var(--accent); text-decoration: none; }
 form.form.wide { max-width: none; }
 form.form textarea { min-height: 10rem; resize: vertical; }
 .buttons { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
-form.form button.secondary { color: var(--accent); background: var(--surface); border: 1px solid var(--accent); }
+form.form > .buttons > button.secondary { color: var(--accent); background: var(--surface); border: 1px solid var(--accent); }
 .preview, .quoted { margin-bottom: 1rem; padding: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
 .preview { border-style: dashed; }
 .preview h2.plain { margin-top: 0; }
@@ -85,6 +85,12 @@ table.list tr.new a.conversation { font-weight: 700; }
 article.result { margin-bottom: 0.75rem; padding: 0.6rem 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
 article.result a.topic { font-weight: 600; }
 article.result p { margin: 0.25rem 0 0; }
+markdown-editor.markdown { border: 1px solid var(--border); border-radius: 4px; font-weight: normal; }
+.body table { border-collapse: collapse; margin: 0 0 0.75rem; }
+.body th, .body td { padding: 0.25rem 0.6rem; border: 1px solid var(--border); }
+.body th { background: var(--background); }
+.body li.task { list-style: none; margin-left: -1.2rem; }
+.body pre.front-matter { color: var(--muted); }
 button.primary { font: inherit; margin-top: 0.5rem; padding: 0.4rem 1rem; color: var(--accent-text); background: var(--accent); border: none; border-radius: 4px; cursor: pointer; }
 
 .pages { margin: 0.75rem 0; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
@@ -99,8 +105,8 @@ button.link { background: none; border: none; padding: 0; font: inherit; text-de
 h2.plain { color: var(--text); background: none; padding: 0; margin: 1.5rem 0 0.5rem; }
 form.form { display: flex; flex-direction: column; gap: 0.75rem; max-width: 28rem; padding: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
 form.form label { display: flex; flex-direction: column; gap: 0.25rem; font-weight: 600; }
-form.form input, form.form select, form.form textarea { font: inherit; font-weight: normal; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; }
-form.form button, .button { align-self: flex-start; font: inherit; padding: 0.4rem 1rem; color: var(--accent-text); background: var(--accent); border: none; border-radius: 4px; cursor: pointer; }
+form.form label > input, form.form label > select, form.form label > textarea { font: inherit; font-weight: normal; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; }
+form.form > button, form.form > .buttons > button, .button { align-self: flex-start; font: inherit; padding: 0.4rem 1rem; color: var(--accent-text); background: var(--accent); border: none; border-radius: 4px; cursor: pointer; }
 form.form .note { font-weight: normal; }
 .problems { padding: 0.5rem 0.75rem; color: #8a1c1c; background: #fdecec; border: 1px solid #f3c1c1; border-radius: 6px; margin-bottom: 0.75rem; }
 .problems p { margin: 0.15rem 0; }

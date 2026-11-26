@@ -12,6 +12,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %> · <%= site.settings["name"] %></title>
   <link rel="stylesheet" href="/css/forum.css">
+  <script type="module" src="/js/forum-editor.js"></script>
   <style>
     :root {
       --accent: <%= colors["accent"] %>; --accent-text: <%= colors["accentText"] %>; --background: <%= colors["background"] %>;

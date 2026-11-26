@@ -3,10 +3,12 @@
 // writes is its own, so that nothing a member writes becomes markup of theirs; a page writes what it gives raw.
 //
 // Blocks: paragraphs, a line break in one kept; headings, # to ######, written as h3 to h6, below the page's own;
-// fenced code, ``` or ~~~; block quotes, >; lists, -, * or + and 1. or 1); and rules, ---. Within them: code spans,
-// `x`; strong, **x** or __x__; emphasis, *x* or _x_; struck text, ~~x~~; links, [text](https://…), <https://…> and
-// bare http and https addresses, which get rel="nofollow ugc noopener"; images, ![alt](https://…), only where options
-// allow them, else links; and escapes, \*.
+// fenced code, ``` or ~~~; block quotes, >; lists, -, * or + and 1. or 1), and task lists, - [ ] and - [x]; pipe tables;
+// rules, ---; and front matter, YAML between two --- at a post's start, shown as it is written. Within them: code
+// spans, `x`; strong, **x** or __x__; emphasis, *x* or _x_; struck text, ~~x~~; underlined, ==x==; subscript, H~2~O,
+// and superscript, x^2^; links, [text](https://…), <https://…> and bare http and https addresses, which get
+// rel="nofollow ugc noopener"; images, ![alt](https://…), only where options allow them, else links; and escapes, \*.
+// The extensions are MarkdownEditor.Web's, MaxPad's, which the forum's editor writes.
 
 import { Html } from "std:html";
 
@@ -20,6 +22,16 @@ const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 export function render(text, options = null) {
     var images = options?["images"] ?? false;
     var lines = (text ?? "").replace("\r\n", "\n").replace("\r", "\n").replace("\t", "    ").split("\n");
+    // Front matter: YAML between a --- that begins the text and the next --- or ..., shown as it is written.
+    if (lines[0].trimEnd() == "---") {
+        for (var end = 1; end < lines.length; end++) {
+            var fence = lines[end].trimEnd();
+            if (fence == "---" || fence == "...") {
+                var yaml = end == 1 ? "" : Html.escape("\n".join(lines.slice(1, end))) + "\n";
+                return $"<pre class=\"front-matter\"><code>{yaml}</code></pre>\n" + blocks(lines.slice(end + 1), 0, images);
+            }
+        }
+    }
     return blocks(lines, 0, images);
 }
 
@@ -208,6 +220,14 @@ function blocks(lines, depth, images) {
             i = list(lines, i, depth, images, out);
             continue;
         }
+        if (depth < maxDepth && i + 1 < lines.length && line.contains("|")) {
+            var aligns = alignmentsOf(lines[i + 1]);
+            var header = cellsOf(line);
+            if (aligns != null && aligns.length == header.length) {
+                i = table(lines, i, header, aligns, depth, images, out);
+                continue;
+            }
+        }
         var paragraph = [inline(line.trim(), depth, images, true)];
         i++;
         while (i < lines.length && lines[i].trim() != "" && !starts(lines[i])) {
@@ -266,15 +286,100 @@ function list(lines, i, depth, images, out) {
     var open = !ordered ? "<ul>" : first["start"] == 1 ? "<ol>" : $"<ol start=\"{first['start']}\">";
     var written = [open];
     foreach (var item in items) {
+        // A task's box, [ ] or [x], before its text.
+        var box = null;
+        foreach (var mark in ["[ ]", "[x]", "[X]"]) {
+            if (item[0] == mark || item[0].startsWith(mark + " ")) {
+                box = mark == "[ ]" ? "<input type=\"checkbox\" disabled> " : "<input type=\"checkbox\" disabled checked> ";
+                item[0] = item[0].slice(3).trimStart();
+            }
+        }
         var html = blocks(item, depth + 1, images);
         // A tight list's item: its first paragraph without its <p>.
         if (!loose && html.startsWith("<p>")) {
             var end = html.indexOf("</p>");
             html = html.slice(3, end) + html.slice(end + 4);
         }
-        written.push("<li>" + html.trimEnd() + "</li>");
+        if (box == null) {
+            written.push("<li>" + html.trimEnd() + "</li>");
+        } else {
+            written.push("<li class=\"task\">" + (html.startsWith("<p>") ? "<p>" + box + html.slice(3) : box + html).trimEnd() + "</li>");
+        }
     }
     written.push(!ordered ? "</ul>" : "</ol>");
+    out.push("\n".join(written));
+    return i;
+}
+
+// A table row's cells, its line split at each | not escaped, a | at either end left out, each cell trimmed.
+function cellsOf(line) {
+    var cells = [];
+    var cell = "";
+    foreach (var piece in line.trim().split("|")) {
+        if (cell.endsWith("\\")) {
+            cell = cell + "|" + piece;
+        } else {
+            cells.push(cell);
+            cell = piece;
+        }
+    }
+    cells.push(cell);
+    cells = cells.slice(1);
+    if (cells.length > 0 && cells[0].trim() == "" && line.trim().startsWith("|")) {
+        cells = cells.slice(1);
+    }
+    if (cells.length > 0 && cells[cells.length - 1].trim() == "" && line.trim().endsWith("|") && !line.trim().endsWith("\\|")) {
+        cells = cells.slice(0, cells.length - 1);
+    }
+    return cells.map(cell => cell.trim());
+}
+
+// A table's delimiter row's alignment for each column, "", "left", "center" or "right", or null where the line is none:
+// each cell a run of hyphens, with a colon at either end or both.
+function alignmentsOf(line) {
+    if (!line.contains("-") || indentOf(line) > 3) {
+        return null;
+    }
+    var aligns = [];
+    foreach (var cell in cellsOf(line)) {
+        var dashes = cell.trimStart(":").trimEnd(":");
+        if (dashes == "" || dashes.trim("-") != "" || cell.length - dashes.length > 2) {
+            return null;
+        }
+        var left = cell.startsWith(":");
+        var right = cell.endsWith(":");
+        aligns.push(left && right ? "center" : right ? "right" : left ? "left" : "");
+    }
+    return aligns.length == 0 ? null : aligns;
+}
+
+// A table from its header at lines[i], its delimiter row after it, and its rows up to a blank line or another block:
+// written to out; gives the line after it. A row of fewer cells than the header is filled, of more cut.
+function table(lines, i, header, aligns, depth, images, out) {
+    function row(cells, tag) {
+        var written = [];
+        for (var c = 0; c < aligns.length; c++) {
+            var style = aligns[c] == "" ? "" : $" style=\"text-align: {aligns[c]}\"";
+            var html = c < cells.length ? inline(cells[c], depth + 1, images, true) : "";
+            written.push($"<{tag}{style}>{html}</{tag}>");
+        }
+        return "<tr>" + "".join(written) + "</tr>";
+    }
+    var written = ["<table>", "<thead>", row(header, "th"), "</thead>"];
+    i += 2;
+    var body = [];
+    while (i < lines.length && lines[i].trim() != "" && !starts(lines[i])) {
+        body.push(row(cellsOf(lines[i]), "td"));
+        i++;
+    }
+    if (body.length > 0) {
+        written.push("<tbody>");
+        foreach (var r in body) {
+            written.push(r);
+        }
+        written.push("</tbody>");
+    }
+    written.push("</table>");
     out.push("\n".join(written));
     return i;
 }
@@ -374,19 +479,22 @@ function inline(text, depth, images, links) {
     var i = 0;
 
     // Where a closing delimiter of emphasis is from start: after text that does not end with a space, and, for _, not
-    // before a letter; or -1.
-    function closer(delimiter, start) {
-        if (none.has(delimiter) && start >= none[delimiter]) {
+    // before a letter; exact, a run of the delimiter's own length alone; or -1.
+    function closer(delimiter, start, exact) {
+        var key = exact ? delimiter + "!" : delimiter;
+        if (none.has(key) && start >= none[key]) {
             return -1;
         }
         var size = delimiter.length;
+        var c = delimiter[0];
         for (var at = start + 1; at + size <= n; at++) {
-            if (chars[at] == delimiter[0] && (size == 1 || chars[at + 1] == delimiter[0]) && !isSpace(chars[at - 1])
-                && (delimiter[0] != "_" || at + size >= n || !letters.contains(chars[at + size]))) {
+            if (chars[at] == c && (size == 1 || chars[at + 1] == c) && !isSpace(chars[at - 1])
+                && (c != "_" || at + size >= n || !letters.contains(chars[at + size]))
+                && (!exact || (chars[at - 1] != c && (at + size >= n || chars[at + size] != c)))) {
                 return at;
             }
         }
-        none[delimiter] = start;
+        none[key] = start;
         return -1;
     }
 
@@ -476,24 +584,28 @@ function inline(text, depth, images, links) {
                 }
             }
         }
-        if (c == "*" || c == "_" || c == "~") {
+        if (c == "*" || c == "_" || c == "~" || c == "=" || c == "^") {
             var run = runOf(chars, i, c);
-            var size = c == "~" ? 2 : (run >= 2 ? 2 : 1);
-            var opens = depth < maxDepth && run <= 3 && (c != "~" || run == 2) && i + run < n && !isSpace(chars[i + run])
+            // Emphasis and strong, * and _; struck text and underlined, runs of two, ~~ and ==; subscript and superscript,
+            // runs of one, ~ and ^, each closed by a run of its own length alone.
+            var emphasis = c == "*" || c == "_";
+            var size = emphasis ? (run >= 2 ? 2 : 1) : c == "=" ? 2 : c == "^" ? 1 : run;
+            var allowed = emphasis ? run <= 3 : c == "~" ? run <= 2 : c == "=" ? run == 2 : run == 1;
+            var opens = depth < maxDepth && allowed && i + run < n && !isSpace(chars[i + run])
                         && (c != "_" || i == 0 || !letters.contains(chars[i - 1]));
             if (opens) {
                 var delimiter = c.repeat(size);
-                var at = closer(delimiter, i + size);
+                var at = closer(delimiter, i + size, !emphasis);
                 if (at > i + size) {
                     // Strong whose text holds an emphasis left open ends at the last of a longer run, ***, so that its
                     // emphasis closes first.
                     var after = runOf(chars, at, c);
                     var inner = part(chars, i + size, at);
-                    if (size == 2 && after > 2 && (inner.length - inner.replace(c, "").length) % 2 == 1) {
+                    if (emphasis && size == 2 && after > 2 && (inner.length - inner.replace(c, "").length) % 2 == 1) {
                         at = at + after - 2;
                         inner = part(chars, i + size, at);
                     }
-                    var tag = c == "~" ? "del" : size == 2 ? "strong" : "em";
+                    var tag = c == "~" ? (size == 2 ? "del" : "sub") : c == "=" ? "u" : c == "^" ? "sup" : size == 2 ? "strong" : "em";
                     out.push(Html.escape(part(chars, from, i)));
                     out.push($"<{tag}>{inline(inner, depth + 1, images, links)}</{tag}>");
                     i = at + size;

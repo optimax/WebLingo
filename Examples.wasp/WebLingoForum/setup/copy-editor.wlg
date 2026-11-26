@@ -1,0 +1,57 @@
+// Copies MarkdownEditor.Web, the owner's WYSIWYG Markdown editor, into the forum's site, site/js/markdown-editor: its
+// src folder, which a page imports as it is, and its LICENSE (Documents/weblingo-forum.md, section 3.7). Run again when
+// the editor changes: weblingo run copy-editor.wlg, or with from=, its checkout's folder, beside this repository's by
+// default.
+
+param from = "../../../../MarkdownEditor.Web";
+
+import { writeLn } from "std:console";
+import fs from "std:fs";
+
+const target = "../site/js/markdown-editor";
+
+// Copies a folder's files and folders into another, made where it is not there.
+async function copyFolder(source, destination) {
+    if (!(await fs.exists(destination))) {
+        await fs.makeFolder(destination);
+    }
+    var count = 0;
+    foreach (var name in await fs.list(source)) {
+        var path = source + "/" + name;
+        if (await fs.isFolder(path)) {
+            count = count + await copyFolder(path, destination + "/" + name);
+        } else {
+            await fs.copy(path, destination + "/" + name);
+            count = count + 1;
+        }
+    }
+    return count;
+}
+
+// Removes a folder and everything in it.
+async function removeAll(path) {
+    foreach (var name in await fs.list(path)) {
+        if (await fs.isFolder(path + "/" + name)) {
+            await removeAll(path + "/" + name);
+        } else {
+            await fs.remove(path + "/" + name);
+        }
+    }
+    await fs.removeFolder(path);
+}
+
+if (!(await fs.exists(from + "/src/index.js"))) {
+    throw new Error($"MarkdownEditor.Web is not at {from}: give its folder, from=C:/PROJECTS/MarkdownEditor.Web.");
+}
+if (await fs.exists(target)) {
+    await removeAll(target);
+}
+var count = await copyFolder(from + "/src", target);
+var licensed = await fs.exists(from + "/LICENSE");
+if (licensed) {
+    await fs.copy(from + "/LICENSE", target + "/LICENSE");
+}
+writeLn($"Copied MarkdownEditor.Web's {count} files into site/js/markdown-editor.");
+if (!licensed) {
+    writeLn("MarkdownEditor.Web has no LICENSE yet: the copy is not to be committed until it has.");
+}

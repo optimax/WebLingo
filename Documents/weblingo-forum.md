@@ -48,7 +48,8 @@ As example2's and example3's sites are, the site is one folder. Everything the s
 ```text
 Examples.wasp/WebLingoForum/
   README.md         what it is, and how to run and deploy it
-  setup/            outside the site: setup.wlg, which makes the forum's database, and its weblingo.config
+  setup/            outside the site: setup.wlg, which makes the forum's database, and its weblingo.config;
+                    copy-editor.wlg, which copies MarkdownEditor.Web into site/js/markdown-editor
   data/             outside the site, made by setup.wlg, never in the repository: the SQLite database,
                     the uploaded avatars and attachments
   site/             the site, and wasp's root
@@ -120,7 +121,10 @@ Posts, signatures and private messages are written in Markdown, rendered by the 
 - paragraphs and line breaks, emphasis and strong emphasis, code spans and fenced code blocks;
 - block quotes (a quoted post is one), lists, headings, horizontal rules;
 - links and autolinks to `http`, `https` and `mailto` addresses only;
-- images only where the forum's settings allow them, its `"images"`, false by default, a link to the image otherwise (**Guess**).
+- images only where the forum's settings allow them, its `"images"`, false by default, a link to the image otherwise (**Guess**);
+- the extensions MarkdownEditor.Web writes, MaxPad's: pipe tables, task lists, `==underline==`, `~~strikethrough~~`, `~subscript~`, `^superscript^`, and front matter, shown as it is written (the owner's answer, A3 (b) of "WebLingo Forum: MarkdownEditor.Web in the Post Form", read as the renderer following what MarkdownEditor.Web writes, as it changes).
+
+The text of a post, a reply, a message and a signature is written in MarkdownEditor.Web, the owner's WYSIWYG Markdown editor (the owner's note on "Extensive WASP Example", and A1, A2 and A4 of its task): each a `<textarea data-markdown>`, which `site/js/forum-editor.js` replaces with the editor's `<markdown-editor>` where scripts run and the editor's files are in `site/js/markdown-editor`, so that the form works without them as it did. `setup/copy-editor.wlg` copies them there from a checkout of MarkdownEditor.Web beside this repository's, with its licence, MIT's, its copy committed once MarkdownEditor.Web has its `LICENSE`.
 
 A quoted post begins its reply as a block quote, after a line naming who wrote it, the name escaped so that it is only text.
 

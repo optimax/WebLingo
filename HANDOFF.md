@@ -371,6 +371,14 @@ or left. The schema's version 5 adds `conversations`, `conversation_members` and
 `tests/messages-tests.wlg`, and by `ForumTests`' walk of messages (`MessagesAsync`), on all four databases; the pages
 looked at in a browser.
 
+Its Markdown editor (the task "WebLingo Forum: MarkdownEditor.Web in the Post Form"): the forms' textareas marked
+`data-markdown`, which `site/js/forum-editor.js`, in the layout's head, replaces with MarkdownEditor.Web's
+`<markdown-editor>` where the editor's files are in `site/js/markdown-editor`, the form working without them as before;
+`setup/copy-editor.wlg` copies them there from MarkdownEditor.Web's checkout. The copy is not committed yet:
+MarkdownEditor.Web has no `LICENSE`, the task "A License: the MIT License" in its own `TO-DO.md`. The renderer reads
+MarkdownEditor.Web's extensions: tables, task lists, underline, subscript, superscript and front matter. Tried in a
+browser with the copy in a scratch forum: written, bold by Ctrl+B, previewed, posted as Markdown.
+
 Its search (part 7): `site/lib/search.wlg`, the forum's own index of words, `post_words`, the schema's version 6, kept
 by `posts.wlg` as a post is written and edited, a topic's title with its first post; and `search.wasp`, the posts with
 every word given, on the boards the reader may read, on one of them and by an author where asked (`searchPage` in

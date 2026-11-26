@@ -18,7 +18,7 @@
   <label><%= site.t("messages.to") %> <input name="to" value="<%= values["to"] %>" required maxlength="500">
     <span class="note"><%= site.t("messages.toHint") %></span></label>
   <label><%= site.t("messages.subject") %> <input name="subject" value="<%= values["subject"] %>" required maxlength="200"></label>
-  <label><%= site.t("messages.body") %> <textarea name="body" rows="10" required maxlength="20000"><%= values["body"] %></textarea>
+  <label><%= site.t("messages.body") %> <textarea name="body" rows="10" required maxlength="20000" data-markdown><%= values["body"] %></textarea>
     <span class="note"><%= site.t("post.markdownHint") %></span></label>
   <div class="buttons">
     <button name="action" value="post"><%= site.t("messages.send") %></button>

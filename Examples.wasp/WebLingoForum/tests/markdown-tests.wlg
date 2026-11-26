@@ -88,6 +88,23 @@ export class MarkdownTests {
         assertEqual(render("&lt; \"q\""), "<p>&amp;lt; &quot;q&quot;</p>\n");
     }
 
+    testMarkdownEditorWebsExtensions() {
+        assertEqual(render("==under== H~2~O x^2^ ~~gone~~"), "<p><u>under</u> H<sub>2</sub>O x<sup>2</sup> <del>gone</del></p>\n");
+        assertEqual(render("a == b, 2^10 and ~ alone, ~~~x~~~"), "<p>a == b, 2^10 and ~ alone, ~~~x~~~</p>\n");
+        assertEqual(render("- [ ] milk\n- [x] tea\n- plain"),
+            "<ul>\n<li class=\"task\"><input type=\"checkbox\" disabled> milk</li>\n"
+            + "<li class=\"task\"><input type=\"checkbox\" disabled checked> tea</li>\n<li>plain</li>\n</ul>\n");
+        assertEqual(render("| Tea | Price |\n| :--- | ---: |\n| Green | **3** |\n| a \\| b |\nAfter"),
+            "<table>\n<thead>\n<tr><th style=\"text-align: left\">Tea</th><th style=\"text-align: right\">Price</th></tr>\n</thead>\n"
+            + "<tbody>\n<tr><td style=\"text-align: left\">Green</td><td style=\"text-align: right\"><strong>3</strong></td></tr>\n"
+            + "<tr><td style=\"text-align: left\">a | b</td><td style=\"text-align: right\"></td></tr>\n"
+            + "<tr><td style=\"text-align: left\">After</td><td style=\"text-align: right\"></td></tr>\n</tbody>\n</table>\n");
+        assertEqual(render("a | b\n--- | :-:"), "<table>\n<thead>\n<tr><th>a</th><th style=\"text-align: center\">b</th></tr>\n</thead>\n</table>\n");
+        assertEqual(render("a | b\n--- | --- | ---"), "<p>a | b<br>\n--- | --- | ---</p>\n");
+        assertEqual(render("| <b>x</b> |\n| --- |"), "<table>\n<thead>\n<tr><th>&lt;b&gt;x&lt;/b&gt;</th></tr>\n</thead>\n</table>\n");
+        assertEqual(render("---\ntitle: <Tea>\n---\n# Tea"), "<pre class=\"front-matter\"><code>title: &lt;Tea&gt;\n</code></pre>\n<h3>Tea</h3>\n");
+    }
+
     testANameIsEscapedAndAPostQuoted() {
         assertEqual(escape("Anna_K. *x*"), "Anna\\_K\\. \\*x\\*");
         assertEqual(render(escape("**not bold** [x](https://a.example)")), "<p>**not bold** [x](https://a.example)</p>\n");

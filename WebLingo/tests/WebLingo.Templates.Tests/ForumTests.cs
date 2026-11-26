@@ -439,6 +439,10 @@ public sealed class ForumTests
         Assert.Contains("<p><strong>Tea</strong>, of course.</p>\n<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>", body);
         Assert.DoesNotContain("<script>alert", body);
         Assert.Contains(">**Tea**, of course.\n\n&lt;script&gt;alert(1)&lt;/script&gt;</textarea>", body);
+        // The text is a textarea, which the forum's script makes MarkdownEditor.Web's editor where the editor is there.
+        Assert.Contains("<textarea name=\"body\" rows=\"12\" required maxlength=\"20000\" data-markdown>", body);
+        Assert.Contains("<script type=\"module\" src=\"/js/forum-editor.js\"></script>", body);
+        Assert.Contains("import('./markdown-editor/index.js')", (await bob.Get("/js/forum-editor.js")).Item2);
         Assert.Contains("<td class=\"count\">31 topics<br>75 posts</td>", (await bob.Get("/")).Item2);
         (status, body, _) = await bob.Post("/post/new?board=1", ("title", " "), ("body", tea), ("action", "post"));
         Assert.Equal(HttpStatusCode.BadRequest, status);

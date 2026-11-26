@@ -17,7 +17,7 @@
       <option value="<%= code %>"<% if (view.values["language"] == code) { %> selected<% } %>><%= name %></option>
 <% } %>
     </select></label>
-  <label><%= site.t("profile.signature") %> <textarea name="signature" rows="3" maxlength="500"><%= view.values["signature"] %></textarea>
+  <label><%= site.t("profile.signature") %> <textarea name="signature" rows="3" maxlength="500" data-markdown><%= view.values["signature"] %></textarea>
     <span class="note"><%= site.t("profile.signatureHint") %></span></label>
   <button><%= site.t("form.save") %></button>
 </form>
