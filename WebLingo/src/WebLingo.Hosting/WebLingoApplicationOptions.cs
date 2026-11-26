@@ -129,6 +129,16 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// <summary>A request's instructions by default, 4 to 14 s of computing on a development machine (section 6.12, "Limits").</summary>
     public const long DefaultInstructionBudget = 1_000_000_000;
 
+    /// <summary>
+    /// How many instructions a request runs before it yields its worker to the other requests' ready work, then goes on
+    /// (section 9, "M0.24 parts", part 2): the configuration's <c>"limits"</c>' <c>"quantum"</c>, <see cref="DefaultQuantum"/>
+    /// by default, 0 for none; only where the request suspends, its host giving it a scheduler (<see cref="Scheduler"/>).
+    /// </summary>
+    public long Quantum { get; init; } = DefaultQuantum;
+
+    /// <summary>A request's quantum by default (the owner's answer, 26 November 2026, A1 (a) of "M0.24: Fair Workers").</summary>
+    public const long DefaultQuantum = 100_000;
+
     /// <summary>A request's time by default, as IIS's request timeout is (section 6.12, "Limits").</summary>
     public static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(60);
 

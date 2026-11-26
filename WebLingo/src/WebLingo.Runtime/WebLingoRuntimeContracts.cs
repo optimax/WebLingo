@@ -142,6 +142,15 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     /// </summary>
     public bool Suspends { get; init; }
 
+    /// <summary>
+    /// How many instructions the execution runs, where it suspends (<see cref="Suspends"/>), before it yields its worker, as at
+    /// an <c>await</c> already done, so that its host runs the other requests' ready work first, never another task of its
+    /// own (section 9, "M0.24 parts", part 2): its VM looks at it where it looks at its budget, before whichever instruction
+    /// comes, its result then waiting (<see cref="WebLingoExecutionResult.Waiting"/>) for no time, 0; the count begun again
+    /// where it goes on. 0, by default, for none.
+    /// </summary>
+    public long Quantum { get; init; }
+
     /// <summary>The host's workers, which <c>std:workers</c> reaches through the heap (<see cref="WebLingoHeap.Workers"/>); none by default.</summary>
     public IWebLingoWorkers? Workers { get; init; }
 

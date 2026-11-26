@@ -2142,8 +2142,17 @@ that the owner has not decided is a question of its task's, and Proposed here un
    so that a request's tasks still switch only at `await`; looked at where the VM looks at its budget, at no cost while
    it is not due, measured against `main` on the benchmark; a native function's work, which no quantum interrupts, left
    as it is. The VM looks at its budget before an instruction, whichever it is, once a count of instructions is reached,
-   not at calls and jumps back, and can wait before any instruction, as its debugger's stops show: where it yields is the
-   task's question (Proposed: where it looks at its budget).
+   not at calls and jumps back, and can wait before any instruction, as its debugger's stops show: where it yields (the
+   owner's answer, 26 November 2026, A1 (a) of "M0.24, Part 2: The Quantum"), where it looks at its budget, before
+   whatever instruction comes once the quantum has passed, at no cost while it is not due, any instruction being a point
+   where it can wait. Built (26 November 2026; Proposed where it says more): `WebLingoExecutionContext.Quantum`, which a
+   suspending execution's VM keeps (`Suspends`, a host's request's, never `weblingo`'s), counted from where `Run` begins
+   or goes on, and looked at where its budget and its cancellation are, every 1,024 instructions, so that a quantum is
+   kept to the next multiple of 1,024; its yield, `Yield`, not inlined, the request waiting before the instruction as its
+   debugger's stop leaves it, `Waits(0)`, its result waiting for no time, which the hosts' worker pool queues behind the
+   worker's other ready work, as a timer due at once; its going on, `GoesOn`, at once, the instruction then seen by its
+   debugger as any other; `WebLingoApplicationOptions.Quantum`, `wasp.config`'s `"limits"`' `"quantum"`, an integer more
+   than 0, or `null` for none; `QuantumTests`.
 3. **Measured.** The load test, a page that computes for long beside pages that do not, their latencies with each
    quantum and without one, the quantum's default chosen from them, its numbers in §5.6.
 

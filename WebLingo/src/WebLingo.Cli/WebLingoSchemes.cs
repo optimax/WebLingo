@@ -333,7 +333,8 @@ public static class WebLingoSchemes
                 + "\"workerTimeout\" numbers of seconds more than 0, or null for none, \"requestInstructions\" and \"workerInstructions\" integers "
                 + "more than 0, \"workerInstructions\" null for none too, \"requestMemory\" and \"workerMemory\" numbers of megabytes from 1 to "
                 + "1048576, \"workers\" an integer from 1 to 1024, \"drain\", \"requestArrival\" and \"keepAlive\" numbers of seconds more than 0, "
-                + $"and \"requestLine\" and \"requestHeaders\" numbers of bytes from 1 to 1048576, each number of seconds at most {MaxSeconds}.";
+                + "and \"requestLine\" and \"requestHeaders\" numbers of bytes from 1 to 1048576; and \"quantum\": 100000, the instructions a "
+                + $"request runs before it lets the others run, an integer more than 0, or null for none; each number of seconds at most {MaxSeconds}.";
         if (setting.ValueKind != JsonValueKind.Object) return false;
         foreach (var entry in setting.EnumerateObject())
         {
@@ -373,6 +374,15 @@ public static class WebLingoSchemes
             else if (entry.Name == "requestMemory" && number && entry.Value.TryGetInt64(out var megabytes) && megabytes is >= 1 and <= 1_048_576)
             {
                 limits = limits with { MemoryMegabytes = megabytes };
+            }
+            // A request's quantum (section 9, "M0.24 parts", part 2).
+            else if (entry.Name == "quantum" && number && entry.Value.TryGetInt64(out var quantum) && quantum > 0)
+            {
+                limits = limits with { Quantum = quantum, NoQuantum = false };
+            }
+            else if (entry.Name == "quantum" && entry.Value.ValueKind == JsonValueKind.Null)
+            {
+                limits = limits with { Quantum = null, NoQuantum = true };
             }
             // A script's workers' limits, weblingo's (section 9, "M0.26 parts", part 4).
             else if (entry.Name == "workers" && number && entry.Value.TryGetInt32(out var workers) && workers is >= 1 and <= 1024)
@@ -964,6 +974,14 @@ public sealed record WebLingoLimitSettings(double? TimeoutSeconds, long? Instruc
     /// megabytes of strings, <c>"workerMemory"</c>; each null where it gives none, the host's default then.
     /// </summary>
     public int? Workers { get; init; }
+
+    /// <summary>
+    /// A request's quantum, <c>"quantum"</c>, the instructions it runs before it yields its worker (section 9, "M0.24 parts",
+    /// part 2), null where it gives none; and whether it says there is none, <c>"quantum": null</c>.
+    /// </summary>
+    public long? Quantum { get; init; }
+
+    public bool NoQuantum { get; init; }
 
     public double? WorkerTimeoutSeconds { get; init; }
 

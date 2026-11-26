@@ -143,6 +143,14 @@ M0.23's part 4: `IWebLingoHttpRequest.ClientAddress`, a script's `request.client
 else `X-Forwarded-For`/`-Proto`, where its peer is trusted; ASP.NET Core's `Translate`, the standalone server and (by
 `REMOTE_ADDR`) FastCGI give the client. `WebLingoSchemes.TryLoadFolder` has one more out, `proxies`.
 
+## The quantum
+
+M0.24's part 2: a suspending execution's VM yields once its quantum (`WebLingoExecutionContext.Quantum`, `wasp.config`'s
+`"limits"`' `"quantum"`, 100,000 by default) has passed: `Run` keeps `_quantumDue`, set where it begins or goes on, and
+looks at it where it looks at its budget and cancellation, every 1,024 instructions; `Yield` (not inlined) stops it as
+the debugger's stop does, `_stopDepth` and `_yielded`, returning `Waits(0)`, and `GoesOn` goes on at once. The worker
+pool's timer for 0 ms requeues it behind the worker's other ready work. `QuantumTests` (`WebLingo.Hosting.Tests`).
+
 ## Values copied between heaps
 
 M0.26's part 1: `WebLingoMessage` (`WebLingo.Runtime`): `TryCopy(heap, value, errorClass, thrownAt)` copies a value out,

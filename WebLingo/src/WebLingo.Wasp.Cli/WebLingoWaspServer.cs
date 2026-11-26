@@ -241,6 +241,8 @@ public static class WebLingoWaspServer
             RequestTimeout = debugger is not null ? null : requestTimeout,
             Drain = limits.DrainSeconds is { } drain ? TimeSpan.FromSeconds(drain) : WebLingoApplicationOptions.DefaultDrain(requestTimeout),
             InstructionBudget = limits.Instructions ?? WebLingoApplicationOptions.DefaultInstructionBudget,
+            // Its quantum, a long request yielding its worker to the others (section 9, "M0.24 parts", part 2).
+            Quantum = limits.NoQuantum ? 0 : limits.Quantum ?? WebLingoApplicationOptions.DefaultQuantum,
             // What its server takes of a client, wasp.config's or Kestrel's defaults (section 9, "M0.23 parts", part 3).
             Proxies = proxies,
             HttpLimits = WebLingoHttpLimits.Default with

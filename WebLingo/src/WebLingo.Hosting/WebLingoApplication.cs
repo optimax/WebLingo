@@ -452,6 +452,7 @@ public sealed class WebLingoApplication
             TimeZone = _options.TimeZone,
             SchedulerHost = host,
             Suspends = scheduler is not null,
+            Quantum = _options.Quantum,
             InstructionBudget = _options.InstructionBudget,
             Resources = WebLingoResourceBudget.Default with { MaxHeapUnits = _options.MaxHeapUnits },
             Cancellation = cancellation,

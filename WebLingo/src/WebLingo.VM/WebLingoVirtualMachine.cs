@@ -402,6 +402,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             var debugger = Debugger;
             var maxCallDepth = context.Resources.MaxCallDepth;
             var executed = _executed;
+            // Its quantum, a suspending execution's, counted from where it begins or goes on (section 9, "M0.24 parts", part 2).
+            _quantumDue = context.Suspends && context.Quantum > 0 ? executed + context.Quantum : long.MaxValue;
             var dueAt = executed; // The count of instructions at which the budget and the cancellation signal are looked at.
             _resuming = resuming;
             WebLingoRuntimeError? error = null;
@@ -439,6 +441,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             return Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled.", frame.Function, pc)
                                 with { Instructions = executed };
                         }
+                        if (executed >= _quantumDue) return Yield(frames, frame, depth, pc, executed);
                         dueAt = Math.Min(budget, (executed / CancellationInterval + 1) * CancellationInterval);
                     }
                     if (debugger is not null && DebugInstruction(debugger, frames, frame, depth, pc, executed)) return _left!;
@@ -1592,6 +1595,25 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// <summary>Whether it has just gone on from such a stop, which the point it stopped at is not stopped at again.</summary>
         private bool _wentOn;
 
+        /// <summary>The count of instructions at which it yields its worker, its quantum's; <see cref="long.MaxValue"/> for none.</summary>
+        private long _quantumDue = long.MaxValue;
+
+        /// <summary>Whether its stop at <see cref="_stopDepth"/> is a yield of its quantum's, not its debugger's.</summary>
+        private bool _yielded;
+
+        /// <summary>
+        /// Its quantum passed (section 9, "M0.24 parts", part 2): it waits where it is, before the instruction at
+        /// <paramref name="pc"/>, its frames on the VM's stack, as its debugger's stop leaves it, for no time, so that its
+        /// host runs the other requests' ready work, then resumes it there.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private WebLingoExecutionResult Yield(Frame[] frames, Frame frame, int depth, int pc, long executed)
+        {
+            frame.Pc = pc;
+            (_frames, _executed, _depth, _stopDepth, _yielded) = (frames, executed, depth, depth, true);
+            return WebLingoExecutionResult.Waits(0) with { Instructions = executed };
+        }
+
         /// <summary>What <c>Run</c> returns where a debugger's stop leaves it: waiting, or cancelled.</summary>
         private WebLingoExecutionResult? _left;
 
@@ -1651,6 +1673,14 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 _left = Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled.", frame.Function, frame.Pc)
                     with { Instructions = executed };
                 return -1;
+            }
+            if (_yielded)
+            {
+                // A yield, gone on from at once, before the instruction it waited at, which no debugger has seen yet.
+                _yielded = false;
+                var resumed = _depth = _stopDepth;
+                _stopDepth = -1;
+                return resumed;
             }
             if (Debugger!.Waits)
             {
