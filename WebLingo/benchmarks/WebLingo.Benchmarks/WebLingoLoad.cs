@@ -52,6 +52,19 @@ public static class WebLingoLoad
         new("upload", Post, body => Has(body, $"<p>Received: {Upload.Length} {Upload.Length}.</p>"))
     ];
 
+    /// <summary>
+    /// WebLingo Forum's pages as a guest reads them (<c>Examples.wasp/WebLingoForum</c>; <c>Documents/weblingo-forum.md</c>,
+    /// section 6, part 10), <c>--site forum</c>, at <c>--url</c>, where the forum is served, its database made by its
+    /// <c>setup.wlg</c>: its front page, its first board, its first topic, and a search.
+    /// </summary>
+    public static IReadOnlyList<WebLingoLoadPage> ForumPages { get; } =
+    [
+        new("home", () => Get("/"), body => Has(body, "<title>Boards · ")),
+        new("board", () => Get("/board?id=1"), body => Has(body, "Welcome to the forum")),
+        new("topic", () => Get("/topic?id=1"), body => Has(body, "first post. Introduce yourself here")),
+        new("search", () => Get("/search?q=forum"), body => Has(body, "<p class=\"note\">"))
+    ];
+
     /// <summary>The site's folder beside the benchmark, copied for each run.</summary>
     public static string SiteFolder { get; } = Path.Combine(AppContext.BaseDirectory, "LoadSite");
 
@@ -63,6 +76,7 @@ public static class WebLingoLoad
             if (i + 1 >= args.Length || !settings.TryTake(args[i], args[i + 1])) return Usage(error);
             i++;
         }
+        if (!settings.IsWhole) return Usage(error);
         try
         {
             return RunAsync(settings, output, error).GetAwaiter().GetResult();
@@ -79,6 +93,7 @@ public static class WebLingoLoad
     private sealed class Settings
     {
         public string Host { get; private set; } = "serve";
+        public string Site { get; private set; } = "load";
         public Uri? Url { get; private set; }
         public List<string> Names { get; } = [];
         public int[] Clients { get; private set; } = [1, 4, 16, 64, 256];
@@ -88,8 +103,12 @@ public static class WebLingoLoad
         public double? Soak { get; private set; }
         public int Sample { get; private set; } = 10;
 
-        public IReadOnlyList<WebLingoLoadPage> Pages =>
-            Names.Count == 0 ? WebLingoLoad.Pages : WebLingoLoad.Pages.Where(page => Names.Contains(page.Name)).ToList();
+        public IReadOnlyList<WebLingoLoadPage> All => Site == "forum" ? ForumPages : WebLingoLoad.Pages;
+
+        public IReadOnlyList<WebLingoLoadPage> Pages => Names.Count == 0 ? All : All.Where(page => Names.Contains(page.Name)).ToList();
+
+        /// <summary>Whether what it was given goes together: the forum's pages at a URL, and pages its site has.</summary>
+        public bool IsWhole => (Site != "forum" || Url is not null) && Names.All(name => All.Any(page => page.Name == name));
 
         public bool TryTake(string option, string value)
         {
@@ -101,7 +120,10 @@ public static class WebLingoLoad
                 case "--url" when Uri.TryCreate(value, UriKind.Absolute, out var given) && given.Scheme is "http" or "https":
                     (Host, Url) = ("url", given);
                     return true;
-                case "--page" when WebLingoLoad.Pages.Any(page => page.Name == value):
+                case "--site" when value is "load" or "forum":
+                    Site = value;
+                    return true;
+                case "--page" when WebLingoLoad.Pages.Concat(ForumPages).Any(page => page.Name == value):
                     Names.Add(value);
                     return true;
                 case "--clients" when TryCounts(value, out var counts):
@@ -443,10 +465,11 @@ public static class WebLingoLoad
 
     private static int Usage(TextWriter error)
     {
-        error.WriteLine("Usage: WebLingo.Benchmarks --load [--host serve|fastcgi | --url <url>] [--page NAME]...");
+        error.WriteLine("Usage: WebLingo.Benchmarks --load [--host serve|fastcgi | --url <url>] [--site load|forum] [--page NAME]...");
         error.WriteLine("                             [--clients 1,4,16,64,256]");
         error.WriteLine("                             [--seconds N] [--warm-up N] [--reload SECONDS | --soak HOURS [--sample MINUTES]]");
         error.WriteLine($"  pages: {string.Join(", ", Pages.Select(page => page.Name))}");
+        error.WriteLine($"  the forum's, --site forum, at --url: {string.Join(", ", ForumPages.Select(page => page.Name))}");
         return UsageError;
     }
 }

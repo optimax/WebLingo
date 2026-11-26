@@ -99,7 +99,7 @@ public sealed class ForumTests
     /// uses them.
     /// </summary>
     /// <summary>A copy of the forum in a folder of its own, without what its data folders hold but their READMEs.</summary>
-    private static string CopyForum()
+    internal static string CopyForum()
     {
         var forum = Forum();
         var copy = Path.Combine(Path.GetTempPath(), "weblingo-forum-" + Guid.NewGuid().ToString("N"));

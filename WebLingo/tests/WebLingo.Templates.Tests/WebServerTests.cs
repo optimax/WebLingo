@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using WebLingo.Cli;
 using WebLingo.Wasp.Cli;
 using Xunit;
@@ -91,6 +92,117 @@ public sealed class WebServerTests : IDisposable
             using var stopping = Start(Path.Combine(root, "nginx.exe"), [.. arguments, "-s", "stop"], root);
             stopping.WaitForExit(20_000);
             if (!nginx.WaitForExit(20_000)) nginx.Kill(entireProcessTree: true);
+        }
+    }
+
+    /// <summary>
+    /// WebLingo Forum behind nginx, as its README deploys it (<c>Examples.wasp/WebLingoForum/README.md</c>, "Deploying
+    /// it"): <c>wasp fastcgi</c> serving a copy of the forum, its database made by its <c>setup.wlg</c>, and nginx passing it
+    /// requests whose bodies are as large as a post's files may be, <c>client_max_body_size 12m</c>, nginx's own 1 MB
+    /// being less: its front page; its administrator signed in; a picture of 1.5 MB attached to a reply, and sent back
+    /// whole, in part, and not again to a browser that has it.
+    /// </summary>
+    [WebServerFact("nginx")]
+    public async Task NginxServesTheForumFromWaspFastCgi()
+    {
+        var forum = ForumTests.CopyForum();
+        try
+        {
+            var (output, error) = (new StringWriter(), new StringWriter());
+            Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.Combine(forum, "setup", "setup.wlg"), "name=Anna",
+                "email=anna@example.com", "password=correct-horse", "uploads=" + Path.Combine(forum, "data", "uploads")], output, error));
+            var root = Path.Combine(Unpack("nginx"), Path.GetFileNameWithoutExtension(WebServerFactAttribute.Download("nginx")));
+            var (waspPort, port) = (FreePort(), FreePort());
+            await using var wasp = StartWasp(waspPort, Path.Combine(forum, "site"));
+            File.WriteAllText(Path.Combine(root, "conf", "forum.conf"), $$"""
+                worker_processes 1;
+                error_log logs/error.log;
+                pid logs/nginx.pid;
+                events { worker_connections 64; }
+                http {
+                    access_log off;
+                    upstream wasp {
+                        server 127.0.0.1:{{waspPort}};
+                        keepalive 16;
+                    }
+                    server {
+                        listen 127.0.0.1:{{port}};
+                        client_max_body_size 12m;
+                        location / {
+                            include fastcgi_params;
+                            fastcgi_keep_conn on;
+                            fastcgi_pass wasp;
+                        }
+                    }
+                }
+                """);
+            string[] arguments = ["-p", Slashed(root) + "/", "-c", "conf/forum.conf"];
+            using var nginx = Start(Path.Combine(root, "nginx.exe"), arguments, root);
+            try
+            {
+                Assert.True(await ListensAsync(port, nginx), Read(Path.Combine(root, "logs", "error.log")));
+                using var client = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() })
+                {
+                    BaseAddress = new Uri($"http://127.0.0.1:{port}"), Timeout = TimeSpan.FromSeconds(60)
+                };
+                async Task<string> TokenOf(string path) =>
+                    Regex.Match(await client.GetStringAsync(path), "name=\"csrfToken\" value=\"([0-9a-f]{32})\"").Groups[1].Value;
+                Assert.Contains("<title>Boards · WebLingo Forum</title>", await client.GetStringAsync("/"));
+                using (var signIn = await client.PostAsync("/account/sign-in", new FormUrlEncodedContent([new("csrfToken", await TokenOf("/account/sign-in")),
+                    new("name", "Anna"), new("password", "correct-horse")])))
+                {
+                    Assert.Equal(HttpStatusCode.OK, signIn.StatusCode);
+                }
+                var picture = new byte[1_500_000];
+                new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }.CopyTo(picture, 0);
+                for (var i = 8; i < picture.Length; i++) picture[i] = (byte)(i % 251);
+                using var reply = new MultipartFormDataContent
+                {
+                    { new StringContent(await TokenOf("/post/reply?topic=1")), "csrfToken" }, { new StringContent("A big picture."), "body" },
+                    { new StringContent("post"), "action" }, { new ByteArrayContent(picture), "files", "big.png" }
+                };
+                using var posted = await client.PostAsync("/post/reply?topic=1", reply);
+                var page = await posted.Content.ReadAsStringAsync();
+                Assert.True(posted.StatusCode == HttpStatusCode.OK, page);
+                var id = Regex.Match(page, "href=\"/attachment\\?id=(\\d+)\"").Groups[1].Value;
+                using var whole = await client.GetAsync($"/attachment?id={id}");
+                Assert.Equal(picture, await whole.Content.ReadAsByteArrayAsync());
+                using (var part = new HttpRequestMessage(HttpMethod.Get, $"/attachment?id={id}"))
+                {
+                    part.Headers.TryAddWithoutValidation("Range", "bytes=0-7");
+                    using var answer = await client.SendAsync(part);
+                    Assert.Equal((HttpStatusCode.PartialContent, "bytes 0-7/1500000"), (answer.StatusCode, answer.Content.Headers.ContentRange?.ToString()));
+                    Assert.Equal(picture[..8], await answer.Content.ReadAsByteArrayAsync());
+                }
+                using (var again = new HttpRequestMessage(HttpMethod.Get, $"/attachment?id={id}"))
+                {
+                    again.Headers.TryAddWithoutValidation("If-None-Match", whole.Headers.ETag!.Tag);
+                    using var answer = await client.SendAsync(again);
+                    Assert.Equal(HttpStatusCode.NotModified, answer.StatusCode);
+                }
+            }
+            finally
+            {
+                using var stopping = Start(Path.Combine(root, "nginx.exe"), [.. arguments, "-s", "stop"], root);
+                stopping.WaitForExit(20_000);
+                if (!nginx.WaitForExit(20_000)) nginx.Kill(entireProcessTree: true);
+            }
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            for (var attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    Directory.Delete(forum, recursive: true);
+                    break;
+                }
+                catch (Exception failure) when (failure is IOException or UnauthorizedAccessException && attempt < 20)
+                {
+                    Thread.Sleep(250);
+                }
+            }
         }
     }
 
@@ -186,12 +298,12 @@ public sealed class WebServerTests : IDisposable
         }
     }
 
-    /// <summary><c>wasp fastcgi --root site --port n</c>, run here, as its command line runs it, until disposed.</summary>
-    private Running StartWasp(int port)
+    /// <summary><c>wasp fastcgi --root site --port n</c>, run here, as its command line runs it, until disposed; the root the test's site unless given.</summary>
+    private Running StartWasp(int port, string? site = null)
     {
         var stop = new CancellationTokenSource();
         var (output, error) = (new StringWriter(), new StringWriter());
-        string[] arguments = ["fastcgi", "--root", _site, "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture)];
+        string[] arguments = ["fastcgi", "--root", site ?? _site, "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture)];
         var running = Task.Run(() => WebLingoCommandThread.Run(() => WebLingoWaspFastCgi.Run(arguments, output, error, stop.Token)));
         return new Running(stop, running);
     }

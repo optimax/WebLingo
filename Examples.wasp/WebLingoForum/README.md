@@ -120,3 +120,67 @@ one they name `"forum"`:
 
 then run `setup.wlg`. MySQL makes each table as its own statement, so that a setup that fails there leaves the tables it
 made: drop them before running it again.
+
+## Deploying it
+
+The forum is three folders, `setup`, `site` and `data`, the last outside the site, as the WASP User Manual's section 17
+deploys a site: WebLingo installed once on the server, the site its own folder beside its `web.config`, and nothing it
+writes inside it.
+
+### Under IIS
+
+On a Windows server with IIS and WebLingo (the WASP User Manual, section 17), copy the forum's `setup`, `site` and
+`data` folders, `data` with its README alone, to a folder of the server's, `C:\WWW\forum`; make its database there,
+and its folder of members' files:
+
+```powershell
+cd C:\WWW\forum\setup
+weblingo run setup.wlg
+```
+
+then add its site to IIS from the repository's `Scripts` folder, as administrator, with `add-wasp-site.wlg`, which gives
+the site's application pool write access to `data`, its database and its members' files:
+
+```powershell
+weblingo run add-wasp-site.wlg name=wasp.forum folder=C:\WWW\forum\site host=forum.wasp.localhost writable=C:\WWW\forum\data
+```
+
+and open <https://forum.wasp.localhost/>. Keep its sessions in its database, so that a recycled application pool signs
+no member out: `"sessions": { "store": "database", "database": "forum" }` in `site/wasp.config`, and its table made once,
+`wasp sessions create --root C:\WWW\forum\site` ([Mail, and members](#mail-and-members)). IIS takes 30,000,000 bytes of
+a request's body by default, more than a post's files may be.
+
+### Behind nginx or Apache, through FastCGI
+
+`wasp fastcgi --root /srv/forum/site --port 9000`, kept running by the server's service manager, as PHP-FPM is, and the
+web server passing it every request, as the WASP User Manual's section 18 configures nginx and Apache httpd. nginx takes
+1 MB of a request's body by default, less than a post's files may be: give its server block more,
+
+```nginx
+server {
+    listen 80;
+    server_name forum.example.com;
+    client_max_body_size 12m;
+    location / {
+        include fastcgi_params;
+        fastcgi_pass 127.0.0.1:9000;
+    }
+}
+```
+
+`WebServerTests.NginxServesTheForumFromWaspFastCgi` serves the forum so, a picture of 1.5 MB attached through it.
+
+### A client's forum
+
+A client's folder lies over the installed forum's site ([`clients/acme`](clients/acme/README.md)): copy it to the server,
+`C:\WWW\acme`, its `site/wasp.config`'s `"base"` the forum's site's folder there, `"C:/WWW/forum/site"`; make its own
+database with the forum's setup, from its folder, `weblingo run C:\WWW\forum\setup\setup.wlg database=sqlite:data/forum.db
+uploads=data/uploads`; and add its `site` to IIS as a site of its own, `writable=C:\WWW\acme\data`. Its application pool
+reads the forum's folder, as the server's users may.
+
+### Under load
+
+`WebLingo.Benchmarks --load --site forum --url http://localhost:8080/` asks for the forum's front page, its first board,
+its first topic and a search, as many clients at once as `--clients` says, each answer checked, and writes a table of
+each page's requests a second and latencies; its numbers on a development machine are in the forum's design,
+`Documents/weblingo-forum.md`, section 6, part 10.

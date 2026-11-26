@@ -1479,6 +1479,9 @@ The repository's `Examples.wasp/example1` is such a site, and `Examples.wasp/REA
 
 ---
 
+WebLingo Forum, `Examples.wasp/WebLingoForum`, a whole site with its database, its members' files and a client's
+forum over it, is deployed so in its README's "Deploying it", under IIS and behind nginx and Apache.
+
 ## 18. Serving through nginx or Apache: FastCGI
 
 A web server other than IIS, nginx or Apache httpd, runs a WASP site through FastCGI, as it runs PHP's: `wasp fastcgi`

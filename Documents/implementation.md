@@ -297,7 +297,9 @@ and latency and the server's working set and handles, and exits 1 where an answe
 pages in turn, a row every `--sample` minutes, 10 by default. `sqlserver.wasp` reads the machine's SQL Server, `localhost`,
 `master`, a page it cannot answer left out. The clients run on the same machine as the server, so that its numbers are
 the machine's, shared; run it on an otherwise idle machine. Its numbers are in the specification's section 5.6, "Under load".
-`LoadTests` (`WebLingo.VM.Tests`) checks its pages and its options, not the load.
+With `--site forum` and `--url`, it asks for WebLingo Forum's pages instead, served there, its database made by its
+`setup.wlg`: its front page, its first board, its first topic and a search (`WebLingoLoad.ForumPages`), their numbers
+in `Documents/weblingo-forum.md`, section 6, part 10. `LoadTests` (`WebLingo.VM.Tests`) checks its pages and its options, not the load.
 
 ### Trying FastCGI with nginx and Apache
 

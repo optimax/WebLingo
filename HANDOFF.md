@@ -433,6 +433,13 @@ for a client to replace; and an example client, `clients/acme`, with its own sty
 Tested by `tests/hooks-tests.wlg`, and by `ForumTests.TheExampleClientIsServedOverTheForum`, Acme's forum over a copy of
 the forum's on SQLite.
 
+Its deployment (part 10): the README's "Deploying it", under IIS by `Scripts/add-wasp-site.wlg`, behind nginx and
+Apache through `wasp fastcgi`, and a client's forum; `WebServerTests.NginxServesTheForumFromWaspFastCgi`, the forum
+behind nginx; and `WebLingo.Benchmarks --load --site forum`, its pages measured, in the design's section 6, part 10.
+Its deployment under IIS waits for the commands the README gives to be run as administrator, this machine's IIS being
+set up only so. Its pages level off under load, a topic's at about 40 a second on SQLite: the task "WebLingo Forum:
+Pages Under Load".
+
 Found while writing it: in WebLingo, `s[i]` and a string's `length` took time in proportion to its length, its scalar
 values counted from its start each time, so the renderer reads an array of a line's characters (`charsOf` in
 `markdown.wlg`). Fixed since, below, "Strings read by their index".
@@ -440,7 +447,8 @@ values counted from its start each time, so the renderer reads an array of a lin
 The branch `claude/forum-writing` on GitHub holds part 3 unfinished (`9093b78`), which `main` has whole, in one commit,
 instead: it may be deleted there.
 
-Next: "WebLingo Forum, Part 10: Deployment". "WebLingo Forum:
+Next: "WebLingo Forum: Pages Under Load"; part 10's deployment under IIS waits for its commands to be run as
+administrator. "WebLingo Forum:
 MarkdownEditor.Web in the Post Form" waits for MarkdownEditor.Web's `LICENSE` to commit the editor's copy. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to
 be written as tasks and into the specification's roadmap; neither is begun.
 

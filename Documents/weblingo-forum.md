@@ -183,6 +183,15 @@ Each part is a task in `TO-DO.md`, landed on its own and tested on all four data
 7. **Search.**
 8. **Avatars and attachments**, sent back by `response.sendFile`.
 9. **Customization.** A client's files in place of the forum's, a folder over the forum's site. Hooks and an example plugin. An example client, with its own look, texts and plugin. Hooks and an example plugin. An example client, with its own look, texts and plugin.
-10. **Deployment.** The forum's `README.md`. Its deployment under IIS by the repository's `Scripts`, and behind nginx and Apache through FastCGI. The WASP User Manual pointing to it. A measurement of its pages under load, with `WebLingo.Benchmarks --load --url`.
+10. **Deployment.** The forum's `README.md`. Its deployment under IIS by the repository's `Scripts`, and behind nginx and Apache through FastCGI. The WASP User Manual pointing to it. A measurement of its pages under load, with `WebLingo.Benchmarks --load --url`. As built: the README's "Deploying it", under IIS by `Scripts/add-wasp-site.wlg`, behind nginx and Apache through `wasp fastcgi`, nginx's `client_max_body_size` raised for a post's files, and a client's forum over the installed one; `WebServerTests.NginxServesTheForumFromWaspFastCgi`; and `WebLingo.Benchmarks --load --site forum`, the forum's pages as a guest reads them. Measured (25 November 2026), `wasp serve` on a Windows development machine of 8 logical processors, the forum on SQLite as `setup.wlg` makes it, the clients on the same machine, 5 s each after 2 s, requests a second and their median and 99th percentile:
+
+    | Page | 1 client | 4 clients | 16 clients | 64 clients |
+    |---|---:|---:|---:|---:|
+    | front page, `/` | 62, 17 ms, 38 ms | 183, 20 ms, 47 ms | 180, 87 ms, 172 ms | 166, 381 ms, 543 ms |
+    | a board, `/board?id=1` | 88, 10 ms, 31 ms | 145, 25 ms, 60 ms | 135, 108 ms, 306 ms | 152, 420 ms, 668 ms |
+    | a topic, `/topic?id=1` | 52, 18 ms, 38 ms | 40, 20 ms, 1,524 ms | 42, 42 ms, 3,351 ms | 39, 728 ms, 9,537 ms |
+    | a search, `/search?q=forum` | 67, 12 ms, 58 ms | 136, 27 ms, 102 ms | 119, 126 ms, 280 ms | 142, 454 ms, 726 ms |
+
+    Every answer was right. The pages that only read level off at 4 clients, at about 140 to 185 a second, as though something served them one at a time; a topic's page, which counts each view, a write to SQLite's one file, at about 40, its slowest waiting seconds for SQLite's lock. Why, and what to change, the task "WebLingo Forum: Pages Under Load" finds.
 
 The pilot, "WASP Pilot: the Forum in Real Use", then serves it.

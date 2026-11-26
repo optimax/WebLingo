@@ -25,6 +25,10 @@ public sealed class LoadTests
     [InlineData("--url", "ftp://example.com/")]
     [InlineData("--soak", "0")]
     [InlineData("--seconds")]
+    [InlineData("--site", "shop")]
+    [InlineData("--site", "forum")]
+    [InlineData("--site", "forum", "--url", "http://localhost:8080/", "--page", "hello")]
+    [InlineData("--page", "topic")]
     public void AnOptionItDoesNotTakeIsAUsageError(params string[] args)
     {
         var error = new StringWriter();
