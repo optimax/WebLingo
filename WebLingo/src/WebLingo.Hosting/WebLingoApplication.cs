@@ -107,6 +107,13 @@ public sealed class WebLingoApplication
     public int GenerationNumber => _current.Number;
 
     /// <summary>
+    /// The generation requests are served from, as an object to hold a weak reference to, and nothing else: so that a test
+    /// sees it let go, with its compiled pages and modules, once a reload has replaced it and its last request has ended
+    /// (section 9, "M0.22 parts", part 2).
+    /// </summary>
+    public object CurrentGeneration => _current;
+
+    /// <summary>
     /// Makes a new generation from the root's files as they are now (section 6.5, WL-T007), and publishes it, at once and
     /// whole, if its routes can be made: from then on, a request is served from it, its pages compiled anew when first
     /// requested; a request already running finishes on the generation it began on, which goes when the last such one has.

@@ -108,6 +108,13 @@ and `finally` and disposal on cancellation, which no cancellation runs; both que
 `RequestLimitTests`, `WaspServeTests.AReloadEndsARequestStillRunningOnTheSiteAsItWas_OnceItsDrainHasPassed`,
 `FastCgiTests.ARequestOnAnOlderGenerationIsStoppedWhenTheDrainHasPassed`.
 
+M0.22's part 2: `GenerationsLetGoTests` (`WebLingo.Hosting.Tests`) reloads a site 24 times or more under four clients,
+drained requests, a page that does not compile and a refused reload among them, and checks by weak references that only
+the generation served is held (`WebLingoApplication.CurrentGeneration`, an object to watch) and no request's heap (a
+test built-in, `remember()`, given the heap); `FastCgiTests.OldGenerationsAreLetGoUnderFastCgi` does the same through
+the FastCGI host and the real watcher, generations only. Nothing was found to fix; each fails with a leak put in on
+purpose. Rebuild a test project after such a trial: its build is what runs.
+
 ## Logging
 
 `std:log` (`WebLingo.StdLib.Log`, `std/log.dll`): `log.debug/info/warn/error(text)` through the execution's

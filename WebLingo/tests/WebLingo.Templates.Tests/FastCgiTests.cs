@@ -393,6 +393,113 @@ public sealed class FastCgiTests : IDisposable
     }
 
     /// <summary>
+    /// Old generations let go under the FastCGI host and <c>wasp</c>'s own loading of a site, its native modules among it
+    /// (section 9, "M0.22 parts", part 2): the site reloaded by its watcher as its files change, while clients ask for its
+    /// pages, drained requests and a page that does not compile among them; once the clients have stopped, every generation
+    /// but the one served let go. A request's heap let go with it is <c>GenerationsLetGoTests</c>' (<c>WebLingo.Hosting.Tests</c>).
+    /// </summary>
+    [Fact]
+    public async Task OldGenerationsAreLetGoUnderFastCgi()
+    {
+        var site = Path.Combine(_root, "reloaded");
+        Directory.CreateDirectory(site);
+        File.WriteAllText(Path.Combine(site, "wasp.config"), "{ \"mode\": \"development\", \"limits\": { \"drain\": 0.2 } }");
+        File.WriteAllText(Path.Combine(site, "slow.wasp"), "<% import { delay } from \"std:system\"; await delay(2000); %>slow");
+        File.WriteAllText(Path.Combine(site, "lib.wlg"), "export class Cup { constructor(n) { this.n = n; } size() { return this.n; } }");
+        File.WriteAllText(Path.Combine(site, "cup.wasp"),
+            "<% import { Cup } from \"/lib.wlg\"; import { Json } from \"std:json\"; %><%- Json.stringify({ n: new Cup(3).size() }) %>");
+        Version(site, 0);
+        var application = WebLingoWaspServer.Load(site, new Dictionary<string, string>(), WebLingoMode.Production, null, out _, out _, out var error);
+        Assert.True(application is not null, error);
+        var generations = new List<WeakReference> { Watch(application) };
+        using var stop = new CancellationTokenSource();
+        using var listener = WebLingoWaspFastCgi.Listen(0, null, out _);
+        _ = new WebLingoFastCgiServer(application, _workers).ServeAsync(listener, stop.Token);
+        var reloader = new WebLingoReloader(application, site, (_, why) =>
+        {
+            if (why is null) lock (generations) generations.Add(Watch(application));
+        });
+        try
+        {
+            using var asking = new CancellationTokenSource();
+            var answers = new int[2];
+            var port = ((IPEndPoint)listener.LocalEndPoint!).Port;
+            var clients = Enumerable.Range(0, 3).Select(client => Ask(port, client, asking.Token, answers)).ToArray();
+            // 8 versions, and more while no request has been drained yet, as on a loaded machine, for 30 seconds at most.
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            for (var version = 1; version <= 8 || (Volatile.Read(ref answers[1]) == 0 && clock.Elapsed < TimeSpan.FromSeconds(30)); version++)
+            {
+                await Task.Delay(150);
+                Version(site, version);
+                for (var waited = 0; Count(generations) < version + 1 && waited < 30_000; waited += 10) await Task.Delay(10);
+                Assert.Equal(version + 1, Count(generations));
+            }
+            await asking.CancelAsync();
+            await Task.WhenAll(clients);
+            var drain = WebLingoDrain.Of(application);
+            for (var waited = 0; drain.Running > 0 && waited < 30_000; waited += 10) await Task.Delay(10);
+            Assert.Equal(0, drain.Running);
+            Assert.True(answers[0] > 0, "no page was served");
+            Assert.True(answers[1] > 0, "no request was drained");
+        }
+        finally
+        {
+            reloader.Dispose();
+            stop.Cancel();
+        }
+        var held = 0;
+        for (var i = 0; i < 10; i++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            lock (generations) held = generations.Count(generation => generation.IsAlive);
+            if (held == 1) break;
+            await Task.Delay(50);
+        }
+        Assert.Equal(1, held);
+        Assert.True(generations[^1].IsAlive);
+        GC.KeepAlive(application);
+
+        static int Count(List<WeakReference> generations)
+        {
+            lock (generations) return generations.Count;
+        }
+
+        // A client, a connection of its own, asking for each page in turn until it is told to stop.
+        static async Task Ask(int port, int client, CancellationToken asking, int[] answers)
+        {
+            using var connection = new TcpClient();
+            await connection.ConnectAsync(IPAddress.Loopback, port);
+            string[] pages = ["/", "/cup", "/slow", "/broken"];
+            for (var turn = client; !asking.IsCancellationRequested; turn++)
+            {
+                var path = pages[turn % pages.Length];
+                var (head, body, _) = await RequestAsync(connection, 1, Get(path), [], keep: true);
+                if (head[0] == "Status: 503 Service Unavailable")
+                {
+                    Interlocked.Increment(ref answers[1]);
+                    continue;
+                }
+                Assert.True(head[0] == "Status: 200 OK" || (path == "/broken" && head[0] == "Status: 500 Internal Server Error"), $"{path}: {head[0]} {body}");
+                Assert.True(path != "/cup" || body == "{\"n\":3}", body);
+                Interlocked.Increment(ref answers[0]);
+            }
+        }
+
+        // The pages a reload changes: the front page's text, and a page that does not compile in every third version.
+        static void Version(string site, int version)
+        {
+            File.WriteAllText(Path.Combine(site, "index.wasp"), $"<p>version {version}</p>");
+            File.WriteAllText(Path.Combine(site, "broken.wasp"), version % 3 == 2 ? "<%= [1][2 %>" : $"<%= {version} %>");
+        }
+    }
+
+    /// <summary>A weak reference to the generation served now, made in a method of its own, so that no local of the test's holds it.</summary>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference Watch(WebLingoApplication application) => new(application.CurrentGeneration);
+
+    /// <summary>
     /// A file a page sends, through FastCGI (specification, section 6.12, "Files sent"): with the page's status and headers,
     /// its tag, a 304 for a client that has it, and one range of it, as CGI's <c>HTTP_</c> variables ask; and a site's own
     /// file in part too.
