@@ -402,8 +402,10 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             var debugger = Debugger;
             var maxCallDepth = context.Resources.MaxCallDepth;
             var executed = _executed;
-            // Its quantum, a suspending execution's, counted from where it begins or goes on (section 9, "M0.24 parts", part 2).
-            _quantumDue = context.Suspends && context.Quantum > 0 ? executed + context.Quantum : long.MaxValue;
+            // Its quantum, a suspending execution's, counted from where it begins or goes on (section 9, "M0.24 parts", part 2):
+            // the budget it runs to, where that comes first, so that the budget's own look finds it and the loop gains nothing.
+            _yields = context.Suspends && context.Quantum > 0 && budget - executed > context.Quantum;
+            if (_yields) budget = executed + context.Quantum;
             var dueAt = executed; // The count of instructions at which the budget and the cancellation signal are looked at.
             _resuming = resuming;
             WebLingoRuntimeError? error = null;
@@ -431,6 +433,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         }
                         if (executed >= budget)
                         {
+                            if (_yields) return Yield(pc, executed);
                             return Failure(WebLingoDiagnosticCodes.BudgetExceeded,
                                     $"The program ran {executed} instructions, its whole budget, and was stopped.", frame.Function, pc)
                                 with { Instructions = executed };
@@ -441,7 +444,6 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             return Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled.", frame.Function, pc)
                                 with { Instructions = executed };
                         }
-                        if (executed >= _quantumDue) return Yield(frames, frame, depth, pc, executed);
                         dueAt = Math.Min(budget, (executed / CancellationInterval + 1) * CancellationInterval);
                     }
                     if (debugger is not null && DebugInstruction(debugger, frames, frame, depth, pc, executed)) return _left!;
@@ -1595,8 +1597,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// <summary>Whether it has just gone on from such a stop, which the point it stopped at is not stopped at again.</summary>
         private bool _wentOn;
 
-        /// <summary>The count of instructions at which it yields its worker, its quantum's; <see cref="long.MaxValue"/> for none.</summary>
-        private long _quantumDue = long.MaxValue;
+        /// <summary>Whether the budget <c>Run</c> runs to is its quantum's, at which it yields its worker, not its own.</summary>
+        private bool _yields;
 
         /// <summary>Whether its stop at <see cref="_stopDepth"/> is a yield of its quantum's, not its debugger's.</summary>
         private bool _yielded;
@@ -1604,13 +1606,14 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// <summary>
         /// Its quantum passed (section 9, "M0.24 parts", part 2): it waits where it is, before the instruction at
         /// <paramref name="pc"/>, its frames on the VM's stack, as its debugger's stop leaves it, for no time, so that its
-        /// host runs the other requests' ready work, then resumes it there.
+        /// host runs the other requests' ready work, then resumes it there. Its frames and its depth are the fields
+        /// <c>Run</c> keeps current, so that its call passes nothing more.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private WebLingoExecutionResult Yield(Frame[] frames, Frame frame, int depth, int pc, long executed)
+        private WebLingoExecutionResult Yield(int pc, long executed)
         {
-            frame.Pc = pc;
-            (_frames, _executed, _depth, _stopDepth, _yielded) = (frames, executed, depth, depth, true);
+            _frames[_depth].Pc = pc;
+            (_executed, _stopDepth, _yielded) = (executed, _depth, true);
             return WebLingoExecutionResult.Waits(0) with { Instructions = executed };
         }
 
