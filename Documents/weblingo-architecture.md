@@ -2078,8 +2078,9 @@ owner has not decided is a question of its task's, and Proposed here until it is
    for its host (`WebLingoScheduler.HasWork`), and copies an exception nothing caught into its result, a runtime error as
    an instance of its class (`WebLingoExecutionResult.Thrown`), where it was thrown its host's `work.wlg(12,5)`, one a
    message cannot hold, or a limit's, an `Error` of its report; a value posted to a worker that has ended dropped; a
-   disposed `Worker`'s members WL3001, as any disposed native instance's, and a `Worker` the collector frees ending its
-   worker; a worker's own workers ending with it, and every worker with its program, cancelled, waited for 5 seconds
+   disposed `Worker`'s members WL3001, as any disposed native instance's, and a `Worker` the collector frees not ending
+   its worker, which runs until it ends, or its program does, so that no collection decides when a worker ends; a
+   worker's own workers ending with it, and every worker with its program, cancelled, waited for 5 seconds
    each; an exception a worker ended with that its parent never received not reported; a worker writing where its
    program writes, each text whole; and a native class whose members make errors in the program's heap declaring so
    (`WebLingoNativeClass.DeclareMakesErrors`), so that a program using it makes `Error` and its runtime errors' classes

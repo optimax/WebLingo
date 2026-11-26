@@ -73,7 +73,7 @@ public static partial class WebLingoCommandLine
         {
             Worker[] started;
             lock (_started) started = [.. _started];
-            foreach (var worker in started) worker.Dispose();
+            foreach (var worker in started) worker.End();
             foreach (var worker in started) worker.Join();
         }
 
@@ -101,7 +101,7 @@ public static partial class WebLingoCommandLine
             public void Receive(Action<WebLingoWorkerReceipt> received) => _fromWorker.Receive(received);
 
             /// <summary>The worker ended, cancelled, as a request past its time is; nothing more is received from it.</summary>
-            public void Dispose()
+            public void End()
             {
                 _cancellation.Cancel();
                 _fromWorker.End(new WebLingoWorkerReceipt(null, false));
@@ -153,14 +153,14 @@ public static partial class WebLingoCommandLine
             }
         }
 
-        /// <summary>A worker's own end of its link with its parent, which <c>std:workers</c>' <c>parent</c> holds; disposing it ends nothing.</summary>
+        /// <summary>A worker's own end of its link with its parent, which <c>std:workers</c>' <c>parent</c> holds; ending it ends nothing.</summary>
         private sealed class ParentEnd(Mailbox fromParent, Mailbox toParent) : IWebLingoWorkerLink
         {
             public void Post(WebLingoMessage message) => toParent.Post(message);
 
             public void Receive(Action<WebLingoWorkerReceipt> received) => fromParent.Receive(received);
 
-            public void Dispose() { }
+            public void End() { }
         }
 
         /// <summary>

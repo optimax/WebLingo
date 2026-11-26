@@ -54,7 +54,7 @@ public sealed class WebLingoWorkersModule : IWebLingoNativeModule
         }
         if (!workers.TryStart(heap.GetString(a[1]), out var worker, out error)) return false;
         if (_worker.TrySetHostObject(a[0], worker!, heap, out error)) return true;
-        worker!.Dispose();
+        worker!.End();
         return false;
     }
 
@@ -99,7 +99,7 @@ public sealed class WebLingoWorkersModule : IWebLingoNativeModule
     {
         result = WebLingoValue.Null;
         if (!_worker.TryReleaseHostObject(a[0], heap, out var worker, out error)) return false;
-        (worker as IWebLingoWorkerLink)?.Dispose();
+        (worker as IWebLingoWorkerLink)?.End();
         return true;
     }
 

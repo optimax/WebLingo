@@ -1758,8 +1758,8 @@ its `message` and its `code` as they were, with two fields of its own, `classNam
 where it was thrown.
 
 A worker ends once its module's top level has ended and none of its tasks waits, a task waiting for its parent's next
-value among them; when its `Worker` is disposed, or let go of and collected; and when its program ends. An exception
-nothing catches in it is thrown by its parent's next `receive()`, copied as an error is.
+value among them; when its `Worker` is disposed; and when its program ends, a `Worker` let go of not ending it. An
+exception nothing catches in it is thrown by its parent's next `receive()`, copied as an error is.
 
 Save this worker as `square.wlg`:
 

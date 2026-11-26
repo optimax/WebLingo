@@ -21,10 +21,10 @@ public interface IWebLingoWorkers
 
 /// <summary>
 /// One end of the link between a worker and its parent: what one end posts the other receives, in the order it was
-/// posted. Disposing a parent's end ends its worker, cancelled as a request past its time is; disposing a worker's own end
-/// does nothing, so that the heap's release of it, where the worker's execution ends, ends nothing.
+/// posted. Not disposable, so that the collector, freeing the instance that holds it, ends nothing: a worker runs until it
+/// ends, is ended (<see cref="End"/>), or its program ends, never as a collection happens to fall.
 /// </summary>
-public interface IWebLingoWorkerLink : IDisposable
+public interface IWebLingoWorkerLink
 {
     /// <summary>A message to the other end; dropped where that end has ended.</summary>
     void Post(WebLingoMessage message);
@@ -35,6 +35,9 @@ public interface IWebLingoWorkerLink : IDisposable
     /// and with no message after.
     /// </summary>
     void Receive(Action<WebLingoWorkerReceipt> received);
+
+    /// <summary>The worker ended, cancelled as a request past its time is, where this is its parent's end; nothing at a worker's own.</summary>
+    void End();
 }
 
 /// <summary>What a worker's link gives a <c>receive()</c>: a message, the error its other end ended with (<see cref="Failed"/>), or, ended, nothing.</summary>

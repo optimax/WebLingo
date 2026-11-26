@@ -157,6 +157,31 @@ public sealed class WorkersTests : IDisposable
     }
 
     [Fact]
+    public void AWorkerLetGoOfGoesOn_NoCollectionEndingIt()
+    {
+        // The worker waits for a file the program writes once it has made enough to collect, then answers with another; each
+        // new in the loop, since the VM keeps what new made last, the Worker until then (a collection ending it failed this).
+        var (go, done) = (Path.Combine(_folder, "go.txt").Replace('\\', '/'), Path.Combine(_folder, "done.txt").Replace('\\', '/'));
+        Write("letgo.wlg", $$"""
+            import fs from "std:fs";
+            while (!fs.existsSync("{{go}}")) await delay(10);
+            fs.writeTextSync("{{done}}", "still running");
+            """);
+        var (output, error) = Run(Imports + $$"""
+            import fs from "std:fs";
+            function start() { new Worker("letgo.wlg"); }
+            start();
+            var made = null;
+            class Box { constructor(i) { this.i = [i]; } }
+            for (var i = 0; i < 200000; i++) made = new Box(i);
+            fs.writeTextSync("{{go}}", "go");
+            for (var waited = 0; waited < 3000 && !fs.existsSync("{{done}}"); waited++) await delay(10);
+            writeLn(fs.readTextSync("{{done}}"));
+            """);
+        Assert.Equal(("still running\n", ""), (output, error));
+    }
+
+    [Fact]
     public void WorkersStartWorkers_AndWriteWhereTheProgramWrites()
     {
         Write("middle.wlg", Imports + """
