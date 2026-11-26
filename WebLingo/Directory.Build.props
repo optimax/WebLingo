@@ -10,7 +10,7 @@
     <!-- The solution's version, every assembly's, 0.N.0 for M0.N, the last milestone landed whole, which the task that
          lands a milestone raises; weblingo and wasp print it (the owner's answer, 18 November 2026; without its
          "-pre-alpha" since 21 November 2026, the owner's request, "Drop Pre-Alpha"). -->
-    <Version>0.20.0</Version>
+    <Version>0.21.0</Version>
     <!-- The version as it is, without the commit .NET would add after a '+', so that a build is the same from any checkout. -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>

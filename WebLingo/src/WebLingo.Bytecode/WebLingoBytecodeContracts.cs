@@ -289,6 +289,30 @@ public readonly record struct WebLingoConstant(WebLingoConstantKind Kind, long B
 public sealed record WebLingoImport(string Name, int Arity);
 
 /// <summary>
+/// A function's member caches (specification, section 9, "M0.21 parts", part 3): a slot for each of its instructions,
+/// holding what a VM made of what that instruction found last, an object of the VM's, immutable, replaced whole by one
+/// reference's write, so that executions on any worker share them and none sees one half written. No part of a
+/// function's equality, nor of its file.
+/// </summary>
+public sealed class WebLingoMemberSites(int count)
+{
+    private readonly object?[] _entries = count <= 0 ? [] : new object?[count];
+
+    /// <summary>The entry of the instruction at <paramref name="instruction"/>; none beyond its code.</summary>
+    public object? this[int instruction]
+    {
+        get => (uint)instruction < (uint)_entries.Length ? _entries[instruction] : null;
+        set
+        {
+            if ((uint)instruction < (uint)_entries.Length) _entries[instruction] = value;
+        }
+    }
+
+    public override bool Equals(object? obj) => obj is WebLingoMemberSites;
+    public override int GetHashCode() => 0;
+}
+
+/// <summary>
 /// A function: its registers (<see cref="LocalCount"/> locals, then temporaries, <see cref="RegisterCount"/> in all)
 /// and its code. <see cref="Spans"/> (one per instruction) and <see cref="LocalNames"/> (one per local) are
 /// optional debugging information, for runtime error messages.
@@ -297,6 +321,12 @@ public sealed record WebLingoFunction(
     string Name, int RegisterCount, int LocalCount, IReadOnlyList<WebLingoInstruction> Code,
     IReadOnlyList<WebLingoSourceSpan>? Spans = null, IReadOnlyList<string>? LocalNames = null)
 {
+    /// <summary>
+    /// What its instructions that reach a member found last, beside its code, made with it (specification, section 9,
+    /// "M0.21 parts", part 3): every execution of it shares them, and none is written to a file.
+    /// </summary>
+    public WebLingoMemberSites MemberSites { get; init; } = new(Code.Count);
+
     /// <summary>
     /// Source debugger metadata, which a compilation for a debugger gives, and a file has where <c>weblingo compile --debug</c>
     /// wrote it, its debugging section (<see cref="WebLingoBytecodeFile"/>).

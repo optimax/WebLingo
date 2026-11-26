@@ -68,7 +68,7 @@ weblingo hello.wlg
 | `weblingo compile [--debug] <file.wlg>` | compiles the script into a bytecode file, `.wlb`, beside it; `--debug` also writes the names and positions a debugger uses |
 | `weblingo run <bytecode-file>` | runs compiled bytecode without compiling anything |
 | `weblingo disasm <bytecode-file>` | shows compiled bytecode as text, naming its variables, functions, classes and files; a file compiled with `--debug` adds its captures' names, each statement's line and column, and where each variable is visible |
-| `weblingo --version` | its version and its build's number, `WebLingo 0.20.0 (2026.11.21.2330)`, which `weblingo` alone prints first, before how it is used |
+| `weblingo --version` | its version and its build's number, `WebLingo 0.21.0 (2026.11.26.300)`, which `weblingo` alone prints first, before how it is used |
 
 A script is a console program only where it imports `std:console` ([section 15](#15-the-standard-library)). On
 Windows, `weblingo` started without a console, as Explorer starts it for a script double-clicked (the repository's

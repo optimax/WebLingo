@@ -239,7 +239,11 @@ for a class's fields, landed: the lowerer gives each class the fields its constr
 own methods is `GetField`/`SetField`, which fall back to `GetMember`/`SetMember` wherever the place does not hold the
 field; `objects` 17 percent faster, none slower (section 5.6, "Fields in places"). `FieldPlaceTests` runs each case
 through places and by name and compares. Since WLBC is 0.2, `Examples.wlg/01-hello.wlbr`, the owner's 0.1 file, is
-refused; a question in `TO-DO.md`. Part 3, a member's cache, is next.
+refused; a question in `TO-DO.md`. Part 3, a member's cache, landed: `GetMember`, `SetMember` and `CallMethod` on an
+instance remember what they found in their function's `MemberSites`, by the class's definition, so that every
+execution of a module, a site's every request, shares them (`FieldSite`, `MethodSite`; `MemberCacheTests`); a
+method's call 26 percent faster, `objects` 4, none slower (section 5.6, "A member's cache"). M0.21 is whole, the
+version 0.21.0.
 
 A young generation for the collector (the specification, section 4.2, "A young generation") was built on a branch,
 measured, and dropped by the owner (24 November 2026): about 1.7 times as fast where much is live, but four of the

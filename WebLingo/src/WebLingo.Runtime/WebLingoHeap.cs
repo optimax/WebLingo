@@ -266,13 +266,108 @@ public sealed class WebLingoHeap
     /// given until <see cref="Made"/>: those of <paramref name="layout"/>, where its base's are their first, else its base's
     /// (specification, section 9, "M0.21 parts", part 2).
     /// </summary>
-    public void GiveFields(WebLingoValue classValue, string[] layout)
+    public void GiveFields(WebLingoValue classValue, string[] layout, object? definition = null)
     {
         var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
         target.Making = true;
+        target.Definition = definition;
         target.DeclaredLayout = layout;
         target.Layout = LayoutOver(target, layout);
+        target.LayoutDefinition = ReferenceEquals(target.Layout, layout) ? definition : null;
         foreach (var name in target.Layout) _placed.Add(name);
+    }
+
+    /// <summary>
+    /// A member's cache's field (specification, section 9, "M0.21 parts", part 3): an instance's, of a value of the kind
+    /// <c>Instance</c>, at <paramref name="place"/>, where its places are <paramref name="definition"/>'s and it has
+    /// assigned the field there; false otherwise.
+    /// </summary>
+    public bool TryGetPlaceOf(WebLingoValue instance, object definition, int place, string name, out WebLingoValue value)
+    {
+        if (_objects[instance.Handle] is InstanceObject fields && ReferenceEquals(fields.Definition, definition))
+        {
+            return fields.TryGetPlace(place, name, out value);
+        }
+        value = WebLingoValue.Null;
+        return false;
+    }
+
+    /// <summary>The cache's field assigned at its place, as <see cref="TrySetPlace"/> assigns it, where the instance's places are the definition's.</summary>
+    public bool TrySetPlaceOf(WebLingoValue instance, object definition, int place, string name, WebLingoValue value) =>
+        !_placesShadowed && _objects[instance.Handle] is InstanceObject fields && ReferenceEquals(fields.Definition, definition)
+        && fields.TrySetPlace(place, name, value);
+
+    /// <summary>
+    /// Where an instance has assigned a field of its places, for a member's cache to remember, and the definition its
+    /// places are; -1 where its places are no definition's, or the field is not one of them, or not assigned.
+    /// </summary>
+    public int AssignedPlaceOf(WebLingoValue instance, string name, out object? definition)
+    {
+        definition = null;
+        if (instance.Kind != WebLingoValueKind.Instance || _objects[instance.Handle] is not InstanceObject { Definition: { } made } fields)
+        {
+            return -1;
+        }
+        var place = fields.AssignedPlaceOf(name);
+        if (place >= 0) definition = made;
+        return place;
+    }
+
+    /// <summary>
+    /// A member's cache's method (specification, section 9, "M0.21 parts", part 3): the method an instance's class, of
+    /// <paramref name="definition"/>, has from the class <paramref name="depth"/> bases up, its definition's
+    /// <paramref name="index"/>th, where each class up to that one is unchanged since it was made, and the instance has no
+    /// field outside its places, which could hold a function of the method's name; false otherwise.
+    /// </summary>
+    public bool TryGetDeclaredMethod(WebLingoValue instance, object definition, int depth, int index, out WebLingoValue method)
+    {
+        method = WebLingoValue.Null;
+        if (_objects[instance.Handle] is not InstanceObject { OtherCount: 0 } fields) return false;
+        var current = Get<ClassObject>(fields.Class, WebLingoValueKind.Class);
+        if (!ReferenceEquals(current.Definition, definition)) return false;
+        for (var i = 0; ; i++)
+        {
+            if (current.Changed || current.Making) return false;
+            if (i == depth) break;
+            if (current.Base.Kind != WebLingoValueKind.Class) return false;
+            current = Get<ClassObject>(current.Base, WebLingoValueKind.Class);
+        }
+        if ((uint)index >= (uint)current.Declared.Count) return false;
+        method = current.Declared[index];
+        return true;
+    }
+
+    /// <summary>
+    /// Where an instance's method was found, for a member's cache to remember: the definition of the instance's class, how
+    /// many bases up it was declared, and its place among that class's declared methods; false where the instance's class,
+    /// or one up to that class, is no definition's or has changed, the instance has a field outside its places, or the
+    /// method's name is one of its places.
+    /// </summary>
+    public bool TryFindDeclaredMethod(WebLingoValue instance, string name, WebLingoValue method, out object? definition, out int depth,
+        out int index)
+    {
+        (definition, depth, index) = (null, 0, -1);
+        if (instance.Kind != WebLingoValueKind.Instance || _objects[instance.Handle] is not InstanceObject { OtherCount: 0 } fields
+            || fields.HasPlace(name))
+        {
+            return false;
+        }
+        var current = Get<ClassObject>(fields.Class, WebLingoValueKind.Class);
+        if (current.Definition is not { } made) return false;
+        for (; ; depth++)
+        {
+            if (current.Changed || current.Making || current.Definition is null) return false;
+            if (current.OwnMethods.TryGetValue(name, out var own))
+            {
+                if (own != method) return false;
+                index = current.Declared.IndexOf(method);
+                if (index < 0) return false;
+                definition = made;
+                return true;
+            }
+            if (current.Base.Kind != WebLingoValueKind.Class) return false;
+            current = Get<ClassObject>(current.Base, WebLingoValueKind.Class);
+        }
     }
 
     /// <summary>A class made from a definition, given its members: a method given it from now on may shadow a field.</summary>
@@ -646,7 +741,7 @@ public sealed class WebLingoHeap
     public bool TryHoldAnew(WebLingoValue source, WebLingoValue value, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         var from = Get<InstanceObject>(source, WebLingoValueKind.Instance);
-        var made = new InstanceObject(from.Class, from.Layout) { Holds = true, Value = value };
+        var made = new InstanceObject(from.Class, from.Layout) { Holds = true, Value = value, Definition = from.Definition };
         for (var i = 0; i < from.Count; i++)
         {
             var (name, field) = from.At(i);
@@ -1172,6 +1267,11 @@ public sealed class WebLingoHeap
         target.Makes = baseObject.Makes;
         target.Holds = baseObject.Holds;
         target.Layout = LayoutOver(target, target.DeclaredLayout); // Its instances made from now on; those made before keep theirs.
+        if (target.Definition is not null)
+        {
+            target.Changed = true; // A base given anew: its methods are no longer its definition's alone.
+            target.LayoutDefinition = ReferenceEquals(target.Layout, target.DeclaredLayout) ? target.Definition : null;
+        }
         baseObject.HasSubclasses = true;
         Regather(target);
     }
@@ -1465,6 +1565,8 @@ public sealed class WebLingoHeap
         }
         var before = Size(target);
         if (!target.Making) Shadows(name);
+        if (target.Making) target.Declared.Add(method);
+        else if (target.Definition is not null) target.Changed = true;
         target.OwnMethods[name == "destructor" ? "dispose" : name] = method;
         // Object's own, given as Object is made, before it is the heap's, writes an instance as its fields.
         if (name == "toString" && ObjectClass.Kind == WebLingoValueKind.Class) ToStringGiven = true;
@@ -1503,6 +1605,7 @@ public sealed class WebLingoHeap
             return true;
         }
         if (!target.OwnMethods.Remove(name == "destructor" ? "dispose" : name)) return false;
+        if (target.Definition is not null) target.Changed = true;
         MethodsChanged(target, classValue);
         Units--;
         return true;
@@ -1565,6 +1668,7 @@ public sealed class WebLingoHeap
         // Map and Set themselves, a plain one; any other class, an instance alone, made once.
         var own = classObject.IsCollectionClass || classObject.Makes is not (WebLingoValueKind.Array or WebLingoValueKind.Map
             or WebLingoValueKind.Set or WebLingoValueKind.Module or WebLingoValueKind.Task) ? null : new InstanceObject(classValue, classObject.Layout);
+        if (own is not null) own.Definition = classObject.LayoutDefinition;
         return classObject.Makes switch
         {
             WebLingoValueKind.Array =>
@@ -1576,7 +1680,10 @@ public sealed class WebLingoHeap
                 TryAllocate(new ModuleObject("") { Instance = own }, WebLingoValueKind.Module, 0, out instance, out error, own is not null),
             WebLingoValueKind.Task =>
                 TryAllocate(new WebLingoTask { ByHand = true, Instance = own }, WebLingoValueKind.Task, 2, out instance, out error, own is not null),
-            _ => TryAllocate(new InstanceObject(classValue, classObject.Layout) { Holds = classObject.Holds != WebLingoValueKind.Null },
+            _ => TryAllocate(new InstanceObject(classValue, classObject.Layout)
+                {
+                    Holds = classObject.Holds != WebLingoValueKind.Null, Definition = classObject.LayoutDefinition
+                },
                 WebLingoValueKind.Instance, 0, out instance, out error)
         };
     }
@@ -2197,6 +2304,15 @@ public sealed class WebLingoHeap
         public string[]? DeclaredLayout { get; set; }
         /// <summary>Whether it is being given its definition's members, which shadow no field an instance has assigned.</summary>
         public bool Making { get; set; }
+        /// <summary>
+        /// The definition it was made from, the VM's, which its instances' places are where its layout is its definition's;
+        /// the methods its definition gave it, in their order; and whether it has been given or lost a method or a property,
+        /// or been given a base anew, since (specification, section 9, "M0.21 parts", part 3).
+        /// </summary>
+        public object? Definition { get; set; }
+        public object? LayoutDefinition { get; set; }
+        public List<WebLingoValue> Declared { get; } = [];
+        public bool Changed { get; set; }
     }
 
     /// <summary>A class's units: one, and one for each method of its own and static member.</summary>
@@ -2237,6 +2353,19 @@ public sealed class WebLingoHeap
         public WebLingoValue Class { get; } = classValue;
         /// <summary>Its class's places, by the names of their fields, as they were when it was made.</summary>
         public string[] Layout { get; } = layout;
+        /// <summary>The definition its places are, where they are one's, as a member's cache knows them; else null.</summary>
+        public object? Definition { get; set; }
+
+        /// <summary>Whether a field of that name has a place.</summary>
+        public bool HasPlace(string name) => Layout.Length > 0 && PlaceOf(name) >= 0;
+
+        /// <summary>A field's place, where it has one and has assigned it; else -1.</summary>
+        public int AssignedPlaceOf(string name)
+        {
+            if (Layout.Length == 0) return -1;
+            var place = PlaceOf(name);
+            return place >= 0 && _places[place].Kind != WebLingoValueKind.Missing ? place : -1;
+        }
         private readonly WebLingoValue[] _places = MissingPlaces(layout.Length);
 
         private static WebLingoValue[] MissingPlaces(int count)

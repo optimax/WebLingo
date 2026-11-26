@@ -331,6 +331,13 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             return _frames = frames;
         }
 
+        /// <summary>
+        /// Whether <c>Run</c> resumes a task the scheduler holds, which its loop's first look at its budget sees: a field,
+        /// not a local, so that the loop keeps no register for what it reads once (Documents/implementation.md, "A VM's
+        /// Dispatch Method Is Sensitive to Its Locals").
+        /// </summary>
+        private bool _resuming;
+
         public WebLingoExecutionResult Run(bool resuming)
         {
             Frame[] frames;
@@ -393,6 +400,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             var maxCallDepth = context.Resources.MaxCallDepth;
             var executed = _executed;
             var dueAt = executed; // The count of instructions at which the budget and the cancellation signal are looked at.
+            _resuming = resuming;
             WebLingoRuntimeError? error = null;
             // A call being made, which the operations that call set up, and the code after their switch carries out: the
             // value called, the instance a method runs on, where the arguments are, where the result goes, and, for
@@ -410,9 +418,9 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 {
                     if (executed == dueAt)
                     {
-                        if (resuming)
+                        if (_resuming)
                         {
-                            resuming = false;
+                            _resuming = false;
                             dueAt = Math.Min(budget, (executed / CancellationInterval + 1) * CancellationInterval);
                             goto schedule;
                         }
@@ -692,9 +700,13 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             goto call;
                         case WebLingoOpCode.GetMember:
                         {
+                            // An instance's member by a helper .NET does not inline, at the place its cache found it last
+                            // (specification, section 9, "M0.21 parts", part 3), so that this case spends little of .NET's
+                            // budget of inlining (Documents/implementation.md, "A VM's Dispatch Method Is Sensitive to Its Locals").
                             var name = names[ins.C];
-                            if (!WebLingoMembers.TryGet(registers[ins.B], name.Member, name.Text, heap, ins.D != 0, out var member,
-                                    out error))
+                            if (registers[ins.B].Kind == WebLingoValueKind.Instance
+                                    ? !TryGetInstanceMember(frame.Function, code, pc, registers, out var member, out error)
+                                    : !WebLingoMembers.TryGet(registers[ins.B], name.Member, name.Text, heap, ins.D != 0, out member, out error))
                             {
                                 PendAccessor(error, member, registers[ins.B], default, ins.A);
                                 break;
@@ -704,7 +716,9 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             continue;
                         }
                         case WebLingoOpCode.SetMember:
-                            if (!WebLingoMembers.TrySet(registers[ins.A], names[ins.B].Text, registers[ins.C], heap, out error, out callee))
+                            if (registers[ins.A].Kind == WebLingoValueKind.Instance
+                                    ? !TrySetInstanceMember(frame.Function, code, pc, registers, out error, out callee)
+                                    : !WebLingoMembers.TrySet(registers[ins.A], names[ins.B].Text, registers[ins.C], heap, out error, out callee))
                             {
                                 // A setter gives the value assigned, which its result, written where the value is, keeps.
                                 PendAccessor(error, callee, registers[ins.A], registers[ins.C], ins.C);
@@ -747,11 +761,18 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             if (target.Kind == WebLingoValueKind.Instance)
                             {
                                 // A field's function is called as any function is; a method runs on the instance; a native
-                                // class's member it does not declare its fallback calls, below (section 3.10).
-                                if (!WebLingoMembers.TryFindCallee(target, name.Text, heap, out callee, out var isMethod, out error))
+                                // class's member it does not declare its fallback calls, below (section 3.10). A method
+                                // where its cache found it last, else found and remembered (section 9, "M0.21 parts", part 3).
+                                bool isMethod;
+                                if (TryGetCachedMethod(frame.Function, pc, target, out callee)) isMethod = true;
+                                else
                                 {
-                                    if (ReferenceEquals(error, WebLingoMembers.Fallback)) goto memberFallback;
-                                    break;
+                                    if (!WebLingoMembers.TryFindCallee(target, name.Text, heap, out callee, out isMethod, out error))
+                                    {
+                                        if (ReferenceEquals(error, WebLingoMembers.Fallback)) goto memberFallback;
+                                        break;
+                                    }
+                                    if (isMethod) RememberMethod(frame.Function, code, pc, target, callee);
                                 }
                                 self = isMethod ? target : WebLingoValue.Missing;
                                 arguments = registers;
@@ -3547,7 +3568,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 return true;
             }
             if (!heap.TryMakeClass(info.Name, baseClass, out made, out error)) return false;
-            heap.GiveFields(made, LayoutOf(info));
+            heap.GiveFields(made, LayoutOf(info), info);
             if (!TryGiveMembers(info, made, registers, cells, out error)) return false;
             heap.Made(made);
             return true;
@@ -3596,6 +3617,104 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// A <c>GetField</c> or <c>SetField</c> as the <c>GetMember</c> or <c>SetMember</c> that reads or assigns its field by its
         /// name, which the dispatch method runs in its place; not inlined, its copy of the instruction no part of that method.
         /// </summary>
+        /// <summary>
+        /// What a member's instruction found last (specification, section 9, "M0.21 parts", part 3), in its function's
+        /// <see cref="WebLingoFunction.MemberSites"/>: a field's place among those of a class's definition; or a method, the
+        /// definition of the instance's class, how many bases up the method was declared, and its place among that class's
+        /// declared methods. Immutable, replaced whole, keyed by definitions every execution shares.
+        /// </summary>
+        private sealed class FieldSite(object definition, int place)
+        {
+            public readonly object Definition = definition;
+            public readonly int Place = place;
+        }
+
+        private sealed class MethodSite(object definition, int depth, int index)
+        {
+            public readonly object Definition = definition;
+            public readonly int Depth = depth;
+            public readonly int Index = index;
+        }
+
+        /// <summary>
+        /// <c>GetMember</c>'s, or a <c>GetField</c>'s by its name, member of an instance (specification, section 9, "M0.21
+        /// parts", part 3): the field at the place its cache found it last, else as the runtime reads it, a field at one of
+        /// the instance's places remembered; the instruction read from the code, its operands where both have them.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool TryGetInstanceMember(WebLingoFunction function, WebLingoInstruction[] code, int pc, WebLingoValue[] registers,
+            out WebLingoValue member, out WebLingoRuntimeError? error)
+        {
+            ref readonly var ins = ref code[pc];
+            var instance = registers[ins.B];
+            var name = names[ins.C];
+            error = null;
+            if (function.MemberSites[pc] is FieldSite site && heap.TryGetPlaceOf(instance, site.Definition, site.Place, name.Text, out member))
+            {
+                return true;
+            }
+            var optional = ins.OpCode == WebLingoOpCode.GetMember && ins.D != 0;
+            if (!WebLingoMembers.TryGet(instance, name.Member, name.Text, heap, optional, out member, out error)) return false;
+            RememberField(function, pc, instance, ins.C);
+            return true;
+        }
+
+        /// <summary><c>SetMember</c>'s, or a <c>SetField</c>'s by its name, field of an instance assigned, as its cache or the runtime finds it.</summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool TrySetInstanceMember(WebLingoFunction function, WebLingoInstruction[] code, int pc, WebLingoValue[] registers,
+            out WebLingoRuntimeError? error, out WebLingoValue setter)
+        {
+            ref readonly var ins = ref code[pc];
+            var instance = registers[ins.A];
+            var name = names[ins.B].Text;
+            (error, setter) = (null, WebLingoValue.Null);
+            if (function.MemberSites[pc] is FieldSite site && heap.TrySetPlaceOf(instance, site.Definition, site.Place, name, registers[ins.C]))
+            {
+                return true;
+            }
+            if (!WebLingoMembers.TrySet(instance, name, registers[ins.C], heap, out error, out setter)) return false;
+            RememberField(function, pc, instance, ins.B);
+            return true;
+        }
+
+        /// <summary>A field an instance has assigned at one of its places, remembered for the instruction that reached it by name.</summary>
+        private void RememberField(WebLingoFunction function, int pc, WebLingoValue instance, int name)
+        {
+            var place = heap.AssignedPlaceOf(instance, names[name].Text, out var definition);
+            if (place < 0 || function.MemberSites[pc] is FieldSite same && ReferenceEquals(same.Definition, definition) && same.Place == place)
+            {
+                return;
+            }
+            function.MemberSites[pc] = new FieldSite(definition!, place);
+        }
+
+        /// <summary><c>CallMethod</c>'s method where its cache found it last; false where its name must find it.</summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool TryGetCachedMethod(WebLingoFunction function, int pc, WebLingoValue instance, out WebLingoValue method)
+        {
+            method = WebLingoValue.Null;
+            return function.MemberSites[pc] is MethodSite site
+                && heap.TryGetDeclaredMethod(instance, site.Definition, site.Depth, site.Index, out method);
+        }
+
+        /// <summary>
+        /// A method an instance's class declared, remembered for the instruction that called it by name, but for a disposal,
+        /// which runs its chain; the name the instruction's, <c>CallMethod</c>'s or a spread's.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void RememberMethod(WebLingoFunction function, WebLingoInstruction[] code, int pc, WebLingoValue instance, WebLingoValue method)
+        {
+            var name = names[code[pc].B];
+            if (name.Member == WebLingoMember.Dispose) return;
+            if (!heap.TryFindDeclaredMethod(instance, name.Text, method, out var definition, out var depth, out var index)) return;
+            if (function.MemberSites[pc] is MethodSite same && ReferenceEquals(same.Definition, definition) && same.Depth == depth
+                && same.Index == index)
+            {
+                return;
+            }
+            function.MemberSites[pc] = new MethodSite(definition!, depth, index);
+        }
+
         /// <summary><c>GetField</c>'s field at its place, given its destination; false where the name must read it.</summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         private bool TryGetField(WebLingoValue[] registers, WebLingoInstruction[] code, int pc)
