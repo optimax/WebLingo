@@ -1,0 +1,8 @@
+// Acme's own texts, in place of the forum's of the same names (Documents/weblingo-forum.md, section 3.5).
+
+export const texts = {
+    "en": {
+        "forum.poweredBy": "The Acme Tea Club, on WebLingo Forum",
+        "post.markdownHint": "Written in Markdown: **bold**, *italics*, > quotes, - lists, and :tea: for a cup of tea."
+    }
+};

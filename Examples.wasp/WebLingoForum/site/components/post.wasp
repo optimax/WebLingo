@@ -1,5 +1,5 @@
 <% param site; param post; param number; param topic; param first; param attachments = []; %>
-<% import { render } from "/lib/markdown.wlg"; import posts from "/lib/posts.wlg"; import uploads from "/lib/uploads.wlg"; %>
+<% import posts from "/lib/posts.wlg"; import uploads from "/lib/uploads.wlg"; %>
 <article class="post" id="post-<%= post["id"] %>">
   <aside class="author">
 <% if (post["user_name"] == null) { %>
@@ -15,7 +15,7 @@
   </aside>
   <div class="content">
     <p class="note"><a href="#post-<%= post["id"] %>">#<%= number %></a> · <%= site.f("topic.postedAt", { time: site.time(post["created_at"]) }) %><% if (post["edited_at"] != null) { %> · <%= site.f("topic.editedAt", { time: site.time(post["edited_at"]) }) %><% } %></p>
-    <div class="body"><%- render(post["body"], { images: site.settings["images"] }) %></div>
+    <div class="body"><%- await site.html(post["body"]) %></div>
 <% if (attachments.length > 0) { %>
     <ul class="attachments">
 <% foreach (var file in attachments) { %>
@@ -28,7 +28,7 @@
     </ul>
 <% } %>
 <% if (post["user_signature"] != null) { %>
-    <div class="signature"><%- render(post["user_signature"]) %></div>
+    <div class="signature"><%- await site.html(post["user_signature"], "signature") %></div>
 <% } %>
 <% if (site.user != null) { %>
     <p class="actions">

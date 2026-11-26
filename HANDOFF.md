@@ -350,7 +350,7 @@ messages broke their lines as the platform does, a provider's message's line bre
 ## WebLingo Forum
 
 The forum written in WASP, `Examples.wasp/WebLingoForum`, the task "Extensive WASP Example", is designed in
-`Documents/weblingo-forum.md` (`c05087f`), its ten parts in its section 6, each a task of `TO-DO.md`. Parts 1 to 8 have
+`Documents/weblingo-forum.md` (`c05087f`), its ten parts in its section 6, each a task of `TO-DO.md`. Parts 1 to 9 have
 landed. Its foundations (`cdfa20a`): the schema, `site/lib/schema.wlg`, made on SQLite, SQL Server, MySQL and PostgreSQL
 through `site/lib/sql.wlg`; `setup/setup.wlg`, run with `weblingo`, making the database and its first administrator, or
 upgrading it; and the front page, boards and topics, paged. Its members (`ae49457`): sign-up confirmed by mail, signing
@@ -425,6 +425,14 @@ and the site's `wasp.config` lets it write it alone. SQLite gives a new row the 
 attachment's id may name the next one. Tested by `tests/uploads-tests.wlg`, and by `ForumTests`' walk of files
 (`FilesAsync`), on all four databases.
 
+Its customization (part 9): a client's folder a site over the forum's, its base; `site/lib/hooks.wlg`, the plugins
+`plugins/index.wlg` lists, at the events `"post.created"` and `"member.signedUp"` and the filters `"html"` and
+`"nav.links"`; the look's files reaching no logic, a text's HTML and the header's links from the request's forum,
+`site.html` and `site.links`; `css/custom.css`, `texts/custom.wlg` and `plugins/index.wlg`, empty in the forum's site,
+for a client to replace; and an example client, `clients/acme`, with its own stylesheet, texts, plugin, `tea`, and page.
+Tested by `tests/hooks-tests.wlg`, and by `ForumTests.TheExampleClientIsServedOverTheForum`, Acme's forum over a copy of
+the forum's on SQLite.
+
 Found while writing it: in WebLingo, `s[i]` and a string's `length` took time in proportion to its length, its scalar
 values counted from its start each time, so the renderer reads an array of a line's characters (`charsOf` in
 `markdown.wlg`). Fixed since, below, "Strings read by their index".
@@ -432,7 +440,7 @@ values counted from its start each time, so the renderer reads an array of a lin
 The branch `claude/forum-writing` on GitHub holds part 3 unfinished (`9093b78`), which `main` has whole, in one commit,
 instead: it may be deleted there.
 
-Next: "WebLingo Forum, Part 9: Customization", over WASP's bases, above, then part 10. "WebLingo Forum:
+Next: "WebLingo Forum, Part 10: Deployment". "WebLingo Forum:
 MarkdownEditor.Web in the Post Form" waits for MarkdownEditor.Web's `LICENSE` to commit the editor's copy. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to
 be written as tasks and into the specification's roadmap; neither is begun.
 

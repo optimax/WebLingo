@@ -1,0 +1,5 @@
+// A client's own texts, each language's a map of texts' names to their words, in place of the forum's of the same names:
+// none in the forum's own site, a client's folder over it giving its own file of this name (Documents/weblingo-forum.md,
+// section 3.5), { "en": { "forum.poweredBy": "Acme's tea club" } }.
+
+export const texts = {};

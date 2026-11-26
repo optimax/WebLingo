@@ -84,6 +84,7 @@ export async function signUpPage(request, response) {
                 await users.join(db, made, "members");
                 return made;
             });
+            await site.hooks.run("member.signedUp", { user: id });
             if (!confirm) {
                 signIn(request, id);
                 redirect(response, page.back);

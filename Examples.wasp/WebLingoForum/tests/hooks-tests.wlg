@@ -1,0 +1,50 @@
+// The forum's hooks: plugins called at events and filters, in order, and plugins' names (site/lib/hooks.wlg); a text's
+// HTML through the "html" filter, and the header's links through "nav.links" (site/lib/forum.wlg).
+// weblingo test hooks-tests.wlg
+
+import { assertEqual, assertDeepEqual } from "std:test";
+import hooks from "../site/lib/hooks.wlg";
+import { Forum } from "../site/lib/forum.wlg";
+import { defaults } from "../site/lib/settings.wlg";
+import { load } from "../site/lib/texts.wlg";
+import { Permissions } from "../site/lib/permissions.wlg";
+
+export class HooksTests {
+    async testAnEventCallsEachPluginInOrder() {
+        var calls = [];
+        var first = { "post.created": async (values) => { calls.push($"first {values['post']}"); } };
+        var second = { "post.created": (values) => { calls.push($"second {values['post']}"); },
+                       "member.signedUp": (values) => { calls.push("signed up"); } };
+        var made = new hooks.Hooks([first, {}, second]);
+        await made.run("post.created", { post: 7 });
+        await made.run("topic.moved", { topic: 1 });
+        assertDeepEqual(calls, ["first 7", "second 7"]);
+    }
+
+    async testAFilterPassesItsValueThroughEachPlugin() {
+        var made = new hooks.Hooks([{ "html": (html, values) => html + "!" }, { "other": (v, values) => "never" },
+                                    { "html": async (html, values) => $"<{values['kind']}>{html}" }]);
+        assertEqual(await made.filter("html", "tea", { kind: "post" }), "<post>tea!");
+        assertEqual(await new hooks.Hooks([]).filter("html", "tea", {}), "tea");
+    }
+
+    testAPluginsNameIsLettersDigitsAndHyphens() {
+        assertEqual(hooks.isName("tea"), true);
+        assertEqual(hooks.isName("tea-2"), true);
+        foreach (var wrong in ["", "../tea", "tea.wlg", "t e a", "x".repeat(41), null, 5]) {
+            assertEqual(hooks.isName(wrong), false);
+        }
+    }
+
+    async testTheForumsHtmlAndLinksGoThroughItsPlugins() {
+        var site = new Forum(defaults, await load("en"), null, new Permissions({}, false));
+        assertEqual(await site.html("**Tea** :tea:"), "<p><strong>Tea</strong> :tea:</p>\n");
+        assertDeepEqual(await site.links(), []);
+        site.hooks = new hooks.Hooks([{ "html": (html, values) => html.replace(":tea:", values["kind"]),
+                                        "nav.links": (links, values) => [...links, ["Rules", "/rules"]] }]);
+        assertEqual(await site.html("**Tea** :tea:", "signature"), "<p><strong>Tea</strong> signature</p>\n");
+        assertDeepEqual(await site.links(), [["Rules", "/rules"]]);
+        // The forum's own site lists no plugins.
+        assertEqual((await hooks.load()).plugins.length, 0);
+    }
+}

@@ -108,7 +108,9 @@ Each database speaks its own SQL, and `std:db` passes SQL on as it is. So the fo
 
 Every piece of the forum's look is a file of its own: the layout, each include (its header, its footer, the trail of links above a page), each component (a post, a topic's row, a board's row, a member's card, the page numbers), and the CSS. The CSS takes its colours from custom properties, which the layout sets in its `<style>` from the forum's settings, each a colour `#rrggbb`, or the default. An administrator therefore changes the name, logo and colours without touching a file.
 
-A client's own files change more: they replace a layout, an include, a component, a stylesheet, a text or a module of the forum's. They stay in a folder of the client's, apart from the forum's, so that a new version of the forum leaves them alone. How a client's folder takes the place of the forum's files is the owner's choice: the task "WebLingo Forum, Part 9: Customization" asks it.
+A client's own files change more: they replace a layout, an include, a component, a stylesheet, a text or a module of the forum's. They stay in a folder of the client's, apart from the forum's, so that a new version of the forum leaves them alone. A client's folder is a site of its own, which lies over the forum's site, its base, as its `wasp.config` names it, `"base": "C:/WebLingoForum/site"` (the owner's answers, "Overlays in WASP"; the WASP User Manual, section 14, "A site over a base"): WASP takes a file from the client's folder where it has one, and from the forum's otherwise, and the forum's settings where the client's gives none; the client gives its own database and folder of files.
+
+As built (part 9): the forum's look is its layout, includes, components, stylesheets and texts, and its logic its modules in `site/lib`, which the look's files call, never the other way, and no look's file reaches the database or renders Markdown: a text's HTML and the header's links come from the request's forum, `site.html(markdown, kind)` and `site.links()` (`lib/forum.wlg`), each through the plugins' filters (section 3.8). The forum's own site has three files for a client to replace without copying the forum's, each empty there: `css/custom.css`, linked after the forum's stylesheet and its colours, so that a client's rule has the last word; `texts/custom.wlg`, a client's texts in place of the forum's of the same names (section 3.6); and `plugins/index.wlg`, the plugins the forum calls (section 3.8). Any other file of the look a client replaces whole, at its path (**Guess**, each). An example client, `clients/acme`, lies over the forum's site with its own stylesheet, texts, plugin, `tea`, and page, `/rules`, its own SQLite database made by the forum's `setup.wlg`, `database=sqlite:data/forum.db uploads=data/uploads`.
 
 ## 3.6 Its texts
 
@@ -132,12 +134,12 @@ HTML in a post is text, escaped, never markup. The renderer writes only the elem
 
 ## 3.8 Extending it
 
-A client's code extends the forum through **hooks**, named points where the forum calls the modules listed in its settings (**Guess**):
+A client's code extends the forum through **hooks**, named points where the forum calls the modules listed in its `plugins/index.wlg`, which a client's folder replaces (**Guess**):
 
 - **Events**, such as a post made, a member signed up, or a topic moved, called after the fact: `await hooks.run("post.created", { post: post, user: user })`.
 - **Filters**, which can change a value on its way, such as a post's HTML or a page's navigation: `html = await hooks.filter("post.html", html, { post: post })`.
 
-A plugin is a module in `site/plugins`, imported by its name, exporting a function for each hook it serves. The forum keeps no code of its own in a plugin, so a plugin is the client's alone. The task for part 9 adds an example plugin.
+A plugin is a module in `site/plugins`, imported by its name, exporting a function for each hook it serves. The forum keeps no code of its own in a plugin, so a plugin is the client's alone. As built (part 9): `lib/hooks.wlg` loads the plugins `plugins/index.wlg` lists, `export const plugins = ["tea"];`, once for each request, each name letters, digits and hyphens, each plugin exporting a map, `hooks`, of the hooks it serves to its functions, an event's called with values in the plugins' order, each awaited, what it gives unused, and a filter's with a value and values, giving the next the value it gives. The events are `"post.created"`, `{ post, topic, user }`, after a topic's first post and a reply, and `"member.signedUp"`, `{ user }`; the filters `"html"`, a text's HTML with `{ kind, markdown }`, its kind `"post"`, `"signature"`, `"message"` or `"report"`, and `"nav.links"`, the header's links after the forum's own, `[text, path]` each. A plugin's error is its page's (**Guess**, each). The example client's plugin, `clients/acme/site/plugins/tea.wlg`, shows `:tea:` as a cup of tea, adds a link to its rules, and writes each new post to its log.
 
 ## 3.9 Search
 
@@ -180,7 +182,7 @@ Each part is a task in `TO-DO.md`, landed on its own and tested on all four data
 6. **Private messages.**
 7. **Search.**
 8. **Avatars and attachments**, sent back by `response.sendFile`.
-9. **Customization.** A client's files in place of the forum's, a folder over the forum's site. Hooks and an example plugin. An example client, with its own look, texts and plugin.
+9. **Customization.** A client's files in place of the forum's, a folder over the forum's site. Hooks and an example plugin. An example client, with its own look, texts and plugin. Hooks and an example plugin. An example client, with its own look, texts and plugin.
 10. **Deployment.** The forum's `README.md`. Its deployment under IIS by the repository's `Scripts`, and behind nginx and Apache through FastCGI. The WASP User Manual pointing to it. A measurement of its pages under load, with `WebLingo.Benchmarks --load --url`.
 
 The pilot, "WASP Pilot: the Forum in Real Use", then serves it.

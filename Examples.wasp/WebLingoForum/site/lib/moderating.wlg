@@ -10,7 +10,6 @@ import posts from "./posts.wlg";
 import users from "./users.wlg";
 import moderation from "./moderation.wlg";
 import { isAdministrator } from "./permissions.wlg";
-import { render } from "./markdown.wlg";
 
 // The log's entries on a page.
 export const entriesPerPage = 50;
@@ -107,7 +106,7 @@ export async function reportPage(request, response) {
             }
             page.action = $"/post/report?id={post['id']}";
             page.post = post;
-            page.html = render(post["body"]);
+            page.html = await site.html(post["body"], "report");
             if (signInFirst(site, response, page.action)) {
                 return page;
             }
@@ -177,7 +176,7 @@ export async function reportsPage(request, response) {
                 }
             }
             foreach (var report in await moderation.openReports(db, site.permissions.moderated())) {
-                report["html"] = render(report["body"]);
+                report["html"] = await site.html(report["body"], "report");
                 report["link"] = await posts.linkOf(db, report["topic_id"], report["post_id"], site.settings["postsPerPage"]);
                 page.reports.push(report);
             }

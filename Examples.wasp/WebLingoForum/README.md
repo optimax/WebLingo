@@ -9,7 +9,8 @@ each group, and moderation: topics locked, pinned, moved, deleted and restored, 
 reported, members banned, and a log of it all; and its administration: its settings, categories and boards, who may do
 what on each, groups, and members' groups; private messages, conversations of members, with what is new to each; and
 search, by words, on a board and by an author; and members' files, their avatars, posts' attachments and the forum's
-logo. A client's own look and code, and its deployment, come in the parts after them.
+logo; and a client's own look, texts and plugins, in a folder of the client's over the forum's site, `clients/acme`
+an example of one, with its own README. Its deployment comes in the part after them.
 
 ```text
 WebLingoForum/
@@ -36,8 +37,11 @@ WebLingoForum/
     lib/        the forum's modules: the database's SQL, its schema, settings, texts, members, their mail and tokens,
                 posts, what each member has read and watches, the Markdown, permissions, moderation, and what each
                 page shows and does
-    texts/      the forum's texts, a module for each language: en.wlg
-    layouts/, includes/, components/, css/    its look, each piece a file of its own
+    texts/      the forum's texts, a module for each language: en.wlg; and custom.wlg, a client's own, none here
+    plugins/    index.wlg, the plugins the forum calls at its hooks, none here, which a client's folder replaces
+    css/        forum.css, the forum's look, and custom.css, a client's own, none here
+    layouts/, includes/, components/    its look, each piece a file of its own, which a client may replace
+  clients/acme/ an example client, Acme, whose site lies over the forum's: its own look, texts, plugin and page
   tests/        the forum's modules' own tests, run by weblingo test
 ```
 
@@ -65,7 +69,8 @@ The forum's own tests, from `tests`:
 
 ```bash
 weblingo test accounts-tests.wlg administration-tests.wlg markdown-tests.wlg messages-tests.wlg moderation-tests.wlg \
-    schema-tests.wlg search-tests.wlg sql-tests.wlg texts-tests.wlg uploads-tests.wlg users-tests.wlg writing-tests.wlg
+    hooks-tests.wlg schema-tests.wlg search-tests.wlg sql-tests.wlg texts-tests.wlg uploads-tests.wlg users-tests.wlg \
+    writing-tests.wlg
 ```
 
 ## Mail, and members

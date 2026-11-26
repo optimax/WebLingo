@@ -1,0 +1,64 @@
+// The forum's hooks (Documents/weblingo-forum.md, section 3.8): named points where it calls the plugins that
+// plugins/index.wlg lists, each a module of plugins/ exporting a map, hooks, of the hooks it serves to its functions.
+// An event's function is called after the fact with values, and what it gives is not used; a filter's is called with a
+// value and values, and gives the value, changed or not, to the next plugin's, and the last's to the forum. A client's
+// folder over the forum's site has its own plugins/index.wlg, and its own plugins beside it.
+//
+//   Events:  "post.created"     { post, topic, user }, a post's id, its topic's, and the member who wrote it
+//            "member.signedUp"  { user }, the new member's id
+//   Filters: "html"             a text's HTML, { kind, markdown }: "post", "signature", "message" or "report", and its Markdown
+//            "nav.links"        the header's links after the forum's own, an array of [text, path]
+
+export class Hooks {
+    // The plugins' maps of their hooks, in the order plugins/index.wlg lists them.
+    constructor(plugins) {
+        this.plugins = plugins;
+    }
+
+    // Calls each plugin's function for an event, in their order, each awaited.
+    async run(name, values) {
+        foreach (var hooks in this.plugins) {
+            var serve = hooks?[name];
+            if (serve != null) {
+                await serve(values);
+            }
+        }
+    }
+
+    // A value through each plugin's filter of the name, in their order: what the last gives.
+    async filter(name, value, values) {
+        foreach (var hooks in this.plugins) {
+            var serve = hooks?[name];
+            if (serve != null) {
+                value = await serve(value, values);
+            }
+        }
+        return value;
+    }
+}
+
+// Whether a text is a plugin's name: letters, digits and hyphens, 1 to 40 of them.
+export function isName(text) {
+    if (!(text is String) || text.length == 0 || text.length > 40) {
+        return false;
+    }
+    foreach (var c in text) {
+        if (!"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-".contains(c)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// The plugins plugins/index.wlg lists, each module loaded once for each request.
+export async function load() {
+    var index = await Module.import("../plugins/index.wlg");
+    var found = [];
+    foreach (var name in index.plugins) {
+        if (!isName(name)) {
+            throw new Error($"'{name}' is not a plugin's name: plugins/index.wlg lists names of letters, digits and hyphens.");
+        }
+        found.push((await Module.import("../plugins/" + name + ".wlg")).hooks);
+    }
+    return new Hooks(found);
+}

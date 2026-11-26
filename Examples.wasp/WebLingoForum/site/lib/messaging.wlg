@@ -7,7 +7,6 @@ import { DateTime } from "std:datetime";
 import { begin, open, viewOf, formOf, redirect, idOf, pageOf, pagesOf, refuse, signInFirst } from "./forum.wlg";
 import messages from "./messages.wlg";
 import posts from "./posts.wlg";
-import { render } from "./markdown.wlg";
 
 // The conversations on a page of a member's list.
 export const conversationsPerPage = 25;
@@ -74,7 +73,7 @@ export async function newPage(request, response) {
         }
         page.values = { to: (form?["to"] ?? "").trim(), subject: messages.subjectOf(form?["subject"]), body: posts.bodyOf(form?["body"]) };
         if (form?["action"] == "preview") {
-            page.preview = render(page.values["body"]);
+            page.preview = await site.html(page.values["body"], "message");
             return page;
         }
         using (var db = await open()) {
@@ -141,7 +140,7 @@ export async function conversationPage(request, response) {
                 } else {
                     page.values = { body: posts.bodyOf(form?["body"]) };
                     if (form?["action"] == "preview") {
-                        page.preview = render(page.values["body"]);
+                        page.preview = await site.html(page.values["body"], "message");
                     } else {
                         var problem = posts.bodyProblem(page.values["body"]);
                         if (problem != null) {
@@ -162,7 +161,7 @@ export async function conversationPage(request, response) {
             page.page = request.method == "POST" ? page.pages : pageWithin(request, page.pages);
             page.first = (page.page - 1) * perPage;
             foreach (var message in await messages.messages(db, conversation["id"], page.first, perPage)) {
-                message["html"] = render(message["body"]);
+                message["html"] = await site.html(message["body"], "message");
                 message["new"] = message["id"] > conversation["last_read_id"] && message["user_id"] != site.user["id"];
                 page.messages.push(message);
             }

@@ -1,0 +1,8 @@
+<% param request; param response; %>
+<% layout "/layouts/main.wasp", { title: "Rules" }; %>
+<%# A page of Acme's own, laid out by the forum's layout, as its base gives it (Documents/weblingo-forum.md, section 3.5). %>
+<h1>The club's rules</h1>
+<ol>
+  <li>Be kind, and keep to the board's subject.</li>
+  <li>Tea before coffee: write :tea: and a cup is poured.</li>
+</ol>

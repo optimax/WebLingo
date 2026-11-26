@@ -19,6 +19,7 @@
       --surface: <%= colors["surface"] %>; --text: <%= colors["text"] %>; --muted: <%= colors["muted"] %>; --border: <%= colors["border"] %>;
     }
   </style>
+  <link rel="stylesheet" href="/css/custom.css">
 </head>
 <body>
 <% include "/includes/header.wasp"; %>

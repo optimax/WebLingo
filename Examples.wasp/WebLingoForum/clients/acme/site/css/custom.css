@@ -1,0 +1,5 @@
+/* Acme's look over the forum's (Documents/weblingo-forum.md, section 3.5): its own type, a band of its red under the
+   header, and round avatars. The forum's colours stay its administrator's, set on its settings page. */
+body { font-family: Georgia, "Times New Roman", serif; }
+header.site { border-bottom: 4px solid #c8102e; }
+.avatar { border-radius: 50%; }

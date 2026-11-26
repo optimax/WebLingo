@@ -98,17 +98,81 @@ public sealed class ForumTests
     /// sent to the tests' SMTP server; its pages read as a reader reads them, and its members' pages used as a member
     /// uses them.
     /// </summary>
-    private static async Task ServesTheForumAsync(string? connection, string provider)
+    /// <summary>A copy of the forum in a folder of its own, without what its data folders hold but their READMEs.</summary>
+    private static string CopyForum()
     {
         var forum = Forum();
         var copy = Path.Combine(Path.GetTempPath(), "weblingo-forum-" + Guid.NewGuid().ToString("N"));
         foreach (var file in Directory.GetFiles(forum, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(forum, file);
-            if (relative.StartsWith("data" + Path.DirectorySeparatorChar, StringComparison.Ordinal) && !relative.EndsWith("README.md", StringComparison.Ordinal)) continue;
+            var data = relative.Split(Path.DirectorySeparatorChar).Contains("data");
+            if (data && !relative.EndsWith("README.md", StringComparison.Ordinal)) continue;
             Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(copy, relative))!);
             File.Copy(file, Path.Combine(copy, relative));
         }
+        return copy;
+    }
+
+    /// <summary>
+    /// Acme's forum, <c>clients/acme</c> (<c>Documents/weblingo-forum.md</c>, section 3.5), served over the forum's site, its
+    /// base, on a SQLite database of its own, which the forum's <c>setup.wlg</c> makes: its own stylesheet after the forum's,
+    /// its own texts in place of the forum's, its plugin's link in the header and its cup of tea in a reply, and a page
+    /// of its own in the forum's layout.
+    /// </summary>
+    [Fact]
+    public async Task TheExampleClientIsServedOverTheForum()
+    {
+        var copy = CopyForum();
+        try
+        {
+            var acme = Path.Combine(copy, "clients", "acme");
+            Assert.Equal((WebLingoCommandLine.Success, "Made the forum's database 'sqlite:" + Path.Combine(acme, "data", "forum.db")
+                + "' on sqlite, version 7, with its administrator Anna.\n", ""),
+                Run("run", Path.Combine(copy, "setup", "setup.wlg"), "name=Anna", "email=anna@example.com", "password=correct-horse",
+                    "database=sqlite:" + Path.Combine(acme, "data", "forum.db"), "uploads=" + Path.Combine(acme, "data", "uploads")));
+            var server = WebLingoWaspServer.Create(Path.Combine(acme, "site"), 0, new Dictionary<string, string>(), out var error, out _);
+            Assert.True(server is not null, error);
+            await server.StartAsync();
+            try
+            {
+                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                using var anna = new Browser(address);
+                var (status, home) = await anna.Get("/");
+                Assert.Equal(HttpStatusCode.OK, status);
+                Assert.True(home.IndexOf("</style>", StringComparison.Ordinal) < home.IndexOf("<link rel=\"stylesheet\" href=\"/css/custom.css\">",
+                    StringComparison.Ordinal), home);
+                Assert.Contains("<a href=\"/rules\">Rules</a>", home);
+                Assert.Contains("The Acme Tea Club, on WebLingo Forum", home);
+                Assert.Contains("Welcome to the forum", home);
+                Assert.Contains("font-family: Georgia", (await anna.Get("/css/custom.css")).Item2);
+                Assert.Contains("h1 { font-size: 1.6rem;", (await anna.Get("/css/forum.css")).Item2);
+                var (_, rules) = await anna.Get("/rules");
+                Assert.Contains("<title>Rules · WebLingo Forum</title>", rules);
+                Assert.Contains("<h1>The club's rules</h1>", rules);
+
+                (status, _, _) = await anna.Post("/account/sign-in", ("name", "Anna"), ("password", "correct-horse"));
+                Assert.Equal(HttpStatusCode.OK, status);
+                Assert.Contains(":tea: for a cup of tea.", (await anna.Get("/post/reply?topic=1")).Item2);
+                (status, var body, var at) = await anna.Post("/post/reply?topic=1", ("body", "Green, :tea: please."), ("action", "post"));
+                Assert.True(status == HttpStatusCode.OK && at.StartsWith("/topic?id=1", StringComparison.Ordinal), at + "\n" + body);
+                Assert.Contains("<p>Green, \U0001F375 please.</p>", body);
+            }
+            finally
+            {
+                await server.StopAsync();
+            }
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Directory.Delete(copy, recursive: true);
+        }
+    }
+
+    private static async Task ServesTheForumAsync(string? connection, string provider)
+    {
+        var copy = CopyForum();
         using var smtp = new SmtpTestServer { Tls = SmtpTestTls.None }.Start();
         try
         {

@@ -10,7 +10,7 @@ import topics from "./topics.wlg";
 import posts from "./posts.wlg";
 import reading from "./reading.wlg";
 import moderation from "./moderation.wlg";
-import { render, escape, quote } from "./markdown.wlg";
+import { escape, quote } from "./markdown.wlg";
 import { sendReplies } from "./mail.wlg";
 import uploads from "./uploads.wlg";
 
@@ -28,9 +28,9 @@ function view(site, title, crumbs) {
     return page;
 }
 
-// A post's text as HTML, its images as the forum's settings allow them.
-function htmlOf(site, body) {
-    return render(body, { images: site.settings["images"] });
+// A post's text as HTML, its images as the forum's settings allow them, through the plugins' filter.
+async function htmlOf(site, body) {
+    return await site.html(body, "post");
 }
 
 // The form a page posted, with its text and its title, where it has one, kept as they are kept, its files checked,
@@ -45,7 +45,7 @@ async function postedTo(page, request, response, titled, kept = 0) {
     }
     page.values = { title: titled ? posts.titleOf(form?["title"]) : page.values["title"], body: posts.bodyOf(form?["body"]) };
     if (form?["action"] == "preview") {
-        page.preview = htmlOf(page.site, page.values["body"]);
+        page.preview = await htmlOf(page.site, page.values["body"]);
     } else {
         foreach (var problem in [titled ? posts.titleProblem(page.values["title"]) : null, posts.bodyProblem(page.values["body"])]) {
             if (problem != null) {
@@ -99,6 +99,7 @@ export async function newTopicPage(request, response) {
             }
             var made = await posts.start(db, board["id"], site.user["id"], page.values["title"], page.values["body"], DateTime.utcNow());
             await attach(db, page, made["post"]);
+            await site.hooks.run("post.created", { post: made["post"], topic: made["topic"], user: site.user["id"] });
             await reading.saw(db, site.user["id"], made["topic"], made["post"]);
             await reading.watch(db, site.user["id"], made["topic"]);
             page.done = true;
@@ -144,6 +145,7 @@ export async function replyPage(request, response) {
             }
             var post = await posts.reply(db, topic, site.user["id"], page.values["body"], DateTime.utcNow());
             await attach(db, page, post);
+            await site.hooks.run("post.created", { post: post, topic: topic["id"], user: site.user["id"] });
             await reading.saw(db, site.user["id"], topic["id"], post);
             await sendReplies(db, site, request, topic, site.user);
             page.done = true;
@@ -237,7 +239,7 @@ export async function deletePage(request, response) {
             if (!(await changed(db, site, request, response, page, "delete"))) {
                 return page;
             }
-            page.html = htmlOf(site, page.post["body"]);
+            page.html = await htmlOf(site, page.post["body"]);
             page.alone = page.topic["post_count"] == 1;
             if (request.method != "POST") {
                 return page;

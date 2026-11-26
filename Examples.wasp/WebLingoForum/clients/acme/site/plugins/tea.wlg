@@ -1,0 +1,13 @@
+// Acme's plugin, an example of the forum's hooks (Documents/weblingo-forum.md, section 3.8; site/lib/hooks.wlg): :tea:
+// in a post, a signature or a message shown as a cup of tea; a link to Acme's rules in the header; and each new post
+// written to the site's log.
+
+import { info } from "std:log";
+
+export const hooks = {
+    "html": (html, values) => html.replace(":tea:", "\u{1f375}"),
+    "nav.links": (links, values) => [...links, ["Rules", "/rules"]],
+    "post.created": (values) => {
+        info($"Post {values['post']} written in topic {values['topic']} by member {values['user']}.");
+    }
+};

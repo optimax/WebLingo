@@ -5,6 +5,9 @@
     <nav class="account">
       <a href="/search"><%= site.t("nav.search") %></a>
       <a href="/members"><%= site.t("nav.members") %></a>
+<% foreach (var link in await site.links()) { %>
+      <a href="<%= link[1] %>"><%= link[0] %></a>
+<% } %>
 <% if (site.user == null) { %>
       <a href="/account/sign-in?back=<%= hereOf(request) %>"><%= site.t("nav.signIn") %></a>
       <a href="/account/sign-up"><%= site.t("nav.signUp") %></a>

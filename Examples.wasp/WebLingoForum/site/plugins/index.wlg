@@ -1,0 +1,6 @@
+// The plugins the forum calls at its hooks, in order, each a module of this folder by its name, plugins/<name>.wlg,
+// exporting a map, hooks, of the hooks it serves to its functions (Documents/weblingo-forum.md, section 3.8; lib/hooks.wlg):
+// none in the forum's own site, a client's folder over it giving its own file of this name, export const plugins =
+// ["tea"];, and its plugins beside it.
+
+export const plugins = [];

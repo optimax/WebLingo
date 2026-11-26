@@ -54,9 +54,11 @@ export function isLanguage(text) {
     return text[2] == "-" && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(text[3]) && "ABCDEFGHIJKLMNOPQRSTUVWXYZ".contains(text[4]);
 }
 
-// The texts of a language, from its module, English's where the name is not a language's.
+// The texts of a language, from its module, English's where the name is not a language's; a client's own of the
+// language, texts/custom.wlg's, in place of the forum's of the same names (section 3.5).
 export async function load(language) {
     var name = isLanguage(language) ? language : "en";
     var module = await Module.import("../texts/" + name + ".wlg");
-    return new Texts(name, module.texts, module.plural);
+    var custom = await Module.import("../texts/custom.wlg");
+    return new Texts(name, { ...module.texts, ...(custom.texts?[name] ?? {}) }, module.plural);
 }

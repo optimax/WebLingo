@@ -1,7 +1,8 @@
-// The forum as a request sees it: its settings, its texts, the member signed in, what they may do on each board, and
-// the time zone its dates are shown in, read once for each request, since a module runs once for each request that
-// imports it (the WASP User Manual, section 8); and what its pages share: their forms, their redirects, and the member a
-// session keeps.
+// The forum as a request sees it: its settings, its texts, the member signed in, what they may do on each board, the
+// time zone its dates are shown in, and its plugins' hooks, read once for each request, since a module runs once for
+// each request that imports it (the WASP User Manual, section 8); and what its pages share: their forms, their
+// redirects, and the member a session keeps. What its look's files show, a text's HTML and the header's links, it gives
+// them, so that a client who changes the look changes no logic (Documents/weblingo-forum.md, section 3.5).
 
 import { Database } from "std:db";
 import { DateTime } from "std:datetime";
@@ -10,6 +11,8 @@ import { load } from "./texts.wlg";
 import permissions from "./permissions.wlg";
 import { banOf } from "./moderation.wlg";
 import messages from "./messages.wlg";
+import hooks from "./hooks.wlg";
+import { render } from "./markdown.wlg";
 
 export class Forum {
     constructor(values, texts, user, can) {
@@ -21,6 +24,20 @@ export class Forum {
         // How many private messages are new to the member.
         this.unread = 0;
         this.kept = {};
+        // Its plugins' hooks (section 3.8), none until begin loads them.
+        this.hooks = new hooks.Hooks([]);
+    }
+
+    // A text's Markdown as HTML, through the plugins' "html" filter: a "post"'s, its pictures shown as the settings
+    // allow, a "signature"'s, a "message"'s or a "report"'s.
+    async html(markdown, kind = "post") {
+        var html = render(markdown, { images: kind == "post" && this.settings["images"] });
+        return await this.hooks.filter("html", html, { kind: kind, markdown: markdown });
+    }
+
+    // The header's links after the forum's own, each [text, path], as the plugins' "nav.links" filter gives them.
+    async links() {
+        return await this.hooks.filter("nav.links", [], {});
     }
 
     // Whether the reader has a permission on a board: see, read, start, reply, edit, delete or moderate.
@@ -64,6 +81,7 @@ export async function begin(request) {
         }
         current = new Forum(values, await load(user?["language"] ?? values["language"]), user, can);
         current.unread = unread;
+        current.hooks = await hooks.load();
     }
     return current;
 }

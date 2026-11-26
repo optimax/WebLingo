@@ -1,0 +1,3 @@
+// Acme's plugins, in the order the forum calls them at its hooks (Documents/weblingo-forum.md, section 3.8).
+
+export const plugins = ["tea"];
