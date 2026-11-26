@@ -2450,7 +2450,16 @@ is not planned.
    kept on purpose. They found nothing to fix.
 3. **The soak with reloads** (A2 (c)). `WebLingo.Benchmarks --load --soak` with a reload every few seconds, the server's
    memory, its .NET heap, its handles and its threads sampled, a trend that keeps rising after warming up a failure, its
-   report giving the growth per reload; run before a release and when hosting changes, its numbers here.
+   report giving the growth per reload; run before a release and when hosting changes, its numbers here. Run (26
+   November 2026, 13:02 to 16:03, on this branch's build; the machine not idle throughout, its builds and tests run
+   meanwhile, which slowed its throughput, not its memory): 3 hours under `wasp serve`, ASP.NET Core's server, 8
+   clients asking for `hello`, `compute`, `sqlite`, `sqlserver`, `large`, `session` and `upload` in turn, `hello.wasp`
+   replaced every 5 seconds, a sample every 5 minutes, .NET 10.0.15 on Windows, 8 logical processors: 21,615,280
+   requests, 0 errors, 2,155 reloads, the page refused 0 times while the server read it; 1,700 to 2,380 requests a
+   second, a median of 1.6 to 2.0 ms and 99 percent under 21 to 30 ms; the working set 104 to 113 MB, private bytes 44
+   to 48 MB, handles 840 to 945, threads 41 to 45; after the warm-up, 27 samples, private bytes +0.3 KB a reload,
+   handles +0.027 a reload, threads 0.000 a reload: none keeps rising. The .NET heap not sampled, a question of the
+   task's.
 
 **A cancelled request's cleanup, parts** (27 November 2026), what part 1 left, its A3 (a) of "M0.22, Part 1: The Drain",
 and how an exception a cleanup throws then goes, A1 (a) of "A Cancelled Request's Cleanup": a request cancelled, by its
