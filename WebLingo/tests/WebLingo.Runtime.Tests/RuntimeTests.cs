@@ -100,6 +100,35 @@ public sealed class HeapTests
     }
 
     [Fact]
+    public void AStringsScalarValuesAreCountedOnceAndFoundWithoutCountingAgain()
+    {
+        var heap = new WebLingoHeap();
+        var roots = new WebLingoValue[2];
+        heap.AddRoots(roots);
+        Assert.True(heap.TryAllocateString("tea", out roots[0], out _));
+        Assert.Equal(3, heap.ScalarCount(roots[0]));
+        Assert.Equal(2, heap.ScalarStart(roots[0], 2));
+        Assert.Equal(1, heap.ScalarsBefore(roots[0], 1));
+        // A surrogate pair is one scalar value: "a😀b😀c" is five, at 0, 1, 3, 4 and 6 of its seven UTF-16 units, its
+        // table of starts counted in the heap's units until the string is freed.
+        var units = heap.Units;
+        Assert.True(heap.TryAllocateString("a\U0001F600b\U0001F600c", out roots[1], out _));
+        Assert.Equal(5, heap.ScalarCount(roots[1]));
+        Assert.Equal(units + 7 + WebLingoHeap.ObjectOverhead, heap.Units);
+        Assert.Equal([0, 1, 3, 4, 6, 7], Enumerable.Range(0, 6).Select(i => heap.ScalarStart(roots[1], i)));
+        Assert.Equal(units + 7 + WebLingoHeap.ObjectOverhead + 12, heap.Units);
+        Assert.Equal([0, 1, 2, 3, 4, 5], new[] { 0, 1, 3, 4, 6, 7 }.Select(i => heap.ScalarsBefore(roots[1], i)));
+        roots[1] = WebLingoValue.Null;
+        heap.Collect();
+        Assert.Equal(units, heap.Units);
+
+        // A string made where a freed one was is counted anew.
+        Assert.True(heap.TryAllocateString("tea time", out roots[1], out _));
+        Assert.Equal(8, heap.ScalarCount(roots[1]));
+        Assert.Equal(5, heap.ScalarStart(roots[1], 5));
+    }
+
+    [Fact]
     public void GarbageIsCollectedBeforeTheBudgetRunsOut()
     {
         var heap = new WebLingoHeap(maxUnits: 10_000);

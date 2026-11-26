@@ -1,0 +1,13 @@
+// A string read by its index, sliced and searched: each of 20,000 characters read by its position, and a slice and a
+// search at 2,000 places, in a string whose characters are a UTF-16 unit each, then in one with surrogate pairs.
+import { writeLn } from "std:console";
+var count = 0;
+foreach (var text in ["ab*cd".repeat(4000), "ab*c\u{1F600}".repeat(4000)]) {
+    for (var i = 0; i < text.length; i = i + 1) {
+        if (text[i] == "*") count = count + 1;
+    }
+    for (var i = 0; i < 2000; i = i + 1) {
+        count = count + text.slice(i * 10, i * 10 + 5).length + text.indexOf("*", i * 10);
+    }
+}
+writeLn(count);

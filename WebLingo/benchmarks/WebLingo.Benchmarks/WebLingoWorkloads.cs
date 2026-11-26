@@ -30,6 +30,7 @@ public static class WebLingoWorkloads
         Load("imports", "a native module's functions, imported by name, called in a loop", "10000199985\n"),
         Load("closures", "closures made and called, sharing captured cells", "3300000\n"),
         Load("strings", "string concatenation and comparison, the heap and its collector", "20000\n"),
+        Load("indexing", "a string's characters read by their index, its slices and searches, with and without surrogate pairs", "40016000\n"),
         Load("bytes", "bytes built from many small pieces by BytesBuilders, and read", "600300\n"),
         Load("collections", "arrays and maps: elements and entries read, written and visited with foreach", "200124998\n"),
         Load("objects", "instances made, their fields read and written, their methods called", "1666691666750000\n"),

@@ -300,6 +300,17 @@ reported through GitHub's private vulnerability reporting, which the owner turns
 package added, upgraded or removed updates it (`Documents/implementation.md`, section 10). Both files ship in every
 installer's package (`Installers/Windows/package.ps1`, `Installers/Linux/package.sh`).
 
+## Strings read by their index
+
+A string's count of Unicode scalar values is kept with it in the heap once counted, and, for a string with a surrogate
+pair, where each of its scalar values starts, made the first time a position in it is asked for
+(`WebLingo/src/WebLingo.Runtime/WebLingoHeap.cs`, `ScalarCount`, `ScalarStart` and `ScalarsBefore`, freed with the
+string by the collector): `length`, `s[i]`, `slice`, `indexOf`, `lastIndexOf`, `padStart` and `padEnd`
+(`WebLingoMembers.cs`, `WebLingoMembers.Strings.cs`) take constant time after the first, where they counted the string
+from its start each time. 20,000 lookups of a string of 20,000 characters, 700 ms before, take 13 ms. The benchmark's
+workload `indexing` measures it (the specification, section 5.6, "A string read by its index");
+`RuntimeTests.AStringsScalarValuesAreCountedOnceAndFoundWithoutCountingAgain` tests it.
+
 ## MySQL and PostgreSQL
 
 `std:db`'s MySQL and PostgreSQL are tried by `MySqlTests` and `PostgreSqlTests` (`WebLingo.Conformance.Tests`), and
@@ -367,10 +378,9 @@ every word given, on the boards the reader may read, on one of them and by an au
 `tests/search-tests.wlg`, and by `ForumTests`' walk of search (`SearchAsync`), on all four databases; the page looked at
 in a browser.
 
-Found while writing it: in WebLingo, `s[i]` and a string's `length` take time in proportion to its length, its scalar
-values counted from its start each time (`WebLingoMembers.ScalarCount`), 20,000 lookups 683 ms against 2 ms by
-`foreach`; so a scanner reads an array of a string's characters (`charsOf` in `markdown.wlg`). The task "Indexing a
-String in Constant Time" is to fix it.
+Found while writing it: in WebLingo, `s[i]` and a string's `length` took time in proportion to its length, its scalar
+values counted from its start each time, so the renderer reads an array of a line's characters (`charsOf` in
+`markdown.wlg`). Fixed since, below, "Strings read by their index".
 
 The branch `claude/forum-writing` on GitHub holds part 3 unfinished (`9093b78`), which `main` has whole, in one commit,
 instead: it may be deleted there.
@@ -379,6 +389,7 @@ Next: "WebLingo Forum, Part 10: Deployment". Parts 8 and 9 wait for "Sending Fil
 and "WebLingo Forum: MarkdownEditor.Web in the Post Form" for its answers, each with questions in `TO-DO.md`. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to
 be written as tasks and into the specification's roadmap; neither is begun.
 
-The last full suite, on Windows, in Release (25 November 2026, MySQL's and PostgreSQL's tests among them): 3,642 tests
-passing, none skipped, before the forum's parts, whose `ForumTests` ran for each. Linux not tried since `2e27309`: the
-forum's design, the build number and the forum's parts 1 to 7 were tried on Windows only.
+The last full suite, on Windows, in Release (25 November 2026, MySQL's and PostgreSQL's tests among them): 3,661 tests
+passing, none skipped, with the forum's parts 1 to 7 and strings read by their index. Linux not tried since `2e27309`:
+the forum's design, the build number, the forum's parts 1 to 7 and strings read by their index were tried on Windows
+only.

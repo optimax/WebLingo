@@ -281,9 +281,9 @@ function list(lines, i, depth, images, out) {
 
 // ---- Inline ----
 //
-// A line's characters are read from an array of them, since a string's character at a position is found from its
-// start; and no search goes on past what one construct may hold, or twice where it found nothing, so that a post of
-// any length renders in time linear in its length.
+// A line's characters are read from an array of them, each a string made once, where a string's character at a
+// position is a new string each time it is read; and no search goes on past what one construct may hold, or twice
+// where it found nothing, so that a post of any length renders in time linear in its length.
 
 // The longest a link's address, or an autolink, may be.
 const longestAddress = 2000;

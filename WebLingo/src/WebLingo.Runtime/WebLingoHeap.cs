@@ -712,6 +712,75 @@ public sealed class WebLingoHeap
     /// <summary>The text of a string value of this heap.</summary>
     public string GetString(WebLingoValue value) => Get<string>(value, WebLingoValueKind.String);
 
+    // Each string's count of Unicode scalar values, by its handle, -1 until it is first counted; and, for a string with a
+    // surrogate pair, where each of its scalar values starts, made the first time a position in it is asked for: so that
+    // a string's length, its indexing and its slices take constant time after the first (the task "Indexing a String in
+    // Constant Time"). A string without a surrogate pair, most strings, needs no table, each scalar value one UTF-16 unit.
+    private readonly List<int> _scalars = [];
+    private Dictionary<int, int[]>? _starts;
+
+    /// <summary>
+    /// The number of Unicode scalar values in a string of this heap, a surrogate pair counting once: counted the first time
+    /// it is asked for, and kept with the string.
+    /// </summary>
+    public long ScalarCount(WebLingoValue value)
+    {
+        var text = GetString(value);
+        var handle = value.Handle;
+        while (_scalars.Count <= handle) _scalars.Add(-1);
+        var count = _scalars[handle];
+        if (count < 0) _scalars[handle] = count = (int)WebLingoMembers.ScalarCount(text);
+        return count;
+    }
+
+    /// <summary>
+    /// The UTF-16 index at which a string's <paramref name="scalar"/>-th Unicode scalar value starts, its length for its
+    /// count; the scalar values counted from 0 to its count.
+    /// </summary>
+    public int ScalarStart(WebLingoValue value, long scalar)
+    {
+        var count = ScalarCount(value);
+        return count == GetString(value).Length ? (int)scalar : StartsOf(value, count)[scalar];
+    }
+
+    /// <summary>How many Unicode scalar values a string has before a UTF-16 index at which one of them starts.</summary>
+    public long ScalarsBefore(WebLingoValue value, int index)
+    {
+        var count = ScalarCount(value);
+        if (count == GetString(value).Length) return index;
+        var starts = StartsOf(value, count);
+        var (low, high) = (0, starts.Length - 1);
+        while (low < high)
+        {
+            var middle = (low + high) / 2;
+            if (starts[middle] < index) low = middle + 1;
+            else high = middle;
+        }
+        return low;
+    }
+
+    /// <summary>
+    /// Where each of a string's scalar values starts, and its length after them, made once, kept with the string, and
+    /// counted in the heap's units, two for each entry, as a string's characters are counted one each.
+    /// </summary>
+    private int[] StartsOf(WebLingoValue value, long count)
+    {
+        _starts ??= [];
+        if (_starts.TryGetValue(value.Handle, out var starts)) return starts;
+        var text = GetString(value);
+        starts = new int[count + 1];
+        var i = 0;
+        for (var scalar = 0; scalar < count; scalar++)
+        {
+            starts[scalar] = i;
+            i += i + 1 < text.Length && char.IsSurrogatePair(text[i], text[i + 1]) ? 2 : 1;
+        }
+        starts[count] = text.Length;
+        _starts[value.Handle] = starts;
+        Units += starts.Length * 2L;
+        return starts;
+    }
+
     /// <summary>
     /// New bytes (section 3.2, "Bytes"), holding <paramref name="data"/>, which the heap keeps and nothing may change after:
     /// immutable, as a string is. They take a unit for every eight bytes.
@@ -1779,6 +1848,11 @@ public sealed class WebLingoHeap
             if (marked[handle] || _objects[handle] is not { } item) continue;
             if (_natives is { Count: > 0 } && _natives.Remove(handle, out var native)) DisposeHostObject(native);
             Units -= SizeOf(item);
+            if (item is string && handle < _scalars.Count)
+            {
+                _scalars[handle] = -1;
+                if (_starts is { Count: > 0 } && _starts.Remove(handle, out var starts)) Units -= starts.Length * 2L;
+            }
             _objects[handle] = null;
             _free.Push(handle);
         }

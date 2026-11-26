@@ -81,19 +81,19 @@ public static partial class WebLingoMembers
                 if (count is < 1 or > 2) return WrongArgumentCount(name, 1, 2, count, out error);
                 if (!TryText(new(name, 0, 2, "the search", "a string"), values[first], heap, out var search, out error)) return false;
                 var from = 0L;
-                if (count == 2 && !TryPosition(new(name, 1, 2, "the start", "an integer"), values[first + 1], ScalarCount(text), out from, out error))
+                if (count == 2 && !TryPosition(new(name, 1, 2, "the start", "an integer"), values[first + 1], heap.ScalarCount(target), out from, out error))
                 {
                     return false;
                 }
-                var at = text.IndexOf(search, ScalarStart(text, from), StringComparison.Ordinal);
-                return Done(WebLingoValue.FromInt64(at < 0 ? -1 : ScalarsBefore(text, at)), out result, out error);
+                var at = text.IndexOf(search, heap.ScalarStart(target, from), StringComparison.Ordinal);
+                return Done(WebLingoValue.FromInt64(at < 0 ? -1 : heap.ScalarsBefore(target, at)), out result, out error);
             }
             case WebLingoMember.LastIndexOf:
             {
                 if (count != 1) return WrongArgumentCount(name, 1, count, out error);
                 if (!TryText(new(name, 0, 1, "the search", "a string"), values[first], heap, out var search, out error)) return false;
                 var at = search.Length == 0 ? text.Length : text.LastIndexOf(search, StringComparison.Ordinal);
-                return Done(WebLingoValue.FromInt64(at < 0 ? -1 : ScalarsBefore(text, at)), out result, out error);
+                return Done(WebLingoValue.FromInt64(at < 0 ? -1 : heap.ScalarsBefore(target, at)), out result, out error);
             }
             case WebLingoMember.Contains or WebLingoMember.StartsWith or WebLingoMember.EndsWith:
             {
@@ -111,7 +111,7 @@ public static partial class WebLingoMembers
             {
                 // slice(start, end): from start to end, end left out the string's end; WL3005 outside it, as bytes' slice.
                 if (count is < 1 or > 2) return WrongArgumentCount(name, 1, 2, count, out error);
-                var length = ScalarCount(text);
+                var length = heap.ScalarCount(target);
                 var start = values[first];
                 var end = count == 2 ? values[first + 1] : WebLingoValue.FromInt64(length);
                 if (start.Kind != WebLingoValueKind.Int64 || end.Kind != WebLingoValueKind.Int64)
@@ -126,7 +126,7 @@ public static partial class WebLingoMembers
                         $"The range {from} to {to} is not within the string, 0 to {length}.");
                     return false;
                 }
-                var (begin, finish) = (ScalarStart(text, from), ScalarStart(text, to));
+                var (begin, finish) = (heap.ScalarStart(target, from), heap.ScalarStart(target, to));
                 return heap.TryAllocateString(text[begin..finish], out result, out error);
             }
             case WebLingoMember.Split:
@@ -237,7 +237,7 @@ public static partial class WebLingoMembers
                 }
                 var pad = " ";
                 if (count == 2 && !TryText(new(name, 1, 2, "the pad", "a string"), values[first + 1], heap, out pad, out error)) return false;
-                var missing = values[first].AsInt64 - ScalarCount(text);
+                var missing = values[first].AsInt64 - heap.ScalarCount(target);
                 if (missing <= 0 || pad.Length == 0) return Done(target, out result, out error);
                 if (!heap.TryMakeRoom(text.Length + (long)Math.Min((decimal)missing * 2, long.MaxValue), out error)) return false;
                 var padding = new StringBuilder();
@@ -368,18 +368,6 @@ public static partial class WebLingoMembers
         }
         error = null;
         return true;
-    }
-
-    /// <summary>How many Unicode scalar values a string has before a UTF-16 index, which starts one.</summary>
-    private static long ScalarsBefore(string text, int index)
-    {
-        var count = 0L;
-        for (var i = 0; i < index; i++)
-        {
-            if (i + 1 < index && char.IsSurrogatePair(text[i], text[i + 1])) i++;
-            count++;
-        }
-        return count;
     }
 
     private static bool Done(WebLingoValue value, out WebLingoValue result, out WebLingoRuntimeError? error)

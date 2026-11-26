@@ -317,7 +317,7 @@ public static partial class WebLingoMembers
         }
         if (target.Kind == WebLingoValueKind.String && member == WebLingoMember.Length)
         {
-            result = WebLingoValue.FromInt64(ScalarCount(heap.GetString(target)));
+            result = WebLingoValue.FromInt64(heap.ScalarCount(target));
             error = null;
             return true;
         }
@@ -1233,8 +1233,8 @@ public static partial class WebLingoMembers
             return false;
         }
         var text = heap.GetString(target);
-        if (!TryIndex(index, ScalarCount(text), out var position, out error)) return Absent(optional, ref error);
-        var start = ScalarStart(text, position);
+        if (!TryIndex(index, heap.ScalarCount(target), out var position, out error)) return Absent(optional, ref error);
+        var start = heap.ScalarStart(target, position);
         var length = start + 1 < text.Length && char.IsSurrogatePair(text[start], text[start + 1]) ? 2 : 1;
         return heap.TryAllocateString(text.Substring(start, length), out result, out error);
     }
@@ -1525,17 +1525,6 @@ public static partial class WebLingoMembers
             count++;
         }
         return count;
-    }
-
-    /// <summary>The UTF-16 index at which the string's <paramref name="scalar"/>-th Unicode scalar value starts.</summary>
-    private static int ScalarStart(string text, long scalar)
-    {
-        var i = 0;
-        for (var seen = 0L; seen < scalar; seen++)
-        {
-            i += i + 1 < text.Length && char.IsSurrogatePair(text[i], text[i + 1]) ? 2 : 1;
-        }
-        return i;
     }
 
     /// <summary>An int64 index. An array may also count from the end, starting at −1 for the last element.</summary>
