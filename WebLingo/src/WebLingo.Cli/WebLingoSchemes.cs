@@ -63,7 +63,7 @@ public static class WebLingoSchemes
         out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed, out WebLingoEnvSettings env,
         out IReadOnlyDictionary<string, WebLingoMailServer> mail, out string? error) =>
         TryLoadFolder(Path.GetDirectoryName(Path.GetFullPath(program)) ?? ".", configuration, given, out schemes, out _, out _, out allowedHosts,
-            out databases, out files, out allowed, out env, out mail, out _, out _, out _, out _, out _, out _, out error);
+            out databases, out files, out allowed, out env, out mail, out _, out _, out _, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// The configuration in <paramref name="folder"/>, its file <paramref name="configuration"/>: its schemes, the command
@@ -73,7 +73,7 @@ public static class WebLingoSchemes
     public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out string? error) =>
         TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out _, out _, out _, out _, out _, out _, out _,
-            out _, out _, out _, out _, out _, out error);
+            out _, out _, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and the hosts the configuration allows its scripts to reach, none when it names none, its databases,
@@ -83,7 +83,7 @@ public static class WebLingoSchemes
         out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out string? error) =>
         TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out allowedHosts, out databases, out files,
-            out _, out _, out _, out _, out _, out _, out _, out _, out _, out error);
+            out _, out _, out _, out _, out _, out _, out _, out _, out _, out _, out error);
 
     /// <summary>
     /// As the other, and what its settings allow native modules, <c>"com"</c>'s list, by its setting's name, and what its
@@ -96,8 +96,10 @@ public static class WebLingoSchemes
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
         out WebLingoEnvSettings env, out IReadOnlyDictionary<string, WebLingoMailServer> mail, out WebLingoUploadSettings uploads,
         out WebLingoSessionSettings sessions, out WebLingoLimitSettings limits, out WebLingoLogSettings log, out WebLingoHeaderSettings headers,
-        out IReadOnlyList<string> served, out string? error)
+        out IReadOnlyList<string> served, out IReadOnlyList<string> proxies, out string? error)
     {
+        var trusted = new List<string>();
+        proxies = trusted;
         limits = WebLingoLimitSettings.Default;
         log = WebLingoLogSettings.Default;
         headers = WebLingoHeaderSettings.Default;
@@ -133,12 +135,12 @@ public static class WebLingoSchemes
             if (!TryFindBase(folder, configuration, out var over, out var own, out error)) return false;
             var baseFile = over is null ? null : Path.Combine(over, configuration);
             if (baseFile is not null && File.Exists(baseFile) && !TryRead(baseFile, over!, schemes, ref mode, ref sendTimeout, hosts, named, read,
-                write, allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, ref headers, serving, own, out error))
+                write, allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, ref headers, serving, trusted, own, out error))
             {
                 return false;
             }
             if (!TryRead(file, folder, schemes, ref mode, ref sendTimeout, hosts, named, read, write,
-                allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, ref headers, serving, null, out error))
+                allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, ref headers, serving, trusted, null, out error))
             {
                 return false;
             }
@@ -673,7 +675,7 @@ public static class WebLingoSchemes
         List<string> hosts, Dictionary<string, WebLingoSecret> databases, List<string> read, List<string> write,
         Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, Dictionary<string, WebLingoMailServer> mail,
         ref WebLingoUploadSettings uploads, ref WebLingoSessionSettings sessions, ref WebLingoLimitSettings limits, ref WebLingoLogSettings log,
-        ref WebLingoHeaderSettings headers, List<string> served, IReadOnlySet<string>? skipped, out string? error)
+        ref WebLingoHeaderSettings headers, List<string> served, List<string> proxies, IReadOnlySet<string>? skipped, out string? error)
     {
         error = null;
         try
@@ -821,6 +823,20 @@ public static class WebLingoSchemes
                     if (!TryReadHeaders(file, setting.Value, ref headers, out error)) return false;
                     continue;
                 }
+                if (setting.Name == "proxies")
+                {
+                    // The proxies it trusts, each an address or a range, which wasp reads (section 9, "M0.23 parts", part 4); a
+                    // site's own in place of its base's.
+                    if (setting.Value.ValueKind != JsonValueKind.Array
+                        || setting.Value.EnumerateArray().Any(entry => entry.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(entry.GetString())))
+                    {
+                        error = $"{file}: \"proxies\" is a list of the proxies it trusts, each an address or a range: [\"127.0.0.1\", \"10.0.0.0/8\"].";
+                        return false;
+                    }
+                    proxies.Clear();
+                    foreach (var entry in setting.Value.EnumerateArray()) proxies.Add(entry.GetString()!.Trim());
+                    continue;
+                }
                 if (setting.Name == "serve")
                 {
                     // The extensions of files a site does not serve by default that it does (section 6.12, "Sensitive files").
@@ -849,7 +865,7 @@ public static class WebLingoSchemes
                 {
                     error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"mode\", "
                             + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
-                            + "\"sessions\", \"limits\", \"log\", \"headers\", \"serve\" and \"base\".";
+                            + "\"sessions\", \"limits\", \"log\", \"headers\", \"serve\", \"proxies\" and \"base\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)

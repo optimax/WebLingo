@@ -23,6 +23,12 @@ public interface IWebLingoHttpRequest
     /// <summary>The host the client named, with the port if it named one: <c>example.com:8080</c>.</summary>
     string Host { get; }
 
+    /// <summary>
+    /// The client's address, as text, <c>203.0.113.7</c> or <c>2001:db8::7</c>, without its port, behind a proxy the site
+    /// trusts the one the proxy names (specification, section 9, "M0.23 parts", part 4); empty where its host does not know it.
+    /// </summary>
+    string ClientAddress { get; }
+
     /// <summary>Its headers, which cannot be changed.</summary>
     IWebLingoHeaderCollection Headers { get; }
 

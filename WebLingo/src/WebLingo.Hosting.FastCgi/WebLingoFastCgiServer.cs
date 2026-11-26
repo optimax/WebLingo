@@ -145,7 +145,11 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, WebLi
             else if (name == "CONTENT_TYPE" && value.Length > 0) headers.Add(("Content-Type", value));
             else if (name == "CONTENT_LENGTH" && value.Length > 0) headers.Add(("Content-Length", value));
         }
-        return new WebLingoBufferedRequest(Get("REQUEST_METHOD") is { Length: > 0 } method ? method : "GET", path, query, scheme, host, headers, body);
+        // Its client, as the web server saw it (section 9, "M0.23 parts", part 4).
+        return new WebLingoBufferedRequest(Get("REQUEST_METHOD") is { Length: > 0 } method ? method : "GET", path, query, scheme, host, headers, body)
+        {
+            ClientAddress = Get("REMOTE_ADDR")
+        };
     }
 
     /// <summary><c>ACCEPT_LANGUAGE</c> as <c>Accept-Language</c>: each word's first letter a capital, the rest small, joined by <c>-</c>.</summary>

@@ -37,6 +37,7 @@ public sealed class FastCgiTests : IDisposable
         Write("broken.wasp", "<%= [1][2] %>");
         Write("css/site.css", "h1 { }");
         Write("deep.wasp", "<%= " + new string('(', 250) + "1" + new string(')', 250) + " %>");
+        Write("client.wasp", "<% param request; %><%= request.clientAddress %>");
         var application = WebLingoWaspServer.Load(_root, new Dictionary<string, string>(), WebLingoMode.Production, null, out _, out _, out var error);
         Assert.True(application is not null, error);
         _server = new WebLingoFastCgiServer(application, _workers);
@@ -62,6 +63,15 @@ public sealed class FastCgiTests : IDisposable
         };
         foreach (var (name, value) in more) parameters[name] = value;
         return parameters;
+    }
+
+    /// <summary>A request's client, as the web server gives it, <c>REMOTE_ADDR</c> (section 9, "M0.23 parts", part 4).</summary>
+    [Fact]
+    public async Task ARequestsClientIsTheWebServersRemoteAddress()
+    {
+        using var connection = await Connect();
+        var (head, body, _) = await RequestAsync(connection, 1, Get("/client", ("REMOTE_ADDR", "203.0.113.7")), []);
+        Assert.Equal(("Status: 200 OK", "203.0.113.7"), (head[0], body));
     }
 
     [Fact]

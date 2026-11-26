@@ -73,6 +73,7 @@ internal sealed class WebLingoHttpObjects
             .DeclareProperty("path", (a, heap, out r, out e) => Text(a, heap, s => s.Request.Path, out r, out e))
             .DeclareProperty("scheme", (a, heap, out r, out e) => Text(a, heap, s => s.Request.Scheme, out r, out e))
             .DeclareProperty("host", (a, heap, out r, out e) => Text(a, heap, s => s.Request.Host, out r, out e))
+            .DeclareProperty("clientAddress", (a, heap, out r, out e) => Text(a, heap, s => s.Request.ClientAddress, out r, out e))
             .DeclareProperty("query", Query)
             .DeclareProperty("headers", (a, heap, out r, out e) => RequestHeaders(a, heap, out r, out e))
             .DeclareProperty("cookies", Cookies)

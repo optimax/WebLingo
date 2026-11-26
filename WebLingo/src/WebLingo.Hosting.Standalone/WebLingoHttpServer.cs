@@ -299,7 +299,13 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
             var sink = new Sink(this, head);
             var body = head.HasBody ? new Body(this, head, application.MaxBodySize, sink, gone, server.Limits) : null;
             if (body is null) Watch(gone);
-            var request = new WebLingoBufferedRequest(head.Method, head.Path, head.Query, "http", head.Host, head.Headers, (IWebLingoBodyReader?)body ?? Empty.Body);
+            // Its client its connection's, or, from a proxy the site trusts, the proxy's word, with its scheme (part 4).
+            var (client, scheme) = WebLingoProxies.Of(application).Resolve((socket.RemoteEndPoint as IPEndPoint)?.Address, "http",
+                name => head.Headers.Where(header => header.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).Select(header => header.Value));
+            var request = new WebLingoBufferedRequest(head.Method, head.Path, head.Query, scheme, head.Host, head.Headers, (IWebLingoBodyReader?)body ?? Empty.Body)
+            {
+                ClientAddress = client
+            };
             var response = new WebLingoStreamingResponse(gone.Token);
             var cancellation = new WebLingoCancellationSignal();
             using var cancelled = gone.Token.Register(cancellation.Cancel);

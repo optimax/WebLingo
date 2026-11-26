@@ -152,7 +152,13 @@ public static class WebLingoWaspServer
         (workers, mode) = (Math.Max(1, Environment.ProcessorCount), defaultMode);
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
             out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out var env, out var mail,
-            out var uploads, out var sessions, out var limits, out var logging, out var headers, out var served, out error)) return null;
+            out var uploads, out var sessions, out var limits, out var logging, out var headers, out var served, out var proxies, out error)) return null;
+        // The proxies it trusts, each an address or a range (section 9, "M0.23 parts", part 4).
+        if (!WebLingoProxies.TryParse(proxies, out _, out var wrongProxy))
+        {
+            error = $"{Path.Combine(full, WebLingoRouteTable.ConfigurationFile)}: \"proxies\" names {wrongProxy}";
+            return null;
+        }
         if (configured is not null) mode = configured == "production" ? WebLingoMode.Production : WebLingoMode.Development;
         // The site it lies over, where its wasp.config names one, whose files its own come before (section 6.12, "A site
         // over a base"); its settings, those the site's own does not give, read above.
@@ -236,6 +242,7 @@ public static class WebLingoWaspServer
             Drain = limits.DrainSeconds is { } drain ? TimeSpan.FromSeconds(drain) : WebLingoApplicationOptions.DefaultDrain(requestTimeout),
             InstructionBudget = limits.Instructions ?? WebLingoApplicationOptions.DefaultInstructionBudget,
             // What its server takes of a client, wasp.config's or Kestrel's defaults (section 9, "M0.23 parts", part 3).
+            Proxies = proxies,
             HttpLimits = WebLingoHttpLimits.Default with
             {
                 RequestLine = limits.RequestLine ?? WebLingoHttpLimits.Default.RequestLine,

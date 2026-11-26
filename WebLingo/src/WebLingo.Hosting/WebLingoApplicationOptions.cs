@@ -89,6 +89,13 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     public WebLingoHttpLimits HttpLimits { get; init; } = WebLingoHttpLimits.Default;
 
     /// <summary>
+    /// The proxies it trusts, <c>wasp.config</c>'s <c>"proxies"</c>, each an address or a range, <c>10.0.0.0/8</c>, whose
+    /// <c>Forwarded</c>, or <c>X-Forwarded-For</c> and <c>X-Forwarded-Proto</c>, give a request's client and scheme; none by
+    /// default (section 9, "M0.23 parts", part 4). Its hosts read them, the portable core knowing no addresses.
+    /// </summary>
+    public IReadOnlyList<string> Proxies { get; init; } = [];
+
+    /// <summary>
     /// Where the site keeps its sessions (section 6.12, "Sessions and cookies"), which a request's <c>request.session</c>
     /// reaches, its id made with <see cref="Crypto"/>; none by default, <c>request.session</c> then an error.
     /// </summary>

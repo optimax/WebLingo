@@ -32,6 +32,10 @@ public sealed class WebLingoBufferedRequest : IWebLingoHttpRequest
     public string QueryString { get; }
     public string Scheme { get; }
     public string Host { get; }
+
+    /// <summary>The client's address, its host's to give, empty by default.</summary>
+    public string ClientAddress { get; init; } = "";
+
     public IWebLingoHeaderCollection Headers => _headers;
     public IWebLingoBodyReader Body { get; }
 

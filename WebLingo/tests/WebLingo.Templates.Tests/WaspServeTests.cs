@@ -840,6 +840,38 @@ public class WaspServeTests : IDisposable
     }
 
     /// <summary>
+    /// A request's client (section 9, "M0.23 parts", part 4): <c>request.clientAddress</c>, its connection's, and, where the
+    /// site trusts the proxy it comes from, <c>wasp.config</c>'s <c>"proxies"</c>, the client and the scheme the proxy's
+    /// forwarding headers give, on either server; a proxy it does not trust not believed; and an entry that is neither an
+    /// address nor a range refused.
+    /// </summary>
+    [Fact]
+    public async Task ARequestsClientIsItsConnectionsOrATrustedProxysWord()
+    {
+        Write("client.wasp", "<% param request; %><%= request.clientAddress %> <%= request.scheme %>");
+        foreach (var (config, address, scheme) in new[] { ("{ }", "127.0.0.1", "http"), ("{ \"proxies\": [\"127.0.0.1\", \"::1\"] }", "203.0.113.7", "https") })
+        {
+            Write("wasp.config", config);
+            await using var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+            Assert.True(server is not null, error);
+            await server.StartAsync();
+            using var client = new HttpClient { BaseAddress = new Uri(server.Address) };
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/client");
+            request.Headers.Add("X-Forwarded-For", "203.0.113.7");
+            request.Headers.Add("X-Forwarded-Proto", "https");
+            using var response = await client.SendAsync(request);
+            Assert.Equal($"{address} {scheme}", await response.Content.ReadAsStringAsync());
+            await server.StopAsync();
+        }
+        Write("wasp.config", "{ \"proxies\": [\"10.0.0.0/40\"] }");
+        Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out var wrong, out _));
+        Assert.EndsWith("wasp.config: \"proxies\" names '10.0.0.0/40' is not a range: its prefix is a number of bits from 0 to 32.", wrong);
+        Write("wasp.config", "{ \"proxies\": \"127.0.0.1\" }");
+        Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out wrong, out _));
+        Assert.EndsWith("\"proxies\" is a list of the proxies it trusts, each an address or a range: [\"127.0.0.1\", \"10.0.0.0/8\"].", wrong);
+    }
+
+    /// <summary>
     /// What a site's server takes of a client, <c>wasp.config</c>'s <c>"limits"</c>' (section 9, "M0.23 parts", part 3): a
     /// request's line longer than its <c>"requestLine"</c> a 414, and headers larger than its <c>"requestHeaders"</c> a 431, on
     /// either server, ASP.NET Core's Kestrel given the site's limits too.
@@ -980,10 +1012,17 @@ public class WaspServeTests : IDisposable
         {
             var address = server.Address;
             var until = DateTime.UtcNow.AddSeconds(5);
+            var longest = DateTime.UtcNow.AddSeconds(30);
+            var wrong = new System.Collections.Concurrent.ConcurrentBag<string>();
+            var seen = new System.Collections.Concurrent.ConcurrentDictionary<string, bool>();
+            var asked = 0;
+            // 5 seconds, and longer, up to 30, where a busy machine has not yet given 100 answers and both versions: what is
+            // tested is that each answer is whole, not how many come.
+            bool Going() => DateTime.UtcNow < until || ((Volatile.Read(ref asked) <= 100 || seen.Count < 2) && DateTime.UtcNow < longest);
             var replacing = Task.Run(async () =>
             {
                 var path = Path.Combine(_root, "page.wasp");
-                for (var i = 1; DateTime.UtcNow < until; i++)
+                for (var i = 1; Going(); i++)
                 {
                     // Longer than the reloader waits for quiet, 250 ms, so that each replacement is a generation of its own.
                     await Task.Delay(300);
@@ -1003,13 +1042,10 @@ public class WaspServeTests : IDisposable
                     }
                 }
             });
-            var wrong = new System.Collections.Concurrent.ConcurrentBag<string>();
-            var seen = new System.Collections.Concurrent.ConcurrentDictionary<string, bool>();
-            var asked = 0;
             await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(async () =>
             {
                 using var client = new HttpClient { BaseAddress = new Uri(address) };
-                while (DateTime.UtcNow < until)
+                while (Going())
                 {
                     using var response = await client.GetAsync("/page");
                     var body = await response.Content.ReadAsStringAsync();
@@ -1064,7 +1100,7 @@ public class WaspServeTests : IDisposable
         Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
         Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"mode\", "
                         + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
-                        + "\"sessions\", \"limits\", \"log\", \"headers\", \"serve\" and \"base\".", error);
+                        + "\"sessions\", \"limits\", \"log\", \"headers\", \"serve\", \"proxies\" and \"base\".", error);
 
         Write("wasp.config", "{ \"sendTimeout\": 5 }");
         Assert.NotNull(Create(_root, 0, new Dictionary<string, string>(), out error, out _));

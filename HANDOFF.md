@@ -138,6 +138,11 @@ M0.23's part 3: `WebLingoHttpLimits` moved to the hosting core (`WebLingoApplica
 server keeps them, its body's pace counting only waits for the client (`Body.Waiting`); `WebLingoWaspServer.Create` gives
 Kestrel the same (`ConfigureKestrel`).
 
+M0.23's part 4: `IWebLingoHttpRequest.ClientAddress`, a script's `request.clientAddress`; `WebLingoProxies.Of(application)`
+(`WebLingo.Hosting.DotNet`) reads `wasp.config`'s `"proxies"` and resolves a request's client and scheme from `Forwarded`,
+else `X-Forwarded-For`/`-Proto`, where its peer is trusted; ASP.NET Core's `Translate`, the standalone server and (by
+`REMOTE_ADDR`) FastCGI give the client. `WebLingoSchemes.TryLoadFolder` has one more out, `proxies`.
+
 ## The work off the workers
 
 `DotNetBlockingPool` (`WebLingo.Platform.DotNet`) runs work that blocks, a database's, a file's, a subprocess's, a mail

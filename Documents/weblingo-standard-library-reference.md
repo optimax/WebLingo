@@ -1153,6 +1153,7 @@ The classes' names are not in scope, `request is Request` being WL2001: a script
 | `request.method` | its method, `"GET"`, `"POST"`, as the client sent it |
 | `request.path` | its path, from `/`, decoded, without the query: `/greet` |
 | `request.scheme`, `request.host` | `"http"` or `"https"`, and the host the client asked for, with its port if it gave one |
+| `request.clientAddress` | the client's address, `"203.0.113.7"` or `"2001:db8::7"`, without its port: its connection's, the web server's word behind FastCGI, and a trusted proxy's behind one (`wasp.config`'s `"proxies"`); `""` where its host does not know it |
 | `request.query` | the query's names and values, decoded, a map, a name given twice having its last value |
 | `request.headers` | its headers, a `Headers`, which cannot be changed |
 | `request.cookies` | its cookies, a map of their names to their values, decoded, a name sent twice having its first value |

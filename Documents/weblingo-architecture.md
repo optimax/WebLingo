@@ -2146,7 +2146,16 @@ each needs that the owner has not decided is a question of its task's, and Propo
 4. **Behind a proxy.** A proxy's `Forwarded`, or `X-Forwarded-For` and `X-Forwarded-Proto`, trusted only from the
    proxies `wasp.config` lists, so that a request's scheme and its client are known behind one. WLHI's request has no
    client's address today, nor a script's: how a script reads it, and under which hosts, is the task's question
-   (Proposed: under every host, the client's address a member of the request).
+   (Proposed: under every host, the client's address a member of the request). Answered (26 November 2026, A1 (a) of
+   "M0.23, Part 4: Behind a Proxy"): WLHI's request has its client's address, a script's `request.clientAddress`, its text,
+   under every host, ASP.NET Core's from its connection, FastCGI's from its `REMOTE_ADDR`, the standalone host's from its
+   socket; `wasp.config`'s `"proxies"`, the addresses or ranges of the proxies trusted, none by default, a request from one
+   of them taking its client and its scheme from its `Forwarded`, else its `X-Forwarded-For` and `X-Forwarded-Proto`, the
+   client the nearest address that is not a trusted proxy's, under `wasp serve` on either server. Built (26 November
+   2026): `IWebLingoHttpRequest.ClientAddress`; `WebLingoProxies` (`WebLingo.Hosting.DotNet`), its entries checked where
+   `wasp.config` is read, an IPv4 address mapped into IPv6 written as IPv4's, a hop that names no address, `unknown` or
+   one obfuscated, where what can be known ends, the proxy then the client; tested on its own, through `wasp serve` on
+   both servers, and through FastCGI. Under IIS, ASP.NET Core's own integration already gives the client IIS saw.
 5. **Proved.** The load and soak tests run on it beside ASP.NET Core's server, `--host standalone` among the load
    benchmark's hosts, its numbers here; what they find fixed.
 6. **The default.** Once part 5 has passed, the standalone server `wasp serve`'s own, `--host aspnetcore` choosing ASP.NET

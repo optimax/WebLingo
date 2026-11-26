@@ -35,7 +35,8 @@ public static class WebLingoAspNetCore
         {
             limit.MaxRequestBodySize = application.MaxBodySize;
         }
-        var request = Translate(context.Request, context.RequestAborted);
+        // Its client and scheme its connection's, or, from a proxy the site trusts, the proxy's word (section 9, "M0.23 parts", part 4).
+        var request = Translate(context.Request, context.RequestAborted, WebLingoProxies.Of(application));
         var response = new WebLingoStreamingResponse(context.RequestAborted);
         var cancellation = new WebLingoCancellationSignal();
         // The client gone: the request cancelled first, then, if it waits, resumed to see it.
@@ -92,9 +93,10 @@ public static class WebLingoAspNetCore
     /// <summary>
     /// ASP.NET Core's request as WLHI's: its path without the application's base, its query without the <c>?</c>, and its
     /// body read as it arrives, as a script asks for it, never before the page runs (section 9, "M0.14.7 parts", part 4);
-    /// <paramref name="gone"/> signalled when its client has gone.
+    /// <paramref name="gone"/> signalled when its client has gone; its client's address its connection's, and, where
+    /// <paramref name="proxies"/> trusts the connection, its client and its scheme as its forwarding headers give them.
     /// </summary>
-    public static WebLingoBufferedRequest Translate(HttpRequest request, CancellationToken gone = default)
+    public static WebLingoBufferedRequest Translate(HttpRequest request, CancellationToken gone = default, WebLingoProxies? proxies = null)
     {
         var headers = new List<(string, string)>();
         foreach (var (name, values) in request.Headers)
@@ -102,8 +104,13 @@ public static class WebLingoAspNetCore
             foreach (var value in values) headers.Add((name, value ?? ""));
         }
         var query = request.QueryString.Value ?? "";
+        var (client, scheme) = (proxies ?? WebLingoProxies.None).Resolve(request.HttpContext.Connection.RemoteIpAddress, request.Scheme,
+            name => request.Headers[name].Select(value => value ?? ""));
         return new WebLingoBufferedRequest(request.Method, request.Path.HasValue ? request.Path.Value : "/",
-            query.StartsWith('?') ? query[1..] : query, request.Scheme, request.Host.Value ?? "", headers, new BodyReader(request.Body, gone));
+            query.StartsWith('?') ? query[1..] : query, scheme, request.Host.Value ?? "", headers, new BodyReader(request.Body, gone))
+        {
+            ClientAddress = client
+        };
     }
 
     /// <summary>A request's body as ASP.NET Core gives it, read as it arrives.</summary>

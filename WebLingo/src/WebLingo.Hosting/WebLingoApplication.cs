@@ -232,6 +232,9 @@ public sealed class WebLingoApplication
     /// <summary>What its server takes of a client before it refuses it (section 9, "M0.23 parts", part 3), which its hosts keep.</summary>
     public WebLingoHttpLimits HttpLimits => _options.HttpLimits;
 
+    /// <summary>The proxies it trusts (<see cref="WebLingoApplicationOptions.Proxies"/>), which its hosts read.</summary>
+    public IReadOnlyList<string> Proxies => _options.Proxies;
+
     /// <summary>
     /// How long a request may take, which its host keeps, the portable core having no timers, telling the request's
     /// cancellation signal <see cref="TimeLimitMessage"/> once it has passed (section 6.12, "Limits"); null for none.
