@@ -137,7 +137,7 @@ A plugin is a module in `site/plugins`, imported by its name, exporting a functi
 
 ## 3.9 Search
 
-The forum keeps its own index (**Guess**): a table of each word's posts, filled when a post is written, edited or removed. A search looks up each word and gives the posts that have all of them. It works the same on all four databases, where each database's own full-text search does not (SQLite's FTS5, SQL Server's full-text catalogues, MySQL's `FULLTEXT` and PostgreSQL's `tsvector` differ in what they need and give).
+The forum keeps its own index (**Guess**): a table of each word's posts, `post_words`, filled when a post is written or edited, a topic's title kept with its first post's words. A word is letters and digits of any script, 2 to 40 of them, in lower case; a search takes up to 8 words, whole, and gives the posts that have all of them, the latest first, on the boards the reader may read, a deleted post or topic never; its results show where each post is and the beginning of its text, as it was written (**Guess**, each). A database whose posts came before the index has them indexed by `setup.wlg`'s upgrade. It works the same on all four databases, where each database's own full-text search does not (SQLite's FTS5, SQL Server's full-text catalogues, MySQL's `FULLTEXT` and PostgreSQL's `tsvector` differ in what they need and give).
 
 ## 3.10 Mail
 

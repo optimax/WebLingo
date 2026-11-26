@@ -3,6 +3,7 @@
 // who may write what, by each board's permissions for the reader's groups (part 4).
 
 import { insert, page } from "./sql.wlg";
+import search from "./search.wlg";
 
 // The longest a post's text and a topic's title may be, in characters.
 export const longestPost = 20000;
@@ -108,6 +109,7 @@ export async function start(db, board, user, title, body, now) {
             UPDATE boards SET topic_count = topic_count + 1, post_count = post_count + 1, last_post_id = @post WHERE id = @board
             """, { post: post, board: board });
         await db.execute("UPDATE users SET post_count = post_count + 1 WHERE id = @user", { user: user });
+        await search.index(db, post, title + "\n" + body);
         return { topic: topic, post: post };
     });
 }
@@ -122,6 +124,7 @@ export async function reply(db, topic, user, body, now) {
         await db.execute("UPDATE boards SET post_count = post_count + 1, last_post_id = @post WHERE id = @board",
                          { post: post, board: topic["board_id"] });
         await db.execute("UPDATE users SET post_count = post_count + 1 WHERE id = @user", { user: user });
+        await search.index(db, post, body);
         return post;
     });
 }
@@ -135,6 +138,7 @@ export async function edit(db, post, body, title, user, now) {
         if (title != null) {
             await db.execute("UPDATE topics SET title = @title WHERE id = @topic", { title: title, topic: post["topic_id"] });
         }
+        await search.index(db, post["id"], title == null ? body : title + "\n" + body);
     });
 }
 

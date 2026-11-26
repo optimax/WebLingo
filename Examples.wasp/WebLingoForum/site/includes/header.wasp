@@ -3,6 +3,7 @@
     <a class="name" href="/"><%= site.settings["name"] %></a>
     <span class="description"><%= site.settings["description"] %></span>
     <nav class="account">
+      <a href="/search"><%= site.t("nav.search") %></a>
       <a href="/members"><%= site.t("nav.members") %></a>
 <% if (site.user == null) { %>
       <a href="/account/sign-in?back=<%= hereOf(request) %>"><%= site.t("nav.signIn") %></a>

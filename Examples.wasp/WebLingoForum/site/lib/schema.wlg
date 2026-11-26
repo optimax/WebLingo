@@ -5,8 +5,8 @@ import { columnType } from "./sql.wlg";
 
 // The schema's version, which the table schema_version holds: 1, the forum's first part's; 2, its members' tokens and
 // failed sign-ins; 3, what each member has read, and the topics they watch; 4, each board's permissions for each group,
-// bans, reports and the moderation log; 5, private messages.
-export const version = 5;
+// bans, reports and the moderation log; 5, private messages; 6, the search's index.
+export const version = 6;
 
 function id() { return { name: "id", type: "id", nullable: false }; }
 function integer(name) { return { name: name, type: "integer", nullable: false }; }
@@ -102,7 +102,11 @@ export const tables = [
     // A private message: its conversation, who wrote it and when, and its Markdown.
     { name: "messages", since: 5, columns: [id(), integer("conversation_id"), integer("user_id"), text("body"), date("created_at")],
       references: { "conversation_id": "conversations", "user_id": "users" },
-      indexes: [{ name: "messages_conversation", columns: ["conversation_id", "id"], unique: false }] }
+      indexes: [{ name: "messages_conversation", columns: ["conversation_id", "id"], unique: false }] },
+    // A word of a post's, its text's, or its topic's title's for the topic's first post: the search's index.
+    { name: "post_words", since: 6, columns: [string("word", 40), integer("post_id")],
+      key: ["word", "post_id"], references: { "post_id": "posts" },
+      indexes: [{ name: "post_words_post", columns: ["post_id"], unique: false }] }
 ];
 
 // The schema's version that added a table.

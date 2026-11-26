@@ -1,0 +1,33 @@
+<% session readonly; %>
+<% param request; param response; import { searchPage } from "/lib/pages.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await searchPage(request)).title }; %>
+<% var view = await searchPage(request); var site = view.site; var values = view.values; %>
+<h1><%= view.title %></h1>
+<form method="get" class="form wide search" action="/search">
+  <label><%= site.t("search.words") %> <input type="search" name="q" value="<%= values["q"] %>" maxlength="200" required>
+    <span class="note"><%= site.t("search.wordsHint") %></span></label>
+  <label><%= site.t("search.board") %>
+    <select name="board">
+      <option value=""><%= site.t("search.everyBoard") %></option>
+<% foreach (var board in view.boards) { %>
+      <option value="<%= board["id"] %>"<% if (values["board"] == board["id"]) { %> selected<% } %>><%= board["category_name"] %> › <%= board["name"] %></option>
+<% } %>
+    </select></label>
+  <label><%= site.t("search.author") %> <input name="author" value="<%= values["author"] %>" maxlength="40">
+    <span class="note"><%= site.t("search.authorHint") %></span></label>
+  <button><%= site.t("search.submit") %></button>
+</form>
+<% if (view.problem != null) { response.status = 400; %>
+<div class="problems" role="alert"><p><%= site.t(view.problem) %></p></div>
+<% } else if (view.searched) { %>
+<p class="note"><%= view.count == 0 ? site.t("search.none") : site.f("search.found", { count: view.count }) %></p>
+<% await renderComponent("/components/pages.wasp", { site: site, base: view.base, page: view.page, pages: view.pages }); %>
+<% foreach (var post in view.results) { %>
+<article class="result">
+  <a class="topic" href="<%= post["link"] %>"><%= post["topic_title"] %></a>
+  <p class="note"><%= site.f("search.by", { name: post["user_name"] ?? site.t("user.deleted"), time: site.time(post["created_at"]), board: post["board_name"] }) %></p>
+  <p><%= post["excerpt"] %></p>
+</article>
+<% } %>
+<% await renderComponent("/components/pages.wasp", { site: site, base: view.base, page: view.page, pages: view.pages }); %>
+<% } %>

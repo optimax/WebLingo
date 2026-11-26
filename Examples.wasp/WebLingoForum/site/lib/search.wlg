@@ -1,0 +1,107 @@
+// The forum's search (Documents/weblingo-forum.md, section 3.9): its own index of words, a table of each word's posts,
+// kept as a post is written and edited, the same on every database; a search gives the posts that have all its words.
+
+import { Regex } from "std:regex";
+import { page } from "./sql.wlg";
+
+// A word: letters and digits of any script.
+const wordPattern = new Regex("[\\p{L}\\p{N}]+");
+
+// The shortest and the longest word kept, and the most words a search takes.
+export const shortestWord = 2;
+export const longestWord = 40;
+export const mostWords = 8;
+
+// The rows one statement inserts at most, so that no database's limit on a statement's values is reached.
+const rowsAtOnce = 200;
+
+// The words of a text, each once, in lower case, in the order they first come: letters and digits of any script, of 2 to
+// 40 of them.
+export function wordsOf(text) {
+    var words = [];
+    var seen = #{};
+    foreach (var match in wordPattern.matchAll(text ?? "")) {
+        var word = match[0].toLower();
+        if (word.length >= shortestWord && word.length <= longestWord && seen.add(word)) {
+            words.push(word);
+        }
+    }
+    return words;
+}
+
+// Keeps a post's words, its text's, and, for a topic's first post, its title's too; those it had before forgotten.
+export async function index(db, post, text) {
+    await db.execute("DELETE FROM post_words WHERE post_id = @post", { post: post });
+    var words = wordsOf(text);
+    var at = 0;
+    while (at < words.length) {
+        var values = { post: post };
+        var rows = [];
+        var end = at + rowsAtOnce < words.length ? at + rowsAtOnce : words.length;
+        for (var i = at; i < end; i++) {
+            values[$"w{i}"] = words[i];
+            rows.push($"(@w{i}, @post)");
+        }
+        await db.execute($"INSERT INTO post_words (word, post_id) VALUES {', '.join(rows)}", values);
+        at = end;
+    }
+}
+
+// Keeps every post's words anew, a topic's first post's with its title: for a database whose posts were written before
+// the index was.
+export async function indexAll(db) {
+    var firsts = #{};
+    foreach (var row in await db.query("SELECT MIN(id) AS id FROM posts GROUP BY topic_id")) {
+        firsts.add(row["id"]);
+    }
+    foreach (var post in await db.query("SELECT p.id, p.body, t.title FROM posts p JOIN topics t ON t.id = p.topic_id ORDER BY p.id")) {
+        await index(db, post["id"], firsts.has(post["id"]) ? post["title"] + "\n" + post["body"] : post["body"]);
+    }
+}
+
+// What a search asks: its words, up to the most taken, and its WHERE clause's conditions and values, within the boards
+// given, null for every board, a board of them, and an author, where given.
+function query(words, boards, board, author) {
+    var conditions = ["p.deleted = @deleted", "t.deleted = @deleted"];
+    var values = { deleted: false };
+    for (var i = 0; i < words.length && i < mostWords; i++) {
+        conditions.push($"p.id IN (SELECT post_id FROM post_words WHERE word = @w{i})");
+        values[$"w{i}"] = words[i];
+    }
+    if (boards != null) {
+        var holes = ["0"];
+        for (var i = 0; i < boards.length; i++) {
+            holes.push($"@b{i}");
+            values[$"b{i}"] = boards[i];
+        }
+        conditions.push($"t.board_id IN ({', '.join(holes)})");
+    }
+    if (board != null) {
+        conditions.push("t.board_id = @board");
+        values["board"] = board;
+    }
+    if (author != null) {
+        conditions.push("p.user_id = @author");
+        values["author"] = author;
+    }
+    return { where: " AND ".join(conditions), values: values };
+}
+
+// How many posts have all of a search's words, and a page of them, the latest first, each with its topic, board and
+// author; within the boards given, null for every board, a board of them, where given, and an author's, where given.
+export async function count(db, words, boards, board, author) {
+    var asked = query(words, boards, board, author);
+    return (await db.query($"SELECT COUNT(*) AS n FROM posts p JOIN topics t ON t.id = p.topic_id WHERE {asked['where']}",
+                           asked["values"]))[0]["n"];
+}
+export async function find(db, words, boards, board, author, skip, count) {
+    var asked = query(words, boards, board, author);
+    return await db.query($"""
+        SELECT p.id, p.topic_id, p.body, p.created_at, p.user_id, u.name AS user_name, t.title AS topic_title,
+               b.id AS board_id, b.name AS board_name
+        FROM posts p JOIN topics t ON t.id = p.topic_id JOIN boards b ON b.id = t.board_id LEFT JOIN users u ON u.id = p.user_id
+        WHERE {asked['where']}
+        ORDER BY p.id DESC
+        {page(db.provider)}
+        """, { ...asked["values"], skip: skip, count: count });
+}

@@ -1,0 +1,90 @@
+// The forum's search: its index of words, kept as posts are written and edited, and what a search finds
+// (site/lib/search.wlg). weblingo test search-tests.wlg
+
+import { assertEqual, assertDeepEqual } from "std:test";
+import { Database } from "std:db";
+import { DateTime } from "std:datetime";
+import schema from "../site/lib/schema.wlg";
+import { insert } from "../site/lib/sql.wlg";
+import users from "../site/lib/users.wlg";
+import topics from "../site/lib/topics.wlg";
+import posts from "../site/lib/posts.wlg";
+import search from "../site/lib/search.wlg";
+
+const now = DateTime.utc(2026, 11, 25, 12, 0);
+
+// A database of the forum's in memory, with Anna, 1, and Bob, 2, and two boards, 1 and 2.
+async function forum(db) {
+    foreach (var statement in schema.create(db.provider)) {
+        await db.execute(statement);
+    }
+    await users.make(db, "Anna", "anna@example.com", "no hash", now, now);
+    await users.make(db, "Bob", "bob@example.com", "no hash", now, now);
+    var category = await insert(db, "categories", { name: "General", sort_order: 1 });
+    foreach (var name in ["Welcome", "Staff"]) {
+        await insert(db, "boards", { category_id: category, name: name, description: null, sort_order: 1, topic_count: 0,
+                                     post_count: 0, last_post_id: null });
+    }
+}
+
+async function found(db, text, boards = null, board = null, author = null) {
+    var words = search.wordsOf(text);
+    var rows = await search.find(db, words, boards, board, author, 0, 50);
+    assertEqual(await search.count(db, words, boards, board, author), rows.length);
+    return rows.map(row => row["id"]);
+}
+
+export class SearchTests {
+    testAWordIsLettersAndDigitsOfAnyScriptInLowerCase() {
+        assertDeepEqual(search.wordsOf("Tea, TEA and coffee — Kaffee! a b 2026 żółw x".repeat(1)),
+                        ["tea", "and", "coffee", "kaffee", "2026", "żółw"]);
+        assertDeepEqual(search.wordsOf("**Bold** [link](https://example.com/tea)"), ["bold", "link", "https", "example", "com", "tea"]);
+        assertDeepEqual(search.wordsOf(null), []);
+        assertDeepEqual(search.wordsOf("x".repeat(41) + " ok"), ["ok"]);
+    }
+
+    async testAPostIsFoundByAllItsWordsAndItsTopicsTitle() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            var tea = await posts.start(db, 1, 1, "Tea or coffee", "Green tea, of course.", now);
+            var topic = await topics.one(db, tea["topic"]);
+            var reply = await posts.reply(db, topic, 2, "Black coffee for me.", now.addMinutes(1));
+            var staff = await posts.start(db, 2, 1, "Staff tea", "Tea in the staff room.", now.addMinutes(2));
+            assertDeepEqual(await found(db, "coffee"), [reply, tea["post"]]);
+            assertDeepEqual(await found(db, "COFFEE black"), [reply]);
+            assertDeepEqual(await found(db, "tea"), [staff["post"], tea["post"]]);
+            assertDeepEqual(await found(db, "tea", [1]), [tea["post"]]);
+            assertDeepEqual(await found(db, "tea", null, 2), [staff["post"]]);
+            assertDeepEqual(await found(db, "coffee", null, null, 2), [reply]);
+            assertDeepEqual(await found(db, "milk"), []);
+
+            // An edit's words replace the post's; its title's with the first post's; a deleted post is found no more.
+            await posts.edit(db, await posts.one(db, tea["post"]), "Milk first.", "Tea or milk", 1, now.addMinutes(3));
+            assertDeepEqual(await found(db, "milk"), [tea["post"]]);
+            assertDeepEqual(await found(db, "coffee"), [reply]);
+            await posts.remove(db, await posts.one(db, reply), await topics.one(db, tea["topic"]));
+            assertDeepEqual(await found(db, "black"), []);
+        }
+    }
+
+    async testManyWordsAreKeptAndEveryPostIndexedAnew() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            var words = [];
+            for (var i = 0; i < 450; i++) {
+                words.push($"word{i}");
+            }
+            var made = await posts.start(db, 1, 1, "Many", " ".join(words), now);
+            assertEqual((await db.query("SELECT COUNT(*) AS n FROM post_words"))[0]["n"], 451);
+            assertDeepEqual(await found(db, "word449 many"), [made["post"]]);
+
+            // Posts written before the index was, indexed by indexAll, a first post with its topic's title.
+            await db.execute("DELETE FROM post_words");
+            var reply = await insert(db, "posts", { topic_id: made["topic"], user_id: 2, body: "Late tea.", created_at: now,
+                                                    edited_at: null, edited_by: null, deleted: false });
+            await search.indexAll(db);
+            assertDeepEqual(await found(db, "many"), [made["post"]]);
+            assertDeepEqual(await found(db, "late"), [reply]);
+        }
+    }
+}

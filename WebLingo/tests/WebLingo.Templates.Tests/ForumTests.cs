@@ -123,9 +123,9 @@ public sealed class ForumTests
                 ["mail"] = new Dictionary<string, object> { ["default"] = new Dictionary<string, object> { ["host"] = "127.0.0.1", ["port"] = smtp.Port, ["tls"] = "none" } }
             }));
             var setup = Path.Combine(copy, "setup", "setup.wlg");
-            Assert.Equal((WebLingoCommandLine.Success, $"Made the forum's database 'forum' on {provider}, version 5, with its administrator Anna.\n", ""),
+            Assert.Equal((WebLingoCommandLine.Success, $"Made the forum's database 'forum' on {provider}, version 6, with its administrator Anna.\n", ""),
                 Run("run", setup, "name=Anna", "email=anna@example.com", "password=correct-horse"));
-            Assert.Equal((WebLingoCommandLine.Success, "The forum's database 'forum' is at version 5 already: nothing to do.\n", ""),
+            Assert.Equal((WebLingoCommandLine.Success, "The forum's database 'forum' is at version 6 already: nothing to do.\n", ""),
                 Run("run", setup));
 
             // 30 topics, each of one post but the first, of 45, on 2 January 2026 and the day before, the last locked; and a
@@ -235,6 +235,7 @@ public sealed class ForumTests
                 await ModerationAsync(address, anna, bob);
                 await AdministrationAsync(address, anna, bob);
                 await MessagesAsync(address, anna, bob);
+                await SearchAsync(address, bob);
             }
             finally
             {
@@ -806,6 +807,35 @@ public sealed class ForumTests
         Assert.Equal(HttpStatusCode.NotFound, (await carol.Get("/messages/conversation?id=1")).Item1);
         Assert.Contains("In this conversation: Anna, Bob</p>", (await bob.Get("/messages/conversation?id=1")).Item2);
         Assert.Equal(HttpStatusCode.NotFound, (await bob.Get("/messages/conversation?id=99")).Item1);
+    }
+
+    /// <summary>
+    /// The search, of the posts the walks before it wrote and of the forum's first, which <c>setup.wlg</c> indexed: by
+    /// every word given, in titles too, on a board and by an author, never a deleted post's or topic's; words too short and
+    /// an author no member is refused.
+    /// </summary>
+    private static async Task SearchAsync(string address, Browser bob)
+    {
+        using var guest = new Browser(address);
+        var (status, body) = await guest.Get("/search?q=coffee");
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("<p class=\"note\">2 posts</p>", body);
+        var anna = body.IndexOf("href=\"/topic?id=32#post-77\"", StringComparison.Ordinal);
+        Assert.True(anna > 0 && anna < body.IndexOf("href=\"/topic?id=32#post-76\"", StringComparison.Ordinal), body);
+        Assert.Contains("<p>&gt; **Bob** wrote: &gt; Tea Coffee, *always*.</p>", body);
+        Assert.Contains("<p class=\"note\">1 post</p>", (await guest.Get("/search?q=coffee&author=Anna")).Item2);
+        Assert.Contains("<p class=\"note\">1 post</p>", (await guest.Get("/search?q=Tea+ALWAYS")).Item2);
+        Assert.Contains("<p class=\"note\">1 post</p>", (await guest.Get("/search?q=welcome")).Item2);
+        Assert.Contains("No post has all of those words.", (await guest.Get("/search?q=gone")).Item2);
+        Assert.Contains("No post has all of those words.", (await guest.Get("/search?q=alone")).Item2);
+        (status, body) = await guest.Get("/search?q=x");
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Contains("Give a word of two letters or more.", body);
+        (status, body) = await guest.Get("/search?q=tea&author=Nobody");
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Contains("No member has that name.", body);
+        Assert.Contains("<p class=\"note\">4 posts</p>", (await bob.Get("/search?q=tea&board=1")).Item2);
+        Assert.Contains("<a href=\"/search\">Search</a>", (await bob.Get("/")).Item2);
     }
 
     private static (int, string, string) Run(params string[] arguments)

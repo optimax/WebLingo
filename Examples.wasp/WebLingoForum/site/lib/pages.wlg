@@ -7,6 +7,8 @@ import topics from "./topics.wlg";
 import posts from "./posts.wlg";
 import reading from "./reading.wlg";
 import users from "./users.wlg";
+import search from "./search.wlg";
+import url from "std:url";
 
 function view(site, title, crumbs) {
     return viewOf(site, title, crumbs);
@@ -111,6 +113,71 @@ export async function topicPage(request, response) {
             }
             return page;
         }
+    });
+}
+
+// The longest a search result's excerpt of its post may be, in characters.
+const longestExcerpt = 240;
+
+// A post's beginning, as a search's result shows it: its text on one line, cut where it is too long.
+function excerptOf(body) {
+    var text = " ".join(body.replace("\r", " ").replace("\n", " ").split(" ").filter(word => word != ""));
+    return text.length <= longestExcerpt ? text : text.slice(0, longestExcerpt).trimEnd() + "…";
+}
+
+// The search's page, /search?q=tea+cake&board=3&author=Anna&page=2: the posts that have all the words, on the boards the
+// reader may read, on one of them and by an author where the query names them, the latest first, a page of them, each
+// with its beginning and where it is.
+export async function searchPage(request) {
+    var site = await begin(request);
+    return await site.once("search", async () => {
+        var page = view(site, site.t("search.title"), []);
+        page.values = { q: (request.query?["q"] ?? "").trim(), board: idOf(request.query?["board"]),
+                        author: (request.query?["author"] ?? "").trim() };
+        page.results = [];
+        page.count = 0;
+        page.pages = 1;
+        page.page = 1;
+        page.problem = null;
+        page.searched = false;
+        using (var db = await open()) {
+            page.boards = (await boards.all(db)).filter(board => site.can(board["id"], "read"));
+            var words = search.wordsOf(page.values["q"]);
+            if (words.length == 0) {
+                page.problem = page.values["q"] == "" ? null : "search.noWords";
+                return page;
+            }
+            var author = null;
+            if (page.values["author"] != "") {
+                var member = await users.byName(db, users.keyOf(page.values["author"]));
+                if (member == null) {
+                    page.problem = "search.noAuthor";
+                    return page;
+                }
+                author = member["id"];
+            }
+            var board = page.values["board"] != null && site.can(page.values["board"], "read") ? page.values["board"] : null;
+            var readable = site.permissions.admin ? null : page.boards.map(board => board["id"]);
+            var perPage = site.settings["postsPerPage"];
+            page.searched = true;
+            page.count = await search.count(db, words, readable, board, author);
+            page.pages = pagesOf(page.count, perPage);
+            page.page = pageWithin(request, page.pages);
+            foreach (var post in await search.find(db, words, readable, board, author, (page.page - 1) * perPage, perPage)) {
+                post["excerpt"] = excerptOf(post["body"]);
+                post["link"] = await posts.linkOf(db, post["topic_id"], post["id"], perPage);
+                page.results.push(post);
+            }
+            var pairs = [["q", page.values["q"]]];
+            if (board != null) {
+                pairs.push(["board", $"{board}"]);
+            }
+            if (author != null) {
+                pairs.push(["author", page.values["author"]]);
+            }
+            page.base = "/search?" + url.formatQuery(pairs);
+        }
+        return page;
     });
 }
 
