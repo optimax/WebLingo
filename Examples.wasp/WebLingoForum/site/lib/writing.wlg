@@ -12,6 +12,7 @@ import reading from "./reading.wlg";
 import moderation from "./moderation.wlg";
 import { render, escape, quote } from "./markdown.wlg";
 import { sendReplies } from "./mail.wlg";
+import uploads from "./uploads.wlg";
 
 // A writing page's view: what its form holds, what is wrong with it, its preview, and, where the page is refused, why,
 // a text's name.
@@ -22,6 +23,8 @@ function view(site, title, crumbs) {
     page.preview = null;
     page.refused = null;
     page.done = false;
+    page.files = uploads.offered(site.settings, []);
+    page.checked = [];
     return page;
 }
 
@@ -30,9 +33,10 @@ function htmlOf(site, body) {
     return render(body, { images: site.settings["images"] });
 }
 
-// The form a page posted, with its text and its title, where it has one, kept as they are kept, and what is wrong with
-// them; or null where its token against cross-site request forgery is not the browser's, the page then refused.
-async function postedTo(page, request, response, titled) {
+// The form a page posted, with its text and its title, where it has one, kept as they are kept, its files checked,
+// the post keeping kept of its own, and what is wrong with them; or null where its token against cross-site request
+// forgery is not the browser's, the page then refused. A preview keeps no file: they are chosen again to be posted.
+async function postedTo(page, request, response, titled, kept = 0) {
     var form = await formOf(request);
     if (form == null) {
         response.status = 400;
@@ -48,11 +52,23 @@ async function postedTo(page, request, response, titled) {
                 page.problems.push(problem);
             }
         }
+        var files = await uploads.posted(page.site.settings, request, kept);
+        page.checked = files.checked;
+        foreach (var problem in files.problems) {
+            page.problems.push(problem);
+        }
         if (page.problems.length > 0) {
             response.status = 400;
         }
     }
     return form;
+}
+
+// A post's files, checked, kept as its attachments, its writer's.
+async function attach(db, page, post) {
+    foreach (var checked in page.checked) {
+        await uploads.keep(db, checked, "attachment", page.site.user["id"], post, DateTime.utcNow());
+    }
 }
 
 // /post/new?board=1: a new topic on a board whose groups let the member start one, its title and its first post, which
@@ -82,6 +98,7 @@ export async function newTopicPage(request, response) {
                 return page;
             }
             var made = await posts.start(db, board["id"], site.user["id"], page.values["title"], page.values["body"], DateTime.utcNow());
+            await attach(db, page, made["post"]);
             await reading.saw(db, site.user["id"], made["topic"], made["post"]);
             await reading.watch(db, site.user["id"], made["topic"]);
             page.done = true;
@@ -126,6 +143,7 @@ export async function replyPage(request, response) {
                 return page;
             }
             var post = await posts.reply(db, topic, site.user["id"], page.values["body"], DateTime.utcNow());
+            await attach(db, page, post);
             await reading.saw(db, site.user["id"], topic["id"], post);
             await sendReplies(db, site, request, topic, site.user);
             page.done = true;
@@ -170,8 +188,8 @@ async function changed(db, site, request, response, page, action) {
     return false;
 }
 
-// /post/edit?id=7: a post, its text, and its topic's title where it is the topic's first; a moderator's edit of another's
-// post logged.
+// /post/edit?id=7: a post, its text, its topic's title where it is the topic's first, and its files, those ticked
+// removed, others added; a moderator's edit of another's post logged.
 export async function editPage(request, response) {
     var site = await begin(request);
     return await site.once("edit", async () => {
@@ -182,15 +200,23 @@ export async function editPage(request, response) {
             }
             page.titled = page.post["id"] == page.first;
             page.values = { title: page.topic["title"], body: page.post["body"] };
+            var attached = await uploads.ofPost(db, page.post["id"]);
+            page.files = uploads.offered(site.settings, attached);
             if (request.method != "POST") {
                 return page;
             }
-            var form = await postedTo(page, request, response, page.titled);
+            var given = await request.form();
+            var removed = attached.filter(file => (given?[$"remove.{file['id']}"] ?? "") != "");
+            var form = await postedTo(page, request, response, page.titled, attached.length - removed.length);
             if (form == null || page.preview != null || page.problems.length > 0) {
                 return page;
             }
             var now = DateTime.utcNow();
             await posts.edit(db, page.post, page.values["body"], page.titled ? page.values["title"] : null, site.user["id"], now);
+            foreach (var file in removed) {
+                await uploads.remove(db, await uploads.one(db, file["id"]));
+            }
+            await attach(db, page, page.post["id"]);
             if (page.post["user_id"] != site.user["id"]) {
                 await moderation.log(db, site.user["id"], "editPost", { topic: page.topic["id"], post: page.post["id"] }, now);
             }

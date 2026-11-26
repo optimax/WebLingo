@@ -47,17 +47,18 @@ export async function countOfPosts(db, topic) {
                            { topic: topic, deleted: false }))[0]["n"];
 }
 
-// A page of a topic's posts, in order, each with its author's name, when they joined, how many posts they have, and their
-// signature.
+// A page of a topic's posts, in order, each with its author's name, when they joined, how many posts they have, their
+// signature, and their avatar's id, or null.
 export async function posts(db, topic, skip, count) {
     return await db.query($"""
         SELECT p.id, p.body, p.created_at, p.edited_at, p.user_id,
-               u.name AS user_name, u.created_at AS user_joined, u.post_count AS user_posts, u.signature AS user_signature
+               u.name AS user_name, u.created_at AS user_joined, u.post_count AS user_posts, u.signature AS user_signature,
+               (SELECT MAX(a.id) FROM uploads a WHERE a.user_id = p.user_id AND a.kind = @avatar) AS user_avatar
         FROM posts p LEFT JOIN users u ON u.id = p.user_id
         WHERE p.topic_id = @topic AND p.deleted = @deleted
         ORDER BY p.id
         {page(db.provider)}
-        """, { topic: topic, deleted: false, skip: skip, count: count });
+        """, { topic: topic, deleted: false, skip: skip, count: count, avatar: "avatar" });
 }
 
 // Counts a topic's view.

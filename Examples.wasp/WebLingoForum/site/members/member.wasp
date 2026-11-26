@@ -7,6 +7,9 @@
 <p><%= site.t("forum.notFoundText") %> <a href="/members"><%= site.t("members.title") %></a>.</p>
 <% } else { var member = view.member; %>
 <h1><%= member["name"] %></h1>
+<% if (view.avatar != null) { %>
+<img class="avatar large" src="/avatar?id=<%= member["id"] %>&amp;v=<%= view.avatar["id"] %>" alt="">
+<% } %>
 <ul class="facts">
   <li><%= site.f("member.joined", { time: site.time(member["created_at"]) }) %></li>
 <% if (member["last_seen_at"] != null) { %>

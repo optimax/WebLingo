@@ -119,3 +119,13 @@ ul.facts { padding-left: 1.2rem; color: var(--muted); }
   .post { flex-direction: column; }
   .post .author { width: auto; border-right: none; border-bottom: 1px solid var(--border); flex-direction: row; flex-wrap: wrap; gap: 0 0.75rem; }
 }
+
+/* Avatars, attachments and the logo (part 8). */
+.avatar { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; margin-bottom: 0.25rem; }
+.avatar.large { width: 128px; height: 128px; }
+.avatar-form { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; margin-bottom: 1rem; }
+.post .attachments { list-style: none; padding: 0; margin: 0.75rem 0 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
+.post .attachments .picture img { max-width: 12rem; max-height: 12rem; border: 1px solid var(--border); border-radius: 4px; }
+fieldset.files { border: 1px solid var(--border); border-radius: 6px; }
+header.site .logo { height: 1.75rem; vertical-align: middle; margin-right: 0.5rem; }
+.logo.large { height: 4rem; }

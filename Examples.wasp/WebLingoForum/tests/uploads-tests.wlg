@@ -1,0 +1,145 @@
+// Members' files: their kinds, by their first bytes, their names, their sizes, the checks a file and a post's files pass,
+// and the uploads a member and a post have (site/lib/uploads.wlg). weblingo test uploads-tests.wlg
+
+import { assertEqual, assertDeepEqual } from "std:test";
+import { Bytes } from "std:bytes";
+import { Database } from "std:db";
+import { DateTime } from "std:datetime";
+import schema from "../site/lib/schema.wlg";
+import { insert } from "../site/lib/sql.wlg";
+import users from "../site/lib/users.wlg";
+import posts from "../site/lib/posts.wlg";
+import uploads from "../site/lib/uploads.wlg";
+
+const now = DateTime.utc(2026, 11, 25, 12, 0);
+const png = Bytes.fromHex("89504e470d0a1a0a0000000d49484452");
+const pdf = Bytes.from("%PDF-1.7\n%tea\n");
+const program = Bytes.fromHex("4d5a90000300000004000000");
+
+// A file as a form posts it, its name and its bytes, as request.files() gives an UploadedFile.
+class Upload {
+    constructor(fileName, content) {
+        this.fileName = fileName;
+        this.content = content;
+        this.size = content.length;
+    }
+
+    async bytes() {
+        return this.content;
+    }
+}
+
+// A request whose form posted files, request.files()'s map of each input's name to its files.
+class Posted {
+    constructor(given) {
+        this.given = given;
+        this.asked = false;
+    }
+
+    async files() {
+        this.asked = true;
+        return this.given;
+    }
+}
+
+// A database of the forum's in memory, with a member, Anna, 1, and a board, 1, with two topics of a post each, 1 and 2.
+async function forum(db) {
+    foreach (var statement in schema.create(db.provider)) {
+        await db.execute(statement);
+    }
+    await users.make(db, "Anna", "anna@example.com", "no hash", now, now);
+    var category = await insert(db, "categories", { name: "General", sort_order: 1 });
+    await insert(db, "boards", { category_id: category, name: "Welcome", description: null, sort_order: 1, topic_count: 0,
+                                 post_count: 0, last_post_id: null });
+    await posts.start(db, 1, 1, "Tea", "Green.", now);
+    await posts.start(db, 1, 1, "Cake", "Lemon.", now);
+}
+
+function row(kind, post, name) {
+    return { user_id: 1, kind: kind, stored_name: name, type: "image/png", name: name + ".png", size: 16, created_at: now, post_id: post };
+}
+
+export class UploadsTests {
+    testAFileIsKnownByItsFirstBytesNeverByItsName() {
+        assertDeepEqual(uploads.kindOf(png), { type: "image/png", picture: true });
+        assertDeepEqual(uploads.kindOf(Bytes.fromHex("ffd8ffe000104a464946")), { type: "image/jpeg", picture: true });
+        assertDeepEqual(uploads.kindOf(Bytes.from("GIF89a\u{1}\u{1}")), { type: "image/gif", picture: true });
+        assertDeepEqual(uploads.kindOf(Bytes.from("GIF87a\u{1}\u{1}")), { type: "image/gif", picture: true });
+        assertDeepEqual(uploads.kindOf(Bytes.fromHex("524946462400000057454250565038")), { type: "image/webp", picture: true });
+        assertDeepEqual(uploads.kindOf(pdf), { type: "application/pdf", picture: false });
+        assertDeepEqual(uploads.kindOf(Bytes.fromHex("504b0304140000000800")), { type: "application/zip", picture: false });
+        assertDeepEqual(uploads.kindOf(Bytes.from("Tea, please.\nZa\u{17c}\u{f3}\u{142}\u{107}.\n")), { type: uploads.textType, picture: false });
+        // A program, bytes that are not UTF-8, a WebP's marker without RIFF's, and nothing at all, are none of them.
+        assertEqual(uploads.kindOf(program), null);
+        assertEqual(uploads.kindOf(Bytes.fromHex("fffe41")), null);
+        assertEqual(uploads.kindOf(Bytes.fromHex("000000000000000057454250")), null);
+        assertEqual(uploads.kindOf(Bytes.from("")), null);
+        assertEqual(uploads.isPicture("image/gif"), true);
+        assertEqual(uploads.isPicture(uploads.textType), false);
+    }
+
+    testANameKeepsItsLastPartAndNoControlCharacters() {
+        assertEqual(uploads.nameOf("C:\\fakepath\\tea.png"), "tea.png");
+        assertEqual(uploads.nameOf("a/b/notes.txt"), "notes.txt");
+        assertEqual(uploads.nameOf("tab\there\u{7f}.txt"), "tabhere.txt");
+        assertEqual(uploads.nameOf("  "), "file");
+        assertEqual(uploads.nameOf(null), "file");
+        assertEqual(uploads.nameOf("x".repeat(250)).length, 200);
+    }
+
+    testASizeIsShownInItsUnit() {
+        assertEqual(uploads.sizeOf(500), "500 B");
+        assertEqual(uploads.sizeOf(1536), "2 KB");
+        assertEqual(uploads.sizeOf(3 * 1024 * 1024), "3.0 MB");
+    }
+
+    async testAFileIsCheckedByItsSizeAndItsKind() {
+        var checked = await uploads.check(new Upload("C:\\fakepath\\tea.png", png), 1, true);
+        assertDeepEqual([checked["problem"], checked["type"], checked["name"], checked["bytes"] == png], [null, "image/png", "tea.png", true]);
+        assertEqual((await uploads.check(new Upload("big.png", Bytes.concat([png, Bytes.from("x".repeat(1024))])), 1, true))["problem"], "upload.tooLarge");
+        assertEqual((await uploads.check(new Upload("none.png", Bytes.from("")), 1, true))["problem"], "upload.empty");
+        assertEqual((await uploads.check(new Upload("doc.pdf", pdf), 10, true))["problem"], "upload.notPicture");
+        assertEqual((await uploads.check(new Upload("tea.png", program), 10, false))["problem"], "upload.notAllowed");
+        assertEqual((await uploads.check(new Upload("doc.pdf", pdf), 10, false))["type"], "application/pdf");
+    }
+
+    async testAPostsFilesAreCheckedAgainstTheSettings() {
+        var settings = { attachments: 2, attachmentSize: 1 };
+        var offered = uploads.offered(settings, []);
+        assertDeepEqual([offered.attached, offered.count, offered.size], [[], 2, 1]);
+        var found = await uploads.posted(settings, new Posted({ files: [new Upload("a.pdf", pdf), new Upload("b.png", png)] }), 0);
+        assertDeepEqual([found.checked.map(c => c["name"]), found.problems], [["a.pdf", "b.png"], []]);
+        found = await uploads.posted(settings, new Posted({ files: [new Upload("a.pdf", pdf), new Upload("b.png", png)] }), 1);
+        assertDeepEqual([found.checked, found.problems], [[], ["upload.tooMany"]]);
+        found = await uploads.posted(settings, new Posted({ files: [new Upload("a.exe", program), new Upload("b.exe", program)] }), 0);
+        assertDeepEqual(found.problems, ["upload.notAllowed"]);
+        assertDeepEqual((await uploads.posted(settings, new Posted({}), 0)).problems, []);
+        // Where the forum takes no files, a form's are not read.
+        var request = new Posted({ files: [new Upload("a.pdf", pdf)] });
+        assertEqual(uploads.offered({ attachments: 0, attachmentSize: 1 }, []), null);
+        assertEqual(uploads.offered({ attachments: 5, attachmentSize: 0 }, []), null);
+        found = await uploads.posted({ attachments: 0, attachmentSize: 1 }, request, 0);
+        assertDeepEqual([found.checked, found.problems, request.asked], [[], [], false]);
+    }
+
+    async testAMembersAvatarAndAPostsFilesAreFound() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            foreach (var made in [row("avatar", null, "a1"), row("avatar", null, "a2"), row("attachment", 1, "p1"), row("attachment", 2, "p2"),
+                                  row("attachment", 1, "p3"), row("logo", null, "l1")]) {
+                await insert(db, "uploads", made);
+            }
+            assertEqual((await uploads.avatarOf(db, 1))["stored_name"], "a2");
+            assertEqual(await uploads.avatarOf(db, 2), null);
+            assertDeepEqual((await uploads.ofPost(db, 1)).map(file => file["name"]), ["p1.png", "p3.png"]);
+            var found = await uploads.ofPosts(db, [1, 2, 3]);
+            assertDeepEqual([found[1].map(file => file["id"]), found[2].map(file => file["id"]), found.has(3)], [[3, 5], [4], false]);
+            assertDeepEqual(await uploads.ofPosts(db, []), {});
+            assertEqual((await uploads.one(db, 6))["kind"], "logo");
+            assertEqual(await uploads.one(db, null), null);
+            // Its row removed, a file already gone left so.
+            await uploads.remove(db, await uploads.one(db, 2));
+            assertEqual((await uploads.avatarOf(db, 1))["stored_name"], "a1");
+        }
+    }
+}

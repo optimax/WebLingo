@@ -1,0 +1,19 @@
+// /avatar?id=7: a member's avatar, a picture, shown to anyone, as their posts are; a 404 for a member without one
+// (Documents/weblingo-forum.md, section 6, part 8).
+
+import { open, idOf } from "./lib/forum.wlg";
+import uploads from "./lib/uploads.wlg";
+
+export const session = "readonly";
+
+export async function get(request, response) {
+    using (var db = await open()) {
+        var id = idOf(request.query?["id"]);
+        var avatar = id == null ? null : await uploads.avatarOf(db, id);
+        if (avatar == null) {
+            uploads.notFound(response);
+            return;
+        }
+        await uploads.send(response, avatar, true);
+    }
+}

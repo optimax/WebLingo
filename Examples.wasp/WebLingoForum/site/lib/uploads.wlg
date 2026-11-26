@@ -1,0 +1,224 @@
+// Members' files: their avatars, posts' attachments and the forum's logo (Documents/weblingo-forum.md, section 3.4,
+// "Uploads"; section 6, part 8). Each is checked by its size and by its first bytes, never by its name; kept under a
+// random name in data/uploads, outside the site, which wasp.config's "files" lets the site write; and sent back with
+// its type, a picture shown, any other file saved under the name it came with.
+
+import fs from "std:fs";
+import crypto from "std:crypto";
+import { Bytes } from "std:bytes";
+import { insert } from "./sql.wlg";
+
+// The folder the files are kept in, from the site's root.
+export const folder = "../data/uploads";
+
+// The kinds of file the forum takes, each by the bytes it begins with, a picture's or not: PNG, JPEG, GIF and WebP
+// pictures, PDF documents and ZIP archives; and text in UTF-8, which begins with no bytes of its own.
+const kinds = [
+    { type: "image/png", picture: true, starts: Bytes.fromHex("89504e470d0a1a0a"), at: 0 },
+    { type: "image/jpeg", picture: true, starts: Bytes.fromHex("ffd8ff"), at: 0 },
+    { type: "image/gif", picture: true, starts: Bytes.from("GIF87a"), at: 0 },
+    { type: "image/gif", picture: true, starts: Bytes.from("GIF89a"), at: 0 },
+    { type: "image/webp", picture: true, starts: Bytes.from("WEBP"), at: 8, riff: true },
+    { type: "application/pdf", picture: false, starts: Bytes.from("%PDF-"), at: 0 },
+    { type: "application/zip", picture: false, starts: Bytes.fromHex("504b0304"), at: 0 }
+];
+
+export const textType = "text/plain; charset=utf-8";
+
+// The kind of a file's bytes, its type and whether it is a picture, or null for one the forum does not take: text only
+// where it is UTF-8 throughout, without a NUL.
+export function kindOf(bytes) {
+    foreach (var kind in kinds) {
+        var end = kind["at"] + kind["starts"].length;
+        if (bytes.length >= end && bytes.slice(kind["at"], end) == kind["starts"]
+            && (!(kind?["riff"] ?? false) || bytes.slice(0, 4) == Bytes.from("RIFF"))) {
+            return { type: kind["type"], picture: kind["picture"] };
+        }
+    }
+    if (bytes.length > 0) {
+        var text = bytes.text();
+        if (!text.contains("\0") && Bytes.from(text) == bytes) {
+            return { type: textType, picture: false };
+        }
+    }
+    return null;
+}
+
+// Whether a type is a picture's, which a page shows rather than saves.
+export function isPicture(type) {
+    return type.startsWith("image/");
+}
+
+// The name a file came with, as it is kept and offered when it is saved: its last part, without control characters,
+// at most 200 characters, "file" where nothing is left.
+export function nameOf(given) {
+    var name = (given ?? "").replace("\\", "/").split("/").pop().trim();
+    var kept = "";
+    foreach (var c in name) {
+        if (c >= " " && c != "\u{7f}") {
+            kept += c;
+        }
+    }
+    kept = (kept.length > 200 ? kept.slice(0, 200) : kept).trim();
+    return kept == "" ? "file" : kept;
+}
+
+// An uploaded file, checked: its bytes, its kind and its name, or the name of a text that says what is wrong with it,
+// a file larger than kilobytes allow, empty, or of a kind the forum does not take, or not a picture where one must be.
+export async function check(file, kilobytes, picturesOnly) {
+    if (file.size == 0) {
+        return { problem: "upload.empty" };
+    }
+    if (file.size > kilobytes * 1024) {
+        return { problem: "upload.tooLarge", kilobytes: kilobytes };
+    }
+    var bytes = await file.bytes();
+    var kind = kindOf(bytes);
+    if (kind == null || (picturesOnly && !kind["picture"])) {
+        return { problem: picturesOnly ? "upload.notPicture" : "upload.notAllowed" };
+    }
+    return { problem: null, bytes: bytes, type: kind["type"], name: nameOf(file.fileName) };
+}
+
+// Keeps a checked file under a random name, as what kind ("avatar", "attachment" or "logo") of whose, and of which post
+// for an attachment; gives its row's id.
+export async function keep(db, checked, kind, user, post, now) {
+    var stored = crypto.randomBytes(16).toHex();
+    await fs.writeBytes(folder + "/" + stored, checked["bytes"]);
+    return await insert(db, "uploads", { user_id: user, kind: kind, stored_name: stored, type: checked["type"],
+                                         name: checked["name"], size: checked["bytes"].length, created_at: now, post_id: post });
+}
+
+// An upload's row, or null.
+export async function one(db, id) {
+    if (id == null) {
+        return null;
+    }
+    var rows = await db.query("SELECT id, user_id, kind, stored_name, type, name, size, created_at, post_id FROM uploads WHERE id = @id",
+                              { id: id });
+    return rows.length == 0 ? null : rows[0];
+}
+
+// A member's avatar's row, their latest, or null.
+export async function avatarOf(db, user) {
+    var rows = await db.query("""
+        SELECT id, user_id, kind, stored_name, type, name, size, created_at, post_id FROM uploads
+        WHERE user_id = @user AND kind = @kind ORDER BY id DESC
+        """, { user: user, kind: "avatar" });
+    return rows.length == 0 ? null : rows[0];
+}
+
+// Removes an upload, its row and its file, a file already gone left so.
+export async function remove(db, upload) {
+    await db.execute("DELETE FROM uploads WHERE id = @id", { id: upload["id"] });
+    var path = folder + "/" + upload["stored_name"];
+    if (await fs.exists(path)) {
+        await fs.remove(path);
+    }
+}
+
+// Gives a member a checked picture as their avatar, the one before removed; gives its id.
+export async function setAvatar(db, user, checked, now) {
+    var before = await avatarOf(db, user);
+    var made = await keep(db, checked, "avatar", user, null, now);
+    if (before != null) {
+        await remove(db, before);
+    }
+    return made;
+}
+
+// A post's attachments, in the order they came.
+export async function ofPost(db, post) {
+    return await db.query("SELECT id, type, name, size FROM uploads WHERE post_id = @post AND kind = @kind ORDER BY id",
+                          { post: post, kind: "attachment" });
+}
+
+// The attachments of a page's posts, a map of each post's id to its own, in the order they came.
+export async function ofPosts(db, posts) {
+    var found = {};
+    if (posts.length == 0) {
+        return found;
+    }
+    var values = { kind: "attachment" };
+    var names = [];
+    for (var i = 0; i < posts.length; i++) {
+        values[$"p{i}"] = posts[i];
+        names.push($"@p{i}");
+    }
+    var rows = await db.query($"SELECT id, post_id, type, name, size FROM uploads WHERE kind = @kind AND post_id IN ({', '.join(names)}) ORDER BY id",
+                              values);
+    foreach (var row in rows) {
+        if (!found.has(row["post_id"])) {
+            found[row["post_id"]] = [];
+        }
+        found[row["post_id"]].push(row);
+    }
+    return found;
+}
+
+// What a post's form offers for its files, as the settings allow them: the files the post has, how many it may have, and
+// how large each may be, in kilobytes; or null where the forum takes none.
+export function offered(settings, attached) {
+    var count = settings["attachments"];
+    var size = settings["attachmentSize"];
+    if (count == 0 || size == 0) {
+        return null;
+    }
+    var made = new Object();
+    made.attached = attached;
+    made.count = count;
+    made.size = size;
+    return made;
+}
+
+// The files a post's form sent, its input "files", checked, the post having kept others already: as many as the settings
+// allow, each no larger than they allow; and what is wrong with them, each a text's name once.
+export async function posted(settings, request, kept) {
+    var found = new Object();
+    found.checked = [];
+    found.problems = [];
+    if (offered(settings, []) == null) {
+        return found;
+    }
+    var files = (await request.files())?["files"] ?? [];
+    if (kept + files.length > settings["attachments"]) {
+        found.problems.push("upload.tooMany");
+        return found;
+    }
+    foreach (var file in files) {
+        var checked = await check(file, settings["attachmentSize"], false);
+        if (checked["problem"] == null) {
+            found.checked.push(checked);
+        } else if (!found.problems.contains(checked["problem"])) {
+            found.problems.push(checked["problem"]);
+        }
+    }
+    return found;
+}
+
+// A size as a page shows it: bytes, kilobytes or megabytes.
+export function sizeOf(bytes) {
+    if (bytes < 1024) {
+        return $"{bytes} B";
+    }
+    if (bytes < 1024 * 1024) {
+        return $"{(bytes + 512) \ 1024} KB";
+    }
+    return $"{bytes / (1024.0 * 1024.0):0.0} MB";
+}
+
+// A file that is not there, or that the reader may not have, as the response: a 404, in plain text.
+export function notFound(response) {
+    response.status = 404;
+    response.headers["Content-Type"] = "text/plain; charset=utf-8";
+    response.write("Not found.");
+}
+
+// Sends an upload back as the response: a picture shown, any other file saved under the name it came with; checked
+// again by the browser at each use, its tag answering it while it is unchanged, and kept by no shared cache where it is
+// private, a post's attachment.
+export async function send(response, upload, shared) {
+    response.headers["Cache-Control"] = shared ? "no-cache" : "private, no-cache";
+    var picture = isPicture(upload["type"]);
+    await response.sendFile(folder + "/" + upload["stored_name"], upload["type"], { download: picture ? false : upload["name"] });
+}

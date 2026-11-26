@@ -58,14 +58,15 @@
 <% await renderComponent("/components/pages.wasp", { site: site, base: base, page: view.page, pages: view.pages }); %>
 <% var number = view.first; %>
 <% foreach (var post in view.posts) { number++; %>
-<% await renderComponent("/components/post.wasp", { site: site, post: post, number: number, topic: topic, first: view.firstPost }); %>
+<% await renderComponent("/components/post.wasp", { site: site, post: post, number: number, topic: topic, first: view.firstPost,
+                                                   attachments: view.attachments?[post["id"]] ?? [] }); %>
 <% } %>
 <% await renderComponent("/components/pages.wasp", { site: site, base: base, page: view.page, pages: view.pages }); %>
 <% if (posts.mayReply(site, topic)) { %>
 <section id="reply">
   <h2 class="plain"><%= site.t("topic.yourReply") %></h2>
 <% await renderComponent("/components/post-form.wasp", { site: site, token: request.csrfToken, action: $"/post/reply?topic={topic['id']}",
-                                                        values: { title: "", body: "" }, submit: site.t("post.send") }); %>
+                                                        values: { title: "", body: "" }, submit: site.t("post.send"), files: view.files }); %>
 </section>
 <% } %>
 <% } %>

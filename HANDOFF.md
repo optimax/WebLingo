@@ -338,7 +338,7 @@ messages broke their lines as the platform does, a provider's message's line bre
 ## WebLingo Forum
 
 The forum written in WASP, `Examples.wasp/WebLingoForum`, the task "Extensive WASP Example", is designed in
-`Documents/weblingo-forum.md` (`c05087f`), its ten parts in its section 6, each a task of `TO-DO.md`. Parts 1 to 7 have
+`Documents/weblingo-forum.md` (`c05087f`), its ten parts in its section 6, each a task of `TO-DO.md`. Parts 1 to 8 have
 landed. Its foundations (`cdfa20a`): the schema, `site/lib/schema.wlg`, made on SQLite, SQL Server, MySQL and PostgreSQL
 through `site/lib/sql.wlg`; `setup/setup.wlg`, run with `weblingo`, making the database and its first administrator, or
 upgrading it; and the front page, boards and topics, paged. Its members (`ae49457`): sign-up confirmed by mail, signing
@@ -401,6 +401,18 @@ every word given, on the boards the reader may read, on one of them and by an au
 `tests/search-tests.wlg`, and by `ForumTests`' walk of search (`SearchAsync`), on all four databases; the page looked at
 in a browser.
 
+Its members' files (part 8): `site/lib/uploads.wlg`, a file known by its first bytes, a PNG, JPEG, GIF or WebP picture,
+a PDF, a ZIP or UTF-8 text, never by its name, kept in `data/uploads` under 32 random hexadecimal digits, its row in
+`uploads`, the schema's version 7, and sent back by `response.sendFile`; a member's avatar on the profile page, shown on
+their posts and their page, `/avatar?id=7` (`site/avatar.wlg`); a post's attachments, on a new topic's, a reply's and
+an edit's forms, now `multipart/form-data`, a preview keeping none, an edit removing ticked ones, `/attachment?id=12`
+(`site/attachment.wlg`) to whoever may read the board; and the forum's logo, on the settings page, `/logo`
+(`site/logo.wlg`), in the header. The settings' `"avatarSize"`, `"attachmentSize"`, in kilobytes, and `"attachments"`,
+a post's most, each 0 for none, and `"logo"`; `setup.wlg` makes the folder, from where it runs or where `uploads=` says,
+and the site's `wasp.config` lets it write it alone. SQLite gives a new row the id after the largest, so that a removed
+attachment's id may name the next one. Tested by `tests/uploads-tests.wlg`, and by `ForumTests`' walk of files
+(`FilesAsync`), on all four databases.
+
 Found while writing it: in WebLingo, `s[i]` and a string's `length` took time in proportion to its length, its scalar
 values counted from its start each time, so the renderer reads an array of a line's characters (`charsOf` in
 `markdown.wlg`). Fixed since, below, "Strings read by their index".
@@ -408,8 +420,8 @@ values counted from its start each time, so the renderer reads an array of a lin
 The branch `claude/forum-writing` on GitHub holds part 3 unfinished (`9093b78`), which `main` has whole, in one commit,
 instead: it may be deleted there.
 
-Next: "WebLingo Forum, Part 8: Avatars and Attachments", which WASP's files sent, above, let it build. Part 9 waits for "Overlays in WASP",
-and "WebLingo Forum: MarkdownEditor.Web in the Post Form" for its answers, each with questions in `TO-DO.md`. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to
+Next: "Overlays in WASP", its questions answered, which part 9 waits for, then parts 9 and 10. "WebLingo Forum:
+MarkdownEditor.Web in the Post Form" waits for MarkdownEditor.Web's `LICENSE` to commit the editor's copy. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to
 be written as tasks and into the specification's roadmap; neither is begun.
 
 The last full suite, on Windows, in Release (25 November 2026, MySQL's and PostgreSQL's tests among them): 3,661 tests

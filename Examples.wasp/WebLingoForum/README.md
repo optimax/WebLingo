@@ -8,13 +8,15 @@ preview first, what is new to each member, and topics watched, their replies mai
 each group, and moderation: topics locked, pinned, moved, deleted and restored, others' posts edited and deleted, posts
 reported, members banned, and a log of it all; and its administration: its settings, categories and boards, who may do
 what on each, groups, and members' groups; private messages, conversations of members, with what is new to each; and
-search, by words, on a board and by an author. Avatars, attachments and the rest come in the parts after them.
+search, by words, on a board and by an author; and members' files, their avatars, posts' attachments and the forum's
+logo. A client's own look and code, and its deployment, come in the parts after them.
 
 ```text
 WebLingoForum/
   setup/        outside the site: setup.wlg, which makes the forum's database, and its weblingo.config;
                 copy-editor.wlg, which copies MarkdownEditor.Web, the Markdown editor, into site/js/markdown-editor
-  data/         outside the site: forum.db, which setup.wlg makes, not in the repository
+  data/         outside the site, not in the repository: forum.db, which setup.wlg makes, and uploads/, members'
+                files, kept under random names, which setup.wlg makes and the site writes
   site/         the site, and wasp's root
     index.wasp  /                 the categories and their boards
     board.wasp  /board?id=1       a board's topics, 25 a page, the pinned first
@@ -27,6 +29,8 @@ WebLingoForum/
                 groups.wasp, and members.wasp and member.wasp, a member's groups
     messages/   private messages, /messages: a member's conversations, new.wasp, a new one, and conversation.wasp
     search.wasp /search?q=tea     the posts with all the words, on a board and by an author where asked
+    avatar.wlg  /avatar?id=1      a member's avatar; attachment.wlg, /attachment?id=1, a post's attachment, to those
+                who may read its board; logo.wlg, /logo, the forum's logo
     account/    signing up, confirming an address, signing in and out, a forgotten password, the member's profile
     members/    /members, the members by name, and /members/member?id=1, a member's page
     lib/        the forum's modules: the database's SQL, its schema, settings, texts, members, their mail and tokens,
@@ -51,13 +55,17 @@ dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples.was
 and open <http://localhost:8080/>. `setup.wlg` asks for the forum's first administrator, their name, address and
 password, unless its parameters give them, `name=Anna email=anna@example.com`; it makes the forum's tables, its groups,
 its administrator, and a first category, board and topic. Run on a database it has made, it does nothing; on one an
-earlier version of the forum made, it adds the tables this version adds.
+earlier version of the forum made, it adds the tables this version adds. It makes `data/uploads`, the folder of members'
+files, where it is not there, from the folder it is run in, or where `uploads=` says: the site's `wasp.config` lets the
+site write that folder alone, `"files": { "write": ["../data/uploads"] }`, outside the site, so that nothing written
+there is served as it is, or reloads the site. On a server, give the site's application pool write access to it, as to
+the database's folder.
 
 The forum's own tests, from `tests`:
 
 ```bash
 weblingo test accounts-tests.wlg administration-tests.wlg markdown-tests.wlg messages-tests.wlg moderation-tests.wlg \
-    schema-tests.wlg search-tests.wlg sql-tests.wlg texts-tests.wlg users-tests.wlg writing-tests.wlg
+    schema-tests.wlg search-tests.wlg sql-tests.wlg texts-tests.wlg uploads-tests.wlg users-tests.wlg writing-tests.wlg
 ```
 
 ## Mail, and members
@@ -70,6 +78,7 @@ address its settings' `"mailFrom"` gives:
 ```json
 {
   "databases": { "forum": "sqlite:../data/forum.db" },
+  "files": { "write": ["../data/uploads"] },
   "mail": { "default": { "host": "smtp.example.com", "port": 587, "user": "forum@example.com", "password": { "env": "FORUM_SMTP_PASSWORD" } } }
 }
 ```

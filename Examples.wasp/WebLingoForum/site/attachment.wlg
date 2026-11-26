@@ -1,0 +1,25 @@
+// /attachment?id=12: a post's attachment, to a reader who may read its board, its post and its topic not deleted unless
+// they moderate the board; a picture shown, any other file saved under the name it came with; a 404 otherwise, so that
+// a reader who may not read it cannot tell it from one that is not there (Documents/weblingo-forum.md, section 6, part 8).
+
+import { begin, open, idOf } from "./lib/forum.wlg";
+import uploads from "./lib/uploads.wlg";
+import posts from "./lib/posts.wlg";
+import topics from "./lib/topics.wlg";
+
+export const session = "readonly";
+
+export async function get(request, response) {
+    var site = await begin(request);
+    using (var db = await open()) {
+        var upload = await uploads.one(db, idOf(request.query?["id"]));
+        var post = upload == null || upload["kind"] != "attachment" ? null : await posts.one(db, upload["post_id"], true);
+        var topic = post == null ? null : await topics.one(db, post["topic_id"], true);
+        if (topic == null || !site.can(topic["board_id"], "read")
+            || ((post["deleted"] || topic["deleted"]) && !site.can(topic["board_id"], "moderate"))) {
+            uploads.notFound(response);
+            return;
+        }
+        await uploads.send(response, upload, false);
+    }
+}

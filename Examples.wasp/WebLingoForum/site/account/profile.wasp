@@ -3,8 +3,32 @@
 <% var view = await profilePage(request, response); var site = view.site; %>
 <% if (site.user != null) { %>
 <h1><%= view.title %></h1>
-<% var notice = view.notice ?? (request.query?["saved"] == "1" && request.method == "GET" ? site.t("profile.saved") : null); %>
+<% var saved = request.method == "GET" ? request.query?["saved"] : null; %>
+<% var notice = view.notice ?? (saved == "1" ? site.t("profile.saved") : saved == "avatar" ? site.t("profile.avatarSaved") : null); %>
 <% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems, notice: notice }); %>
+<% if (site.settings["avatarSize"] > 0) { %>
+<h2 class="plain"><%= site.t("profile.avatar") %></h2>
+<div class="avatar-form">
+<% if (view.avatar != null) { %>
+  <img class="avatar large" src="/avatar?id=<%= site.user["id"] %>&amp;v=<%= view.avatar["id"] %>" alt="<%= site.t("profile.avatar") %>">
+<% } %>
+  <form method="post" class="form" action="/account/profile" enctype="multipart/form-data">
+    <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+    <input type="hidden" name="action" value="avatar">
+    <label><%= site.t("profile.avatarFile") %> <input type="file" name="avatar" accept="image/png,image/jpeg,image/gif,image/webp" required>
+      <span class="note"><%= site.f("profile.avatarHint", { size: site.settings["avatarSize"] }) %></span></label>
+    <button><%= site.t("profile.uploadAvatar") %></button>
+  </form>
+<% if (view.avatar != null) { %>
+  <form method="post" action="/account/profile">
+    <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+    <input type="hidden" name="action" value="removeAvatar">
+    <button class="secondary"><%= site.t("profile.removeAvatar") %></button>
+  </form>
+<% } %>
+</div>
+<% } %>
+<h2 class="plain"><%= site.t("profile.details") %></h2>
 <form method="post" class="form" action="/account/profile">
   <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
   <input type="hidden" name="action" value="profile">

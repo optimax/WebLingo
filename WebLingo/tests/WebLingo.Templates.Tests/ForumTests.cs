@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -120,13 +121,17 @@ public sealed class ForumTests
             File.WriteAllText(Path.Combine(copy, "site", "wasp.config"), JsonSerializer.Serialize(new Dictionary<string, object>
             {
                 ["databases"] = databases,
+                ["files"] = new Dictionary<string, object> { ["write"] = new[] { "../data/uploads" } },
                 ["mail"] = new Dictionary<string, object> { ["default"] = new Dictionary<string, object> { ["host"] = "127.0.0.1", ["port"] = smtp.Port, ["tls"] = "none" } }
             }));
             var setup = Path.Combine(copy, "setup", "setup.wlg");
-            Assert.Equal((WebLingoCommandLine.Success, $"Made the forum's database 'forum' on {provider}, version 6, with its administrator Anna.\n", ""),
-                Run("run", setup, "name=Anna", "email=anna@example.com", "password=correct-horse"));
-            Assert.Equal((WebLingoCommandLine.Success, "The forum's database 'forum' is at version 6 already: nothing to do.\n", ""),
-                Run("run", setup));
+            // Its members' files' folder made by setup.wlg, given as a path of its own, the tests' folder being no forum's.
+            var uploads = "uploads=" + Path.Combine(copy, "data", "uploads");
+            Assert.Equal((WebLingoCommandLine.Success, $"Made the forum's database 'forum' on {provider}, version 7, with its administrator Anna.\n", ""),
+                Run("run", setup, "name=Anna", "email=anna@example.com", "password=correct-horse", uploads));
+            Assert.Equal((WebLingoCommandLine.Success, "The forum's database 'forum' is at version 7 already: nothing to do.\n", ""),
+                Run("run", setup, uploads));
+            Assert.True(Directory.Exists(Path.Combine(copy, "data", "uploads")));
 
             // 30 topics, each of one post but the first, of 45, on 2 January 2026 and the day before, the last locked; and a
             // second board, the staff's, which guests do not see, and members read only.
@@ -236,6 +241,7 @@ public sealed class ForumTests
                 await AdministrationAsync(address, anna, bob);
                 await MessagesAsync(address, anna, bob);
                 await SearchAsync(address, bob);
+                await FilesAsync(address, copy, anna, bob);
             }
             finally
             {
@@ -271,14 +277,31 @@ public sealed class ForumTests
 
         public async Task<(HttpStatusCode, string, string)> Post(string path, params (string, string)[] fields)
         {
-            // The form's page, the header's for signing out, as a browser has it before it posts; the front page's header
-            // where the path has no page of its own, a handler's.
+            var token = await TokenFor(path);
+            var response = await Client.PostAsync(path, new FormUrlEncodedContent([new("csrfToken", token), .. fields.Select(f => new KeyValuePair<string, string>(f.Item1, f.Item2))]));
+            return (response.StatusCode, (await response.Content.ReadAsStringAsync()).ReplaceLineEndings("\n"), response.RequestMessage!.RequestUri!.PathAndQuery);
+        }
+
+        /// <summary>A form posted as <c>multipart/form-data</c>, its fields, then its files, each its input's name, its name and its bytes.</summary>
+        public async Task<(HttpStatusCode, string, string)> PostFiles(string path, (string, string)[] fields, params (string Input, string Name, byte[] Bytes)[] files)
+        {
+            using var content = new MultipartFormDataContent { { new StringContent(await TokenFor(path)), "csrfToken" } };
+            foreach (var (name, value) in fields) content.Add(new StringContent(value), name);
+            foreach (var (input, name, bytes) in files) content.Add(new ByteArrayContent(bytes), input, name);
+            var response = await Client.PostAsync(path, content);
+            return (response.StatusCode, (await response.Content.ReadAsStringAsync()).ReplaceLineEndings("\n"), response.RequestMessage!.RequestUri!.PathAndQuery);
+        }
+
+        /// <summary>
+        /// The token the form's page gives, the header's for signing out, as a browser has it before it posts; the front
+        /// page's header's where the path has no page of its own, a handler's.
+        /// </summary>
+        private async Task<string> TokenFor(string path)
+        {
             var page = path == "/account/sign-out" ? "/"
                 : path.Contains('?') && !path.StartsWith("/account/sign-in", StringComparison.Ordinal) ? path : path.Split('?')[0];
             var token = Token((await Get(page)).Item2);
-            if (token.Length == 0) token = Token((await Get("/")).Item2);
-            var response = await Client.PostAsync(path, new FormUrlEncodedContent([new("csrfToken", token), .. fields.Select(f => new KeyValuePair<string, string>(f.Item1, f.Item2))]));
-            return (response.StatusCode, (await response.Content.ReadAsStringAsync()).ReplaceLineEndings("\n"), response.RequestMessage!.RequestUri!.PathAndQuery);
+            return token.Length == 0 ? Token((await Get("/")).Item2) : token;
         }
 
         private static string Token(string page) => Regex.Match(page, "name=\"csrfToken\" value=\"([0-9a-f]{32})\"").Groups[1].Value;
@@ -693,7 +716,7 @@ public sealed class ForumTests
             ["surface"] = "#ffffff", ["text"] = "#1d232a", ["muted"] = "#5c6670", ["border"] = "#d9dee3" };
         (string, string)[] Settings(string zone) => [("name", "Tea Talk"), ("description", "About tea."), ("language", "en"), ("timeZone", zone),
             ("topicsPerPage", "10"), ("postsPerPage", "20"), ("signUp", "1"), ("confirmEmail", "1"), ("mailFrom", "Tea Talk <tea@example.com>"),
-            ("address", ""), .. colors.Select(c => ("color." + c.Key, c.Value))];
+            ("address", ""), ("avatarSize", "256"), ("attachmentSize", "2048"), ("attachments", "5"), .. colors.Select(c => ("color." + c.Key, c.Value))];
         (status, body, _) = await anna.Post("/admin/settings", Settings("Mars/Olympus"));
         Assert.Equal(HttpStatusCode.BadRequest, status);
         Assert.Contains("That is not a time zone this server knows.", body);
@@ -840,6 +863,110 @@ public sealed class ForumTests
         Assert.Contains("No member has that name.", body);
         Assert.Contains("<p class=\"note\">4 posts</p>", (await bob.Get("/search?q=tea&board=1")).Item2);
         Assert.Contains("<a href=\"/search\">Search</a>", (await bob.Get("/")).Item2);
+    }
+
+    /// <summary>
+    /// Members' files (<c>Documents/weblingo-forum.md</c>, section 6, part 8): Bob's avatar, a program named as a picture
+    /// refused, then a picture, shown on his page and his posts, sent back with its tag, a second replacing it, its file
+    /// with it; a new topic's attachments, a picture shown and a document saved under its name, read by a guest where they
+    /// may read the board, too many, and a program, refused, an edit removing one, its file with it, and adding another;
+    /// a staff topic's attachment, which a guest cannot tell from none, read by a member; the forum's logo, uploaded by its
+    /// administrator, in every page's header, and removed; and Bob's avatar removed.
+    /// </summary>
+    private static async Task FilesAsync(string address, string copy, Browser anna, Browser bob)
+    {
+        var uploads = Path.Combine(copy, "data", "uploads");
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0x0D, 0x49, 0x48, 0x44, 0x52];
+        var pdf = Encoding.ASCII.GetBytes("%PDF-1.7\n%tea\n");
+        byte[] program = [0x4D, 0x5A, 0x90, 0, 3, 0, 0, 0];
+        using var guest = new Browser(address);
+
+        var (status, body, at) = await bob.PostFiles("/account/profile", [("action", "avatar")], ("avatar", "me.png", program));
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Contains("That is not a PNG, JPEG, GIF or WebP picture.", body);
+        (status, body, at) = await bob.PostFiles("/account/profile", [("action", "avatar")], ("avatar", "me.png", png));
+        Assert.Equal((HttpStatusCode.OK, "/account/profile?saved=avatar"), (status, at));
+        Assert.Contains("Your avatar is saved.", body);
+        Assert.Single(Directory.GetFiles(uploads));
+        var avatar = await guest.Client.GetAsync("/avatar?id=2");
+        Assert.Equal((HttpStatusCode.OK, "image/png"), (avatar.StatusCode, avatar.Content.Headers.ContentType?.MediaType));
+        Assert.Equal(png, await avatar.Content.ReadAsByteArrayAsync());
+        Assert.False(avatar.Content.Headers.Contains("Content-Disposition"));
+        using (var again = new HttpRequestMessage(HttpMethod.Get, "/avatar?id=2"))
+        {
+            again.Headers.TryAddWithoutValidation("If-None-Match", avatar.Headers.ETag!.Tag);
+            Assert.Equal(HttpStatusCode.NotModified, (await guest.Client.SendAsync(again)).StatusCode);
+        }
+        Assert.Contains("<img class=\"avatar large\" src=\"/avatar?id=2&amp;v=", (await guest.Get("/members/member?id=2")).Item2);
+        Assert.Contains("<img class=\"avatar\" src=\"/avatar?id=2&amp;v=", (await guest.Get("/topic?id=32")).Item2);
+        Assert.Equal(HttpStatusCode.NotFound, (await guest.Get("/avatar?id=1")).Item1);
+        await bob.PostFiles("/account/profile", [("action", "avatar")], ("avatar", "me2.png", png));
+        Assert.Single(Directory.GetFiles(uploads));
+
+        (status, body, at) = await bob.PostFiles("/post/new?board=1", [("title", "Pictures of tea"), ("body", "See them."), ("action", "post")],
+            ("files", "pot.png", png), ("files", "Herbata \u017c\u00f3\u0142ta.pdf", pdf));
+        Assert.True(status == HttpStatusCode.OK && at.StartsWith("/topic?id=", StringComparison.Ordinal), at + "\n" + body);
+        var pictures = at;
+        var ids = Regex.Matches(body, "href=\"/attachment\\?id=(\\d+)\"").Select(m => m.Groups[1].Value).Distinct().ToArray();
+        Assert.Equal(2, ids.Length);
+        Assert.Contains($"<img src=\"/attachment?id={ids[0]}\" alt=\"pot.png\" loading=\"lazy\">", body);
+        Assert.Contains("Herbata \u017c\u00f3\u0142ta.pdf</a> <span class=\"note\">14 B</span>", body);
+        var picture = await guest.Client.GetAsync($"/attachment?id={ids[0]}");
+        Assert.Equal((HttpStatusCode.OK, "image/png"), (picture.StatusCode, picture.Content.Headers.ContentType?.MediaType));
+        Assert.True(picture.Headers.CacheControl is { Private: true, NoCache: true }, picture.Headers.CacheControl?.ToString());
+        Assert.False(picture.Content.Headers.Contains("Content-Disposition"));
+        var document = await guest.Client.GetAsync($"/attachment?id={ids[1]}");
+        Assert.Equal(pdf, await document.Content.ReadAsByteArrayAsync());
+        Assert.Equal("attachment; filename=\"Herbata ___ta.pdf\"; filename*=UTF-8''Herbata%20%C5%BC%C3%B3%C5%82ta.pdf",
+            string.Join(", ", document.Content.Headers.GetValues("Content-Disposition")));
+        Assert.Equal(3, Directory.GetFiles(uploads).Length);
+
+        (status, body, _) = await bob.PostFiles("/post/new?board=1", [("title", "Many"), ("body", "Six of them."), ("action", "post")],
+            [.. Enumerable.Range(1, 6).Select(i => ("files", $"{i}.png", png))]);
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Contains("That is more files than a post may have.", body);
+        (status, body, _) = await bob.PostFiles("/post/new?board=1", [("title", "A program"), ("body", "Run it."), ("action", "post")],
+            ("files", "tea.png", program));
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Contains("The forum takes pictures, PDF documents, ZIP archives and text, not files of other kinds.", body);
+        Assert.Equal(3, Directory.GetFiles(uploads).Length);
+
+        var post = Regex.Match((await bob.Get(pictures)).Item2, "href=\"/post/edit\\?id=(\\d+)\"").Groups[1].Value;
+        Assert.Contains($"name=\"remove.{ids[1]}\"", (await bob.Get($"/post/edit?id={post}")).Item2);
+        (status, body, at) = await bob.PostFiles($"/post/edit?id={post}",
+            [("title", "Pictures of tea"), ("body", "See them, and read this."), ("action", "post"), ($"remove.{ids[1]}", "1")],
+            ("files", "notes.txt", Encoding.UTF8.GetBytes("Steep for 3 minutes.\n")));
+        Assert.True(status == HttpStatusCode.OK && at.StartsWith(pictures, StringComparison.Ordinal), at + "\n" + body);
+        Assert.Contains("notes.txt</a>", body);
+        Assert.DoesNotContain("Herbata", body);
+        // SQLite gives a new row the id after the largest, which may be the one removed: the document is not sent again.
+        Assert.NotEqual(pdf, await (await guest.Client.GetAsync($"/attachment?id={ids[1]}")).Content.ReadAsByteArrayAsync());
+        Assert.Equal(HttpStatusCode.OK, (await guest.Get($"/attachment?id={ids[0]}")).Item1);
+        Assert.Equal(3, Directory.GetFiles(uploads).Length);
+
+        (status, body, at) = await anna.PostFiles("/post/new?board=2", [("title", "Rota"), ("body", "Attached."), ("action", "post")],
+            ("files", "rota.txt", Encoding.UTF8.GetBytes("Monday: Anna\n")));
+        Assert.True(status == HttpStatusCode.OK && at.StartsWith("/topic?id=", StringComparison.Ordinal), at + "\n" + body);
+        var staff = Regex.Match(body, "href=\"/attachment\\?id=(\\d+)\"").Groups[1].Value;
+        Assert.Equal(HttpStatusCode.NotFound, (await guest.Get($"/attachment?id={staff}")).Item1);
+        var rota = await bob.Client.GetAsync($"/attachment?id={staff}");
+        Assert.Equal((HttpStatusCode.OK, "text/plain; charset=utf-8", "Monday: Anna\n"),
+            (rota.StatusCode, rota.Content.Headers.ContentType?.ToString(), await rota.Content.ReadAsStringAsync()));
+        Assert.Equal("attachment; filename=\"rota.txt\"", string.Join(", ", rota.Content.Headers.GetValues("Content-Disposition")));
+
+        (status, body, at) = await anna.PostFiles("/admin/settings", [("action", "logo")], ("logo", "logo.png", png));
+        Assert.Equal((HttpStatusCode.OK, "/admin/settings?saved=1"), (status, at));
+        Assert.Contains("<img class=\"logo\" src=\"/logo?v=", (await guest.Get("/")).Item2);
+        Assert.Equal(png, await guest.Client.GetByteArrayAsync("/logo"));
+        Assert.Equal(5, Directory.GetFiles(uploads).Length);
+        await anna.Post("/admin/settings", ("action", "removeLogo"));
+        Assert.DoesNotContain("class=\"logo\"", (await guest.Get("/")).Item2);
+        Assert.Equal(HttpStatusCode.NotFound, (await guest.Get("/logo")).Item1);
+
+        await bob.Post("/account/profile", ("action", "removeAvatar"));
+        Assert.Equal(HttpStatusCode.NotFound, (await guest.Get("/avatar?id=2")).Item1);
+        Assert.DoesNotContain("class=\"avatar\"", (await guest.Get("/topic?id=32")).Item2);
+        Assert.Equal(3, Directory.GetFiles(uploads).Length);
     }
 
     private static (int, string, string) Run(params string[] arguments)

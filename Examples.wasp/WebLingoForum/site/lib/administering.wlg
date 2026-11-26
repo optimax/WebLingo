@@ -8,6 +8,7 @@ import { begin, open, viewOf, formOf, redirect, idOf, pageOf, pagesOf, refuse, s
 import boards from "./boards.wlg";
 import users from "./users.wlg";
 import admin from "./administration.wlg";
+import uploads from "./uploads.wlg";
 import { languages } from "./texts.wlg";
 
 // The members on a page of the administration's list.
@@ -91,7 +92,30 @@ export async function indexPage(request, response) {
     });
 }
 
-// /admin/settings: the forum's settings, saved where each is as it should be.
+// The forum's logo, uploaded or removed: a picture no larger than an avatar may be, 256 KB where avatars are off, the
+// logo before it removed.
+async function logoPosted(site, request, response, page, action) {
+    using (var db = await open()) {
+        var before = await uploads.one(db, site.settings["logo"]);
+        var logo = null;
+        if (action == "logo") {
+            var file = (await request.files())?["logo"]?[0];
+            var size = site.settings["avatarSize"] == 0 ? 256 : site.settings["avatarSize"];
+            var checked = file == null ? { problem: "upload.noFile" } : await uploads.check(file, size, true);
+            if (problems(page, response, checked["problem"] == null ? [] : [checked["problem"]])) {
+                return page;
+            }
+            logo = await uploads.keep(db, checked, "logo", site.user["id"], null, DateTime.utcNow());
+        }
+        await admin.saveSettings(db, { logo: logo });
+        if (before != null && before["kind"] == "logo") {
+            await uploads.remove(db, before);
+        }
+    }
+    return done(page, response, "/admin/settings?saved=1");
+}
+
+// /admin/settings: the forum's settings, saved where each is as it should be; and its logo, uploaded or removed.
 export async function settingsPage(request, response) {
     var site = await begin(request);
     return await site.once("settings", async () => {
@@ -105,6 +129,9 @@ export async function settingsPage(request, response) {
         var form = await posted(page, request, response);
         if (form == null) {
             return page;
+        }
+        if (form?["action"] == "logo" || form?["action"] == "removeLogo") {
+            return await logoPosted(site, request, response, page, form["action"]);
         }
         var given = admin.settingsOf(form);
         page.values = given["values"];

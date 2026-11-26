@@ -8,6 +8,7 @@ import posts from "./posts.wlg";
 import reading from "./reading.wlg";
 import users from "./users.wlg";
 import search from "./search.wlg";
+import uploads from "./uploads.wlg";
 import url from "std:url";
 
 function view(site, title, crumbs) {
@@ -98,6 +99,8 @@ export async function topicPage(request, response) {
             page.page = 1;
             page.first = 0;
             page.posts = [];
+            page.attachments = {};
+            page.files = uploads.offered(site.settings, []);
             if (site.user != null && request.query?["unread"] == "1") {
                 var next = await reading.firstNew(db, site.user, topic["id"]);
                 redirect(response, await posts.linkOf(db, topic["id"], next ?? topic["last_post_id"], perPage));
@@ -107,6 +110,7 @@ export async function topicPage(request, response) {
             page.page = pageWithin(request, page.pages);
             page.first = (page.page - 1) * perPage;
             page.posts = await topics.posts(db, topic["id"], page.first, perPage);
+            page.attachments = await uploads.ofPosts(db, page.posts.map(post => post["id"]));
             await topics.viewed(db, topic["id"]);
             if (site.user != null && page.posts.length > 0) {
                 await reading.saw(db, site.user["id"], topic["id"], page.posts[page.posts.length - 1]["id"]);
@@ -210,6 +214,7 @@ export async function memberPage(request) {
             }
             var page = view(site, member["name"], [[site.t("members.title"), "/members"]]);
             page.member = member;
+            page.avatar = await uploads.avatarOf(db, member["id"]);
             return page;
         }
     });

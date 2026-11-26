@@ -3,10 +3,13 @@
 // this folder's weblingo.config and the site's wasp.config both give instead (Documents/weblingo-forum.md, section 3.3).
 // A new database gets the forum's tables, its groups, its first administrator, and a first category, board and topic; a
 // database an earlier version of the forum made is upgraded to this one's; and one at this version is left as it is.
+// The folder of members' files, which the site's wasp.config lets it write, ../data/uploads, is made where it is not; a
+// relative path is from the current folder, so run it from this folder, or give uploads= the folder's path.
 // Run it from this folder:
 //
 //   weblingo run setup.wlg
 //   weblingo run setup.wlg name=Anna email=anna@example.com
+//   weblingo run setup.wlg uploads=D:/forum/data/uploads
 //
 // It asks for what its parameters do not give: the administrator's name, address and password, the password unseen.
 
@@ -14,8 +17,10 @@ param name = null;
 param email = null;
 param password = null;
 param database = "forum";
+param uploads = "../data/uploads";
 
 import { write, writeLn, prompt, readPassword } from "std:console";
+import fs from "std:fs";
 import { DateTime } from "std:datetime";
 import { Database } from "std:db";
 import schema from "../site/lib/schema.wlg";
@@ -86,6 +91,21 @@ async function make(db, admin) {
     await db.execute("UPDATE users SET post_count = 1 WHERE id = @user", { user: user });
     await search.indexAll(db);
 }
+
+// A folder, made, with the folders it is in, where it is not there.
+async function makeFolders(path) {
+    var at = path.replace("\\", "/").trimEnd("/");
+    if (at == "" || await fs.exists(at)) {
+        return;
+    }
+    var slash = at.lastIndexOf("/");
+    if (slash > 0) {
+        await makeFolders(at.slice(0, slash));
+    }
+    await fs.makeFolder(at);
+}
+
+await makeFolders(uploads);
 
 using (var db = await Database.open(database)) {
     var version = await schema.versionOf(db);

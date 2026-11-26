@@ -19,6 +19,10 @@
   <label><%= site.t("profile.timeZone") %> <input name="timeZone" value="<%= values["timeZone"] %>" required maxlength="64"></label>
   <label><%= site.t("admin.topicsPerPage") %> <input type="number" name="topicsPerPage" value="<%= values["topicsPerPage"] %>" min="5" max="100" required></label>
   <label><%= site.t("admin.postsPerPage") %> <input type="number" name="postsPerPage" value="<%= values["postsPerPage"] %>" min="5" max="100" required></label>
+  <label><%= site.t("admin.avatarSize") %> <input type="number" name="avatarSize" value="<%= values["avatarSize"] %>" min="0" max="10240" required></label>
+  <label><%= site.t("admin.attachmentSize") %> <input type="number" name="attachmentSize" value="<%= values["attachmentSize"] %>" min="0" max="20480" required></label>
+  <label><%= site.t("admin.attachments") %> <input type="number" name="attachments" value="<%= values["attachments"] %>" min="0" max="20" required>
+    <span class="note"><%= site.t("admin.limitsHint") %></span></label>
   <label class="check"><input type="checkbox" name="signUp" value="1"<% if (values["signUp"]) { %> checked<% } %>> <%= site.t("admin.signUp") %></label>
   <label class="check"><input type="checkbox" name="confirmEmail" value="1"<% if (values["confirmEmail"]) { %> checked<% } %>> <%= site.t("admin.confirmEmail") %></label>
   <label class="check"><input type="checkbox" name="images" value="1"<% if (values["images"]) { %> checked<% } %>> <%= site.t("admin.images") %></label>
@@ -33,4 +37,22 @@
   </fieldset>
   <button><%= site.t("form.save") %></button>
 </form>
+<h2 class="plain"><%= site.t("admin.logo") %></h2>
+<% if (site.settings["logo"] != null) { %>
+<p><img class="logo large" src="/logo?v=<%= site.settings["logo"] %>" alt="<%= site.t("admin.logo") %>"></p>
+<% } %>
+<form method="post" class="form" action="/admin/settings" enctype="multipart/form-data">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <input type="hidden" name="action" value="logo">
+  <label><%= site.t("admin.logoFile") %> <input type="file" name="logo" accept="image/png,image/jpeg,image/gif,image/webp" required>
+    <span class="note"><%= site.t("admin.logoHint") %></span></label>
+  <button><%= site.t("admin.uploadLogo") %></button>
+</form>
+<% if (site.settings["logo"] != null) { %>
+<form method="post" action="/admin/settings">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <input type="hidden" name="action" value="removeLogo">
+  <button class="secondary"><%= site.t("admin.removeLogo") %></button>
+</form>
+<% } %>
 <% } %>

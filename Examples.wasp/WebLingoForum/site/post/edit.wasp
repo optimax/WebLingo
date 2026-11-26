@@ -8,5 +8,5 @@
 <h1><%= view.title %></h1>
 <% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems }); %>
 <% await renderComponent("/components/post-form.wasp", { site: site, token: request.csrfToken, action: view.action, values: view.values,
-                                                        submit: site.t("post.save"), titled: view.titled, preview: view.preview }); %>
+                                                        submit: site.t("post.save"), titled: view.titled, preview: view.preview, files: view.files }); %>
 <% } %>

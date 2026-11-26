@@ -37,6 +37,20 @@ function perPageOf(text) {
     return count >= 5 && count <= 100 ? count : null;
 }
 
+// A whole number a form gives, from least to most, or null where it is not one.
+function wholeOf(text, least, most) {
+    if (!(text is String) || text.length == 0 || text.length > 6) {
+        return null;
+    }
+    foreach (var c in text) {
+        if (!"0123456789".contains(c)) {
+            return null;
+        }
+    }
+    var count = Integer.parse(text);
+    return count >= least && count <= most ? count : null;
+}
+
 // The settings a form gives: each value as the settings keep it, a checkbox true where it was sent, and what is wrong
 // with them, each a text's name.
 export function settingsOf(form) {
@@ -66,6 +80,16 @@ export function settingsOf(form) {
         if (values[name] == null) {
             problems.push("admin.badPerPage");
             values[name] = text(name);
+        }
+    }
+    // The largest avatar and attachment, in kilobytes, the second within the 30,000,000 bytes WASP takes of a request, and
+    // how many files a post may have; each 0 for none.
+    foreach (var limit in [["avatarSize", 10240, "admin.badAvatarSize"], ["attachmentSize", 20480, "admin.badAttachmentSize"],
+                           ["attachments", 20, "admin.badAttachments"]]) {
+        values[limit[0]] = wholeOf(text(limit[0]), 0, limit[1]);
+        if (values[limit[0]] == null) {
+            problems.push(limit[2]);
+            values[limit[0]] = text(limit[0]);
         }
     }
     foreach (var name in ["signUp", "confirmEmail", "images"]) {

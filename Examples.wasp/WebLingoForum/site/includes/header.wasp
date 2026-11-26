@@ -1,6 +1,6 @@
 <header class="site">
   <div class="bar">
-    <a class="name" href="/"><%= site.settings["name"] %></a>
+    <a class="name" href="/"><% if (site.settings["logo"] != null) { %><img class="logo" src="/logo?v=<%= site.settings["logo"] %>" alt=""><% } %><%= site.settings["name"] %></a>
     <span class="description"><%= site.settings["description"] %></span>
     <nav class="account">
       <a href="/search"><%= site.t("nav.search") %></a>

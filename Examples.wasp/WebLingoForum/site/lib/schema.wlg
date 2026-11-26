@@ -5,8 +5,8 @@ import { columnType } from "./sql.wlg";
 
 // The schema's version, which the table schema_version holds: 1, the forum's first part's; 2, its members' tokens and
 // failed sign-ins; 3, what each member has read, and the topics they watch; 4, each board's permissions for each group,
-// bans, reports and the moderation log; 5, private messages; 6, the search's index.
-export const version = 6;
+// bans, reports and the moderation log; 5, private messages; 6, the search's index; 7, members' uploaded files.
+export const version = 7;
 
 function id() { return { name: "id", type: "id", nullable: false }; }
 function integer(name) { return { name: name, type: "integer", nullable: false }; }
@@ -106,7 +106,15 @@ export const tables = [
     // A word of a post's, its text's, or its topic's title's for the topic's first post: the search's index.
     { name: "post_words", since: 6, columns: [string("word", 40), integer("post_id")],
       key: ["word", "post_id"], references: { "post_id": "posts" },
-      indexes: [{ name: "post_words_post", columns: ["post_id"], unique: false }] }
+      indexes: [{ name: "post_words_post", columns: ["post_id"], unique: false }] },
+    // A file a member uploaded, kept in data/uploads under a random name: an avatar, a post's attachment or the forum's
+    // logo; its type, as its first bytes give it, the name it came with, its size, and its post, for an attachment.
+    { name: "uploads", since: 7, columns: [
+        id(), integer("user_id"), string("kind", 20), string("stored_name", 64), string("type", 100), string("name", 200),
+        integer("size"), date("created_at"), optional(integer("post_id"))],
+      references: { "user_id": "users", "post_id": "posts" },
+      indexes: [{ name: "uploads_post", columns: ["post_id"], unique: false },
+                { name: "uploads_user", columns: ["user_id", "kind"], unique: false }] }
 ];
 
 // The schema's version that added a table.

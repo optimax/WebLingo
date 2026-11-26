@@ -1,9 +1,13 @@
-<% param site; param post; param number; param topic; param first; import { render } from "/lib/markdown.wlg"; import posts from "/lib/posts.wlg"; %>
+<% param site; param post; param number; param topic; param first; param attachments = []; %>
+<% import { render } from "/lib/markdown.wlg"; import posts from "/lib/posts.wlg"; import uploads from "/lib/uploads.wlg"; %>
 <article class="post" id="post-<%= post["id"] %>">
   <aside class="author">
 <% if (post["user_name"] == null) { %>
     <span class="name"><%= site.t("user.deleted") %></span>
 <% } else { %>
+<% if (post["user_avatar"] != null) { %>
+    <img class="avatar" src="/avatar?id=<%= post["user_id"] %>&amp;v=<%= post["user_avatar"] %>" alt="" width="64" height="64" loading="lazy">
+<% } %>
     <a class="name" href="/members/member?id=<%= post["user_id"] %>"><%= post["user_name"] %></a>
     <span class="note"><%= site.f("user.posts", { count: post["user_posts"] }) %></span>
     <span class="note"><%= site.f("user.joined", { time: site.time(post["user_joined"]) }) %></span>
@@ -12,6 +16,17 @@
   <div class="content">
     <p class="note"><a href="#post-<%= post["id"] %>">#<%= number %></a> · <%= site.f("topic.postedAt", { time: site.time(post["created_at"]) }) %><% if (post["edited_at"] != null) { %> · <%= site.f("topic.editedAt", { time: site.time(post["edited_at"]) }) %><% } %></p>
     <div class="body"><%- render(post["body"], { images: site.settings["images"] }) %></div>
+<% if (attachments.length > 0) { %>
+    <ul class="attachments">
+<% foreach (var file in attachments) { %>
+<% if (uploads.isPicture(file["type"])) { %>
+      <li class="picture"><a href="/attachment?id=<%= file["id"] %>"><img src="/attachment?id=<%= file["id"] %>" alt="<%= file["name"] %>" loading="lazy"></a></li>
+<% } else { %>
+      <li><a href="/attachment?id=<%= file["id"] %>"><%= file["name"] %></a> <span class="note"><%= uploads.sizeOf(file["size"]) %></span></li>
+<% } %>
+<% } %>
+    </ul>
+<% } %>
 <% if (post["user_signature"] != null) { %>
     <div class="signature"><%- render(post["user_signature"]) %></div>
 <% } %>

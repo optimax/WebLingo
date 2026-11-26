@@ -18,6 +18,12 @@ export const defaults = {
     "confirmEmail": true,
     // Who the forum's mail is from, and the forum's address for links in it, https://forum.example.com, or null for the
     // address each request came to, which a request's Host header gives: set it where the forum is reached by its name.
+    // The largest avatar a member may upload, and the largest attachment, in kilobytes, 0 for none; how many files a post
+    // may have; and the forum's logo, an upload's id, or null for its name alone.
+    "avatarSize": 256,
+    "attachmentSize": 2048,
+    "attachments": 5,
+    "logo": null,
     "mailFrom": "WebLingo Forum <forum@example.com>",
     "address": null,
     "colors": { "accent": "#2a6f97", "accentText": "#ffffff", "background": "#f6f7f9", "surface": "#ffffff",

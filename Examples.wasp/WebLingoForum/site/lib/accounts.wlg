@@ -9,6 +9,7 @@ import users from "./users.wlg";
 import tokens from "./tokens.wlg";
 import { sendConfirmation, sendReset } from "./mail.wlg";
 import { banOf } from "./moderation.wlg";
+import uploads from "./uploads.wlg";
 
 // Failed sign-ins to one account that make the next wait, and for how long, in minutes.
 export const failuresAllowed = 5;
@@ -270,6 +271,29 @@ function isZone(name) {
 
 // /account/profile: the member's own time zone, language and signature, and their password changed; a reader not
 // signed in sent to sign in first.
+// The profile's avatar, uploaded or removed: a picture, PNG, JPEG, GIF or WebP, no larger than the settings allow, the
+// member's avatar before it removed.
+async function avatarPosted(db, site, request, response, page, action) {
+    if (action == "removeAvatar") {
+        if (page.avatar != null) {
+            await uploads.remove(db, page.avatar);
+        }
+        redirect(response, "/account/profile?saved=avatar");
+        return page;
+    }
+    var file = (await request.files())?["avatar"]?[0];
+    var size = site.settings["avatarSize"];
+    var checked = size == 0 ? { problem: "profile.noAvatars" } : file == null ? { problem: "upload.noFile" } : await uploads.check(file, size, true);
+    if (checked["problem"] != null) {
+        response.status = 400;
+        page.problems.push(checked["problem"]);
+        return page;
+    }
+    await uploads.setAvatar(db, site.user["id"], checked, DateTime.utcNow());
+    redirect(response, "/account/profile?saved=avatar");
+    return page;
+}
+
 export async function profilePage(request, response) {
     var site = await begin(request);
     return await site.once("profile", async () => {
@@ -281,14 +305,18 @@ export async function profilePage(request, response) {
         }
         page.values = { timeZone: site.user["time_zone"] ?? "", language: site.user["language"] ?? "",
                         signature: site.user["signature"] ?? "" };
-        if (request.method != "POST") {
-            return page;
-        }
-        var form = await formOf(request);
-        if (form == null) {
-            return expired(page, response);
-        }
         using (var db = await open()) {
+            page.avatar = await uploads.avatarOf(db, site.user["id"]);
+            if (request.method != "POST") {
+                return page;
+            }
+            var form = await formOf(request);
+            if (form == null) {
+                return expired(page, response);
+            }
+            if (form?["action"] == "avatar" || form?["action"] == "removeAvatar") {
+                return await avatarPosted(db, site, request, response, page, form["action"]);
+            }
             if (form?["action"] == "password") {
                 var current = await users.byId(db, site.user["id"]);
                 var password = form?["newPassword"] ?? "";

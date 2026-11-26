@@ -1,0 +1,19 @@
+// /logo: the forum's logo, a picture its administrator uploaded, shown to anyone in its header; a 404 where it has none
+// (Documents/weblingo-forum.md, section 2, "Administration"; section 6, part 8).
+
+import { open } from "./lib/forum.wlg";
+import settings from "./lib/settings.wlg";
+import uploads from "./lib/uploads.wlg";
+
+export const session = "readonly";
+
+export async function get(request, response) {
+    using (var db = await open()) {
+        var logo = await uploads.one(db, (await settings.load(db))["logo"]);
+        if (logo == null || logo["kind"] != "logo") {
+            uploads.notFound(response);
+            return;
+        }
+        await uploads.send(response, logo, true);
+    }
+}

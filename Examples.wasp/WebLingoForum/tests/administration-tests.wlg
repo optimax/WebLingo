@@ -28,7 +28,8 @@ async function forum(db) {
 // A settings form as the settings page sends it, each value as text.
 function form(changes) {
     var made = { name: "Tea Talk", description: "About tea.", language: "en", timeZone: "Europe/Warsaw", topicsPerPage: "10",
-                 postsPerPage: "15", signUp: "1", mailFrom: "Tea Talk <tea@example.com>", address: "https://tea.example.com/" };
+                 postsPerPage: "15", signUp: "1", mailFrom: "Tea Talk <tea@example.com>", address: "https://tea.example.com/",
+                 avatarSize: "256", attachmentSize: "1024", attachments: "3" };
     foreach (var (name, color) in settings.defaults["colors"]) {
         made["color." + name] = color;
     }
@@ -43,6 +44,10 @@ export class AdministrationTests {
         assertDeepEqual([values["name"], values["topicsPerPage"], values["signUp"], values["confirmEmail"], values["images"], values["address"]],
                         ["Tea Talk", 10, true, false, false, "https://tea.example.com"]);
         assertEqual(values["colors"]["accent"], "#aa0000");
+        assertDeepEqual([values["avatarSize"], values["attachmentSize"], values["attachments"]], [256, 1024, 3]);
+        assertDeepEqual(admin.settingsOf(form({ avatarSize: "0", attachmentSize: "0", attachments: "0" }))["problems"], []);
+        assertDeepEqual(admin.settingsOf(form({ avatarSize: "10241", attachmentSize: "-1", attachments: "21" }))["problems"],
+                        ["admin.badAvatarSize", "admin.badAttachmentSize", "admin.badAttachments"]);
         using (var db = await Database.open("sqlite::memory:")) {
             await forum(db);
             await admin.saveSettings(db, values);
