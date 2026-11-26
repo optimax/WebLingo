@@ -146,9 +146,11 @@ else `X-Forwarded-For`/`-Proto`, where its peer is trusted; ASP.NET Core's `Tran
 ## The quantum
 
 M0.24's part 2: a suspending execution's VM yields once its quantum (`WebLingoExecutionContext.Quantum`, `wasp.config`'s
-`"limits"`' `"quantum"`, 100,000 by default) has passed: `Run` keeps `_quantumDue`, set where it begins or goes on, and
-looks at it where it looks at its budget and cancellation, every 1,024 instructions; `Yield` (not inlined) stops it as
-the debugger's stop does, `_stopDepth` and `_yielded`, returning `Waits(0)`, and `GoesOn` goes on at once. The worker
+`"limits"`' `"quantum"`, 100,000 by default) has passed: `WithQuantum` (not inlined) makes it the budget `Run` runs to,
+where it comes first, `_yields` then true; `BudgetPassed` (not inlined), where the budget passes, yields or stops the
+program; `Yield` stops it as the debugger's stop does, `_stopDepth` and `_yielded`, returning `Waits(0)`, and `GoesOn`
+goes on at once. Reading the context's properties in `Run` made the benchmark up to 8 percent slower; with the
+budget's message out of `Run` too, it is up to 21 percent faster than before. The worker
 pool queues a yield for its worker at once (`Item.Yielded`), and, taking it, runs one new request from the shared queue
 first, where one is queued, then queues it again: a worker takes its own queue before the shared one, so without that a
 yield would let no new request in. `QuantumTests` (`WebLingo.Hosting.Tests`).

@@ -2147,8 +2147,14 @@ that the owner has not decided is a question of its task's, and Proposed here un
    whatever instruction comes once the quantum has passed, at no cost while it is not due, any instruction being a point
    where it can wait. Built (26 November 2026; Proposed where it says more): `WebLingoExecutionContext.Quantum`, which a
    suspending execution's VM keeps (`Suspends`, a host's request's, never `weblingo`'s), counted from where `Run` begins
-   or goes on, and looked at where its budget and its cancellation are, every 1,024 instructions, so that a quantum is
-   kept to the next multiple of 1,024; its yield, `Yield`, not inlined, the request waiting before the instruction as its
+   or goes on: the budget `Run` runs to, where it comes before the execution's own, given it by a helper not inlined
+   (`WithQuantum`), so that `Run` reads no property more, and found where the budget is looked at, which yields there
+   rather than stopping the program (`BudgetPassed`, not inlined, which holds both paths, the budget's message among
+   them), so that the loop gains nothing and the quantum is kept exactly; measured against `main`, 12 rounds alternating
+   ABBA on an idle machine, every workload as fast or faster, the budget's message no longer built in `Run`: `loops` 21
+   percent faster, `calls` 9, `strings` 8, `async` 5, `closures` 4, `templates` 3, `indexing` 2, `imports` 2 and
+   `objects` 1.5, `bytes`, `collections` and `io` the same (`Documents/implementation.md`, "A VM's Dispatch Method Is
+   Sensitive to Its Locals"); its yield, `Yield`, not inlined, the request waiting before the instruction as its
    debugger's stop leaves it, `Waits(0)`, its result waiting for no time, which the hosts' worker pool queues for its
    worker at once, behind what is queued for it, and, taken, lets one new request of the shared queue run first, where
    one is queued, then queues again, so that new requests too run between its quanta, the worker taking its own queue

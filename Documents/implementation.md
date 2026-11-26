@@ -435,6 +435,16 @@ once may still keep a register for the whole loop: `Run`'s parameter `resuming`,
 did, which made `calls` 4.5 percent slower once the member's cache's cases (M0.21's part 3) were in, until it was a
 field of the execution's (`_resuming`).
 
+Reading a property in `Run`'s prologue spends that budget too, though it runs once: the quantum (M0.24's part 2, the
+specification's section 9, "M0.24 parts"), its `context.Suspends` and `context.Quantum` read before the loop, made
+`calls` 7.8 percent slower, `imports` 6.1, `closures` 6.2 and `objects` 5.0, though no benchmark yields, and its check
+in the loop's look at the budget, a field and a call, cost as much; read instead by a helper not inlined
+(`WithQuantum`), which gives `Run` its budget, it cost nothing. And code `Run` holds for a path it rarely takes costs
+the paths it always takes: the budget's failure, its interpolated message built in `Run`, moved into a helper not
+inlined (`BudgetPassed`, `Run` keeping only its call, given the pc and the count), made `loops` 21 percent faster,
+`calls` 9, `strings` 8, `async` 5 and `closures` 4, nothing slower (26 November 2026, 12 rounds alternating ABBA against
+`main`). So a rare path's message is built in its helper, never in `Run`, and other such paths may give as much.
+
 ### .NET Loads an Assembly When It Compiles a Method Naming One of Its Types
 
 Referencing a project does not load its assembly: .NET loads it when it first compiles a method that names one of its types, whether or not that line runs. So a method naming the VM loads it, even where that line does not run: a host that should load it only to run names it in a method of its own, marked `[MethodImpl(MethodImplOptions.NoInlining)]`, so that inlining does not bring the name back into the caller (`WebLingoCommandLine.OnVm`). A type a command uses without running anything belongs to an assembly the VM references, the runtime's (`WebLingoExecutionResult`).
