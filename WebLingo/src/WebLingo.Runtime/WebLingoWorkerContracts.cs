@@ -17,6 +17,34 @@ public interface IWebLingoWorkers
 
     /// <summary>Where the execution runs as a worker, its link to its parent; null otherwise.</summary>
     IWebLingoWorkerLink? Parent { get; }
+
+    /// <summary>
+    /// The pool that runs the exported functions of the module at <paramref name="path"/>, found as <see cref="TryStart"/>
+    /// finds one (section 9, "M0.26 parts", part 3): made the first time it is asked for, the module read and compiled then;
+    /// false, with its error, where the module cannot be read or does not compile.
+    /// </summary>
+    bool TryPool(string path, out IWebLingoWorkerPool? pool, out WebLingoRuntimeError? error);
+}
+
+/// <summary>
+/// A pool of workers, each running a module once and then its exported functions, one call at a time, as it is given
+/// them (section 9, "M0.26 parts", part 3): its workers made as they are needed, as many as the machine's processors at most,
+/// a call beyond them waiting for the first that is free, and ended with the program.
+/// </summary>
+public interface IWebLingoWorkerPool
+{
+    /// <summary>
+    /// Whether the module exports <paramref name="name"/>, a function that takes <paramref name="count"/> arguments; false,
+    /// with its error, a <c>MemberError</c> (WL3006) or an <c>ArgumentError</c> (WL2006), otherwise.
+    /// </summary>
+    bool TryCheck(string name, int count, out WebLingoRuntimeError? error);
+
+    /// <summary>
+    /// A call, a message of the function's name and an array of its arguments, run on a worker of the pool: then
+    /// <paramref name="done"/> called, once, from any thread, with what the function gave, copied, or, <see cref="WebLingoWorkerReceipt.Failed"/>,
+    /// the exception it threw.
+    /// </summary>
+    void Run(WebLingoMessage call, Action<WebLingoWorkerReceipt> done);
 }
 
 /// <summary>

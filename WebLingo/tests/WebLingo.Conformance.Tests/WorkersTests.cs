@@ -239,6 +239,97 @@ public sealed class WorkersTests : IDisposable
         Assert.Equal((WebLingoCommandLine.Success, "2\n", ""), Weblingo("run", Path.ChangeExtension(path, ".wlb")));
     }
 
+    private const string Maths = """
+        import { writeLn } from "std:console";
+        writeLn("maths runs");
+        export function square(n) { return n * n; }
+        export async function later(n, wait = 10) { await delay(wait); return n + 1; }
+        export function sum(...values) { var total = 0; foreach (var v in values) total += v; return total; }
+        export function fails(message) { throw new Error(message); }
+        export function pair(n) { return [n, { "n": n }]; }
+        export const half = (n) => n / 2;
+        """;
+
+    [Fact]
+    public void APoolRunsAModulesFunctions_TheirArgumentsAndResultsCopied()
+    {
+        // Section 9, "M0.26 parts", part 3: workers.run(path, name, arguments), the module's function run on a pool's worker.
+        Write("maths.wlg", Maths);
+        var (output, error) = Run("""
+            import { writeLn } from "std:console";
+            import workers from "std:workers";
+            import { run } from "std:workers";
+            writeLn([await workers.run("maths.wlg", "square", [7]), await run("maths", "sum", [1, 2, 3]), await run("maths.wlg", "sum", null)]);
+            writeLn([await run("maths.wlg", "later", [1]), await run("maths.wlg", "half", [9]), await run("maths.wlg", "pair", [2])]);
+            """);
+        Assert.Equal(("maths runs\n[49, 6, 0]\n[2, 4.5, [2, {\"n\": 2}]]\n", ""), (output, error));
+    }
+
+    [Fact]
+    public void APoolsWorkersRunCallsAtOnce_AsManyAsTheProcessors_TheModuleOnceOnEach()
+    {
+        Write("maths.wlg", Maths);
+        var (output, error) = Run("""
+            import { writeLn } from "std:console";
+            import { run } from "std:workers";
+            var calls = [];
+            for (var i = 0; i < 40; i++) calls.push(run("maths.wlg", "later", [i, 20]));
+            writeLn(await Task.all(calls));
+            """);
+        Assert.Equal("", error);
+        var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal("[" + string.Join(", ", Enumerable.Range(1, 40)) + "]", lines[^1]);
+        var runs = lines.Count(line => line == "maths runs");
+        Assert.InRange(runs, 1, Environment.ProcessorCount);
+        Assert.Equal(lines.Length - 1, runs);
+    }
+
+    [Fact]
+    public void APoolsExceptionIsItsCallsTask_ThePoolGoingOn()
+    {
+        Write("maths.wlg", Maths);
+        var (output, error) = Run("""
+            import { writeLn } from "std:console";
+            import { run } from "std:workers";
+            try { await run("maths.wlg", "fails", ["broken"]); }
+            catch (e) { writeLn([e is Error, e.className, e.message, e.thrownAt.endsWith("maths.wlg(6,34)")]); }
+            writeLn(await run("maths.wlg", "square", [3]));
+            """);
+        Assert.Equal(("maths runs\n[true, \"Error\", \"broken\", true]\nmaths runs\n9\n", ""), (output, error));
+    }
+
+    [Fact]
+    public void APoolsErrorsAreTheSpecifiedOnes()
+    {
+        Write("maths.wlg", Maths);
+        Write("broken.wlg", "export function f() { return ; ");
+        var (output, error) = Run("""
+            import { writeLn } from "std:console";
+            import { run } from "std:workers";
+            class Point {}
+            foreach (var call in [() => run("maths.wlg", "cube", [3]), () => run("maths.wlg", "square", [3, 4]),
+                                  () => run("maths.wlg", "later", []), () => run("maths.wlg", "sum", [new Point()]),
+                                  () => run("nothere.wlg", "f"), () => run("maths.wlg", "square", 3), () => run(5, "f"),
+                                  () => run("maths.wlg", null)]) {
+                try { await call(); } catch (e) { writeLn($"{e.code} {e.message}"); }
+            }
+            try { await run("broken.wlg", "f"); } catch (e) { writeLn($"{e.code} {e.message.startsWith("The pool's module 'broken.wlg' does not compile: ")}"); }
+            """);
+        Assert.Equal("", error);
+        Assert.Equal("""
+            WL3006 The module 'maths.wlg' exports no function 'cube'.
+            WL2006 'square' takes 1 argument, not 2.
+            WL2006 'later' takes 1 to 2 arguments, not 0.
+            WL3001 A message holds null, Booleans, numbers, decimals, strings, bytes, dates, arrays, maps and sets of them, and errors, not an instance of Point.
+            WL3011 The pool's module 'nothere.wlg' is not there.
+            WL3001 The third argument of 'run', the arguments, must be an array of the function's arguments, or null for none, not the integer 3.
+            WL3001 The first argument of 'run', the path, must be a module's path, a string, not the integer 5.
+            WL3001 The second argument of 'run', the name, must be the name of a function the module exports, a string, not null.
+            WL3001 true
+
+            """.ReplaceLineEndings("\n"), output);
+    }
+
     /// <summary>The worker's first line, which it writes on a thread of its own, put first, so that the test does not depend on when it runs.</summary>
     private static string Sorted(string output)
     {

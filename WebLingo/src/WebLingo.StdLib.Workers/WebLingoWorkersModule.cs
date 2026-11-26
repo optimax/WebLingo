@@ -35,6 +35,60 @@ public sealed class WebLingoWorkersModule : IWebLingoNativeModule
             .DeclareMethod("receive", 0, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
                 Receive(_parent, a, heap, out result, out error));
         registry.Value("parent", Parent);
+        registry.Function("run", 3, 1, Run);
+    }
+
+    /// <summary>
+    /// <c>run(path, name, arguments)</c>: a task of what the function <paramref name="a"/>[1] the module at the path
+    /// exports gives, given the arguments, an array, each copied there, run on a worker of the module's pool, its result
+    /// copied back, its exception the task's (section 9, "M0.26 parts", part 3).
+    /// </summary>
+    private static bool Run(ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error)
+    {
+        result = WebLingoValue.Null;
+        if (a[0].Kind != WebLingoValueKind.String)
+        {
+            error = new WebLingoArgument("run", 0, 3, "the path", "a module's path, a string").Wrong(a[0], heap);
+            return false;
+        }
+        if (a[1].Kind != WebLingoValueKind.String)
+        {
+            error = new WebLingoArgument("run", 1, 3, "the name", "the name of a function the module exports, a string").Wrong(a[1], heap);
+            return false;
+        }
+        if (a[2].Kind != WebLingoValueKind.Null && (a[2].Kind != WebLingoValueKind.Array || a[2].HasClass))
+        {
+            error = new WebLingoArgument("run", 2, 3, "the arguments", "an array of the function's arguments, or null for none").Wrong(a[2], heap);
+            return false;
+        }
+        if (heap.Workers is not { } workers)
+        {
+            error = Invalid("This host runs no workers.");
+            return false;
+        }
+        if (heap.Scheduler is not { } scheduler)
+        {
+            error = Invalid("This host runs no tasks.");
+            return false;
+        }
+        var count = a[2].Kind == WebLingoValueKind.Null ? 0 : heap.GetArray(a[2]).Count;
+        if (!workers.TryPool(heap.GetString(a[0]), out var pool, out error) || !pool!.TryCheck(heap.GetString(a[1]), count, out error)) return false;
+        // The call, its name and its arguments, copied whole; the array made for none kept while the call's is made.
+        var made = new WebLingoValue[2];
+        heap.AddRoots(made);
+        WebLingoMessage? call;
+        try
+        {
+            made[0] = a[2];
+            if (made[0].Kind == WebLingoValueKind.Null && !heap.TryAllocateArray([], 0, 0, out made[0], out error)) return false;
+            if (!heap.TryAllocateArray([a[1], made[0]], 0, 2, out made[1], out error)) return false;
+            if (!WebLingoMessage.TryCopy(heap, made[1], heap.ErrorClass, null, out call, out error)) return false;
+        }
+        finally
+        {
+            heap.RemoveLastRoots(made);
+        }
+        return scheduler.TryWaitForHost<WebLingoWorkerReceipt>(done => pool.Run(call!, done), Received, out result, out error);
     }
 
     /// <summary><c>new Worker(path)</c>: the module at the path, from the program's own folder, started on a worker of its own.</summary>

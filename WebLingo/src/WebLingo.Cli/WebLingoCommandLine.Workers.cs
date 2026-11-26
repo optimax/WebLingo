@@ -23,58 +23,276 @@ public static partial class WebLingoCommandLine
             TextWriter Output, TextWriter Error, IWebLingoConsoleInput? Input, Action? Console, int RegexTimeout);
 
         private readonly List<Worker> _started = [];
+        private readonly Dictionary<string, Pool> _pools = new(StringComparer.Ordinal);
         private readonly Settings _run = run;
+        private bool _ended;
 
         public IWebLingoWorkerLink? Parent => parent;
 
         public bool TryStart(string path, out IWebLingoWorkerLink? worker, out WebLingoRuntimeError? error)
         {
-            (worker, error) = (null, null);
-            // From the program's own folder, as a browser finds a worker's script from its page's (Proposed), named as an
-            // imported file is, by its path from the current folder, with / between its folders.
-            var file = Relative(Directory.GetCurrentDirectory(), Path.Combine(Path.GetDirectoryName(Path.GetFullPath(_run.MainPath)) ?? "", path));
-            if (Path.GetExtension(file).Length == 0) file += _run.Program.Extension;
-            if (!File.Exists(file))
-            {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.IOFailure, $"The worker's module '{path}' is not there.");
-                return false;
-            }
+            worker = null;
+            if (!TryFind(path, "worker's", out var file, out error)) return false;
             var diagnostics = new StringWriter();
-            var source = PrepareWorker(file, diagnostics);
+            var source = TryReadText(file, diagnostics, out var text) ? Prepare(file, text, diagnostics) : null;
             if (source is null)
             {
-                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                    $"The worker's module '{path}' does not compile: {diagnostics.ToString().TrimEnd()}");
+                error = NotCompiled("worker's", path, diagnostics);
                 return false;
             }
             // Its warnings where the program's are written.
             _run.Error.Write(diagnostics.ToString());
-            var started = new Worker(this, source, path);
-            lock (_started) _started.Add(started);
-            started.Start();
-            worker = started;
+            worker = Launch(source, path);
+            if (worker is not null) return true;
+            error = Ended();
+            return false;
+        }
+
+        public bool TryPool(string path, out IWebLingoWorkerPool? pool, out WebLingoRuntimeError? error)
+        {
+            pool = null;
+            if (!TryFind(path, "pool's", out var file, out error)) return false;
+            lock (_pools)
+            {
+                if (_pools.TryGetValue(file, out var found))
+                {
+                    pool = found;
+                    return true;
+                }
+            }
+            var diagnostics = new StringWriter();
+            if (!TryReadText(file, diagnostics, out var text))
+            {
+                error = NotCompiled("pool's", path, diagnostics);
+                return false;
+            }
+            // Its driver beside it, which no file holds, so that it imports the module as the module's own imports are found.
+            var exports = Pool.Exports(text, file);
+            var driver = Relative(Directory.GetCurrentDirectory(),
+                Path.Combine(Path.GetDirectoryName(Path.GetFullPath(file)) ?? "", $".weblingo-pool-{Guid.NewGuid():N}{_run.Program.Extension}"));
+            var driverText = Pool.Driver(Path.GetFileName(file), exports);
+            if (Prepare(driver, driverText, diagnostics) is not { } first)
+            {
+                error = NotCompiled("pool's", path, diagnostics);
+                return false;
+            }
+            _run.Error.Write(diagnostics.ToString());
+            var made = new Pool(this, path, driver, driverText, exports, first);
+            lock (_pools)
+            {
+                if (!_pools.TryGetValue(file, out var found)) _pools[file] = found = made;
+                pool = found;
+            }
             return true;
         }
 
-        /// <summary>A worker's module read and compiled with the program's configuration, its diagnostics written; null where it does not compile.</summary>
-        private SourceRun? PrepareWorker(string file, TextWriter diagnostics)
+        /// <summary>
+        /// A module's file, from the program's own folder, as a browser finds a worker's script from its page's (Proposed),
+        /// named as an imported file is, by its path from the current folder, with / between its folders; an
+        /// <c>IOError</c> where it is not there.
+        /// </summary>
+        private bool TryFind(string path, string whose, out string file, out WebLingoRuntimeError? error)
         {
-            if (!TryReadText(file, diagnostics, out var text)) return null;
-            var sourceText = new WebLingoSourceText(text, file);
-            if (TryHost(_run.Program, _run.MainPath, file, _run.GivenSchemes, _run.Output, diagnostics, _run.Input, _run.Console) is not { } host) return null;
+            error = null;
+            file = Relative(Directory.GetCurrentDirectory(), Path.Combine(Path.GetDirectoryName(Path.GetFullPath(_run.MainPath)) ?? "", path));
+            if (Path.GetExtension(file).Length == 0) file += _run.Program.Extension;
+            if (File.Exists(file)) return true;
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.IOFailure, $"The {whose} module '{path}' is not there.");
+            return false;
+        }
+
+        private static WebLingoRuntimeError NotCompiled(string whose, string path, StringWriter diagnostics) =>
+            new(WebLingoDiagnosticCodes.InvalidOperation, $"The {whose} module '{path}' does not compile: {diagnostics.ToString().TrimEnd()}");
+
+        private static WebLingoRuntimeError Ended() =>
+            new(WebLingoDiagnosticCodes.InvalidOperation, "The program has ended: it starts no more workers.");
+
+        /// <summary>A program for a worker, its text given, compiled with the program's configuration, its diagnostics written; null where it does not compile.</summary>
+        private SourceRun? Prepare(string name, string text, TextWriter diagnostics)
+        {
+            var sourceText = new WebLingoSourceText(text, name);
+            if (TryHost(_run.Program, _run.MainPath, name, _run.GivenSchemes, _run.Output, diagnostics, _run.Input, _run.Console) is not { } host) return null;
             var compilation = _run.Program.Compile(sourceText, host.Options);
             var prepared = new SourceRun(sourceText, host, host.Options, compilation);
             foreach (var diagnostic in compilation.Result.Diagnostics) WriteDiagnostic(diagnostics, prepared.TextOf(diagnostic), diagnostic);
             return compilation.Result.Module is null ? null : prepared;
         }
 
+        /// <summary>A worker started, running the program compiled; null once its program has ended, which starts no more.</summary>
+        private Worker? Launch(SourceRun source, string path)
+        {
+            var worker = new Worker(this, source, path);
+            lock (_started)
+            {
+                if (_ended) return null;
+                _started.Add(worker);
+            }
+            worker.Start();
+            return worker;
+        }
+
         /// <summary>Every worker started ended, cancelled, and waited for a while, so that what they wrote is written: where the program, or the worker that started them, ends.</summary>
         public void End()
         {
             Worker[] started;
-            lock (_started) started = [.. _started];
+            lock (_started)
+            {
+                _ended = true;
+                started = [.. _started];
+            }
             foreach (var worker in started) worker.End();
             foreach (var worker in started) worker.Join();
+        }
+
+        /// <summary>
+        /// The pool of a module's exported functions (section 9, "M0.26 parts", part 3): each of its workers a driver of its
+        /// own, compiled for it, which imports the module, so that the module runs once on each, then calls the function
+        /// each message names, one at a time, posting back what it gave; an exception it throws ending that worker, its
+        /// parent's receipt its error, a new worker taking the next call. Its workers made as calls come, as many as the
+        /// machine's processors at most, a call beyond them queued until one is free.
+        /// </summary>
+        private sealed class Pool(Workers workers, string path, string driver, string driverText,
+            IReadOnlyDictionary<string, (int Least, int Most)?> exports, SourceRun first) : IWebLingoWorkerPool
+        {
+            private static readonly int Most = Environment.ProcessorCount;
+            private readonly object _gate = new();
+            private readonly Stack<Worker> _free = new();
+            private readonly Queue<(WebLingoMessage Call, Action<WebLingoWorkerReceipt> Done)> _waiting = new();
+            private SourceRun? _first = first;
+            private int _count;
+
+            /// <summary>
+            /// What a module exports that a call may name: each function with the arguments it takes, the least and the
+            /// most, and each variable or constant, which may hold a function, with none known. Nothing where it does not
+            /// parse, which its compiling reports.
+            /// </summary>
+            public static Dictionary<string, (int Least, int Most)?> Exports(string text, string name)
+            {
+                var exports = new Dictionary<string, (int Least, int Most)?>(StringComparer.Ordinal);
+                foreach (var statement in new WebLingoParser(text, name).ParseCompilationUnit().Root.Statements)
+                {
+                    if (statement is not WebLingoExportSyntax export) continue;
+                    if (export.Declaration is WebLingoFunctionDeclarationSyntax function)
+                    {
+                        var (least, most) = (0, function.Parameters.Count);
+                        for (var i = 0; i < function.Parameters.Count; i++)
+                        {
+                            if (function.Parameters[i].IsRest) most = int.MaxValue;
+                            else if (function.Parameters[i].Default is null) least = i + 1;
+                        }
+                        exports[function.Name] = (least, most);
+                    }
+                    else if (export.Declaration is WebLingoVariableDeclarationSyntax variable) exports[variable.Name] = null;
+                }
+                return exports;
+            }
+
+            /// <summary>The driver's text: the module imported, then each call's function called, its result posted back, until its parent ends it.</summary>
+            public static string Driver(string fileName, IReadOnlyDictionary<string, (int Least, int Most)?> exports)
+            {
+                var text = new System.Text.StringBuilder("import { parent } from \"std:workers\";\nimport work from ")
+                    .Append(WebLingoValueFormatter.Quote("./" + fileName)).Append(";\nwhile (true) {\n")
+                    .Append("    var call = await parent.receive();\n    if (call == null) break;\n    switch (call[0]) {\n");
+                foreach (var name in exports.Keys) text.Append($"        case \"{name}\" {{ parent.post(await work.{name}(...call[1])); }}\n");
+                return text.Append("    }\n}\n").ToString();
+            }
+
+            public bool TryCheck(string name, int count, out WebLingoRuntimeError? error)
+            {
+                error = null;
+                if (!exports.TryGetValue(name, out var takes))
+                {
+                    error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.NoSuchMember, $"The module '{path}' exports no function '{name}'.");
+                    return false;
+                }
+                if (takes is not { } arity || count >= arity.Least && count <= arity.Most) return true;
+                error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.WrongArgumentCount,
+                    arity.Most == int.MaxValue ? $"'{name}' takes at least {arity.Least} {(arity.Least == 1 ? "argument" : "arguments")}, not {count}."
+                    : arity.Least == arity.Most ? $"'{name}' takes {arity.Most} {(arity.Most == 1 ? "argument" : "arguments")}, not {count}."
+                    : $"'{name}' takes {arity.Least} to {arity.Most} arguments, not {count}.");
+                return false;
+            }
+
+            public void Run(WebLingoMessage call, Action<WebLingoWorkerReceipt> done)
+            {
+                Worker? worker;
+                lock (_gate)
+                {
+                    if (!_free.TryPop(out worker))
+                    {
+                        if (_count >= Most)
+                        {
+                            _waiting.Enqueue((call, done));
+                            return;
+                        }
+                        _count++;
+                    }
+                }
+                worker ??= Start(done);
+                if (worker is not null) Give(worker, call, done);
+            }
+
+            /// <summary>A new worker of the pool, its driver compiled anew but for the first; null, the call given why, where it cannot be had.</summary>
+            private Worker? Start(Action<WebLingoWorkerReceipt> done)
+            {
+                var source = Interlocked.Exchange(ref _first, null);
+                var diagnostics = new StringWriter();
+                source ??= workers.Prepare(driver, driverText, diagnostics);
+                var worker = source is null ? null : workers.Launch(source, path);
+                if (worker is not null) return worker;
+                lock (_gate) _count--;
+                var why = source is null ? NotCompiled("pool's", path, diagnostics).Message : Ended().Message;
+                done(new WebLingoWorkerReceipt(WebLingoMessage.OfError("TypeError", why, WebLingoDiagnosticCodes.InvalidOperation, null), true));
+                return null;
+            }
+
+            /// <summary>The call given the worker, and its answer to the call's caller: the worker then free, or, ended, gone.</summary>
+            private void Give(Worker worker, WebLingoMessage call, Action<WebLingoWorkerReceipt> done)
+            {
+                worker.Post(call);
+                worker.Receive(receipt =>
+                {
+                    if (!receipt.Failed && receipt.Message is not null)
+                    {
+                        done(receipt);
+                        Free(worker);
+                        return;
+                    }
+                    // It ended, by the call's exception, or with the program, before it answered.
+                    done(receipt.Failed ? receipt : new WebLingoWorkerReceipt(
+                        WebLingoMessage.OfError("Error", "The pool's worker ended before it answered: its program has ended.", null, null), true));
+                    Gone();
+                });
+            }
+
+            private void Free(Worker worker)
+            {
+                (WebLingoMessage Call, Action<WebLingoWorkerReceipt> Done) next;
+                lock (_gate)
+                {
+                    if (!_waiting.TryDequeue(out next))
+                    {
+                        _free.Push(worker);
+                        return;
+                    }
+                }
+                Give(worker, next.Call, next.Done);
+            }
+
+            /// <summary>A worker gone, which a waiting call replaces with one of its own.</summary>
+            private void Gone()
+            {
+                (WebLingoMessage Call, Action<WebLingoWorkerReceipt> Done) next;
+                lock (_gate)
+                {
+                    if (!_waiting.TryDequeue(out next))
+                    {
+                        _count--;
+                        return;
+                    }
+                }
+                if (Start(next.Done) is { } worker) Give(worker, next.Call, next.Done);
+            }
         }
 
         /// <summary>

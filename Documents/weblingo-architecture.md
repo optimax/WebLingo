@@ -2088,7 +2088,18 @@ owner has not decided is a question of its task's, and Proposed here until it is
 3. **A pool** (A1 (c)). `await workers.run("work.wlg", "name", [arguments])`: the module's exported function run on a
    worker of a pool, the module run once on each of the pool's workers, its arguments copied there and its result copied
    back, an exception thrown there the task's, as part 1 copies it, no closure copied; the pool's workers made as they are
-   needed, as many as the machine's processors at most, and ended with the program. A parallel `map` later.
+   needed, as many as the machine's processors at most, and ended with the program. A parallel `map` later. Built (26
+   November 2026; Proposed where it says more): `std:workers`' `run(path, name, arguments)`, its arguments an array or
+   `null` for none, through the host's `IWebLingoWorkers.TryPool`, its `IWebLingoWorkerPool`; a pool for each module,
+   found as a worker's is, made where it is first asked for, its module read then and parsed for what it exports, each
+   function's least and most arguments checked where `run` is called, a name it does not export a `MemberError`, WL3006,
+   arguments the function does not take an `ArgumentError`, WL2006, a variable or a constant exported taking any; each of
+   its workers a worker of part 2's running a driver the host writes, which no file holds, beside the module, importing it
+   and calling each call's function by a `switch` over the names it exports, one call at a time, posting back what it
+   gave; an exception a call throws ending its worker, as part 2's uncaught exception does, the call's task throwing it,
+   where it was thrown kept, the next call made on another worker; each worker's driver compiled for it, every worker
+   then compiling with its own host; the machine's processors, `Environment.ProcessorCount`, counting each pool's workers
+   alone, part 4's limits counting all; `WorkersTests`.
 4. **Its limits** (A3 (b)). The workers a script may run at once, and each one's time, instructions and memory,
    `weblingo.config`'s, a worker past one stopped as a request past its limits is, so that a site's own limits can later
    be given the same way. Their settings' names and defaults are the task's question (Proposed: in `"limits"`, as

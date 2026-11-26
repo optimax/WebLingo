@@ -1750,6 +1750,7 @@ exchange values, each copied whole.
 | `await worker.receive()` | the next value the worker posted; `null` once it has ended and all it posted is received; the exception it ended with thrown, once |
 | `worker.dispose()` | ends the worker, as a request past its time is ended, its `finally` blocks not run; also at the end of a `using` |
 | `parent` | in a worker's module, its `Worker`'s end, with `post(value)` and `receive()` as the `Worker`'s; `null` in a program not run as a worker |
+| `await workers.run(path, name, arguments)` | the function `name` the module at `path` exports run on a worker of the module's pool, given `arguments`, an array, or `null` for none, each copied there; what it gives copied back; its exception thrown here |
 
 A value crosses copied as it was: `null`, Booleans, integers, numbers, decimals, strings, bytes, dates, and arrays,
 maps and sets of them, the references they share and their cycles kept; anything else, an instance, a function, a
@@ -1809,4 +1810,38 @@ try {
 
 ```text
 [true, "NotFound", "no such tea", "fails.wlg(2,1)"]
+```
+
+A module's pool runs its exported functions, `import workers from "std:workers";`, or `import { run } from
+"std:workers";`: its workers are made as calls come, as many as the machine's processors at most, each running the
+module once, then the calls it is given, one at a time; a call beyond them waits for the first that is free, and the
+workers end with the program. A name the module does not export is a `MemberError` (WL3006), and arguments a function
+does not take an `ArgumentError` (WL2006), where `run` is called. With `primes.wlg`:
+
+```javascript
+// How many primes there are below a number, counted the slow way.
+export function count(below) {
+    var found = 0;
+    for (var n = 2; n < below; n++) {
+        var prime = true;
+        for (var d = 2; d * d <= n && prime; d++) prime = n % d != 0;
+        if (prime) found++;
+    }
+    return found;
+}
+```
+
+four counts at once, each on a processor of its own:
+
+```javascript
+import { writeLn } from "std:console";
+import workers from "std:workers";
+
+var counts = [];
+foreach (var below in [10000, 20000, 30000, 40000]) counts.push(workers.run("primes.wlg", "count", [below]));
+writeLn(await Task.all(counts));
+```
+
+```text
+[1229, 2262, 3245, 4203]
 ```

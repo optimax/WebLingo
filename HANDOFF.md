@@ -159,7 +159,10 @@ a thread of its own; `Mailbox` the locked queue each way. The VM: a worker's exe
 top level while `WebLingoScheduler.HasWork` (the outer `Run` loop and `TryResume`'s `_drains`, outside `Run`'s loop),
 and copies an uncaught exception into `WebLingoExecutionResult.Thrown` (`CopyThrown`, not inlined). A native module's
 `IWebLingoNativeRegistry.Value` is a constant made by a built-in; its `MakesErrors` makes an importer bind `Error`.
-The CLI's `TextWriterOutput` locks its writer, workers sharing it. Part 3, the pool, builds on `Workers`.
+The CLI's `TextWriterOutput` locks its writer, workers sharing it. Part 3, the pool: `workers.run(path, name, args)`
+through `IWebLingoWorkers.TryPool`; the CLI's `Pool` parses the module's exports (`Pool.Exports`), writes a driver
+(`Pool.Driver`, a `switch` over them, never on disk), and runs it on part 2's workers, one call at a time each, an
+exception ending that worker; part 4's limits go there and in `Launch`.
 
 ## The work off the workers
 
