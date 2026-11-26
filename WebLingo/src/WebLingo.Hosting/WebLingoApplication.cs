@@ -659,8 +659,11 @@ public sealed class WebLingoApplication
         /// <summary>Whether it declares that it takes requests other sites send, <c>crossorigin allowed;</c>.</summary>
         public bool CrossOrigin { get; set; }
 
-        /// <summary>What finds and compiles a module the page imports while it runs (section 3.9).</summary>
-        public WebLingoModuleLoader Modules { get; } = imports;
+        /// <summary>
+        /// What finds and compiles a module the page imports while it runs (section 3.9), each compiled once, when first
+        /// imported, and kept for the generation, as a component is; joined to each request's program anew.
+        /// </summary>
+        public CachedLoader Modules { get; } = new CachedLoader(imports);
 
         /// <summary>The components the page renders (section 13), each compiled once, when first rendered.</summary>
         public CachedLoader Components { get; } = new CachedLoader(compiler.Components);
@@ -724,7 +727,10 @@ public sealed class WebLingoApplication
             : compiler.Sources.TextOf(name) ?? (modules.Texts.TryGetValue(name, out var module) ? module : text);
     }
 
-    /// <summary>A loader that compiles each module once, its result kept (WL-T007: a component is not compiled for every render).</summary>
+    /// <summary>
+    /// A loader that compiles each module once, its result kept (WL-T007: a component is not compiled for every render, nor
+    /// a module a page imports while it runs, for every request).
+    /// </summary>
     private sealed class CachedLoader(WebLingoModuleLoader loader) : IWebLingoModuleLoader
     {
         private Dictionary<string, (WebLingoCompiledModule? Module, WebLingoDiagnostic? Error)>? _compiled;

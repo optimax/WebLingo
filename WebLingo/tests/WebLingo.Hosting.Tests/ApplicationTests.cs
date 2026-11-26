@@ -126,6 +126,21 @@ public sealed class ApplicationTests
     }
 
     [Fact]
+    public void AModuleAPageImportsWhileItRunsIsCompiledOnceOnEachWorker()
+    {
+        // As a component is: compiled when first imported, and kept for the generation, each request running it anew.
+        var files = Site()
+            .Add("/site/lib/texts.wlg", "export var count = 0; export function next() { count = count + 1; return count; }")
+            .Add("/site/greet.wasp", "<% var texts = await Module.import(\"/lib/texts.wlg\"); %><%= texts.next() %> <%= texts.next() %>");
+        var app = Load(files);
+        Assert.Equal((200, "1 2"), Get(app, "/greet"));
+        Assert.Equal((200, "1 2"), Get(app, "/greet"));
+        Assert.Equal(1, files.Reads["/site/lib/texts.wlg"]);
+        Assert.Equal((200, "1 2"), Get(app, "/greet", worker: 1));
+        Assert.Equal(2, files.Reads["/site/lib/texts.wlg"]);
+    }
+
+    [Fact]
     public void AFailingPageIsA500_ItsErrorShownInDevelopmentOnly()
     {
         var files = Site().Add("/site/fails.wasp", "<p>before</p>\n<%= [\"<a>\"][5] %>");

@@ -203,6 +203,6 @@ Each part is a task in `TO-DO.md`, landed on its own and tested on all four data
     | a topic, `/topic?id=1` | 90, 10 ms, 29 ms | 122, 12 ms, 334 ms | 148, 21 ms, 1,434 ms | 180, 17 ms, 7,150 ms |
     | a search, `/search?q=forum` | 108, 7 ms, 33 ms | 200, 17 ms, 61 ms | 225, 66 ms, 156 ms | 211, 295 ms, 508 ms |
 
-    What is left is WASP's, or a choice of the owner's, each a task of its own: the collector `wasp` runs with, "The Server Collector for `wasp`"; a topic's view, one write of SQLite's for each, some still waiting seconds, "A Topic's View Without a Write Each"; and a module imported while a request runs, joined anew each request, "Dynamic Imports Joined Once".
+    What is left is WASP's, or a choice of the owner's, each a task of its own: the collector `wasp` runs with, "The Server Collector for `wasp`"; a topic's view, one write of SQLite's for each, some still waiting seconds, "A Topic's View Without a Write Each"; and a module imported while a request runs, "Dynamic Imports Joined Once", which found it compiled anew each request, where WASP keeps a page's other files' compilations, and keeps it now (`CompiledPage.Modules`, a cache as a page's components have), the texts imported so costing 1.10 ms a page in place of 3.25, an import with the page 0.96.
 
 The pilot, "WASP Pilot: the Forum in Real Use", then serves it.

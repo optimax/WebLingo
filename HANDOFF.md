@@ -439,7 +439,9 @@ behind nginx; and `WebLingo.Benchmarks --load --site forum`, its pages measured,
 Its deployment under IIS waits for the commands the README gives to be run as administrator, this machine's IIS being
 set up only so. Under load (the task "WebLingo Forum: Pages Under Load"), the forum's pages gained 1.4 to 4.6 times from
 SQLite's WAL, which `setup.wlg` sets, and English's texts imported statically; what is left, the collector `wasp` runs
-with, a topic's view's write, and a dynamic import's join each request, are tasks of their own.
+with and a topic's view's write, are tasks of their own; a module a page imports while it runs, compiled anew each
+request until "Dynamic Imports Joined Once", is compiled once on each worker now, as a component is
+(`CompiledPage.Modules`, a `CachedLoader`; `ApplicationTests.AModuleAPageImportsWhileItRunsIsCompiledOnceOnEachWorker`).
 
 Found while writing it: in WebLingo, `s[i]` and a string's `length` took time in proportion to its length, its scalar
 values counted from its start each time, so the renderer reads an array of a line's characters (`charsOf` in
