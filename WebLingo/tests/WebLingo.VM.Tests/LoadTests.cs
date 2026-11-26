@@ -16,6 +16,8 @@ public sealed class LoadTests
             Assert.True(File.Exists(Path.Combine(WebLingoLoad.SiteFolder, page.Name + ".wasp")), page.Name);
         }
         Assert.True(File.Exists(Path.Combine(WebLingoLoad.SiteFolder, "wasp.config")));
+        // The page --fair asks for beside hello (section 9, "M0.24 parts", part 3).
+        Assert.True(File.Exists(Path.Combine(WebLingoLoad.SiteFolder, "slow.wasp")));
     }
 
     [Theory]
@@ -29,6 +31,9 @@ public sealed class LoadTests
     [InlineData("--site", "forum")]
     [InlineData("--site", "forum", "--url", "http://localhost:8080/", "--page", "hello")]
     [InlineData("--page", "topic")]
+    [InlineData("--fair", "0")]
+    [InlineData("--fair", "none,fast")]
+    [InlineData("--fair", "")]
     public void AnOptionItDoesNotTakeIsAUsageError(params string[] args)
     {
         var error = new StringWriter();
