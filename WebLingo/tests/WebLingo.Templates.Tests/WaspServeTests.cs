@@ -11,11 +11,21 @@ namespace WebLingo.Templates.Tests;
 
 /// <summary>
 /// <c>wasp serve</c> (specification, sections 6.12 and 8.4; section 9, "M0.14 parts", part 5), end to end: an application
-/// on disk, served on Kestrel on a port of the system's choosing, and asked for its pages and files over HTTP.
+/// on disk, served on Kestrel on a port of the system's choosing, and asked for its pages and files over HTTP; and, every
+/// test the same, served by WebLingo's own HTTP server, <c>--host standalone</c> (<see cref="StandaloneWaspServeTests"/>;
+/// section 9, "M0.23 parts", part 2).
 /// </summary>
-public sealed class WaspServeTests : IDisposable
+public class WaspServeTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "wasp-serve-" + Guid.NewGuid().ToString("N"));
+
+    /// <summary>The host that serves the site, <c>wasp serve --host</c>'s.</summary>
+    protected virtual string Host => "aspnetcore";
+
+    /// <summary>The site's server on <see cref="Host"/>, as <c>wasp serve</c> makes it; null, with why, where it cannot be.</summary>
+    private IWebLingoWaspServer? Create(string? root, int port, IReadOnlyDictionary<string, string> schemes, out string? error,
+        out WebLingoMode mode, TextWriter? log = null) =>
+        WebLingoWaspStandalone.Create(Host, root, port, schemes, out error, out mode, log);
 
     public WaspServeTests()
     {
@@ -25,7 +35,11 @@ public sealed class WaspServeTests : IDisposable
         Write("css/site.css", "h1 { }");
     }
 
-    public void Dispose() => Directory.Delete(_root, recursive: true);
+    public void Dispose()
+    {
+        Directory.Delete(_root, recursive: true);
+        GC.SuppressFinalize(this);
+    }
 
     [Fact]
     public async Task AnApplicationIsServedOverHttp()
@@ -33,13 +47,13 @@ public sealed class WaspServeTests : IDisposable
         Write("api/answer.wlg", "export async function get(request, response) { await delay(10); response.write(42); }");
         Write("components/value.wasp", "<% param n; await delay(10); %><%= n %>");
         Write("component.wasp", "<% await renderComponent(\"/components/value.wasp\", {n: 42}); %>");
-        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out var environment);
+        var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out var environment);
         Assert.True(server is not null, error);
         Assert.Equal(WebLingoMode.Development, environment);
         await server.StartAsync();
         try
         {
-            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            var address = server.Address;
             using var client = new HttpClient { BaseAddress = new Uri(address) };
 
             var page = await client.GetAsync("/");
@@ -81,12 +95,12 @@ public sealed class WaspServeTests : IDisposable
             Write("wasp.config", "{ \"maxBodySize\": 31000000, \"uploads\": { \"inMemory\": 1024, \"folder\": \"../" + Path.GetFileName(temporary) + "\" } }");
             Write("upload.wasp", "<% param request; var f = await request.form(); var d = (await request.files())[\"doc\"][0]; %>"
                                  + "<%= f[\"title\"] %>|<%= d.fileName %>|<%= d.size %>|<%= (await d.bytes())[d.size - 1] %>");
-            var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+            var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
             Assert.True(server is not null, error);
             await server.StartAsync();
             try
             {
-                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                var address = server.Address;
                 using var client = new HttpClient { BaseAddress = new Uri(address) };
                 async Task<HttpResponseMessage> Upload(int size)
                 {
@@ -132,12 +146,12 @@ public sealed class WaspServeTests : IDisposable
         Write("slow.wasp", "<% param request; import { delay } from \"std:system\"; request.session[\"step\"] = \"begun\"; await delay(700);\n"
                            + "request.session[\"step\"] = \"ended\"; %>slow");
         Write("step.wasp", "<% param request; %><%= request.session[\"step\"] %>");
-        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
         Assert.True(server is not null, error);
         await server.StartAsync();
         try
         {
-            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            var address = server.Address;
             using var client = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(address) };
             Assert.Equal("1", await client.GetStringAsync("/count"));
             Assert.Equal("2", await client.GetStringAsync("/count"));
@@ -175,7 +189,7 @@ public sealed class WaspServeTests : IDisposable
                  })
         {
             Write("wasp.config", "{ \"sessions\": " + setting + " }");
-            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+            Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
             Assert.EndsWith(message, error);
         }
     }
@@ -207,12 +221,12 @@ public sealed class WaspServeTests : IDisposable
             Assert.Equal((WebLingoCommandLine.UsageError, "Usage: wasp sessions create [--root <folder>] [--database <name>] [--table <name>] [--sql]\n",
                 "'remove' is not what wasp sessions does: create.\n"), Sessions("remove"));
 
-            var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+            var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
             Assert.True(server is not null, error);
             await server.StartAsync();
             try
             {
-                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                var address = server.Address;
                 using var client = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(address) };
                 Assert.Equal("1", await client.GetStringAsync("/count"));
                 Assert.Equal("2", await client.GetStringAsync("/count"));
@@ -307,12 +321,12 @@ public sealed class WaspServeTests : IDisposable
             Sessions("create", "--root", _root));
         Assert.Equal((WebLingoCommandLine.Success, "The database 'main' has its table of sessions 'sessions' already, its schema 1.\n", ""),
             Sessions("create", "--root", _root));
-        var site = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        var site = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
         Assert.True(site is not null, error);
         await site.StartAsync();
         try
         {
-            var address = site.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            var address = site.Address;
             using var client = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(address) };
             Assert.Equal("1", await client.GetStringAsync("/count"));
             Assert.Equal("2", await client.GetStringAsync("/count"));
@@ -346,12 +360,12 @@ public sealed class WaspServeTests : IDisposable
 
         async Task<Dictionary<string, (int Status, string? NoSniff, string? Referrer, string? Policy, string? Frames)>> Serve(params string[] paths)
         {
-            var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+            var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
             Assert.True(server is not null, error);
             await server.StartAsync();
             try
             {
-                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                var address = server.Address;
                 using var client = new HttpClient { BaseAddress = new Uri(address) };
                 var answers = new Dictionary<string, (int, string?, string?, string?, string?)>();
                 foreach (var path in paths)
@@ -421,7 +435,7 @@ public sealed class WaspServeTests : IDisposable
                  })
         {
             Write("wasp.config", setting);
-            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _));
+            Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out var error, out _));
             Assert.EndsWith("wasp.config: " + message, error);
         }
     }
@@ -442,13 +456,13 @@ public sealed class WaspServeTests : IDisposable
         var folder = new DirectoryInfo(AppContext.BaseDirectory);
         while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "Examples.wasp", "example1", "web.config"))) folder = folder.Parent;
         Assert.NotNull(folder);
-        var server = WebLingoWaspServer.Create(Path.Combine(folder.FullName, "Examples.wasp", "example1"), 0,
+        var server = Create(Path.Combine(folder.FullName, "Examples.wasp", "example1"), 0,
             new Dictionary<string, string>(), out var error, out _);
         Assert.True(server is not null, error);
         await server.StartAsync();
         try
         {
-            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            var address = server.Address;
             using var client = new HttpClient { BaseAddress = new Uri(address) };
             foreach (var (path, text) in new[]
                      {
@@ -493,12 +507,12 @@ public sealed class WaspServeTests : IDisposable
             var (made, setupError) = (new StringWriter(), new StringWriter());
             Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", Path.Combine(copy, "database", "setup.wlg")], made, setupError));
             Assert.Equal(("fish.db has 14 fish and 3 orders.\n", ""), (made.ToString(), setupError.ToString()));
-            var server = WebLingoWaspServer.Create(Path.Combine(copy, "site"), 0, new Dictionary<string, string>(), out var error, out _);
+            var server = Create(Path.Combine(copy, "site"), 0, new Dictionary<string, string>(), out var error, out _);
             Assert.True(server is not null, error);
             await server.StartAsync();
             try
             {
-                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                var address = server.Address;
                 using var client = new HttpClient { BaseAddress = new Uri(address) };
                 foreach (var (path, text) in new[]
                          {
@@ -609,12 +623,12 @@ public sealed class WaspServeTests : IDisposable
             var script = Path.Combine(copy, "database", "setup.sql");
             Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["run", setup, "database=" + database, "script=" + script], made, setupError));
             Assert.Equal(($"{database} has 4 lists and 36 items, 30 of them open.\n", ""), (made.ToString(), setupError.ToString()));
-            var server = WebLingoWaspServer.Create(Path.Combine(copy, "site"), 0, new Dictionary<string, string>(), out var error, out _);
+            var server = Create(Path.Combine(copy, "site"), 0, new Dictionary<string, string>(), out var error, out _);
             Assert.True(server is not null, error);
             await server.StartAsync();
             try
             {
-                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                var address = server.Address;
                 using var client = new HttpClient { BaseAddress = new Uri(address) };
                 foreach (var (path, text) in new[]
                          {
@@ -681,12 +695,12 @@ public sealed class WaspServeTests : IDisposable
         Write("data/teas.txt", "Sencha");
         Write("reads.wasp", "<% import fs from \"std:fs\"; %><%= await fs.readText(\"data/teas.txt\") %>|" +
                             "<% try { await fs.readText(\"index.wasp\"); } catch (FilePermissionError e) { %><%= e.code %><% } %>");
-        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
         Assert.True(server is not null, error);
         await server.StartAsync();
         try
         {
-            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            var address = server.Address;
             using var client = new HttpClient { BaseAddress = new Uri(address) };
             Assert.Equal("Sencha|WL3016", await client.GetStringAsync("/reads"));
             Assert.Contains("<h1>Hello</h1>", await client.GetStringAsync("/"));
@@ -712,12 +726,12 @@ public sealed class WaspServeTests : IDisposable
             + "<% await response.sendFile(\"data/report.pdf\", null, { download: request.query?[\"name\"] }); %>");
         Write("api/bytes.wlg", "import { Bytes } from \"std:bytes\";\n"
             + "export function get(request, response) { response.write(\"a\"); response.write(Bytes.fromHex(\"00ff80\")); response.write(\"b\"); }");
-        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
         Assert.True(server is not null, error);
         await server.StartAsync();
         try
         {
-            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            var address = server.Address;
             using var client = new HttpClient { BaseAddress = new Uri(address) };
             var whole = await client.GetAsync("/report");
             Assert.Equal((HttpStatusCode.OK, "application/pdf", 1000L), (whole.StatusCode, whole.Content.Headers.ContentType?.MediaType,
@@ -786,12 +800,12 @@ public sealed class WaspServeTests : IDisposable
         Write("loops.wasp", "<% import { delay } from \"std:system\"; while (true) { await delay(10); } %>never");
         Write("counts.wasp", "<% var sum = 0; for (var i = 0; i < 100000; i++) { sum += i; } %><%= sum %>");
         Write("quick.wasp", "quick");
-        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
         Assert.True(server is not null, error);
         await server.StartAsync();
         try
         {
-            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            var address = server.Address;
             using var client = new HttpClient { BaseAddress = new Uri(address) };
             Assert.Equal("quick", await client.GetStringAsync("/quick"));
             using var loops = await client.GetAsync("/loops");
@@ -816,7 +830,7 @@ public sealed class WaspServeTests : IDisposable
                                          "{ \"drain\": \"60\" }", "{ \"drain\": 4294968 }" })
         {
             Write("wasp.config", "{ \"limits\": " + setting + " }");
-            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+            Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
             Assert.EndsWith(Says, error);
         }
     }
@@ -833,12 +847,12 @@ public sealed class WaspServeTests : IDisposable
         Write("wasp.config", "{ \"mode\": \"development\", \"limits\": { \"requestTimeout\": null, \"drain\": 0.5 } }");
         Write("waits.wasp", "<% import { delay } from \"std:system\"; while (true) { await delay(10); } %>never");
         var log = new StringWriter();
-        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _, TextWriter.Synchronized(log));
+        var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _, TextWriter.Synchronized(log));
         Assert.True(server is not null, error);
         await server.StartAsync();
         try
         {
-            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            var address = server.Address;
             using var client = new HttpClient { BaseAddress = new Uri(address) };
             var waiting = client.GetAsync("/waits");
             // It runs on the site as it is, then the page changes, and the site reloads a quarter of a second after.
@@ -877,12 +891,12 @@ public sealed class WaspServeTests : IDisposable
                                  + "\", \"level\": \"info\" } }");
             Write("logs.wasp", "<% import log from \"std:log\"; log.debug(\"hidden\"); log.info(\"shown\"); log.warn(\"also\"); %>ok");
             Write("fail.wasp", "<% throw \"no tea\"; %>");
-            var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+            var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
             Assert.True(server is not null, error);
             await server.StartAsync();
             try
             {
-                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                var address = server.Address;
                 using var client = new HttpClient { BaseAddress = new Uri(address) };
                 Assert.Equal("ok", await client.GetStringAsync("/logs"));
                 using var failed = await client.GetAsync("/fail");
@@ -905,7 +919,7 @@ public sealed class WaspServeTests : IDisposable
         }
 
         Write("wasp.config", "{ \"log\": { \"file\": \"logs/site.log\" } }");
-        Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var inside, out _));
+        Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out var inside, out _));
         Assert.Contains("\"log\"'s \"file\", ", inside, StringComparison.Ordinal);
         Assert.EndsWith(", is in the site's folder, where it would be served and the site reloaded at each line: name a file outside it.", inside);
         const string Says = "\"log\" is an object, { \"file\": \"../logs/shop.log\", \"level\": \"info\" }, each optional, \"file\" a file "
@@ -915,7 +929,7 @@ public sealed class WaspServeTests : IDisposable
                                          "{ \"file\": 5 }", "{ \"days\": 7 }" })
         {
             Write("wasp.config", "{ \"log\": " + setting + " }");
-            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _));
+            Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out var error, out _));
             Assert.EndsWith(Says, error);
         }
     }
@@ -931,12 +945,12 @@ public sealed class WaspServeTests : IDisposable
     {
         string[] versions = ["<p>first</p>", "<p>second</p>"];
         Write("page.wasp", versions[0]);
-        var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
         Assert.True(server is not null, error);
         await server.StartAsync();
         try
         {
-            var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+            var address = server.Address;
             var until = DateTime.UtcNow.AddSeconds(5);
             var replacing = Task.Run(async () =>
             {
@@ -1006,28 +1020,28 @@ public sealed class WaspServeTests : IDisposable
         // A site's configuration is wasp.config (the owner's decision, 16 November 2026); its weblingo.config is not read.
         Assert.Equal("wasp.config", WebLingoRouteTable.ConfigurationFile);
         Write("weblingo.config", "{ \"mode\": \"production\" }");
-        Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out _, out var mode));
+        Assert.NotNull(Create(_root, 0, new Dictionary<string, string>(), out _, out var mode));
         Assert.Equal(WebLingoMode.Development, mode);
 
         Write("wasp.config", "{ \"mode\": \"production\" }");
-        Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out _, out mode));
+        Assert.NotNull(Create(_root, 0, new Dictionary<string, string>(), out _, out mode));
         Assert.Equal(WebLingoMode.Production, mode);
 
         Write("wasp.config", "{ \"mode\": \"staging\" }");
-        Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out _));
+        Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out var error, out _));
         Assert.EndsWith("wasp.config: \"mode\" is \"development\" or \"production\".", error);
 
         // "environment", its name until the owner renamed it "mode" (18 November 2026), nothing kept for it.
         Write("wasp.config", "{ \"environment\": \"production\" }");
-        Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+        Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
         Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"mode\", "
                         + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
                         + "\"sessions\", \"limits\", \"log\", \"headers\", \"serve\" and \"base\".", error);
 
         Write("wasp.config", "{ \"sendTimeout\": 5 }");
-        Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+        Assert.NotNull(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
         Write("wasp.config", "{ \"sendTimeout\": 0 }");
-        Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+        Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
         Assert.EndsWith("wasp.config: \"sendTimeout\" is a number of seconds, more than 0.", error);
     }
 
@@ -1069,13 +1083,13 @@ public sealed class WaspServeTests : IDisposable
             InForum("index.wasp", "<p>The forum's index</p>");
             InForum("css/forum.css", "body { }");
             Write("wasp.config", "{ \"base\": \"../" + Path.GetFileName(forum) + "\" }");
-            var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out var mode);
+            var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out var mode);
             Assert.True(server is not null, error);
             Assert.Equal(WebLingoMode.Production, mode);
             await server.StartAsync();
             try
             {
-                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                var address = server.Address;
                 using var client = new HttpClient { BaseAddress = new Uri(address) };
                 var home = await client.GetAsync("/");
                 Assert.Equal("<html><title>Home</title><body><h1>Hello</h1>from the page\n</body></html>", await home.Content.ReadAsStringAsync());
@@ -1107,17 +1121,17 @@ public sealed class WaspServeTests : IDisposable
             }
 
             Write("wasp.config", "{ \"base\": \"../" + Path.GetFileName(forum) + "-none\" }");
-            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+            Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
             Assert.EndsWith("-none, is not a folder.", error);
             Write("wasp.config", "{ \"base\": \"css\" }");
-            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+            Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
             Assert.EndsWith("and the site's folder are one within the other: a base is a folder of its own.", error);
             Write("wasp.config", "{ \"base\": 5 }");
-            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+            Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
             Assert.EndsWith("wasp.config: \"base\" is the folder of the site this one lies over, \"../forum/site\".", error);
             InForum("wasp.config", "{ \"base\": \"../elsewhere\" }");
             Write("wasp.config", "{ \"base\": \"../" + Path.GetFileName(forum) + "\" }");
-            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+            Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
             Assert.Contains("wasp.config: a base names no base of its own: a site lies over one base", error);
         }
         finally
@@ -1132,4 +1146,10 @@ public sealed class WaspServeTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, text);
     }
+}
+
+/// <summary>Every test of <c>wasp serve</c>, the site served by WebLingo's own HTTP server, <c>--host standalone</c>.</summary>
+public sealed class StandaloneWaspServeTests : WaspServeTests
+{
+    protected override string Host => "standalone";
 }

@@ -126,6 +126,13 @@ compares with ASP.NET Core's own: a newer ASP.NET Core that adds an extension fa
 nothing of ASP.NET Core's (`DependencyTests.TheHostsOwnCodeUsesNothingOfAspNetCores`). The standalone host (M0.23's part 2)
 builds on it.
 
+M0.23's part 2: `WebLingo.Hosting.Standalone`, `WebLingoHttpServer` (connections, keep-alive, bodies by length and in
+chunks, `100 Continue`, a response by its length or in chunks, a client's going seen by a read held open once the body
+is in) and `WebLingoHttpParser` (strict, RFC 9112; never throws; `TryDecodePath` as ASP.NET Core decodes); `wasp serve
+--host standalone` (`WebLingoWaspStandalone.Create`, which gives an `IWebLingoWaspServer` for either host); limits fixed
+at Kestrel's defaults, `WebLingoHttpLimits`, until part 3 reads them. `WaspServeTests` is a base class now, its tests run
+again by `StandaloneWaspServeTests` with `Host` "standalone".
+
 ## The work off the workers
 
 `DotNetBlockingPool` (`WebLingo.Platform.DotNet`) runs work that blocks, a database's, a file's, a subprocess's, a mail

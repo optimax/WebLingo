@@ -38,7 +38,7 @@ public static class WebLingoWaspCommandLine
             OptionsHelp =
             [
                 "  --root the application's root, which an include's path starting with / is from; the page's folder when left out",
-                $"  serve     wasp serve [--root <folder>] [--port <port>] [--scheme <name>=<folder> …] serves the application at the root, "
+                $"  serve     wasp serve [--root <folder>] [--port <port>] [--host aspnetcore|standalone] [--scheme <name>=<folder> …] serves the application at the root, "
                 + $"the current folder by default, on port {WebLingoWaspServer.DefaultPort}",
                 $"  fastcgi   wasp fastcgi [--root <folder>] [--port <port> | --socket <path> | --stdin] [--scheme <name>=<folder> …] serves "
                 + $"the application to a web server through FastCGI, on port {WebLingoWaspFastCgi.DefaultPort} by default",
@@ -76,12 +76,15 @@ public static class WebLingoWaspCommandLine
     }
 
     /// <summary>
-    /// <c>wasp serve [--root &lt;folder&gt;] [--port &lt;port&gt;] [--scheme name=folder]…</c>: the application at the root, the
-    /// current folder by default, served until the process is stopped (<see cref="WebLingoWaspServer"/>).
+    /// <c>wasp serve [--root &lt;folder&gt;] [--port &lt;port&gt;] [--host aspnetcore|standalone] [--scheme name=folder]…</c>: the
+    /// application at the root, the current folder by default, served until the process is stopped, by ASP.NET Core's server
+    /// (<see cref="WebLingoWaspServer"/>), or by WebLingo's own, <c>--host standalone</c>, while it is proved
+    /// (<see cref="WebLingoWaspStandalone"/>; section 9, "M0.23 parts", part 2).
     /// </summary>
     private static int Serve(string[] args, TextWriter output, TextWriter error)
     {
         string? root = null;
+        string? host = null;
         var port = WebLingoWaspServer.DefaultPort;
         var schemes = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var at = 1; at < args.Length; at += 2)
@@ -95,14 +98,16 @@ public static class WebLingoWaspCommandLine
                     System.Globalization.CultureInfo.InvariantCulture, out port) && port is > 0 and < 65536,
                 ("--scheme", { } scheme) => equals > 0 && WebLingoSchemes.IsName(scheme[..equals]) && equals + 1 < scheme.Length
                                             && schemes.TryAdd(scheme[..equals], scheme[(equals + 1)..]),
+                ("--host", { } named) when host is null => WebLingoWaspStandalone.Hosts.Contains(host = named),
                 _ => false
             };
             if (given) continue;
-            error.WriteLine($"'{args[at]}{(value is null ? "" : " " + value)}' is not --root <folder>, --port <port> or --scheme <name>=<folder>, "
-                            + "or is given twice.");
-            output.WriteLine("Usage: wasp serve [--root <folder>] [--port <port>] [--scheme <name>=<folder> …]");
+            error.WriteLine($"'{args[at]}{(value is null ? "" : " " + value)}' is not --root <folder>, --port <port>, --host aspnetcore|standalone "
+                            + "or --scheme <name>=<folder>, or is given twice.");
+            output.WriteLine("Usage: wasp serve [--root <folder>] [--port <port>] [--host aspnetcore|standalone] [--scheme <name>=<folder> …]");
             return WebLingoCommandLine.UsageError;
         }
+        if (host == "standalone") return ServeStandalone(root, port, schemes, output, error);
         var server = WebLingoWaspServer.Create(root, port, schemes, out var why, out var environment, output);
         if (server is null)
         {
@@ -114,6 +119,40 @@ public static class WebLingoWaspCommandLine
             : $"WASP serving http://localhost:{port}/ ({environment}); Ctrl+C stops it.");
         output.Flush();
         server.Run();
+        return WebLingoCommandLine.Success;
+    }
+
+    /// <summary><c>wasp serve --host standalone</c>: the site served by WebLingo's own HTTP server until Ctrl+C, or the process's end.</summary>
+    private static int ServeStandalone(string? root, int port, Dictionary<string, string> schemes, TextWriter output, TextWriter error)
+    {
+        var server = WebLingoWaspStandalone.Create("standalone", root, port, schemes, out var why, out var environment, output);
+        if (server is null)
+        {
+            error.WriteLine(why);
+            return WebLingoCommandLine.FileUnreadable;
+        }
+        try
+        {
+            server.StartAsync().GetAwaiter().GetResult();
+        }
+        catch (System.Net.Sockets.SocketException failure)
+        {
+            error.WriteLine($"WASP cannot serve on port {port}: {failure.Message}");
+            return WebLingoCommandLine.FileUnreadable;
+        }
+        using var stopping = new ManualResetEventSlim();
+        ConsoleCancelEventHandler cancel = (_, pressed) =>
+        {
+            pressed.Cancel = true;
+            stopping.Set();
+        };
+        Console.CancelKeyPress += cancel;
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => stopping.Set();
+        output.WriteLine($"WASP serving http://localhost:{port}/ ({environment}), on its own server; Ctrl+C stops it.");
+        output.Flush();
+        stopping.Wait();
+        Console.CancelKeyPress -= cancel;
+        server.DisposeAsync().AsTask().GetAwaiter().GetResult();
         return WebLingoCommandLine.Success;
     }
 

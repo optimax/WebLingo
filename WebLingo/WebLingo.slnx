@@ -13,6 +13,7 @@
   <Project Path="src/WebLingo.Hosting/WebLingo.Hosting.csproj" />
   <Project Path="src/WebLingo.Hosting.AspNetCore/WebLingo.Hosting.AspNetCore.csproj" />
   <Project Path="src/WebLingo.Hosting.DotNet/WebLingo.Hosting.DotNet.csproj" />
+  <Project Path="src/WebLingo.Hosting.Standalone/WebLingo.Hosting.Standalone.csproj" />
   <Project Path="src/WebLingo.Hosting.FastCgi/WebLingo.Hosting.FastCgi.csproj" />
   <Project Path="src/WebLingo.StdLib/WebLingo.StdLib.csproj" />
   <Project Path="src/WebLingo.StdLib.Tasks/WebLingo.StdLib.Tasks.csproj" />

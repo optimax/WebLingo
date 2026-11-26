@@ -2115,7 +2115,21 @@ each needs that the owner has not decided is a question of its task's, and Propo
    length is not known; a request with both `Content-Length` and `Transfer-Encoding`, or either malformed, refused, a
    400, its connection then closed, as RFC 9112 asks against request smuggling; run as `wasp serve --host standalone`;
    tested by speaking HTTP to it byte by byte, its parser fuzzed, and by the tests `wasp serve` runs on ASP.NET Core's
-   server run on it too.
+   server run on it too. Built (26 November 2026): `WebLingoHttpServer`, `WebLingoHttpParser` and `WebLingoHttpLimits` in
+   `WebLingo.Hosting.Standalone`, which references nothing of ASP.NET Core's, its requests run on the hosts' own workers
+   with their timers, drain and streaming response; a head read strictly, each line ended by CR LF, a header folded, a
+   space before a colon, a control character, a second `Host`, a `Content-Length` of two lengths, a transfer coding but
+   `chunked` (501), a version but 1.1 and 1.0 (505), a line or headers too large (414, 431), each refused and its
+   connection closed, the refusal's reason its body; its path decoded as ASP.NET Core decodes it, every `%xx` but `%2F`,
+   its dot segments removed; a target in origin form, in absolute form, its authority the host, or `*` for `OPTIONS`; a
+   head's line and headers within 30 seconds, a kept connection's next request within 130, Kestrel's defaults until part
+   3 reads them from `wasp.config`; a body read as the page asks for it, its largest the site's, `100 Continue` sent at
+   its first read; a response with a `Date`, by its length where it comes whole, in chunks otherwise, to its connection's
+   end for HTTP/1.0's; a client's going seen by a read held open once its request's body is in, its request then
+   cancelled; `wasp serve --host aspnetcore|standalone`, the standalone server on 127.0.0.1 and ::1, refused under IIS
+   (`WebLingoWaspStandalone`, `IWebLingoWaspServer`). Tested: `StandaloneHttpTests`, the parser's refusals, its path's
+   decoding and 20,000 heads made at random, and the server byte by byte; and every test of `wasp serve`'s,
+   `StandaloneWaspServeTests`, all passing on it as on ASP.NET Core's server.
 3. **Its limits.** A request's line, its headers, the time its line and headers take to arrive, its body's pace, and how
    long a kept connection may stay idle, each `wasp.config`'s, a request past one refused (414, 431, 408) and its
    connection closed, its body's largest `"maxBodySize"` as now; tested with clients that send too much and too slowly.

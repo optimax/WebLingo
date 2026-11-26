@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The standalone HTTP host (specification, section 9, "M0.23 parts"): HTTP/1.1 written here, on .NET's sockets,
+       translated to WLHI's, its workers, reloads and responses the hosts' own, WebLingo.Hosting.DotNet's, no package, and
+       nothing of ASP.NET Core's. -->
+  <PropertyGroup><OutputType>Library</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />
+    <ProjectReference Include="../WebLingo.Hosting/WebLingo.Hosting.csproj" />
+    <ProjectReference Include="../WebLingo.Hosting.DotNet/WebLingo.Hosting.DotNet.csproj" />
+    <ProjectReference Include="../WebLingo.Platform.DotNet/WebLingo.Platform.DotNet.csproj" />
+  </ItemGroup>
+</Project>

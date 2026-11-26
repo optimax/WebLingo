@@ -35,5 +35,6 @@
     <ProjectReference Include="../../src/WebLingo.Hosting/WebLingo.Hosting.csproj" />
     <ProjectReference Include="../../src/WebLingo.Hosting.DotNet/WebLingo.Hosting.DotNet.csproj" />
     <ProjectReference Include="../../src/WebLingo.Hosting.FastCgi/WebLingo.Hosting.FastCgi.csproj" />
+    <ProjectReference Include="../../src/WebLingo.Hosting.Standalone/WebLingo.Hosting.Standalone.csproj" />
   </ItemGroup>
 </Project>

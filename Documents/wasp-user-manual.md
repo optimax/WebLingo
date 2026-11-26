@@ -1394,7 +1394,7 @@ C:\Clients\acme\site\        Acme's: web.config, wasp.config, and only the files
 ## 16. The `wasp` command line
 
 ```text
-wasp serve [--root <folder>] [--port <port>] [--scheme <name>=<folder> …]
+wasp serve [--root <folder>] [--port <port>] [--host aspnetcore|standalone] [--scheme <name>=<folder> …]
 wasp fastcgi [--root <folder>] [--port <port> | --socket <path> | --stdin] [--scheme <name>=<folder> …]
 wasp run [--root <folder>] [--scheme <name>=<folder> …] <page.wasp> [name=value …]
 wasp check [--root <folder>] [--scheme <name>=<folder> …] <page.wasp>
@@ -1403,7 +1403,9 @@ wasp --version
 ```
 
 - **`wasp serve`** serves the site whose root is `--root`, the current folder by default, on `--port`, 8080 by default,
-  to the local machine only. Under IIS, IIS starts it ([section 17](#17-deploying-to-iis)).
+  to the local machine only. Under IIS, IIS starts it ([section 17](#17-deploying-to-iis)). `--host standalone` serves
+  it with WebLingo's own HTTP server in place of ASP.NET Core's, HTTP/1.1, for a site behind a reverse proxy that gives
+  it TLS and HTTP/2; it is being proved, and ASP.NET Core's stays the default, and IIS's, until it has been.
 - **`wasp fastcgi`** serves the site whose root is `--root` to a web server other than IIS, nginx or Apache, through
   FastCGI, on `--port`, 9000 by default, on a Unix socket, `--socket`, or on the socket or pipe a web server that starts
   it gives it as its standard input, `--stdin` ([section 18](#18-serving-through-nginx-or-apache-fastcgi)).

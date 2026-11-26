@@ -94,6 +94,7 @@ public sealed class DependencyTests
     [Theory]
     [InlineData("WebLingo.Hosting.DotNet")]
     [InlineData("WebLingo.Hosting.FastCgi")]
+    [InlineData("WebLingo.Hosting.Standalone")]
     public void TheHostsOwnCodeUsesNothingOfAspNetCores(string assembly)
     {
         foreach (var name in References(assembly))
