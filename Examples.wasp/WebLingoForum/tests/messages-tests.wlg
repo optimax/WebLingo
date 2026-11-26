@@ -1,0 +1,70 @@
+// Members' private messages: conversations, who is in them, and what is new to each (site/lib/messages.wlg).
+// weblingo test messages-tests.wlg
+
+import { assertEqual, assertDeepEqual } from "std:test";
+import { Database } from "std:db";
+import { DateTime } from "std:datetime";
+import schema from "../site/lib/schema.wlg";
+import users from "../site/lib/users.wlg";
+import messages from "../site/lib/messages.wlg";
+
+const now = DateTime.utc(2026, 11, 25, 12, 0);
+
+// A database of the forum's in memory, with members Anna, 1, Bob, 2, and Carol, 3, and Dan, 4, whose address is not
+// confirmed.
+async function forum(db) {
+    foreach (var statement in schema.create(db.provider)) {
+        await db.execute(statement);
+    }
+    foreach (var name in ["Anna", "Bob", "Carol"]) {
+        await users.make(db, name, name.toLower() + "@example.com", "no hash", now, now);
+    }
+    await users.make(db, "Dan", "dan@example.com", "no hash", now, null);
+}
+
+export class MessagesTests {
+    async testMembersAreNamedOnceEachAndNeverTheWriter() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            var named = await messages.named(db, " bob, CAROL ,Bob, anna, Dan, Nobody, ", 1);
+            assertDeepEqual(named["found"].map(member => member["name"]), ["Bob", "Carol"]);
+            assertDeepEqual(named["missing"], ["Dan", "Nobody"]);
+            assertDeepEqual((await messages.named(db, "", 1))["found"], []);
+        }
+        assertEqual(messages.subjectOf(" Tea\r\nparty "), "Tea  party");
+        assertDeepEqual([messages.subjectProblem(""), messages.subjectProblem("x".repeat(201)), messages.subjectProblem("Tea")],
+                        ["messages.noSubject", "messages.subjectTooLong", null]);
+    }
+
+    async testAConversationsMessagesAreNewToEachMemberUntilTheyReadThem() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            var tea = await messages.start(db, 2, [1, 3], "Tea party", "Come at **five**.", now);
+            assertDeepEqual([await messages.unread(db, 1), await messages.unread(db, 2), await messages.unread(db, 3)], [1, 0, 1]);
+            assertDeepEqual((await messages.membersOf(db, tea)).map(member => member["name"]), ["Anna", "Bob", "Carol"]);
+            var listed = await messages.list(db, 1, 0, 10);
+            assertDeepEqual([listed.length, listed[0]["subject"], listed[0]["unread"], listed[0]["last_by"]], [1, "Tea party", 1, "Bob"]);
+
+            var first = (await messages.messages(db, tea, 0, 10))[0]["id"];
+            await messages.read(db, tea, 1, first);
+            var reply = await messages.reply(db, tea, 1, "Five it is.", now.addMinutes(5));
+            assertDeepEqual([await messages.unread(db, 1), await messages.unread(db, 2), await messages.unread(db, 3)], [0, 1, 2]);
+            assertEqual(await messages.count(db, tea), 2);
+            assertEqual((await messages.list(db, 2, 0, 10))[0]["last_by"], "Anna");
+
+            // Another conversation, later, comes first; a member not in one reads nothing of it.
+            var other = await messages.start(db, 3, [1], "Cake", "And cake?", now.addMinutes(10));
+            assertDeepEqual((await messages.list(db, 1, 0, 10)).map(row => row["subject"]), ["Cake", "Tea party"]);
+            assertEqual(await messages.one(db, other, 2), null);
+            assertEqual((await messages.one(db, tea, 2))["last_read_id"], first);
+            assertEqual(await messages.countOf(db, 1), 2);
+
+            // Carol leaves the tea party: it is no longer hers, nor are its messages new to her.
+            await messages.leave(db, tea, 3);
+            assertEqual(await messages.one(db, tea, 3), null);
+            assertEqual(await messages.unread(db, 3), 0);
+            assertDeepEqual((await messages.membersOf(db, tea)).map(member => member["name"]), ["Anna", "Bob"]);
+            assertEqual(reply > first, true);
+        }
+    }
+}

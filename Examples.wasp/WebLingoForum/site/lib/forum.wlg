@@ -9,6 +9,7 @@ import settings from "./settings.wlg";
 import { load } from "./texts.wlg";
 import permissions from "./permissions.wlg";
 import { banOf } from "./moderation.wlg";
+import messages from "./messages.wlg";
 
 export class Forum {
     constructor(values, texts, user, can) {
@@ -17,6 +18,8 @@ export class Forum {
         this.user = user;
         this.permissions = can;
         this.zone = user?["time_zone"] ?? values["timeZone"];
+        // How many private messages are new to the member.
+        this.unread = 0;
         this.kept = {};
     }
 
@@ -52,12 +55,15 @@ export async function begin(request) {
         var values = null;
         var user = null;
         var can = null;
+        var unread = 0;
         using (var db = await open()) {
             values = await settings.load(db);
             user = await signedIn(db, request);
             can = await permissions.of(db, user?["id"]);
+            unread = user == null ? 0 : await messages.unread(db, user["id"]);
         }
         current = new Forum(values, await load(user?["language"] ?? values["language"]), user, can);
+        current.unread = unread;
     }
     return current;
 }

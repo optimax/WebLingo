@@ -1,0 +1,148 @@
+// Members' private messages (Documents/weblingo-forum.md, section 2, "Private messages"): conversations of two or more
+// members, the last message each member of one has read, and how many are new to them.
+
+import { insert, page } from "./sql.wlg";
+import users from "./users.wlg";
+
+// The longest a conversation's subject may be, and the most members a member may write to at once.
+export const longestSubject = 200;
+export const mostOthers = 10;
+
+// A conversation's subject as it is kept: on one line, and no blank space before or after it.
+export function subjectOf(text) {
+    return (text ?? "").replace("\r", " ").replace("\n", " ").replace("\t", " ").trim();
+}
+
+// Why a conversation's subject cannot be its subject, a text's name, or null where it can.
+export function subjectProblem(subject) {
+    if (subject == "") {
+        return "messages.noSubject";
+    }
+    return subject.length > longestSubject ? "messages.subjectTooLong" : null;
+}
+
+// The members a list of names, separated by commas, names, each once, as a member writing gives them, but the writer:
+// those whose addresses are confirmed, each with their id and name, and the names no such member has.
+export async function named(db, text, writer) {
+    var found = [];
+    var missing = [];
+    var keys = [];
+    foreach (var name in (text ?? "").split(",")) {
+        var key = users.keyOf(name);
+        if (key == "" || keys.contains(key)) {
+            continue;
+        }
+        keys.push(key);
+        var member = await users.byName(db, key);
+        if (member == null || member["confirmed_at"] == null) {
+            missing.push(name.trim());
+        } else if (member["id"] != writer) {
+            found.push({ id: member["id"], name: member["name"] });
+        }
+    }
+    return { found: found, missing: missing };
+}
+
+// A message written in a conversation, at a time; gives its id. Its writer has read it.
+async function write(db, conversation, user, body, now) {
+    var message = await insert(db, "messages", { conversation_id: conversation, user_id: user, body: body, created_at: now });
+    await db.execute("UPDATE conversations SET last_message_id = @message, last_message_at = @now WHERE id = @id",
+                     { message: message, now: now, id: conversation });
+    await db.execute("UPDATE conversation_members SET last_read_id = @message WHERE conversation_id = @id AND user_id = @user",
+                     { message: message, id: conversation, user: user });
+    return message;
+}
+
+// Begins a conversation of a member's with others, its subject, and its first message, at a time; gives its id.
+export async function start(db, user, others, subject, body, now) {
+    return await db.transaction(async () => {
+        var conversation = await insert(db, "conversations", {
+            subject: subject, created_by: user, created_at: now, last_message_id: null, last_message_at: now });
+        foreach (var member in [user, ...others]) {
+            await db.execute("INSERT INTO conversation_members (conversation_id, user_id, last_read_id) VALUES (@id, @user, 0)",
+                             { id: conversation, user: member });
+        }
+        await write(db, conversation, user, body, now);
+        return conversation;
+    });
+}
+
+// A member's reply in a conversation, at a time; gives its id.
+export async function reply(db, conversation, user, body, now) {
+    return await db.transaction(async () => await write(db, conversation, user, body, now));
+}
+
+// A conversation a member is in, with its subject and the last of its messages the member has read; or null, where there
+// is none of that id, or the member is not in it.
+export async function one(db, id, user) {
+    if (id == null || user == null) {
+        return null;
+    }
+    var rows = await db.query("""
+        SELECT c.id, c.subject, c.created_at, c.last_message_id, m.last_read_id
+        FROM conversations c JOIN conversation_members m ON m.conversation_id = c.id
+        WHERE c.id = @id AND m.user_id = @user
+        """, { id: id, user: user });
+    return rows.length == 0 ? null : rows[0];
+}
+
+// A conversation's members, by name.
+export async function membersOf(db, conversation) {
+    return await db.query("""
+        SELECT u.id, u.name FROM conversation_members m JOIN users u ON u.id = m.user_id
+        WHERE m.conversation_id = @id ORDER BY u.name_key, u.id
+        """, { id: conversation });
+}
+
+// How many messages a conversation has, and a page of them, in order, each with its writer's name.
+export async function count(db, conversation) {
+    return (await db.query("SELECT COUNT(*) AS n FROM messages WHERE conversation_id = @id", { id: conversation }))[0]["n"];
+}
+export async function messages(db, conversation, skip, count) {
+    return await db.query($"""
+        SELECT m.id, m.user_id, m.body, m.created_at, u.name AS user_name
+        FROM messages m LEFT JOIN users u ON u.id = m.user_id
+        WHERE m.conversation_id = @id
+        ORDER BY m.id
+        {page(db.provider)}
+        """, { id: conversation, skip: skip, count: count });
+}
+
+// Keeps that a member has read a conversation's messages up to one.
+export async function read(db, conversation, user, message) {
+    await db.execute("""
+        UPDATE conversation_members SET last_read_id = @message
+        WHERE conversation_id = @id AND user_id = @user AND last_read_id < @message
+        """, { message: message, id: conversation, user: user });
+}
+
+// A member leaves a conversation: its messages no longer theirs to read; the others' still.
+export async function leave(db, conversation, user) {
+    await db.execute("DELETE FROM conversation_members WHERE conversation_id = @id AND user_id = @user", { id: conversation, user: user });
+}
+
+// How many conversations a member is in, and a page of them, the latest first, each with its subject, when and by whom
+// its latest message was written, and how many of its messages, others', are new to the member.
+export async function countOf(db, user) {
+    return (await db.query("SELECT COUNT(*) AS n FROM conversation_members WHERE user_id = @user", { user: user }))[0]["n"];
+}
+export async function list(db, user, skip, count) {
+    return await db.query($"""
+        SELECT c.id, c.subject, c.last_message_at, u.name AS last_by,
+               (SELECT COUNT(*) FROM messages x WHERE x.conversation_id = c.id AND x.id > m.last_read_id AND x.user_id <> @user) AS unread
+        FROM conversation_members m JOIN conversations c ON c.id = m.conversation_id
+        LEFT JOIN messages l ON l.id = c.last_message_id
+        LEFT JOIN users u ON u.id = l.user_id
+        WHERE m.user_id = @user
+        ORDER BY c.last_message_at DESC, c.id DESC
+        {page(db.provider)}
+        """, { user: user, skip: skip, count: count });
+}
+
+// How many messages, others', are new to a member, in all their conversations.
+export async function unread(db, user) {
+    return (await db.query("""
+        SELECT COUNT(*) AS n FROM messages x JOIN conversation_members m ON m.conversation_id = x.conversation_id
+        WHERE m.user_id = @user AND x.id > m.last_read_id AND x.user_id <> @user
+        """, { user: user }))[0]["n"];
+}

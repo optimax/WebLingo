@@ -14,8 +14,13 @@
 <% } %>
   <li><%= site.f("user.posts", { count: member["post_count"] }) %></li>
 </ul>
-<% if (site.user != null && site.permissions.moderates() && member["id"] != site.user["id"]) { %>
-<div class="tools"><a href="/mod/ban?member=<%= member["id"] %>"><%= site.t("member.ban") %></a></div>
+<% if (site.user != null && member["id"] != site.user["id"]) { %>
+<div class="tools">
+  <a href="/messages/new?to=<%= member["name"] %>"><%= site.t("member.message") %></a>
+<% if (site.permissions.moderates()) { %>
+  <a href="/mod/ban?member=<%= member["id"] %>"><%= site.t("member.ban") %></a>
+<% } %>
+</div>
 <% } %>
 <% if (member["signature"] != null) { %>
 <h2 class="plain"><%= site.t("member.signature") %></h2>

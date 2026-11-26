@@ -1,0 +1,25 @@
+<% param request; param response; import { conversationsPage } from "/lib/messaging.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await conversationsPage(request, response)).title, crumbs: (await conversationsPage(request, response)).crumbs }; %>
+<% var view = await conversationsPage(request, response); var site = view.site; %>
+<% if (site.user != null) { %>
+<h1><%= view.title %></h1>
+<div class="tools"><a class="button" href="/messages/new"><%= site.t("messages.new") %></a></div>
+<% if (view.conversations.length == 0) { %>
+<p class="note"><%= site.t("messages.none") %></p>
+<% } else { %>
+<% await renderComponent("/components/pages.wasp", { site: site, base: "/messages", page: view.page, pages: view.pages }); %>
+<table class="list conversations">
+<% foreach (var conversation in view.conversations) { %>
+  <tr<% if (conversation["unread"] > 0) { %> class="new"<% } %>>
+    <td class="what">
+<% if (conversation["unread"] > 0) { %>      <span class="tag new"><%= site.f("messages.unread", { count: conversation["unread"] }) %></span><% } %>
+      <a class="conversation" href="/messages/conversation?id=<%= conversation["id"] %>"><%= conversation["subject"] %></a>
+      <p class="note"><%= site.f("messages.with", { names: ", ".join(conversation["members"]) }) %></p>
+    </td>
+    <td class="last"><span class="note"><%= site.f("messages.lastBy", { name: conversation["last_by"] ?? site.t("user.deleted"), time: site.time(conversation["last_message_at"]) }) %></span></td>
+  </tr>
+<% } %>
+</table>
+<% await renderComponent("/components/pages.wasp", { site: site, base: "/messages", page: view.page, pages: view.pages }); %>
+<% } %>
+<% } %>

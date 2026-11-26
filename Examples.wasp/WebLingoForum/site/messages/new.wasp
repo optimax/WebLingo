@@ -1,0 +1,28 @@
+<% param request; param response; import { newPage } from "/lib/messaging.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await newPage(request, response)).title, crumbs: (await newPage(request, response)).crumbs }; %>
+<% var view = await newPage(request, response); var site = view.site; %>
+<% if (site.user != null && !view.done) { var values = view.values; %>
+<h1><%= view.title %></h1>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems }); %>
+<% if (view.unknown != null) { %>
+<div class="problems" role="alert"><p><%= site.f("messages.unknown", { names: view.unknown }) %></p></div>
+<% } %>
+<% if (view.preview != null) { %>
+<section class="preview">
+  <h2 class="plain"><%= site.t("post.preview") %></h2>
+  <div class="body"><%- view.preview %></div>
+</section>
+<% } %>
+<form method="post" class="form wide" action="/messages/new">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <label><%= site.t("messages.to") %> <input name="to" value="<%= values["to"] %>" required maxlength="500">
+    <span class="note"><%= site.t("messages.toHint") %></span></label>
+  <label><%= site.t("messages.subject") %> <input name="subject" value="<%= values["subject"] %>" required maxlength="200"></label>
+  <label><%= site.t("messages.body") %> <textarea name="body" rows="10" required maxlength="20000"><%= values["body"] %></textarea>
+    <span class="note"><%= site.t("post.markdownHint") %></span></label>
+  <div class="buttons">
+    <button name="action" value="post"><%= site.t("messages.send") %></button>
+    <button name="action" value="preview" class="secondary"><%= site.t("post.preview") %></button>
+  </div>
+</form>
+<% } %>

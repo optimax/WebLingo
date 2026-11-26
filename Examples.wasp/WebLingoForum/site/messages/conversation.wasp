@@ -1,0 +1,28 @@
+<% param request; param response; import { conversationPage } from "/lib/messaging.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await conversationPage(request, response)).title, crumbs: (await conversationPage(request, response)).crumbs }; %>
+<% var view = await conversationPage(request, response); var site = view.site; %>
+<% if (view.refused != null) { %>
+<h1><%= view.title %></h1>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null && !view.done) { %>
+<h1><%= view.title %></h1>
+<p class="note"><%= site.f("messages.members", { names: ", ".join(view.members) }) %></p>
+<% await renderComponent("/components/pages.wasp", { site: site, base: view.base, page: view.page, pages: view.pages }); %>
+<% foreach (var message in view.messages) { %>
+<article class="message<% if (message["new"]) { %> new<% } %>" id="message-<%= message["id"] %>">
+  <p class="note"><%= site.f("messages.wrote", { name: message["user_name"] ?? site.t("user.deleted"), time: site.time(message["created_at"]) }) %></p>
+  <div class="body"><%- message["html"] %></div>
+</article>
+<% } %>
+<% await renderComponent("/components/pages.wasp", { site: site, base: view.base, page: view.page, pages: view.pages }); %>
+<section id="reply">
+  <h2 class="plain"><%= site.t("messages.reply") %></h2>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems }); %>
+<% await renderComponent("/components/post-form.wasp", { site: site, token: request.csrfToken, action: view.base, values: view.values,
+                                                        submit: site.t("messages.sendReply"), preview: view.preview }); %>
+</section>
+<form method="post" class="leave" action="<%= view.base %>">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <button name="action" value="leave" class="secondary"><%= site.t("messages.leave") %></button>
+</form>
+<% } %>

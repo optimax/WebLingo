@@ -123,9 +123,9 @@ public sealed class ForumTests
                 ["mail"] = new Dictionary<string, object> { ["default"] = new Dictionary<string, object> { ["host"] = "127.0.0.1", ["port"] = smtp.Port, ["tls"] = "none" } }
             }));
             var setup = Path.Combine(copy, "setup", "setup.wlg");
-            Assert.Equal((WebLingoCommandLine.Success, $"Made the forum's database 'forum' on {provider}, version 4, with its administrator Anna.\n", ""),
+            Assert.Equal((WebLingoCommandLine.Success, $"Made the forum's database 'forum' on {provider}, version 5, with its administrator Anna.\n", ""),
                 Run("run", setup, "name=Anna", "email=anna@example.com", "password=correct-horse"));
-            Assert.Equal((WebLingoCommandLine.Success, "The forum's database 'forum' is at version 4 already: nothing to do.\n", ""),
+            Assert.Equal((WebLingoCommandLine.Success, "The forum's database 'forum' is at version 5 already: nothing to do.\n", ""),
                 Run("run", setup));
 
             // 30 topics, each of one post but the first, of 45, on 2 January 2026 and the day before, the last locked; and a
@@ -234,6 +234,7 @@ public sealed class ForumTests
                 using var anna = await WritingAsync(address, smtp, bob);
                 await ModerationAsync(address, anna, bob);
                 await AdministrationAsync(address, anna, bob);
+                await MessagesAsync(address, anna, bob);
             }
             finally
             {
@@ -759,6 +760,52 @@ public sealed class ForumTests
         (status, body, at) = await carol.Post("/account/sign-in", ("name", "Carol"), ("password", "carols-password"));
         Assert.Equal((HttpStatusCode.OK, "/"), (status, at));
         Assert.Contains(">Carol</a>", body);
+    }
+
+    /// <summary>
+    /// Private messages: Bob writes to Anna and Carol, a name no member has refused, and himself alone; each finds the
+    /// conversation new until they read it; Anna replies; Carol leaves it, and reads it no more. A guest is sent to sign in,
+    /// and no one reads a conversation they are not in.
+    /// </summary>
+    private static async Task MessagesAsync(string address, Browser anna, Browser bob)
+    {
+        using (var guest = new Browser(address))
+        {
+            Assert.Equal("/account/sign-in?back=/messages", (await guest.Visit("/messages")).Item3);
+        }
+        Assert.Contains("<a href=\"/messages/new?to=Anna\">Send a message</a>", (await bob.Get("/members/member?id=1")).Item2);
+        var (status, body, at) = await bob.Post("/messages/new", ("to", "Anna, Nobody"), ("subject", "Tea party"), ("body", "Come at **five**."), ("action", "post"));
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Contains("No member has these names: Nobody.", body);
+        (_, body, _) = await bob.Post("/messages/new", ("to", "Bob"), ("subject", "Tea party"), ("body", "Come at **five**."), ("action", "post"));
+        Assert.Contains("Name at least one other member.", body);
+        (status, body, at) = await bob.Post("/messages/new", ("to", "anna, CAROL"), ("subject", "Tea party"), ("body", "Come at **five**."), ("action", "post"));
+        Assert.Equal((HttpStatusCode.OK, "/messages/conversation?id=1"), (status, at));
+        Assert.Contains("In this conversation: Anna, Bob, Carol", body);
+        Assert.Contains("<div class=\"body\"><p>Come at <strong>five</strong>.</p>\n</div>", body);
+
+        // Anna finds it new, reads it, and replies; then it is new to Bob once, and to Carol twice.
+        Assert.Contains("<a href=\"/messages\">Messages (1)</a>", (await anna.Get("/")).Item2);
+        (_, body) = await anna.Get("/messages");
+        Assert.Contains("<span class=\"tag new\">1 new</span>", body);
+        Assert.Contains(">Tea party</a>", body);
+        await anna.Get("/messages/conversation?id=1");
+        Assert.Contains("<a href=\"/messages\">Messages</a>", (await anna.Get("/")).Item2);
+        (status, body, at) = await anna.Post("/messages/conversation?id=1", ("body", "Five it is."), ("action", "post"));
+        Assert.Equal((HttpStatusCode.OK, "/messages/conversation?id=1"), (status, at));
+        Assert.Contains("<p>Five it is.</p>", body);
+        Assert.Contains("<a href=\"/messages\">Messages (1)</a>", (await bob.Get("/")).Item2);
+        using var carol = new Browser(address);
+        (_, body, _) = await carol.Post("/account/sign-in", ("name", "Carol"), ("password", "carols-password"));
+        Assert.Contains("<a href=\"/messages\">Messages (2)</a>", body);
+
+        // Carol leaves: the conversation is no longer hers, but still Anna's and Bob's. No one reads one they are not in.
+        (status, body, at) = await carol.Post("/messages/conversation?id=1", ("action", "leave"));
+        Assert.Equal((HttpStatusCode.OK, "/messages"), (status, at));
+        Assert.Contains("You are in no conversation yet.", body);
+        Assert.Equal(HttpStatusCode.NotFound, (await carol.Get("/messages/conversation?id=1")).Item1);
+        Assert.Contains("In this conversation: Anna, Bob</p>", (await bob.Get("/messages/conversation?id=1")).Item2);
+        Assert.Equal(HttpStatusCode.NotFound, (await bob.Get("/messages/conversation?id=99")).Item1);
     }
 
     private static (int, string, string) Run(params string[] arguments)

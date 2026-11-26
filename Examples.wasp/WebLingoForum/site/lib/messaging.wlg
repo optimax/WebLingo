@@ -1,0 +1,175 @@
+// What the private messages' pages do, and show (Documents/weblingo-forum.md, section 2, "Private messages"; section 6,
+// part 6): a member's conversations, a new one, and one read and replied to, or left. For members signed in alone, each
+// reading only the conversations they are in. Each page's work runs once for each request, from its layout's values,
+// before anything is written.
+
+import { DateTime } from "std:datetime";
+import { begin, open, viewOf, formOf, redirect, idOf, pageOf, pagesOf, refuse, signInFirst } from "./forum.wlg";
+import messages from "./messages.wlg";
+import posts from "./posts.wlg";
+import { render } from "./markdown.wlg";
+
+// The conversations on a page of a member's list.
+export const conversationsPerPage = 25;
+
+function view(site, title, crumbs) {
+    var page = viewOf(site, title, crumbs);
+    page.problems = [];
+    page.preview = null;
+    page.refused = null;
+    page.done = false;
+    return page;
+}
+
+// The page a query asks for, within the pages there are.
+function pageWithin(request, pages) {
+    var number = pageOf(request.query?["page"]);
+    return number > pages ? pages : number;
+}
+
+// /messages?page=2: a member's conversations, the latest first, each with its members and how many of its messages are
+// new to the member.
+export async function conversationsPage(request, response) {
+    var site = await begin(request);
+    return await site.once("conversations", async () => {
+        var page = view(site, site.t("messages.title"), []);
+        page.conversations = [];
+        page.pages = 1;
+        page.page = 1;
+        if (signInFirst(site, response, "/messages")) {
+            return page;
+        }
+        using (var db = await open()) {
+            var user = site.user["id"];
+            page.pages = pagesOf(await messages.countOf(db, user), conversationsPerPage);
+            page.page = pageWithin(request, page.pages);
+            foreach (var conversation in await messages.list(db, user, (page.page - 1) * conversationsPerPage, conversationsPerPage)) {
+                conversation["members"] = (await messages.membersOf(db, conversation["id"])).map(member => member["name"]);
+                page.conversations.push(conversation);
+            }
+        }
+        return page;
+    });
+}
+
+// /messages/new?to=Anna: a conversation begun with other members, named by their names, separated by commas, its subject
+// and its first message, with a preview first, if asked for.
+export async function newPage(request, response) {
+    var site = await begin(request);
+    return await site.once("newConversation", async () => {
+        var page = view(site, site.t("messages.new"), [[site.t("messages.title"), "/messages"]]);
+        page.values = { to: request.query?["to"] ?? "", subject: "", body: "" };
+        page.unknown = null;
+        if (signInFirst(site, response, "/messages/new")) {
+            return page;
+        }
+        if (request.method != "POST") {
+            return page;
+        }
+        var form = await formOf(request);
+        if (form == null) {
+            response.status = 400;
+            page.problems.push("form.expired");
+            return page;
+        }
+        page.values = { to: (form?["to"] ?? "").trim(), subject: messages.subjectOf(form?["subject"]), body: posts.bodyOf(form?["body"]) };
+        if (form?["action"] == "preview") {
+            page.preview = render(page.values["body"]);
+            return page;
+        }
+        using (var db = await open()) {
+            var named = await messages.named(db, page.values["to"], site.user["id"]);
+            if (named["missing"].length > 0) {
+                page.unknown = ", ".join(named["missing"]);
+            } else if (named["found"].length == 0) {
+                page.problems.push("messages.noRecipients");
+            } else if (named["found"].length > messages.mostOthers) {
+                page.problems.push("messages.tooMany");
+            }
+            foreach (var problem in [messages.subjectProblem(page.values["subject"]), posts.bodyProblem(page.values["body"])]) {
+                if (problem != null) {
+                    page.problems.push(problem);
+                }
+            }
+            if (page.unknown != null || page.problems.length > 0) {
+                response.status = 400;
+                return page;
+            }
+            var conversation = await messages.start(db, site.user["id"], named["found"].map(member => member["id"]), page.values["subject"],
+                                                    page.values["body"], DateTime.utcNow());
+            page.done = true;
+            redirect(response, $"/messages/conversation?id={conversation}");
+        }
+        return page;
+    });
+}
+
+// /messages/conversation?id=3&page=2: a conversation the member is in, a page of its messages, kept as read by them, its
+// members, and a reply, with a preview first, if asked for; or the member leaving it.
+export async function conversationPage(request, response) {
+    var site = await begin(request);
+    return await site.once("conversation", async () => {
+        var id = idOf(request.query?["id"]);
+        var page = view(site, site.t("messages.notFound"), [[site.t("messages.title"), "/messages"]]);
+        page.values = { body: "" };
+        page.messages = [];
+        page.pages = 1;
+        page.page = 1;
+        page.first = 0;
+        if (signInFirst(site, response, id == null ? "/messages" : $"/messages/conversation?id={id}")) {
+            return page;
+        }
+        using (var db = await open()) {
+            var conversation = await messages.one(db, id, site.user["id"]);
+            if (conversation == null) {
+                return refuse(page, response, 404, "forum.notFoundText");
+            }
+            page.conversation = conversation;
+            page.title = conversation["subject"];
+            page.base = $"/messages/conversation?id={conversation['id']}";
+            var perPage = site.settings["postsPerPage"];
+            if (request.method == "POST") {
+                var form = await formOf(request);
+                if (form == null) {
+                    response.status = 400;
+                    page.problems.push("form.expired");
+                } else if (form?["action"] == "leave") {
+                    await messages.leave(db, conversation["id"], site.user["id"]);
+                    page.done = true;
+                    redirect(response, "/messages");
+                    return page;
+                } else {
+                    page.values = { body: posts.bodyOf(form?["body"]) };
+                    if (form?["action"] == "preview") {
+                        page.preview = render(page.values["body"]);
+                    } else {
+                        var problem = posts.bodyProblem(page.values["body"]);
+                        if (problem != null) {
+                            response.status = 400;
+                            page.problems.push(problem);
+                        } else {
+                            var message = await messages.reply(db, conversation["id"], site.user["id"], page.values["body"], DateTime.utcNow());
+                            var last = pagesOf(await messages.count(db, conversation["id"]), perPage);
+                            page.done = true;
+                            redirect(response, page.base + (last > 1 ? $"&page={last}" : "") + $"#message-{message}");
+                            return page;
+                        }
+                    }
+                }
+            }
+            page.members = (await messages.membersOf(db, conversation["id"])).map(member => member["name"]);
+            page.pages = pagesOf(await messages.count(db, conversation["id"]), perPage);
+            page.page = request.method == "POST" ? page.pages : pageWithin(request, page.pages);
+            page.first = (page.page - 1) * perPage;
+            foreach (var message in await messages.messages(db, conversation["id"], page.first, perPage)) {
+                message["html"] = render(message["body"]);
+                message["new"] = message["id"] > conversation["last_read_id"] && message["user_id"] != site.user["id"];
+                page.messages.push(message);
+            }
+            if (page.messages.length > 0) {
+                await messages.read(db, conversation["id"], site.user["id"], page.messages[page.messages.length - 1]["id"]);
+            }
+        }
+        return page;
+    });
+}

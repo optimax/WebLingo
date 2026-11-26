@@ -9,6 +9,7 @@
       <a href="/account/sign-up"><%= site.t("nav.signUp") %></a>
 <% } else { %>
       <a href="/members/member?id=<%= site.user["id"] %>"><%= site.user["name"] %></a>
+      <a href="/messages"><%= site.unread == 0 ? site.t("nav.messages") : site.f("nav.messagesNew", { count: site.unread }) %></a>
       <a href="/account/profile"><%= site.t("nav.profile") %></a>
 <% if (site.permissions.moderates()) { %>
       <a href="/mod/reports"><%= site.t("nav.moderation") %></a>

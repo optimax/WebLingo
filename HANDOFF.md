@@ -312,7 +312,7 @@ messages broke their lines as the platform does, a provider's message's line bre
 ## WebLingo Forum
 
 The forum written in WASP, `Examples.wasp/WebLingoForum`, the task "Extensive WASP Example", is designed in
-`Documents/weblingo-forum.md` (`c05087f`), its ten parts in its section 6, each a task of `TO-DO.md`. Parts 1 to 5 have
+`Documents/weblingo-forum.md` (`c05087f`), its ten parts in its section 6, each a task of `TO-DO.md`. Parts 1 to 6 have
 landed. Its foundations (`cdfa20a`): the schema, `site/lib/schema.wlg`, made on SQLite, SQL Server, MySQL and PostgreSQL
 through `site/lib/sql.wlg`; `setup/setup.wlg`, run with `weblingo`, making the database and its first administrator, or
 upgrading it; and the front page, boards and topics, paged. Its members (`ae49457`): sign-up confirmed by mail, signing
@@ -353,6 +353,13 @@ No change to the schema. Tested by `tests/administration-tests.wlg`, and by `For
 (`AdministrationAsync`), on all four databases; the pages looked at in a browser. The logo the design names waits for
 part 8, which sends files back.
 
+Its private messages (part 6): `site/lib/messages.wlg`, conversations of a member and up to ten others, the last message
+each member has read, and how many are new to them, which the header shows (`site.unread`, counted in `begin`); and
+`site/lib/messaging.wlg` with `site/messages/`, the pages: a member's conversations, a new one, and one read, replied to
+or left. The schema's version 5 adds `conversations`, `conversation_members` and `messages`. Tested by
+`tests/messages-tests.wlg`, and by `ForumTests`' walk of messages (`MessagesAsync`), on all four databases; the pages
+looked at in a browser.
+
 Found while writing it: in WebLingo, `s[i]` and a string's `length` take time in proportion to its length, its scalar
 values counted from its start each time (`WebLingoMembers.ScalarCount`), 20,000 lookups 683 ms against 2 ms by
 `foreach`; so a scanner reads an array of a string's characters (`charsOf` in `markdown.wlg`). The task "Indexing a
@@ -361,10 +368,10 @@ String in Constant Time" is to fix it.
 The branch `claude/forum-writing` on GitHub holds part 3 unfinished (`9093b78`), which `main` has whole, in one commit,
 instead: it may be deleted there.
 
-Next: "WebLingo Forum, Part 6: Private Messages", then parts 7 and 10; parts 8 and 9 each wait for an answer in
-`TO-DO.md`. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to
+Next: "WebLingo Forum, Part 7: Search", then part 10. Parts 8 and 9 wait for "Sending Files Back in WASP" and "Overlays in
+WASP", and "WebLingo Forum: MarkdownEditor.Web in the Post Form" for its answers, each with questions in `TO-DO.md`. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to
 be written as tasks and into the specification's roadmap; neither is begun.
 
 The last full suite, on Windows, in Release (25 November 2026, MySQL's and PostgreSQL's tests among them): 3,642 tests
 passing, none skipped, before the forum's parts, whose `ForumTests` ran for each. Linux not tried since `2e27309`: the
-forum's design, the build number and the forum's parts 1 to 5 were tried on Windows only.
+forum's design, the build number and the forum's parts 1 to 6 were tried on Windows only.

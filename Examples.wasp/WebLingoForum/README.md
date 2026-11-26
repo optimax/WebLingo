@@ -7,7 +7,8 @@ and keep a profile; and writing, in Markdown: topics started, replies, quotes, o
 preview first, what is new to each member, and topics watched, their replies mailed; and each board's permissions for
 each group, and moderation: topics locked, pinned, moved, deleted and restored, others' posts edited and deleted, posts
 reported, members banned, and a log of it all; and its administration: its settings, categories and boards, who may do
-what on each, groups, and members' groups. Private messages and the rest come in the parts after them.
+what on each, groups, and members' groups; and private messages, conversations of members, with what is new to each.
+Search and the rest come in the parts after them.
 
 ```text
 WebLingoForum/
@@ -23,6 +24,7 @@ WebLingoForum/
                 post.wlg, a moderator's actions
     admin/      administration, /admin: settings.wasp, boards.wasp and board.wasp, a board and who may do what on it,
                 groups.wasp, and members.wasp and member.wasp, a member's groups
+    messages/   private messages, /messages: a member's conversations, new.wasp, a new one, and conversation.wasp
     account/    signing up, confirming an address, signing in and out, a forgotten password, the member's profile
     members/    /members, the members by name, and /members/member?id=1, a member's page
     lib/        the forum's modules: the database's SQL, its schema, settings, texts, members, their mail and tokens,
@@ -52,8 +54,8 @@ earlier version of the forum made, it adds the tables this version adds.
 The forum's own tests, from `tests`:
 
 ```bash
-weblingo test accounts-tests.wlg administration-tests.wlg markdown-tests.wlg moderation-tests.wlg schema-tests.wlg \
-    sql-tests.wlg texts-tests.wlg users-tests.wlg writing-tests.wlg
+weblingo test accounts-tests.wlg administration-tests.wlg markdown-tests.wlg messages-tests.wlg moderation-tests.wlg \
+    schema-tests.wlg sql-tests.wlg texts-tests.wlg users-tests.wlg writing-tests.wlg
 ```
 
 ## Mail, and members
