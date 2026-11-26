@@ -125,7 +125,7 @@ public static class WebLingoLoad
         {
             switch (option)
             {
-                case "--host" when value is "serve" or "fastcgi":
+                case "--host" when value is "serve" or "standalone" or "fastcgi":
                     Host = value;
                     return true;
                 case "--url" when Uri.TryCreate(value, UriKind.Absolute, out var given) && given.Scheme is "http" or "https":
@@ -541,7 +541,7 @@ public static class WebLingoLoad
 
     private static int Usage(TextWriter error)
     {
-        error.WriteLine("Usage: WebLingo.Benchmarks --load [--host serve|fastcgi | --url <url>] [--site load|forum] [--page NAME]...");
+        error.WriteLine("Usage: WebLingo.Benchmarks --load [--host serve|standalone|fastcgi | --url <url>] [--site load|forum] [--page NAME]...");
         error.WriteLine("                             [--clients 1,4,16,64,256]");
         error.WriteLine("                             [--seconds N] [--warm-up N] [--reload SECONDS | --soak HOURS [--sample MINUTES]");
         error.WriteLine("                             | --fair none,1000000,100000,10000]");

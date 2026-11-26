@@ -28,7 +28,11 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
     /// <summary>A site served elsewhere, at <paramref name="url"/>, which the benchmark neither starts nor samples.</summary>
     public static WebLingoLoadSite At(Uri url) => new(url, $"the site at {url}", null);
 
-    /// <summary>The load site, served by <c>wasp serve</c> where <paramref name="host"/> is <c>serve</c>, else behind nginx.</summary>
+    /// <summary>
+    /// The load site, served by <c>wasp serve</c> where <paramref name="host"/> is <c>serve</c>, by <c>wasp serve --host
+    /// standalone</c>, WebLingo's own HTTP server, where it is <c>standalone</c> (specification, section 9, "M0.23 parts", part
+    /// 5), else behind nginx; its <c>wasp.config</c> given <paramref name="setting"/> more, where one is given.
+    /// </summary>
     public static async Task<WebLingoLoadSite> Start(string host, string? setting = null)
     {
         var folder = Path.Combine(Path.GetTempPath(), "weblingo-load-" + Guid.NewGuid().ToString("N"));
@@ -50,6 +54,11 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
         {
             served = new WebLingoLoadSite(new Uri($"http://127.0.0.1:{port}/"), "`wasp serve`", folder);
             served._server = served.Started(wasp, ["serve", "--root", site, "--port", Text(port)], site);
+        }
+        else if (host == "standalone")
+        {
+            served = new WebLingoLoadSite(new Uri($"http://127.0.0.1:{port}/"), "`wasp serve --host standalone`, WebLingo's own HTTP server", folder);
+            served._server = served.Started(wasp, ["serve", "--host", "standalone", "--root", site, "--port", Text(port)], site);
         }
         else
         {
