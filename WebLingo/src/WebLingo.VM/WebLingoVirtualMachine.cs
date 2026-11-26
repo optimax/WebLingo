@@ -402,10 +402,10 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             var debugger = Debugger;
             var maxCallDepth = context.Resources.MaxCallDepth;
             var executed = _executed;
-            // Its quantum, a suspending execution's, counted from where it begins or goes on (section 9, "M0.24 parts", part 2):
-            // the budget it runs to, where that comes first, so that the budget's own look finds it and the loop gains nothing.
-            _yields = context.Suspends && context.Quantum > 0 && budget - executed > context.Quantum;
-            if (_yields) budget = executed + context.Quantum;
+            // Its quantum, a suspending execution's, the budget it runs to where that comes first (section 9, "M0.24 parts",
+            // part 2), read by a helper not inlined, so that Run reads no property more, which would spend .NET's budget of
+            // inlining into it (Documents/implementation.md, "A VM's Dispatch Method Is Sensitive to Its Locals").
+            budget = WithQuantum(budget, executed);
             var dueAt = executed; // The count of instructions at which the budget and the cancellation signal are looked at.
             _resuming = resuming;
             WebLingoRuntimeError? error = null;
@@ -431,13 +431,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             dueAt = Math.Min(budget, (executed / CancellationInterval + 1) * CancellationInterval);
                             goto schedule;
                         }
-                        if (executed >= budget)
-                        {
-                            if (_yields) return Yield(pc, executed);
-                            return Failure(WebLingoDiagnosticCodes.BudgetExceeded,
-                                    $"The program ran {executed} instructions, its whole budget, and was stopped.", frame.Function, pc)
-                                with { Instructions = executed };
-                        }
+                        if (executed >= budget) return BudgetPassed(pc, executed);
                         if (cancellation is not null && executed % CancellationInterval == 0
                             && cancellation.IsCancellationRequested)
                         {
@@ -1599,6 +1593,29 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
 
         /// <summary>Whether the budget <c>Run</c> runs to is its quantum's, at which it yields its worker, not its own.</summary>
         private bool _yields;
+
+        /// <summary>
+        /// The budget <c>Run</c> runs to passed, before the instruction at <paramref name="pc"/>: its quantum's, where
+        /// <see cref="_yields"/>, at which it yields; else its own, at which it is stopped (WL3003), its frame the one at the
+        /// depth <c>Run</c> keeps current. A helper not inlined, so that <c>Run</c> holds neither path's code.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private WebLingoExecutionResult BudgetPassed(int pc, long executed) =>
+            _yields ? Yield(pc, executed)
+            : Failure(WebLingoDiagnosticCodes.BudgetExceeded, $"The program ran {executed} instructions, its whole budget, and was stopped.",
+                _frames[_depth].Function, pc) with { Instructions = executed };
+
+        /// <summary>
+        /// The budget <c>Run</c> runs to from <paramref name="executed"/>: its quantum's end, a suspending execution's, where
+        /// that comes before <paramref name="budget"/>, the execution's own, <see cref="_yields"/> then true; else the budget.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private long WithQuantum(long budget, long executed)
+        {
+            var quantum = context.Suspends ? context.Quantum : 0;
+            _yields = quantum > 0 && budget - executed > quantum;
+            return _yields ? executed + quantum : budget;
+        }
 
         /// <summary>Whether its stop at <see cref="_stopDepth"/> is a yield of its quantum's, not its debugger's.</summary>
         private bool _yielded;
