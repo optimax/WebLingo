@@ -2155,10 +2155,12 @@ that the owner has not decided is a question of its task's, and Proposed here un
    percent faster, `calls` 9, `strings` 8, `async` 5, `closures` 4, `templates` 3, `indexing` 2, `imports` 2 and
    `objects` 1.5, `bytes`, `collections` and `io` the same (`Documents/implementation.md`, "A VM's Dispatch Method Is
    Sensitive to Its Locals"); its yield, `Yield`, not inlined, the request waiting before the instruction as its
-   debugger's stop leaves it, `Waits(0)`, its result waiting for no time, which the hosts' worker pool queues for its
-   worker at once, behind what is queued for it, and, taken, lets one new request of the shared queue run first, where
-   one is queued, then queues again, so that new requests too run between its quanta, the worker taking its own queue
-   before the shared one otherwise (`WebLingoWorkerPool`); its going on, `GoesOn`, at once, the instruction then seen by its
+   debugger's stop leaves it, `Waits(0)`, its result waiting for no time, which the hosts' worker pool wakes as it wakes a
+   request whose timer is due, by a timer for no time, the worker free meanwhile to take another request's work or a new
+   request; a pool that queued a yield at once and, taking it, let one new request in first, so that new requests ran
+   between its quanta by rule rather than by that moment, made a client's going take more than 30 seconds to reach its
+   request in the standalone server's tests under load, four runs of five against none of five, for a reason not found,
+   and was set aside, whether a yield lets new requests in enough the load test's to say (part 3); its going on, `GoesOn`, at once, the instruction then seen by its
    debugger as any other; `WebLingoApplicationOptions.Quantum`, `wasp.config`'s `"limits"`' `"quantum"`, an integer more
    than 0, or `null` for none; `QuantumTests`.
 3. **Measured.** The load test, a page that computes for long beside pages that do not, their latencies with each

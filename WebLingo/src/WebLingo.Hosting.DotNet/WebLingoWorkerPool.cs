@@ -10,10 +10,7 @@ namespace WebLingo.Hosting.DotNet;
 /// queue that every worker shares, and a request that waits (<see cref="WebLingoRequestOutcomeKind.Waiting"/>) stays its
 /// own, resumed only by it (WL-P013), when the request's scheduler host is posted work, its wait is over, or its client
 /// goes, its resumption queued for that worker alone, and taken before new work; meanwhile the worker runs other requests,
-/// up to <see cref="WaitingPerWorker"/> waiting at once, beyond which it takes no new work. A request that yields its worker,
-/// its quantum passed, waiting for no time (section 9, "M0.24 parts", part 2), is queued for its worker at once, behind what
-/// is queued for it already, and, taken, lets one new request run first, where one is queued, then is queued again, so that
-/// its worker runs the other requests' ready work, and the new, between its quanta. Disposed, it finishes the work
+/// up to <see cref="WaitingPerWorker"/> waiting at once, beyond which it takes no new work. Disposed, it finishes the work
 /// queued, cancels the requests that wait, then stops. Each worker's stack is the one a compiler needs
 /// (<see cref="WebLingoParser.CompilerStackSize"/>), since a page is compiled on the worker it is first requested on.
 /// </summary>
@@ -86,18 +83,6 @@ public sealed class WebLingoWorkerPool : IDisposable
                 break; // Disposed, and nothing more queued.
             }
             if (item is null) continue;
-            if (item.Yielded)
-            {
-                // A request that yielded: a new one first, where one is queued, then it again, behind its worker's queue.
-                item.Yielded = false;
-                if (waiting.Count < WaitingPerWorker && _shared.TryTake(out var other))
-                {
-                    Interlocked.Exchange(ref item.Queued, 0);
-                    item.Yielded = true;
-                    Wake(worker.Value, item);
-                    item = other;
-                }
-            }
             if (item.Work is { } work)
             {
                 try
@@ -150,14 +135,6 @@ public sealed class WebLingoWorkerPool : IDisposable
             item.Resume = next;
             waiting.Add(item);
             item.Timer?.Dispose();
-            if (outcome.WaitMilliseconds == 0)
-            {
-                // A yield, its quantum passed (section 9, "M0.24 parts", part 2): ready at once, behind the others.
-                item.Timer = null;
-                item.Yielded = true;
-                Wake(worker.Value, item);
-                return;
-            }
             item.Timer = outcome.WaitMilliseconds < 0 ? null
                 : new Timer(_ => item.Scheduler!.Wake(), null, Math.Min(outcome.WaitMilliseconds, int.MaxValue), Timeout.Infinite);
             return;
@@ -202,9 +179,6 @@ public sealed class WebLingoWorkerPool : IDisposable
         public Timer? Timer;
         public CancellationTokenRegistration Gone;
         public int Queued;
-
-        /// <summary>Whether it yielded its worker, its quantum passed, and has not been taken since.</summary>
-        public bool Yielded;
 
         public void End(WebLingoRequestOutcome? outcome, Exception? exception)
         {
