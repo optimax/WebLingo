@@ -1,5 +1,10 @@
 // The forum's texts, every word it shows, from a module of each language, texts/en.wlg, which exports them as a map
-// from a text's name to its words, and its plural rule (Documents/weblingo-forum.md, section 3.6).
+// from a text's name to its words, and its plural rule (Documents/weblingo-forum.md, section 3.6). English's, and a
+// client's own, imported with this module, a module imported while a request runs costing about 2 ms more a request
+// than one imported with its importer (section 6, part 10, "Under load"); another language's imported as it is asked for.
+
+import english from "../texts/en.wlg";
+import custom from "../texts/custom.wlg";
 
 // The languages the forum has texts in, each with its own name for itself.
 export const languages = { "en": "English" };
@@ -58,7 +63,6 @@ export function isLanguage(text) {
 // language, texts/custom.wlg's, in place of the forum's of the same names (section 3.5).
 export async function load(language) {
     var name = isLanguage(language) ? language : "en";
-    var module = await Module.import("../texts/" + name + ".wlg");
-    var custom = await Module.import("../texts/custom.wlg");
+    var module = name == "en" ? english : await Module.import("../texts/" + name + ".wlg");
     return new Texts(name, { ...module.texts, ...(custom.texts?[name] ?? {}) }, module.plural);
 }

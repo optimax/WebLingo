@@ -437,8 +437,9 @@ Its deployment (part 10): the README's "Deploying it", under IIS by `Scripts/add
 Apache through `wasp fastcgi`, and a client's forum; `WebServerTests.NginxServesTheForumFromWaspFastCgi`, the forum
 behind nginx; and `WebLingo.Benchmarks --load --site forum`, its pages measured, in the design's section 6, part 10.
 Its deployment under IIS waits for the commands the README gives to be run as administrator, this machine's IIS being
-set up only so. Its pages level off under load, a topic's at about 40 a second on SQLite: the task "WebLingo Forum:
-Pages Under Load".
+set up only so. Under load (the task "WebLingo Forum: Pages Under Load"), the forum's pages gained 1.4 to 4.6 times from
+SQLite's WAL, which `setup.wlg` sets, and English's texts imported statically; what is left, the collector `wasp` runs
+with, a topic's view's write, and a dynamic import's join each request, are tasks of their own.
 
 Found while writing it: in WebLingo, `s[i]` and a string's `length` took time in proportion to its length, its scalar
 values counted from its start each time, so the renderer reads an array of a line's characters (`charsOf` in
@@ -447,8 +448,8 @@ values counted from its start each time, so the renderer reads an array of a lin
 The branch `claude/forum-writing` on GitHub holds part 3 unfinished (`9093b78`), which `main` has whole, in one commit,
 instead: it may be deleted there.
 
-Next: "WebLingo Forum: Pages Under Load"; part 10's deployment under IIS waits for its commands to be run as
-administrator. "WebLingo Forum:
+Next: the tasks after "WebLingo Forum: Pages Under Load", and the milestones M0.21 to M0.26, each with its questions;
+part 10's deployment under IIS waits for its commands to be run as administrator. "WebLingo Forum:
 MarkdownEditor.Web in the Post Form" waits for MarkdownEditor.Web's `LICENSE` to commit the editor's copy. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to
 be written as tasks and into the specification's roadmap; neither is begun.
 

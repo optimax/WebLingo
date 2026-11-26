@@ -108,6 +108,11 @@ async function makeFolders(path) {
 await makeFolders(uploads);
 
 using (var db = await Database.open(database)) {
+    // SQLite's journal written ahead, so that pages that read go on while one writes, a topic's view counted among them
+    // (Documents/weblingo-forum.md, section 6, part 10, "Under load"); kept by the database's file, set again each run.
+    if (db.provider == "sqlite") {
+        await db.query("PRAGMA journal_mode=WAL");
+    }
     var version = await schema.versionOf(db);
     if (version == schema.version) {
         writeLn($"The forum's database '{database}' is at version {version} already: nothing to do.");

@@ -192,6 +192,17 @@ Each part is a task in `TO-DO.md`, landed on its own and tested on all four data
     | a topic, `/topic?id=1` | 52, 18 ms, 38 ms | 40, 20 ms, 1,524 ms | 42, 42 ms, 3,351 ms | 39, 728 ms, 9,537 ms |
     | a search, `/search?q=forum` | 67, 12 ms, 58 ms | 136, 27 ms, 102 ms | 119, 126 ms, 280 ms | 142, 454 ms, 726 ms |
 
-    Every answer was right. The pages that only read level off at 4 clients, at about 140 to 185 a second, as though something served them one at a time; a topic's page, which counts each view, a write to SQLite's one file, at about 40, its slowest waiting seconds for SQLite's lock. Why, and what to change, the task "WebLingo Forum: Pages Under Load" finds.
+    Every answer was right. The pages that only read level off at 4 clients, at about 140 to 185 a second, as though something served them one at a time; a topic's page, which counts each view, a write to SQLite's one file, at about 40, its slowest waiting seconds for SQLite's lock.
+
+    **Under load, found** (25 November 2026, the task "WebLingo Forum: Pages Under Load"). Each page under one client, probed piece by piece, a page of `ok` taking 0.63 ms: opening the database and closing it about 0.1 ms; the modules a request imports, `lib/forum.wlg` and those it imports, run anew for each request, as a module runs once for each execution, about 2.7 ms; and the texts, imported while the request ran, `Module.import`, about 2 ms more than imported with their importer, 2.77 ms against 0.85, a module imported while a request runs joined to its program anew each request. With 4 clients and more, `wasp`'s requests share .NET's workstation collector, a console program's own, `wasp` using about 2.3 of the 8 processors: with the server collector, `DOTNET_gcServer=1`, the front page took 385 a second at 4 clients in place of 183, and a board 410 at 16 in place of 135, the same forum. And a topic's view waits for SQLite's lock, its journal rolled back, which every reader takes too. Changed, the forum's own: `setup.wlg` puts a SQLite database's journal ahead of it, WAL, so that pages that read go on while one writes; and `lib/texts.wlg` imports English's texts, and a client's own, with itself. Measured again, as before, with the workstation collector, requests a second and their median and 99th percentile:
+
+    | Page | 1 client | 4 clients | 16 clients | 64 clients |
+    |---|---:|---:|---:|---:|
+    | front page, `/` | 96, 8 ms, 25 ms | 264, 13 ms, 40 ms | 284, 53 ms, 131 ms | 237, 265 ms, 434 ms |
+    | a board, `/board?id=1` | 121, 7 ms, 32 ms | 235, 15 ms, 47 ms | 226, 67 ms, 143 ms | 215, 291 ms, 452 ms |
+    | a topic, `/topic?id=1` | 90, 10 ms, 29 ms | 122, 12 ms, 334 ms | 148, 21 ms, 1,434 ms | 180, 17 ms, 7,150 ms |
+    | a search, `/search?q=forum` | 108, 7 ms, 33 ms | 200, 17 ms, 61 ms | 225, 66 ms, 156 ms | 211, 295 ms, 508 ms |
+
+    What is left is WASP's, or a choice of the owner's, each a task of its own: the collector `wasp` runs with, "The Server Collector for `wasp`"; a topic's view, one write of SQLite's for each, some still waiting seconds, "A Topic's View Without a Write Each"; and a module imported while a request runs, joined anew each request, "Dynamic Imports Joined Once".
 
 The pilot, "WASP Pilot: the Forum in Real Use", then serves it.
