@@ -1,0 +1,136 @@
+// The forum's administration: its settings, categories and boards, groups and their permissions, and members' groups
+// (site/lib/administration.wlg). weblingo test administration-tests.wlg
+
+import { assertEqual, assertDeepEqual } from "std:test";
+import { Database } from "std:db";
+import { DateTime } from "std:datetime";
+import schema from "../site/lib/schema.wlg";
+import { insert } from "../site/lib/sql.wlg";
+import users from "../site/lib/users.wlg";
+import settings from "../site/lib/settings.wlg";
+import permissions from "../site/lib/permissions.wlg";
+import posts from "../site/lib/posts.wlg";
+import admin from "../site/lib/administration.wlg";
+
+const now = DateTime.utc(2026, 11, 25, 12, 0);
+
+// A database of the forum's in memory, with its four groups and a member, Bob, 1, in the members' group.
+async function forum(db) {
+    foreach (var statement in schema.create(db.provider)) {
+        await db.execute(statement);
+    }
+    foreach (var kind in ["guests", "members", "moderators", "administrators"]) {
+        await insert(db, "member_groups", { name: kind, kind: kind });
+    }
+    await users.join(db, await users.make(db, "Bob", "bob@example.com", "no hash", now, null), "members");
+}
+
+// A settings form as the settings page sends it, each value as text.
+function form(changes) {
+    var made = { name: "Tea Talk", description: "About tea.", language: "en", timeZone: "Europe/Warsaw", topicsPerPage: "10",
+                 postsPerPage: "15", signUp: "1", mailFrom: "Tea Talk <tea@example.com>", address: "https://tea.example.com/" };
+    foreach (var (name, color) in settings.defaults["colors"]) {
+        made["color." + name] = color;
+    }
+    return { ...made, ...changes };
+}
+
+export class AdministrationTests {
+    async testSettingsAreCheckedSavedAndRead() {
+        var given = admin.settingsOf(form({ "color.accent": "#AA0000" }));
+        assertDeepEqual(given["problems"], []);
+        var values = given["values"];
+        assertDeepEqual([values["name"], values["topicsPerPage"], values["signUp"], values["confirmEmail"], values["images"], values["address"]],
+                        ["Tea Talk", 10, true, false, false, "https://tea.example.com"]);
+        assertEqual(values["colors"]["accent"], "#aa0000");
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            await admin.saveSettings(db, values);
+            await admin.saveSettings(db, values);
+            var loaded = await settings.load(db);
+            assertDeepEqual([loaded["name"], loaded["timeZone"], loaded["postsPerPage"], loaded["confirmEmail"], loaded["colors"]["accent"]],
+                            ["Tea Talk", "Europe/Warsaw", 15, false, "#aa0000"]);
+        }
+        var wrong = admin.settingsOf(form({ name: "", timeZone: "Mars/Olympus", topicsPerPage: "4", postsPerPage: "x", language: "xx",
+                                            mailFrom: "nobody", address: "ftp://tea.example.com", "color.text": "black;}" }));
+        assertDeepEqual(wrong["problems"], ["admin.badName", "profile.badLanguage", "profile.badZone", "admin.badPerPage", "admin.badPerPage",
+                                            "admin.badMailFrom", "admin.badAddress", "admin.badColor"]);
+        assertEqual(wrong["values"]["colors"]["text"], settings.defaults["colors"]["text"]);
+        assertEqual(admin.settingsOf(form({ address: "" }))["values"]["address"], null);
+    }
+
+    async testCategoriesAndBoardsAreMadeChangedAndRemoved() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            var general = await admin.makeCategory(db, "General");
+            var other = await admin.makeCategory(db, "Other");
+            assertDeepEqual((await db.query("SELECT sort_order FROM categories ORDER BY id")).map(row => row["sort_order"]), [1, 2]);
+            var tea = await admin.makeBoard(db, general, "Tea", null);
+            var cake = await admin.makeBoard(db, general, "Cake", "Sweet.");
+            assertDeepEqual((await db.query("SELECT sort_order FROM boards ORDER BY id")).map(row => row["sort_order"]), [1, 2]);
+            assertEqual((await permissions.of(db, null)).has(tea, "read"), true);
+            assertEqual((await db.query("SELECT COUNT(*) AS n FROM board_permissions WHERE board_id = @board", { board: cake }))[0]["n"], 4);
+
+            await admin.changeBoard(db, cake, other, "Cakes", null, 5);
+            var row = (await db.query("SELECT category_id, name, description, sort_order FROM boards WHERE id = @id", { id: cake }))[0];
+            assertDeepEqual([row["category_id"], row["name"], row["description"], row["sort_order"]], [other, "Cakes", null, 5]);
+            await admin.changeCategory(db, other, "Elsewhere", 0);
+            assertEqual((await db.query("SELECT name FROM categories ORDER BY sort_order"))[0]["name"], "Elsewhere");
+
+            // A category with boards, and a board that has had a topic, deleted ones counted, stay.
+            assertEqual(await admin.removeCategory(db, other), false);
+            var made = await posts.start(db, tea, 1, "Tea", "Tea.", now);
+            await db.execute("UPDATE topics SET deleted = @deleted", { deleted: true });
+            assertEqual(await admin.removeBoard(db, tea), false);
+            assertEqual(await admin.removeBoard(db, cake), true);
+            assertEqual((await db.query("SELECT COUNT(*) AS n FROM board_permissions WHERE board_id = @board", { board: cake }))[0]["n"], 0);
+            assertEqual(await admin.removeCategory(db, other), true);
+            assertDeepEqual([admin.nameProblem(""), admin.nameProblem("x".repeat(101)), admin.nameProblem("Tea")], ["admin.badName", "admin.badName", null]);
+        }
+    }
+
+    async testGroupsAndTheirPermissionsOnABoard() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            var board = await admin.makeBoard(db, await admin.makeCategory(db, "General"), "Tea", null);
+            var tasters = await admin.makeGroup(db, "Tea tasters");
+            var listed = await admin.groups(db);
+            assertDeepEqual(listed.map(group => [group["name"], group["kind"], group["members"]]),
+                            [["guests", "guests", 0], ["members", "members", 1], ["moderators", "moderators", 0],
+                             ["administrators", "administrators", 0], ["Tea tasters", null, 0]]);
+            var given = await admin.boardPermissions(db, board);
+            assertDeepEqual([given[0]["can"]["read"], given[0]["can"]["start"], given[4]["can"]["see"]], [true, false, false]);
+
+            // The form's checkboxes: guests nothing, the tasters reading and replying.
+            var checked = {};
+            foreach (var name in ["see", "read", "reply"]) {
+                checked[$"p.{tasters}.{name}"] = "1";
+            }
+            await admin.setBoardPermissions(db, board, checked);
+            assertEqual((await permissions.of(db, null)).has(board, "see"), false);
+            await admin.setGroups(db, 1, [tasters]);
+            assertDeepEqual(await admin.groupsOf(db, 1), [tasters]);
+            var bob = await permissions.of(db, 1);
+            assertDeepEqual([bob.has(board, "read"), bob.has(board, "reply"), bob.has(board, "start")], [true, true, false]);
+
+            await admin.renameGroup(db, tasters, "Tasters");
+            assertEqual(await admin.removeGroup(db, 1), false);
+            assertEqual(await admin.removeGroup(db, tasters), true);
+            assertDeepEqual(await admin.groupsOf(db, 1), []);
+            assertEqual((await db.query("SELECT COUNT(*) AS n FROM board_permissions WHERE group_id = @group", { group: tasters }))[0]["n"], 0);
+        }
+    }
+
+    async testAMembersAddressIsConfirmedAndEveryMemberListed() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            await users.make(db, "Anna", "anna@example.com", "no hash", now, now);
+            assertEqual(await admin.memberCount(db), 2);
+            var listed = await admin.members(db, 0, 10);
+            assertDeepEqual(listed.map(member => [member["name"], member["confirmed_at"] == null]), [["Anna", false], ["Bob", true]]);
+            await admin.confirm(db, 1, now.addHours(1));
+            await admin.confirm(db, 1, now.addHours(2));
+            assertEqual((await users.byId(db, 1))["confirmed_at"], now.addHours(1));
+        }
+    }
+}

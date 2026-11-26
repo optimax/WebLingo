@@ -1,0 +1,36 @@
+<% param request; param response; import { settingsPage } from "/lib/administering.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await settingsPage(request, response)).title, crumbs: (await settingsPage(request, response)).crumbs }; %>
+<% var view = await settingsPage(request, response); var site = view.site; %>
+<h1><%= view.title %></h1>
+<% if (view.refused != null) { %>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null && !view.done) { var values = view.values; %>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems, notice: view.saved ? site.t("admin.saved") : null }); %>
+<form method="post" class="form" action="/admin/settings">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <label><%= site.t("admin.forumName") %> <input name="name" value="<%= values["name"] %>" required maxlength="100"></label>
+  <label><%= site.t("admin.description") %> <input name="description" value="<%= values["description"] %>" maxlength="500"></label>
+  <label><%= site.t("profile.language") %>
+    <select name="language">
+<% foreach (var (code, name) in view.languages) { %>
+      <option value="<%= code %>"<% if (values["language"] == code) { %> selected<% } %>><%= name %></option>
+<% } %>
+    </select></label>
+  <label><%= site.t("profile.timeZone") %> <input name="timeZone" value="<%= values["timeZone"] %>" required maxlength="64"></label>
+  <label><%= site.t("admin.topicsPerPage") %> <input type="number" name="topicsPerPage" value="<%= values["topicsPerPage"] %>" min="5" max="100" required></label>
+  <label><%= site.t("admin.postsPerPage") %> <input type="number" name="postsPerPage" value="<%= values["postsPerPage"] %>" min="5" max="100" required></label>
+  <label class="check"><input type="checkbox" name="signUp" value="1"<% if (values["signUp"]) { %> checked<% } %>> <%= site.t("admin.signUp") %></label>
+  <label class="check"><input type="checkbox" name="confirmEmail" value="1"<% if (values["confirmEmail"]) { %> checked<% } %>> <%= site.t("admin.confirmEmail") %></label>
+  <label class="check"><input type="checkbox" name="images" value="1"<% if (values["images"]) { %> checked<% } %>> <%= site.t("admin.images") %></label>
+  <label><%= site.t("admin.mailFrom") %> <input name="mailFrom" value="<%= values["mailFrom"] %>" required maxlength="200"></label>
+  <label><%= site.t("admin.address") %> <input type="url" name="address" value="<%= values["address"] ?? "" %>" maxlength="200">
+    <span class="note"><%= site.t("admin.addressHint") %></span></label>
+  <fieldset class="colors">
+    <legend><%= site.t("admin.colors") %></legend>
+<% foreach (var name in ["accent", "accentText", "background", "surface", "text", "muted", "border"]) { %>
+    <label><input type="color" name="color.<%= name %>" value="<%= values["colors"][name] %>"> <%= site.t("admin.color." + name) %></label>
+<% } %>
+  </fieldset>
+  <button><%= site.t("form.save") %></button>
+</form>
+<% } %>

@@ -1,0 +1,56 @@
+<% param request; param response; import { boardsPage } from "/lib/administering.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await boardsPage(request, response)).title, crumbs: (await boardsPage(request, response)).crumbs }; %>
+<% var view = await boardsPage(request, response); var site = view.site; %>
+<h1><%= view.title %></h1>
+<% if (view.refused != null) { %>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null && !view.done) { %>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems }); %>
+<% foreach (var category in view.categories) { %>
+<section class="category">
+  <form method="post" class="inline-form" action="/admin/boards">
+    <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+    <input type="hidden" name="id" value="<%= category["id"] %>">
+    <input name="name" value="<%= category["name"] %>" required maxlength="100" aria-label="<%= site.t("admin.categoryName") %>">
+    <input type="number" name="order" value="<%= category["sort_order"] %>" min="0" aria-label="<%= site.t("admin.order") %>">
+    <button name="action" value="category" class="secondary"><%= site.t("form.save") %></button>
+<% if (category["boards"].length == 0) { %>
+    <button name="action" value="removeCategory" class="secondary"><%= site.t("admin.remove") %></button>
+<% } %>
+  </form>
+  <table class="list">
+<% foreach (var board in category["boards"]) { %>
+    <tr>
+      <td class="what"><a class="board" href="/admin/board?id=<%= board["id"] %>"><%= board["name"] %></a>
+<% if (board["description"] != null) { %>        <p class="note"><%= board["description"] %></p><% } %>
+      </td>
+      <td class="count"><%= site.f("board.topics", { count: board["topic_count"] }) %><br><%= site.f("board.posts", { count: board["post_count"] }) %></td>
+    </tr>
+<% } %>
+  </table>
+</section>
+<% } %>
+<h2 class="plain"><%= site.t("admin.addBoard") %></h2>
+<% if (view.categories.length == 0) { %>
+<p class="note"><%= site.t("admin.noCategories") %></p>
+<% } else { %>
+<form method="post" class="form" action="/admin/boards">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <label><%= site.t("admin.category") %>
+    <select name="category">
+<% foreach (var category in view.categories) { %>
+      <option value="<%= category["id"] %>"><%= category["name"] %></option>
+<% } %>
+    </select></label>
+  <label><%= site.t("admin.boardName") %> <input name="name" required maxlength="100"></label>
+  <label><%= site.t("admin.description") %> <input name="description" maxlength="500"></label>
+  <button name="action" value="addBoard"><%= site.t("admin.addBoard") %></button>
+</form>
+<% } %>
+<h2 class="plain"><%= site.t("admin.addCategory") %></h2>
+<form method="post" class="form" action="/admin/boards">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <label><%= site.t("admin.categoryName") %> <input name="name" required maxlength="100"></label>
+  <button name="action" value="addCategory"><%= site.t("admin.addCategory") %></button>
+</form>
+<% } %>

@@ -1,0 +1,322 @@
+// What the administration's pages do, and show (Documents/weblingo-forum.md, section 2, "Administration"; section 6,
+// part 5): the forum's settings, its categories and boards, a board and each group's permissions on it, the groups, and
+// the members and their groups; for administrators alone. Each page's work runs once for each request, from its layout's
+// values, before anything is written.
+
+import { DateTime } from "std:datetime";
+import { begin, open, viewOf, formOf, redirect, idOf, pageOf, pagesOf, refuse, signInFirst } from "./forum.wlg";
+import boards from "./boards.wlg";
+import users from "./users.wlg";
+import admin from "./administration.wlg";
+import { languages } from "./texts.wlg";
+
+// The members on a page of the administration's list.
+export const membersPerPage = 50;
+
+function view(site, title) {
+    var page = viewOf(site, title, [[site.t("admin.title"), "/admin"]]);
+    page.problems = [];
+    page.notice = null;
+    page.refused = null;
+    page.done = false;
+    return page;
+}
+
+// An administration's page refused where the reader is not signed in, sent to sign in first, or is not an
+// administrator; gives whether it was.
+function notForThem(site, page, response, back) {
+    if (signInFirst(site, response, back)) {
+        return true;
+    }
+    if (!site.permissions.admin) {
+        refuse(page, response, 403, "admin.notAdministrator");
+        return true;
+    }
+    return false;
+}
+
+// The form a page was posted, or null where it was not; a form whose token against cross-site request forgery is not the
+// browser's refused, 400.
+async function posted(page, request, response) {
+    if (request.method != "POST") {
+        return null;
+    }
+    var form = await formOf(request);
+    if (form == null) {
+        response.status = 400;
+        page.problems.push("form.expired");
+    }
+    return form;
+}
+
+// A page's work done: the browser sent on to a path, as a form's answer does.
+function done(page, response, path) {
+    page.done = true;
+    redirect(response, path);
+    return page;
+}
+
+// A page's problems, each a text's name, once each; 400 where it has any.
+function problems(page, response, found) {
+    foreach (var problem in found) {
+        if (problem != null && !page.problems.contains(problem)) {
+            page.problems.push(problem);
+        }
+    }
+    if (page.problems.length > 0) {
+        response.status = 400;
+    }
+    return page.problems.length > 0;
+}
+
+// A place in order, from a form's text, 0 or more, or null.
+function orderOf(text) {
+    var trimmed = (text ?? "").trim();
+    return trimmed == "0" ? 0 : idOf(trimmed);
+}
+
+// A form's field, trimmed.
+function field(form, name) {
+    return (form?[name] ?? "").trim();
+}
+
+// /admin: the administration's pages.
+export async function indexPage(request, response) {
+    var site = await begin(request);
+    return await site.once("admin", async () => {
+        var page = viewOf(site, site.t("admin.title"), []);
+        page.refused = null;
+        notForThem(site, page, response, "/admin");
+        return page;
+    });
+}
+
+// /admin/settings: the forum's settings, saved where each is as it should be.
+export async function settingsPage(request, response) {
+    var site = await begin(request);
+    return await site.once("settings", async () => {
+        var page = view(site, site.t("admin.settings"));
+        if (notForThem(site, page, response, "/admin/settings")) {
+            return page;
+        }
+        page.values = site.settings;
+        page.languages = languages;
+        page.saved = request.method == "GET" && request.query?["saved"] == "1";
+        var form = await posted(page, request, response);
+        if (form == null) {
+            return page;
+        }
+        var given = admin.settingsOf(form);
+        page.values = given["values"];
+        if (problems(page, response, given["problems"])) {
+            return page;
+        }
+        using (var db = await open()) {
+            await admin.saveSettings(db, page.values);
+        }
+        return done(page, response, "/admin/settings?saved=1");
+    });
+}
+
+// /admin/boards: the categories and their boards; a category made, renamed and put in its place, or removed where it has
+// no boards; and a board made, with each group's permissions by default.
+export async function boardsPage(request, response) {
+    var site = await begin(request);
+    return await site.once("boards", async () => {
+        var page = view(site, site.t("admin.boards"));
+        page.categories = [];
+        if (notForThem(site, page, response, "/admin/boards")) {
+            return page;
+        }
+        using (var db = await open()) {
+            var form = await posted(page, request, response);
+            if (form != null) {
+                var action = form?["action"];
+                var name = field(form, "name");
+                if (action == "addCategory") {
+                    if (!problems(page, response, [admin.nameProblem(name)])) {
+                        await admin.makeCategory(db, name);
+                        return done(page, response, "/admin/boards");
+                    }
+                } else if (action == "category") {
+                    var order = orderOf(form?["order"]);
+                    if (!problems(page, response, [admin.nameProblem(name), order == null ? "admin.badOrder" : null])) {
+                        await admin.changeCategory(db, idOf(form?["id"]), name, order);
+                        return done(page, response, "/admin/boards");
+                    }
+                } else if (action == "removeCategory") {
+                    if (!problems(page, response, [await admin.removeCategory(db, idOf(form?["id"])) ? null : "admin.categoryNotEmpty"])) {
+                        return done(page, response, "/admin/boards");
+                    }
+                } else if (action == "addBoard") {
+                    var category = idOf(form?["category"]);
+                    var description = field(form, "description");
+                    var known = category != null
+                                && (await db.query("SELECT 1 AS n FROM categories WHERE id = @id", { id: category })).length > 0;
+                    if (!problems(page, response, [known ? null : "admin.noCategory", admin.nameProblem(name),
+                                                   description.length > admin.longestDescription ? "admin.badDescription" : null])) {
+                        var board = await admin.makeBoard(db, category, name, description == "" ? null : description);
+                        return done(page, response, $"/admin/board?id={board}");
+                    }
+                }
+            }
+            page.categories = await db.query("SELECT id, name, sort_order FROM categories ORDER BY sort_order, id");
+            var grouped = await boards.index(db);
+            foreach (var category in page.categories) {
+                category["boards"] = [];
+                foreach (var listed in grouped) {
+                    if (listed["id"] == category["id"]) {
+                        category["boards"] = listed["boards"];
+                    }
+                }
+            }
+        }
+        return page;
+    });
+}
+
+// /admin/board?id=3: a board: its category, its name, its description and its place in order; each group's permissions
+// on it; or the board removed, where it has never had a topic.
+export async function boardPage(request, response) {
+    var site = await begin(request);
+    return await site.once("board", async () => {
+        using (var db = await open()) {
+            var board = await boards.one(db, idOf(request.query?["id"]));
+            var page = view(site, board == null ? site.t("board.notFound") : site.f("admin.boardTitle", { name: board["name"] }));
+            page.crumbs.push([site.t("admin.boards"), "/admin/boards"]);
+            if (board == null) {
+                return refuse(page, response, 404, "forum.notFoundText");
+            }
+            var here = $"/admin/board?id={board['id']}";
+            page.action = here;
+            if (notForThem(site, page, response, here)) {
+                return page;
+            }
+            page.board = board;
+            page.values = { name: board["name"], description: board["description"] ?? "", category: board["category_id"],
+                            order: board["sort_order"] };
+            page.categories = await db.query("SELECT id, name FROM categories ORDER BY sort_order, id");
+            page.saved = request.method == "GET" && request.query?["saved"] == "1";
+            var form = await posted(page, request, response);
+            if (form != null) {
+                var action = form?["action"];
+                if (action == "board") {
+                    var category = idOf(form?["category"]);
+                    var order = orderOf(form?["order"]);
+                    page.values = { name: field(form, "name"), description: field(form, "description"), category: category, order: form?["order"] };
+                    var known = page.categories.any(c => c["id"] == category);
+                    if (!problems(page, response, [admin.nameProblem(page.values["name"]), known ? null : "admin.noCategory",
+                                                   order == null ? "admin.badOrder" : null,
+                                                   page.values["description"].length > admin.longestDescription ? "admin.badDescription" : null])) {
+                        await admin.changeBoard(db, board["id"], category, page.values["name"],
+                                                page.values["description"] == "" ? null : page.values["description"], order);
+                        return done(page, response, here + "&saved=1");
+                    }
+                } else if (action == "permissions") {
+                    await admin.setBoardPermissions(db, board["id"], form);
+                    return done(page, response, here + "&saved=1");
+                } else if (action == "remove") {
+                    if (!problems(page, response, [await admin.removeBoard(db, board["id"]) ? null : "admin.boardNotEmpty"])) {
+                        return done(page, response, "/admin/boards");
+                    }
+                }
+            }
+            page.groups = await admin.boardPermissions(db, board["id"]);
+            return page;
+        }
+    });
+}
+
+// /admin/groups: the groups, each with how many members it has; one made or renamed, or removed where an administrator
+// made it.
+export async function groupsPage(request, response) {
+    var site = await begin(request);
+    return await site.once("groups", async () => {
+        var page = view(site, site.t("admin.groups"));
+        page.groups = [];
+        if (notForThem(site, page, response, "/admin/groups")) {
+            return page;
+        }
+        using (var db = await open()) {
+            var form = await posted(page, request, response);
+            if (form != null) {
+                var action = form?["action"];
+                var name = field(form, "name");
+                if (action == "add" && !problems(page, response, [admin.nameProblem(name)])) {
+                    await admin.makeGroup(db, name);
+                    return done(page, response, "/admin/groups");
+                }
+                if (action == "rename" && !problems(page, response, [admin.nameProblem(name)])) {
+                    await admin.renameGroup(db, idOf(form?["id"]), name);
+                    return done(page, response, "/admin/groups");
+                }
+                if (action == "remove" && !problems(page, response, [await admin.removeGroup(db, idOf(form?["id"])) ? null : "admin.groupBuiltIn"])) {
+                    return done(page, response, "/admin/groups");
+                }
+            }
+            page.groups = await admin.groups(db);
+        }
+        return page;
+    });
+}
+
+// /admin/members?page=2: every member, whose address is confirmed or not, by name, a page of them.
+export async function membersPage(request, response) {
+    var site = await begin(request);
+    return await site.once("members", async () => {
+        var page = view(site, site.t("admin.members"));
+        page.members = [];
+        page.pages = 1;
+        page.page = 1;
+        if (notForThem(site, page, response, "/admin/members")) {
+            return page;
+        }
+        using (var db = await open()) {
+            page.pages = pagesOf(await admin.memberCount(db), membersPerPage);
+            var number = pageOf(request.query?["page"]);
+            page.page = number > page.pages ? page.pages : number;
+            page.members = await admin.members(db, (page.page - 1) * membersPerPage, membersPerPage);
+        }
+        return page;
+    });
+}
+
+// /admin/member?id=2: a member's groups, and their address confirmed. An administrator never takes themselves out of the
+// administrators' group, so that the forum keeps one.
+export async function memberPage(request, response) {
+    var site = await begin(request);
+    return await site.once("member", async () => {
+        using (var db = await open()) {
+            var member = await users.byId(db, idOf(request.query?["id"]));
+            var page = view(site, member == null ? site.t("member.notFound") : member["name"]);
+            page.crumbs.push([site.t("admin.members"), "/admin/members"]);
+            if (member == null) {
+                return refuse(page, response, 404, "forum.notFoundText");
+            }
+            var here = $"/admin/member?id={member['id']}";
+            page.action = here;
+            if (notForThem(site, page, response, here)) {
+                return page;
+            }
+            page.member = member;
+            page.groups = await admin.groups(db);
+            page.memberGroups = await admin.groupsOf(db, member["id"]);
+            page.saved = request.method == "GET" && request.query?["saved"] == "1";
+            var form = await posted(page, request, response);
+            if (form != null) {
+                if (form?["action"] == "confirm") {
+                    await admin.confirm(db, member["id"], DateTime.utcNow());
+                    return done(page, response, here + "&saved=1");
+                }
+                var chosen = page.groups.filter(group => form?[$"g.{group['id']}"] != null);
+                var keepsAdministrators = chosen.any(group => group["kind"] == "administrators");
+                page.memberGroups = chosen.map(group => group["id"]);
+                if (!problems(page, response, [member["id"] == site.user["id"] && !keepsAdministrators ? "admin.keepYourself" : null])) {
+                    await admin.setGroups(db, member["id"], page.memberGroups);
+                    return done(page, response, here + "&saved=1");
+                }
+            }
+            return page;
+        }
+    });
+}

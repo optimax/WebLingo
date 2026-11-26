@@ -6,7 +6,8 @@ from its database; its members, who sign up, confirm their address by mail, sign
 and keep a profile; and writing, in Markdown: topics started, replies, quotes, one's own posts edited and deleted, with a
 preview first, what is new to each member, and topics watched, their replies mailed; and each board's permissions for
 each group, and moderation: topics locked, pinned, moved, deleted and restored, others' posts edited and deleted, posts
-reported, members banned, and a log of it all. Administration and the rest come in the parts after them.
+reported, members banned, and a log of it all; and its administration: its settings, categories and boards, who may do
+what on each, groups, and members' groups. Private messages and the rest come in the parts after them.
 
 ```text
 WebLingoForum/
@@ -20,6 +21,8 @@ WebLingoForum/
                 post reported, and watch.wlg, watching a topic or not
     mod/        moderation: reports.wasp, the reports, log.wasp, the log, ban.wasp, a member's ban, and topic.wlg and
                 post.wlg, a moderator's actions
+    admin/      administration, /admin: settings.wasp, boards.wasp and board.wasp, a board and who may do what on it,
+                groups.wasp, and members.wasp and member.wasp, a member's groups
     account/    signing up, confirming an address, signing in and out, a forgotten password, the member's profile
     members/    /members, the members by name, and /members/member?id=1, a member's page
     lib/        the forum's modules: the database's SQL, its schema, settings, texts, members, their mail and tokens,
@@ -49,7 +52,8 @@ earlier version of the forum made, it adds the tables this version adds.
 The forum's own tests, from `tests`:
 
 ```bash
-weblingo test accounts-tests.wlg markdown-tests.wlg moderation-tests.wlg schema-tests.wlg sql-tests.wlg texts-tests.wlg users-tests.wlg writing-tests.wlg
+weblingo test accounts-tests.wlg administration-tests.wlg markdown-tests.wlg moderation-tests.wlg schema-tests.wlg \
+    sql-tests.wlg texts-tests.wlg users-tests.wlg writing-tests.wlg
 ```
 
 ## Mail, and members
@@ -67,7 +71,7 @@ address its settings' `"mailFrom"` gives:
 ```
 
 Without a mail server, a newcomer is told that their mail could not be sent, and gets it when they sign in later. The
-settings, which its administration's pages will change, are `site/lib/settings.wlg`'s defaults for now: `"signUp"`,
+settings, which its administration's pages change, `/admin/settings`, have `site/lib/settings.wlg`'s defaults: `"signUp"`,
 whether anyone may sign up; `"confirmEmail"`, whether a newcomer confirms their address first; `"mailFrom"`; and
 `"address"`, the forum's own address, `"https://forum.example.com"`, for the links in its mail, which, left `null`, is
 the address each request came to, its `Host` header's: set it where the forum is served by its name, so that no request

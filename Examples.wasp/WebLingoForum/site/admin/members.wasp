@@ -1,0 +1,21 @@
+<% param request; param response; import { membersPage } from "/lib/administering.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await membersPage(request, response)).title, crumbs: (await membersPage(request, response)).crumbs }; %>
+<% var view = await membersPage(request, response); var site = view.site; %>
+<h1><%= view.title %></h1>
+<% if (view.refused != null) { %>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null) { %>
+<% await renderComponent("/components/pages.wasp", { site: site, base: "/admin/members", page: view.page, pages: view.pages }); %>
+<table class="list members">
+  <tr><th><%= site.t("members.name") %></th><th><%= site.t("signUp.email") %></th><th><%= site.t("members.joined") %></th><th><%= site.t("members.posts") %></th></tr>
+<% foreach (var member in view.members) { %>
+  <tr>
+    <td><a href="/admin/member?id=<%= member["id"] %>"><%= member["name"] %></a><% if (member["confirmed_at"] == null) { %> <span class="tag"><%= site.t("admin.unconfirmed") %></span><% } %></td>
+    <td><%= member["email"] %></td>
+    <td><%= site.time(member["created_at"]) %></td>
+    <td><%= member["post_count"] %></td>
+  </tr>
+<% } %>
+</table>
+<% await renderComponent("/components/pages.wasp", { site: site, base: "/admin/members", page: view.page, pages: view.pages }); %>
+<% } %>

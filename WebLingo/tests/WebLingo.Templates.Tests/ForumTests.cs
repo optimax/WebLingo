@@ -233,6 +233,7 @@ public sealed class ForumTests
                 using var bob = await MembersAsync(address, smtp);
                 using var anna = await WritingAsync(address, smtp, bob);
                 await ModerationAsync(address, anna, bob);
+                await AdministrationAsync(address, anna, bob);
             }
             finally
             {
@@ -661,6 +662,103 @@ public sealed class ForumTests
                       "Restored the topic", "Deleted a post", "Restored a post", "Banned", "Lifted the ban of"], actions);
         Assert.Contains("from Welcome", body);
         Assert.Contains("from Staff", body);
+    }
+
+    /// <summary>
+    /// Administration, as Anna, an administrator, uses it: the forum's settings, a time zone it does not know refused; a
+    /// category and a board in it made, its groups' permissions changed, and both removed, a board with topics not; a group
+    /// made and removed, the forum's own not; Bob made a moderator and back, Anna never taking herself out of the
+    /// administrators; and a newcomer's address confirmed. A guest sent to sign in, and Bob refused.
+    /// </summary>
+    private static async Task AdministrationAsync(string address, Browser anna, Browser bob)
+    {
+        using (var guest = new Browser(address))
+        {
+            Assert.Equal("/account/sign-in?back=/admin/settings", (await guest.Visit("/admin/settings")).Item3);
+        }
+        Assert.Equal(HttpStatusCode.Forbidden, (await bob.Get("/admin")).Item1);
+        Assert.DoesNotContain(">Administration</a>", (await bob.Get("/")).Item2);
+        var (status, body) = await anna.Get("/admin");
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("<a href=\"/admin\">Administration</a>", body);
+
+        // The settings: the forum renamed, its accent red, ten topics a page.
+        var colors = new Dictionary<string, string> { ["accent"] = "#AA0000", ["accentText"] = "#ffffff", ["background"] = "#f6f7f9",
+            ["surface"] = "#ffffff", ["text"] = "#1d232a", ["muted"] = "#5c6670", ["border"] = "#d9dee3" };
+        (string, string)[] Settings(string zone) => [("name", "Tea Talk"), ("description", "About tea."), ("language", "en"), ("timeZone", zone),
+            ("topicsPerPage", "10"), ("postsPerPage", "20"), ("signUp", "1"), ("confirmEmail", "1"), ("mailFrom", "Tea Talk <tea@example.com>"),
+            ("address", ""), .. colors.Select(c => ("color." + c.Key, c.Value))];
+        (status, body, _) = await anna.Post("/admin/settings", Settings("Mars/Olympus"));
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Contains("That is not a time zone this server knows.", body);
+        (status, body, var at) = await anna.Post("/admin/settings", Settings("Europe/Warsaw"));
+        Assert.Equal((HttpStatusCode.OK, "/admin/settings?saved=1"), (status, at));
+        Assert.Contains("Saved.", body);
+        var home = (await bob.Get("/")).Item2;
+        Assert.Contains("<title>Boards · Tea Talk</title>", home);
+        Assert.Contains("--accent: #aa0000;", home);
+        Assert.Contains("<a href=\"/board?id=1&amp;page=4\">4</a>", (await bob.Get("/board?id=1")).Item2);
+
+        // A category, and a board in it, which guests see by default until its permissions say otherwise; then both removed.
+        (status, body, at) = await anna.Post("/admin/boards", ("name", "Off topic"), ("action", "addCategory"));
+        Assert.Equal((HttpStatusCode.OK, "/admin/boards"), (status, at));
+        (status, body, at) = await anna.Post("/admin/boards", ("category", "2"), ("name", "Tea"), ("description", "All about tea."), ("action", "addBoard"));
+        Assert.Equal((HttpStatusCode.OK, "/admin/board?id=3"), (status, at));
+        using (var guest = new Browser(address))
+        {
+            var seen = (await guest.Get("/")).Item2;
+            Assert.Contains("<h2>Off topic</h2>", seen);
+            Assert.Contains("<a class=\"board\" href=\"/board?id=3\">Tea</a>", seen);
+            (status, body, at) = await anna.Post("/admin/board?id=3", ("p.2.see", "1"), ("p.2.read", "1"), ("p.2.start", "1"), ("p.2.reply", "1"),
+                ("p.3.see", "1"), ("p.3.read", "1"), ("p.3.moderate", "1"), ("action", "permissions"));
+            Assert.Equal((HttpStatusCode.OK, "/admin/board?id=3&saved=1"), (status, at));
+            Assert.DoesNotContain("Off topic", (await guest.Get("/")).Item2);
+        }
+        Assert.Contains("<a class=\"board\" href=\"/board?id=3\">Tea</a>", (await bob.Get("/")).Item2);
+        (status, body, _) = await anna.Post("/admin/board?id=1", ("action", "remove"));
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Contains("Only a board that has never had a topic can be removed.", body);
+        (status, _, at) = await anna.Post("/admin/board?id=3", ("action", "remove"));
+        Assert.Equal((HttpStatusCode.OK, "/admin/boards"), (status, at));
+        (status, _, at) = await anna.Post("/admin/boards", ("id", "2"), ("action", "removeCategory"));
+        Assert.Equal((HttpStatusCode.OK, "/admin/boards"), (status, at));
+        Assert.DoesNotContain("Off topic", (await bob.Get("/")).Item2);
+
+        // A group made and removed; the forum's own stay.
+        (status, body, at) = await anna.Post("/admin/groups", ("name", "Tea tasters"), ("action", "add"));
+        Assert.Equal((HttpStatusCode.OK, "/admin/groups"), (status, at));
+        var tasters = Regex.Match(body, "name=\"id\" value=\"(\\d+)\">\\s*<input name=\"name\" value=\"Tea tasters\"").Groups[1].Value;
+        Assert.NotEqual("", tasters);
+        (status, body, _) = await anna.Post("/admin/groups", ("id", "2"), ("action", "remove"));
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Contains("The forum&#39;s own groups cannot be removed.", body);
+        (status, body, at) = await anna.Post("/admin/groups", ("id", tasters), ("action", "remove"));
+        Assert.Equal((HttpStatusCode.OK, "/admin/groups"), (status, at));
+        Assert.DoesNotContain("Tea tasters", body);
+
+        // Bob made a moderator, which gives him the moderators' pages, and back; Anna never takes herself out of the
+        // administrators.
+        (status, _, at) = await anna.Post("/admin/member?id=2", ("g.2", "1"), ("g.3", "1"), ("action", "groups"));
+        Assert.Equal((HttpStatusCode.OK, "/admin/member?id=2&saved=1"), (status, at));
+        Assert.Contains("<a href=\"/mod/reports\">Moderation</a>", (await bob.Get("/")).Item2);
+        Assert.Equal(HttpStatusCode.OK, (await bob.Get("/mod/reports")).Item1);
+        await anna.Post("/admin/member?id=2", ("g.2", "1"), ("action", "groups"));
+        Assert.Equal(HttpStatusCode.Forbidden, (await bob.Get("/mod/reports")).Item1);
+        (status, body, _) = await anna.Post("/admin/member?id=1", ("g.2", "1"), ("action", "groups"));
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Contains("You cannot take yourself out of the administrators&#39; group.", body);
+
+        // A newcomer, Carol, whose mail never came: Anna confirms her address, and Carol signs in.
+        using var carol = new Browser(address);
+        (_, body, _) = await carol.Post("/account/sign-up", ("name", "Carol"), ("email", "carol@example.com"), ("password", "carols-password"),
+            ("passwordAgain", "carols-password"));
+        Assert.Contains("We sent a link to carol@example.com.", body);
+        Assert.Contains(">Carol</a> <span class=\"tag\">Unconfirmed</span>", (await anna.Get("/admin/members")).Item2);
+        (status, _, at) = await anna.Post("/admin/member?id=3", ("action", "confirm"));
+        Assert.Equal((HttpStatusCode.OK, "/admin/member?id=3&saved=1"), (status, at));
+        (status, body, at) = await carol.Post("/account/sign-in", ("name", "Carol"), ("password", "carols-password"));
+        Assert.Equal((HttpStatusCode.OK, "/"), (status, at));
+        Assert.Contains(">Carol</a>", body);
     }
 
     private static (int, string, string) Run(params string[] arguments)

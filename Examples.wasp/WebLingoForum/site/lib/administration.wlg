@@ -1,0 +1,258 @@
+// The forum's administration (Documents/weblingo-forum.md, section 2, "Administration"): its settings, its categories and
+// boards, its groups and each board's permissions for them, and its members' groups; each a change the administration's
+// pages make, checked first where a form gives it.
+
+import { Json } from "std:json";
+import { DateTime } from "std:datetime";
+import { insert, page } from "./sql.wlg";
+import settings from "./settings.wlg";
+import permissions from "./permissions.wlg";
+import { languages } from "./texts.wlg";
+
+// The longest a category's, a board's and a group's name may be, and a board's description.
+export const longestName = 100;
+export const longestDescription = 500;
+
+// Whether a time zone's name is one the server knows.
+export function isZone(name) {
+    try {
+        DateTime.utcNow().toZone(name);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// A number of items on a page, from a form's text, 5 to 100, or null.
+function perPageOf(text) {
+    if (!(text is String) || text.length == 0 || text.length > 3) {
+        return null;
+    }
+    foreach (var c in text) {
+        if (!"0123456789".contains(c)) {
+            return null;
+        }
+    }
+    var count = Integer.parse(text);
+    return count >= 5 && count <= 100 ? count : null;
+}
+
+// The settings a form gives: each value as the settings keep it, a checkbox true where it was sent, and what is wrong
+// with them, each a text's name.
+export function settingsOf(form) {
+    var values = {};
+    var problems = [];
+    function text(name) {
+        return (form?[name] ?? "").trim();
+    }
+    values["name"] = text("name");
+    if (values["name"] == "" || values["name"].length > longestName) {
+        problems.push("admin.badName");
+    }
+    values["description"] = text("description");
+    if (values["description"].length > longestDescription) {
+        problems.push("admin.badDescription");
+    }
+    values["language"] = text("language");
+    if (!languages.has(values["language"])) {
+        problems.push("profile.badLanguage");
+    }
+    values["timeZone"] = text("timeZone");
+    if (!isZone(values["timeZone"])) {
+        problems.push("profile.badZone");
+    }
+    foreach (var name in ["topicsPerPage", "postsPerPage"]) {
+        values[name] = perPageOf(text(name));
+        if (values[name] == null) {
+            problems.push("admin.badPerPage");
+            values[name] = text(name);
+        }
+    }
+    foreach (var name in ["signUp", "confirmEmail", "images"]) {
+        values[name] = form?[name] != null;
+    }
+    values["mailFrom"] = text("mailFrom");
+    if (!values["mailFrom"].contains("@") || values["mailFrom"].length > 200 || values["mailFrom"].contains("\n")) {
+        problems.push("admin.badMailFrom");
+    }
+    var address = text("address").trimEnd("/");
+    values["address"] = address == "" ? null : address;
+    var lower = address.toLower();
+    if (address != "" && (address.length > 200 || address.contains(" ")
+                          || !(lower.startsWith("http://") || lower.startsWith("https://")) || address.length < 9)) {
+        problems.push("admin.badAddress");
+    }
+    var colors = {};
+    foreach (var (name, color) in settings.defaults["colors"]) {
+        var given = text("color." + name).toLower();
+        colors[name] = given;
+        if (!settings.isColor(given)) {
+            problems.push("admin.badColor");
+            colors[name] = color;
+        }
+    }
+    values["colors"] = colors;
+    return { values: values, problems: problems };
+}
+
+// Saves the forum's settings, each kept as JSON.
+export async function saveSettings(db, values) {
+    await db.transaction(async () => {
+        foreach (var (name, value) in values) {
+            await db.execute("DELETE FROM settings WHERE name = @name", { name: name });
+            await db.execute("INSERT INTO settings (name, value) VALUES (@name, @value)", { name: name, value: Json.stringify(value) });
+        }
+    });
+}
+
+// Why a name cannot be a category's, a board's or a group's, a text's name, or null where it can.
+export function nameProblem(name) {
+    return name == "" || name.length > longestName ? "admin.badName" : null;
+}
+
+// Makes a category, last in order; gives its id.
+export async function makeCategory(db, name) {
+    var last = (await db.query("SELECT MAX(sort_order) AS n FROM categories"))[0]["n"] ?? 0;
+    return await insert(db, "categories", { name: name, sort_order: last + 1 });
+}
+
+// Renames a category, and puts it in its place in order.
+export async function changeCategory(db, id, name, order) {
+    await db.execute("UPDATE categories SET name = @name, sort_order = @order WHERE id = @id", { name: name, order: order, id: id });
+}
+
+// Removes a category without boards; gives whether it did.
+export async function removeCategory(db, id) {
+    if ((await db.query("SELECT 1 AS n FROM boards WHERE category_id = @id", { id: id })).length > 0) {
+        return false;
+    }
+    return await db.execute("DELETE FROM categories WHERE id = @id", { id: id }) == 1;
+}
+
+// Makes a board in a category, last in its order, with each group's permissions by default; gives its id.
+export async function makeBoard(db, category, name, description) {
+    return await db.transaction(async () => {
+        var last = (await db.query("SELECT MAX(sort_order) AS n FROM boards WHERE category_id = @category", { category: category }))[0]["n"] ?? 0;
+        var board = await insert(db, "boards", {
+            category_id: category, name: name, description: description, sort_order: last + 1, topic_count: 0, post_count: 0,
+            last_post_id: null });
+        await permissions.giveDefaults(db, board);
+        return board;
+    });
+}
+
+// Changes a board: its category, its name, its description, and its place in order.
+export async function changeBoard(db, id, category, name, description, order) {
+    await db.execute("""
+        UPDATE boards SET category_id = @category, name = @name, description = @description, sort_order = @order WHERE id = @id
+        """, { category: category, name: name, description: description, order: order, id: id });
+}
+
+// Removes a board that has never had a topic, deleted ones counted, with its permissions; gives whether it did.
+export async function removeBoard(db, id) {
+    if ((await db.query("SELECT 1 AS n FROM topics WHERE board_id = @id", { id: id })).length > 0) {
+        return false;
+    }
+    return await db.transaction(async () => {
+        await db.execute("DELETE FROM board_permissions WHERE board_id = @id", { id: id });
+        return await db.execute("DELETE FROM boards WHERE id = @id", { id: id }) == 1;
+    });
+}
+
+// The groups, in order, each with its kind, null for one an administrator made, and how many members it has.
+export async function groups(db) {
+    return await db.query("""
+        SELECT g.id, g.name, g.kind, (SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id) AS members
+        FROM member_groups g ORDER BY g.id
+        """);
+}
+
+// Makes a group, which no board gives anything yet; gives its id.
+export async function makeGroup(db, name) {
+    return await insert(db, "member_groups", { name: name, kind: null });
+}
+
+// Renames a group.
+export async function renameGroup(db, id, name) {
+    await db.execute("UPDATE member_groups SET name = @name WHERE id = @id", { name: name, id: id });
+}
+
+// Removes a group an administrator made, its members and its permissions with it; gives whether it did. The forum's own
+// four, guests, members, moderators and administrators, stay.
+export async function removeGroup(db, id) {
+    var rows = await db.query("SELECT kind FROM member_groups WHERE id = @id", { id: id });
+    if (rows.length == 0 || rows[0]["kind"] != null) {
+        return false;
+    }
+    await db.transaction(async () => {
+        await db.execute("DELETE FROM group_members WHERE group_id = @id", { id: id });
+        await db.execute("DELETE FROM board_permissions WHERE group_id = @id", { id: id });
+        await db.execute("DELETE FROM member_groups WHERE id = @id", { id: id });
+    });
+    return true;
+}
+
+// Each group's permissions on a board, every group's, a group the board gives nothing to with each permission false:
+// each a map of the group's id, name and kind, and its permissions, a map from each permission's name to whether it has it.
+export async function boardPermissions(db, board) {
+    var given = {};
+    foreach (var row in await db.query("SELECT * FROM board_permissions WHERE board_id = @board", { board: board })) {
+        given[row["group_id"]] = row;
+    }
+    var made = [];
+    foreach (var group in await db.query("SELECT id, name, kind FROM member_groups ORDER BY id")) {
+        var can = {};
+        foreach (var name in permissions.names) {
+            can[name] = given.has(group["id"]) && given[group["id"]]["can_" + name];
+        }
+        made.push({ id: group["id"], name: group["name"], kind: group["kind"], can: can });
+    }
+    return made;
+}
+
+// Sets each group's permissions on a board, as a form's checkboxes give them, each named p.{group}.{permission}.
+export async function setBoardPermissions(db, board, form) {
+    await db.transaction(async () => {
+        foreach (var group in await db.query("SELECT id FROM member_groups ORDER BY id")) {
+            var values = { board_id: board, group_id: group["id"] };
+            foreach (var name in permissions.names) {
+                values["can_" + name] = form?[$"p.{group['id']}.{name}"] != null;
+            }
+            await permissions.put(db, values);
+        }
+    });
+}
+
+// The ids of the groups a member is in.
+export async function groupsOf(db, user) {
+    return (await db.query("SELECT group_id FROM group_members WHERE user_id = @user ORDER BY group_id", { user: user }))
+        .map(row => row["group_id"]);
+}
+
+// Puts a member in the groups whose ids are given, and in no other.
+export async function setGroups(db, user, ids) {
+    await db.transaction(async () => {
+        await db.execute("DELETE FROM group_members WHERE user_id = @user", { user: user });
+        foreach (var id in ids) {
+            await db.execute("INSERT INTO group_members (group_id, user_id) VALUES (@group, @user)", { group: id, user: user });
+        }
+    });
+}
+
+// Confirms a member's address, as the link mailed to them would.
+export async function confirm(db, user, now) {
+    await db.execute("UPDATE users SET confirmed_at = @now WHERE id = @id AND confirmed_at IS NULL", { now: now, id: user });
+}
+
+// How many members there are, confirmed or not, and a page of them, by name, each with whether their address is
+// confirmed.
+export async function memberCount(db) {
+    return (await db.query("SELECT COUNT(*) AS n FROM users"))[0]["n"];
+}
+export async function members(db, skip, count) {
+    return await db.query($"""
+        SELECT id, name, email, created_at, confirmed_at, post_count, last_seen_at FROM users
+        ORDER BY name_key, id
+        {page(db.provider)}
+        """, { skip: skip, count: count });
+}

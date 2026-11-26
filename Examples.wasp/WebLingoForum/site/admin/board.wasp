@@ -1,0 +1,48 @@
+<% param request; param response; import { boardPage } from "/lib/administering.wlg"; import permissions from "/lib/permissions.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await boardPage(request, response)).title, crumbs: (await boardPage(request, response)).crumbs }; %>
+<% var view = await boardPage(request, response); var site = view.site; %>
+<h1><%= view.title %></h1>
+<% if (view.refused != null) { %>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null && !view.done) { var values = view.values; %>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems, notice: view.saved ? site.t("admin.saved") : null }); %>
+<p><a href="/board?id=<%= view.board["id"] %>"><%= site.t("admin.seeBoard") %></a></p>
+<form method="post" class="form" action="<%= view.action %>">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <label><%= site.t("admin.category") %>
+    <select name="category">
+<% foreach (var category in view.categories) { %>
+      <option value="<%= category["id"] %>"<% if (category["id"] == values["category"]) { %> selected<% } %>><%= category["name"] %></option>
+<% } %>
+    </select></label>
+  <label><%= site.t("admin.boardName") %> <input name="name" value="<%= values["name"] %>" required maxlength="100"></label>
+  <label><%= site.t("admin.description") %> <input name="description" value="<%= values["description"] %>" maxlength="500"></label>
+  <label><%= site.t("admin.order") %> <input type="number" name="order" value="<%= values["order"] %>" min="0" required></label>
+  <button name="action" value="board"><%= site.t("form.save") %></button>
+</form>
+<h2 class="plain"><%= site.t("admin.permissions") %></h2>
+<form method="post" action="<%= view.action %>">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <table class="list permissions">
+    <tr><th><%= site.t("admin.group") %></th><% foreach (var name in permissions.names) { %><th><%= site.t("admin.can." + name) %></th><% } %></tr>
+<% foreach (var group in view.groups) { %>
+    <tr>
+      <td><%= group["name"] %></td>
+<% foreach (var name in permissions.names) { %>
+      <td><input type="checkbox" name="p.<%= group["id"] %>.<%= name %>" value="1" aria-label="<%= group["name"] %>: <%= site.t("admin.can." + name) %>"<% if (group["can"][name]) { %> checked<% } %>></td>
+<% } %>
+    </tr>
+<% } %>
+  </table>
+  <p class="note"><%= site.t("admin.administratorsNote") %></p>
+  <button name="action" value="permissions" class="primary"><%= site.t("form.save") %></button>
+</form>
+<% if (view.board["topic_count"] == 0) { %>
+<h2 class="plain"><%= site.t("admin.removeBoard") %></h2>
+<form method="post" class="form" action="<%= view.action %>">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <p class="note"><%= site.t("admin.removeBoardNote") %></p>
+  <button name="action" value="remove" class="secondary"><%= site.t("admin.remove") %></button>
+</form>
+<% } %>
+<% } %>

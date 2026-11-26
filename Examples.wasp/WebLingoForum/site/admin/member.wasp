@@ -1,0 +1,30 @@
+<% param request; param response; import { memberPage } from "/lib/administering.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await memberPage(request, response)).title, crumbs: (await memberPage(request, response)).crumbs }; %>
+<% var view = await memberPage(request, response); var site = view.site; %>
+<h1><%= view.title %></h1>
+<% if (view.refused != null) { %>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null && !view.done) { var member = view.member; %>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems, notice: view.saved ? site.t("admin.saved") : null }); %>
+<ul class="facts">
+  <li><%= member["email"] %></li>
+  <li><%= site.f("member.joined", { time: site.time(member["created_at"]) }) %></li>
+  <li><%= site.f("user.posts", { count: member["post_count"] }) %></li>
+  <li><a href="/members/member?id=<%= member["id"] %>"><%= site.t("admin.seeMember") %></a></li>
+</ul>
+<% if (member["confirmed_at"] == null) { %>
+<form method="post" class="form" action="<%= view.action %>">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <p><%= site.t("admin.unconfirmedNote") %></p>
+  <button name="action" value="confirm"><%= site.t("admin.confirm") %></button>
+</form>
+<% } %>
+<h2 class="plain"><%= site.t("admin.groups") %></h2>
+<form method="post" class="form" action="<%= view.action %>">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+<% foreach (var group in view.groups) { %>
+  <label class="check"><input type="checkbox" name="g.<%= group["id"] %>" value="1"<% if (view.memberGroups.contains(group["id"])) { %> checked<% } %>> <%= group["name"] %></label>
+<% } %>
+  <button name="action" value="groups"><%= site.t("form.save") %></button>
+</form>
+<% } %>

@@ -36,13 +36,14 @@ export async function all(db) {
         """);
 }
 
-// A board, with its category's id and name, or null where there is none of that id.
+// A board, with its place in order, and its category's id and name, or null where there is none of that id.
 export async function one(db, id) {
     if (id == null) {
         return null;
     }
     var rows = await db.query("""
-        SELECT b.id, b.name, b.description, b.topic_count, b.post_count, c.id AS category_id, c.name AS category_name
+        SELECT b.id, b.name, b.description, b.topic_count, b.post_count, b.sort_order, c.id AS category_id,
+               c.name AS category_name
         FROM boards b JOIN categories c ON c.id = b.category_id
         WHERE b.id = @id
         """, { id: id });

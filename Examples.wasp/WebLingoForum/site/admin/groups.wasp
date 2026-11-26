@@ -1,0 +1,36 @@
+<% param request; param response; import { groupsPage } from "/lib/administering.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await groupsPage(request, response)).title, crumbs: (await groupsPage(request, response)).crumbs }; %>
+<% var view = await groupsPage(request, response); var site = view.site; %>
+<h1><%= view.title %></h1>
+<% if (view.refused != null) { %>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null && !view.done) { %>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems }); %>
+<table class="list groups">
+  <tr><th><%= site.t("admin.group") %></th><th><%= site.t("admin.members") %></th><th></th></tr>
+<% foreach (var group in view.groups) { %>
+  <tr>
+    <td>
+      <form method="post" class="inline-form" action="/admin/groups">
+        <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+        <input type="hidden" name="id" value="<%= group["id"] %>">
+        <input name="name" value="<%= group["name"] %>" required maxlength="100" aria-label="<%= site.t("admin.groupName") %>">
+        <button name="action" value="rename" class="secondary"><%= site.t("admin.rename") %></button>
+<% if (group["kind"] == null) { %>
+        <button name="action" value="remove" class="secondary"><%= site.t("admin.remove") %></button>
+<% } %>
+      </form>
+    </td>
+    <td class="count"><%= group["members"] %></td>
+    <td class="note"><%= group["kind"] == null ? "" : site.t("admin.kind." + group["kind"]) %></td>
+  </tr>
+<% } %>
+</table>
+<h2 class="plain"><%= site.t("admin.addGroup") %></h2>
+<form method="post" class="form" action="/admin/groups">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <label><%= site.t("admin.groupName") %> <input name="name" required maxlength="100"></label>
+  <p class="note"><%= site.t("admin.addGroupNote") %></p>
+  <button name="action" value="add"><%= site.t("admin.addGroup") %></button>
+</form>
+<% } %>

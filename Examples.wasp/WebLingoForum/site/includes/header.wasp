@@ -13,6 +13,9 @@
 <% if (site.permissions.moderates()) { %>
       <a href="/mod/reports"><%= site.t("nav.moderation") %></a>
 <% } %>
+<% if (site.permissions.admin) { %>
+      <a href="/admin"><%= site.t("nav.administration") %></a>
+<% } %>
       <form method="post" action="/account/sign-out">
         <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
         <button class="link"><%= site.t("nav.signOut") %></button>
