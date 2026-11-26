@@ -1,0 +1,157 @@
+// Members' posts, what each has read, and the topics they watch (site/lib/posts.wlg, site/lib/reading.wlg).
+// weblingo test writing-tests.wlg
+
+import { assertEqual, assertDeepEqual } from "std:test";
+import { Database } from "std:db";
+import { DateTime } from "std:datetime";
+import schema from "../site/lib/schema.wlg";
+import { insert } from "../site/lib/sql.wlg";
+import users from "../site/lib/users.wlg";
+import topics from "../site/lib/topics.wlg";
+import posts from "../site/lib/posts.wlg";
+import reading from "../site/lib/reading.wlg";
+
+const joined = DateTime.utc(2026, 11, 25, 12, 0);
+
+// A database of the forum's in memory, with two members, Anna, 1, and Bob, 2, who joined at noon on 25 November 2026,
+// Bob's address unconfirmed, and a board, 1, without topics.
+async function forum(db) {
+    foreach (var statement in schema.create(db.provider)) {
+        await db.execute(statement);
+    }
+    await users.make(db, "Anna", "anna@example.com", "no hash", joined, joined);
+    await users.make(db, "Bob", "bob@example.com", "no hash", joined, null);
+    var category = await insert(db, "categories", { name: "General", sort_order: 1 });
+    await insert(db, "boards", { category_id: category, name: "Welcome", description: null, sort_order: 1, topic_count: 0,
+                                 post_count: 0, last_post_id: null });
+}
+
+async function counts(db) {
+    var board = (await db.query("SELECT topic_count, post_count, last_post_id FROM boards WHERE id = 1"))[0];
+    var members = await db.query("SELECT post_count FROM users ORDER BY id");
+    return [board["topic_count"], board["post_count"], board["last_post_id"], members[0]["post_count"], members[1]["post_count"]];
+}
+
+export class WritingTests {
+    testATextAndATitleAreKeptAsTheyAreWritten() {
+        assertEqual(posts.bodyOf("  Tea,\r\nplease.\r\n\r\n"), "Tea,\nplease.");
+        assertEqual(posts.bodyOf(null), "");
+        assertEqual(posts.titleOf(" Tea\r\nor coffee\t"), "Tea  or coffee");
+        assertEqual(posts.bodyProblem(""), "post.empty");
+        assertEqual(posts.bodyProblem("x".repeat(20001)), "post.tooLong");
+        assertEqual(posts.bodyProblem("x".repeat(20000)), null);
+        assertEqual(posts.titleProblem(""), "post.noTitle");
+        assertEqual(posts.titleProblem("x".repeat(201)), "post.titleTooLong");
+        assertEqual(posts.titleProblem("Tea"), null);
+    }
+
+    testOnlyItsAuthorChangesAPostAndNotInALockedTopic() {
+        var anna = { id: 1 };
+        var bob = { id: 2 };
+        var topic = { locked: false, post_count: 2 };
+        var first = { id: 10, user_id: 1 };
+        var reply = { id: 11, user_id: 1 };
+        assertEqual(posts.mayReply(null, topic), false);
+        assertEqual(posts.mayReply(bob, topic), true);
+        assertEqual(posts.mayEdit(anna, topic, reply), true);
+        assertEqual(posts.mayEdit(bob, topic, reply), false);
+        assertEqual(posts.mayDelete(anna, topic, reply, 10), true);
+        assertEqual(posts.mayDelete(anna, topic, first, 10), false);
+        assertEqual(posts.mayDelete(anna, { locked: false, post_count: 1 }, first, 10), true);
+        var locked = { locked: true, post_count: 2 };
+        assertEqual(posts.mayReply(anna, locked), false);
+        assertEqual(posts.mayEdit(anna, locked, reply), false);
+        assertEqual(posts.mayDelete(anna, locked, reply, 10), false);
+    }
+
+    async testATopicsPostsKeepItsBoardsAndAuthorsCounts() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            var made = await posts.start(db, 1, 1, "Tea", "Tea, please.", joined.addHours(1));
+            assertEqual(made["topic"], 1);
+            assertEqual(made["post"], 1);
+            var topic = await topics.one(db, 1);
+            var reply = await posts.reply(db, topic, 2, "Coffee.", joined.addHours(2));
+            var again = await posts.reply(db, topic, 1, "Both.", joined.addHours(3));
+            assertDeepEqual(await counts(db), [1, 3, again, 2, 1]);
+            topic = await topics.one(db, 1);
+            assertDeepEqual([topic["post_count"], topic["last_post_id"]], [3, again]);
+            assertEqual(await posts.firstOf(db, 1), 1);
+            assertEqual(await posts.linkOf(db, 1, again, 2), "/topic?id=1&page=2#post-3");
+            assertEqual(await posts.linkOf(db, 1, reply, 2), "/topic?id=1#post-2");
+
+            await posts.edit(db, await posts.one(db, 1), "Tea, always.", "Tea!", 1, joined.addHours(4));
+            var edited = await posts.one(db, 1);
+            assertDeepEqual([edited["body"], edited["edited_at"]], ["Tea, always.", joined.addHours(4)]);
+            assertEqual((await topics.one(db, 1))["title"], "Tea!");
+
+            // The last reply deleted: the topic's latest post the one before it, and every count one less.
+            assertEqual(await posts.remove(db, await posts.one(db, again), await topics.one(db, 1)), false);
+            assertEqual(await posts.one(db, again), null);
+            topic = await topics.one(db, 1);
+            assertDeepEqual([topic["post_count"], topic["last_post_id"], topic["last_post_at"]], [2, reply, joined.addHours(2)]);
+            assertDeepEqual(await counts(db), [1, 2, reply, 1, 1]);
+
+            // A second topic, alone, deleted with its only post; the board's latest post the first topic's again.
+            var other = await posts.start(db, 1, 2, "Alone", "Soon gone.", joined.addHours(5));
+            assertDeepEqual(await counts(db), [2, 3, other["post"], 1, 2]);
+            assertEqual(await posts.remove(db, await posts.one(db, other["post"]), await topics.one(db, other["topic"])), true);
+            assertEqual(await topics.one(db, other["topic"]), null);
+            assertDeepEqual(await counts(db), [1, 2, reply, 1, 1]);
+        }
+    }
+
+    async testWhatIsNewToAMemberIsWhatCameAfterWhatTheySaw() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            var anna = await users.byId(db, 1);
+            var made = await posts.start(db, 1, 2, "Tea", "Tea, please.", joined.addHours(1));
+            var topic = await topics.one(db, 1);
+            var second = await posts.reply(db, topic, 2, "Or coffee.", joined.addHours(2));
+            assertEqual(await reading.lastSeen(db, 1, 1), 0);
+            assertEqual(await reading.firstNew(db, anna, 1), made["post"]);
+            await reading.saw(db, 1, 1, made["post"]);
+            await reading.saw(db, 1, 1, made["post"]);
+            assertEqual(await reading.firstNew(db, anna, 1), second);
+            await reading.saw(db, 1, 1, second);
+            await reading.saw(db, 1, 1, made["post"]);
+            assertEqual(await reading.lastSeen(db, 1, 1), second);
+            assertEqual(await reading.firstNew(db, anna, 1), null);
+
+            // A board's row: new where its latest post came after what they saw, and after they joined; never to a guest.
+            var row = { last_post_id: 3, last_read: 2, last_post_at: joined.addHours(3) };
+            assertEqual(reading.isNew(anna, row), true);
+            assertEqual(reading.isNew(anna, { ...row, last_read: 3 }), false);
+            assertEqual(reading.isNew(anna, { ...row, last_read: null }), true);
+            assertEqual(reading.isNew(anna, { ...row, last_read: null, last_post_at: joined.addHours(-1) }), false);
+            assertEqual(reading.isNew(null, row), false);
+
+            // Posts before a member joined are never new to them.
+            var early = await posts.start(db, 1, 2, "Old", "From before.", joined.addHours(-1));
+            assertEqual(await reading.firstNew(db, anna, early["topic"]), null);
+        }
+    }
+
+    async testAWatcherIsMailedOnceUntilTheyReadTheTopicAgain() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            await forum(db);
+            await posts.start(db, 1, 1, "Tea", "Tea, please.", joined.addHours(1));
+            assertEqual(await reading.isWatching(db, 1, 1), false);
+            await reading.watch(db, 1, 1);
+            await reading.watch(db, 1, 1);
+            await reading.watch(db, 2, 1);
+            assertEqual(await reading.isWatching(db, 1, 1), true);
+            // Bob, whose address is not confirmed, and Anna, who wrote the reply, are not mailed.
+            assertEqual((await reading.toMail(db, 1, 1)).length, 0);
+            var mailed = await reading.toMail(db, 1, 2);
+            assertDeepEqual([mailed.length, mailed[0]["name"], mailed[0]["email"]], [1, "Anna", "anna@example.com"]);
+            await reading.mailed(db, 1, 1);
+            assertEqual((await reading.toMail(db, 1, 2)).length, 0);
+            await reading.saw(db, 1, 1, 1);
+            assertEqual((await reading.toMail(db, 1, 2)).length, 1);
+            await reading.unwatch(db, 1, 1);
+            assertEqual(await reading.isWatching(db, 1, 1), false);
+            assertEqual((await reading.toMail(db, 1, 2)).length, 0);
+        }
+    }
+}

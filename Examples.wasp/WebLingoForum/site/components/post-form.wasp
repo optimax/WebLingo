@@ -1,0 +1,19 @@
+<% param site; param token; param action; param values; param submit; param titled = false; param preview = null; %>
+<% if (preview != null) { %>
+<section class="preview">
+  <h2 class="plain"><%= site.t("post.preview") %></h2>
+  <div class="body"><%- preview %></div>
+</section>
+<% } %>
+<form method="post" class="form wide" action="<%= action %>">
+  <input type="hidden" name="csrfToken" value="<%= token %>">
+<% if (titled) { %>
+  <label><%= site.t("post.title") %> <input name="title" value="<%= values["title"] %>" required maxlength="200"></label>
+<% } %>
+  <label><%= site.t("post.body") %> <textarea name="body" rows="12" required maxlength="20000"><%= values["body"] %></textarea>
+    <span class="note"><%= site.t("post.markdownHint") %></span></label>
+  <div class="buttons">
+    <button name="action" value="post"><%= submit %></button>
+    <button name="action" value="preview" class="secondary"><%= site.t("post.preview") %></button>
+  </div>
+</form>

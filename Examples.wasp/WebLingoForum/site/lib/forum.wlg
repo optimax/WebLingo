@@ -51,15 +51,15 @@ export async function begin(request) {
     return current;
 }
 
-// The member the request's session keeps, whose address is confirmed, or null; when they were last seen kept, to five
-// minutes.
+// The member the request's session keeps, whose address is confirmed, with when they joined, or null; when they were
+// last seen kept, to five minutes.
 async function signedIn(db, request) {
     var id = request.session?["user"];
     if (!(id is Integer)) {
         return null;
     }
     var rows = await db.query("""
-        SELECT id, name, email, time_zone, language, signature, last_seen_at FROM users
+        SELECT id, name, email, time_zone, language, signature, created_at, last_seen_at FROM users
         WHERE id = @id AND confirmed_at IS NOT NULL
         """, { id: id });
     if (rows.length == 0) {

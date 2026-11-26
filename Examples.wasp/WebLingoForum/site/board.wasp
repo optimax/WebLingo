@@ -10,6 +10,13 @@
 <% if (board["description"] != null) { %>
 <p class="note"><%= board["description"] %></p>
 <% } %>
+<div class="tools">
+<% if (site.user == null) { %>
+  <a href="/account/sign-in?back=<%= base %>"><%= site.t("board.signInToStart") %></a>
+<% } else { %>
+  <a class="button" href="/post/new?board=<%= board["id"] %>"><%= site.t("board.newTopic") %></a>
+<% } %>
+</div>
 <% await renderComponent("/components/pages.wasp", { site: site, base: base, page: view.page, pages: view.pages }); %>
 <% if (view.topics.length == 0) { %>
 <p class="note"><%= site.t("board.noTopics") %></p>

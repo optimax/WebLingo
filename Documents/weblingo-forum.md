@@ -24,9 +24,9 @@ The forum also serves the pilot, "WASP Pilot: the Forum in Real Use": served und
 A forum as people know it from phpBB, FluxBB and Discourse's plain pages:
 
 - **Boards.** Boards are grouped in categories. Each board lists its topics: pinned ones first, then the most recently active, with page numbers. The front page lists the categories and their boards, each with its topic and post counts and its latest post.
-- **Topics and posts.** A topic is a title and its posts, in order, with page numbers. A member starts a topic, replies, quotes another post, edits their own posts and deletes them, within the board's permissions. Posts are written in Markdown (section 3.7). A preview shows a post before it is sent.
+- **Topics and posts.** A topic is a title and its posts, in order, with page numbers. A member starts a topic, replies, quotes another post, edits their own posts and deletes them, within the board's permissions. Posts are written in Markdown (section 3.7). A preview shows a post before it is sent. Until each board's permissions come, in part 4, any member signed in writes on any board, and a locked topic takes no replies and no changes. A post has at most 20,000 characters and a title 200. A topic's first post is edited with its title, and is deleted only where it is the topic's only post, the topic going with it. A deleted post is kept, marked deleted, for a moderator to restore (**Guess**, each).
 - **Members.** Anyone can sign up with a name, an address and a password; the address is confirmed by mail. Members sign in and out and reset a forgotten password by mail. A profile holds a display name, an avatar, a signature, a time zone and a language. There is a list of members.
-- **Reading.** The forum remembers what each member has read, so new posts are marked and a topic opens at the first unread post. A member can watch a topic and get mail when someone replies.
+- **Reading.** The forum remembers what each member has read, so new posts are marked and a topic opens at the first unread post. A member can watch a topic and get mail when someone replies. A post written before a member joined is never new to them, a member watches the topics they start, and a watcher is mailed of a topic's next reply, then of none until they have read it again (**Guess**, each).
 - **Groups and permissions.** Every member belongs to one or more groups: guests (anyone not signed in), members, moderators, administrators, and any others the administrator makes. Each board gives each group its permissions: to see the board, read it, start topics, reply, edit and delete one's own posts, and moderate. A member has every permission any of their groups gives.
 - **Moderation.** Moderators lock, pin, move, delete and restore topics. They edit and delete any post on their boards. They ban a member, for a time or for good. Members report posts, and moderators work through the reports. The forum logs every moderator's action.
 - **Private messages.** Members write to one another in conversations of two or more people, with unread counts.
@@ -77,7 +77,7 @@ Pages are found by their path, as WASP finds every page. A topic is therefore `/
 
 ## 3.2 Its modules
 
-The pages and handlers hold no SQL. They call the forum's modules in `site/lib`, one for each area: `boards.wlg`, `topics.wlg`, `posts.wlg`, `users.wlg`, `groups.wlg`, `permissions.wlg`, `moderation.wlg`, `messages.wlg`, `search.wlg`, `settings.wlg`, `mail.wlg`, `markdown.wlg`, `texts.wlg`, `hooks.wlg`, `sql.wlg` and `schema.wlg`.
+The pages and handlers hold no SQL. They call the forum's modules in `site/lib`, one for each area: `boards.wlg`, `topics.wlg`, `posts.wlg`, `reading.wlg` (what each member has read, and the topics they watch), `users.wlg`, `tokens.wlg` (the links mailed to members), `groups.wlg`, `permissions.wlg`, `moderation.wlg`, `messages.wlg`, `search.wlg`, `settings.wlg`, `mail.wlg`, `markdown.wlg`, `texts.wlg`, `hooks.wlg`, `sql.wlg` and `schema.wlg`; and, for the pages, `forum.wlg`, `pages.wlg` (the pages that read), `accounts.wlg` (the account's pages) and `writing.wlg` (the pages that write).
 
 The database is the one the configuration names `"forum"`, as `Database.open("forum")` opens it, closed at the end of its `using`; the provider pools its connections. `forum.wlg` gives a request its forum, its settings and texts read once, and `pages.wlg` what each page shows, read once for each request, so that a page and its layout, which both ask for it, share it: a module runs once for each request (the WASP User Manual, section 8). The modules give data, which the pages and their components write.
 
@@ -120,7 +120,9 @@ Posts, signatures and private messages are written in Markdown, rendered by the 
 - paragraphs and line breaks, emphasis and strong emphasis, code spans and fenced code blocks;
 - block quotes (a quoted post is one), lists, headings, horizontal rules;
 - links and autolinks to `http`, `https` and `mailto` addresses only;
-- images only where the forum's settings allow them.
+- images only where the forum's settings allow them, its `"images"`, false by default, a link to the image otherwise (**Guess**).
+
+A quoted post begins its reply as a block quote, after a line naming who wrote it, the name escaped so that it is only text.
 
 HTML in a post is text, escaped, never markup. The renderer writes only the elements above, each escaped as it is written. A page writes its output raw, `<%- %>`, which is the only raw output the forum has. Its tests feed it every kind of malformed input and check that nothing it writes escapes its elements.
 
@@ -139,7 +141,7 @@ The forum keeps its own index (**Guess**): a table of each word's posts, filled 
 
 ## 3.10 Mail
 
-The forum sends mail through `std:mail`: confirming an address, resetting a password, and telling watchers of a reply. Its server is `wasp.config`'s `"mail"`, its password kept as `{ "env": … }` or `{ "file": … }`. Each mail's subject and text are texts of the forum's (section 3.6). Mail is sent while the request runs, since WASP has no background work. A reply's notifications are sent after the reply is saved, so a failed mail never loses a post.
+The forum sends mail through `std:mail`: confirming an address, resetting a password, and telling watchers of a reply. Its server is `wasp.config`'s `"mail"`, its password kept as `{ "env": … }` or `{ "file": … }`. Each mail's subject and text are texts of the forum's (section 3.6). Mail is sent while the request runs, since WASP has no background work. A reply's notifications are sent after the reply is saved, so a failed mail never loses a post; a watcher whose mail failed is mailed of the next reply instead. Each says who replied to which topic, with a link to its first post new to the reader.
 
 ------
 

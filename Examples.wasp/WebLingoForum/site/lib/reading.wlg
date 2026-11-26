@@ -1,0 +1,87 @@
+// What each member has read, and the topics they watch (Documents/weblingo-forum.md, section 2, "Reading"). A topic's
+// posts are new to a member where they came after the last of its posts the member saw, and after the member joined, so
+// that a newcomer finds no old post new. A member who watches a topic is mailed of its next reply, and then of no other
+// until they have read it again.
+
+import { page } from "./sql.wlg";
+
+// The last of a topic's posts a member saw, or 0.
+export async function lastSeen(db, user, topic) {
+    var rows = await db.query("SELECT last_read_post_id FROM topic_reads WHERE user_id = @user AND topic_id = @topic",
+                              { user: user, topic: topic });
+    return rows.length == 0 ? 0 : rows[0]["last_read_post_id"];
+}
+
+// Keeps that a member saw a topic's posts up to a post, the last on the page they read; and that they read the topic
+// again, so that its next reply is mailed to them where they watch it.
+export async function saw(db, user, topic, post) {
+    var values = { user: user, topic: topic, post: post };
+    var raise = "UPDATE topic_reads SET last_read_post_id = @post WHERE user_id = @user AND topic_id = @topic AND last_read_post_id < @post";
+    if (await db.execute(raise, values) == 0
+        && (await db.query("SELECT 1 AS n FROM topic_reads WHERE user_id = @user AND topic_id = @topic", values)).length == 0) {
+        try {
+            await db.execute("INSERT INTO topic_reads (user_id, topic_id, last_read_post_id) VALUES (@user, @topic, @post)", values);
+        } catch (DatabaseError e) {
+            // Another of the member's requests kept it first, the page they read in another tab.
+            await db.execute(raise, values);
+        }
+    }
+    await db.execute("UPDATE topic_watches SET notified = @no WHERE user_id = @user AND topic_id = @topic AND notified = @yes",
+                     { no: false, yes: true, user: user, topic: topic });
+}
+
+// The first of a topic's posts that is new to a member, or null where none is; the member a row of users, with when they
+// joined.
+export async function firstNew(db, user, topic) {
+    var rows = await db.query($"""
+        SELECT id FROM posts WHERE topic_id = @topic AND deleted = @deleted AND id > @last AND created_at > @joined
+        ORDER BY id {page(db.provider)}
+        """, { topic: topic, deleted: false, last: await lastSeen(db, user["id"], topic), joined: user["created_at"],
+               skip: 0, count: 1 });
+    return rows.length == 0 ? null : rows[0]["id"];
+}
+
+// Whether a topic of a board's list, which gives its latest post, when it came, and the last of its posts the member saw,
+// has posts new to the member; never for a reader not signed in.
+export function isNew(user, topic) {
+    return user != null && topic["last_post_id"] > (topic["last_read"] ?? 0) && topic["last_post_at"] > user["created_at"];
+}
+
+// Whether a member watches a topic.
+export async function isWatching(db, user, topic) {
+    return (await db.query("SELECT 1 AS n FROM topic_watches WHERE user_id = @user AND topic_id = @topic",
+                           { user: user, topic: topic })).length > 0;
+}
+
+// A member watches a topic, from its next reply on.
+export async function watch(db, user, topic) {
+    if (!(await isWatching(db, user, topic))) {
+        try {
+            await db.execute("INSERT INTO topic_watches (user_id, topic_id, notified) VALUES (@user, @topic, @no)",
+                             { user: user, topic: topic, no: false });
+        } catch (DatabaseError e) {
+            // Another of the member's requests watched it first.
+        }
+    }
+}
+
+// A member stops watching a topic.
+export async function unwatch(db, user, topic) {
+    await db.execute("DELETE FROM topic_watches WHERE user_id = @user AND topic_id = @topic", { user: user, topic: topic });
+}
+
+// Those to mail of a reply to a topic: the members who watch it, but its author, whose address is confirmed, and who
+// were not mailed of it since they last read it; each with their name and address.
+export async function toMail(db, topic, author) {
+    return await db.query("""
+        SELECT u.id, u.name, u.email FROM topic_watches w JOIN users u ON u.id = w.user_id
+        WHERE w.topic_id = @topic AND w.user_id <> @author AND w.notified = @no AND u.confirmed_at IS NOT NULL
+        ORDER BY u.id
+        """, { topic: topic, author: author, no: false });
+}
+
+// Keeps that a member was mailed of a topic's reply, so that its next one is not mailed until they have read it.
+export async function mailed(db, user, topic) {
+    await db.execute("UPDATE topic_watches SET notified = @yes WHERE user_id = @user AND topic_id = @topic",
+                     { yes: true, user: user, topic: topic });
+}

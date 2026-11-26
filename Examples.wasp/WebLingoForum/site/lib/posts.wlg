@@ -1,0 +1,155 @@
+// The forum's posts as members write them (Documents/weblingo-forum.md, sections 2 and 6, part 3): a topic started, a
+// reply, an edit and a deletion, each keeping the counts and the latest posts of its topic, its board and its author; and
+// who may change a post, until each board's permissions for each group come (part 4).
+
+import { insert, page } from "./sql.wlg";
+
+// The longest a post's text and a topic's title may be, in characters.
+export const longestPost = 20000;
+export const longestTitle = 200;
+
+// A post's text as it is kept: its line breaks LF, and no blank space before or after it.
+export function bodyOf(text) {
+    return (text ?? "").replace("\r\n", "\n").replace("\r", "\n").trim();
+}
+
+// A topic's title as it is kept: on one line, and no blank space before or after it.
+export function titleOf(text) {
+    return (text ?? "").replace("\r", " ").replace("\n", " ").replace("\t", " ").trim();
+}
+
+// Why a post's text cannot be posted, a text's name, or null where it can.
+export function bodyProblem(body) {
+    if (body == "") {
+        return "post.empty";
+    }
+    return body.length > longestPost ? "post.tooLong" : null;
+}
+
+// Why a topic's title cannot be its title, a text's name, or null where it can.
+export function titleProblem(title) {
+    if (title == "") {
+        return "post.noTitle";
+    }
+    return title.length > longestTitle ? "post.titleTooLong" : null;
+}
+
+// Whether a member may reply to a topic: any member signed in, while the topic is not locked.
+export function mayReply(user, topic) {
+    return user != null && !topic["locked"];
+}
+
+// Whether a member may edit a post: its author, while its topic is not locked.
+export function mayEdit(user, topic, post) {
+    return mayReply(user, topic) && post["user_id"] == user["id"];
+}
+
+// Whether a member may delete a post: its author, while its topic is not locked; a topic's first post only where it is
+// the topic's only one, the topic then deleted with it.
+export function mayDelete(user, topic, post, first) {
+    return mayEdit(user, topic, post) && (post["id"] != first || topic["post_count"] == 1);
+}
+
+// A post, with its author's name, or null where there is none of that id, or it is deleted.
+export async function one(db, id) {
+    if (id == null) {
+        return null;
+    }
+    var rows = await db.query("""
+        SELECT p.id, p.topic_id, p.user_id, p.body, p.created_at, p.edited_at, u.name AS user_name
+        FROM posts p LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.id = @id AND p.deleted = @deleted
+        """, { id: id, deleted: false });
+    return rows.length == 0 ? null : rows[0];
+}
+
+// The id of a topic's first post.
+export async function firstOf(db, topic) {
+    return (await db.query("SELECT MIN(id) AS id FROM posts WHERE topic_id = @topic AND deleted = @deleted",
+                           { topic: topic, deleted: false }))[0]["id"];
+}
+
+// Where a post is shown: its topic's page that holds it, perPage posts a page, and its anchor there.
+export async function linkOf(db, topic, post, perPage) {
+    var before = (await db.query("SELECT COUNT(*) AS n FROM posts WHERE topic_id = @topic AND deleted = @deleted AND id < @id",
+                                 { topic: topic, deleted: false, id: post }))[0]["n"];
+    var number = before \ perPage + 1;
+    return $"/topic?id={topic}" + (number > 1 ? $"&page={number}" : "") + $"#post-{post}";
+}
+
+// Starts a topic on a board, its first post a member's, at a time: gives the topic's id and the post's.
+export async function start(db, board, user, title, body, now) {
+    return await db.transaction(async () => {
+        var topic = await insert(db, "topics", {
+            board_id: board, user_id: user, title: title, created_at: now, post_count: 1, view_count: 0, last_post_id: null,
+            last_post_at: now, pinned: false, locked: false, deleted: false });
+        var post = await insert(db, "posts", {
+            topic_id: topic, user_id: user, body: body, created_at: now, edited_at: null, edited_by: null, deleted: false });
+        await db.execute("UPDATE topics SET last_post_id = @post WHERE id = @topic", { post: post, topic: topic });
+        await db.execute("""
+            UPDATE boards SET topic_count = topic_count + 1, post_count = post_count + 1, last_post_id = @post WHERE id = @board
+            """, { post: post, board: board });
+        await db.execute("UPDATE users SET post_count = post_count + 1 WHERE id = @user", { user: user });
+        return { topic: topic, post: post };
+    });
+}
+
+// A member's reply to a topic, at a time: gives the post's id.
+export async function reply(db, topic, user, body, now) {
+    return await db.transaction(async () => {
+        var post = await insert(db, "posts", {
+            topic_id: topic["id"], user_id: user, body: body, created_at: now, edited_at: null, edited_by: null, deleted: false });
+        await db.execute("UPDATE topics SET post_count = post_count + 1, last_post_id = @post, last_post_at = @now WHERE id = @topic",
+                         { post: post, now: now, topic: topic["id"] });
+        await db.execute("UPDATE boards SET post_count = post_count + 1, last_post_id = @post WHERE id = @board",
+                         { post: post, board: topic["board_id"] });
+        await db.execute("UPDATE users SET post_count = post_count + 1 WHERE id = @user", { user: user });
+        return post;
+    });
+}
+
+// A post's new text, by a member, at a time; and its topic's new title, where it is the topic's first post and title is
+// not null.
+export async function edit(db, post, body, title, user, now) {
+    await db.transaction(async () => {
+        await db.execute("UPDATE posts SET body = @body, edited_at = @now, edited_by = @user WHERE id = @id",
+                         { body: body, now: now, user: user, id: post["id"] });
+        if (title != null) {
+            await db.execute("UPDATE topics SET title = @title WHERE id = @topic", { title: title, topic: post["topic_id"] });
+        }
+    });
+}
+
+// Deletes a post: kept, marked deleted, so that a moderator may restore it; its author's count, and its topic's and its
+// board's counts and latest posts, made again without it. A topic left without posts is deleted with it. Gives whether
+// the topic was.
+export async function remove(db, post, topic) {
+    return await db.transaction(async () => {
+        await db.execute("UPDATE posts SET deleted = @deleted WHERE id = @id", { deleted: true, id: post["id"] });
+        await db.execute("UPDATE users SET post_count = post_count - 1 WHERE id = @user AND post_count > 0", { user: post["user_id"] });
+        var left = await db.query($"""
+            SELECT id, created_at FROM posts WHERE topic_id = @topic AND deleted = @deleted ORDER BY id DESC {page(db.provider)}
+            """, { topic: topic["id"], deleted: false, skip: 0, count: 1 });
+        if (left.length == 0) {
+            await db.execute("UPDATE topics SET deleted = @deleted WHERE id = @topic", { deleted: true, topic: topic["id"] });
+        } else {
+            var count = (await db.query("SELECT COUNT(*) AS n FROM posts WHERE topic_id = @topic AND deleted = @deleted",
+                                        { topic: topic["id"], deleted: false }))[0]["n"];
+            await db.execute("UPDATE topics SET post_count = @count, last_post_id = @last, last_post_at = @at WHERE id = @topic",
+                             { count: count, last: left[0]["id"], at: left[0]["created_at"], topic: topic["id"] });
+        }
+        await recountBoard(db, topic["board_id"]);
+        return left.length == 0;
+    });
+}
+
+// A board's counts of topics and posts, and its latest post, made again from its topics.
+export async function recountBoard(db, board) {
+    await db.execute("""
+        UPDATE boards SET
+            topic_count = (SELECT COUNT(*) FROM topics WHERE board_id = @board AND deleted = @deleted),
+            post_count = (SELECT COALESCE(SUM(post_count), 0) FROM topics WHERE board_id = @board AND deleted = @deleted),
+            last_post_id = (SELECT MAX(last_post_id) FROM topics WHERE board_id = @board AND deleted = @deleted)
+        WHERE id = @board
+        """, { board: board, deleted: false });
+}

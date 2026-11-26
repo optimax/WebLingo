@@ -1,0 +1,12 @@
+<% param request; param response; import { replyPage } from "/lib/writing.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await replyPage(request, response)).title, crumbs: (await replyPage(request, response)).crumbs }; %>
+<% var view = await replyPage(request, response); var site = view.site; %>
+<% if (view.refused != null) { %>
+<h1><%= view.title %></h1>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null && !view.done) { %>
+<h1><%= view.title %></h1>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems }); %>
+<% await renderComponent("/components/post-form.wasp", { site: site, token: request.csrfToken, action: view.action, values: view.values,
+                                                        submit: site.t("post.send"), preview: view.preview }); %>
+<% } %>

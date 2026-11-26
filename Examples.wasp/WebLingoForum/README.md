@@ -2,8 +2,10 @@
 
 A discussion forum written in WASP, on SQLite, SQL Server, MySQL or PostgreSQL. Its design, and the parts it is built in,
 are in `Documents/weblingo-forum.md`; this is what is built so far: its foundations, a forum's boards and topics read
-from its database, and its members, who sign up, confirm their address by mail, sign in and out, reset a forgotten
-password and keep a profile. Writing, moderation and the rest come in the parts after them.
+from its database; its members, who sign up, confirm their address by mail, sign in and out, reset a forgotten password
+and keep a profile; and writing, in Markdown: topics started, replies, quotes, one's own posts edited and deleted, with a
+preview first, what is new to each member, and topics watched, their replies mailed. Moderation and the rest come in the
+parts after them.
 
 ```text
 WebLingoForum/
@@ -12,11 +14,13 @@ WebLingoForum/
   site/         the site, and wasp's root
     index.wasp  /                 the categories and their boards
     board.wasp  /board?id=1       a board's topics, 25 a page, the pinned first
-    topic.wasp  /topic?id=1       a topic's posts, 20 a page
+    topic.wasp  /topic?id=1       a topic's posts, 20 a page, and a reply's form; &unread=1 its first new post
+    post/       writing: new.wasp, a new topic, reply.wasp, a reply, edit.wasp and delete.wasp, one's own post, and
+                watch.wlg, watching a topic or not
     account/    signing up, confirming an address, signing in and out, a forgotten password, the member's profile
     members/    /members, the members by name, and /members/member?id=1, a member's page
     lib/        the forum's modules: the database's SQL, its schema, settings, texts, members, their mail and tokens,
-                and what each page shows
+                posts, what each member has read and watches, the Markdown, and what each page shows and does
     texts/      the forum's texts, a module for each language: en.wlg
     layouts/, includes/, components/, css/    its look, each piece a file of its own
   tests/        the forum's modules' own tests, run by weblingo test
@@ -35,19 +39,21 @@ dotnet run --project WebLingo/src/WebLingo.Wasp.Cli -- serve --root Examples.was
 
 and open <http://localhost:8080/>. `setup.wlg` asks for the forum's first administrator, their name, address and
 password, unless its parameters give them, `name=Anna email=anna@example.com`; it makes the forum's tables, its groups,
-its administrator, and a first category, board and topic. Run on a database it has made, it does nothing.
+its administrator, and a first category, board and topic. Run on a database it has made, it does nothing; on one an
+earlier version of the forum made, it adds the tables this version adds.
 
 The forum's own tests, from `tests`:
 
 ```bash
-weblingo test accounts-tests.wlg schema-tests.wlg sql-tests.wlg texts-tests.wlg users-tests.wlg
+weblingo test accounts-tests.wlg markdown-tests.wlg schema-tests.wlg sql-tests.wlg texts-tests.wlg users-tests.wlg writing-tests.wlg
 ```
 
 ## Mail, and members
 
-A newcomer confirms their address by a link the forum mails them, good for 48 hours, and a member who forgot their
-password resets it by a link good for an hour: the forum sends mail through the server its `site/wasp.config`'s
-`"mail"` names (the Standard Library Reference, section 31), from the address its settings' `"mailFrom"` gives:
+A newcomer confirms their address by a link the forum mails them, good for 48 hours; a member who forgot their password
+resets it by a link good for an hour; and a member who watches a topic is told of its replies. The forum sends mail
+through the server its `site/wasp.config`'s `"mail"` names (the Standard Library Reference, section 31), from the
+address its settings' `"mailFrom"` gives:
 
 ```json
 {

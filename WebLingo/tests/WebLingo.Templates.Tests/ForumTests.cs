@@ -123,9 +123,9 @@ public sealed class ForumTests
                 ["mail"] = new Dictionary<string, object> { ["default"] = new Dictionary<string, object> { ["host"] = "127.0.0.1", ["port"] = smtp.Port, ["tls"] = "none" } }
             }));
             var setup = Path.Combine(copy, "setup", "setup.wlg");
-            Assert.Equal((WebLingoCommandLine.Success, $"Made the forum's database 'forum' on {provider}, version 2, with its administrator Anna.\n", ""),
+            Assert.Equal((WebLingoCommandLine.Success, $"Made the forum's database 'forum' on {provider}, version 3, with its administrator Anna.\n", ""),
                 Run("run", setup, "name=Anna", "email=anna@example.com", "password=correct-horse"));
-            Assert.Equal((WebLingoCommandLine.Success, "The forum's database 'forum' is at version 2 already: nothing to do.\n", ""),
+            Assert.Equal((WebLingoCommandLine.Success, "The forum's database 'forum' is at version 3 already: nothing to do.\n", ""),
                 Run("run", setup));
 
             // 30 topics, each of one post but the first, of 45, on 2 January 2026 and the day before, the last locked.
@@ -220,7 +220,8 @@ public sealed class ForumTests
                 Assert.Contains("<h1>No such board</h1>", await Page("/board?id=x", HttpStatusCode.NotFound));
                 await Page("/lib/sql.wlg", HttpStatusCode.NotFound);
 
-                await MembersAsync(address, smtp);
+                using var bob = await MembersAsync(address, smtp);
+                await WritingAsync(address, smtp, bob);
             }
             finally
             {
@@ -235,28 +236,53 @@ public sealed class ForumTests
     }
 
     /// <summary>
-    /// The members' pages, as a newcomer, Bob, uses them: signing up, their address confirmed by the link mailed to them,
-    /// their profile's time zone, signing out and in, too many failed sign-ins, a password reset by mail; and the members'
-    /// list. Each form's token against cross-site request forgery read from the form, as a browser sends it.
+    /// A browser of the forum's, its cookies its own: a page's status and text, its line breaks LF, and, where it was sent
+    /// on, the path it came to; and a form posted with the token against cross-site request forgery its page gives.
     /// </summary>
-    private static async Task MembersAsync(string address, SmtpTestServer smtp)
+    private sealed class Browser(string address) : IDisposable
     {
-        using var bob = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(address) };
-        async Task<(HttpStatusCode, string)> Get(string path)
+        public HttpClient Client { get; } = new(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(address) };
+
+        public async Task<(HttpStatusCode, string)> Get(string path)
         {
-            var response = await bob.GetAsync(path);
-            return (response.StatusCode, (await response.Content.ReadAsStringAsync()).ReplaceLineEndings("\n"));
+            var (status, body, _) = await Visit(path);
+            return (status, body);
         }
-        async Task<(HttpStatusCode, string, string)> Post(string path, params (string, string)[] fields)
+
+        public async Task<(HttpStatusCode, string, string)> Visit(string path)
         {
-            // The form's page, the header's for signing out, as a browser has it before it posts.
-            var page = path == "/account/sign-out" ? "/"
-                : path.Contains('?') && !path.StartsWith("/account/sign-in", StringComparison.Ordinal) ? path : path.Split('?')[0];
-            var (_, form) = await Get(page);
-            var token = Regex.Match(form, "name=\"csrfToken\" value=\"([0-9a-f]{32})\"").Groups[1].Value;
-            var response = await bob.PostAsync(path, new FormUrlEncodedContent([new("csrfToken", token), .. fields.Select(f => new KeyValuePair<string, string>(f.Item1, f.Item2))]));
+            var response = await Client.GetAsync(path);
             return (response.StatusCode, (await response.Content.ReadAsStringAsync()).ReplaceLineEndings("\n"), response.RequestMessage!.RequestUri!.PathAndQuery);
         }
+
+        public async Task<(HttpStatusCode, string, string)> Post(string path, params (string, string)[] fields)
+        {
+            // The form's page, the header's for signing out, as a browser has it before it posts; the front page's header
+            // where the path has no page of its own, a handler's.
+            var page = path == "/account/sign-out" ? "/"
+                : path.Contains('?') && !path.StartsWith("/account/sign-in", StringComparison.Ordinal) ? path : path.Split('?')[0];
+            var token = Token((await Get(page)).Item2);
+            if (token.Length == 0) token = Token((await Get("/")).Item2);
+            var response = await Client.PostAsync(path, new FormUrlEncodedContent([new("csrfToken", token), .. fields.Select(f => new KeyValuePair<string, string>(f.Item1, f.Item2))]));
+            return (response.StatusCode, (await response.Content.ReadAsStringAsync()).ReplaceLineEndings("\n"), response.RequestMessage!.RequestUri!.PathAndQuery);
+        }
+
+        private static string Token(string page) => Regex.Match(page, "name=\"csrfToken\" value=\"([0-9a-f]{32})\"").Groups[1].Value;
+
+        public void Dispose() => Client.Dispose();
+    }
+
+    /// <summary>
+    /// The members' pages, as a newcomer, Bob, uses them: signing up, their address confirmed by the link mailed to them,
+    /// their profile's time zone, signing out and in, too many failed sign-ins, a password reset by mail; and the members'
+    /// list. Each form's token against cross-site request forgery read from the form, as a browser sends it. Gives Bob's
+    /// browser, Bob signed in.
+    /// </summary>
+    private static async Task<Browser> MembersAsync(string address, SmtpTestServer smtp)
+    {
+        var bob = new Browser(address);
+        Task<(HttpStatusCode, string)> Get(string path) => bob.Get(path);
+        Task<(HttpStatusCode, string, string)> Post(string path, params (string, string)[] fields) => bob.Post(path, fields);
         string Link(int message, string page)
         {
             var mail = smtp.Messages[message].Replace("=\r\n", "").Replace("=3D", "=");
@@ -306,14 +332,14 @@ public sealed class ForumTests
         Assert.Contains("That is not a time zone this server knows.", body);
 
         // A form whose token is not the browser's refused; signing out, and the header says so.
-        var refused = await bob.PostAsync("/account/profile", new FormUrlEncodedContent([new("csrfToken", "0".PadLeft(32, '0')), new("action", "profile")]));
+        var refused = await bob.Client.PostAsync("/account/profile", new FormUrlEncodedContent([new("csrfToken", "0".PadLeft(32, '0')), new("action", "profile")]));
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
         Assert.Contains("This form has expired: send it again.", await refused.Content.ReadAsStringAsync());
         (status, body, at) = await Post("/account/sign-out");
         Assert.Equal((HttpStatusCode.OK, "/"), (status, at));
         Assert.Contains(">Sign in</a>", body);
         Assert.Equal(HttpStatusCode.OK, (await Get("/account/profile")).Item1);
-        Assert.EndsWith("/account/sign-in?back=/account/profile", (await bob.GetAsync("/account/profile")).RequestMessage!.RequestUri!.PathAndQuery);
+        Assert.EndsWith("/account/sign-in?back=/account/profile", (await bob.Visit("/account/profile")).Item3);
 
         // Signing in, back where Bob was, but never to another site; five failures make the sixth wait, even with the right
         // password.
@@ -364,6 +390,139 @@ public sealed class ForumTests
         Assert.Contains("<h1>Bob</h1>", body);
         Assert.Contains("Bob, of Lodz.", body);
         Assert.Equal(HttpStatusCode.NotFound, (await Get("/members/member?id=99")).Item1);
+        return bob;
+    }
+
+    /// <summary>
+    /// Writing, as Bob and Anna write: a topic started after its preview; a quote, replies, and the mail a watcher gets of
+    /// them, once until they read the topic again; what is new to a member, and their first new post; a post and a title
+    /// edited, a reply deleted, and a topic deleted with its only post, every count kept; and what a guest, a locked topic,
+    /// another's post and a form from elsewhere are refused. Bob signed in, as the members' walk leaves him.
+    /// </summary>
+    private static async Task WritingAsync(string address, SmtpTestServer smtp, Browser bob)
+    {
+        string Mail(int message) => smtp.Messages[message].Replace("=\r\n", "").Replace("=3D", "=");
+
+        // A guest is sent to sign in first, and offered to; a topic has no form for them.
+        using (var guest = new Browser(address))
+        {
+            Assert.Equal("/account/sign-in?back=/post/new?board=1", (await guest.Visit("/post/new?board=1")).Item3);
+            Assert.Contains("Sign in to start a topic", (await guest.Get("/board?id=1")).Item2);
+            var (_, page) = await guest.Get("/topic?id=2");
+            Assert.Contains("Sign in to reply", page);
+            Assert.DoesNotContain("id=\"reply\"", page);
+            Assert.DoesNotContain("/post/reply?", page);
+        }
+
+        // Bob's preview: the post as it will look, its HTML escaped, nothing kept; a topic without a title refused; then
+        // the topic, which he watches.
+        var mails = smtp.Messages.Count;
+        const string tea = "**Tea**, of course.\r\n\r\n<script>alert(1)</script>";
+        Assert.Contains("<a class=\"button\" href=\"/post/new?board=1\">New topic</a>", (await bob.Get("/board?id=1")).Item2);
+        var (status, body, at) = await bob.Post("/post/new?board=1", ("title", "Tea or coffee"), ("body", tea), ("action", "preview"));
+        Assert.True(status == HttpStatusCode.OK, body);
+        Assert.Contains("<p><strong>Tea</strong>, of course.</p>\n<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>", body);
+        Assert.DoesNotContain("<script>alert", body);
+        Assert.Contains(">**Tea**, of course.\n\n&lt;script&gt;alert(1)&lt;/script&gt;</textarea>", body);
+        Assert.Contains("<td class=\"count\">31 topics<br>75 posts</td>", (await bob.Get("/")).Item2);
+        (status, body, _) = await bob.Post("/post/new?board=1", ("title", " "), ("body", tea), ("action", "post"));
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Contains("A topic needs a title.", body);
+        (status, body, at) = await bob.Post("/post/new?board=1", ("title", "Tea or coffee"), ("body", tea), ("action", "post"));
+        Assert.True(status == HttpStatusCode.OK && at == "/topic?id=32", at + "\n" + body);
+        Assert.Contains("<h1>Tea or coffee</h1>", body);
+        Assert.Contains("<div class=\"body\"><p><strong>Tea</strong>, of course.</p>\n<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>\n</div>", body);
+        Assert.Contains("<div class=\"signature\"><p>Bob, of Lodz.</p>\n</div>", body);
+        Assert.Contains(">Stop watching</button>", body);
+        var home = (await bob.Get("/")).Item2;
+        Assert.Contains("<td class=\"count\">32 topics<br>76 posts</td>", home);
+        Assert.Contains("<a href=\"/topic?id=32\">Tea or coffee</a><br>\n    <span class=\"note\">by Bob,", home);
+
+        // Anna finds the topic new, and is taken to its first new post; then it is new no more.
+        using var anna = new Browser(address);
+        (status, body, at) = await anna.Post("/account/sign-in", ("name", "Anna"), ("password", "correct-horse"));
+        Assert.Equal((HttpStatusCode.OK, "/"), (status, at));
+        (_, body) = await anna.Get("/board?id=1");
+        Assert.Contains("<a class=\"tag new\" href=\"/topic?id=32&amp;unread=1\">New</a>", body);
+        Assert.Single(Regex.Matches(body, "class=\"tag new\""));
+        Assert.Equal("/topic?id=32", (await anna.Visit("/topic?id=32&unread=1")).Item3);
+        Assert.DoesNotContain("class=\"tag new\"", (await anna.Get("/board?id=1")).Item2);
+
+        // Anna quotes Bob, who watches the topic he started, and is mailed of her reply; of her next, not, until he has read
+        // the topic again.
+        (_, body) = await anna.Get("/post/reply?topic=32&quote=76");
+        Assert.Contains(">&gt; **Bob** wrote:\n&gt; **Tea**, of course.\n&gt;\n&gt; &lt;script&gt;alert(1)&lt;/script&gt;\n\n</textarea>", body);
+        (status, body, at) = await anna.Post("/post/reply?topic=32", ("body", "> **Bob** wrote:\n> Tea\n\nCoffee, *always*."), ("action", "post"));
+        Assert.True(status == HttpStatusCode.OK && at == "/topic?id=32", at + "\n" + body);
+        Assert.Contains("<blockquote>\n<p><strong>Bob</strong> wrote:<br>\nTea</p>\n</blockquote>\n<p>Coffee, <em>always</em>.</p>", body);
+        Assert.Equal(mails + 1, smtp.Messages.Count);
+        Assert.Contains("Subject: Anna replied to Tea or coffee", Mail(mails));
+        Assert.Contains("To: bob@example.com", Mail(mails));
+        Assert.Contains("/topic?id=32&unread=1", Mail(mails));
+        await anna.Post("/post/reply?topic=32", ("body", "Or tea."), ("action", "post"));
+        Assert.Equal(mails + 1, smtp.Messages.Count);
+        Assert.Equal("/topic?id=32", (await bob.Visit("/topic?id=32&unread=1")).Item3);
+        await anna.Post("/post/reply?topic=32", ("body", "Both, then."), ("action", "post"));
+        Assert.Equal(mails + 2, smtp.Messages.Count);
+
+        // Bob edits his post, and the topic's title with it, the first post's; Anna's posts are not his to change, nor his
+        // first post his to delete while the topic has replies.
+        Assert.Contains("name=\"title\" value=\"Tea or coffee\"", (await bob.Get("/post/edit?id=76")).Item2);
+        (status, body, at) = await bob.Post("/post/edit?id=76", ("title", "Tea, or coffee?"), ("body", "Tea, *of course*."), ("action", "post"));
+        Assert.True(status == HttpStatusCode.OK && at == "/topic?id=32", at + "\n" + body);
+        Assert.Contains("<h1>Tea, or coffee?</h1>", body);
+        Assert.Contains("<p>Tea, <em>of course</em>.</p>", body);
+        Assert.Contains(" · Edited ", body);
+        Assert.Contains("href=\"/post/edit?id=76\"", body);
+        Assert.DoesNotContain("href=\"/post/edit?id=77\"", body);
+        Assert.DoesNotContain("href=\"/post/delete?id=76\"", body);
+        Assert.Contains("href=\"/post/reply?topic=32&amp;quote=77\"", body);
+        (status, body) = await bob.Get("/post/edit?id=77");
+        Assert.Equal(HttpStatusCode.Forbidden, status);
+        Assert.Contains("Only its author may change a post.", body);
+        (status, body) = await bob.Get("/post/delete?id=76");
+        Assert.Equal(HttpStatusCode.Forbidden, status);
+        Assert.Contains("A topic&#39;s first post cannot be deleted while the topic has replies.", body);
+
+        // Bob stops watching, and is mailed of no more replies; Anna deletes her last.
+        (status, body, at) = await bob.Post("/post/watch", ("topic", "32"), ("action", "unwatch"));
+        Assert.Equal((HttpStatusCode.OK, "/topic?id=32"), (status, at));
+        Assert.Contains(">Watch this topic</button>", body);
+        await anna.Post("/post/reply?topic=32", ("body", "Gone soon."), ("action", "post"));
+        Assert.Equal(mails + 2, smtp.Messages.Count);
+        (_, body) = await anna.Get("/post/delete?id=80");
+        Assert.Contains("Delete this post?", body);
+        Assert.Contains("<p>Gone soon.</p>", body);
+        Assert.DoesNotContain("the topic is deleted with it", body);
+        (status, body, at) = await anna.Post("/post/delete?id=80");
+        Assert.Equal((HttpStatusCode.OK, "/topic?id=32"), (status, at));
+        Assert.DoesNotContain("Gone soon.", body);
+        Assert.Contains("<td class=\"count\">32 topics<br>79 posts</td>", (await anna.Get("/")).Item2);
+
+        // A topic whose only post is deleted is deleted with it, and the board's counts and latest post with it.
+        (status, body, at) = await bob.Post("/post/new?board=1", ("title", "Short-lived"), ("body", "Alone."), ("action", "post"));
+        Assert.Equal((HttpStatusCode.OK, "/topic?id=33"), (status, at));
+        Assert.Contains("It is the topic&#39;s only post: the topic is deleted with it.", (await bob.Get("/post/delete?id=81")).Item2);
+        (status, body, at) = await bob.Post("/post/delete?id=81");
+        Assert.Equal((HttpStatusCode.OK, "/board?id=1"), (status, at));
+        Assert.Equal(HttpStatusCode.NotFound, (await bob.Get("/topic?id=33")).Item1);
+        home = (await bob.Get("/")).Item2;
+        Assert.Contains("<td class=\"count\">32 topics<br>79 posts</td>", home);
+        Assert.Contains("<a href=\"/topic?id=32\">Tea, or coffee?</a>", home);
+        Assert.Contains("<li>1 post</li>", (await bob.Get("/members/member?id=2")).Item2);
+
+        // A locked topic takes no replies; a form whose token is not the browser's is refused, and nothing is kept.
+        (_, body) = await bob.Get("/topic?id=31");
+        Assert.DoesNotContain("id=\"reply\"", body);
+        Assert.DoesNotContain("/post/reply?topic=31", body);
+        (status, body) = await bob.Get("/post/reply?topic=31");
+        Assert.Equal(HttpStatusCode.Forbidden, status);
+        Assert.Contains("This topic is locked: it takes no more replies.", body);
+        var refused = await bob.Client.PostAsync("/post/new?board=1", new FormUrlEncodedContent(
+            [new("csrfToken", "0".PadLeft(32, '0')), new("title", "x"), new("body", "x"), new("action", "post")]));
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Contains("This form has expired: send it again.", await refused.Content.ReadAsStringAsync());
+        Assert.Contains("<td class=\"count\">32 topics<br>79 posts</td>", (await bob.Get("/")).Item2);
     }
 
     private static (int, string, string) Run(params string[] arguments)

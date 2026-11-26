@@ -3,6 +3,7 @@
 
 import mail from "std:mail";
 import tokens from "./tokens.wlg";
+import reading from "./reading.wlg";
 
 // The forum's address, for links in its mail: its settings' "address", or the address the request came to.
 export function addressOf(site, request) {
@@ -26,6 +27,18 @@ export async function sendConfirmation(db, site, request, user, now) {
     var token = await tokens.make(db, user["id"], "confirm", 48, now);
     return await send(site, user["email"], "mail.confirm.subject", "mail.confirm.text",
                       { name: user["name"], link: $"{addressOf(site, request)}/account/confirm?token={token}" });
+}
+
+// Mails those who watch a topic of a reply to it, by its author, each once until they have read the topic again: one
+// whose mail cannot be sent is mailed of the next reply instead, and the reply, saved first, is never lost to mail.
+export async function sendReplies(db, site, request, topic, author) {
+    var link = $"{addressOf(site, request)}/topic?id={topic['id']}&unread=1";
+    foreach (var watcher in await reading.toMail(db, topic["id"], author["id"])) {
+        if (await send(site, watcher["email"], "mail.reply.subject", "mail.reply.text",
+                       { name: watcher["name"], author: author["name"], topic: topic["title"], link: link })) {
+            await reading.mailed(db, watcher["id"], topic["id"]);
+        }
+    }
 }
 
 // Mails a member a link to reset their password, good for an hour; gives whether it was sent.

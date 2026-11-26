@@ -1,4 +1,4 @@
-<% param site; param post; param number; %>
+<% param site; param post; param number; param topic; param first; import { render } from "/lib/markdown.wlg"; import posts from "/lib/posts.wlg"; %>
 <article class="post" id="post-<%= post["id"] %>">
   <aside class="author">
 <% if (post["user_name"] == null) { %>
@@ -11,6 +11,20 @@
   </aside>
   <div class="content">
     <p class="note"><a href="#post-<%= post["id"] %>">#<%= number %></a> · <%= site.f("topic.postedAt", { time: site.time(post["created_at"]) }) %><% if (post["edited_at"] != null) { %> · <%= site.f("topic.editedAt", { time: site.time(post["edited_at"]) }) %><% } %></p>
-    <div class="body text"><%= post["body"] %></div>
+    <div class="body"><%- render(post["body"], { images: site.settings["images"] }) %></div>
+<% if (post["user_signature"] != null) { %>
+    <div class="signature"><%- render(post["user_signature"]) %></div>
+<% } %>
+<% if (posts.mayReply(site.user, topic)) { %>
+    <p class="actions">
+      <a href="<%= $"/post/reply?topic={topic['id']}&quote={post['id']}" %>"><%= site.t("topic.quote") %></a>
+<% if (posts.mayEdit(site.user, topic, post)) { %>
+      <a href="/post/edit?id=<%= post["id"] %>"><%= site.t("topic.edit") %></a>
+<% } %>
+<% if (posts.mayDelete(site.user, topic, post, first)) { %>
+      <a href="/post/delete?id=<%= post["id"] %>"><%= site.t("topic.delete") %></a>
+<% } %>
+    </p>
+<% } %>
   </div>
 </article>

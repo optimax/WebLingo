@@ -11,6 +11,8 @@ export const defaults = {
     "timeZone": "UTC",
     "topicsPerPage": 25,
     "postsPerPage": 20,
+    // Whether a post's Markdown shows its images, ![…](https://…), each from wherever its address is, or links to them.
+    "images": false,
     // Whether anyone may sign up, and whether a new member confirms their address by a link mailed to it first.
     "signUp": true,
     "confirmEmail": true,

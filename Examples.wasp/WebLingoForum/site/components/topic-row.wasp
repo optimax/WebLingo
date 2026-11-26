@@ -3,6 +3,7 @@
   <td class="what">
 <% if (topic["pinned"]) { %>    <span class="tag"><%= site.t("board.pinned") %></span><% } %>
 <% if (topic["locked"]) { %>    <span class="tag"><%= site.t("board.locked") %></span><% } %>
+<% if (topic["new"]) { %>    <a class="tag new" href="<%= $"/topic?id={topic['id']}&unread=1" %>"><%= site.t("board.new") %></a><% } %>
     <a class="topic" href="/topic?id=<%= topic["id"] %>"><%= topic["title"] %></a>
     <p class="note"><%= site.f("topic.startedBy", { name: topic["user_name"] ?? site.t("user.deleted"), time: site.time(topic["created_at"]) }) %></p>
   </td>

@@ -4,8 +4,8 @@
 import { columnType } from "./sql.wlg";
 
 // The schema's version, which the table schema_version holds: 1, the forum's first part's; 2, its members' tokens and
-// failed sign-ins.
-export const version = 2;
+// failed sign-ins; 3, what each member has read, and the topics they watch.
+export const version = 3;
 
 function id() { return { name: "id", type: "id", nullable: false }; }
 function integer(name) { return { name: name, type: "integer", nullable: false }; }
@@ -57,7 +57,14 @@ export const tables = [
     // A failed sign-in to a member's account, which too many of in a short time make the next wait.
     { name: "sign_in_failures", since: 2, columns: [id(), integer("user_id"), date("failed_at")],
       references: { "user_id": "users" },
-      indexes: [{ name: "sign_in_failures_user", columns: ["user_id", "failed_at"], unique: false }] }
+      indexes: [{ name: "sign_in_failures_user", columns: ["user_id", "failed_at"], unique: false }] },
+    // The last post of a topic a member has read.
+    { name: "topic_reads", since: 3, columns: [integer("user_id"), integer("topic_id"), integer("last_read_post_id")],
+      key: ["user_id", "topic_id"], references: { "user_id": "users", "topic_id": "topics" } },
+    // A topic a member watches, mailed of its next reply; notified until they read it again, so that they get one mail.
+    { name: "topic_watches", since: 3, columns: [integer("user_id"), integer("topic_id"), boolean("notified")],
+      key: ["user_id", "topic_id"], references: { "user_id": "users", "topic_id": "topics" },
+      indexes: [{ name: "topic_watches_topic", columns: ["topic_id"], unique: false }] }
 ];
 
 // The schema's version that added a table.

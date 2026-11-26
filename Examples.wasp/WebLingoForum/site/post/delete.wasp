@@ -1,0 +1,21 @@
+<% param request; param response; import { deletePage } from "/lib/writing.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await deletePage(request, response)).title, crumbs: (await deletePage(request, response)).crumbs }; %>
+<% var view = await deletePage(request, response); var site = view.site; %>
+<% if (view.refused != null) { %>
+<h1><%= view.title %></h1>
+<p class="notice"><%= site.t(view.refused) %></p>
+<% } else if (site.user != null && !view.done) { %>
+<h1><%= site.t("post.deleteQuestion") %></h1>
+<% await renderComponent("/components/problems.wasp", { site: site, problems: view.problems }); %>
+<div class="quoted body"><%- view.html %></div>
+<% if (view.alone) { %>
+<p class="notice"><%= site.t("post.deleteTopic") %></p>
+<% } %>
+<form method="post" class="form" action="<%= view.action %>">
+  <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+  <div class="buttons">
+    <button><%= site.t("post.deleteButton") %></button>
+    <a href="<%= $"/topic?id={view.topic['id']}" %>"><%= site.t("post.keep") %></a>
+  </div>
+</form>
+<% } %>

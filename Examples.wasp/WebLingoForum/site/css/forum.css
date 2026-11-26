@@ -36,7 +36,31 @@ table.list tr.pinned { background: color-mix(in srgb, var(--accent) 6%, var(--su
 .post .author .name { font-weight: 600; }
 .post .content { padding: 0.75rem; min-width: 0; flex: 1; }
 .post .body { margin-top: 0.5rem; overflow-wrap: anywhere; }
-.post .body.text { white-space: pre-wrap; }
+.post .signature { margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.875rem; }
+.post .actions { margin: 0.75rem 0 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.875rem; }
+
+/* A post's Markdown, as its renderer writes it (Documents/weblingo-forum.md, section 3.7). */
+.body > :first-child { margin-top: 0; }
+.body > :last-child { margin-bottom: 0; }
+.body p, .body ul, .body ol, .body pre, .body blockquote { margin: 0 0 0.75rem; }
+.body h3, .body h4, .body h5, .body h6 { margin: 1rem 0 0.5rem; }
+.body blockquote { padding: 0.25rem 0.75rem; border-left: 3px solid var(--border); color: var(--muted); }
+.body pre { padding: 0.5rem 0.75rem; overflow-x: auto; background: var(--background); border: 1px solid var(--border); border-radius: 4px; }
+.body code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.9em; }
+.body img { max-width: 100%; }
+
+.tools { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; margin: 0.5rem 0; }
+.tools form { display: inline; margin: 0; }
+a.button { display: inline-block; text-decoration: none; }
+a.tag.new { background: var(--accent); text-decoration: none; }
+form.form.wide { max-width: none; }
+form.form textarea { min-height: 10rem; resize: vertical; }
+.buttons { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+form.form button.secondary { color: var(--accent); background: var(--surface); border: 1px solid var(--accent); }
+.preview, .quoted { margin-bottom: 1rem; padding: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.preview { border-style: dashed; }
+.preview h2.plain { margin-top: 0; }
+#reply { margin-top: 1.5rem; }
 
 .pages { margin: 0.75rem 0; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
 .pages a, .pages strong { padding: 0.1rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); text-decoration: none; }

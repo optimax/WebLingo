@@ -312,7 +312,7 @@ messages broke their lines as the platform does, a provider's message's line bre
 ## WebLingo Forum
 
 The forum written in WASP, `Examples.wasp/WebLingoForum`, the task "Extensive WASP Example", is designed in
-`Documents/weblingo-forum.md` (`c05087f`), its ten parts in its section 6, each a task of `TO-DO.md`. Parts 1 and 2 have
+`Documents/weblingo-forum.md` (`c05087f`), its ten parts in its section 6, each a task of `TO-DO.md`. Parts 1 to 3 have
 landed. Its foundations (`cdfa20a`): the schema, `site/lib/schema.wlg`, made on SQLite, SQL Server, MySQL and PostgreSQL
 through `site/lib/sql.wlg`; `setup/setup.wlg`, run with `weblingo`, making the database and its first administrator, or
 upgrading it; and the front page, boards and topics, paged. Its members (`ae49457`): sign-up confirmed by mail, signing
@@ -322,32 +322,30 @@ runs them, then serves the forum on each database, its mail through `SmtpTestSer
 tests passed on Windows, MySQL and PostgreSQL from the `Databases` downloads. The forum's pages read their own line
 breaks, since a Windows checkout gives its files CRLF, so the tests compare pages with their line breaks made LF.
 
-Part 3, writing, was stopped at the owner's request, half done: committed, unfinished, on the branch
-`claude/forum-writing`, which is pushed to GitHub and has not landed on `main`. On that branch `ForumTests` fails until
-the change to its expectations below is made.
+Its writing (part 3), in Markdown: `site/lib/markdown.wlg`, the forum's own renderer, every member's text escaped, links
+to http, https, mailto and the forum's own paths only, images only where the settings' `"images"` allows them, nesting
+and every search bounded, so that a post renders in time linear in its length; `site/lib/posts.wlg`, a topic started, a
+reply, an edit and a deletion, each keeping its topic's, its board's and its author's counts and latest posts, and who
+may change a post, its author while its topic is not locked, until part 4's permissions; `site/lib/reading.wlg`, what
+is new to a member, the posts after the last they saw and after they joined, and the topics they watch, a watcher
+mailed of a reply once until they read the topic again, the schema's version 3 adding `topic_reads` and
+`topic_watches`; and `site/lib/writing.wlg` with `site/post/`, the pages, each with a preview, posts and signatures
+rendered by `components/post.wasp`. Tested by `tests/writing-tests.wlg` and `tests/markdown-tests.wlg`, and by
+`ForumTests`' walk of writing (`WritingAsync`), on all four databases; the pages looked at in a browser, served by
+`wasp serve`. The guesses it made are marked in the design document's section 2.
 
-- `site/lib/markdown.wlg`, new: the forum's Markdown, `render(text, options)`: paragraphs, emphasis, strong, struck text
-  and code; headings from `<h3>`; fenced code; quotes, nested; lists; rules; links to http, https, mailto and the
-  forum's own paths only, `rel="nofollow ugc noopener"`; images only given `{ images: true }`, else links; everything
-  else escaped. Nesting stops at 12 levels, and every search is bounded, so that a post renders in time linear in its
-  length.
-- `tests/markdown-tests.wlg`, new: 10 tests, passing, a pathological post among them, rendered in 0.4 s.
-- `site/lib/schema.wlg`: version 3, with `topic_reads` and `topic_watches`; `tests/accounts-tests.wlg` expects it.
+Found while writing it: in WebLingo, `s[i]` and a string's `length` take time in proportion to its length, its scalar
+values counted from its start each time (`WebLingoMembers.ScalarCount`), 20,000 lookups 683 ms against 2 ms by
+`foreach`; so a scanner reads an array of a string's characters (`charsOf` in `markdown.wlg`). The task "Indexing a
+String in Constant Time" is to fix it.
 
-Left of part 3: a module of posts, a new topic, a reply, a quote, editing and deleting one's own, and the counts; what a
-member has read and the topics they watch, unread markers, a link to the first unread post, and a watch's mail; the
-pages for a new topic, a reply, an edit and a deletion, and a watch's handler; the post component rendering Markdown and
-the signature; a setting for images; and `ForumTests`' walk of writing. Version 3 breaks `ForumTests` until its two
-expectations of `version 2`, after running `setup.wlg`, say `version 3`. Then the design document kept to what is built.
+The branch `claude/forum-writing` on GitHub holds part 3 unfinished (`9093b78`), which `main` has whole, in one commit,
+instead: it may be deleted there.
 
-Found while writing it: in WebLingo, `s[i]` takes time in proportion to `i`, a string's characters being found from its
-start, 20,000 lookups 683 ms against 2 ms by `foreach`; so a scanner reads an array of a string's characters
-(`charsOf` in `markdown.wlg`). It is not a task of `TO-DO.md` yet.
-
-Next: "WebLingo Forum, Part 3: Writing", above, then parts 4 to 7 and 10; parts 8 and 9 each wait for an answer in
-`TO-DO.md`. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to be written
-as tasks and into the specification's roadmap; neither is begun.
+Next: "WebLingo Forum, Part 4: Permissions and Moderation", then parts 5 to 7 and 10; parts 8 and 9 each wait for an
+answer in `TO-DO.md`. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to
+be written as tasks and into the specification's roadmap; neither is begun.
 
 The last full suite, on Windows, in Release (25 November 2026, MySQL's and PostgreSQL's tests among them): 3,642 tests
 passing, none skipped, before the forum's parts, whose `ForumTests` ran for each. Linux not tried since `2e27309`: the
-forum's design, the build number and the forum's parts 1 and 2 were tried on Windows only.
+forum's design, the build number and the forum's parts 1 to 3 were tried on Windows only.

@@ -1,9 +1,11 @@
 // What each of the forum's pages shows, read from the database once for each request, so that a page and its layout
 // share it: its title, the trail of links above it, and its own data, as an object's fields.
 
-import { begin, open, viewOf, idOf, pageOf, pagesOf } from "./forum.wlg";
+import { begin, open, viewOf, redirect, idOf, pageOf, pagesOf } from "./forum.wlg";
 import boards from "./boards.wlg";
 import topics from "./topics.wlg";
+import posts from "./posts.wlg";
+import reading from "./reading.wlg";
 import users from "./users.wlg";
 
 function view(site, title, crumbs) {
@@ -28,8 +30,8 @@ export async function indexPage(request) {
     });
 }
 
-// A board's page, /board?id=3&page=2: the board, a page of its topics, and the page numbers; its board null where the
-// query names none.
+// A board's page, /board?id=3&page=2: the board, a page of its topics, each marked where it has posts new to the
+// member, and the page numbers; its board null where the query names none.
 export async function boardPage(request) {
     var site = await begin(request);
     return await site.once("board", async () => {
@@ -45,15 +47,19 @@ export async function boardPage(request) {
             page.board = board;
             page.pages = pagesOf(await topics.countOnBoard(db, board["id"]), perPage);
             page.page = pageWithin(request, page.pages);
-            page.topics = await topics.onBoard(db, board["id"], (page.page - 1) * perPage, perPage);
+            page.topics = await topics.onBoard(db, board["id"], site.user?["id"] ?? 0, (page.page - 1) * perPage, perPage);
+            foreach (var topic in page.topics) {
+                topic["new"] = reading.isNew(site.user, topic);
+            }
             return page;
         }
     });
 }
 
-// A topic's page, /topic?id=42&page=2: the topic, a page of its posts, and the page numbers, its view counted; its topic
-// null where the query names none.
-export async function topicPage(request) {
+// A topic's page, /topic?id=42&page=2: the topic, its first post's id, whether the member watches it, a page of its posts,
+// and the page numbers, its view counted, and its posts kept as seen by the member; its topic null where the query names
+// none. With &unread=1, the member is sent on to the first post new to them, or to its last.
+export async function topicPage(request, response) {
     var site = await begin(request);
     return await site.once("topic", async () => {
         using (var db = await open()) {
@@ -67,11 +73,25 @@ export async function topicPage(request) {
                                                    [topic["board_name"], $"/board?id={topic['board_id']}"]]);
             var perPage = site.settings["postsPerPage"];
             page.topic = topic;
+            page.firstPost = await posts.firstOf(db, topic["id"]);
+            page.watching = site.user != null && await reading.isWatching(db, site.user["id"], topic["id"]);
+            page.pages = 1;
+            page.page = 1;
+            page.first = 0;
+            page.posts = [];
+            if (site.user != null && request.query?["unread"] == "1") {
+                var next = await reading.firstNew(db, site.user, topic["id"]);
+                redirect(response, await posts.linkOf(db, topic["id"], next ?? topic["last_post_id"], perPage));
+                return page;
+            }
             page.pages = pagesOf(await topics.countOfPosts(db, topic["id"]), perPage);
             page.page = pageWithin(request, page.pages);
             page.first = (page.page - 1) * perPage;
             page.posts = await topics.posts(db, topic["id"], page.first, perPage);
             await topics.viewed(db, topic["id"]);
+            if (site.user != null && page.posts.length > 0) {
+                await reading.saw(db, site.user["id"], topic["id"], page.posts[page.posts.length - 1]["id"]);
+            }
             return page;
         }
     });

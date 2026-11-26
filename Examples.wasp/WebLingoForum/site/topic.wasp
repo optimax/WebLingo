@@ -1,7 +1,7 @@
 <% session readonly; %>
-<% param request; param response; import { topicPage } from "/lib/pages.wlg"; %>
-<% layout "/layouts/main.wasp", { title: (await topicPage(request)).title, crumbs: (await topicPage(request)).crumbs }; %>
-<% var view = await topicPage(request); var site = view.site; %>
+<% param request; param response; import { topicPage } from "/lib/pages.wlg"; import posts from "/lib/posts.wlg"; %>
+<% layout "/layouts/main.wasp", { title: (await topicPage(request, response)).title, crumbs: (await topicPage(request, response)).crumbs }; %>
+<% var view = await topicPage(request, response); var site = view.site; %>
 <% if (view.topic == null) { response.status = 404; %>
 <h1><%= site.t("topic.notFound") %></h1>
 <p><%= site.t("forum.notFoundText") %> <a href="/"><%= site.t("forum.goHome") %></a>.</p>
@@ -10,10 +10,32 @@
 <% if (topic["locked"]) { %>
 <p class="notice"><%= site.t("topic.locked") %></p>
 <% } %>
+<div class="tools">
+<% if (site.user == null) { %>
+  <a href="/account/sign-in?back=<%= base %>"><%= site.t("topic.signInToReply") %></a>
+<% } else { %>
+<% if (posts.mayReply(site.user, topic)) { %>
+  <a class="button" href="#reply"><%= site.t("topic.reply") %></a>
+<% } %>
+  <form method="post" action="/post/watch">
+    <input type="hidden" name="csrfToken" value="<%= request.csrfToken %>">
+    <input type="hidden" name="topic" value="<%= topic["id"] %>">
+    <input type="hidden" name="action" value="<%= view.watching ? "unwatch" : "watch" %>">
+    <button class="link"><%= site.t(view.watching ? "topic.unwatch" : "topic.watch") %></button>
+  </form>
+<% } %>
+</div>
 <% await renderComponent("/components/pages.wasp", { site: site, base: base, page: view.page, pages: view.pages }); %>
 <% var number = view.first; %>
 <% foreach (var post in view.posts) { number++; %>
-<% await renderComponent("/components/post.wasp", { site: site, post: post, number: number }); %>
+<% await renderComponent("/components/post.wasp", { site: site, post: post, number: number, topic: topic, first: view.firstPost }); %>
 <% } %>
 <% await renderComponent("/components/pages.wasp", { site: site, base: base, page: view.page, pages: view.pages }); %>
+<% if (posts.mayReply(site.user, topic)) { %>
+<section id="reply">
+  <h2 class="plain"><%= site.t("topic.yourReply") %></h2>
+<% await renderComponent("/components/post-form.wasp", { site: site, token: request.csrfToken, action: $"/post/reply?topic={topic['id']}",
+                                                        values: { title: "", body: "" }, submit: site.t("post.send") }); %>
+</section>
+<% } %>
 <% } %>

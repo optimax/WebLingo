@@ -1,5 +1,5 @@
 <% session readonly; %>
-<% param request; param response; import { memberPage } from "/lib/pages.wlg"; %>
+<% param request; param response; import { memberPage } from "/lib/pages.wlg"; import { render } from "/lib/markdown.wlg"; %>
 <% layout "/layouts/main.wasp", { title: (await memberPage(request)).title, crumbs: (await memberPage(request)).crumbs }; %>
 <% var view = await memberPage(request); var site = view.site; %>
 <% if (view.member == null) { response.status = 404; %>
@@ -16,6 +16,6 @@
 </ul>
 <% if (member["signature"] != null) { %>
 <h2 class="plain"><%= site.t("member.signature") %></h2>
-<div class="body text"><%= member["signature"] %></div>
+<div class="body"><%- render(member["signature"]) %></div>
 <% } %>
 <% } %>

@@ -1,0 +1,8 @@
+// /post/watch, posted by a topic's button: the member signed in watches the topic, or stops watching it, where the form's
+// token against cross-site request forgery is the browser's, and is sent back to the topic.
+
+import { watchPosted } from "../lib/writing.wlg";
+
+export async function post(request, response) {
+    await watchPosted(request, response);
+}
