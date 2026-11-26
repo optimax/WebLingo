@@ -296,6 +296,7 @@ export const texts = {
     "signIn.submit": "Sign in",
     "signIn.wrong": "That name or address and that password do not match.",
     "signIn.tooMany": "Too many sign-ins to that account failed: wait 15 minutes, or reset its password.",
+    "signIn.tooManyHere": "Too many sign-ins from your address failed lately: wait 15 minutes.",
     "signIn.unconfirmed": "Your address is not confirmed yet: we sent you a new link, to {email}.",
     "signIn.forgot": "Forgot your password?",
     "signIn.noAccount": "No account yet?",

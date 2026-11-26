@@ -5,8 +5,9 @@ import { columnType } from "./sql.wlg";
 
 // The schema's version, which the table schema_version holds: 1, the forum's first part's; 2, its members' tokens and
 // failed sign-ins; 3, what each member has read, and the topics they watch; 4, each board's permissions for each group,
-// bans, reports and the moderation log; 5, private messages; 6, the search's index; 7, members' uploaded files.
-export const version = 7;
+// bans, reports and the moderation log; 5, private messages; 6, the search's index; 7, members' uploaded files; 8, failed
+// sign-ins by the address they came from.
+export const version = 8;
 
 function id() { return { name: "id", type: "id", nullable: false }; }
 function integer(name) { return { name: name, type: "integer", nullable: false }; }
@@ -114,7 +115,11 @@ export const tables = [
         integer("size"), date("created_at"), optional(integer("post_id"))],
       references: { "user_id": "users", "post_id": "posts" },
       indexes: [{ name: "uploads_post", columns: ["post_id"], unique: false },
-                { name: "uploads_user", columns: ["user_id", "kind"], unique: false }] }
+                { name: "uploads_user", columns: ["user_id", "kind"], unique: false }] },
+    // A failed sign-in, to any name, by the address it came from, which too many of in a short time make the next wait.
+    { name: "sign_in_address_failures", since: 8, columns: [id(), string("address", 45), date("failed_at")],
+      indexes: [{ name: "sign_in_address_failures_address", columns: ["address", "failed_at"], unique: false },
+                { name: "sign_in_address_failures_at", columns: ["failed_at"], unique: false }] }
 ];
 
 // The schema's version that added a table.

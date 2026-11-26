@@ -11,9 +11,11 @@ import { sendConfirmation, sendReset } from "./mail.wlg";
 import { banOf } from "./moderation.wlg";
 import uploads from "./uploads.wlg";
 
-// Failed sign-ins to one account that make the next wait, and for how long, in minutes.
+// Failed sign-ins to one account that make the next wait, and for how long, in minutes; and those from one address, to any
+// names, a member's or not, so that one client trying many accounts waits too, more, since many share an address.
 export const failuresAllowed = 5;
 export const failuresWindow = 15;
+export const addressFailuresAllowed = 20;
 
 function view(site, title, request) {
     var page = viewOf(site, title, []);
@@ -143,6 +145,17 @@ export async function signInPage(request, response) {
         using (var db = await open()) {
             var user = name == "" ? null : await users.byNameOrEmail(db, name);
             var now = DateTime.utcNow();
+            // The client's address, a trusted proxy's word for it behind one; none where its host gives none.
+            var address = request.clientAddress;
+            if (address != "") {
+                var fromHere = (await db.query("SELECT COUNT(*) AS n FROM sign_in_address_failures WHERE address = @address AND failed_at > @since",
+                                               { address: address, since: now.addMinutes(-failuresWindow) }))[0]["n"];
+                if (fromHere >= addressFailuresAllowed) {
+                    response.status = 429;
+                    page.problems.push("signIn.tooManyHere");
+                    return page;
+                }
+            }
             if (user != null) {
                 var failures = (await db.query("SELECT COUNT(*) AS n FROM sign_in_failures WHERE user_id = @user AND failed_at > @since",
                                                { user: user["id"], since: now.addMinutes(-failuresWindow) }))[0]["n"];
@@ -155,6 +168,12 @@ export async function signInPage(request, response) {
             if (!(await users.verify(password, user?["password_hash"]))) {
                 if (user != null) {
                     await db.execute("INSERT INTO sign_in_failures (user_id, failed_at) VALUES (@user, @now)", { user: user["id"], now: now });
+                }
+                if (address != "") {
+                    // Those older than the window forgotten, every address's, so that the table keeps only what counts.
+                    await db.execute("DELETE FROM sign_in_address_failures WHERE failed_at <= @since", { since: now.addMinutes(-failuresWindow) });
+                    await db.execute("INSERT INTO sign_in_address_failures (address, failed_at) VALUES (@address, @now)",
+                                     { address: address, now: now });
                 }
                 response.status = 400;
                 page.problems.push("signIn.wrong");

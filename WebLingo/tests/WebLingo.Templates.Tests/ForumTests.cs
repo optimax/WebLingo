@@ -128,7 +128,7 @@ public sealed class ForumTests
         {
             var acme = Path.Combine(copy, "clients", "acme");
             Assert.Equal((WebLingoCommandLine.Success, "Made the forum's database 'sqlite:" + Path.Combine(acme, "data", "forum.db")
-                + "' on sqlite, version 7, with its administrator Anna.\n", ""),
+                + "' on sqlite, version 8, with its administrator Anna.\n", ""),
                 Run("run", Path.Combine(copy, "setup", "setup.wlg"), "name=Anna", "email=anna@example.com", "password=correct-horse",
                     "database=sqlite:" + Path.Combine(acme, "data", "forum.db"), "uploads=" + Path.Combine(acme, "data", "uploads")));
             var server = WebLingoWaspServer.Create(Path.Combine(acme, "site"), 0, new Dictionary<string, string>(), out var error, out _);
@@ -186,14 +186,16 @@ public sealed class ForumTests
             {
                 ["databases"] = databases,
                 ["files"] = new Dictionary<string, object> { ["write"] = new[] { "../data/uploads" } },
+                // The tests' own address a trusted proxy's, so that a browser may say it is another client (section 3.4).
+                ["proxies"] = new[] { "127.0.0.1", "::1" },
                 ["mail"] = new Dictionary<string, object> { ["default"] = new Dictionary<string, object> { ["host"] = "127.0.0.1", ["port"] = smtp.Port, ["tls"] = "none" } }
             }));
             var setup = Path.Combine(copy, "setup", "setup.wlg");
             // Its members' files' folder made by setup.wlg, given as a path of its own, the tests' folder being no forum's.
             var uploads = "uploads=" + Path.Combine(copy, "data", "uploads");
-            Assert.Equal((WebLingoCommandLine.Success, $"Made the forum's database 'forum' on {provider}, version 7, with its administrator Anna.\n", ""),
+            Assert.Equal((WebLingoCommandLine.Success, $"Made the forum's database 'forum' on {provider}, version 8, with its administrator Anna.\n", ""),
                 Run("run", setup, "name=Anna", "email=anna@example.com", "password=correct-horse", uploads));
-            Assert.Equal((WebLingoCommandLine.Success, "The forum's database 'forum' is at version 7 already: nothing to do.\n", ""),
+            Assert.Equal((WebLingoCommandLine.Success, "The forum's database 'forum' is at version 8 already: nothing to do.\n", ""),
                 Run("run", setup, uploads));
             Assert.True(Directory.Exists(Path.Combine(copy, "data", "uploads")));
 
@@ -468,6 +470,21 @@ public sealed class ForumTests
         Assert.Contains("Too many sign-ins to that account failed", body);
         (status, body, _) = await Post("/account/sign-in", ("name", "Nobody"), ("password", "bobs-password"));
         Assert.Contains("That name or address and that password do not match.", body);
+
+        // Failed sign-ins counted for each address too, to any name, a member's or not: from one client, behind the
+        // trusted proxy, 20 make the next wait, Bob's right password included, the other clients' going on.
+        using (var elsewhere = new Browser(address))
+        {
+            elsewhere.Client.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.9");
+            for (var i = 0; i < 20; i++)
+            {
+                (status, body, _) = await elsewhere.Post("/account/sign-in", ("name", $"nobody{i}"), ("password", "guess"));
+                Assert.Equal(HttpStatusCode.BadRequest, status);
+            }
+            (status, body, _) = await elsewhere.Post("/account/sign-in", ("name", "Anna"), ("password", "correct-horse"));
+            Assert.Equal((HttpStatusCode)429, status);
+            Assert.Contains("Too many sign-ins from your address failed lately: wait 15 minutes.", body);
+        }
 
         // A password reset by mail, for a member's address only, the answer the same for any; the new password signs
         // Bob in, and the failures are forgotten.
