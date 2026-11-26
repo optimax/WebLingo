@@ -19,9 +19,9 @@ public sealed class WebLingoWorkersModule : IWebLingoNativeModule
 
     public void Register(IWebLingoNativeRegistry registry)
     {
-        // Each makes errors, a worker's exception, which a message holds (WebLingoMessage).
+        // Its exports make errors, a worker's exception, which a message holds (WebLingoMessage).
+        registry.MakesErrors();
         _worker = registry.Class("Worker")
-            .DeclareMakesErrors()
             .DeclareConstructor(1, Construct)
             .DeclareMethod("post", 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
                 Post(_worker, a, heap, out result, out error))
@@ -30,7 +30,6 @@ public sealed class WebLingoWorkersModule : IWebLingoNativeModule
             .DeclareMethod("dispose", 0, Dispose);
         _parent = registry.Class("WorkerParent")
             .DeclareMadeByModule()
-            .DeclareMakesErrors()
             .DeclareMethod("post", 1, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
                 Post(_parent, a, heap, out result, out error))
             .DeclareMethod("receive", 0, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>

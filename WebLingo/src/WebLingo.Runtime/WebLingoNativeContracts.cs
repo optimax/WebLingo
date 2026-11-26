@@ -53,6 +53,14 @@ public interface IWebLingoNativeRegistry
     void Value(string name, WebLingoNativeFunction make);
 
     /// <summary>
+    /// Its exports make errors, instances of <c>Error</c>, in the program's heap, or read them, as <c>std:workers</c>'
+    /// <c>receive()</c> makes a worker's (section 9, "M0.26 parts", part 2): a program that imports the module makes
+    /// <c>Error</c>, and the runtime errors' classes, as one with a <c>try</c> does, though it names none
+    /// (<see cref="WebLingoHeap.ErrorClass"/>).
+    /// </summary>
+    void MakesErrors();
+
+    /// <summary>
     /// An exported class, by a name a script can write, given once, and not a function's too: its members are declared on
     /// what this gives (<see cref="WebLingoNativeClass"/>), whose host objects its functions reach through it.
     /// </summary>

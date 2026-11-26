@@ -14,6 +14,9 @@ public sealed record WebLingoNativeModuleInfo(string Name, IReadOnlyList<WebLing
 
     /// <summary>Its exported constants (section 3.9).</summary>
     public IReadOnlyList<WebLingoNativeConstant> Constants { get; init; } = [];
+
+    /// <summary>Whether its exports make errors in the program's heap, for which a program that imports it makes <c>Error</c> (section 9, "M0.26 parts", part 2).</summary>
+    public bool MakesErrors { get; init; }
 }
 
 /// <summary>
@@ -61,9 +64,6 @@ public sealed record WebLingoNativeClassInfo(string Name, WebLingoNativeExport C
     /// class, so that the module knows it (section 3.10); null for any other.
     /// </summary>
     public WebLingoNativeExport? Registration { get; init; }
-
-    /// <summary>Whether its members make errors in the program's heap, for which a program that uses it makes <c>Error</c> (section 9, "M0.26 parts", part 2).</summary>
-    public bool MakesErrors { get; init; }
 
     /// <summary>
     /// A native class's methods written in WebLingo, as a class's body declares them, read; false, with why, for a source

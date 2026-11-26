@@ -2082,9 +2082,9 @@ owner has not decided is a question of its task's, and Proposed here until it is
    its worker, which runs until it ends, or its program does, so that no collection decides when a worker ends; a
    worker's own workers ending with it, and every worker with its program, cancelled, waited for 5 seconds
    each; an exception a worker ended with that its parent never received not reported; a worker writing where its
-   program writes, each text whole; and a native class whose members make errors in the program's heap declaring so
-   (`WebLingoNativeClass.DeclareMakesErrors`), so that a program using it makes `Error` and its runtime errors' classes
-   (`WebLingoHeap.ErrorClass`) though it names none; `WorkersTests`.
+   program writes, each text whole; and a native module whose exports make errors in the program's heap declaring so
+   (`IWebLingoNativeRegistry.MakesErrors`, Proposed), so that a program importing it makes `Error` and the runtime
+   errors' classes (`WebLingoHeap.ErrorClass`) though it names none; `WorkersTests`.
 3. **A pool** (A1 (c)). `await workers.run("work.wlg", "name", [arguments])`: the module's exported function run on a
    worker of a pool, the module run once on each of the pool's workers, its arguments copied there and its result copied
    back, an exception thrown there the task's, as part 1 copies it, no closure copied; the pool's workers made as they are

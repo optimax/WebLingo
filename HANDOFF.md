@@ -158,7 +158,7 @@ through `IWebLingoWorkers` (`WebLingo.Runtime`, `WebLingoWorkerContracts.cs`), w
 a thread of its own; `Mailbox` the locked queue each way. The VM: a worker's execution (`IsWorker`) goes on after its
 top level while `WebLingoScheduler.HasWork` (the outer `Run` loop and `TryResume`'s `_drains`, outside `Run`'s loop),
 and copies an uncaught exception into `WebLingoExecutionResult.Thrown` (`CopyThrown`, not inlined). A native module's
-`IWebLingoNativeRegistry.Value` is a constant made by a built-in; `DeclareMakesErrors` makes a program bind `Error`.
+`IWebLingoNativeRegistry.Value` is a constant made by a built-in; its `MakesErrors` makes an importer bind `Error`.
 The CLI's `TextWriterOutput` locks its writer, workers sharing it. Part 3, the pool, builds on `Workers`.
 
 ## The work off the workers

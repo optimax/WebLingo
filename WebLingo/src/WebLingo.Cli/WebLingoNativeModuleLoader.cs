@@ -301,7 +301,6 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
             classes.Add(new WebLingoNativeClassInfo(nativeClass.Name, constructor, methods, statics)
             {
                 Registration = nativeClass.MadeByModule ? Export("class", members[^1]) : null,
-                MakesErrors = nativeClass.MakesErrors,
                 WebLingoMethods = written,
                 Properties = properties,
                 StaticProperties = staticProperties,
@@ -310,7 +309,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
                 IndexOptional = indexOptional
             });
         }
-        module = new WebLingoNativeModuleInfo(name, exports) { Classes = classes, Constants = registry.Constants };
+        module = new WebLingoNativeModuleInfo(name, exports) { Classes = classes, Constants = registry.Constants, MakesErrors = registry.MakingErrors };
         error = null;
         return true;
     }
@@ -326,6 +325,11 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
 
         /// <summary>The built-ins that make its values (<see cref="Value"/>), which nothing exports by name.</summary>
         public List<NativeFunction> Makers { get; } = [];
+
+        /// <summary>Whether its exports make errors in the program's heap (<see cref="MakesErrors"/>).</summary>
+        public bool MakingErrors { get; private set; }
+
+        public void MakesErrors() => MakingErrors = true;
         private string? _error;
 
         /// <summary>The first fault in what the module registered, its classes' included.</summary>

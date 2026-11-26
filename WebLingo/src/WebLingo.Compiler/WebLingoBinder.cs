@@ -2120,8 +2120,6 @@ public sealed class WebLingoBinder
     /// </summary>
     private WebLingoLocalSymbol BindNativeClass(string module, WebLingoNativeClassInfo info)
     {
-        // Errors its members make need Error, and its runtime errors' classes, in the program (section 9, "M0.26 parts", part 2).
-        if (info.MakesErrors) UseError();
         var callees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
         var name = module + "." + info.Name;
         var methods = new List<WebLingoMethodSyntax> { NativeMember("constructor", info.Constructor, false, callees, returns: false) };
@@ -2325,6 +2323,8 @@ public sealed class WebLingoBinder
     private WebLingoBoundUnit FinishNativeUnit(int index)
     {
         var unit = _nativeUnits[index];
+        // Errors its exports make need Error, and the runtime errors' classes, in the program (section 9, "M0.26 parts", part 2).
+        if (unit.Info.MakesErrors) UseError();
         foreach (var nativeClass in unit.Info.Classes)
         {
             if (nativeClass.Registration is not null) TryNativeExport(unit, nativeClass.Name, out _);

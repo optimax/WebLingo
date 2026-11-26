@@ -89,20 +89,6 @@ public sealed class WebLingoNativeClass(string name)
         return this;
     }
 
-    /// <summary>Whether its members make errors in the program's heap (<see cref="DeclareMakesErrors"/>).</summary>
-    public bool MakesErrors { get; private set; }
-
-    /// <summary>
-    /// Its members make errors, instances of <c>Error</c>, in the program's heap, or read them, as <c>std:workers</c>'
-    /// <c>receive()</c> makes a worker's (section 9, "M0.26 parts", part 2): a program that uses the class makes <c>Error</c>,
-    /// and its runtime errors' classes, as one with a <c>try</c> does, though it names none (<see cref="WebLingoHeap.ErrorClass"/>).
-    /// </summary>
-    public WebLingoNativeClass DeclareMakesErrors()
-    {
-        MakesErrors = true;
-        return this;
-    }
-
     /// <summary>
     /// Its fallback, which reads, assigns and calls the members its instances have that it does not declare: one that a
     /// field, a method, a property or a static member of its class, or of a class extending it, does not hide; declared
