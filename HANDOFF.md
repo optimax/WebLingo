@@ -130,7 +130,10 @@ steps, and `Documents/implementation.md`, section 8, how it is built. A script's
 skipped by the lexer, so that an executable `.wlg` runs by its name. Nothing of it was made or run on this machine,
 which has no Linux and no Linux runtime packs: CI's job `linux-installer` makes the x64 packages and installs, runs and
 removes them with `Installers/Linux/tests/test.sh` on every push, so it is first tried by the push after it lands. The
-arm64 packages are made by `package.sh` but tried nowhere.
+arm64 packages are made by `package.sh` but tried nowhere. `Installers/Linux/tests/serve.sh`, its next step, failed on
+every push from `2e27309` to `b79f11e`, taking nginx's 502 for the site being served before `wasp fastcgi` listened;
+`eef7703` waits for a success instead, not yet tried by a push. The build and its tests passed on `ubuntu-latest` and
+`windows-latest` on each of those pushes.
 
 ## The console module
 
