@@ -27,10 +27,12 @@ public sealed record WebLingoServerSample(long WorkingSet, long PrivateBytes, in
 /// its own cookies, as browsers do, every answer checked, until the time measured ends. It writes each page's throughput and
 /// latency at each number of clients, and its server's memory after; with <c>--reload</c>, a page replaced every quarter
 /// of a second while clients ask for it, every answer one version's whole; with <c>--soak</c>, the pages asked for in turn
-/// for hours, the server's memory and handles sampled as it goes; with <c>--fair</c>, a page that computes for long asked
-/// for by a client for each of the server's workers while others ask for <c>hello</c>, under each quantum given (section 9,
-/// "M0.24 parts", part 3). Exit codes: 0 every answer right, 1 one wrong or failed,
-/// 2 a usage error.
+/// for hours, the server's memory, handles and threads sampled as it goes, and, with <c>--reload-every</c>, a page replaced
+/// every few seconds, which reloads the site, the growth of each for each reload given after the warm-up, one that keeps
+/// rising a failure (specification, section 9, "M0.22 parts", part 3; <see cref="WebLingoSoakTrend"/>); with
+/// <c>--fair</c>, a page that computes for long asked for by a client for each of the server's workers while others ask for
+/// <c>hello</c>, under each quantum given (section 9, "M0.24 parts", part 3). Exit codes: 0 every answer right, 1 one
+/// wrong or failed, or a soak's measure rising, 2 a usage error.
 /// </summary>
 public static class WebLingoLoad
 {
@@ -113,13 +115,18 @@ public static class WebLingoLoad
         /// <summary>The quanta <c>--fair</c> tries, null for none, each in turn; null where it is not asked for.</summary>
         public List<long?>? Fair { get; private set; }
         public int Sample { get; private set; } = 10;
+        public int? ReloadEvery { get; private set; }
 
         public IReadOnlyList<WebLingoLoadPage> All => Site == "forum" ? ForumPages : WebLingoLoad.Pages;
 
         public IReadOnlyList<WebLingoLoadPage> Pages => Names.Count == 0 ? All : All.Where(page => Names.Contains(page.Name)).ToList();
 
-        /// <summary>Whether what it was given goes together: the forum's pages at a URL, and pages its site has.</summary>
-        public bool IsWhole => (Site != "forum" || Url is not null) && Names.All(name => All.Any(page => page.Name == name));
+        /// <summary>
+        /// Whether what it was given goes together: the forum's pages at a URL, pages its site has, and a soak's reloads on a
+        /// site the benchmark serves itself, whose page it replaces.
+        /// </summary>
+        public bool IsWhole => (Site != "forum" || Url is not null) && Names.All(name => All.Any(page => page.Name == name))
+                               && (ReloadEvery is null || (Soak is not null && Url is null));
 
         public bool TryTake(string option, string value)
         {
@@ -158,6 +165,9 @@ public static class WebLingoLoad
                 case "--fair" when TryQuanta(value, out var quanta):
                     Fair = quanta;
                     return true;
+                case "--reload-every" when TryCount(value, 1, out var every):
+                    ReloadEvery = every;
+                    return true;
                 default:
                     return false;
             }
@@ -176,7 +186,8 @@ public static class WebLingoLoad
         if (settings.Soak is { } hours)
         {
             var sample = TimeSpan.FromMinutes(settings.Sample);
-            return await Soak(site, settings.Pages, settings.Clients.Max(), TimeSpan.FromHours(hours), sample, output);
+            var every = settings.ReloadEvery is { } seconds ? TimeSpan.FromSeconds(seconds) : (TimeSpan?)null;
+            return await Soak(site, settings.Pages, settings.Clients.Max(), TimeSpan.FromHours(hours), sample, every, output);
         }
 
         var (time, warmUp) = (TimeSpan.FromSeconds(settings.Seconds), TimeSpan.FromSeconds(settings.WarmUp));
@@ -272,9 +283,7 @@ public static class WebLingoLoad
     /// </summary>
     private static async Task<int> Reload(WebLingoLoadSite site, int count, TimeSpan time, TextWriter output)
     {
-        string[] versions = ["<p>Hello, load.</p>", "<p>Hello again, load.</p>"];
-        const string Name = "<%= request.query?[\"name\"] ?? \"load\" %>";
-        var page = new WebLingoLoadPage("hello", () => Get("/hello"), body => versions.Any(version => Has(body, version)));
+        var page = Hellos;
         var until = Stopwatch.GetTimestamp() + Ticks(time);
         var (replaced, refused) = (0, 0);
         var replacing = Task.Run(async () =>
@@ -282,8 +291,7 @@ public static class WebLingoLoad
             while (Stopwatch.GetTimestamp() < until)
             {
                 await Task.Delay(250);
-                var text = versions[++replaced % 2].Replace("load", Name, StringComparison.Ordinal);
-                refused += await site.Replace("hello.wasp", "<% param request; %>" + text + "\n");
+                refused += await site.Replace("hello.wasp", Hello(++replaced));
             }
         });
         var tallies = Enumerable.Range(0, count).Select(_ => new Tally()).ToArray();
@@ -299,10 +307,29 @@ public static class WebLingoLoad
         return errors == 0 ? Success : Failed;
     }
 
-    /// <summary>The pages asked for in turn by <paramref name="count"/> clients for <paramref name="time"/>, a row each sample.</summary>
+    /// <summary>The two versions of <c>hello.wasp</c> a reload replaces it with, in turn.</summary>
+    private static readonly string[] HelloVersions = ["<p>Hello, load.</p>", "<p>Hello again, load.</p>"];
+
+    /// <summary><c>hello</c> as either of its versions answers it, while it is replaced.</summary>
+    private static WebLingoLoadPage Hellos { get; } =
+        new("hello", () => Get("/hello"), body => HelloVersions.Any(version => Has(body, version)));
+
+    /// <summary><c>hello.wasp</c>'s text for its <paramref name="version"/>th replacement, the other of its two versions each time.</summary>
+    private static string Hello(long version) =>
+        "<% param request; %>" + HelloVersions[version % 2].Replace("load", "<%= request.query?[\"name\"] ?? \"load\" %>", StringComparison.Ordinal)
+        + "\n";
+
+    /// <summary>
+    /// The pages asked for in turn by <paramref name="count"/> clients for <paramref name="time"/>, a row each sample; with
+    /// <paramref name="reloadEvery"/>, <c>hello.wasp</c> replaced that often, as a deployment replaces it, which reloads the
+    /// site; then what the samples after the warm-up say (<see cref="WebLingoSoakTrend"/>), a measure that keeps rising a
+    /// failure.
+    /// </summary>
     private static async Task<int> Soak(WebLingoLoadSite site, IReadOnlyList<WebLingoLoadPage> pages, int count, TimeSpan time,
-        TimeSpan sample, TextWriter output)
+        TimeSpan sample, TimeSpan? reloadEvery, TextWriter output)
     {
+        // While it is replaced, either of hello's versions is its answer.
+        if (reloadEvery is not null) pages = [.. pages.Select(page => page.Name == "hello" ? Hellos : page)];
         var answered = new List<WebLingoLoadPage>();
         foreach (var page in pages)
         {
@@ -310,13 +337,26 @@ public static class WebLingoLoad
             else answered.Add(page);
         }
         output.WriteLine($"{string.Join(", ", answered.Select(page => page.Name))}, asked for in turn by {count} clients for "
-                         + $"{time.TotalHours:0.#} h.");
+                         + $"{time.TotalHours:0.#} h" + (reloadEvery is { } each
+                             ? $", `hello.wasp` replaced every {each.TotalSeconds:0} s, which reloads the site." : "."));
         output.WriteLine();
-        output.WriteLine("| Elapsed | Requests | Requests/s | Median | 99% under | Errors | Working set | Private bytes | Handles "
-                         + "| Threads |");
-        output.WriteLine("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+        output.WriteLine("| Elapsed | Requests | Requests/s | Median | 99% under | Errors | Reloads | Working set | Private bytes "
+                         + "| Handles | Threads |");
+        output.WriteLine("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         var started = Stopwatch.GetTimestamp();
         var until = started + Ticks(time);
+        long reloads = 0;
+        var refused = 0;
+        var reloading = reloadEvery is not { } every ? Task.CompletedTask : Task.Run(async () =>
+        {
+            while (Stopwatch.GetTimestamp() + Ticks(every) < until)
+            {
+                await Task.Delay(every);
+                refused += await site.Replace("hello.wasp", Hello(Interlocked.Read(ref reloads) + 1));
+                Interlocked.Increment(ref reloads);
+            }
+        });
+        var samples = new List<WebLingoSoakSample>();
         var tallies = Enumerable.Range(0, count).Select(_ => new Tally()).ToArray();
         var asking = Task.WhenAll(tallies.Select((tally, i) => Task.Run(async () =>
         {
@@ -341,17 +381,64 @@ public static class WebLingoLoad
             var server = site.Sample();
             var elapsed = TimeSpan.FromSeconds((now - started) / (double)Stopwatch.Frequency);
             var rate = sorted.Length / ((now - last) / (double)Stopwatch.Frequency);
+            var reloaded = Interlocked.Read(ref reloads);
+            if (server is not null) samples.Add(new WebLingoSoakSample(elapsed, reloaded, server));
             output.WriteLine($"| {elapsed:hh\\:mm} | {requests:#,0} | {Number(rate)} | "
                              + $"{Milliseconds(Percentile(sorted, 0.5))} | {Milliseconds(Percentile(sorted, 0.99))} | {errors} | "
-                             + $"{Megabytes(server?.WorkingSet)} | {Megabytes(server?.PrivateBytes)} | {Text(server?.Handles)} | "
-                             + $"{Text(server?.Threads)} |");
+                             + $"{reloaded:#,0} | {Megabytes(server?.WorkingSet)} | {Megabytes(server?.PrivateBytes)} | "
+                             + $"{Text(server?.Handles)} | {Text(server?.Threads)} |");
             output.Flush();
             last = now;
         }
         await asking;
+        await reloading;
         var first = tallies.Select(tally => tally.FirstError).FirstOrDefault(failure => failure is not null);
         if (first is not null) output.WriteLine($"The first error: {first}.");
-        return errors == 0 ? Success : Failed;
+        if (reloadEvery is not null) output.WriteLine($"`hello.wasp` replaced {reloads:#,0} times, refused {refused} times while the server read it, and tried again.");
+        var rising = Verdict(samples, output);
+        return errors == 0 && !rising ? Success : Failed;
+    }
+
+    /// <summary>
+    /// What a soak's samples say after its warm-up (<see cref="WebLingoSoakTrend"/>): each measure's growth for each reload, or
+    /// each hour, and which keep rising; true where one does.
+    /// </summary>
+    private static bool Verdict(IReadOnlyList<WebLingoSoakSample> samples, TextWriter output)
+    {
+        if (samples.Count == 0)
+        {
+            output.WriteLine("The server's process was not sampled: its growth is not known.");
+            return false;
+        }
+        var after = WebLingoSoakTrend.AfterWarmUp(samples);
+        var growths = new List<string>();
+        var rising = new List<string>();
+        var unsure = false;
+        foreach (var measure in WebLingoSoakTrend.Measures)
+        {
+            if (WebLingoSoakTrend.Growth(after, measure, out var perReload) is { } growth)
+            {
+                var shown = measure.Unit == "bytes"
+                    ? (growth / 1024).ToString("+#,0.0;-#,0.0;0.0", CultureInfo.InvariantCulture) + " KB"
+                    : growth.ToString("+0.000;-0.000;0.000", CultureInfo.InvariantCulture);
+                growths.Add($"{measure.Name} {shown} a {(perReload ? "reload" : "hour")}");
+            }
+            switch (WebLingoSoakTrend.KeepsRising(after, measure))
+            {
+                case true:
+                    rising.Add(measure.Name);
+                    break;
+                case null:
+                    unsure = true;
+                    break;
+            }
+        }
+        output.WriteLine($"After the warm-up, the first quarter of the samples, {after.Count} samples: "
+                         + (growths.Count == 0 ? "too few to give a growth" : string.Join(", ", growths)) + ".");
+        output.WriteLine(rising.Count > 0 ? $"Rising all the way, by more than its noise: {string.Join(", ", rising)}."
+            : unsure ? $"Too few samples after the warm-up to say whether any keeps rising: {WebLingoSoakTrend.Fewest} are needed."
+            : "None keeps rising.");
+        return rising.Count > 0;
     }
 
     /// <summary>One client's latencies and errors, which a soak takes from another thread as it samples.</summary>
@@ -544,7 +631,8 @@ public static class WebLingoLoad
         error.WriteLine("Usage: WebLingo.Benchmarks --load [--host serve|standalone|aspnetcore|fastcgi | --url <url>] [--site load|forum]");
         error.WriteLine("                             [--page NAME]...");
         error.WriteLine("                             [--clients 1,4,16,64,256]");
-        error.WriteLine("                             [--seconds N] [--warm-up N] [--reload SECONDS | --soak HOURS [--sample MINUTES]");
+        error.WriteLine("                             [--seconds N] [--warm-up N]");
+        error.WriteLine("                             [--reload SECONDS | --soak HOURS [--sample MINUTES] [--reload-every SECONDS]");
         error.WriteLine("                             | --fair none,1000000,100000,10000]");
         error.WriteLine($"  pages: {string.Join(", ", Pages.Select(page => page.Name))}");
         error.WriteLine($"  the forum's, --site forum, at --url: {string.Join(", ", ForumPages.Select(page => page.Name))}");
