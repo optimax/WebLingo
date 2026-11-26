@@ -2046,9 +2046,14 @@ owner has not decided is a question of its task's, and Proposed here until it is
    integers, numbers, decimals, strings, bytes, dates, and arrays, maps and sets of them, their cycles and the references
    they share kept as they were; anything else, an instance, a function, a class, a task, a module, a native class's
    instance, an error naming it, WL3001; an instance of `Error`, or of a class extending it, crossing as an `Error`, its
-   class's name, its message, its code and where it was thrown kept. Tested on its own, two heaps on one thread. How the
-   error that arrives holds its class's name and where it was thrown is the task's question (Proposed: two fields of its
-   own).
+   class's name, its message, its code and where it was thrown kept. Tested on its own, two heaps on one thread. The error
+   that arrives (the owner's answer, 26 November 2026, A1 (a) of "M0.26, Part 1"): an `Error`, its `message` and its `code`
+   as they were, and two fields of its own, `className`, its class's name, and `thrownAt`, where it was thrown, as the
+   worker's host names its file. Built (26 November 2026): `WebLingoMessage` (`WebLingo.Runtime`), `TryCopy` and `TryRead`,
+   neither recursing, a value 100,000 levels deep copied; a message holding no heap's handle, never changing, so that any
+   thread may read it; an error's other fields left out, an `Error` copied before keeping the `className` it came with, and
+   where it was thrown the one given for the value copied, an uncaught exception's, else its own `thrownAt`; a value of a
+   class extending another kind's, `Stack` extending `Array`, refused as an instance is (Proposed); `MessageTests`.
 2. **A worker** (A1 (c), A3 (b)). `std:workers`, a standard module of `weblingo`'s, its import WL2015 under `wasp`:
    `new Worker("work.wlg")`, the module run on a worker of its own, a thread of the host's with an execution and a heap
    of its own, its path from the importing file's folder, as an import's is; `worker.post(message)`, a message copied to

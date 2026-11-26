@@ -143,6 +143,13 @@ M0.23's part 4: `IWebLingoHttpRequest.ClientAddress`, a script's `request.client
 else `X-Forwarded-For`/`-Proto`, where its peer is trusted; ASP.NET Core's `Translate`, the standalone server and (by
 `REMOTE_ADDR`) FastCGI give the client. `WebLingoSchemes.TryLoadFolder` has one more out, `proxies`.
 
+## Values copied between heaps
+
+M0.26's part 1: `WebLingoMessage` (`WebLingo.Runtime`): `TryCopy(heap, value, errorClass, thrownAt)` copies a value out,
+whole, with no heap handle, iteratively, cycles and shared references kept by node index; `TryRead(heap, errorClass)`
+makes it anew, every value first, then the collections filled, its values rooted meanwhile. An error crosses as `Error`
+with `className` and `thrownAt`. No LINQ in the portable core: `PortabilityTests` refuses it. Part 2, a worker, uses it.
+
 ## The work off the workers
 
 `DotNetBlockingPool` (`WebLingo.Platform.DotNet`) runs work that blocks, a database's, a file's, a subprocess's, a mail
