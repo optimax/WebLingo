@@ -299,8 +299,7 @@ for a class's fields, landed: the lowerer gives each class the fields its constr
 (`WebLingoIrLayout`; `WebLingoClassInfo.Fields`, WLBC 0.2), an instance a place for each, and `this.x` in the class's
 own methods is `GetField`/`SetField`, which fall back to `GetMember`/`SetMember` wherever the place does not hold the
 field; `objects` 17 percent faster, none slower (section 5.6, "Fields in places"). `FieldPlaceTests` runs each case
-through places and by name and compares. Since WLBC is 0.2, `Examples.wlg/01-hello.wlbr`, the owner's 0.1 file, is
-refused; a question in `TO-DO.md`. Part 3, a member's cache, landed: `GetMember`, `SetMember` and `CallMethod` on an
+through places and by name and compares. Part 3, a member's cache, landed: `GetMember`, `SetMember` and `CallMethod` on an
 instance remember what they found in their function's `MemberSites`, by the class's definition, so that every
 execution of a module, a site's every request, shares them (`FieldSite`, `MethodSite`; `MemberCacheTests`); a
 method's call 26 percent faster, `objects` 4, none slower (section 5.6, "A member's cache"). M0.21 is whole, the
