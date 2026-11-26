@@ -2149,8 +2149,10 @@ that the owner has not decided is a question of its task's, and Proposed here un
    suspending execution's VM keeps (`Suspends`, a host's request's, never `weblingo`'s), counted from where `Run` begins
    or goes on, and looked at where its budget and its cancellation are, every 1,024 instructions, so that a quantum is
    kept to the next multiple of 1,024; its yield, `Yield`, not inlined, the request waiting before the instruction as its
-   debugger's stop leaves it, `Waits(0)`, its result waiting for no time, which the hosts' worker pool queues behind the
-   worker's other ready work, as a timer due at once; its going on, `GoesOn`, at once, the instruction then seen by its
+   debugger's stop leaves it, `Waits(0)`, its result waiting for no time, which the hosts' worker pool queues for its
+   worker at once, behind what is queued for it, and, taken, lets one new request of the shared queue run first, where
+   one is queued, then queues again, so that new requests too run between its quanta, the worker taking its own queue
+   before the shared one otherwise (`WebLingoWorkerPool`); its going on, `GoesOn`, at once, the instruction then seen by its
    debugger as any other; `WebLingoApplicationOptions.Quantum`, `wasp.config`'s `"limits"`' `"quantum"`, an integer more
    than 0, or `null` for none; `QuantumTests`.
 3. **Measured.** The load test, a page that computes for long beside pages that do not, their latencies with each

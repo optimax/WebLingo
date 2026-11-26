@@ -149,7 +149,9 @@ M0.24's part 2: a suspending execution's VM yields once its quantum (`WebLingoEx
 `"limits"`' `"quantum"`, 100,000 by default) has passed: `Run` keeps `_quantumDue`, set where it begins or goes on, and
 looks at it where it looks at its budget and cancellation, every 1,024 instructions; `Yield` (not inlined) stops it as
 the debugger's stop does, `_stopDepth` and `_yielded`, returning `Waits(0)`, and `GoesOn` goes on at once. The worker
-pool's timer for 0 ms requeues it behind the worker's other ready work. `QuantumTests` (`WebLingo.Hosting.Tests`).
+pool queues a yield for its worker at once (`Item.Yielded`), and, taking it, runs one new request from the shared queue
+first, where one is queued, then queues it again: a worker takes its own queue before the shared one, so without that a
+yield would let no new request in. `QuantumTests` (`WebLingo.Hosting.Tests`).
 
 ## Values copied between heaps
 
