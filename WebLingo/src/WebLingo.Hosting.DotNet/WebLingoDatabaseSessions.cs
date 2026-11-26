@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using WebLingo.Platform.Abstractions;
 using WebLingo.Platform.DotNet;
-namespace WebLingo.Hosting.AspNetCore;
+namespace WebLingo.Hosting.DotNet;
 
 /// <summary>
 /// A site's sessions in a database (specification, section 6.12, "Sessions and cookies"; "Sessions and cookies, parts",

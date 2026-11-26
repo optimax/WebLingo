@@ -2,9 +2,8 @@ using System.IO.Pipes;
 using Microsoft.Win32.SafeHandles;
 using System.Net.Sockets;
 using System.Text;
-using Microsoft.AspNetCore.WebUtilities;
 using WebLingo.Hosting.Abstractions;
-using WebLingo.Hosting.AspNetCore;
+using WebLingo.Hosting.DotNet;
 using WebLingo.Runtime;
 namespace WebLingo.Hosting.FastCgi;
 
@@ -460,7 +459,7 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, WebLi
         {
             var head = new StringBuilder();
             head.Append("Status: ").Append(status.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            var reason = ReasonPhrases.GetReasonPhrase(status);
+            var reason = WebLingoReasonPhrases.Of(status);
             if (reason.Length > 0) head.Append(' ').Append(reason);
             head.Append("\r\n");
             var hasLength = false;

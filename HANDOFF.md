@@ -115,6 +115,17 @@ test built-in, `remember()`, given the heap); `FastCgiTests.OldGenerationsAreLet
 the FastCGI host and the real watcher, generations only. Nothing was found to fix; each fails with a leak put in on
 purpose. Rebuild a test project after such a trial: its build is what runs.
 
+## The hosts' own code
+
+`WebLingo.Hosting.DotNet` (M0.23's part 1) holds what every host shares and is not ASP.NET Core's: `WebLingoWorkerPool`,
+`WebLingoStreamingResponse` and `IWebLingoResponseSink`, `WebLingoFileSending` and `WebLingoFilePlan`, `WebLingoRequestTimer`,
+`WebLingoDrain`, `WebLingoReloader`, `WebLingoMemorySessions`, `WebLingoDatabaseSessions` and `WebLingoExecutionClock`, and
+two tables made from ASP.NET Core 10's, `WebLingoContentTypes` and `WebLingoReasonPhrases`, which `HostsOwnCodeTests`
+compares with ASP.NET Core's own: a newer ASP.NET Core that adds an extension fails it, the table then made again.
+`WebLingo.Hosting.AspNetCore` keeps `WebLingoAspNetCore` and `WebLingoAspNetCoreSink`; `WebLingo.Hosting.FastCgi` references
+nothing of ASP.NET Core's (`DependencyTests.TheHostsOwnCodeUsesNothingOfAspNetCores`). The standalone host (M0.23's part 2)
+builds on it.
+
 ## The work off the workers
 
 `DotNetBlockingPool` (`WebLingo.Platform.DotNet`) runs work that blocks, a database's, a file's, a subprocess's, a mail

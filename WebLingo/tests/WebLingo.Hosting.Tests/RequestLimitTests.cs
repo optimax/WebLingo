@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.AspNetCore.Http;
 using WebLingo.Bytecode;
 using WebLingo.Hosting.AspNetCore;
+using WebLingo.Hosting.DotNet;
 using WebLingo.Platform.Abstractions;
 using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;

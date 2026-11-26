@@ -1,4 +1,4 @@
-namespace WebLingo.Hosting.AspNetCore;
+namespace WebLingo.Hosting.DotNet;
 
 /// <summary>
 /// Reloads an application when its files change (specification, section 6.5, WL-T007; section 9, "M0.14 parts", part 6):

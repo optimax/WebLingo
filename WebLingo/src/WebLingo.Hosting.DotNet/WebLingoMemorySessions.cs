@@ -1,4 +1,4 @@
-namespace WebLingo.Hosting.AspNetCore;
+namespace WebLingo.Hosting.DotNet;
 
 /// <summary>
 /// A site's sessions in the process's memory (specification, section 6.12, "Sessions and cookies"; "Sessions and cookies,

@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using WebLingo.Hosting.Abstractions;
-using WebLingo.Hosting.AspNetCore;
+using WebLingo.Hosting.DotNet;
 using WebLingo.Platform.Abstractions;
 using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;

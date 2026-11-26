@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 816" role="img" aria-labelledby="title desc">
   <title id="title">WebLingo product project dependencies</title>
-  <desc id="desc">Arrows point from each product project to a project it depends on. The WASP executable uses the WebLingo CLI and the FastCGI host. The VM uses Bytecode and Runtime. The CLI builds and ships the grouped native modules, which depend on Runtime. Core has no project dependencies. Redundant arrows are omitted.</desc>
+  <desc id="desc">Arrows point from each product project to a project it depends on. The WASP executable uses the WebLingo CLI, the FastCGI host and the ASP.NET Core host, which share the hosts' own .NET code, Hosting.DotNet. The VM uses Bytecode and Runtime. The CLI builds and ships the grouped native modules, which depend on Runtime. Core has no project dependencies. Redundant arrows are omitted.</desc>
   <defs>
     <marker id="arrow" markerWidth="6.5" markerHeight="6.5" refX="6" refY="3.25" orient="auto">
       <path d="M0 0 6.5 3.25 0 6.5Z" fill="#627780"/>
@@ -33,9 +33,11 @@
   <g aria-hidden="true">
     <path class="edge" data-from="Wasp.Cli" data-to="Cli" d="M520 98 L408 131"/>
     <path class="edge" data-from="Wasp.Cli" data-to="Hosting.FastCgi" d="M620 98 L730 131"/>
-    <path class="edge" data-from="Hosting.FastCgi" data-to="Hosting.AspNetCore" d="M779 171 L795 201"/>
-    <path class="edge" data-from="Hosting.AspNetCore" data-to="Hosting" d="M814 241 L826 280"/>
-    <path class="edge" data-from="Hosting.AspNetCore" data-to="Platform.DotNet" d="M890 241 L1035 276"/>
+    <path class="edge" data-from="Wasp.Cli" data-to="Hosting.AspNetCore" d="M642 86 L930 131"/>
+    <path class="edge" data-from="Hosting.FastCgi" data-to="Hosting.DotNet" d="M790 171 L815 201"/>
+    <path class="edge" data-from="Hosting.AspNetCore" data-to="Hosting.DotNet" d="M965 171 L918 201"/>
+    <path class="edge" data-from="Hosting.DotNet" data-to="Hosting" d="M840 241 L834 280"/>
+    <path class="edge" data-from="Hosting.DotNet" data-to="Platform.DotNet" d="M950 236 L1035 276"/>
     <path class="edge" data-from="Cli" data-to="Templates" d="M346 171 C346 245 300 313 300 385"/>
     <path class="edge" data-from="Cli" data-to="VM" d="M380 171 C384 257 555 303 575 385"/>
     <path class="edge" data-from="Cli" data-to="StdLib" d="M396 171 C427 249 713 264 727 385"/>
@@ -101,8 +103,12 @@
     <text x="770" y="157" text-anchor="middle">Hosting.FastCgi</text>
   </g>
   <g class="node host" role="group" aria-label="WebLingo.Hosting.AspNetCore">
-    <rect x="701" y="201" width="212" height="40" rx="8"/>
-    <text x="807" y="227" text-anchor="middle">Hosting.AspNetCore</text>
+    <rect x="880" y="131" width="212" height="40" rx="8"/>
+    <text x="986" y="157" text-anchor="middle">Hosting.AspNetCore</text>
+  </g>
+  <g class="node adapter" role="group" aria-label="WebLingo.Hosting.DotNet">
+    <rect x="760" y="201" width="190" height="40" rx="8"/>
+    <text x="855" y="227" text-anchor="middle">Hosting.DotNet</text>
   </g>
   <g class="node core" role="group" aria-label="WebLingo.Hosting">
     <rect x="763" y="280" width="136" height="40" rx="8"/>

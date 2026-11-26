@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using WebLingo.Language;
 using WebLingo.Platform.Abstractions;
 using WebLingo.Runtime;
-namespace WebLingo.Hosting.AspNetCore;
+namespace WebLingo.Hosting.DotNet;
 
 /// <summary>
 /// The host's workers (specification, sections 6.6, 6.10 and 7.8): a bounded pool of threads of their own, each a

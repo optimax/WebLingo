@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using WebLingo.Hosting.Abstractions;
+using WebLingo.Hosting.DotNet;
 using WebLingo.Runtime;
 namespace WebLingo.Hosting.AspNetCore;
 
@@ -11,7 +12,8 @@ namespace WebLingo.Hosting.AspNetCore;
 /// back as the worker writes it; a file the application leaves to its host, a site's own or one a page sent, sent as it is
 /// (<see cref="WebLingoFileSending"/>), a site's with the content type its extension gives, and a 404 for an extension
 /// ASP.NET Core does not know, as its own static files are served. Only HTTP is translated here: everything else is the
-/// host's core's (section 6.12).
+/// host's core's (section 6.12), or the hosts' own, which it shares with the others (<c>WebLingo.Hosting.DotNet</c>; section
+/// 9, "M0.23 parts", part 1).
 /// </summary>
 public static class WebLingoAspNetCore
 {
@@ -52,7 +54,7 @@ public static class WebLingoAspNetCore
             gone.Token, response.End);
         try
         {
-            await response.SendAsync(context);
+            await response.SendAsync(new WebLingoAspNetCoreSink(context, context.RequestAborted));
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
@@ -69,7 +71,7 @@ public static class WebLingoAspNetCore
             throw;
         }
         if (await run is not { Kind: WebLingoRequestOutcomeKind.File, File: { } file } outcome) return;
-        var sink = new WebLingoStreamingResponse.AspNetCoreSink(context, context.RequestAborted);
+        var sink = new WebLingoAspNetCoreSink(context, context.RequestAborted);
         try
         {
             if (outcome.Sent is { } sent)

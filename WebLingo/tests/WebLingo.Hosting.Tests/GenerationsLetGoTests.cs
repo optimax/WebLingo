@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using WebLingo.Hosting.AspNetCore;
+using WebLingo.Hosting.DotNet;
 using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
 using WebLingo.StdLib;

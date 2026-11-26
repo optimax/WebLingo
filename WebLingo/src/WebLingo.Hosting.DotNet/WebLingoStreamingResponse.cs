@@ -1,12 +1,10 @@
 using System.Threading.Channels;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Primitives;
 using WebLingo.Hosting.Abstractions;
-namespace WebLingo.Hosting.AspNetCore;
+namespace WebLingo.Hosting.DotNet;
 
 /// <summary>
-/// What a response's pieces are sent to (<see cref="WebLingoStreamingResponse"/>): an HTTP server's response, ASP.NET Core's,
-/// or FastCGI's records (section 6.2). Its status and headers come once, before its body, with the body's length when it
+/// What a response's pieces are sent to (<see cref="WebLingoStreamingResponse"/>): an HTTP server's response, ASP.NET Core's
+/// (its adapter's <c>WebLingoAspNetCoreSink</c>), or FastCGI's records (section 6.2). Its status and headers come once, before its body, with the body's length when it
 /// comes whole; then its body, piece by piece; or its end, unfinished, which the client sees.
 /// </summary>
 public interface IWebLingoResponseSink
@@ -19,10 +17,10 @@ public interface IWebLingoResponseSink
 }
 
 /// <summary>
-/// A response sent as it is written (specification, section 6.12, "Streaming"; section 9, "M0.14.7 parts", part 1), to
-/// ASP.NET Core's, or to another host's sink (<see cref="IWebLingoResponseSink"/>): its worker commits it, writes its body
+/// A response sent as it is written (specification, section 6.12, "Streaming"; section 9, "M0.14.7 parts", part 1), to a
+/// host's sink (<see cref="IWebLingoResponseSink"/>), ASP.NET Core's or FastCGI's: its worker commits it, writes its body
 /// and completes or aborts it, each a piece passed to the request's own task, which sends its status and headers, then its
-/// body, as they come, through <see cref="SendAsync(HttpContext)"/>. A body sent whole, in one piece, has its
+/// body, as they come, through <see cref="SendAsync"/>. A body sent whole, in one piece, has its
 /// <c>Content-Length</c>. A write never waits: once <see cref="Pieces"/> pieces of the body wait to
 /// be sent, the body is full (<see cref="IWebLingoBodyWriter.IsFull"/>), and a page waits for it, its worker running other
 /// requests meanwhile (backpressure, part 3), until the client has taken one, or has gone.
@@ -147,13 +145,10 @@ public sealed class WebLingoStreamingResponse : IWebLingoHttpResponse
     }
 
     /// <summary>
-    /// On the request's task: sends the pieces to <paramref name="context"/>'s response as they come, until its worker ends
-    /// the response; whether it was committed, so that a response left uncommitted, a file's, is the caller's to send. If
-    /// it fails, it ends the response, so that its worker never waits for it again.
+    /// On the request's task: sends the pieces to <paramref name="sink"/> as they come, until its worker ends the response;
+    /// whether it was committed, so that a response left uncommitted, a file's, is the caller's to send. If it fails, it
+    /// ends the response, so that its worker never waits for it again.
     /// </summary>
-    public Task<bool> SendAsync(HttpContext context) => SendAsync(new AspNetCoreSink(context, _gone));
-
-    /// <summary>As the other, the pieces sent to <paramref name="sink"/>.</summary>
     public async Task<bool> SendAsync(IWebLingoResponseSink sink)
     {
         try
@@ -219,27 +214,6 @@ public sealed class WebLingoStreamingResponse : IWebLingoHttpResponse
             await Start(0);
         }
         return committed;
-    }
-
-    /// <summary>ASP.NET Core's response as a sink: its status and headers set, its body written, an abort the connection's.</summary>
-    internal sealed class AspNetCoreSink(HttpContext context, CancellationToken gone) : IWebLingoResponseSink
-    {
-        public ValueTask StartAsync(int status, IWebLingoHeaderCollection headers, long? length)
-        {
-            var response = context.Response;
-            response.StatusCode = status;
-            foreach (var name in headers.Names) response.Headers[name] = new StringValues([.. headers.GetValues(name)]);
-            if (length is { } bytes) response.ContentLength = bytes;
-            return ValueTask.CompletedTask;
-        }
-
-        public ValueTask WriteAsync(byte[] bytes) => context.Response.Body.WriteAsync(bytes, gone);
-
-        public async ValueTask AbortAsync()
-        {
-            await context.Response.Body.FlushAsync(gone);
-            context.Abort();
-        }
     }
 
     private enum PieceKind { Commit, Data, Abort }

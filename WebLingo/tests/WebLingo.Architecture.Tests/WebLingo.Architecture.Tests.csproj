@@ -33,5 +33,7 @@
     <ProjectReference Include="../../src/WebLingo.Platform.Abstractions/WebLingo.Platform.Abstractions.csproj" />
     <ProjectReference Include="../../src/WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />
     <ProjectReference Include="../../src/WebLingo.Hosting/WebLingo.Hosting.csproj" />
+    <ProjectReference Include="../../src/WebLingo.Hosting.DotNet/WebLingo.Hosting.DotNet.csproj" />
+    <ProjectReference Include="../../src/WebLingo.Hosting.FastCgi/WebLingo.Hosting.FastCgi.csproj" />
   </ItemGroup>
 </Project>

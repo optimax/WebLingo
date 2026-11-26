@@ -1455,7 +1455,7 @@ includes from its own folder, without a base.
 
 **The owner's answers** (17 November 2026, "FastCGI: A Host Beside IIS's", M0.19): a host that speaks FastCGI, beside the ASP.NET Core adapter, so that a web server other than IIS, nginx or Apache, runs WASP's sites, as it runs PHP's; run both ways, first as PHP-FPM runs, `wasp fastcgi --root site --port 9000`, a process the server's service manager, systemd or a Windows service, starts and keeps running, which the web server reaches by TCP, or by a Unix socket on Linux, then as Apache's mod_fcgid starts PHP, by the web server itself, on demand, its socket given as its standard input; FastCGI's protocol, a record's header and its kinds, written in WebLingo's own C#, in a new adapter, `WebLingo.Hosting.FastCgi`, on .NET's sockets, with no package, rather than through a package that implements it; and the host tried with nginx and with Apache httpd, beside its tests.
 
-**As built** (M0.19, 17 November 2026; Proposed, §15.2, "FastCGI"): `WebLingoFastCgiServer`, in `WebLingo.Hosting.FastCgi`, an adapter beside the ASP.NET Core one, whose worker pool, reloading and streaming response it shares, translates FastCGI's responder role to WLHI's and back, and `wasp fastcgi` runs it, listening on a port of the local machine, 9000 unless given another, or on a Unix socket, or on the socket or the named pipe a web server gives it as its standard input. Tried with its tests, which speak FastCGI to it as a web server does, and behind the web servers themselves, on Windows (17 November 2026, `WebServerTests`): nginx 1.30.6, and Apache httpd 2.4.71, Apache Lounge's build, through `mod_proxy_fcgi`, each to `wasp fastcgi` on a port, and through `mod_fcgid` 2.3.10, starting `wasp` itself on a named pipe as its standard input, each configured as the WASP User Manual's section 18 configures it; which found two faults, fixed: nginx sends a request's `Content-Type` and `Content-Length` as headers too, which were read twice, and a connection closed with a request's last `FCGI_STDIN` unread, which came after its response, was reset, losing the response's end. Not yet on Linux.
+**As built** (M0.19, 17 November 2026; Proposed, §15.2, "FastCGI"): `WebLingoFastCgiServer`, in `WebLingo.Hosting.FastCgi`, an adapter beside the ASP.NET Core one, whose worker pool, reloading and streaming response it shares (since 26 November 2026 the hosts' own, `WebLingo.Hosting.DotNet`, FastCGI's host then using nothing of ASP.NET Core's; §9, "M0.23 parts", part 1), translates FastCGI's responder role to WLHI's and back, and `wasp fastcgi` runs it, listening on a port of the local machine, 9000 unless given another, or on a Unix socket, or on the socket or the named pipe a web server gives it as its standard input. Tried with its tests, which speak FastCGI to it as a web server does, and behind the web servers themselves, on Windows (17 November 2026, `WebServerTests`): nginx 1.30.6, and Apache httpd 2.4.71, Apache Lounge's build, through `mod_proxy_fcgi`, each to `wasp fastcgi` on a port, and through `mod_fcgid` 2.3.10, starting `wasp` itself on a named pipe as its standard input, each configured as the WASP User Manual's section 18 configures it; which found two faults, fixed: nginx sends a request's `Content-Type` and `Content-Length` as headers too, which were read twice, and a connection closed with a request's last `FCGI_STDIN` unread, which came after its response, was reset, losing the response's end. Not yet on Linux.
 
 ---
 
@@ -1722,6 +1722,7 @@ WebLingo/
     WebLingo.Platform.DotNet/
     WebLingo.Hosting.Abstractions/
     WebLingo.Hosting.AspNetCore/
+    WebLingo.Hosting.DotNet/
     WebLingo.Hosting.Standalone/
     WebLingo.StdLib/
     WebLingo.Cli/
@@ -2099,8 +2100,14 @@ each needs that the owner has not decided is a question of its task's, and Propo
    the streaming response, files sent and their plan, the request timer, the drain, the reloader and the sessions in
    memory and in a database; ASP.NET Core's adapter keeping only what translates its requests, and a file's content type
    by its extension, ASP.NET Core's table today, made a table of WebLingo's own. Nothing a site sees changes. Where it
-   goes is the task's question (Proposed: a new adapter project, `WebLingo.Hosting.DotNet`, which the three hosts
-   reference).
+   goes: a new adapter project, `WebLingo.Hosting.DotNet`, which the three hosts reference (the owner's answer, 26
+   November 2026, A1 (a) of "M0.23, Part 1"). Built (26 November 2026): the worker pool, the streaming response, files
+   sent and their plan, the request timer, the drain, the reloader, the sessions and the execution's clock moved there
+   whole, `WebLingo.Hosting.DotNet` their namespace, ASP.NET Core's adapter keeping `WebLingoAspNetCore` and its sink,
+   `WebLingoAspNetCoreSink`; a file's content type by `WebLingoContentTypes`, and a status line's reason phrase by
+   `WebLingoReasonPhrases`, FastCGI's until then ASP.NET Core's `ReasonPhrases`, each made from ASP.NET Core 10's table,
+   382 extensions and 63 statuses, MIT's, and compared with it by a test; FastCGI's host referencing nothing of ASP.NET
+   Core's, which `DependencyTests` checks of it and of `WebLingo.Hosting.DotNet`.
 2. **HTTP/1.1.** `WebLingo.Hosting.Standalone`, its server written in WebLingo's own C# on .NET's sockets, with no
    package: a request's line and its headers, its body by its `Content-Length` or chunked, `Expect: 100-continue`,
    keep-alive and `Connection: close`, an HTTP/1.0 request answered as one; a response streamed, chunked where its

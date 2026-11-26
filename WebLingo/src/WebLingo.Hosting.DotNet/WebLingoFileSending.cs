@@ -1,8 +1,7 @@
 using System.Globalization;
 using System.Text;
-using Microsoft.AspNetCore.StaticFiles;
 using WebLingo.Hosting.Abstractions;
-namespace WebLingo.Hosting.AspNetCore;
+namespace WebLingo.Hosting.DotNet;
 
 /// <summary>
 /// How a file is sent (specification, section 6.12, "Files sent"): a site's own file, with the site's headers, and one a
@@ -19,10 +18,10 @@ public static class WebLingoFileSending
     /// <summary>How much of a file a piece of its body holds, within a FastCGI record's most.</summary>
     public const int Piece = 32 * 1024;
 
-    private static readonly FileExtensionContentTypeProvider ContentTypes = new();
+
 
     /// <summary>The media type a file's extension gives, as ASP.NET Core's static files have them, or null for one it does not know.</summary>
-    public static string? TypeOf(string path) => ContentTypes.TryGetContentType(path, out var type) ? type : null;
+    public static string? TypeOf(string path) => WebLingoContentTypes.Of(path);
 
     /// <summary>
     /// Sends a site's own file at <paramref name="path"/>, with the site's headers, <paramref name="site"/>: a 404 where its

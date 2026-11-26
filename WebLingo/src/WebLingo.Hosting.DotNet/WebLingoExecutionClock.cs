@@ -1,6 +1,6 @@
 using WebLingo.Platform.Abstractions;
 using WebLingo.Runtime;
-namespace WebLingo.Hosting.AspNetCore;
+namespace WebLingo.Hosting.DotNet;
 
 /// <summary>
 /// The clock an execution's timers (<c>delay</c>) wait on (specification, section 3.8): the platform's monotonic clock, in

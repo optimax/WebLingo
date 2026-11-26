@@ -1,4 +1,4 @@
-namespace WebLingo.Hosting.AspNetCore;
+namespace WebLingo.Hosting.DotNet;
 
 /// <summary>
 /// What a file is sent as (<see cref="WebLingoFileSending.Plan"/>): its status, the length its <c>Content-Length</c> gives,

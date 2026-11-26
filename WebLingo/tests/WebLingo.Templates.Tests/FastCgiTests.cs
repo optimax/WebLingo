@@ -5,7 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using WebLingo.Cli;
 using WebLingo.Hosting;
-using WebLingo.Hosting.AspNetCore;
+using WebLingo.Hosting.DotNet;
 using WebLingo.Hosting.FastCgi;
 using WebLingo.Wasp.Cli;
 using Xunit;

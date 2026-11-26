@@ -86,6 +86,23 @@ public sealed class DependencyTests
         APortableAssemblyReferencesOnlyTheWebLingoAssembliesItMay(assembly, ["WebLingo.Core", "WebLingo.Runtime"]);
     }
 
+    /// <summary>
+    /// The hosts' own code, and the FastCGI host, use nothing of ASP.NET Core's (section 9, "M0.23 parts", part 1), so that a
+    /// host without it, the standalone one, Native C#'s, has all it needs: neither references ASP.NET Core, its extensions,
+    /// nor its adapter.
+    /// </summary>
+    [Theory]
+    [InlineData("WebLingo.Hosting.DotNet")]
+    [InlineData("WebLingo.Hosting.FastCgi")]
+    public void TheHostsOwnCodeUsesNothingOfAspNetCores(string assembly)
+    {
+        foreach (var name in References(assembly))
+        {
+            Assert.False(name.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal) || name.StartsWith("Microsoft.Extensions", StringComparison.Ordinal)
+                         || name == "WebLingo.Hosting.AspNetCore", $"{assembly} references {name}");
+        }
+    }
+
     private static IEnumerable<string> References(string assembly) =>
         Assembly.Load(assembly).GetReferencedAssemblies().Select(reference => reference.Name ?? "");
 }

@@ -1,5 +1,5 @@
 using WebLingo.Runtime;
-namespace WebLingo.Hosting.AspNetCore;
+namespace WebLingo.Hosting.DotNet;
 
 /// <summary>
 /// A request's time limit, its site's (specification, section 6.12, "Limits"), kept by its host, the portable core having

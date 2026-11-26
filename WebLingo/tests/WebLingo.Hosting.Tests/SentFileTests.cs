@@ -1,6 +1,6 @@
 using System.Text;
 using WebLingo.Hosting.Abstractions;
-using WebLingo.Hosting.AspNetCore;
+using WebLingo.Hosting.DotNet;
 using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
 using WebLingo.StdLib;

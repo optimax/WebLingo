@@ -10,6 +10,7 @@ using WebLingo.Cli;
 using WebLingo.Data.DotNet;
 using WebLingo.Hosting;
 using WebLingo.Hosting.AspNetCore;
+using WebLingo.Hosting.DotNet;
 using WebLingo.Platform.Abstractions;
 using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;

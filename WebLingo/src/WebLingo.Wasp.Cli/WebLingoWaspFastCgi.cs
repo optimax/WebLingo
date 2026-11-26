@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 using WebLingo.Cli;
 using WebLingo.Hosting;
-using WebLingo.Hosting.AspNetCore;
+using WebLingo.Hosting.DotNet;
 using WebLingo.Hosting.FastCgi;
 namespace WebLingo.Wasp.Cli;
 

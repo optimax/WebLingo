@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using WebLingo.Runtime;
 using WebLingo.VM;
-namespace WebLingo.Hosting.AspNetCore;
+namespace WebLingo.Hosting.DotNet;
 
 /// <summary>
 /// An application's drain (specification, section 6.12, "Reloading"; section 9, "M0.22 parts", part 1): once a reload has
