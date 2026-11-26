@@ -46,10 +46,12 @@ pages() {
     echo "$how: the example's pages served."
 }
 
-# The server at the port answering, within 30 s.
+# The server at the port answering a page of the site's, within 60 s: a success, so that a web server's 502, while
+# wasp behind it has not yet started listening, is not taken for an answer (25 November 2026, every run on CI from
+# 2e27309 failing so, nginx answering before wasp did).
 ready() {
-    for _ in $(seq 1 60); do
-        curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$1/css/site.css" && return 0
+    for _ in $(seq 1 120); do
+        curl -sf -o /dev/null --max-time 2 "http://127.0.0.1:$1/css/site.css" && return 0
         sleep 0.5
     done
     fail "$2 did not answer"
