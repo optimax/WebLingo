@@ -2133,7 +2133,16 @@ each needs that the owner has not decided is a question of its task's, and Propo
 3. **Its limits.** A request's line, its headers, the time its line and headers take to arrive, its body's pace, and how
    long a kept connection may stay idle, each `wasp.config`'s, a request past one refused (414, 431, 408) and its
    connection closed, its body's largest `"maxBodySize"` as now; tested with clients that send too much and too slowly.
-   Their settings' names and defaults are the task's question (Proposed: Kestrel's defaults, in `"limits"`).
+   Their settings (the owner's answer, 26 November 2026, A1 (a) of "M0.23, Part 3: Its Limits"): in `"limits"`, with
+   Kestrel's defaults, `"requestLine"`, 8,192 bytes, `"requestHeaders"`, 32,768 bytes in all and at most 100 of them,
+   `"requestArrival"`, 30 seconds for a request's line and headers, its body then at least 240 bytes a second once its
+   first 5 seconds are over, and `"keepAlive"`, 130 seconds; each applied to `wasp serve`'s ASP.NET Core server too, under
+   IIS among it, Kestrel's own limits set from them, so that both servers refuse alike, a web server in front of FastCGI
+   keeping its own. Built (26 November 2026): `WebLingoHttpLimits`, the hosting core's (`WebLingoApplicationOptions.HttpLimits`),
+   read from `wasp.config` by `WebLingoSchemes`, bytes from 1 to 1,048,576 and seconds more than 0 (Proposed), kept by the
+   standalone server, a body's pace counting only the time spent waiting for its client, as Kestrel's does, and given to
+   Kestrel (`ConfigureKestrel`); tested on both servers, a line and headers too large, and on the standalone one, a head
+   too slow, a kept connection idle and a body too slow, the last refused by failing its read, the page then answering.
 4. **Behind a proxy.** A proxy's `Forwarded`, or `X-Forwarded-For` and `X-Forwarded-Proto`, trusted only from the
    proxies `wasp.config` lists, so that a request's scheme and its client are known behind one. WLHI's request has no
    client's address today, nor a script's: how a script reads it, and under which hosts, is the task's question

@@ -271,6 +271,65 @@ public sealed class StandaloneHttpTests : IDisposable
         Assert.Equal(0, drain.Running);
     }
 
+    /// <summary>
+    /// A site's limits on what a client sends (section 9, "M0.23 parts", part 3): a head slower than its
+    /// <c>"requestArrival"</c> a 408, a kept connection idle past its <c>"keepAlive"</c> closed, and a body slower than 240
+    /// bytes a second once its first 5 seconds are over refused, its connection closed.
+    /// </summary>
+    [Fact]
+    public async Task AClientThatSendsTooSlowlyIsRefused()
+    {
+        var site = Path.Combine(_root, "slow");
+        Directory.CreateDirectory(site);
+        File.WriteAllText(Path.Combine(site, "wasp.config"), "{ \"limits\": { \"requestArrival\": 0.5, \"keepAlive\": 0.5 } }");
+        File.WriteAllText(Path.Combine(site, "index.wasp"), "index");
+        File.WriteAllText(Path.Combine(site, "echo.wasp"), "<% param request; var form = await request.form(); %><%= form[\"tea\"] %>");
+        var application = WebLingoWaspServer.Load(site, new Dictionary<string, string>(), WebLingoMode.Production, null, out _, out _, out var error);
+        Assert.True(application is not null, error);
+        Assert.Equal((TimeSpan.FromSeconds(0.5), TimeSpan.FromSeconds(0.5)), (application.HttpLimits.RequestArrival, application.HttpLimits.KeepAlive));
+        using var stop = new CancellationTokenSource();
+        using var listener = WebLingoHttpServer.Listen(IPAddress.Loopback, 0);
+        _ = new WebLingoHttpServer(application, _workers).ServeAsync(listener, stop.Token);
+        try
+        {
+            var port = ((IPEndPoint)listener.LocalEndPoint!).Port;
+            using (var client = new TcpClient())
+            {
+                await client.ConnectAsync(IPAddress.Loopback, port);
+                var stream = client.GetStream();
+                await Send(stream, "GET / HTTP/1.1\r\nHost: a\r\n");
+                var (status, headers, body) = await ReadResponse(stream);
+                Assert.Equal(408, status);
+                Assert.Contains("Connection: close", headers);
+                Assert.Contains("took too long to arrive", body, StringComparison.Ordinal);
+            }
+            using (var client = new TcpClient())
+            {
+                await client.ConnectAsync(IPAddress.Loopback, port);
+                var stream = client.GetStream();
+                Assert.Equal(200, (await ReadAfter(stream, "GET / HTTP/1.1\r\nHost: a\r\n\r\n")).Status);
+                // Kept, then idle past its half a second: closed.
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                Assert.Equal(0, await stream.ReadAsync(new byte[1], timeout.Token));
+            }
+            using (var client = new TcpClient())
+            {
+                await client.ConnectAsync(IPAddress.Loopback, port);
+                var stream = client.GetStream();
+                // 10 bytes of 10,000, then nothing: once the body's 5 seconds are over, it has come too slowly.
+                await Send(stream, "POST /echo HTTP/1.1\r\nHost: a\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 10000\r\n\r\ntea=sench");
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                var (status, _, _) = await ReadResponse(stream);
+                Assert.NotEqual(200, status);
+                Assert.InRange(clock.Elapsed, TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(30));
+            }
+        }
+        finally
+        {
+            await stop.CancelAsync();
+        }
+    }
+
     [Fact]
     public void WaspServeTakesTheHostsItKnows()
     {

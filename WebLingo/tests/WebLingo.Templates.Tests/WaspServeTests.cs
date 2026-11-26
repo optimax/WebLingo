@@ -821,18 +821,46 @@ public class WaspServeTests : IDisposable
         }
 
         const string Says = "\"limits\" is an object, { \"requestTimeout\": 60, \"requestInstructions\": 1000000000, \"requestMemory\": 128, "
-                            + "\"drain\": 60 }, each optional, \"requestTimeout\" a number of seconds more than 0, or null for none, "
-                            + "\"requestInstructions\" an integer more than 0, \"requestMemory\" a number of megabytes from 1 to 1048576, and "
-                            + "\"drain\" a number of seconds more than 0, each number of seconds at most 4294967.";
+                            + "\"drain\": 60, \"requestLine\": 8192, \"requestHeaders\": 32768, \"requestArrival\": 30, \"keepAlive\": 130 }, "
+                            + "each optional, \"requestTimeout\" a number of seconds more than 0, or null for none, \"requestInstructions\" an integer "
+                            + "more than 0, \"requestMemory\" a number of megabytes from 1 to 1048576, \"drain\", \"requestArrival\" and \"keepAlive\" "
+                            + "numbers of seconds more than 0, and \"requestLine\" and \"requestHeaders\" numbers of bytes from 1 to 1048576, each number "
+                            + "of seconds at most 4294967.";
         foreach (var setting in new[] { "[]", "{ \"requestTimeout\": 0 }", "{ \"requestTimeout\": \"60\" }", "{ \"requestInstructions\": 1.5 }",
                                          "{ \"requestInstructions\": 0 }", "{ \"requestMemory\": 0 }", "{ \"requestMemory\": 2000000 }",
                                          "{ \"time\": 60 }", "{ \"requestTimeout\": 5000000 }", "{ \"drain\": 0 }", "{ \"drain\": null }",
-                                         "{ \"drain\": \"60\" }", "{ \"drain\": 4294968 }" })
+                                         "{ \"drain\": \"60\" }", "{ \"drain\": 4294968 }", "{ \"requestLine\": 0 }", "{ \"requestLine\": 1.5 }",
+                                         "{ \"requestHeaders\": 2000000 }", "{ \"requestArrival\": 0 }", "{ \"keepAlive\": \"130\" }",
+                                         "{ \"keepAlive\": null }" })
         {
             Write("wasp.config", "{ \"limits\": " + setting + " }");
             Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
             Assert.EndsWith(Says, error);
         }
+    }
+
+    /// <summary>
+    /// What a site's server takes of a client, <c>wasp.config</c>'s <c>"limits"</c>' (section 9, "M0.23 parts", part 3): a
+    /// request's line longer than its <c>"requestLine"</c> a 414, and headers larger than its <c>"requestHeaders"</c> a 431, on
+    /// either server, ASP.NET Core's Kestrel given the site's limits too.
+    /// </summary>
+    [Fact]
+    public async Task ARequestsLineAndHeadersAreLimitedByTheSiteOnEitherServer()
+    {
+        Write("wasp.config", "{ \"limits\": { \"requestLine\": 200, \"requestHeaders\": 600 } }");
+        Write("short.wasp", "short");
+        await using var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        Assert.True(server is not null, error);
+        await server.StartAsync();
+        using var client = new HttpClient { BaseAddress = new Uri(server.Address) };
+        Assert.Equal("short", await client.GetStringAsync("/short"));
+        using var line = await client.GetAsync("/short?" + new string('a', 300));
+        Assert.Equal(HttpStatusCode.RequestUriTooLong, line.StatusCode);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/short");
+        request.Headers.Add("X-Large", new string('a', 700));
+        using var headers = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.RequestHeaderFieldsTooLarge, headers.StatusCode);
+        await server.StopAsync();
     }
 
     /// <summary>

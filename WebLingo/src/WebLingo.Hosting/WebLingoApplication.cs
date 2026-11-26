@@ -229,6 +229,9 @@ public sealed class WebLingoApplication
     /// <summary>The largest body a site's request may have (section 6.12, "Uploaded files"), which its hosts let through.</summary>
     public long MaxBodySize => _options.Uploads.MaxBodySize;
 
+    /// <summary>What its server takes of a client before it refuses it (section 9, "M0.23 parts", part 3), which its hosts keep.</summary>
+    public WebLingoHttpLimits HttpLimits => _options.HttpLimits;
+
     /// <summary>
     /// How long a request may take, which its host keeps, the portable core having no timers, telling the request's
     /// cancellation signal <see cref="TimeLimitMessage"/> once it has passed (section 6.12, "Limits"); null for none.

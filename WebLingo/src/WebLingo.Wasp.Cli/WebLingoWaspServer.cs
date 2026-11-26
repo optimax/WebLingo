@@ -71,6 +71,18 @@ public static class WebLingoWaspServer
         }
         // Kestrel chooses a port only for an address: 127.0.0.1 for port 0, localhost, IPv4's and IPv6's, otherwise.
         if (!UnderIis) builder.WebHost.UseUrls(port == 0 ? "http://127.0.0.1:0" : $"http://localhost:{port}");
+        // What Kestrel takes of a client, the site's, so that it refuses as WebLingo's own server does (section 9, "M0.23
+        // parts", part 3), under IIS too, whose ASP.NET Core Module passes each request on to it.
+        var limits = application.HttpLimits;
+        builder.WebHost.ConfigureKestrel(kestrel =>
+        {
+            kestrel.Limits.MaxRequestLineSize = limits.RequestLine;
+            kestrel.Limits.MaxRequestHeadersTotalSize = limits.RequestHeaders;
+            kestrel.Limits.MaxRequestHeaderCount = limits.HeaderCount;
+            kestrel.Limits.RequestHeadersTimeout = limits.RequestArrival;
+            kestrel.Limits.KeepAliveTimeout = limits.KeepAlive;
+            kestrel.Limits.MinRequestBodyDataRate = new Microsoft.AspNetCore.Server.Kestrel.Core.MinDataRate(limits.BodyRate, limits.BodyGrace);
+        });
         var server = builder.Build();
         var pool = new WebLingoWorkerPool(workers);
         server.Lifetime.ApplicationStopped.Register(pool.Dispose);
@@ -223,6 +235,14 @@ public static class WebLingoWaspServer
             RequestTimeout = debugger is not null ? null : requestTimeout,
             Drain = limits.DrainSeconds is { } drain ? TimeSpan.FromSeconds(drain) : WebLingoApplicationOptions.DefaultDrain(requestTimeout),
             InstructionBudget = limits.Instructions ?? WebLingoApplicationOptions.DefaultInstructionBudget,
+            // What its server takes of a client, wasp.config's or Kestrel's defaults (section 9, "M0.23 parts", part 3).
+            HttpLimits = WebLingoHttpLimits.Default with
+            {
+                RequestLine = limits.RequestLine ?? WebLingoHttpLimits.Default.RequestLine,
+                RequestHeaders = limits.RequestHeaders ?? WebLingoHttpLimits.Default.RequestHeaders,
+                RequestArrival = limits.RequestArrivalSeconds is { } arrival ? TimeSpan.FromSeconds(arrival) : WebLingoHttpLimits.Default.RequestArrival,
+                KeepAlive = limits.KeepAliveSeconds is { } keepAlive ? TimeSpan.FromSeconds(keepAlive) : WebLingoHttpLimits.Default.KeepAlive
+            },
             MaxHeapUnits = limits.MemoryMegabytes is { } megabytes ? megabytes * 512 * 1024 : WebLingoHeap.DefaultMaxUnits,
             Debugger = debugger
         }, out error);

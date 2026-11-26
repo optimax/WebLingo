@@ -1,4 +1,5 @@
 using System.Text;
+using WebLingo.Hosting;
 namespace WebLingo.Hosting.Standalone;
 
 /// <summary>What reading a request's head came to: more bytes needed, a head read, or the request refused.</summary>

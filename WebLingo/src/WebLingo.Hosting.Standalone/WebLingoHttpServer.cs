@@ -20,8 +20,8 @@ namespace WebLingo.Hosting.Standalone;
 /// </summary>
 public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingoWorkerPool workers)
 {
-    /// <summary>What it takes of a client before it refuses it.</summary>
-    public WebLingoHttpLimits Limits { get; init; } = WebLingoHttpLimits.Default;
+    /// <summary>What it takes of a client before it refuses it: its site's, <c>wasp.config</c>'s <c>"limits"</c>' (part 3).</summary>
+    public WebLingoHttpLimits Limits { get; init; } = application.HttpLimits;
 
     /// <summary>A socket listening on <paramref name="address"/>'s <paramref name="port"/>, 0 for one the system chooses.</summary>
     public static Socket Listen(IPAddress address, int port)
@@ -212,8 +212,11 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
         }
 
-        /// <summary>Up to <paramref name="into"/>'s length of the request's bytes: the buffer's first, then the client's; 0 at the connection's end.</summary>
-        public async ValueTask<int> ReadSomeAsync(Memory<byte> into)
+        /// <summary>
+        /// Up to <paramref name="into"/>'s length of the request's bytes: the buffer's first, then the client's, within
+        /// <paramref name="time"/>, past which it throws <see cref="OperationCanceledException"/>; 0 at the connection's end.
+        /// </summary>
+        public async ValueTask<int> ReadSomeAsync(Memory<byte> into, TimeSpan time)
         {
             if (_start < _end)
             {
@@ -222,12 +225,19 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
                 _start += count;
                 return count;
             }
-            return await _stream.ReadAsync(into, stop);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stop);
+            timeout.CancelAfter(time);
+            return await _stream.ReadAsync(into, timeout.Token);
         }
 
-        /// <summary>A line of the request's body's framing, a chunk's size or a trailer, without its CR LF; null where it is longer than <paramref name="most"/> or the connection ends.</summary>
-        public async ValueTask<string?> ReadLineAsync(int most)
+        /// <summary>
+        /// A line of the request's body's framing, a chunk's size or a trailer, without its CR LF, within <paramref name="time"/>;
+        /// null where it is longer than <paramref name="most"/> or the connection ends.
+        /// </summary>
+        public async ValueTask<string?> ReadLineAsync(int most, TimeSpan time)
         {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stop);
+            timeout.CancelAfter(time);
             while (true)
             {
                 var span = _buffer.AsSpan(_start, _end - _start);
@@ -241,7 +251,7 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
                 }
                 if (span.Length > most + 1) return null; // Its CR may have come, its LF not yet.
                 MakeRoom();
-                var read = await _stream.ReadAsync(_buffer.AsMemory(_end), stop);
+                var read = await _stream.ReadAsync(_buffer.AsMemory(_end), timeout.Token);
                 if (read <= 0) return null;
                 _end += read;
             }
@@ -287,7 +297,7 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
             var application = server._application;
             var gone = new CancellationTokenSource();
             var sink = new Sink(this, head);
-            var body = head.HasBody ? new Body(this, head, application.MaxBodySize, sink, gone) : null;
+            var body = head.HasBody ? new Body(this, head, application.MaxBodySize, sink, gone, server.Limits) : null;
             if (body is null) Watch(gone);
             var request = new WebLingoBufferedRequest(head.Method, head.Path, head.Query, "http", head.Host, head.Headers, (IWebLingoBodyReader?)body ?? Empty.Body);
             var response = new WebLingoStreamingResponse(gone.Token);
@@ -436,10 +446,39 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
     /// <summary>
     /// A request's body, read as its page asks for it (specification, section 6.12, "Streaming"): by its length, or in chunks,
     /// their sizes and trailers read and dropped, at most the site's largest body; a read 0 at its end, -1 where its client
-    /// has gone, or it is malformed or too large, its connection then closed.
+    /// has gone, or it is malformed or too large, its connection then closed. Its pace kept as Kestrel keeps it: once its
+    /// waits for its client have taken <see cref="WebLingoHttpLimits.BodyGrace"/>, it must have come at
+    /// <see cref="WebLingoHttpLimits.BodyRate"/> bytes a second of them, or a read fails, only the time spent waiting for the
+    /// client counted, not the page's between its reads (section 9, "M0.23 parts", part 3).
     /// </summary>
-    private sealed class Body(Connection connection, WebLingoHttpHead head, long largest, Sink sink, CancellationTokenSource gone) : IWebLingoBodyReader
+    private sealed class Body(Connection connection, WebLingoHttpHead head, long largest, Sink sink, CancellationTokenSource gone,
+        WebLingoHttpLimits limits) : IWebLingoBodyReader
     {
+        private TimeSpan _waited;
+
+        /// <summary>How long its next wait for the client may take, its pace kept; nothing where it is too slow already.</summary>
+        private TimeSpan Allowed()
+        {
+            var due = Math.Max(limits.BodyGrace.TotalSeconds, (_read + 1) / limits.BodyRate);
+            return TimeSpan.FromSeconds(due) - _waited;
+        }
+
+        /// <summary>A wait for the client, its time counted towards the body's pace.</summary>
+        private async ValueTask<T> Waiting<T>(Func<TimeSpan, ValueTask<T>> wait)
+        {
+            var allowed = Allowed();
+            if (allowed <= TimeSpan.Zero) throw new OperationCanceledException("The request's body came too slowly.");
+            var clock = Stopwatch.StartNew();
+            try
+            {
+                return await wait(allowed);
+            }
+            finally
+            {
+                _waited += clock.Elapsed;
+            }
+        }
+
         private readonly SemaphoreSlim _reading = new(1, 1);
         private long _left = head.ContentLength ?? 0;
         private long _chunkLeft;
@@ -505,7 +544,7 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
                 _ended = true;
                 return 0;
             }
-            var read = await connection.ReadSomeAsync(into[..(int)Math.Min(into.Length, _left)]);
+            var read = await Waiting(time => connection.ReadSomeAsync(into[..(int)Math.Min(into.Length, _left)], time));
             if (read <= 0) return Fail();
             _left -= read;
             if (_left == 0) _ended = true;
@@ -518,7 +557,7 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
             if (_chunkLeft == 0)
             {
                 // A chunk's size, in hexadecimal, its extensions dropped; 0 the last, its trailers read to the empty line and dropped.
-                var line = await connection.ReadLineAsync(4096);
+                var line = await Waiting(time => connection.ReadLineAsync(4096, time));
                 if (line is null) return Fail();
                 var semicolon = line.IndexOf(';');
                 var size = (semicolon >= 0 ? line[..semicolon] : line).Trim();
@@ -530,7 +569,7 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
                 {
                     for (var trailers = 0; ; trailers++)
                     {
-                        var trailer = await connection.ReadLineAsync(8192);
+                        var trailer = await Waiting(time => connection.ReadLineAsync(8192, time));
                         if (trailer is null || trailers > 100) return Fail();
                         if (trailer.Length == 0) break;
                     }
@@ -538,10 +577,10 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
                     return 0;
                 }
             }
-            var read = await connection.ReadSomeAsync(into[..(int)Math.Min(into.Length, _chunkLeft)]);
+            var read = await Waiting(time => connection.ReadSomeAsync(into[..(int)Math.Min(into.Length, _chunkLeft)], time));
             if (read <= 0) return Fail();
             _chunkLeft -= read;
-            if (_chunkLeft == 0 && await connection.ReadLineAsync(0) is not "") return Fail();
+            if (_chunkLeft == 0 && await Waiting(time => connection.ReadLineAsync(0, time)) is not "") return Fail();
             return read;
         }
     }

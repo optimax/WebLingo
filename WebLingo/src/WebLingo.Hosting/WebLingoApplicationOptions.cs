@@ -85,6 +85,9 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// </summary>
     public WebLingoUploads Uploads { get; init; } = WebLingoUploads.Default;
 
+    /// <summary>What its server takes of a client before it refuses it, <c>wasp.config</c>'s <c>"limits"</c>' (section 9, "M0.23 parts", part 3).</summary>
+    public WebLingoHttpLimits HttpLimits { get; init; } = WebLingoHttpLimits.Default;
+
     /// <summary>
     /// Where the site keeps its sessions (section 6.12, "Sessions and cookies"), which a request's <c>request.session</c>
     /// reaches, its id made with <see cref="Crypto"/>; none by default, <c>request.session</c> then an error.

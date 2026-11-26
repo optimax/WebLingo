@@ -133,6 +133,11 @@ is in) and `WebLingoHttpParser` (strict, RFC 9112; never throws; `TryDecodePath`
 at Kestrel's defaults, `WebLingoHttpLimits`, until part 3 reads them. `WaspServeTests` is a base class now, its tests run
 again by `StandaloneWaspServeTests` with `Host` "standalone".
 
+M0.23's part 3: `WebLingoHttpLimits` moved to the hosting core (`WebLingoApplicationOptions.HttpLimits`), read from
+`wasp.config`'s `"limits"`, `"requestLine"`, `"requestHeaders"`, `"requestArrival"` and `"keepAlive"`; the standalone
+server keeps them, its body's pace counting only waits for the client (`Body.Waiting`); `WebLingoWaspServer.Create` gives
+Kestrel the same (`ConfigureKestrel`).
+
 ## The work off the workers
 
 `DotNetBlockingPool` (`WebLingo.Platform.DotNet`) runs work that blocks, a database's, a file's, a subprocess's, a mail
