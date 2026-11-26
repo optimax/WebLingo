@@ -883,6 +883,35 @@ clients, up to 256 at once, rather than with time, as far as 16 clients show. It
 and 45 to 49 MB until 7 hours and 10 minutes in, were 50 to 54 MB from 7 hours and 20 minutes on, 51 MB at the end: a rise too
 small, and too late in one run, to call a leak. Nothing failed or leaked, so that no task came of it.
 
+**Fair workers** (M0.24's part 3, §9, "M0.24 parts", 26 November 2026), `WebLingo.Benchmarks --load --fair
+none,1000000,100000,10000`, from `a713a79`, on part 1's machine, idle, .NET 10.0.15, under `wasp serve`, the site
+served anew under each quantum, its `wasp.config`'s `"limits"`' `"quantum"` given it: `slow.wasp`, 20,000,000 numbers'
+remainders summed, about 100,000,000 instructions, asked for by 16 clients, two for each of the server's 8 workers, so
+that every worker computes and slow requests wait for one, beside `hello` asked for at once, for 10 seconds after 3.
+With 16 clients asking for `hello`:
+
+| Quantum | `hello`: requests/s | Median | 95% under | 99% under | `slow`: requests/s | Median |
+|---|---:|---:|---:|---:|---:|---:|
+| none | 38 | 376.1 ms | 643.8 ms | 667.1 ms | 21.6 | 729.2 ms |
+| 1,000,000 | 1,142 | 12.5 ms | 26.4 ms | 35.6 ms | 19.7 | 793.7 ms |
+| 100,000 | 3,228 | 4.3 ms | 11.0 ms | 15.2 ms | 16.1 | 930.1 ms |
+| 10,000 | 10,346 | 1.2 ms | 3.5 ms | 4.9 ms | 7.0 | 2,131.9 ms |
+
+With one, so that `hello`'s own work takes little from `slow`'s, which then loses what its yields cost, about 70 µs
+each at 100,000, a yield's wake a timer's hop to the thread pool and back to its worker (§9, "M0.24 parts", part 2):
+
+| Quantum | `hello`: requests/s | Median | 95% under | 99% under | `slow`: requests/s | Median |
+|---|---:|---:|---:|---:|---:|---:|
+| none | 2 | 381.5 ms | 672.0 ms | 776.8 ms | 21.6 | 727.8 ms |
+| 1,000,000 | 89 | 9.8 ms | 25.3 ms | 33.0 ms | 20.7 | 774.5 ms |
+| 100,000 | 265 | 3.1 ms | 9.0 ms | 13.3 ms | 17.5 | 896.4 ms |
+| 10,000 | 1,441 | 0.6 ms | 1.5 ms | 2.4 ms | 11.5 | 1,245.7 ms |
+
+Without a quantum a short page waits for the long ones ahead of it on its worker, 0.4 seconds at its median; with one,
+it is answered between their quanta, and a long page gives up 4 percent of its throughput at 1,000,000, 19 at 100,000,
+the default, and 47 at 10,000. No answer was wrong. The default is the owner's to choose from them, a question of the
+task's.
+
 ### 5.7 Local source debugging
 
 On 19 November 2026, the owner approved local `.wlg` launches on the default register VM in VS Code.
@@ -2164,7 +2193,10 @@ that the owner has not decided is a question of its task's, and Proposed here un
    debugger as any other; `WebLingoApplicationOptions.Quantum`, `wasp.config`'s `"limits"`' `"quantum"`, an integer more
    than 0, or `null` for none; `QuantumTests`.
 3. **Measured.** The load test, a page that computes for long beside pages that do not, their latencies with each
-   quantum and without one, the quantum's default chosen from them, its numbers in §5.6.
+   quantum and without one, the quantum's default chosen from them, its numbers in §5.6. Built and run (26 November
+   2026; Proposed where it says more): `WebLingo.Benchmarks --load --fair QUANTA`, the site served anew under each
+   quantum, since a server reads its `"limits"` as it starts, `slow.wasp` asked for by two clients for each worker,
+   `hello` by `--clients`; its numbers in §5.6, "Fair workers". Which default they argue for is the task's question.
 
 **M0.23 parts** (26 November 2026, the owner's answers to "M0.23: A Standalone HTTP Host", A1 (a) and A2 (a), then
 (c); the register, "M0.23, a standalone HTTP host"), each a task of its own in `TO-DO.md`, landed in this order. What

@@ -29,11 +29,19 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
     public static WebLingoLoadSite At(Uri url) => new(url, $"the site at {url}", null);
 
     /// <summary>The load site, served by <c>wasp serve</c> where <paramref name="host"/> is <c>serve</c>, else behind nginx.</summary>
-    public static async Task<WebLingoLoadSite> Start(string host)
+    public static async Task<WebLingoLoadSite> Start(string host, string? setting = null)
     {
         var folder = Path.Combine(Path.GetTempPath(), "weblingo-load-" + Guid.NewGuid().ToString("N"));
         var site = Path.Combine(folder, "site");
         Copy(WebLingoLoad.SiteFolder, site);
+        if (setting is not null)
+        {
+            // A setting more in its wasp.config, beside its own, which its server reads as it starts (section 9, "M0.24 parts", part 3).
+            var config = Path.Combine(site, "wasp.config");
+            var original = File.ReadAllText(config);
+            var brace = original.IndexOf('{', StringComparison.Ordinal);
+            File.WriteAllText(config, original[..(brace + 1)] + "\n  " + setting + "," + original[(brace + 1)..]);
+        }
         MakeDatabase(Path.Combine(folder, "load-data", "load.db"));
         var wasp = Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? "wasp.exe" : "wasp");
         var port = FreePort();
@@ -99,33 +107,6 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
         if (_server is not { HasExited: false } server) return null;
         server.Refresh();
         return new WebLingoServerSample(server.WorkingSet64, server.PrivateMemorySize64, server.HandleCount, server.Threads.Count);
-    }
-
-    /// <summary>
-    /// The site's <c>wasp.config</c> given a setting more, <paramref name="setting"/>, beside its own, the site then reloaded
-    /// and answering again, every request after it on the new configuration (section 9, "M0.24 parts", part 3).
-    /// </summary>
-    public async Task Configure(string setting)
-    {
-        if (_folder is null) throw new InvalidOperationException("--fair needs a site the benchmark serves itself.");
-        var original = await File.ReadAllTextAsync(Path.Combine(WebLingoLoad.SiteFolder, "wasp.config"));
-        var brace = original.IndexOf('{', StringComparison.Ordinal);
-        await Replace("wasp.config", original[..(brace + 1)] + "\n  " + setting + "," + original[(brace + 1)..]);
-        // The reload is seen by the next request: asked for until answered, then a moment more for the old generation's drain.
-        using var client = Client();
-        for (var tries = 0; tries < 100; tries++)
-        {
-            try
-            {
-                using var response = await client.GetAsync("/hello");
-                if (response.IsSuccessStatusCode) break;
-            }
-            catch (HttpRequestException)
-            {
-            }
-            await Task.Delay(100);
-        }
-        await Task.Delay(1000);
     }
 
     /// <summary>

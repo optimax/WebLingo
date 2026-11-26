@@ -166,13 +166,13 @@ public static class WebLingoLoad
 
     private static async Task<int> RunAsync(Settings settings, TextWriter output, TextWriter error)
     {
+        if (settings.Fair is { } fair) return await Fair(fair, settings, output);
         await using var site = settings.Url is { } url ? WebLingoLoadSite.At(url) : await WebLingoLoadSite.Start(settings.Host);
         output.WriteLine($"WASP under load: {site.Description}.");
         output.WriteLine($".NET {Environment.Version}, {RuntimeInformation.OSDescription.Trim()}, {Environment.ProcessorCount} "
                          + "logical processors, the clients on the same machine.");
         output.WriteLine();
         if (settings.Reload is { } reload) return await Reload(site, settings.Clients.Max(), TimeSpan.FromSeconds(reload), output);
-        if (settings.Fair is { } fair) return await Fair(site, fair, settings, output);
         if (settings.Soak is { } hours)
         {
             var sample = TimeSpan.FromMinutes(settings.Sample);
@@ -425,16 +425,22 @@ public static class WebLingoLoad
 
     /// <summary>What <c>compute.wasp</c> sums, computed as it computes it.</summary>
     /// <summary>
-    /// <c>--fair</c> (section 9, "M0.24 parts", part 3): under each quantum, the site's <c>wasp.config</c> given it, a client
-    /// for each of the server's workers, the machine's processors, asking for <c>slow</c>, so that every worker computes, and
-    /// the most <c>--clients</c> gives asking for <c>hello</c> at once: <c>hello</c>'s latencies, which a worker held by a
+    /// <c>--fair</c> (section 9, "M0.24 parts", part 3): under each quantum, the site served anew, its <c>wasp.config</c>
+    /// given it, which a server reads as it starts, two
+    /// clients for each of the server's workers, the machine's processors, asking for <c>slow</c>, so that every worker
+    /// computes and slow requests wait for one, and the most <c>--clients</c> gives asking for <c>hello</c> at once: <c>hello</c>'s latencies, which a worker held by a
     /// slow page delays, and both pages' throughput.
     /// </summary>
-    private static async Task<int> Fair(WebLingoLoadSite site, IReadOnlyList<long?> quanta, Settings settings, TextWriter output)
+    private static async Task<int> Fair(IReadOnlyList<long?> quanta, Settings settings, TextWriter output)
     {
+        if (settings.Url is not null) throw new InvalidOperationException("--fair needs a site the benchmark serves itself.");
+        output.WriteLine($"WASP under load: {(settings.Host == "serve" ? "`wasp serve`" : settings.Host)}, served anew under each quantum.");
+        output.WriteLine($".NET {Environment.Version}, {RuntimeInformation.OSDescription.Trim()}, {Environment.ProcessorCount} "
+                         + "logical processors, the clients on the same machine.");
+        output.WriteLine();
         var (time, warmUp) = (TimeSpan.FromSeconds(settings.Seconds), TimeSpan.FromSeconds(settings.WarmUp));
-        var (slow, quick) = (Environment.ProcessorCount, settings.Clients.Max());
-        output.WriteLine($"`slow` asked for by {slow} clients, one for each of the server's workers, and `hello` by {quick} at once, "
+        var (slow, quick) = (2 * Environment.ProcessorCount, settings.Clients.Max());
+        output.WriteLine($"`slow` asked for by {slow} clients, two for each of the server's workers, and `hello` by {quick} at once, "
                          + $"for {settings.Seconds} s after {settings.WarmUp} s, under each quantum.");
         output.WriteLine();
         output.WriteLine("| Quantum | hello: requests/s | Median | 95% under | 99% under | slow: requests/s | Median | Errors |");
@@ -443,7 +449,7 @@ public static class WebLingoLoad
         foreach (var quantum in quanta)
         {
             var limit = quantum is { } given ? given.ToString(CultureInfo.InvariantCulture) : "null";
-            await site.Configure($"\"limits\": {{ \"quantum\": {limit} }}");
+            await using var site = await WebLingoLoadSite.Start(settings.Host, $"\"limits\": {{ \"quantum\": {limit} }}");
             var hello = Pages[0];
             var measured = await Task.WhenAll(Measure(site, Slow, slow, warmUp, time), Measure(site, hello, quick, warmUp, time));
             var (slowResult, helloResult) = (measured[0], measured[1]);
