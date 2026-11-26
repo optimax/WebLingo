@@ -117,6 +117,9 @@ public sealed class WebLingoHeap
 
     public WebLingo.Platform.Abstractions.IWebLingoProcessRunner? Processes { get; set; }
 
+    /// <summary>The host's workers (<see cref="WebLingoExecutionContext.Workers"/>), for <c>std:workers</c> (section 9, "M0.26 parts", part 2).</summary>
+    public IWebLingoWorkers? Workers { get; set; }
+
     /// <summary>What the configuration allows native modules (<see cref="WebLingoExecutionContext.Allowed"/>), COM's objects (section 3.10).</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>>? Allowed { get; set; }
 
@@ -197,6 +200,12 @@ public sealed class WebLingoHeap
     /// <c>iterate()</c> give (section 3.6); kept as <see cref="ObjectClass"/> is, by the program that made it.
     /// </summary>
     public WebLingoValue IteratorClass { get; set; }
+
+    /// <summary>
+    /// The class <c>Error</c>, once the program has made it, whose instances, and its subclasses', a message copies as errors
+    /// (<see cref="WebLingoMessage"/>); kept as <see cref="ObjectClass"/> is, by the program that made it.
+    /// </summary>
+    public WebLingoValue ErrorClass { get; set; }
 
     /// <summary>
     /// Seals a class, a kind of value's (section 3.7, "Classes of values"): no class extends it, and <c>new</c> makes

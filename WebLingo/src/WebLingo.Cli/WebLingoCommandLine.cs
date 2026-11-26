@@ -66,7 +66,8 @@ public static partial class WebLingoCommandLine
     {
         Bytecode = true,
         RunsFileNamedFirst = true,
-        AllowsProcesses = true
+        AllowsProcesses = true,
+        RunsWorkers = true
     };
 
     public static int Run(string[] args, TextWriter output, TextWriter error) => Run(Scripts, args, output, error);
@@ -346,9 +347,14 @@ public static partial class WebLingoCommandLine
         var source = PrepareSource(program, path, givenSchemes, output, error, input, false, out var exit, run ? console : null);
         if (source is null || !run) return exit;
         // The VM imports modules with the same resolver the compiler used (section 3.9).
-        var context = Context(source.Host, parameters, source.LineOf, regexTimeout);
+        // A script's workers, std:workers', where its command line runs them (section 9, "M0.26 parts", part 2).
+        var workers = program.RunsWorkers
+            ? new Workers(new Workers.Settings(program, path, givenSchemes, output, error, input, console, regexTimeout), null)
+            : null;
+        var context = Context(source.Host, parameters, source.LineOf, regexTimeout) with { Workers = workers };
         var loader = new WebLingoModuleLoader(source.Options);
         var result = OnVm(source.Compilation.Result.Module!, loader, source.Compilation.Components, context);
+        workers?.End(); // Its workers end with it.
         output.Flush();
         return source.Report(result, error);
     }
@@ -485,8 +491,13 @@ public static partial class WebLingoCommandLine
             }
         }
         var loader = new WebLingoModuleLoader(host.Options);
-        var context = Context(host, parameters, LineOf, regexTimeout);
+        // Its workers' modules compiled from their source, as a script's are (section 9, "M0.26 parts", part 2).
+        var workers = program.RunsWorkers
+            ? new Workers(new Workers.Settings(program, path, givenSchemes, output, error, input, console, regexTimeout), null)
+            : null;
+        var context = Context(host, parameters, LineOf, regexTimeout) with { Workers = workers };
         var result = OnVm(register, loader, null, context);
+        workers?.End();
         output.Flush();
         if (result.Succeeded) return Success;
         var diagnostic = result.Error!;
@@ -616,7 +627,7 @@ public static partial class WebLingoCommandLine
         // std:console a script's, but not a site's, which has no console (section 3.9, "The console: std:console").
         var native = new WebLingoNativeModuleLoader(schemes, services)
         {
-            Refused = program.HasConsole ? new Dictionary<string, string>() : WebLingoNativeModuleLoader.WithoutConsole,
+            Refused = program.HasConsole ? new Dictionary<string, string>() : WebLingoNativeModuleLoader.RefusedBySites,
             // A script that imports std:console, run, is a console program: given a console where it has none (section 3.9).
             Loaded = console is null ? null : name => { if (name == "std:console") console(); }
         };
@@ -845,6 +856,11 @@ public static partial class WebLingoCommandLine
     /// <summary>Script output to a text writer as it is written, line breaks LF on every platform.</summary>
     private sealed class TextWriterOutput(TextWriter writer) : IWebLingoTextOutput
     {
-        public void Write(string text) => writer.Write(text);
+        // Locked, so that a script and its workers, each on a thread of its own, write whole texts to one writer (section 9,
+        // "M0.26 parts", part 2).
+        public void Write(string text)
+        {
+            lock (writer) writer.Write(text);
+        }
     }
 }

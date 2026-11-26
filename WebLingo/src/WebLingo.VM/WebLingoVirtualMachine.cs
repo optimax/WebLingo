@@ -85,6 +85,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         heap.Databases = context.Databases;
         heap.Mail = context.Mail;
         heap.Processes = context.Processes;
+        heap.Workers = context.Workers;
         heap.Allowed = context.Allowed;
         heap.Crypto = context.Crypto;
         heap.Environment = context.Environment;
@@ -158,6 +159,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         try
         {
             result = execution.Run(resuming);
+            // A worker's execution goes on after its top level while its tasks have work (section 9, "M0.26 parts", part 2).
+            while (result.Succeeded && execution.GoesOn(result)) result = execution.Run(resuming: true);
             return result;
         }
         finally
@@ -2933,11 +2936,29 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// <summary>Whether <see cref="TryResume"/>'s false is a wait, not the execution's end.</summary>
         private bool _waits;
 
+        /// <summary>
+        /// Whether a worker's execution, its top level ended, goes on running its tasks (<see cref="WebLingoExecutionContext.IsWorker"/>),
+        /// which <see cref="TryResume"/> then ends once none has work.
+        /// </summary>
+        private bool _drains;
+
+        /// <summary>
+        /// Whether the execution, a worker's, which has just ended with its top level, goes on, its tasks having work: it then
+        /// resumes them, from the instructions it had run, ending once none has.
+        /// </summary>
+        public bool GoesOn(WebLingoExecutionResult ended)
+        {
+            if (!context.IsWorker || !_scheduler.HasWork) return false;
+            _drains = true;
+            _executed = ended.Instructions;
+            return true;
+        }
+
         private bool TryResume(Frame[] frames, WebLingoCancellationSignal? cancellation, long executed)
         {
             while (true)
             {
-                if (_main[0].Kind != WebLingoValueKind.Task || heap.GetTask(_main[0]).State != WebLingoTaskState.Pending)
+                if (!_drains && (_main[0].Kind != WebLingoValueKind.Task || heap.GetTask(_main[0]).State != WebLingoTaskState.Pending))
                 {
                     _ended = Finish(executed);
                     return false;
@@ -2971,6 +2992,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     if (_scheduler.Waiting)
                     {
                         _waits = true;
+                        return false;
+                    }
+                    if (_drains)
+                    {
+                        // A worker's tasks, its top level ended, have nothing more to run (section 9, "M0.26 parts", part 2).
+                        _ended = Finish(executed);
                         return false;
                     }
                     if (TryRaiseStuck()) continue;
@@ -3118,7 +3145,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         /// <summary>A built-in class the module has made: <c>Object</c>, <c>Error</c>, a kind of value's, or of runtime error's.</summary>
         private void Remember(int index, WebLingoValue made)
         {
-            if (index == module.ErrorClass) _errorClass[0] = made;
+            if (index == module.ErrorClass) _errorClass[0] = heap.ErrorClass = made;
             if (index == module.ObjectClass)
             {
                 _objectClass[0] = made;
@@ -3359,8 +3386,21 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             var failure = Failure(code, message, SpanOfOrigin(_origin)) with { Instructions = executed };
             return failure with
             {
-                Error = failure.Error! with { Source = OwnerOfOrigin(_origin)?.Source, ExceptionClass = exceptionClass, Stack = StackOfOrigin() }
+                Error = failure.Error! with { Source = OwnerOfOrigin(_origin)?.Source, ExceptionClass = exceptionClass, Stack = StackOfOrigin() },
+                Thrown = context.IsWorker ? CopyThrown() : null
             };
+        }
+
+        /// <summary>
+        /// A worker's uncaught exception, copied for its parent (section 9, "M0.26 parts", part 2): the value thrown, or a
+        /// runtime error as an instance of its class; null where a message cannot hold it.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private WebLingoMessage? CopyThrown()
+        {
+            var thrown = _thrown;
+            if (_thrownError is { } error && !WebLingoExceptions.TryMakeError(heap, ErrorClassFor(error.Code), error, out thrown)) return null;
+            return WebLingoMessage.TryCopy(heap, thrown, _errorClass[0], null, out var message, out _) ? message : null;
         }
 
         /// <summary>The first handler whose region holds the instruction, or -1.</summary>

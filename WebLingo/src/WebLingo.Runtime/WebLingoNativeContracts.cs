@@ -44,6 +44,15 @@ public interface IWebLingoNativeRegistry
     void Constant(string name, WebLingoValue value);
 
     /// <summary>
+    /// An exported value made for each program that imports it, where the program begins, after its module's classes are
+    /// made: what <paramref name="make"/>, given no argument, gives in that program's heap, an instance of a class the module
+    /// makes instances of among what it may give; read as its module's member, which no importer may assign, as a constant
+    /// is (section 9, "M0.26 parts", part 2: <c>std:workers</c>' <c>parent</c>, its worker's parent where the program runs as
+    /// a worker, <c>null</c> otherwise).
+    /// </summary>
+    void Value(string name, WebLingoNativeFunction make);
+
+    /// <summary>
     /// An exported class, by a name a script can write, given once, and not a function's too: its members are declared on
     /// what this gives (<see cref="WebLingoNativeClass"/>), whose host objects its functions reach through it.
     /// </summary>

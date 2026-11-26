@@ -205,7 +205,7 @@
         },
         {
           "name": "support.class.weblingo",
-          "match": "(?<![\\w.])(?:Iterator|Bytes|BytesBuilder|DateTime|Decimal|Regex|Json|Html|File|Socket|Database|Environment|Console|ConsoleColor|Request|Response|Headers|ComObject|ComEnumerator)\\b"
+          "match": "(?<![\\w.])(?:Iterator|Bytes|BytesBuilder|DateTime|Decimal|Regex|Json|Html|File|Socket|Database|Environment|Console|ConsoleColor|Worker|Request|Response|Headers|ComObject|ComEnumerator)\\b"
         },
         {
           "name": "support.class.error.weblingo",

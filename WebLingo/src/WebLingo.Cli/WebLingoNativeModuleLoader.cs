@@ -23,13 +23,15 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
     private readonly Dictionary<string, WebLingoNativeModuleInfo> _loaded = new(StringComparer.Ordinal);
 
     /// <summary>
-    /// <c>std:console</c>, which a site's scripts may not import, a site having no console (the owner's answer, 20 November
-    /// 2026, "Console Module", A3), and why: what <c>wasp</c>'s loaders refuse.
+    /// What <c>wasp</c>'s loaders refuse, and why: <c>std:console</c>, which a site's scripts may not import, a site having no
+    /// console (the owner's answer, 20 November 2026, "Console Module", A3); and <c>std:workers</c>, <c>weblingo</c>'s alone
+    /// for now (the owner's answer, 26 November 2026, A3 (b) of "M0.26: Parallel Work").
     /// </summary>
-    public static IReadOnlyDictionary<string, string> WithoutConsole { get; } = new Dictionary<string, string>(StringComparer.Ordinal)
+    public static IReadOnlyDictionary<string, string> RefusedBySites { get; } = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["std:console"] = "a site has no console: a page writes with its own write and writeLn, a handler with "
-                          + "response.write and response.writeLn"
+                          + "response.write and response.writeLn",
+        ["std:workers"] = "a site's pages run no workers of their own: std:workers is weblingo's, for scripts"
     };
 
     /// <summary>
@@ -225,6 +227,10 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
             error = wrong;
             return false;
         }
+        foreach (var maker in registry.Makers)
+        {
+            if (!builtins.TryGetBuiltin(maker.Name, out _)) builtins.Register(maker);
+        }
         var exports = new List<WebLingoNativeExport>();
         foreach (var function in registry.Functions)
         {
@@ -295,6 +301,7 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
             classes.Add(new WebLingoNativeClassInfo(nativeClass.Name, constructor, methods, statics)
             {
                 Registration = nativeClass.MadeByModule ? Export("class", members[^1]) : null,
+                MakesErrors = nativeClass.MakesErrors,
                 WebLingoMethods = written,
                 Properties = properties,
                 StaticProperties = staticProperties,
@@ -316,6 +323,9 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
         public List<NativeFunction> Functions { get; } = [];
         public List<WebLingoNativeClass> Classes { get; } = [];
         public List<WebLingoNativeConstant> Constants { get; } = [];
+
+        /// <summary>The built-ins that make its values (<see cref="Value"/>), which nothing exports by name.</summary>
+        public List<NativeFunction> Makers { get; } = [];
         private string? _error;
 
         /// <summary>The first fault in what the module registered, its classes' included.</summary>
@@ -366,6 +376,20 @@ public sealed class WebLingoNativeModuleLoader(IReadOnlyDictionary<string, strin
             else if (Taken(name)) _error = $"it registers '{name}' twice";
             else if (given == this) _error = $"it registers '{name}', a constant that is not null, a Boolean, an integer or a number";
             else Constants.Add(new WebLingoNativeConstant(name, given));
+        }
+
+        public void Value(string name, WebLingoNativeFunction make)
+        {
+            if (_error is not null) return;
+            if (!IsName(name)) _error = $"it registers a value named '{name}', which is not a name";
+            else if (Taken(name)) _error = $"it registers '{name}' twice";
+            else
+            {
+                // A built-in whose name no program can write, which the program calls where it begins (section 3.9).
+                var maker = new NativeFunction(module + ".value:" + name, name, 0, make);
+                Makers.Add(maker);
+                Constants.Add(new WebLingoNativeConstant(name, null) { Maker = new WebLingoNativeExport(name, maker.Name, 0) });
+            }
         }
 
         public void Function(string name, int arity, WebLingoNativeFunction function) => Add(name, arity, 0, function, false);

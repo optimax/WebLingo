@@ -72,6 +72,12 @@ public readonly record struct WebLingoResumption(WebLingoValue Task, WebLingoVal
 public delegate bool WebLingoOffWorkerFinish<in T>(T value, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error);
 
 /// <summary>
+/// What a host's value makes of the task that waits for it, on the worker: true, with its result, or, where
+/// <paramref name="throws"/>, the value the task throws; false, with its error.
+/// </summary>
+public delegate bool WebLingoHostFinish<in T>(T value, WebLingoHeap heap, out WebLingoValue result, out bool throws, out WebLingoRuntimeError? error);
+
+/// <summary>
 /// The host's clock, which an execution's timers (<c>delay</c>) wait on; a host gives one, or the execution runs in
 /// virtual time (section 3.8). The portable core reads no clock itself (WL-P006, WL-P016).
 /// </summary>
@@ -437,6 +443,44 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         });
         return true;
     }
+
+    /// <summary>
+    /// A task that its host completes, as the other overloads' do, whose <paramref name="finish"/> may give, in place of
+    /// its result, a value the task throws: an error a worker sent its parent (section 9, "M0.26 parts", part 2).
+    /// </summary>
+    public bool TryWaitForHost<T>(Action<Action<T>> start, WebLingoHostFinish<T> finish, out WebLingoValue task, out WebLingoRuntimeError? error)
+    {
+        task = WebLingoValue.Null;
+        if (heap.SchedulerHost is not { } host)
+        {
+            error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation, "This host runs no operations off its worker.");
+            return false;
+        }
+        if (!heap.TryAllocateTask(out var made, out error)) return false;
+        task = made;
+        _operations.Add(made);
+        start(value =>
+        {
+            host.Post(() =>
+            {
+                if (!finish(value, heap, out var result, out var throws, out var failed)) Finished(made, failed);
+                else if (!throws) Finished(made, null, result);
+                else
+                {
+                    // Thrown from the await that waits for it (section 3.8).
+                    _operations.Remove(made);
+                    Fault(made, result, null, WebLingoExceptions.Nowhere);
+                }
+            });
+        });
+        return true;
+    }
+
+    /// <summary>
+    /// Whether any of the execution's tasks may still run: one ready, a timer, or an operation off its worker, which a
+    /// worker's execution goes on for after its top level has ended (<see cref="WebLingoExecutionContext.IsWorker"/>).
+    /// </summary>
+    public bool HasWork => _ready.Count > 0 || _timers.Count > 0 || _operations.Count > 0;
 
     /// <summary>An operation's end, on the worker: its task completed with its result, or faulted with its error.</summary>
     private void Finished(WebLingoValue task, WebLingoRuntimeError? error, WebLingoValue result = default)

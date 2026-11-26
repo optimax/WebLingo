@@ -30,6 +30,33 @@ public sealed class WebLingoMessage
     public int Count => _nodes.Length;
 
     /// <summary>
+    /// An error, as a message: an <c>Error</c> of the class named <paramref name="className"/>, its <c>message</c> and its
+    /// <c>code</c>, thrown at <paramref name="thrownAt"/>, where that is given: what a worker's end is copied as where its
+    /// exception was not, its limits' or one a message cannot hold (section 9, "M0.26 parts", part 2).
+    /// </summary>
+    public static WebLingoMessage OfError(string className, string message, string? code, string? thrownAt) =>
+        new([
+            new Node(Kind.Error, default, new ErrorParts(className, 1, 2, thrownAt)),
+            new Node(Kind.String, default, message),
+            code is null ? new Node(Kind.Plain, WebLingoValue.Null, null) : new Node(Kind.String, default, code)
+        ]);
+
+    /// <summary>
+    /// The message, where it is an error, thrown at <paramref name="thrownAt"/>, in place of where it says it was: a worker's
+    /// uncaught exception, which its host locates (section 9, "M0.26 parts", part 2); else the message itself.
+    /// </summary>
+    public WebLingoMessage ThrownAt(string thrownAt)
+    {
+        if (_nodes[0].Kind != Kind.Error) return this;
+        var nodes = (Node[])_nodes.Clone();
+        nodes[0] = nodes[0] with { Payload = (ErrorParts)nodes[0].Payload! with { ThrownAt = thrownAt } };
+        return new WebLingoMessage(nodes);
+    }
+
+    /// <summary>Whether it holds an error, an <c>Error</c> once it is read (<see cref="TryRead"/>).</summary>
+    public bool IsError => _nodes[0].Kind == Kind.Error;
+
+    /// <summary>
     /// <paramref name="value"/>, of <paramref name="heap"/>, copied into a message; an error <paramref name="errorClass"/>'s
     /// instance or its subclasses', where it is the value itself, thrown at <paramref name="thrownAt"/>, where that is given;
     /// false, with WL3001, where the value holds anything a message cannot.

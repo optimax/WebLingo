@@ -73,6 +73,7 @@ public sealed class PortabilityTests
         "WebLingo.StdLib.Fs", "WebLingo.StdLib.Http", "WebLingo.StdLib.Net", "WebLingo.StdLib.Db", "WebLingo.StdLib.Crypto", "WebLingo.Hosting.Abstractions",
         "WebLingo.Hosting", "WebLingo.StdLib.Env", "WebLingo.StdLib.Log", "WebLingo.StdLib.Math", "WebLingo.StdLib.Mail",
         "WebLingo.StdLib.Csv", "WebLingo.StdLib.Random", "WebLingo.StdLib.Process", "WebLingo.StdLib.Test", "WebLingo.StdLib.Console",
+        "WebLingo.StdLib.Workers",
     };
 
     [Theory]

@@ -426,6 +426,17 @@ public sealed class WaspTests : IDisposable
     }
 
     [Fact]
+    public void ASiteRunsNoWorkers()
+    {
+        // std:workers is weblingo's alone, for now: its import WL2015 under wasp (the owner's answer, 26 November 2026, A3 (b)
+        // of "M0.26: Parallel Work").
+        var (exit, _, error) = Wasp("check", "<% import { Worker } from \"std:workers\"; %>");
+        Assert.Equal(WebLingoCommandLine.CompilationFailed, exit);
+        Assert.EndsWith("page.wasp(1,27): ERROR WL2015: The module 'std:workers' cannot be imported: a site's pages run no workers "
+                        + "of their own: std:workers is weblingo's, for scripts.", error.TrimEnd(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AnUndefinedNameInAPageSuggestsTheImportItNeeds()
     {
         // As in a script (section 3.9): a standard module's export, with the module to import it from.

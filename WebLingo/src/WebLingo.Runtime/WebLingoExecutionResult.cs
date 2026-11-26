@@ -24,4 +24,11 @@ public sealed record WebLingoExecutionResult(bool Succeeded, WebLingoDiagnostic?
 
     /// <summary>An execution that waits, its next timer due in <paramref name="milliseconds"/>, or -1 for none.</summary>
     public static WebLingoExecutionResult Waits(long milliseconds) => new(false, null) { Waiting = true, WaitMilliseconds = milliseconds };
+
+    /// <summary>
+    /// For a worker's execution (<see cref="WebLingoExecutionContext.IsWorker"/>) that an exception nothing caught ended, the
+    /// exception, copied, for its parent (section 9, "M0.26 parts", part 2); a runtime error as an instance of its class. Null
+    /// otherwise, and where the exception holds what a message cannot, or its limits or a cancellation ended it.
+    /// </summary>
+    public WebLingoMessage? Thrown { get; init; }
 }

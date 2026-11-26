@@ -141,6 +141,17 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     /// has been posted work, or the timer's time has come, on the same worker. False by default, the VM waiting itself.
     /// </summary>
     public bool Suspends { get; init; }
+
+    /// <summary>The host's workers, which <c>std:workers</c> reaches through the heap (<see cref="WebLingoHeap.Workers"/>); none by default.</summary>
+    public IWebLingoWorkers? Workers { get; init; }
+
+    /// <summary>
+    /// Whether the execution is a worker's (section 9, "M0.26 parts", part 2): it goes on after its top level has ended
+    /// while any of its tasks is ready, due or waits for work off its worker, a message among it, and ends once none is;
+    /// and an exception nothing caught is copied into its result (<see cref="WebLingoExecutionResult.Thrown"/>), for its
+    /// parent. False by default, an execution ending with its top level, its tasks still running cancelled (section 3.8).
+    /// </summary>
+    public bool IsWorker { get; init; }
 }
 
 /// <summary>

@@ -276,7 +276,7 @@ public static class WebLingoWaspServer
     private static WebLingoWorkerServices Services(IReadOnlyDictionary<string, string> schemes, string importer)
     {
         var builtins = new WebLingoBuiltinRegistry();
-        var native = new WebLingoNativeModuleLoader(schemes, builtins) { Refused = WebLingoNativeModuleLoader.WithoutConsole };
+        var native = new WebLingoNativeModuleLoader(schemes, builtins) { Refused = WebLingoNativeModuleLoader.RefusedBySites };
         native.TryResolve(importer, "std:system", out var system, out _);
         foreach (var function in native.FunctionsOf(system!)) builtins.Register(function);
         return new WebLingoWorkerServices(builtins, native);

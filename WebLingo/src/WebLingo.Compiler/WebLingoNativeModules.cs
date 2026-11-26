@@ -18,9 +18,14 @@ public sealed record WebLingoNativeModuleInfo(string Name, IReadOnlyList<WebLing
 
 /// <summary>
 /// A native module's constant as the compiler sees it: its name, and its value, <c>null</c>, a <see cref="bool"/>, a
-/// <see cref="long"/> or a <see cref="double"/>, which the program's top level gives the module's member as its literal.
+/// <see cref="long"/> or a <see cref="double"/>, which the program's top level gives the module's member as its literal; or,
+/// where <see cref="Maker"/> is given, the value that built-in gives, called where the program begins (section 3.9).
 /// </summary>
-public sealed record WebLingoNativeConstant(string Name, object? Value);
+public sealed record WebLingoNativeConstant(string Name, object? Value)
+{
+    /// <summary>The built-in that makes its value for each program, given nothing; null for a constant whose value is its <see cref="Value"/>.</summary>
+    public WebLingoNativeExport? Maker { get; init; }
+}
 
 /// <summary>
 /// A native module's class as the compiler sees it: its name, and the built-ins that are its constructor, its methods and
@@ -56,6 +61,9 @@ public sealed record WebLingoNativeClassInfo(string Name, WebLingoNativeExport C
     /// class, so that the module knows it (section 3.10); null for any other.
     /// </summary>
     public WebLingoNativeExport? Registration { get; init; }
+
+    /// <summary>Whether its members make errors in the program's heap, for which a program that uses it makes <c>Error</c> (section 9, "M0.26 parts", part 2).</summary>
+    public bool MakesErrors { get; init; }
 
     /// <summary>
     /// A native class's methods written in WebLingo, as a class's body declares them, read; false, with why, for a source

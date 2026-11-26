@@ -34,6 +34,8 @@ public sealed class DependencyTests
         { "WebLingo.StdLib.Test", ["WebLingo.Core", "WebLingo.Runtime"] },
         { "WebLingo.StdLib.Random", ["WebLingo.Core", "WebLingo.Runtime"] },
         { "WebLingo.StdLib.Process", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions"] },
+        // std:workers reaches the host's workers through the runtime's contract (section 9, "M0.26 parts", part 2).
+        { "WebLingo.StdLib.Workers", ["WebLingo.Core", "WebLingo.Runtime"] },
         // std:console registers the standard library's writing and reading, which hosts and tests give as their own too.
         { "WebLingo.StdLib.Console", ["WebLingo.Core", "WebLingo.Runtime", "WebLingo.Platform.Abstractions", "WebLingo.StdLib"] },
         { "WebLingo.Platform.Abstractions", ["WebLingo.Core"] },
@@ -74,7 +76,7 @@ public sealed class DependencyTests
     [Fact]
     public void TheRulesCoverEveryPortableAssembly()
     {
-        Assert.Equal(26, PortableCore.Count); // Section 3 of Documents/implementation.md lists the portable assemblies.
+        Assert.Equal(27, PortableCore.Count); // Section 3 of Documents/implementation.md lists the portable assemblies.
     }
 
     [Theory]

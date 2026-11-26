@@ -148,7 +148,18 @@ else `X-Forwarded-For`/`-Proto`, where its peer is trusted; ASP.NET Core's `Tran
 M0.26's part 1: `WebLingoMessage` (`WebLingo.Runtime`): `TryCopy(heap, value, errorClass, thrownAt)` copies a value out,
 whole, with no heap handle, iteratively, cycles and shared references kept by node index; `TryRead(heap, errorClass)`
 makes it anew, every value first, then the collections filled, its values rooted meanwhile. An error crosses as `Error`
-with `className` and `thrownAt`. No LINQ in the portable core: `PortabilityTests` refuses it. Part 2, a worker, uses it.
+with `className` and `thrownAt`. No LINQ in the portable core: `PortabilityTests` refuses it.
+
+## Workers
+
+M0.26's part 2: `std:workers` (`WebLingo.StdLib.Workers`), `Worker` and `parent`, each with `post` and `receive`,
+through `IWebLingoWorkers` (`WebLingo.Runtime`, `WebLingoWorkerContracts.cs`), which `weblingo` implements in
+`WebLingoCommandLine.Workers.cs`: a worker's module compiled on the parent's thread where `new Worker` runs, then run on
+a thread of its own; `Mailbox` the locked queue each way. The VM: a worker's execution (`IsWorker`) goes on after its
+top level while `WebLingoScheduler.HasWork` (the outer `Run` loop and `TryResume`'s `_drains`, outside `Run`'s loop),
+and copies an uncaught exception into `WebLingoExecutionResult.Thrown` (`CopyThrown`, not inlined). A native module's
+`IWebLingoNativeRegistry.Value` is a constant made by a built-in; `DeclareMakesErrors` makes a program bind `Error`.
+The CLI's `TextWriterOutput` locks its writer, workers sharing it. Part 3, the pool, builds on `Workers`.
 
 ## The work off the workers
 

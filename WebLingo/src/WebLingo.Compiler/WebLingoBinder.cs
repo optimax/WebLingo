@@ -2120,6 +2120,8 @@ public sealed class WebLingoBinder
     /// </summary>
     private WebLingoLocalSymbol BindNativeClass(string module, WebLingoNativeClassInfo info)
     {
+        // Errors its members make need Error, and its runtime errors' classes, in the program (section 9, "M0.26 parts", part 2).
+        if (info.MakesErrors) UseError();
         var callees = new Dictionary<string, WebLingoBuiltinDeclaration>(StringComparer.Ordinal);
         var name = module + "." + info.Name;
         var methods = new List<WebLingoMethodSyntax> { NativeMember("constructor", info.Constructor, false, callees, returns: false) };
@@ -2191,13 +2193,16 @@ public sealed class WebLingoBinder
             IsCaptured = true
         };
         _main.Locals.Add(local);
-        WebLingoBoundExpression value = constant.Value switch
-        {
-            bool b => new WebLingoBoundBooleanLiteral(b, default),
-            long l => new WebLingoBoundIntegerLiteral(l, default),
-            double d => new WebLingoBoundBinary64Literal(d, default),
-            _ => new WebLingoBoundNullLiteral(default)
-        };
+        WebLingoBoundExpression value = constant.Maker is { } maker
+            // A value its module makes for the program, where the program begins (section 3.9).
+            ? new WebLingoBoundBuiltinCall(UseBuiltin(new WebLingoBuiltinDeclaration(maker.Builtin, maker.Arity)), [], default)
+            : constant.Value switch
+            {
+                bool b => new WebLingoBoundBooleanLiteral(b, default),
+                long l => new WebLingoBoundIntegerLiteral(l, default),
+                double d => new WebLingoBoundBinary64Literal(d, default),
+                _ => new WebLingoBoundNullLiteral(default)
+            };
         _nativeFunctions.Add(new WebLingoBoundVariableDeclaration(local, value, default));
         return local;
     }
@@ -2295,6 +2300,14 @@ public sealed class WebLingoBinder
         foreach (var constant in unit.Info.Constants)
         {
             if (constant.Name != name) continue;
+            // A value its module makes may be an instance of a class it makes instances of, which is told its class first.
+            if (constant.Maker is not null)
+            {
+                foreach (var nativeClass in unit.Info.Classes)
+                {
+                    if (nativeClass.Registration is not null) TryNativeExport(unit, nativeClass.Name, out _);
+                }
+            }
             export = (null, BindNativeConstant(unit.Name, constant));
             unit.Bound[name] = export;
             return true;

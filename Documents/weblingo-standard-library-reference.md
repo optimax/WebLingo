@@ -41,6 +41,7 @@ This reference describes the standard library in the current release and shows w
 30. [`std:test`](#30-stdtest)
 31. [`std:mail`](#31-stdmail)
 32. [`std:log`](#32-stdlog)
+33. [`std:workers`](#33-stdworkers)
 
 ---
 
@@ -1129,9 +1130,10 @@ A native module is code compiled for .NET that extends what scripts can use: fun
 module's are, by a scheme naming a folder of them, `import db from "native:sqlite";`. The folders are named by the
 configuration, `weblingo.config` beside a script and `wasp.config` in a site, `{ "schemes": { "native":
 "C:/WebLingo/native" } }`, and by the command line's `--scheme native=folder`. The standard modules, `std:system`,
-`std:console`, `std:tasks`, `std:fs`, `std:http`, `std:net`, `std:db`, `std:crypto`, `std:env`, `std:math` and `std:mail`, are native modules themselves, in the `std`
+`std:console`, `std:tasks`, `std:fs`, `std:http`, `std:net`, `std:db`, `std:crypto`, `std:env`, `std:math`, `std:mail` and `std:workers`, are native modules themselves, in the `std`
 folder beside `weblingo` and `wasp`. A native module's function may have optional parameters, or a rest parameter, as
-`math.max(a, …)` has, and a module may export constants, as `math.PI` is, which no importer may assign.
+`math.max(a, …)` has, and a module may export constants, as `math.PI` is, and values made for each program where it
+begins, as `std:workers`' `parent` is, which no importer may assign.
 
 ---
 
@@ -1731,3 +1733,80 @@ working
 ```
 
 The output and the log are written to the terminal as they come; the log alone, `weblingo run script.wlg 2> log.txt`.
+
+---
+
+## 33. `std:workers`
+
+Work done in parallel, on the machine's other processors: `import { Worker, parent } from "std:workers";`, under
+`weblingo` alone for now, its import WL2015 under `wasp`. `new Worker(path)` runs a module, a `.wlg` file of the
+program's, on a worker of its own, a thread with a heap of its own, which shares nothing with its parent: the two
+exchange values, each copied whole.
+
+| Member | What it does |
+|---|---|
+| `new Worker(path)` | runs the module at `path`, from the program's own folder, `.wlg` added to a path without an extension; an `IOError` (WL3011) where it is not there, WL3001 where it does not compile, its errors in the message |
+| `worker.post(value)` | copies `value` to the worker, giving `null`; dropped where the worker has ended |
+| `await worker.receive()` | the next value the worker posted; `null` once it has ended and all it posted is received; the exception it ended with thrown, once |
+| `worker.dispose()` | ends the worker, as a request past its time is ended, its `finally` blocks not run; also at the end of a `using` |
+| `parent` | in a worker's module, its `Worker`'s end, with `post(value)` and `receive()` as the `Worker`'s; `null` in a program not run as a worker |
+
+A value crosses copied as it was: `null`, Booleans, integers, numbers, decimals, strings, bytes, dates, and arrays,
+maps and sets of them, the references they share and their cycles kept; anything else, an instance, a function, a
+class, a task, is WL3001, naming it. An error, an instance of `Error` or of a class extending it, crosses as an `Error`,
+its `message` and its `code` as they were, with two fields of its own, `className`, its class's name, and `thrownAt`,
+where it was thrown.
+
+A worker ends once its module's top level has ended and none of its tasks waits, a task waiting for its parent's next
+value among them; when its `Worker` is disposed, or let go of and collected; and when its program ends. An exception
+nothing catches in it is thrown by its parent's next `receive()`, copied as an error is.
+
+Save this worker as `square.wlg`:
+
+```javascript
+import { parent } from "std:workers";
+
+// Each number its parent posts answered with its square, until the parent posts null.
+var n = await parent.receive();
+while (n != null) {
+    parent.post(n * n);
+    n = await parent.receive();
+}
+```
+
+And this program beside it, which runs it:
+
+```javascript
+import { writeLn } from "std:console";
+import { Worker } from "std:workers";
+
+using (var worker = new Worker("square.wlg")) {
+    foreach (var n in [3, 4, 5]) worker.post(n);
+    writeLn([await worker.receive(), await worker.receive(), await worker.receive()]);
+    worker.post(null);
+    writeLn(await worker.receive());
+}
+```
+
+```text
+[9, 16, 25]
+null
+```
+
+A worker's exception, with `fails.wlg` holding `class NotFound extends Error {}` and `throw new NotFound("no such
+tea");` on its second line:
+
+```javascript
+import { writeLn } from "std:console";
+import { Worker } from "std:workers";
+
+try {
+    await new Worker("fails.wlg").receive();
+} catch (e) {
+    writeLn([e is Error, e.className, e.message, e.thrownAt]);
+}
+```
+
+```text
+[true, "NotFound", "no such tea", "fails.wlg(2,1)"]
+```

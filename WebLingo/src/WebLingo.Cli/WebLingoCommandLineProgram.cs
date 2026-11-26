@@ -70,6 +70,13 @@ public sealed record WebLingoCommandLineProgram(
     public bool AllowsProcesses { get; init; }
 
     /// <summary>
+    /// Whether its scripts run workers, <c>std:workers</c>' (specification, section 9, "M0.26 parts", part 2): <c>weblingo</c>'s;
+    /// not <c>wasp</c>'s, whose loaders refuse the module, its import WL2015 (the owner's answer, 26 November 2026, A3 (b) of
+    /// "M0.26: Parallel Work").
+    /// </summary>
+    public bool RunsWorkers { get; init; }
+
+    /// <summary>
     /// Whether its scripts may import <c>std:console</c> (specification, section 3.9, "The console: <c>std:console</c>"):
     /// <c>weblingo</c>'s; not <c>wasp</c>'s, a site having no console, its import WL2015 (the owner's answer, 20 November
     /// 2026, "Console Module", A3).

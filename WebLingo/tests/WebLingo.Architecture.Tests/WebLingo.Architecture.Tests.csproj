@@ -30,6 +30,7 @@
     <ProjectReference Include="../../src/WebLingo.StdLib.Random/WebLingo.StdLib.Random.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib.Process/WebLingo.StdLib.Process.csproj" />
     <ProjectReference Include="../../src/WebLingo.StdLib.Console/WebLingo.StdLib.Console.csproj" />
+    <ProjectReference Include="../../src/WebLingo.StdLib.Workers/WebLingo.StdLib.Workers.csproj" />
     <ProjectReference Include="../../src/WebLingo.Platform.Abstractions/WebLingo.Platform.Abstractions.csproj" />
     <ProjectReference Include="../../src/WebLingo.Hosting.Abstractions/WebLingo.Hosting.Abstractions.csproj" />
     <ProjectReference Include="../../src/WebLingo.Hosting/WebLingo.Hosting.csproj" />
