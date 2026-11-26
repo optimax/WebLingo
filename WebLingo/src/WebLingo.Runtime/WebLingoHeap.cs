@@ -245,6 +245,71 @@ public sealed class WebLingoHeap
     /// too; and, for a class whose methods values that are not instances reach, those values given their class's methods
     /// from then on (<see cref="Extended"/>, section 3.7).
     /// </summary>
+    /// <summary>
+    /// The names of the fields any class's instances have places for, and whether a class already made has since been given
+    /// a method or a property of one of those names, which an instance's field of that name, already assigned, does not
+    /// keep from being one: its place, once it is, is then never assigned directly, so that such an assignment is checked
+    /// as any other is (specification, section 9, "M0.21 parts", part 2).
+    /// </summary>
+    private readonly HashSet<string> _placed = new(StringComparer.Ordinal);
+    private bool _placesShadowed;
+
+    private void Shadows(string name)
+    {
+        if (_placed.Count == 0) return;
+        if (name.StartsWith("get:", StringComparison.Ordinal) || name.StartsWith("set:", StringComparison.Ordinal)) name = name[4..];
+        if (_placed.Contains(name)) _placesShadowed = true;
+    }
+
+    /// <summary>
+    /// Gives a class made from a definition the places of its instances' fields, before its members, which it is being
+    /// given until <see cref="Made"/>: those of <paramref name="layout"/>, where its base's are their first, else its base's
+    /// (specification, section 9, "M0.21 parts", part 2).
+    /// </summary>
+    public void GiveFields(WebLingoValue classValue, string[] layout)
+    {
+        var target = Get<ClassObject>(classValue, WebLingoValueKind.Class);
+        target.Making = true;
+        target.DeclaredLayout = layout;
+        target.Layout = LayoutOver(target, layout);
+        foreach (var name in target.Layout) _placed.Add(name);
+    }
+
+    /// <summary>A class made from a definition, given its members: a method given it from now on may shadow a field.</summary>
+    public void Made(WebLingoValue classValue) => Get<ClassObject>(classValue, WebLingoValueKind.Class).Making = false;
+
+    /// <summary>The places a class's instances have: those its definition gave it, where its base's are their first, else its base's.</summary>
+    private string[] LayoutOver(ClassObject target, string[]? declared)
+    {
+        var baseLayout = target.Base.Kind == WebLingoValueKind.Class ? Get<ClassObject>(target.Base, WebLingoValueKind.Class).Layout : [];
+        if (declared is null || declared.Length < baseLayout.Length) return baseLayout;
+        for (var i = 0; i < baseLayout.Length; i++)
+        {
+            if (!string.Equals(declared[i], baseLayout[i], StringComparison.Ordinal)) return baseLayout;
+        }
+        return declared;
+    }
+
+    /// <summary>
+    /// <c>GetField</c>'s field (specification, section 9, "M0.21 parts", part 2): an instance's, a value of the kind
+    /// <c>Instance</c>, at its place, where the instance has <paramref name="name"/> there and has assigned it; false
+    /// otherwise, the VM reading it by its name then.
+    /// </summary>
+    public bool TryGetPlace(WebLingoValue instance, int place, string name, out WebLingoValue value)
+    {
+        if (_objects[instance.Handle] is InstanceObject fields) return fields.TryGetPlace(place, name, out value);
+        value = WebLingoValue.Null;
+        return false;
+    }
+
+    /// <summary>
+    /// <c>SetField</c>'s field: an instance's at its place, where the instance has <paramref name="name"/> there and has
+    /// assigned it already, and no class made has been given a method or a property of such a field's name since; false
+    /// otherwise, the VM assigning it by its name then, as any other.
+    /// </summary>
+    public bool TrySetPlace(WebLingoValue instance, int place, string name, WebLingoValue value) =>
+        !_placesShadowed && _objects[instance.Handle] is InstanceObject fields && fields.TrySetPlace(place, name, value);
+
     private void MethodsChanged(ClassObject target, WebLingoValue classValue)
     {
         Regather(target);
@@ -581,7 +646,7 @@ public sealed class WebLingoHeap
     public bool TryHoldAnew(WebLingoValue source, WebLingoValue value, out WebLingoValue result, out WebLingoRuntimeError? error)
     {
         var from = Get<InstanceObject>(source, WebLingoValueKind.Instance);
-        var made = new InstanceObject(from.Class) { Holds = true, Value = value };
+        var made = new InstanceObject(from.Class, from.Layout) { Holds = true, Value = value };
         for (var i = 0; i < from.Count; i++)
         {
             var (name, field) = from.At(i);
@@ -1106,6 +1171,7 @@ public sealed class WebLingoHeap
         target.Base = baseClass;
         target.Makes = baseObject.Makes;
         target.Holds = baseObject.Holds;
+        target.Layout = LayoutOver(target, target.DeclaredLayout); // Its instances made from now on; those made before keep theirs.
         baseObject.HasSubclasses = true;
         Regather(target);
     }
@@ -1398,6 +1464,7 @@ public sealed class WebLingoHeap
             return true;
         }
         var before = Size(target);
+        if (!target.Making) Shadows(name);
         target.OwnMethods[name == "destructor" ? "dispose" : name] = method;
         // Object's own, given as Object is made, before it is the heap's, writes an instance as its fields.
         if (name == "toString" && ObjectClass.Kind == WebLingoValueKind.Class) ToStringGiven = true;
@@ -1497,7 +1564,7 @@ public sealed class WebLingoHeap
         // A class extending Array, Map, Set, Module or Task makes a value of that kind, with an instance's fields; Array,
         // Map and Set themselves, a plain one; any other class, an instance alone, made once.
         var own = classObject.IsCollectionClass || classObject.Makes is not (WebLingoValueKind.Array or WebLingoValueKind.Map
-            or WebLingoValueKind.Set or WebLingoValueKind.Module or WebLingoValueKind.Task) ? null : new InstanceObject(classValue);
+            or WebLingoValueKind.Set or WebLingoValueKind.Module or WebLingoValueKind.Task) ? null : new InstanceObject(classValue, classObject.Layout);
         return classObject.Makes switch
         {
             WebLingoValueKind.Array =>
@@ -1509,7 +1576,7 @@ public sealed class WebLingoHeap
                 TryAllocate(new ModuleObject("") { Instance = own }, WebLingoValueKind.Module, 0, out instance, out error, own is not null),
             WebLingoValueKind.Task =>
                 TryAllocate(new WebLingoTask { ByHand = true, Instance = own }, WebLingoValueKind.Task, 2, out instance, out error, own is not null),
-            _ => TryAllocate(new InstanceObject(classValue) { Holds = classObject.Holds != WebLingoValueKind.Null },
+            _ => TryAllocate(new InstanceObject(classValue, classObject.Layout) { Holds = classObject.Holds != WebLingoValueKind.Null },
                 WebLingoValueKind.Instance, 0, out instance, out error)
         };
     }
@@ -1948,7 +2015,8 @@ public sealed class WebLingoHeap
     {
         if (fields is null) return;
         Mark(fields.Class, marked, pending);
-        for (var i = 0; i < fields.Count; i++) Mark(fields.At(i).Value, marked, pending);
+        foreach (var value in fields.Places) Mark(value, marked, pending); // A place not assigned, missing, refers to nothing.
+        for (var i = 0; i < fields.OtherCount; i++) Mark(fields.OtherAt(i), marked, pending);
     }
 
     private static long SizeOf(object item) => ObjectOverhead + item switch
@@ -2120,6 +2188,15 @@ public sealed class WebLingoHeap
         /// </summary>
         public HashSet<string>? ClassMethods { get; set; }
         public Dictionary<string, WebLingoValue> StaticFields { get; init; } = new(StringComparer.Ordinal);
+        /// <summary>
+        /// The fields its instances have places for, by place (specification, section 9, "M0.21 parts", part 2): those its
+        /// definition gave it, where its base's are their first, else its base's; and those its definition gave it, which a
+        /// base it is given later is checked against again.
+        /// </summary>
+        public string[] Layout { get; set; } = [];
+        public string[]? DeclaredLayout { get; set; }
+        /// <summary>Whether it is being given its definition's members, which shadow no field an instance has assigned.</summary>
+        public bool Making { get; set; }
     }
 
     /// <summary>A class's units: one, and one for each method of its own and static member.</summary>
@@ -2140,12 +2217,13 @@ public sealed class WebLingoHeap
     private sealed record BoundMethodObject(WebLingoValue Instance, WebLingoValue Closure, bool Disposes);
 
     /// <summary>
-    /// An instance: its class, and its fields, by name, in no defined order. Its fields are an array, in the order they
-    /// were first assigned, searched in order, with a dictionary of their positions only once it has more than
-    /// <see cref="FieldsSearched"/>, so that an instance of a few fields is two .NET objects, and allocates nothing more
-    /// until its first field (the specification, section 5.6, "Where the time goes").
+    /// An instance: its class, and its fields, by name, in no defined order. Those its class has places for, its layout's,
+    /// each in its place, missing until it is assigned (specification, section 9, "M0.21 parts", part 2); any other in an
+    /// array, in the order they were first assigned, searched in order, with a dictionary of their positions only once it
+    /// has more than <see cref="FieldsSearched"/>, so that an instance of a few such fields is two .NET objects, and
+    /// allocates nothing more until its first (the specification, section 5.6, "Where the time goes").
     /// </summary>
-    private sealed class InstanceObject(WebLingoValue classValue)
+    private sealed class InstanceObject(WebLingoValue classValue, string[] layout)
     {
         /// <summary>How many fields an instance searches in order before it keeps their positions in a dictionary.</summary>
         private const int FieldsSearched = 8;
@@ -2153,9 +2231,63 @@ public sealed class WebLingoHeap
         private (string Name, WebLingoValue Value)[] _fields = [];
         private int _count;
         private Dictionary<string, int>? _positions;
+        /// <summary>How many of its places it has assigned.</summary>
+        private int _placed;
 
         public WebLingoValue Class { get; } = classValue;
-        public int Count => _count;
+        /// <summary>Its class's places, by the names of their fields, as they were when it was made.</summary>
+        public string[] Layout { get; } = layout;
+        private readonly WebLingoValue[] _places = MissingPlaces(layout.Length);
+
+        private static WebLingoValue[] MissingPlaces(int count)
+        {
+            if (count == 0) return [];
+            var places = new WebLingoValue[count];
+            for (var i = 0; i < count; i++) places[i] = WebLingoValue.Missing;
+            return places;
+        }
+
+        public int Count => _placed + _count;
+
+        /// <summary>Its places, a missing value where it has not assigned one; and its other fields, for the collector.</summary>
+        public ReadOnlySpan<WebLingoValue> Places => _places;
+        public int OtherCount => _count;
+        public WebLingoValue OtherAt(int position) => _fields[position].Value;
+
+        /// <summary>A field's place in its layout, or -1: its name compared first by reference, then by its characters.</summary>
+        private int PlaceOf(string name)
+        {
+            var layout = Layout;
+            for (var i = 0; i < layout.Length; i++)
+            {
+                if (ReferenceEquals(layout[i], name) || string.Equals(layout[i], name, StringComparison.Ordinal)) return i;
+            }
+            return -1;
+        }
+
+        public bool TryGetPlace(int place, string name, out WebLingoValue value)
+        {
+            var layout = Layout;
+            if ((uint)place < (uint)layout.Length && ReferenceEquals(layout[place], name))
+            {
+                value = _places[place];
+                return value.Kind != WebLingoValueKind.Missing;
+            }
+            value = WebLingoValue.Null;
+            return false;
+        }
+
+        public bool TrySetPlace(int place, string name, WebLingoValue value)
+        {
+            var layout = Layout;
+            if ((uint)place >= (uint)layout.Length || !ReferenceEquals(layout[place], name)
+                || _places[place].Kind == WebLingoValueKind.Missing)
+            {
+                return false;
+            }
+            _places[place] = value;
+            return true;
+        }
         /// <summary>Whether it holds a value, as an instance of a class extending a kind of value does, and which (section 3.7).</summary>
         public bool Holds { get; init; }
         public WebLingoValue Value { get; set; }
@@ -2179,6 +2311,13 @@ public sealed class WebLingoHeap
 
         public bool TryGet(string name, out WebLingoValue value)
         {
+            if (Layout.Length > 0 && PlaceOf(name) is >= 0 and var place)
+            {
+                value = _places[place];
+                if (value.Kind != WebLingoValueKind.Missing) return true;
+                value = WebLingoValue.Null;
+                return false;
+            }
             var position = Find(name);
             if (position >= 0)
             {
@@ -2191,6 +2330,12 @@ public sealed class WebLingoHeap
 
         public void Set(string name, WebLingoValue value)
         {
+            if (Layout.Length > 0 && PlaceOf(name) is >= 0 and var place)
+            {
+                if (_places[place].Kind == WebLingoValueKind.Missing) _placed++;
+                _places[place] = value;
+                return;
+            }
             var position = Find(name);
             if (position >= 0)
             {
@@ -2208,7 +2353,17 @@ public sealed class WebLingoHeap
             _count++;
         }
 
-        public (string Name, WebLingoValue Value) At(int position) => _fields[position];
+        /// <summary>Its field at a position from 0 to its count − 1: its places assigned, in their order, then its others.</summary>
+        public (string Name, WebLingoValue Value) At(int position)
+        {
+            if (position >= _placed) return _fields[position - _placed];
+            for (var i = 0; i < _places.Length; i++)
+            {
+                if (_places[i].Kind == WebLingoValueKind.Missing) continue;
+                if (position-- == 0) return (Layout[i], _places[i]);
+            }
+            throw new ArgumentOutOfRangeException(nameof(position));
+        }
     }
 
     /// <summary>A map's key as the map compares it: a string by its text, anything else by its kind and payload.</summary>

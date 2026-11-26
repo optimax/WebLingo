@@ -49,6 +49,66 @@ public sealed record WebLingoIrClass(string Name, int Constructor, IReadOnlyList
 
     /// <summary>Whether its constructor is the one a class that declares none gets, which only runs its base's.</summary>
     public bool DefaultConstructor { get; init; }
+
+    /// <summary>The fields its instances have places for, or null for none.</summary>
+    public WebLingoIrLayout? Layout { get; init; }
+}
+
+/// <summary>
+/// The fields a class's instances have places for (specification, section 9, "M0.21 parts", part 2): its base's first,
+/// where its base is a class of the program's, or it has none; then those its constructor and its other methods assign
+/// to <c>this</c>, in the order the lowerer meets them, but for its own methods' and properties' names and its static
+/// members'. None where its base is another value, whose fields the compiler cannot know.
+/// </summary>
+public sealed class WebLingoIrLayout(WebLingoIrLayout? baseLayout, bool known)
+{
+    private readonly List<string> _own = [];
+    private readonly HashSet<string> _excluded = new(StringComparer.Ordinal);
+
+    /// <summary>Whether its places are known: its base's are, or it has none.</summary>
+    public bool Known { get; } = known && (baseLayout is null || baseLayout.Known);
+
+    /// <summary>A name that is no field of its instances: one of its methods', its properties', or its static members'.</summary>
+    public void Exclude(string name) => _excluded.Add(name);
+
+    /// <summary>A name its constructor or one of its methods assigns to <c>this</c>.</summary>
+    public void Assigned(string name)
+    {
+        if (!Known || _excluded.Contains(name) || name.StartsWith("__", StringComparison.Ordinal) || _own.Contains(name)) return;
+        _own.Add(name);
+    }
+
+    /// <summary>Its fields, by place: its base's, then its own that its base has not.</summary>
+    public IReadOnlyList<string> Names
+    {
+        get
+        {
+            if (!Known) return [];
+            var names = new List<string>(baseLayout?.Names ?? []);
+            foreach (var name in _own)
+            {
+                if (!names.Contains(name)) names.Add(name);
+            }
+            return names;
+        }
+    }
+
+    /// <summary>A field's place, or -1 for a name that has none.</summary>
+    public int PlaceOf(string name)
+    {
+        var names = Names;
+        for (var i = 0; i < names.Count; i++)
+        {
+            if (names[i] == name) return i;
+        }
+        return -1;
+    }
+}
+
+/// <summary>A field of <c>this</c> in a method of a class, its place in <paramref name="Layout"/>, if it has one.</summary>
+public sealed record WebLingoIrField(WebLingoIrLayout Layout, string Name)
+{
+    public int Place => Layout.PlaceOf(Name);
 }
 
 /// <summary>Where a closure's capture comes from: a local of the function making it, or one of that one's captures.</summary>
@@ -327,11 +387,18 @@ public sealed record WebLingoIrMember(WebLingoIrExpression Target, string Name, 
 {
     /// <summary><c>target?.name</c>: <c>null</c> for a <c>null</c> target or a missing member (section 3.7).</summary>
     public bool IsOptional { get; init; }
+
+    /// <summary>For <c>this.name</c> in a method of a class: the field, whose place, if it has one, the read reads first.</summary>
+    public WebLingoIrField? Field { get; init; }
 }
 
 /// <summary><c>target.name = value</c>: the target, then the value, evaluated; its value is the value.</summary>
 public sealed record WebLingoIrStoreMember(WebLingoIrExpression Target, string Name, WebLingoIrExpression Value, WebLingoSourceSpan Span)
-    : WebLingoIrExpression(Span);
+    : WebLingoIrExpression(Span)
+{
+    /// <summary>For <c>this.name = value</c> in a method of a class: the field, whose place, if it has one, it assigns first.</summary>
+    public WebLingoIrField? Field { get; init; }
+}
 
 /// <summary>A new class value of the program's class <paramref name="Class"/>, its methods closures made now.</summary>
 public sealed record WebLingoIrMakeClass(int Class, WebLingoSourceSpan Span) : WebLingoIrExpression(Span)

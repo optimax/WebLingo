@@ -280,6 +280,10 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                 return null;
             case WebLingoOpCode.SetMember:
                 return Register(function, a, "target") ?? Name(module, b) ?? Register(function, c, "value") ?? Unused(d);
+            case WebLingoOpCode.SetField:
+                return Register(function, a, "target") ?? Name(module, b) ?? Register(function, c, "value") ?? Place(d);
+            case WebLingoOpCode.GetField:
+                return Register(function, a, "destination") ?? Register(function, b, "target") ?? Name(module, c) ?? Place(d);
             case WebLingoOpCode.GetSuper:
                 return Register(function, a, "destination") ?? Register(function, b, "class") ?? Register(function, c, "this")
                     ?? Name(module, d);
@@ -666,8 +670,10 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                 }
                 return -1;
             case WebLingoOpCode.GetMember:
+            case WebLingoOpCode.GetField:
                 return Unwritten(instruction.B, state, locals);
             case WebLingoOpCode.SetMember:
+            case WebLingoOpCode.SetField:
             {
                 var target = Unwritten(instruction.A, state, locals);
                 return target >= 0 ? target : Unwritten(instruction.C, state, locals);
@@ -779,7 +785,7 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
             or WebLingoOpCode.Not or WebLingoOpCode.Equal or WebLingoOpCode.NotEqual or WebLingoOpCode.Less or WebLingoOpCode.LessOrEqual
             or WebLingoOpCode.Greater or WebLingoOpCode.GreaterOrEqual or WebLingoOpCode.NewCell or WebLingoOpCode.BoxRegister or WebLingoOpCode.CopyCell
             or WebLingoOpCode.LoadCell or WebLingoOpCode.LoadCapture or WebLingoOpCode.MakeClosure or WebLingoOpCode.LoadBuiltin
-            or WebLingoOpCode.Call or WebLingoOpCode.GetMember or WebLingoOpCode.CallMethod or WebLingoOpCode.GetIndex
+            or WebLingoOpCode.Call or WebLingoOpCode.GetMember or WebLingoOpCode.GetField or WebLingoOpCode.CallMethod or WebLingoOpCode.GetIndex
             or WebLingoOpCode.NewArray or WebLingoOpCode.NewMap or WebLingoOpCode.NewSet or WebLingoOpCode.MakeClass or WebLingoOpCode.New
             or WebLingoOpCode.GetSuper or WebLingoOpCode.TakeRest or WebLingoOpCode.CallSpread or WebLingoOpCode.CallMethodSpread
             or WebLingoOpCode.NewSpread or WebLingoOpCode.ToJson or WebLingoOpCode.AddConstant or WebLingoOpCode.SubtractConstant or WebLingoOpCode.MultiplyConstant or WebLingoOpCode.RemainderConstant or WebLingoOpCode.EqualConstant or WebLingoOpCode.NotEqualConstant or WebLingoOpCode.LessConstant or WebLingoOpCode.LessOrEqualConstant or WebLingoOpCode.GreaterConstant or WebLingoOpCode.GreaterOrEqualConstant => instruction.A,
@@ -793,6 +799,10 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
         register >= 0 && register < function.RegisterCount
             ? null
             : $"its {role} register {register} is not one of the function's {function.RegisterCount}.";
+
+    /// <summary>A field's place in its class's instances (<see cref="WebLingoClassInfo.Fields"/>).</summary>
+    private static string? Place(int place) =>
+        place is >= 0 and < WebLingoClassTables.MaxFields ? null : $"its field's place, {place}, is not from 0 to {WebLingoClassTables.MaxFields - 1}.";
 
     /// <summary>A member's name, which must be a string constant.</summary>
     private static string? Name(WebLingoCompiledModule module, int constant) =>

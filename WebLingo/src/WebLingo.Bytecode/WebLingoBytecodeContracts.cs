@@ -247,7 +247,20 @@ public enum WebLingoOpCode : byte
     LessConstant,
     LessOrEqualConstant,
     GreaterConstant,
-    GreaterOrEqualConstant
+    GreaterOrEqualConstant,
+    /// <summary>
+    /// A = destination register, B = target register, C = constant index of the member's name, a string, D = the field's
+    /// place in its class's instances (<see cref="WebLingoClassInfo.Fields"/>): <see cref="GetMember"/>'s <c>A = B.C</c>,
+    /// read from that place where B is an instance whose class has the field there and it has been assigned, and as
+    /// <see cref="GetMember"/> reads it otherwise (specification, section 9, "M0.21 parts", part 2).
+    /// </summary>
+    GetField,
+    /// <summary>
+    /// A = target register, B = constant index of the field's name, a string, C = value register, D = the field's place:
+    /// <see cref="SetMember"/>'s <c>A.B = C</c>, written to that place where A is an instance whose class has the field
+    /// there and it has been assigned before, and as <see cref="SetMember"/> assigns it otherwise.
+    /// </summary>
+    SetField
 }
 
 public readonly record struct WebLingoInstruction(WebLingoOpCode OpCode, int A = 0, int B = 0, int C = 0, int D = 0);
@@ -344,6 +357,13 @@ public sealed record WebLingoClassInfo(string Name, int Constructor, IReadOnlyLi
 
     /// <summary>The names of its static fields, which exist, as <c>null</c>, from when it is made.</summary>
     public IReadOnlyList<string> StaticFields { get; init; } = [];
+
+    /// <summary>
+    /// The fields its instances have places for, by place: its base's first, then those its constructor and its other
+    /// methods assign to <c>this</c>; none where its base is not a class of the program's, whose fields the compiler
+    /// knows, its instances then having its base's places (specification, section 9, "M0.21 parts", part 2).
+    /// </summary>
+    public IReadOnlyList<string> Fields { get; init; } = [];
 
     /// <summary>
     /// Whether its constructor is the one a class that declares none gets, which only runs its base's, and which a

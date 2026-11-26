@@ -651,7 +651,9 @@ public sealed class WebLingoCodeGenerator
                 var subject = EmitExpression(member.Target, null);
                 _nextRegister = mark;
                 var destination = target ?? Allocate();
-                Emit(new WebLingoInstruction(WebLingoOpCode.GetMember, destination, subject, StringConstant(member.Name), member.IsOptional ? 1 : 0),
+                Emit(member is { IsOptional: false, Field.Place: >= 0 and var place }
+                    ? new WebLingoInstruction(WebLingoOpCode.GetField, destination, subject, StringConstant(member.Name), place)
+                    : new WebLingoInstruction(WebLingoOpCode.GetMember, destination, subject, StringConstant(member.Name), member.IsOptional ? 1 : 0),
                     member.Span);
                 return destination;
             }
@@ -660,7 +662,9 @@ public sealed class WebLingoCodeGenerator
                 var mark = _nextRegister;
                 var subject = KeptIfAssigned(EmitExpression(store.Target, null), store.Target.Span, store.Value);
                 var value = EmitExpression(store.Value, null);
-                Emit(new WebLingoInstruction(WebLingoOpCode.SetMember, subject, StringConstant(store.Name), value), store.Span);
+                Emit(store.Field?.Place is >= 0 and var place
+                    ? new WebLingoInstruction(WebLingoOpCode.SetField, subject, StringConstant(store.Name), value, place)
+                    : new WebLingoInstruction(WebLingoOpCode.SetMember, subject, StringConstant(store.Name), value), store.Span);
                 if (target is { } destination)
                 {
                     if (destination != value) Emit(new WebLingoInstruction(WebLingoOpCode.Move, destination, value), store.Span);

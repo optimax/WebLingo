@@ -14,7 +14,7 @@ namespace WebLingo.Bytecode;
 public static class WebLingoBytecodeFile
 {
     public const int MajorVersion = 0;
-    public const int MinorVersion = 1;
+    public const int MinorVersion = 2;
     /// <summary>A WLBC file's extension (the owner's request, 23 November 2026, in place of <c>.wlbr</c> and <c>.wlbs</c>).</summary>
     public const string Extension = ".wlb";
     /// <summary>The register VM's before it, a file of which is read as one of <see cref="Extension"/>.</summary>
@@ -337,6 +337,7 @@ public static class WebLingoBytecodeFile
             WriteMethods(w, info.StaticMethods);
             WriteNames(w, info.StaticFields);
             w.Byte(info.DefaultConstructor ? 1 : 0);
+            WriteNames(w, info.Fields);
         }
         w.Count(units.Count);
         foreach (var unit in units)
@@ -670,7 +671,8 @@ public static class WebLingoBytecodeFile
             {
                 StaticMethods = ReadMethods(r),
                 StaticFields = ReadNames(r),
-                DefaultConstructor = r.Flags(1) == 1
+                DefaultConstructor = r.Flags(1) == 1,
+                Fields = ReadNames(r)
             };
         }
         return classes;

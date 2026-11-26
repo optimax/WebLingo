@@ -1357,6 +1357,10 @@ public sealed class WebLingoBinder
                 var read = new WebLingoIndexExpressionSyntax(held, at, element.Span);
                 return (read, value => new WebLingoIndexAssignmentSyntax(read, value, span));
             }
+            case WebLingoMemberAccessSyntax { Target: WebLingoThisSyntax } field:
+                // this.name, read and assigned as it is, this being the same each time it is read: the field's place, where
+                // it has one, read and assigned directly (specification, section 9, "M0.21 parts", part 2).
+                return (field, value => new WebLingoMemberAssignmentSyntax(field, value, span));
             case WebLingoMemberAccessSyntax member:
             {
                 var held = Temporary(member.Target, member.Target.Span, out var storeTarget);

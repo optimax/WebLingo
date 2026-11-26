@@ -81,6 +81,20 @@ public sealed class VerifierTests
         }, -1, "one it shares");
     }
 
+    /// <summary>A class's fields' places (specification, section 9, "M0.21 parts", part 2): each a name, none twice.</summary>
+    [Fact]
+    public void AClassesFieldsAreNamedOnceEach()
+    {
+        var module = Module(registers: 0, locals: 0, I(WebLingoOpCode.Return)) with
+        {
+            Classes = [new WebLingoClassInfo("A", -1, []) { Fields = ["x", "y"] }]
+        };
+        Assert.Equal(WebLingoVerificationResult.Valid, Verify(module));
+        AssertRejected(module with { Classes = [new WebLingoClassInfo("A", -1, []) { Fields = ["x", "x"] }] }, -1,
+            "Class 0 ('A'): a field has no name, or one it shares.");
+        AssertRejected(module with { Classes = [new WebLingoClassInfo("A", -1, []) { Fields = [""] }] }, -1, "a field has no name");
+    }
+
     [Fact]
     public void ADynamicImportsFlagsAreItsValuesAndAComponentsRender()
     {
@@ -396,6 +410,13 @@ public sealed class VerifierTests
         var code = module.EntryPoint.Code.ToArray();
 
         AssertRejected(With(module, code, 1, I(WebLingoOpCode.GetMember, 1, 0, 1)), 1, "constant 1 is not a name");
+        // A field read and assigned at its place (specification, section 9, "M0.21 parts", part 2): its name, then its place.
+        Assert.Equal(Valid, Verify(With(module, code, 1, I(WebLingoOpCode.GetField, 1, 0, 0, 3))));
+        Assert.Equal(Valid, Verify(With(module, code, 3, I(WebLingoOpCode.SetField, 0, 0, 1, 0))));
+        AssertRejected(With(module, code, 1, I(WebLingoOpCode.GetField, 1, 0, 1, 0)), 1, "constant 1 is not a name");
+        AssertRejected(With(module, code, 1, I(WebLingoOpCode.GetField, 1, 0, 0, -1)), 1, "its field's place, -1, is not from 0 to 65534.");
+        AssertRejected(With(module, code, 3, I(WebLingoOpCode.SetField, 0, 0, 1, 65535)), 3, "its field's place, 65535, is not from 0 to 65534.");
+        AssertRejected(With(module, code, 3, I(WebLingoOpCode.SetField, 0, 0, 2, 0)), 3, "value register 2");
         AssertRejected(With(module, code, 4, I(WebLingoOpCode.CallMethod, 1, 0, 1, 1)), 4, "registers 1 to 2");
         AssertRejected(With(module, code, 2, I(WebLingoOpCode.GetIndex, 1, 0, 2)), 2, "index register 2");
         Assert.Equal(Valid, Verify(With(module, code, 2, I(WebLingoOpCode.GetIndex, 1, 0, 1, 1)))); // ?[

@@ -105,6 +105,8 @@ public static class WebLingoDisassembler
             WebLingoOpCode.Return => "Return",
             WebLingoOpCode.GetMember => $"GetMember {Register(function, a)}, {Register(function, b)}{(d == 0 ? "." : "?.")}{Constant(module, c)}",
             WebLingoOpCode.SetMember => $"SetMember {Register(function, a)}.{Constant(module, b)}, {Register(function, c)}",
+            WebLingoOpCode.GetField => $"GetField {Register(function, a)}, {Register(function, b)}.{Constant(module, c)}@{d}",
+            WebLingoOpCode.SetField => $"SetField {Register(function, a)}.{Constant(module, b)}@{d}, {Register(function, c)}",
             WebLingoOpCode.Dispose => $"Dispose {Register(function, a)}",
             WebLingoOpCode.Throw => $"Throw {Register(function, a)}",
             WebLingoOpCode.ToText => $"ToText {Register(function, a)}, {Register(function, b)}" + (c == 1 ? ", written" : ""),

@@ -4,6 +4,9 @@ namespace WebLingo.Bytecode;
 /// <summary>What both verifiers check of a module's classes (specification, section 3.7).</summary>
 internal static class WebLingoClassTables
 {
+    /// <summary>The most fields a class's instances have places for, and so the most a <c>GetField</c>'s place may be.</summary>
+    public const int MaxFields = 65535;
+
     /// <summary>
     /// The first fault of the classes, or null: each has a name, its methods have names, none twice, and its
     /// constructor and methods are functions that take <c>this</c>; its static fields and methods have names, none
@@ -33,6 +36,12 @@ internal static class WebLingoClassTables
                 if (!isMethod(method.Function)) return $"Class {i} ('{info.Name}'): '{method.Name}', function {method.Function}, is not a method.";
             }
             if (info.StaticMethods is null || info.StaticFields is null) return $"Class {i} ('{info.Name}') has no static members.";
+            if (info.Fields is null || info.Fields.Count > MaxFields) return $"Class {i} ('{info.Name}') has no table of its fields' places, or more than {MaxFields}.";
+            var fields = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var field in info.Fields)
+            {
+                if (string.IsNullOrEmpty(field) || !fields.Add(field)) return $"Class {i} ('{info.Name}'): a field has no name, or one it shares.";
+            }
             var statics = new HashSet<string>(StringComparer.Ordinal);
             foreach (var field in info.StaticFields)
             {

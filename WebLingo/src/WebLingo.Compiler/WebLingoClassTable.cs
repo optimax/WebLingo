@@ -17,7 +17,8 @@ internal static class WebLingoClassTable
             {
                 StaticMethods = statics,
                 StaticFields = declared.StaticFields,
-                DefaultConstructor = declared.DefaultConstructor
+                DefaultConstructor = declared.DefaultConstructor,
+                Fields = declared.Layout?.Names ?? []
             });
         }
         return classes;

@@ -233,8 +233,13 @@ own cost, landed: a call reads what it checks from the VM's own `Callable`, fiel
 spent its budget of inlining and every property's getter is a call; a frame keeps the function, code and cells it holds
 already; a return clears its registers in a loop. `calls` 22 percent faster, `closures` 10, `objects` 4, none slower
 (section 5.6, "The call's own cost"). `DOTNET_JitDisasm=Run` on the benchmark prints `Run`'s machine code, which is how
-it was found (`Documents/implementation.md`, "A VM's Dispatch Method Is Sensitive to Its Locals"). Parts 2 and 3, fixed
-places for a class's fields and a member's cache, are next.
+it was found (`Documents/implementation.md`, "A VM's Dispatch Method Is Sensitive to Its Locals"). Part 2, fixed places
+for a class's fields, landed: the lowerer gives each class the fields its constructor and methods assign to `this`
+(`WebLingoIrLayout`; `WebLingoClassInfo.Fields`, WLBC 0.2), an instance a place for each, and `this.x` in the class's
+own methods is `GetField`/`SetField`, which fall back to `GetMember`/`SetMember` wherever the place does not hold the
+field; `objects` 17 percent faster, none slower (section 5.6, "Fields in places"). `FieldPlaceTests` runs each case
+through places and by name and compares. Since WLBC is 0.2, `Examples.wlg/01-hello.wlbr`, the owner's 0.1 file, is
+refused; a question in `TO-DO.md`. Part 3, a member's cache, is next.
 
 A young generation for the collector (the specification, section 4.2, "A young generation") was built on a branch,
 measured, and dropped by the owner (24 November 2026): about 1.7 times as fast where much is live, but four of the

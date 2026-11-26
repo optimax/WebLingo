@@ -1064,6 +1064,30 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             registers[returnTo] = result;
                             continue;
                         }
+                        case WebLingoOpCode.GetField:
+                            // this.name in a method of its class: the field at its place, where the instance has it there and
+                            // has assigned it; else read as GetMember reads it (specification, section 9, "M0.21 parts", part 2).
+                            // Each calls helpers .NET does not inline, which read the instruction from the code themselves, and
+                            // reads no property, so that it spends none of .NET's budget of inlining into this method, and keeps
+                            // ins live across no call, which would keep it in memory on every instruction (Documents/
+                            // implementation.md, "A VM's Dispatch Method Is Sensitive to Its Locals").
+                            if (TryGetField(registers, code, pc))
+                            {
+                                pc++;
+                                continue;
+                            }
+                            ins = ref ByName(code, pc);
+                            goto case WebLingoOpCode.GetMember;
+                        case WebLingoOpCode.SetField:
+                            // this.name = value: the field at its place, where the instance has assigned it there already; else
+                            // assigned as SetMember assigns it, the first time among them.
+                            if (TrySetField(registers, code, pc))
+                            {
+                                pc++;
+                                continue;
+                            }
+                            ins = ref ByName(code, pc);
+                            goto case WebLingoOpCode.SetMember;
                         default:
                             // The verifier admits no other operation; this only guards against a verifier that did.
                             error = new WebLingoRuntimeError(WebLingoDiagnosticCodes.BytecodeVerificationFailure,
@@ -2570,7 +2594,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 var constant = import.Constants[i];
                 if (constant.Kind == WebLingoConstantKind.String)
                 {
-                    addedNames[i] = new WebLingoMemberName(WebLingoMembers.Find(constant.Text!), constant.Text!);
+                    addedNames[i] = new WebLingoMemberName(WebLingoMembers.Find(constant.Text!), Text(constant.Text!));
                     if (!heap.TryAllocateString(constant.Text!, out addedConstants[i], out error)) return false;
                     _linked.Add(addedConstants[i]);
                     continue;
@@ -2605,8 +2629,9 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     var ins = code[i];
                     moved[i] = ins.OpCode switch
                     {
-                        WebLingoOpCode.LoadConstant or WebLingoOpCode.SetMember or WebLingoOpCode.CallMethod => ins with { B = ins.B + constantBase },
-                        WebLingoOpCode.GetMember or WebLingoOpCode.AddConstant or WebLingoOpCode.SubtractConstant or WebLingoOpCode.MultiplyConstant or WebLingoOpCode.RemainderConstant or WebLingoOpCode.EqualConstant or WebLingoOpCode.NotEqualConstant or WebLingoOpCode.LessConstant or WebLingoOpCode.LessOrEqualConstant or WebLingoOpCode.GreaterConstant or WebLingoOpCode.GreaterOrEqualConstant => ins with { C = ins.C + constantBase },
+                        WebLingoOpCode.LoadConstant or WebLingoOpCode.SetMember or WebLingoOpCode.SetField or WebLingoOpCode.CallMethod
+                            => ins with { B = ins.B + constantBase },
+                        WebLingoOpCode.GetMember or WebLingoOpCode.GetField or WebLingoOpCode.AddConstant or WebLingoOpCode.SubtractConstant or WebLingoOpCode.MultiplyConstant or WebLingoOpCode.RemainderConstant or WebLingoOpCode.EqualConstant or WebLingoOpCode.NotEqualConstant or WebLingoOpCode.LessConstant or WebLingoOpCode.LessOrEqualConstant or WebLingoOpCode.GreaterConstant or WebLingoOpCode.GreaterOrEqualConstant => ins with { C = ins.C + constantBase },
                         WebLingoOpCode.GetSuper => ins with { D = ins.D + constantBase },
                         WebLingoOpCode.CallBuiltin or WebLingoOpCode.LoadBuiltin => ins with { B = ins.B + builtinBase },
                         WebLingoOpCode.MakeClosure => ins with { B = ins.B + functionBase },
@@ -3521,7 +3546,82 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                 error = null;
                 return true;
             }
-            return heap.TryMakeClass(info.Name, baseClass, out made, out error) && TryGiveMembers(info, made, registers, cells, out error);
+            if (!heap.TryMakeClass(info.Name, baseClass, out made, out error)) return false;
+            heap.GiveFields(made, LayoutOf(info));
+            if (!TryGiveMembers(info, made, registers, cells, out error)) return false;
+            heap.Made(made);
+            return true;
+        }
+
+        /// <summary>
+        /// The places of a class's instances' fields, as its definition gives them, each name the string the program's
+        /// instructions name it by, which <c>GetField</c> and <c>SetField</c> compare by reference; made once for each
+        /// definition (specification, section 9, "M0.21 parts", part 2).
+        /// </summary>
+        private string[] LayoutOf(WebLingoClassInfo info)
+        {
+            if (info.Fields.Count == 0) return [];
+            if (_layouts.TryGetValue(info, out var layout)) return layout;
+            layout = new string[info.Fields.Count];
+            for (var i = 0; i < layout.Length; i++) layout[i] = Text(info.Fields[i]);
+            _layouts.Add(info, layout);
+            return layout;
+        }
+        private readonly Dictionary<WebLingoClassInfo, string[]> _layouts = new(ReferenceEqualityComparer.Instance);
+
+        /// <summary>
+        /// The program's names, its string constants' texts, by their text, each the one string its instructions read: a
+        /// module joined to it given the same strings for the same names.
+        /// </summary>
+        private string Text(string text)
+        {
+            if (_nameTexts is null)
+            {
+                _nameTexts = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var name in names)
+                {
+                    if (!string.IsNullOrEmpty(name.Text)) _nameTexts.TryAdd(name.Text, name.Text);
+                }
+            }
+            if (_nameTexts.TryGetValue(text, out var same)) return same;
+            _nameTexts.Add(text, text);
+            return text;
+        }
+        private Dictionary<string, string>? _nameTexts;
+
+        /// <summary>A <c>GetField</c> or <c>SetField</c> read or assigned by its name, as the instruction it is then.</summary>
+        private readonly WebLingoInstruction[] _member = new WebLingoInstruction[1];
+
+        /// <summary>
+        /// A <c>GetField</c> or <c>SetField</c> as the <c>GetMember</c> or <c>SetMember</c> that reads or assigns its field by its
+        /// name, which the dispatch method runs in its place; not inlined, its copy of the instruction no part of that method.
+        /// </summary>
+        /// <summary><c>GetField</c>'s field at its place, given its destination; false where the name must read it.</summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool TryGetField(WebLingoValue[] registers, WebLingoInstruction[] code, int pc)
+        {
+            ref readonly var ins = ref code[pc];
+            var target = registers[ins.B];
+            if (target.Kind != WebLingoValueKind.Instance || !heap.TryGetPlace(target, ins.D, names[ins.C].Text, out var value)) return false;
+            registers[ins.A] = value;
+            return true;
+        }
+
+        /// <summary><c>SetField</c>'s field assigned at its place; false where the name must assign it.</summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private bool TrySetField(WebLingoValue[] registers, WebLingoInstruction[] code, int pc)
+        {
+            ref readonly var ins = ref code[pc];
+            var target = registers[ins.A];
+            return target.Kind == WebLingoValueKind.Instance && heap.TrySetPlace(target, ins.D, names[ins.B].Text, registers[ins.C]);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private ref readonly WebLingoInstruction ByName(WebLingoInstruction[] code, int pc)
+        {
+            ref readonly var ins = ref code[pc];
+            _member[0] = ins with { OpCode = ins.OpCode == WebLingoOpCode.GetField ? WebLingoOpCode.GetMember : WebLingoOpCode.SetMember, D = 0 };
+            return ref _member[0];
         }
 
         /// <summary><c>extend</c> (section 3.7): an extension's members given to the class <paramref name="target"/>, as a class's are.</summary>

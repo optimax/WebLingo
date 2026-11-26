@@ -15,6 +15,13 @@ public sealed class WebLingoLowerer
 {
     private readonly List<WebLingoIrFunction?> _functions = [];
     private readonly List<WebLingoIrClass> _classes = [];
+    /// <summary>The classes the program declares, by the constant each is, whose fields a class extending one knows.</summary>
+    private readonly Dictionary<WebLingoLocalSymbol, WebLingoBoundClass> _declaredClasses = [];
+    /// <summary>Each class's fields' places, made as a class extending it or the class itself is lowered.</summary>
+    private readonly Dictionary<WebLingoBoundClass, WebLingoIrLayout> _layouts = [];
+    private readonly HashSet<WebLingoBoundClass> _layingOut = [];
+    /// <summary>The <c>this</c> of each constructor and method of a class, and the class's fields' places.</summary>
+    private readonly Dictionary<WebLingoLocalSymbol, WebLingoIrLayout> _thisLayouts = [];
     private WebLingoBoundClass? _errorBound;
     private int _errorClass = -1;
     private WebLingoBoundClass? _objectBound;
@@ -164,6 +171,10 @@ public sealed class WebLingoLowerer
         IReadOnlyList<WebLingoIrStatement>? prologue = null, IReadOnlyList<WebLingoBoundStatement>? madeFirst = null)
     {
         var lowered = new List<WebLingoIrStatement>();
+        foreach (var statement in block)
+        {
+            if (statement is WebLingoBoundClassDeclaration declared) _declaredClasses[declared.Local] = declared.Class;
+        }
         foreach (var statement in block)
         {
             var local = statement switch
@@ -340,8 +351,61 @@ public sealed class WebLingoLowerer
         }
     }
 
+    /// <summary>
+    /// A class's fields' places (specification, section 9, "M0.21 parts", part 2): its base's, where its base is a class the
+    /// program declares, or it has none, then its own, which lowering its constructor and methods finds.
+    /// </summary>
+    private WebLingoIrLayout LayoutOf(WebLingoBoundClass declaration)
+    {
+        if (_layouts.TryGetValue(declaration, out var layout)) return layout;
+        WebLingoIrLayout? baseLayout = null;
+        var known = true;
+        if (declaration.Base is { } baseClass)
+        {
+            var local = baseClass switch
+            {
+                WebLingoBoundLocalReference reference => reference.Local,
+                WebLingoBoundCaptureReference capture => capture.Local,
+                _ => null
+            };
+            known = local is not null && _declaredClasses.TryGetValue(local, out var declaredBase) && _layingOut.Add(declaration)
+                && (baseLayout = LayoutOf(declaredBase)) is not null;
+            _layingOut.Remove(declaration);
+        }
+        layout = new WebLingoIrLayout(baseLayout, known);
+        foreach (var (name, _) in declaration.Methods) layout.Exclude(Unprefixed(name));
+        foreach (var (name, _) in declaration.StaticMethods) layout.Exclude(Unprefixed(name));
+        foreach (var (name, _, _) in declaration.StaticFields) layout.Exclude(name);
+        _layouts[declaration] = layout;
+        return layout;
+
+        // A property's getter and setter are its methods, get:name and set:name, whose name no field may have.
+        static string Unprefixed(string name) =>
+            name.StartsWith("get:", StringComparison.Ordinal) || name.StartsWith("set:", StringComparison.Ordinal) ? name[4..] : name;
+    }
+
+    /// <summary>The field <c>this.name</c> is in a constructor or method of a class, assigned there or read, else null.</summary>
+    private WebLingoIrField? FieldOf(WebLingoBoundExpression target, string name, bool assigned)
+    {
+        var local = target switch
+        {
+            WebLingoBoundLocalReference reference => reference.Local,
+            WebLingoBoundCaptureReference capture => capture.Local,
+            _ => null
+        };
+        if (local is null || !_thisLayouts.TryGetValue(local, out var layout)) return null;
+        if (assigned) layout.Assigned(name);
+        return new WebLingoIrField(layout, name);
+    }
+
     private int LowerClass(WebLingoBoundClass declaration)
     {
+        var layout = LayoutOf(declaration);
+        if (declaration.Constructor is { HasThis: true, Locals.Count: > 0 } made) _thisLayouts[made.Locals[0]] = layout;
+        foreach (var (_, function) in declaration.Methods)
+        {
+            if (function is { HasThis: true, Locals.Count: > 0 }) _thisLayouts[function.Locals[0]] = layout;
+        }
         var constructor = declaration.Constructor is null ? -1 : LowerFunction(declaration.Constructor);
         var methods = new List<(string, int)>();
         foreach (var (name, function) in declaration.Methods) methods.Add((name, LowerFunction(function)));
@@ -353,7 +417,8 @@ public sealed class WebLingoLowerer
         {
             StaticMethods = staticMethods,
             StaticFields = staticFields,
-            DefaultConstructor = declaration.DefaultConstructor
+            DefaultConstructor = declaration.DefaultConstructor,
+            Layout = layout
         });
         return _classes.Count - 1;
     }
@@ -631,9 +696,16 @@ public sealed class WebLingoLowerer
                 return new WebLingoIrImportDynamic(LowerExpression(imported.Path), imported.Values is { } values ? LowerExpression(values) : null,
                     imported.Span) { Anew = imported.Anew };
             case WebLingoBoundMember member:
-                return new WebLingoIrMember(LowerExpression(member.Target), member.Name, member.Span) { IsOptional = member.IsOptional };
+                return new WebLingoIrMember(LowerExpression(member.Target), member.Name, member.Span)
+                {
+                    IsOptional = member.IsOptional,
+                    Field = member.IsOptional ? null : FieldOf(member.Target, member.Name, assigned: false)
+                };
             case WebLingoBoundMemberAssignment field:
-                return new WebLingoIrStoreMember(LowerExpression(field.Target), field.Name, LowerExpression(field.Value), field.Span);
+                return new WebLingoIrStoreMember(LowerExpression(field.Target), field.Name, LowerExpression(field.Value), field.Span)
+                {
+                    Field = FieldOf(field.Target, field.Name, assigned: true)
+                };
             case WebLingoBoundSuper super:
                 return new WebLingoIrGetSuper(LowerExpression(super.Class), LowerExpression(super.This), super.Name, super.Span);
             case WebLingoBoundNew created:

@@ -18,7 +18,7 @@ public sealed class BytecodeFileTests
     {
         var file = WebLingoBytecodeFile.Write(WebLingoCompiledModule.Empty("main"));
         Assert.Equal("WLBC", Encoding.ASCII.GetString(file, 0, 4));
-        Assert.Equal((0ul, 1ul, 1ul, 0ul), (Fixed(file, 4, 2), Fixed(file, 6, 2), Fixed(file, 8, 2), Fixed(file, 10, 2)));
+        Assert.Equal((0ul, 2ul, 1ul, 0ul), (Fixed(file, 4, 2), Fixed(file, 6, 2), Fixed(file, 8, 2), Fixed(file, 10, 2)));
         Assert.Equal((7ul, 32ul, (ulong)file.Length), (Fixed(file, 12, 4), Fixed(file, 16, 8), Fixed(file, 24, 8)));
         var offset = 32ul + 7 * 32;
         for (var i = 0; i < 7; i++)
@@ -64,6 +64,7 @@ public sealed class BytecodeFileTests
         Assert.Equal(module.Units.Select(u => (u.Name, u.Function, u.IsNative, string.Join(",", u.Exports))),
             read.Units.Select(u => (u.Name, u.Function, u.IsNative, string.Join(",", u.Exports))));
         Assert.Equal(["count"], read.Classes[0].StaticFields);
+        Assert.Equal(["x", "y"], read.Classes[0].Fields);
     }
 
     [Fact]
@@ -161,9 +162,9 @@ public sealed class BytecodeFileTests
         var other = (byte[])file.Clone();
         SetFixed(other, 4, 2, 1);
         SetFixed(other, 6, 2, 0);
-        AssertRefused(other, "The file is WLBC 1.0, which this reader does not know: it reads WLBC 0.1.");
+        AssertRefused(other, "The file is WLBC 1.0, which this reader does not know: it reads WLBC 0.2.");
         Assert.False(WebLingoBytecodeFile.TryReadKind(other, out _, out var error));
-        Assert.Equal("The file is WLBC 1.0, which this reader does not know: it reads WLBC 0.1.", error);
+        Assert.Equal("The file is WLBC 1.0, which this reader does not know: it reads WLBC 0.2.", error);
         other = (byte[])file.Clone();
         SetFixed(other, 8, 2, 3);
         AssertRefused(other, "The file is damaged: its header names VM 3, which is neither 1, the register VM, nor 2, the stack VM.");
@@ -302,7 +303,7 @@ public sealed class BytecodeFileTests
             [new WebLingoImport("writeLn", 1)], main)
         {
             Functions = [closure, lib],
-            Classes = [new WebLingoClassInfo("C", -1, []) { StaticFields = ["count"] }],
+            Classes = [new WebLingoClassInfo("C", -1, []) { StaticFields = ["count"], Fields = ["x", "y"] }],
             Units = [new WebLingoUnitInfo("main.wlg", -1, []), new WebLingoUnitInfo("lib.wlg", 1, ["x"])],
         };
     }
