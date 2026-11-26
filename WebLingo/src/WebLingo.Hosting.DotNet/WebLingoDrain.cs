@@ -29,11 +29,13 @@ public sealed class WebLingoDrain
 
     /// <summary>
     /// A request begun, its watch, which <see cref="WebLingoApplication.Handle"/> is given and tells of its generation, kept
-    /// until it is disposed, once the request has ended; <paramref name="wake"/> wakes the request where it waits.
+    /// until it is disposed, once the request has ended; <paramref name="wake"/> wakes the request where it waits; and
+    /// <paramref name="limit"/>, its time limit's timer (<see cref="WebLingoRequestTimer"/>), stopped where its page or handler
+    /// declares that it has none.
     /// </summary>
-    public Request Begin(WebLingoCancellationSignal cancellation, CancellationTokenSource wake)
+    public Request Begin(WebLingoCancellationSignal cancellation, CancellationTokenSource wake, IDisposable? limit = null)
     {
-        var request = new Request(this, cancellation, wake);
+        var request = new Request(this, cancellation, wake, limit);
         lock (_lock) _running.Add(request);
         return request;
     }
@@ -70,13 +72,14 @@ public sealed class WebLingoDrain
         private readonly WebLingoDrain _drain;
         private readonly WebLingoCancellationSignal _cancellation;
         private readonly CancellationTokenSource _wake;
+        private IDisposable? _limit;
         private IWebLingoDebuggerThread? _thread;
         private Timer? _timer;
         private int _stops;
         private bool _ended;
 
-        internal Request(WebLingoDrain drain, WebLingoCancellationSignal cancellation, CancellationTokenSource wake) =>
-            (_drain, _cancellation, _wake) = (drain, cancellation, wake);
+        internal Request(WebLingoDrain drain, WebLingoCancellationSignal cancellation, CancellationTokenSource wake, IDisposable? limit) =>
+            (_drain, _cancellation, _wake, _limit) = (drain, cancellation, wake, limit);
 
         /// <summary>The generation it is served from, once its application has said; null until then.</summary>
         internal int? Generation { get; private set; }
@@ -94,6 +97,13 @@ public sealed class WebLingoDrain
         public void Debugged(IWebLingoDebuggerThread thread)
         {
             lock (_drain._lock) _thread = thread;
+        }
+
+        public void Untimed()
+        {
+            IDisposable? limit;
+            lock (_drain._lock) (limit, _limit) = (_limit, null);
+            limit?.Dispose();
         }
 
         /// <summary>Its drain begun, once, under the drain's lock.</summary>

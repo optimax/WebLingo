@@ -338,6 +338,44 @@ public sealed class PageTests
         Assert.StartsWith(diagnostic, Render(page, Templates(templates)).Diagnostics);
     }
 
+    /// <summary>
+    /// <c>timeout none;</c> (specification, section 6.12, "A request's limits"): a statement of its own at the top level of a
+    /// page's own text, which is nothing in its program, and which the template compiler gives its host.
+    /// </summary>
+    [Fact]
+    public void APageDeclaresThatItHasNoTimeLimit()
+    {
+        Assert.Equal(("", "a 1", ""), Render("<% timeout none; %>a <% var timeout = 1; var none = timeout; %><%= none %>"));
+        var compiler = new WebLingoTemplateCompiler(Options, Templates("l.wasp=[<% renderBody(); %>]"));
+        compiler.Compile(new WebLingoSourceText("<% param x = 1;\ntimeout none; crossorigin allowed; layout \"/l.wasp\"; %>x", "page.wasp"));
+        Assert.Equal((new WebLingoSourceSpan(16, 12), new WebLingoSourceSpan(30, 19)), (compiler.NoTimeout, compiler.CrossOriginAllowed));
+        compiler = new WebLingoTemplateCompiler(Options);
+        compiler.Compile(new WebLingoSourceText("<% crossorigin allowed; %>", "page.wasp"));
+        Assert.Null(compiler.NoTimeout);
+    }
+
+    [Theory]
+    [InlineData("<% include \"/h.wasp\"; %>", "h.wasp=<% timeout none; %>",
+        "WL5011 at h.wasp 1,4: A template a page includes cannot declare how long the request may take: its page declares it.")]
+    [InlineData("<% layout \"/l.wasp\"; %>x", "l.wasp=<% timeout none; %><% renderBody(); %>",
+        "WL5011 at l.wasp 1,4: A layout cannot declare how long the request may take: its page declares it.")]
+    [InlineData("<% while (false) { timeout none; } %>", "",
+        "WL5011 at page.wasp 1,20: 'timeout none;' is a statement of its own, at the page's top level, not inside another.")]
+    [InlineData("<% timeout none; timeout none; %>", "", "WL5011 at page.wasp 1,18: A page declares once that it has no time limit.")]
+    [InlineData("<% timeout none %>", "", "WL1002 at page.wasp 1,16: A ';' is missing here.")]
+    public void NoTimeLimitDeclaredWhereItCannotBeIsAnError(string page, string templates, string diagnostic)
+    {
+        Assert.StartsWith(diagnostic, Render(page, Templates(templates)).Diagnostics);
+    }
+
+    [Fact]
+    public void AComponentCannotDeclareHowLongTheRequestMayTake()
+    {
+        var error = Render("<% await renderComponent(\"/c.wasp\"); %>", Templates("c.wasp=<% timeout none; %>c")).Error;
+        Assert.StartsWith("WL5011 at page.wasp 1,10: The component '/c.wasp'", error);
+        Assert.Contains("A component cannot declare how long the request may take: its page declares it.", error);
+    }
+
     // A component is compiled when it is rendered, its errors the page's runtime error.
     [Fact]
     public void AComponentCannotDeclareWhichRequestsItTakes()

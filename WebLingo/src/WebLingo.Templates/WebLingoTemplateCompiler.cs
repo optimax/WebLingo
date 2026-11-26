@@ -49,6 +49,12 @@ public sealed class WebLingoTemplateCompiler
     /// </summary>
     public WebLingoSourceSpan? CrossOriginAllowed { get; private set; }
 
+    /// <summary>
+    /// Where the page it compiled declares that its request has no time limit, <c>timeout none;</c>, in the page's own file;
+    /// null where it does not (section 6.12, "A request's limits").
+    /// </summary>
+    public WebLingoSourceSpan? NoTimeout { get; private set; }
+
     public WebLingoCompilationResult Compile(WebLingoSourceText page)
     {
         var result = new WebLingoCompiler(_options).Compile(Parse(page, WebLingoTemplateKind.Page));
@@ -67,8 +73,9 @@ public sealed class WebLingoTemplateCompiler
     {
         var hosted = new List<string>();
         foreach (var parameter in _options.HostParameters) hosted.Add(parameter.Name);
-        var tree = WebLingoTemplateParser.Parse(page, _templates, out var files, out var readOnly, out var crossOrigin, kind, hosted);
-        if (kind == WebLingoTemplateKind.Page) (ReadOnlySession, CrossOriginAllowed) = (readOnly, crossOrigin);
+        var tree = WebLingoTemplateParser.Parse(page, _templates, out var files, out var readOnly, out var crossOrigin, out var noTimeout, kind,
+            hosted);
+        if (kind == WebLingoTemplateKind.Page) (ReadOnlySession, CrossOriginAllowed, NoTimeout) = (readOnly, crossOrigin, noTimeout);
         Sources.Add(files);
         _templateFiles.Add(page.Name);
         return tree;

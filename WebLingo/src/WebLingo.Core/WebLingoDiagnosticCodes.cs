@@ -187,4 +187,11 @@ public static class WebLingoDiagnosticCodes
     /// twice; or a handler's <c>crossorigin</c> export that is not <c>export const crossorigin = "allowed";</c>.
     /// </summary>
     public const string MisplacedCrossOrigin = "WL5010";
+
+    /// <summary>
+    /// A page's declaration that its request has no time limit misplaced (section 6.12, "A request's limits"):
+    /// <c>timeout none;</c> in a template a page includes, a layout or a component, inside another statement, or twice; or a
+    /// handler's <c>timeout</c> export that is not <c>export const timeout = "none";</c>.
+    /// </summary>
+    public const string MisplacedTimeout = "WL5011";
 }

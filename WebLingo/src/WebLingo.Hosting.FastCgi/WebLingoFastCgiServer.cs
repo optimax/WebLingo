@@ -404,7 +404,7 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, WebLi
         using var wake = CancellationTokenSource.CreateLinkedTokenSource(request.Going.Token);
         using var timer = WebLingoRequestTimer.Start(application, cancellation, wake);
         // A reload's drain, which stops it too where a reload leaves it on an older generation (section 6.12, "Reloading").
-        using var drained = WebLingoDrain.Of(application).Begin(cancellation, wake);
+        using var drained = WebLingoDrain.Of(application).Begin(cancellation, wake, timer);
         var run = workers.Serve((worker, scheduler) => application.Handle(translated, response, worker, cancellation, scheduler, drained),
             wake.Token, response.End);
         var sink = new Sink(connection, request.Id);

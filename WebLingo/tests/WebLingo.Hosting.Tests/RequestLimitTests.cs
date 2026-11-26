@@ -31,6 +31,11 @@ public sealed class RequestLimitTests : IDisposable
         Write("waits.wasp", "<% import { delay } from \"std:system\"; await delay(60000); %>never");
         Write("counts.wasp", "<% var sum = 0; for (var i = 0; i < 100000; i++) { sum += i; } %><%= sum %>");
         Write("grows.wasp", "<% var s = \"x\"; var i = 0; while (i < 30) { s = s + s; i = i + 1; } %><%= s.length %>");
+        Write("open.wasp", "<% timeout none; import { delay } from \"std:system\"; await delay(1000); %>still open");
+        Write("open-forever.wasp", "<% timeout none; import { delay } from \"std:system\"; await delay(60000); %>never");
+        Write("api/open.wlg", "import { delay } from \"std:system\";\nexport const timeout = \"none\";\n"
+                              + "export async function get(request, response) { await delay(1000); response.write(\"still open\"); }");
+        Write("api/wrong.wlg", "export const timeout = 5;\nexport function get(request, response) { response.write(\"x\"); }");
     }
 
     public void Dispose()
@@ -198,6 +203,41 @@ public sealed class RequestLimitTests : IDisposable
         gone.Cancel();
         await waiting;
         Assert.Equal(0, drain.Running);
+    }
+
+    [Fact]
+    public async Task APageOrAHandlerThatDeclaresNoTimeLimitOutlastsItsSites()
+    {
+        // The site's limit, 0.3 seconds; each waits a second.
+        var application = Load(timeout: TimeSpan.FromMilliseconds(300));
+        Assert.Equal((200, "still open"), await Get(application, "/open"));
+        Assert.Equal((200, "still open"), await Get(application, "/api/open"));
+        var (status, body) = await Get(application, "/waits");
+        Assert.Equal(503, status);
+        Assert.Contains("error WL3003: The request took longer than 0.3 seconds", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AHandlersTimeoutExportThatIsNotNoneIsAnError()
+    {
+        var (status, body) = await Get(Load(), "/api/wrong");
+        Assert.Equal(500, status);
+        Assert.Contains("api/wrong.wlg(1,1): error WL5011: A handler&#39;s &#39;timeout&#39; export declares that its request has no time "
+                        + "limit, &#39;export const timeout = &quot;none&quot;;&#39;, and is nothing else.", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheDrainStillEndsARequestWithNoTimeLimit()
+    {
+        var application = Load(timeout: TimeSpan.FromSeconds(30), drain: TimeSpan.FromMilliseconds(300));
+        var drain = WebLingoDrain.Of(application);
+        var waiting = Get(application, "/open-forever");
+        await Until(() => drain.Running == 1);
+        Assert.True(application.TryReload(out var error), error);
+        drain.Reloaded(application.GenerationNumber);
+        var (status, body) = await waiting;
+        Assert.Equal(503, status);
+        Assert.Contains("error WL3003: The site was reloaded", body, StringComparison.Ordinal);
     }
 
     [Fact]

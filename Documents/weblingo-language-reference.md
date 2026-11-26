@@ -2352,6 +2352,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL5008 | a page's HTML that the escaping of its values cannot follow |
 | WL5009 | `session readonly;` where a page cannot have it, or a handler's `session` export that is not `"readonly"` |
 | WL5010 | `crossorigin allowed;` where a page cannot have it, or a handler's `crossorigin` export that is not `"allowed"` |
+| WL5011 | `timeout none;` where a page cannot have it, or a handler's `timeout` export that is not `"none"` |
 
 ---
 

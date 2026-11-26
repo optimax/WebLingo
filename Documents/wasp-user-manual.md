@@ -1109,7 +1109,12 @@ to the server's log; a page cannot catch it. `wasp.config`'s `"limits"` gives ot
 ```
 
 `"requestTimeout": null` gives a site's requests no time limit at all, for pages that are meant to stay open; their
-instructions and their memory are still limited, and a reload still ends them, as below. A limit of time is at most
+instructions and their memory are still limited, and a reload still ends them, as below. A page that is meant to stay
+open, where the site's others are not, says so itself, `<% timeout none; %>`, at the top level of its own text, as it
+declares `session readonly;`, and a route handler by an export, `export const timeout = "none";`; its includes, its
+layout and its components cannot, WL5011. Under IIS and behind nginx, the web server's own timeout still applies to such a
+page, its `web.config`'s `requestTimeout` and nginx's `fastcgi_read_timeout`, which a page meant to stay open raises
+there too. A limit of time is at most
 4,294,967 seconds, about 49 days.
 
 **When the site changes.** A request already running when the site's files change, and it loads them anew

@@ -15,4 +15,11 @@ public interface IWebLingoRequestWatch
 
     /// <summary>The request's debugger's thread, told once it is made, where the application runs under a debugger.</summary>
     void Debugged(IWebLingoDebuggerThread thread);
+
+    /// <summary>
+    /// The request's page or handler declares that it has no time limit, <c>timeout none;</c> or <c>export const timeout =
+    /// "none";</c> (section 6.12, "A request's limits"), told before any of its code runs: its host stops keeping its time,
+    /// its instructions, its memory and a reload's drain still its bounds.
+    /// </summary>
+    void Untimed();
 }

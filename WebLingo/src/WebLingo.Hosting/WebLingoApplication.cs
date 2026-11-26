@@ -158,7 +158,7 @@ public sealed class WebLingoApplication
             case { Kind: WebLingoRouteKind.Page } page:
                 var compiled = generation.Page(worker, page.File, this);
                 return Run(compiled, request, response, worker, cancellation, scheduler, WebLingoRequestOutcomeKind.Page, compiled.ReadOnly,
-                    compiled.CrossOrigin, watch);
+                    compiled.CrossOrigin, watch, compiled.Untimed);
             case { Kind: WebLingoRouteKind.Handler } handler:
                 return Handler(generation, handler.File, request, response, worker, cancellation, scheduler, watch);
             default:
@@ -198,7 +198,7 @@ public sealed class WebLingoApplication
             return new WebLingoRequestOutcome(WebLingoRequestOutcomeKind.MethodNotAllowed);
         }
         return Run(generation.Handler(worker, file, function, this), request, response, worker, cancellation, scheduler,
-            WebLingoRequestOutcomeKind.Handler, handler?.ReadOnly, handler?.CrossOrigin ?? false, watch);
+            WebLingoRequestOutcomeKind.Handler, handler?.ReadOnly, handler?.CrossOrigin ?? false, watch, handler?.Untimed ?? false);
     }
 
     /// <summary>An error's stack, each call a line of the request's log at <c>error</c>, after the error's own.</summary>
@@ -269,7 +269,7 @@ public sealed class WebLingoApplication
         }
         var names = new HashSet<string>(StringComparer.Ordinal);
         string? readOnly = null, error = null;
-        var crossOrigin = false;
+        var (crossOrigin, untimed) = (false, false);
         var source = new WebLingoSourceText(text, file);
         foreach (var statement in tree.Root.Statements)
         {
@@ -282,9 +282,22 @@ public sealed class WebLingoApplication
                 _ => null
             };
             if (name is not null) names.Add(name);
-            if (name is not (SessionExport or CrossOriginExport)) continue;
+            if (name is not (SessionExport or CrossOriginExport or TimeoutExport)) continue;
             var at = source.GetLocation(export.Span.Start);
             var where = $"{file}({at.Line},{at.Column})";
+            if (name == TimeoutExport)
+            {
+                if (export.Declaration is WebLingoVariableDeclarationSyntax { Kind: WebLingoDeclarationKind.Const, Initializer: WebLingoStringLiteralSyntax { Value: "none" } })
+                {
+                    untimed = true;
+                }
+                else
+                {
+                    error = $"{where}: error {WebLingoDiagnosticCodes.MisplacedTimeout}: A handler's 'timeout' export declares that its request has "
+                            + "no time limit, 'export const timeout = \"none\";', and is nothing else.";
+                }
+                continue;
+            }
             if (name == CrossOriginExport)
             {
                 if (export.Declaration is WebLingoVariableDeclarationSyntax { Kind: WebLingoDeclarationKind.Const, Initializer: WebLingoStringLiteralSyntax { Value: "allowed" } })
@@ -308,7 +321,7 @@ public sealed class WebLingoApplication
                         + "its session, 'export const session = \"readonly\";', and is nothing else.";
             }
         }
-        return new HandlerExports(names, readOnly, error, crossOrigin);
+        return new HandlerExports(names, readOnly, error, crossOrigin, untimed);
     }
 
     /// <summary>The export that declares how a handler uses its session.</summary>
@@ -317,8 +330,11 @@ public sealed class WebLingoApplication
     /// <summary>The export that declares that a handler takes requests other sites send.</summary>
     private const string CrossOriginExport = "crossorigin";
 
+    /// <summary>The export that declares that a handler's request has no time limit.</summary>
+    private const string TimeoutExport = "timeout";
+
     /// <summary>A handler's exports, where it declares that it only reads its session, and what is wrong with its declaration.</summary>
-    private sealed record HandlerExports(HashSet<string> Names, string? ReadOnly, string? Error, bool CrossOrigin);
+    private sealed record HandlerExports(HashSet<string> Names, string? ReadOnly, string? Error, bool CrossOrigin, bool Untimed);
 
     /// <summary>
     /// A page run, or a handler's, its session opened first, waiting for its lock where another request holds it:
@@ -327,10 +343,12 @@ public sealed class WebLingoApplication
     /// </summary>
     private WebLingoRequestOutcome Run(CompiledPage page, IWebLingoHttpRequest request, IWebLingoHttpResponse response, WebLingoWorkerId worker,
         WebLingoCancellationSignal? cancellation, IWebLingoSchedulerHost? scheduler, WebLingoRequestOutcomeKind done, string? readOnly = null,
-        bool crossOrigin = false, IWebLingoRequestWatch? watch = null)
+        bool crossOrigin = false, IWebLingoRequestWatch? watch = null, bool untimed = false)
     {
         var log = LogFor(request);
         if (page.Module is null) return Failed(response, page.Errors, log);
+        // A page or a handler that declares no time limit: its host stops keeping its time (section 6.12, "A request's limits").
+        if (untimed) watch?.Untimed();
         if (!crossOrigin && CrossSite(request) is { } why)
         {
             log?.Write(WebLingoLogLevel.Warn, WebLingoLogText.OneLine(why));
@@ -582,6 +600,7 @@ public sealed class WebLingoApplication
         var result = compiler.Compile(text);
         page.Module = result.Module;
         page.CrossOrigin = compiler.CrossOriginAllowed is not null;
+        page.Untimed = compiler.NoTimeout is not null;
         if (compiler.ReadOnlySession is { } declared)
         {
             var at = text.GetLocation(declared.Start);
@@ -680,6 +699,9 @@ public sealed class WebLingoApplication
 
         /// <summary>Whether it declares that it takes requests other sites send, <c>crossorigin allowed;</c>.</summary>
         public bool CrossOrigin { get; set; }
+
+        /// <summary>Whether it declares that its request has no time limit, <c>timeout none;</c>.</summary>
+        public bool Untimed { get; set; }
 
         /// <summary>
         /// What finds and compiles a module the page imports while it runs (section 3.9), each compiled once, when first
