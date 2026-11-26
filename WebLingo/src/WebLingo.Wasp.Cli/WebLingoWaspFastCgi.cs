@@ -81,7 +81,7 @@ public static class WebLingoWaspFastCgi
         using var pool = new WebLingoWorkerPool(workers);
         using var siteLog = application.Log as IDisposable; // Its log's file closed as it ends.
         using var reloader = WebLingoWaspServer.Reloader(application, full);
-        var server = new WebLingoFastCgiServer(application, full, pool, log.WriteLine);
+        var server = new WebLingoFastCgiServer(application, pool, log.WriteLine);
         using var stopping = CancellationTokenSource.CreateLinkedTokenSource(stop);
         ConsoleCancelEventHandler cancel = (_, e) =>
         {

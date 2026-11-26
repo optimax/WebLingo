@@ -151,14 +151,12 @@ The forum sends mail through `std:mail`: confirming an address, resetting a pass
 
 # 4. What it needs of WASP
 
-One thing the forum needs is not there yet:
+Two things the forum needed are built:
 
 - **A response's bytes.** Built (25 November 2026, "Sending Files Back in WASP"): `response.write(bytes)` writes bytes as they are, and `await response.sendFile(path, type, { download })` sends a file the forum keeps outside its site, `data/uploads`, its folder in `wasp.config`'s `"files"`, with its tag, ranges and name (the WASP User Manual, section 9, "Sending a file").
-- **A client's files in place of the forum's.** An include and a layout are paths fixed when the page compiles (the WASP User Manual, sections 5 and 6), so the forum cannot choose them by client while it runs. The task for part 9 asks how this is to be solved.
+- **A client's files in place of the forum's.** Built (25 November 2026, "Overlays in WASP"): a client's folder is the site's root, its `wasp.config` naming the forum's site as its base, `"base": "C:/WebLingoForum/site"`, its files taken first, the forum's after, and the forum's settings where the client's gives none (the WASP User Manual, section 14, "A site over a base").
 
-It is not needed before its part: parts 1 to 8 are built without it.
-
-The first, built, gives part 8 its avatars and attachments.
+The first gives part 8 its avatars and attachments, the second part 9 its clients.
 
 ------
 
@@ -182,7 +180,7 @@ Each part is a task in `TO-DO.md`, landed on its own and tested on all four data
 6. **Private messages.**
 7. **Search.**
 8. **Avatars and attachments**, sent back by `response.sendFile`.
-9. **Customization.** A client's files in place of the forum's, as its task's answer has it. Hooks and an example plugin. An example client, with its own look, texts and plugin.
+9. **Customization.** A client's files in place of the forum's, a folder over the forum's site. Hooks and an example plugin. An example client, with its own look, texts and plugin.
 10. **Deployment.** The forum's `README.md`. Its deployment under IIS by the repository's `Scripts`, and behind nginx and Apache through FastCGI. The WASP User Manual pointing to it. A measurement of its pages under load, with `WebLingo.Benchmarks --load --url`.
 
 The pilot, "WASP Pilot: the Forum in Real Use", then serves it.

@@ -84,7 +84,10 @@ public sealed class WebLingoApplication
         _current = generation;
     }
 
-    /// <summary>The application at <paramref name="options"/>' root, its routes made; null, with why, if they cannot be.</summary>
+    /// <summary>
+    /// The application at <paramref name="options"/>' root, its routes made, its files over its base's where it has one
+    /// (section 6.12, "A site over a base"); null, with why, if they cannot be.
+    /// </summary>
     public static WebLingoApplication? Load(WebLingoApplicationOptions options, out string? error)
     {
         if (options.Workers < 1)
@@ -92,6 +95,7 @@ public sealed class WebLingoApplication
             error = "an application needs a worker or more";
             return null;
         }
+        if (options.Base is { } over) options = options with { FileSystem = new WebLingoBaseFiles(options.FileSystem, options.Root, over) };
         var routes = WebLingoRouteTable.Make(options.FileSystem, options.Root, options.Served, out error);
         return routes is null ? null : new WebLingoApplication(options, new Generation(routes, options.Workers));
     }
@@ -198,6 +202,15 @@ public sealed class WebLingoApplication
 
     /// <summary>The application's log, its host's (section 6.12, "Logging"), where its host writes what it does too; none without one.</summary>
     public IWebLingoLog? Log => _options.Log;
+
+    /// <summary>The folder of the site it lies over (section 6.12, "A site over a base"), which its host watches too; null for none.</summary>
+    public string? Base => _options.Base;
+
+    /// <summary>
+    /// Where a file a request's outcome leaves its host is, <see cref="WebLingoRequestOutcome.File"/>, from the root: in the
+    /// site's folder, or in its base's where the site has none of its own (section 6.12, "A site over a base").
+    /// </summary>
+    public string PathOf(string file) => _options.FileSystem.ReadablePath(_options.Root + "/" + file);
 
     /// <summary>The site's headers (<see cref="WebLingoApplicationOptions.Headers"/>), which its host gives a file it sends, and its 404 for one it cannot.</summary>
     public IReadOnlyList<KeyValuePair<string, string>> Headers => _options.Headers;

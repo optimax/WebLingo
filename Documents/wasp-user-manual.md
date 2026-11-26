@@ -1212,6 +1212,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"log"` | the site's log, each optional: `{ "file": "C:/inetpub/logs/WebLingo/mysite.log", "level": "info" }`, a file a day, outside the site, from this file's folder, and the lowest level written, `"debug"`, `"info"`, `"warn"` or `"error"` (section 12, "The log") | the host's own log, `"info"` |
 | `"limits"` | a request's limits, each optional: `{ "requestTimeout": 60, "requestInstructions": 1000000000, "requestMemory": 128 }`, the seconds it may take, its waits included, more than 0, the instructions it may run, and the megabytes of strings it may hold, 1 to 1,048,576; one passed a 503, WL3003 (section 12, "A request's limits") | 60 seconds, 1,000,000,000 instructions, 128 MB |
 | `"mail"` | the mail servers the site's pages and handlers send through, with `std:mail`, each a name and its settings: `{ "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": { "env": "SMTP_PASSWORD" } } }` | none |
+| `"base"` | the folder of the site this one lies over, from this file's folder: `"C:/WebLingoForum/site"`, its files taken where this site has none of its own, its `wasp.config`'s settings where this one gives none ([A site over a base](#a-site-over-a-base)) | none |
 
 A setting the file does not know, or a value it does not allow, stops the site from starting, with a message that says
 which. `wasp serve` and `wasp fastcgi` read the site's configuration when they start. Restart the host after changing it.
@@ -1316,6 +1317,31 @@ scripts that `weblingo` runs, not a site, and `wasp` does not read it. `wasp run
 `--root` is given, in which case it comes from the site's root configuration.
 
 ---
+
+### A site over a base
+
+One installed site may serve many clients, each with its own look, texts, code and settings, kept in a folder of the
+client's own: the client's folder is the site's root, with its own `web.config` and `wasp.config`, which names the site
+it lies over, its base:
+
+```text
+C:\WebLingoForum\site\        the forum, installed once: its pages, layouts, components, modules, stylesheets, wasp.config
+C:\Clients\acme\site\        Acme's: web.config, wasp.config, and only the files it changes
+    wasp.config                { "base": "C:/WebLingoForum/site", "databases": { "forum": "sqlite:../data/forum.db" } }
+    layouts\main.wasp          Acme's own layout, which every page of the forum's is laid out by
+    css\forum.css              Acme's own stylesheet
+```
+
+- A file is the client's where its folder has one, and the base's otherwise, at the same path: a page, an include, a
+  layout, a component, a module, a stylesheet or a picture. The site's routes are both folders' pages and files.
+- A setting of the client's `wasp.config` replaces the base's of that name whole, `"databases"` all its databases; a
+  setting the client's does not give is the base's, a path in it from the base's folder. Give a client its own
+  database, its own `"files"` and its own `"mail"`, so that it shares nothing of the base's.
+- `wasp serve` and `wasp fastcgi` watch both folders: a change to either reloads the site.
+- A script's paths, through `std:fs`, are from the client's folder; the base's files are only where `"files"` lists
+  their folder.
+- A base names no base of its own, and neither folder is within the other.
+- `wasp run` and `wasp check` read a page, and what it includes, from its own folder, without its base.
 
 ## 15. While you work
 

@@ -15,11 +15,10 @@ namespace WebLingo.Hosting.AspNetCore;
 /// </summary>
 public static class WebLingoAspNetCore
 {
-    /// <summary>Serves <paramref name="application"/>, whose root is <paramref name="root"/>, on <paramref name="workers"/>, as the end of the pipeline.</summary>
-    public static IApplicationBuilder UseWebLingo(this IApplicationBuilder builder, WebLingoApplication application, string root,
-        WebLingoWorkerPool workers)
+    /// <summary>Serves <paramref name="application"/> on <paramref name="workers"/>, as the end of the pipeline.</summary>
+    public static IApplicationBuilder UseWebLingo(this IApplicationBuilder builder, WebLingoApplication application, WebLingoWorkerPool workers)
     {
-        builder.Run(context => Serve(context, application, root, workers));
+        builder.Run(context => Serve(context, application, workers));
         return builder;
     }
 
@@ -27,7 +26,7 @@ public static class WebLingoAspNetCore
     /// Serves one request, its response sent as its worker writes it (<see cref="WebLingoStreamingResponse"/>), on a worker
     /// that runs other requests while it waits (section 6.6).
     /// </summary>
-    public static async Task Serve(HttpContext context, WebLingoApplication application, string root, WebLingoWorkerPool workers)
+    public static async Task Serve(HttpContext context, WebLingoApplication application, WebLingoWorkerPool workers)
     {
         // The site's limit on a body is its own (section 6.12, "Uploaded files"), not Kestrel's 30,000,000 bytes.
         if (context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
@@ -77,7 +76,7 @@ public static class WebLingoAspNetCore
             }
             else
             {
-                await WebLingoFileSending.SendSiteFileAsync(sink, request.Method, request.Headers, Path.Combine(root, file), application.Headers);
+                await WebLingoFileSending.SendSiteFileAsync(sink, request.Method, request.Headers, application.PathOf(file), application.Headers);
             }
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)

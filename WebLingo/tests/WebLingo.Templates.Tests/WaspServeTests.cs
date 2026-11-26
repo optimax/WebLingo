@@ -980,7 +980,7 @@ public sealed class WaspServeTests : IDisposable
         Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
         Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"mode\", "
                         + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
-                        + "\"sessions\", \"limits\", \"log\", \"headers\" and \"serve\".", error);
+                        + "\"sessions\", \"limits\", \"log\", \"headers\", \"serve\" and \"base\".", error);
 
         Write("wasp.config", "{ \"sendTimeout\": 5 }");
         Assert.NotNull(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
@@ -999,6 +999,89 @@ public sealed class WaspServeTests : IDisposable
         Assert.Equal(WebLingoCommandLine.FileUnreadable,
             WebLingoWaspCommandLine.Run(["serve", "--root", Path.Combine(_root, "missing")], new StringWriter(), error = new StringWriter()));
         Assert.Contains("the application's root is not a folder", error.ToString());
+    }
+
+    /// <summary>
+    /// A site over a base (specification, section 6.12, "A site over a base"), through Kestrel: a client's folder, its
+    /// <c>wasp.config</c> naming the forum's site as its base, served with the base's pages and files where it has none of
+    /// its own, its own first, its layout laying out the base's page; the base's settings where the client's gives none,
+    /// its mode, its headers and its scripts' folders, each path from the base's folder; a page added to the base routed
+    /// once the site reloads; and a base that is not a folder, is within the site, or names a base of its own, refused.
+    /// </summary>
+    [Fact]
+    public async Task ASiteIsServedOverItsBase()
+    {
+        var forum = _root + "-forum";
+        void InForum(string relative, string text)
+        {
+            var path = Path.Combine(forum, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, text);
+        }
+        try
+        {
+            InForum("wasp.config", "{ \"mode\": \"production\", \"headers\": { \"referrerPolicy\": \"no-referrer\" }, \"files\": { \"read\": [\"data\"] } }");
+            InForum("data/motto.txt", "Tea first.");
+            InForum("about.wasp", "<% layout \"/layouts/main.wasp\", { title: \"About\" }; %><p>The forum's about</p>");
+            InForum("motto.wasp", "<% import fs from \"std:fs\"; %><%= await fs.readText(\"../" + Path.GetFileName(forum) + "/data/motto.txt\") %>");
+            InForum("index.wasp", "<p>The forum's index</p>");
+            InForum("css/forum.css", "body { }");
+            Write("wasp.config", "{ \"base\": \"../" + Path.GetFileName(forum) + "\" }");
+            var server = WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out var error, out var mode);
+            Assert.True(server is not null, error);
+            Assert.Equal(WebLingoMode.Production, mode);
+            await server.StartAsync();
+            try
+            {
+                var address = server.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+                using var client = new HttpClient { BaseAddress = new Uri(address) };
+                var home = await client.GetAsync("/");
+                Assert.Equal("<html><title>Home</title><body><h1>Hello</h1>from the page\n</body></html>", await home.Content.ReadAsStringAsync());
+                Assert.Equal(["no-referrer"], home.Headers.GetValues("Referrer-Policy"));
+                Assert.Equal("<html><title>About</title><body><p>The forum's about</p></body></html>", await client.GetStringAsync("/about"));
+                var css = await client.GetAsync("/css/forum.css");
+                Assert.Equal((HttpStatusCode.OK, "text/css", "body { }"), (css.StatusCode, css.Content.Headers.ContentType?.MediaType,
+                    await css.Content.ReadAsStringAsync()));
+                Assert.NotNull(css.Headers.ETag);
+                Assert.Equal("h1 { }", await client.GetStringAsync("/css/site.css"));
+                Assert.Equal("Tea first.", await client.GetStringAsync("/motto"));
+                var broken = await client.GetAsync("/broken");
+                Assert.Equal(HttpStatusCode.InternalServerError, broken.StatusCode);
+                Assert.DoesNotContain("broken.wasp(1,", await broken.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+                Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/wasp.config")).StatusCode);
+
+                InForum("news.wasp", "<p>News</p>");
+                var found = false;
+                for (var tries = 0; tries < 100 && !found; tries++)
+                {
+                    found = (await client.GetAsync("/news")).StatusCode == HttpStatusCode.OK;
+                    if (!found) await Task.Delay(100);
+                }
+                Assert.True(found, "a page added to the base was not routed");
+            }
+            finally
+            {
+                await server.StopAsync();
+            }
+
+            Write("wasp.config", "{ \"base\": \"../" + Path.GetFileName(forum) + "-none\" }");
+            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+            Assert.EndsWith("-none, is not a folder.", error);
+            Write("wasp.config", "{ \"base\": \"css\" }");
+            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+            Assert.EndsWith("and the site's folder are one within the other: a base is a folder of its own.", error);
+            Write("wasp.config", "{ \"base\": 5 }");
+            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+            Assert.EndsWith("wasp.config: \"base\" is the folder of the site this one lies over, \"../forum/site\".", error);
+            InForum("wasp.config", "{ \"base\": \"../elsewhere\" }");
+            Write("wasp.config", "{ \"base\": \"../" + Path.GetFileName(forum) + "\" }");
+            Assert.Null(WebLingoWaspServer.Create(_root, 0, new Dictionary<string, string>(), out error, out _));
+            Assert.Contains("wasp.config: a base names no base of its own: a site lies over one base", error);
+        }
+        finally
+        {
+            Directory.Delete(forum, recursive: true);
+        }
     }
 
     private void Write(string relative, string text)

@@ -120,7 +120,7 @@ public sealed class RequestLimitTests : IDisposable
         context.Request.Method = "GET";
         context.Request.Path = path;
         context.Response.Body = new MemoryStream();
-        await WebLingoAspNetCore.Serve(context, application, _root, _workers);
+        await WebLingoAspNetCore.Serve(context, application, _workers);
         return (context.Response.StatusCode, Encoding.UTF8.GetString(((MemoryStream)context.Response.Body).ToArray()));
     }
 

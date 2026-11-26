@@ -51,6 +51,12 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// </summary>
     public IWebLingoFileSystem? ScriptFileSystem { get; init; }
 
+    /// <summary>
+    /// The folder of the site it lies over (section 6.12, "A site over a base"), its configuration's <c>"base"</c>, a full
+    /// path, whose files its own come before (<see cref="WebLingoBaseFiles"/>); null for none.
+    /// </summary>
+    public string? Base { get; init; }
+
     /// <summary>The platform's cryptography, which <c>std:crypto</c> reaches (section 7.10); none without it.</summary>
     public WebLingo.Platform.Abstractions.IWebLingoCrypto? Crypto { get; init; }
 

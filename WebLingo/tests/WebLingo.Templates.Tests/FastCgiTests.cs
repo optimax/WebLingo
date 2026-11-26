@@ -39,7 +39,7 @@ public sealed class FastCgiTests : IDisposable
         Write("deep.wasp", "<%= " + new string('(', 250) + "1" + new string(')', 250) + " %>");
         var application = WebLingoWaspServer.Load(_root, new Dictionary<string, string>(), WebLingoMode.Production, null, out _, out _, out var error);
         Assert.True(application is not null, error);
-        _server = new WebLingoFastCgiServer(application, _root, _workers);
+        _server = new WebLingoFastCgiServer(application, _workers);
         _listener = WebLingoWaspFastCgi.Listen(0, null, out _);
         _ = _server.ServeAsync(_listener, _stop.Token);
     }
@@ -340,7 +340,7 @@ public sealed class FastCgiTests : IDisposable
         Assert.True(application is not null, error);
         using var stop = new CancellationTokenSource();
         using var listener = WebLingoWaspFastCgi.Listen(0, null, out _);
-        _ = new WebLingoFastCgiServer(application, site, _workers).ServeAsync(listener, stop.Token);
+        _ = new WebLingoFastCgiServer(application, _workers).ServeAsync(listener, stop.Token);
         try
         {
             using var connection = new TcpClient();
@@ -374,7 +374,7 @@ public sealed class FastCgiTests : IDisposable
         Assert.True(application is not null, error);
         using var stop = new CancellationTokenSource();
         using var listener = WebLingoWaspFastCgi.Listen(0, null, out _);
-        _ = new WebLingoFastCgiServer(application, site, _workers).ServeAsync(listener, stop.Token);
+        _ = new WebLingoFastCgiServer(application, _workers).ServeAsync(listener, stop.Token);
         try
         {
             using var connection = new TcpClient();

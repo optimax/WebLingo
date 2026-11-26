@@ -126,13 +126,105 @@ public static class WebLingoSchemes
         (mode, error) = (null, null);
         folder = Path.GetFullPath(folder);
         var file = Path.Combine(folder, configuration);
-        if (File.Exists(file) && !TryRead(file, folder, schemes, ref mode, ref sendTimeout, hosts, named, read, write,
-            allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, ref headers, serving, out error))
+        if (File.Exists(file))
         {
-            return false;
+            // A site over a base: its base's settings first, those the site's own does not give, each path in them from the
+            // base's folder (section 6.12, "A site over a base").
+            if (!TryFindBase(folder, configuration, out var over, out var own, out error)) return false;
+            var baseFile = over is null ? null : Path.Combine(over, configuration);
+            if (baseFile is not null && File.Exists(baseFile) && !TryRead(baseFile, over!, schemes, ref mode, ref sendTimeout, hosts, named, read,
+                write, allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, ref headers, serving, own, out error))
+            {
+                return false;
+            }
+            if (!TryRead(file, folder, schemes, ref mode, ref sendTimeout, hosts, named, read, write,
+                allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, ref headers, serving, null, out error))
+            {
+                return false;
+            }
         }
         foreach (var (name, path) in given) schemes[name] = Path.GetFullPath(path);
         return true;
+    }
+
+    /// <summary>
+    /// <summary>
+    /// The base a site's configuration in <paramref name="folder"/> names, <c>"base": "../forum/site"</c> (specification,
+    /// section 6.12, "A site over a base"): the full path of the folder of the site it lies over, from the configuration's
+    /// folder, whose files the site's own come before and whose configuration gives the settings the site's own does not;
+    /// null where it names none; and <paramref name="own"/>, the settings the site's configuration gives. A site's alone,
+    /// <c>wasp.config</c>'s, never a script's; one base, which names none of its own; neither folder within the other.
+    /// A configuration that is not an object, or cannot be read, is left to <see cref="TryRead"/> to report.
+    /// </summary>
+    public static bool TryFindBase(string folder, string configuration, out string? baseFolder, out IReadOnlySet<string> own, out string? error)
+    {
+        (baseFolder, error) = (null, null);
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        own = names;
+        folder = Path.GetFullPath(folder);
+        var file = Path.Combine(folder, configuration);
+        string? given;
+        try
+        {
+            if (!File.Exists(file)) return true;
+            using var document = JsonDocument.Parse(File.ReadAllText(file));
+            if (document.RootElement.ValueKind != JsonValueKind.Object) return true;
+            foreach (var setting in document.RootElement.EnumerateObject()) names.Add(setting.Name);
+            if (!document.RootElement.TryGetProperty("base", out var named)) return true;
+            given = named.ValueKind == JsonValueKind.String ? named.GetString() : null;
+        }
+        catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+        if (configuration == ConfigurationFile)
+        {
+            error = $"{file}: \"base\" is a site's setting, its wasp.config's, not a script's.";
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(given))
+        {
+            error = $"{file}: \"base\" is the folder of the site this one lies over, \"../forum/site\".";
+            return false;
+        }
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.Combine(folder, given)));
+        if (!Directory.Exists(full))
+        {
+            error = $"{file}: \"base\", {full}, is not a folder.";
+            return false;
+        }
+        if (Within(full, folder) || Within(folder, full))
+        {
+            error = $"{file}: \"base\", {full}, and the site's folder are one within the other: a base is a folder of its own.";
+            return false;
+        }
+        var baseFile = Path.Combine(full, configuration);
+        try
+        {
+            if (File.Exists(baseFile))
+            {
+                using var based = JsonDocument.Parse(File.ReadAllText(baseFile));
+                if (based.RootElement.ValueKind == JsonValueKind.Object && based.RootElement.TryGetProperty("base", out _))
+                {
+                    error = $"{baseFile}: a base names no base of its own: a site lies over one base, {file}'s.";
+                    return false;
+                }
+            }
+        }
+        catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
+        {
+            // Its own reading, TryRead's, reports it.
+        }
+        baseFolder = full;
+        return true;
+    }
+
+    /// <summary>Whether <paramref name="path"/> is <paramref name="folder"/> or in it, as the file system compares names.</summary>
+    private static bool Within(string path, string folder)
+    {
+        var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var (inner, outer) = (Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)), Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)));
+        return inner.Equals(outer, comparison) || inner.StartsWith(outer + Path.DirectorySeparatorChar, comparison);
     }
 
     /// <summary>
@@ -550,7 +642,7 @@ public static class WebLingoSchemes
         List<string> hosts, Dictionary<string, WebLingoSecret> databases, List<string> read, List<string> write,
         Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, Dictionary<string, WebLingoMailServer> mail,
         ref WebLingoUploadSettings uploads, ref WebLingoSessionSettings sessions, ref WebLingoLimitSettings limits, ref WebLingoLogSettings log,
-        ref WebLingoHeaderSettings headers, List<string> served, out string? error)
+        ref WebLingoHeaderSettings headers, List<string> served, IReadOnlySet<string>? skipped, out string? error)
     {
         error = null;
         try
@@ -563,6 +655,8 @@ public static class WebLingoSchemes
             }
             foreach (var setting in document.RootElement.EnumerateObject())
             {
+                // Its base, which TryFindBase read; and a base's setting the site's own configuration gives.
+                if (setting.Name == "base" || skipped?.Contains(setting.Name) == true) continue;
                 if (setting.Name == "mode")
                 {
                     if (setting.Value.ValueKind != JsonValueKind.String || setting.Value.GetString() is not ("development" or "production"))
@@ -724,7 +818,7 @@ public static class WebLingoSchemes
                 {
                     error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"mode\", "
                             + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
-                            + "\"sessions\", \"limits\", \"log\", \"headers\" and \"serve\".";
+                            + "\"sessions\", \"limits\", \"log\", \"headers\", \"serve\" and \"base\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)

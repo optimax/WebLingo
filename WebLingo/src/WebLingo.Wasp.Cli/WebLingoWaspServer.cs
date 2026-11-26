@@ -76,7 +76,7 @@ public static class WebLingoWaspServer
         server.Lifetime.ApplicationStopped.Register(() => (application.Log as IDisposable)?.Dispose()); // Its log's file closed.
         var reloader = Reloader(application, full);
         server.Lifetime.ApplicationStopping.Register(reloader.Dispose);
-        server.UseWebLingo(application, full, pool);
+        server.UseWebLingo(application, pool);
         return server;
     }
 
@@ -141,6 +141,9 @@ public static class WebLingoWaspServer
             out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out var env, out var mail,
             out var uploads, out var sessions, out var limits, out var logging, out var headers, out var served, out error)) return null;
         if (configured is not null) mode = configured == "production" ? WebLingoMode.Production : WebLingoMode.Development;
+        // The site it lies over, where its wasp.config names one, whose files its own come before (section 6.12, "A site
+        // over a base"); its settings, those the site's own does not give, read above.
+        if (!WebLingoSchemes.TryFindBase(full, WebLingoRouteTable.ConfigurationFile, out var over, out _, out error)) return null;
         // The files a site does not serve by default it serves only by their extensions, each one of those (section 6.12).
         foreach (var extension in served)
         {
@@ -168,10 +171,10 @@ public static class WebLingoWaspServer
         }
         // Its log: the host's own, log, or a file a day where wasp.config names one, outside the site, which would serve it
         // and reload at each line (section 6.12, "Logging").
-        if (logging.File is { } logFile && IsWithin(logFile, full))
+        if (logging.File is { } logFile && (IsWithin(logFile, full) || (over is not null && IsWithin(logFile, over))))
         {
-            error = $"{Path.Combine(full, WebLingoRouteTable.ConfigurationFile)}: \"log\"'s \"file\", {logFile}, is in the site's folder, "
-                    + "where it would be served and the site reloaded at each line: name a file outside it.";
+            error = $"{Path.Combine(full, WebLingoRouteTable.ConfigurationFile)}: \"log\"'s \"file\", {logFile}, is in the site's folder"
+                    + (over is null ? "" : " or its base's") + ", where it would be served and the site reloaded at each line: name a file outside it.";
             return null;
         }
         DotNetLog? siteLog = logging.File is { } named2 ? new DotNetLog(named2, logging.Level, log)
@@ -185,6 +188,7 @@ public static class WebLingoWaspServer
         var application = WebLingoApplication.Load(new WebLingoApplicationOptions(full, new DotNetFileSystem())
         {
             ScriptFileSystem = new DotNetFileSystem(files),
+            Base = over,
             Allowed = allowed, // The COM objects wasp.config allows (section 3.10).
             Crypto = new DotNetCrypto(),
             // Only what wasp.config's "env" allows of the machine's environment, and no variable set (section 7.15).

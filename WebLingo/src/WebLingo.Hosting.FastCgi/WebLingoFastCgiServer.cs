@@ -22,7 +22,7 @@ namespace WebLingo.Hosting.FastCgi;
 /// been answered, as php-cgi reads one. Only FastCGI is translated here: everything else is the host's core's (section
 /// 6.12).
 /// </summary>
-public sealed class WebLingoFastCgiServer(WebLingoApplication application, string root, WebLingoWorkerPool workers, Action<string>? log = null)
+public sealed class WebLingoFastCgiServer(WebLingoApplication application, WebLingoWorkerPool workers, Action<string>? log = null)
 {
     /// <summary>The most a request's <c>FCGI_PARAMS</c> may hold, so that a web server's mistake cannot take the host's memory.</summary>
     public const int MaxParams = 1024 * 1024;
@@ -424,7 +424,7 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, strin
                 }
                 else
                 {
-                    await WebLingoFileSending.SendSiteFileAsync(sink, translated.Method, translated.Headers, Path.Combine(root, file),
+                    await WebLingoFileSending.SendSiteFileAsync(sink, translated.Method, translated.Headers, application.PathOf(file),
                         application.Headers);
                 }
             }

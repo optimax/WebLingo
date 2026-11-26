@@ -39,7 +39,7 @@ public sealed class AspNetCoreTests : IDisposable
         context.Request.Path = "/cookies";
         context.Request.Headers.Cookie = "tea=green; other=1";
         context.Response.Body = new MemoryStream();
-        await WebLingoAspNetCore.Serve(context, Load(), _root, _workers);
+        await WebLingoAspNetCore.Serve(context, Load(), _workers);
         Assert.Equal("green", Body(context));
         Assert.Equal(["a=1; Path=/; HttpOnly; SameSite=Lax", "b=x%20y; Path=/; HttpOnly; SameSite=Lax"], context.Response.Headers.SetCookie.Select(value => value ?? "").ToArray());
     }
@@ -61,7 +61,7 @@ public sealed class AspNetCoreTests : IDisposable
         context.Request.Method = "GET";
         context.Request.Path = "/longfails";
         context.Response.Body = new MemoryStream();
-        await WebLingoAspNetCore.Serve(context, Load(), _root, _workers);
+        await WebLingoAspNetCore.Serve(context, Load(), _workers);
         Assert.True(lifetime.Aborted);
         Assert.Equal(200, context.Response.StatusCode);
         Assert.Equal(new string('x', 100 * 1024), Body(context));
@@ -97,7 +97,7 @@ public sealed class AspNetCoreTests : IDisposable
         context.Request.Method = "GET";
         context.Request.Path = "/forever";
         context.Response.Body = new MemoryStream();
-        var serving = WebLingoAspNetCore.Serve(context, Load(), _root, _workers);
+        var serving = WebLingoAspNetCore.Serve(context, Load(), _workers);
         await Task.Delay(200);
         Assert.False(serving.IsCompleted);
         gone.Cancel();
@@ -117,7 +117,7 @@ public sealed class AspNetCoreTests : IDisposable
         context.Request.Method = "GET";
         context.Request.Path = "/long";
         context.Response.Body = slow;
-        var serving = WebLingoAspNetCore.Serve(context, application, _root, one);
+        var serving = WebLingoAspNetCore.Serve(context, application, one);
         await slow.Blocked.Task.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Equal("quick", Body(await Serve(application, "GET", "/quick", one)));
         Assert.False(serving.IsCompleted);
@@ -172,7 +172,7 @@ public sealed class AspNetCoreTests : IDisposable
         context.Request.Body = new NeverEndingBody();
         context.Response.Body = new MemoryStream();
         Write("quick.wasp", "quick");
-        await WebLingoAspNetCore.Serve(context, Load(), _root, _workers).WaitAsync(TimeSpan.FromSeconds(10));
+        await WebLingoAspNetCore.Serve(context, Load(), _workers).WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Equal("quick", Body(context));
 
         context = new DefaultHttpContext();
@@ -180,7 +180,7 @@ public sealed class AspNetCoreTests : IDisposable
         context.Request.Path = "/body";
         context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("sent"));
         context.Response.Body = new MemoryStream();
-        await WebLingoAspNetCore.Serve(context, Load(), _root, _workers);
+        await WebLingoAspNetCore.Serve(context, Load(), _workers);
         Assert.Equal("sent", Body(context));
     }
 
@@ -323,7 +323,7 @@ public sealed class AspNetCoreTests : IDisposable
         context.Request.Method = method;
         context.Request.Path = path;
         context.Response.Body = new MemoryStream();
-        await WebLingoAspNetCore.Serve(context, application, _root, workers ?? _workers);
+        await WebLingoAspNetCore.Serve(context, application, workers ?? _workers);
         return context;
     }
 
@@ -342,7 +342,7 @@ public sealed class AspNetCoreTests : IDisposable
         context.Request.Method = method;
         context.Request.Path = path;
         context.Response.Body = new MemoryStream();
-        await WebLingoAspNetCore.Serve(context, application, _root, _workers);
+        await WebLingoAspNetCore.Serve(context, application, _workers);
         return context;
     }
 

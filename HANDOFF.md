@@ -306,6 +306,18 @@ send it, and a site's own files, through `WebLingoFileSending` (`WebLingo/src/We
 `FastCgiTests.AFileAPageSendsIsSentWithItsTagAndRanges`; the manual's example tried with `wasp serve` and curl. Page text
 written around `sendFile` is not sent, where the task's guess had writing after it an error.
 
+## A site over a base
+
+A site's `wasp.config` may name the site it lies over, `"base": "C:/WebLingoForum/site"` (the specification's section
+6.12, "A site over a base"; the WASP User Manual, section 14): `WebLingoSchemes.TryFindBase`
+(`WebLingo/src/WebLingo.Cli/WebLingoSchemes.cs`) reads it, and the base's settings the site's own does not give, each
+path from the base's folder; `WebLingoBaseFiles` (`WebLingo/src/WebLingo.Hosting/`) reads a path from the site's folder,
+else the base's, which `WebLingoApplication.Load` puts over the site's files where `WebLingoApplicationOptions.Base` is
+given; `WebLingoApplication.PathOf` gives both hosts a site's file where it is, so that `WebLingoAspNetCore.Serve` and
+`WebLingoFastCgiServer` take no root of their own now; and `WebLingoReloader` watches both folders. Tested by
+`BaseTests` (`WebLingo.Hosting.Tests`) and `WaspServeTests.ASiteIsServedOverItsBase`. `wasp run` and `wasp check` read
+no base.
+
 ## License and notices
 
 WebLingo is under the MIT License, `LICENSE`, its copyright The WebLingo Authors'; `SECURITY.md` has vulnerabilities
@@ -420,7 +432,7 @@ values counted from its start each time, so the renderer reads an array of a lin
 The branch `claude/forum-writing` on GitHub holds part 3 unfinished (`9093b78`), which `main` has whole, in one commit,
 instead: it may be deleted there.
 
-Next: "Overlays in WASP", its questions answered, which part 9 waits for, then parts 9 and 10. "WebLingo Forum:
+Next: "WebLingo Forum, Part 9: Customization", over WASP's bases, above, then part 10. "WebLingo Forum:
 MarkdownEditor.Web in the Post Form" waits for MarkdownEditor.Web's `LICENSE` to commit the editor's copy. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to
 be written as tasks and into the specification's roadmap; neither is begun.
 
