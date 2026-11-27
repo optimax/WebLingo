@@ -173,7 +173,9 @@ verifier. Part 2: the VM's loop, every 1,024 instructions, begins a cancelled ex
 task; a yield goes on when cancelled (`GoesOn`). Part 3: `CleanWaiting`, in `TryResume`, resumes each task that waited
 when the cleanup began with the cancellation thrown at its `await` (`WebLingoHeap.WaitingTasks`, `Withdraw`,
 `WebLingoScheduler.DropReady`), and ends the execution once nothing is left; `WaitFor` keeps a wait within the grace. A
-`finally` on its normal way out is not covered, a task of its own.
+cleanup on its normal way out, listed in WLBC 0.4 (`WebLingoFunction.WaysOut`), postpones the cancellation until the frame
+has left it (`OnItsWayOut`, `LeftItsWayOut`, `Suspending`); the cancellation is thrown as `CancellationThrown`, by its
+identity, which no catch catches.
 
 ## The collector
 

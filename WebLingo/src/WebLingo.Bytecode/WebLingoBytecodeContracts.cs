@@ -369,7 +369,17 @@ public sealed record WebLingoFunction(
     /// the first that holds the instruction it was raised at (section 3.7; section 5.4's table-driven regions).
     /// </summary>
     public IReadOnlyList<WebLingoHandler> Handlers { get; init; } = [];
+    /// <summary>
+    /// The cleanups it runs on their way out with no exception, a <c>finally</c>'s body and a <c>using</c>'s disposal
+    /// written inline after a <c>try</c>'s body and before a <c>break</c>, a <c>continue</c> or a <c>return</c> out of it,
+    /// which no handler marks: a cancellation that comes while one runs waits until it has left it (section 9, "A
+    /// cancelled request's cleanup, parts", and "A Cancellation in a Cleanup on Its Normal Way Out").
+    /// </summary>
+    public IReadOnlyList<WebLingoWayOut> WaysOut { get; init; } = [];
 }
+
+/// <summary>A cleanup's code on its way out with no exception, from <paramref name="Start"/> to <paramref name="End"/> − 1.</summary>
+public readonly record struct WebLingoWayOut(int Start, int End);
 
 /// <summary>
 /// A protected region: an exception raised by an instruction from <paramref name="Start"/> to

@@ -54,6 +54,10 @@ public static class WebLingoDisassembler
                 .Append(handler.IsCleanup ? $", {(handler.Kind == WebLingoHandlerKind.Finally ? "finally" : "using")} to {handler.CleanupEnd - 1}" : ", catch")
                 .Append('\n');
         }
+        foreach (var wayOut in function.WaysOut)
+        {
+            text.Append("cleanup ").Append(wayOut.Start).Append(" to ").Append(wayOut.End - 1).Append(", on its way out\n");
+        }
         WebLingoDisassemblyNames.AppendVariables(text, function.DebugInfo, table, register => $"r{register}",
             register => Register(function, register));
     }

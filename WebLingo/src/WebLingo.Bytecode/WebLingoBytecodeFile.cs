@@ -14,7 +14,7 @@ namespace WebLingo.Bytecode;
 public static class WebLingoBytecodeFile
 {
     public const int MajorVersion = 0;
-    public const int MinorVersion = 3;
+    public const int MinorVersion = 4;
     /// <summary>A WLBC file's extension (the owner's request, 23 November 2026, in place of <c>.wlbr</c> and <c>.wlbs</c>).</summary>
     public const string Extension = ".wlb";
     /// <summary>The register VM's before it, a file of which is read as one of <see cref="Extension"/>.</summary>
@@ -80,6 +80,12 @@ public static class WebLingoBytecodeFile
                 handlers.Byte((byte)handler.Kind);
                 handlers.Signed(handler.CleanupEnd);
             }
+            handlers.Count(function.WaysOut.Count);
+            foreach (var wayOut in function.WaysOut)
+            {
+                handlers.Signed(wayOut.Start);
+                handlers.Signed(wayOut.End);
+            }
         }
         return Assemble(WebLingoBytecodeKind.Register, HeadOf(module), heads, code, handlers, textOf);
     }
@@ -121,6 +127,8 @@ public static class WebLingoBytecodeFile
                 handlers[i] = new WebLingoHandler(handlersReader.Int(), handlersReader.Int(), handlersReader.Int(), handlersReader.Int(),
                     handlersReader.Int(), (WebLingoHandlerKind)handlersReader.Byte(), handlersReader.Int());
             }
+            var waysOut = new WebLingoWayOut[handlersReader.Count()];
+            for (var i = 0; i < waysOut.Length; i++) waysOut[i] = new WebLingoWayOut(handlersReader.Int(), handlersReader.Int());
             functions.Add(new WebLingoFunction(h.Name, h.First, h.Second, code, h.Spans, h.LocalNames)
             {
                 ParameterCount = h.ParameterCount,
@@ -134,6 +142,7 @@ public static class WebLingoBytecodeFile
                 NativeResult = h.NativeResult,
                 Captures = h.Captures,
                 Handlers = handlers,
+                WaysOut = waysOut,
                 DebugInfo = h.DebugInfo
             });
         }

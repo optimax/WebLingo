@@ -1109,8 +1109,8 @@ cleanups first, each `finally` block and each disposal, `using`'s and a class's,
 `warn`, and the cleanups further out still run. A request stopped while it waits, for a timer, a database or another
 task, stops waiting, and its cleanups run from its `await`, as does each of its tasks that waits. A cleanup may itself
 `await`, a database's close among it. The cleanups have 5 seconds and 10,000,000 instructions in all, past which the
-request is stopped at once. A `finally` that runs because its block ended without an exception is not yet covered: a
-stop that comes while it runs leaves the rest of it. `wasp.config`'s `"limits"` gives others ([section 14](#14-configuration-waspconfig)):
+request is stopped at once. A `finally` that runs because its block ended without an exception, or a `using`'s
+disposal there, runs to its end first, and the request stops after it. `wasp.config`'s `"limits"` gives others ([section 14](#14-configuration-waspconfig)):
 
 ```json
 { "limits": { "requestTimeout": 120, "requestInstructions": 5000000000, "requestMemory": 512 } }

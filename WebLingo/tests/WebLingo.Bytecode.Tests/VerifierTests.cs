@@ -79,6 +79,18 @@ public sealed class VerifierTests
             "Handler 0: its kind, 7, is not a catch's, a finally's or a using's.");
     }
 
+    /// <summary>A cleanup on its way out lies within the function's code.</summary>
+    [Fact]
+    public void ACleanupOnItsWayOutLiesWithinTheCode()
+    {
+        WebLingoCompiledModule With(WebLingoWayOut wayOut) => Module(registers: 1, locals: 1, I(WebLingoOpCode.LoadNull, 0), I(WebLingoOpCode.Return)) is var module
+            ? module with { EntryPoint = module.EntryPoint with { WaysOut = [wayOut] } }
+            : null!;
+        Assert.Equal(WebLingoVerificationResult.Valid, Verify(With(new WebLingoWayOut(0, 1))));
+        AssertRejected(With(new WebLingoWayOut(1, 1)), -1, "Way out 0: its code, 1 to 1, is not within the function's.");
+        AssertRejected(With(new WebLingoWayOut(0, 3)), -1, "Way out 0: its code, 0 to 3, is not within the function's.");
+    }
+
     [Fact]
     public void AStaticMethodIsAFunction()
     {

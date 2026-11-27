@@ -176,6 +176,38 @@ public sealed class CleanupTests
         Assert.All(log, line => Assert.Equal(WebLingoLogLevel.Warn, line.Level));
     }
 
+    /// <summary>
+    /// A cleanup on its way out with no exception, which no handler marks, runs to its end before the cancellation goes on
+    /// ("A Cancellation in a Cleanup on Its Normal Way Out").
+    /// </summary>
+    [Fact]
+    public void AFinallyOnItsNormalWayOutFinishesFirst()
+    {
+        var (output, error, _) = Run("""
+            try {
+                try { writeLn("body"); } finally { cancel(); var i = 0; while (i < 5000) { i = i + 1; } writeLn("finally done"); }
+                while (true) { }
+            } finally { writeLn("outer"); }
+            """);
+        Assert.Equal("body\nfinally done\nouter\n", output);
+        Assert.Equal(WebLingoDiagnosticCodes.Cancelled, error!.Code);
+    }
+
+    [Fact]
+    public void ATaskWaitingInACleanupOnItsWayOutFinishesItThenIsCleanedWhereItWaitsNext()
+    {
+        var (output, error, _) = Run("""
+            async function worker() {
+                try { writeLn("worker body"); } finally { await delay(100); writeLn("worker finally done"); }
+                try { while (true) { await delay(100000); } } finally { writeLn("worker cleaned"); }
+            }
+            var t = worker();
+            try { cancel(); while (true) { } } finally { writeLn("main"); }
+            """);
+        Assert.Equal("worker body\nmain\nworker finally done\nworker cleaned\n", output);
+        Assert.Equal(WebLingoDiagnosticCodes.Cancelled, error!.Code);
+    }
+
     [Fact]
     public void WithoutACancellationNothingChanges()
     {

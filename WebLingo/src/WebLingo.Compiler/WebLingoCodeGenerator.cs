@@ -111,6 +111,7 @@ public sealed class WebLingoCodeGenerator
             ParameterCount = parameterCount,
             Captures = captures,
             Handlers = generator._handlers,
+            WaysOut = generator._waysOut,
             DebugInfo = generator._debugPoints is { } points ? new(source, points, debugLocals!, debugCaptures) : null
         };
     }
@@ -168,7 +169,9 @@ public sealed class WebLingoCodeGenerator
                 var guard = OpenGuard(usingStatement.Span, disposes: usingStatement.Resource);
                 EmitStatement(usingStatement.Body);
                 EndGuard(guard);
+                var disposing = _code.Count;
                 EmitDispose(usingStatement.Resource, usingStatement.Span);
+                AddWayOut(disposing);
                 if (guard.Ranges.Count == 0) break;
                 var skip = EmitJump(WebLingoOpCode.Jump, 0, usingStatement.Span);
                 var cleanup = AddHandlers(guard, usingStatement.Value, usingStatement.Origin, WebLingoHandlerKind.Using);
@@ -986,6 +989,13 @@ public sealed class WebLingoCodeGenerator
 
     /// <summary>The function's handlers, innermost first, as each guard's handler is generated.</summary>
     private readonly List<WebLingoHandler> _handlers = [];
+    private readonly List<WebLingoWayOut> _waysOut = [];
+
+    /// <summary>A cleanup's code on its way out with no exception, from <paramref name="start"/> to here.</summary>
+    private void AddWayOut(int start)
+    {
+        if (_code.Count > start) _waysOut.Add(new WebLingoWayOut(start, _code.Count));
+    }
 
     private Guard OpenGuard(WebLingoSourceSpan span, WebLingoIrStatement? cleanup = null, WebLingoIrExpression? disposes = null)
     {
@@ -1041,8 +1051,10 @@ public sealed class WebLingoCodeGenerator
             if (guard.Finally is null && guard.Disposes is null) continue;
             var inner = _guards.GetRange(i, _guards.Count - i);
             _guards.RemoveRange(i, inner.Count);
+            var cleaning = _code.Count;
             if (guard.Disposes is { } resource) EmitDispose(resource, guard.Span);
             else EmitStatement(guard.Finally!);
+            AddWayOut(cleaning);
             _guards.AddRange(inner);
         }
     }
@@ -1072,7 +1084,9 @@ public sealed class WebLingoCodeGenerator
         if (statement.Finally is { } final)
         {
             EndGuard(finallyGuard!);
+            var cleaning = _code.Count;
             EmitStatement(final.Body);
+            AddWayOut(cleaning);
             var skip = EmitJump(WebLingoOpCode.Jump, 0, statement.Span);
             var firstHandler = AddHandlers(finallyGuard!, final.Value, final.Origin, WebLingoHandlerKind.Finally);
             EmitStatement(final.Body);

@@ -140,6 +140,15 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                   ?? CleanupError(function, handler);
             if (error is not null) return Fail($"Handler {i}: {error}");
         }
+        if (function.WaysOut is null) return Fail("The function has no table of its cleanups' ways out.");
+        for (var i = 0; i < function.WaysOut.Count; i++)
+        {
+            var wayOut = function.WaysOut[i];
+            if (wayOut.Start < 0 || wayOut.Start >= wayOut.End || wayOut.End > function.Code.Count)
+            {
+                return Fail($"Way out {i}: its code, {wayOut.Start} to {wayOut.End}, is not within the function's.");
+            }
+        }
 
         var code = function.Code;
         for (var i = 0; i < code.Count; i++)

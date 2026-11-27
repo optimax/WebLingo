@@ -60,6 +60,29 @@ public sealed class CodeGeneratorTests
         Assert.Contains(", using to ", WebLingoDisassembler.Format(module), StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Each cleanup written inline on its way out with no exception is listed (section 9, "A cancelled request's cleanup,
+    /// parts", and "A Cancellation in a Cleanup on Its Normal Way Out"): a <c>finally</c>'s body after its <c>try</c>'s, a
+    /// <c>using</c>'s disposal after its body, and each before a <c>break</c> out of them.
+    /// </summary>
+    [Fact]
+    public void EachCleanupOnItsWayOutIsListed()
+    {
+        var module = Generate("""
+            class R { dispose() { } }
+            try { printLn(1); } finally { printLn(2); }
+            using (var r = new R()) { printLn(3); }
+            while (true) { try { break; } finally { printLn(4); } }
+            """);
+        var code = module.EntryPoint.Code;
+        var waysOut = module.EntryPoint.WaysOut;
+        // The try's, the using's, the break's, and the loop's try's after its body, which the break leaves unreached.
+        Assert.Equal(4, waysOut.Count);
+        Assert.All(waysOut, wayOut => Assert.True(wayOut.Start < wayOut.End));
+        Assert.Contains(waysOut, wayOut => code.Skip(wayOut.Start).Take(wayOut.End - wayOut.Start).Any(i => i.OpCode == WebLingoOpCode.Dispose));
+        Assert.Contains("on its way out", WebLingoDisassembler.Format(module), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void AnAssignmentWritesItsLocalDirectly()
     {
