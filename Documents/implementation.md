@@ -545,6 +545,10 @@ A program's static imports run, each awaited, before its top level's statements 
 
 IIS's ASP.NET Core Module gives the process it starts `ASPNETCORE_IIS_PHYSICAL_PATH`, which in process is the site's folder, but out of process, as a site's `web.config` runs `wasp`, the application's id in IIS's configuration, `/LM/W3SVC/2/ROOT`; it starts the process in the site's folder. So `wasp serve` takes the site's folder from the variable only where it names a folder, and from the folder it was started in otherwise (`WebLingoWaspServer.SiteFolder`); until 18 November 2026 it took the variable as it was, so that under IIS every request was a 502, the application's root `C:\LM\W3SVC\2\ROOT` not being a folder (IIS 10, .NET 10's Hosting Bundle). The module's error, 0x8027025b at its `PostStartCheck`, says only that the process stopped: `wasp`'s own output, with the site's `web.config`'s `stdoutLogEnabled` true, says why.
 
+### A Server's TCP Connections Need `NoDelay`, for Linux
+
+A server that writes a response in pieces over TCP, with Nagle's algorithm left on, sends its last small piece only once the peer has acknowledged the one before, and Linux delays that acknowledgement about 40 ms: `wasp fastcgi` behind nginx on Linux took 44 ms a request, about 90 a second, where Windows answered in 0.7 ms (27 November 2026, the task "FastCGI Behind nginx on Linux: 40 ms a Request"). Each TCP connection a server of WebLingo's accepts is given `NoDelay`, the standalone HTTP server's (`WebLingoHttpServer`) and FastCGI's (`WebLingoFastCgiServer.Accepted`), a Unix socket, which has no such option, left as it is. Only Linux shows it: measure a server's change there too, in WSL (section 8).
+
 ### SQLite Keeps a Database's File Open
 
 Microsoft.Data.Sqlite pools connections, so that a database's file stays open after its connection is closed, and Windows will not delete it: a test that removes a database's folder calls `SqliteConnection.ClearAllPools()` first (`DatabaseTests`, `WaspServeTests`).

@@ -41,8 +41,20 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, WebLi
             {
                 return;
             }
-            _ = ServeConnectionAsync(new NetworkStream(accepted, ownsSocket: true), stop);
+            _ = ServeConnectionAsync(Accepted(accepted), stop);
         }
+    }
+
+    /// <summary>
+    /// A connection the listener accepted, as it is served: over TCP without Nagle's algorithm (<c>NoDelay</c>), as WebLingo's
+    /// own HTTP server sends, so that a response's last small record does not wait for the web server's acknowledgement of the
+    /// one before, which Linux delays about 40 ms, a request then taking that long behind nginx (the task "FastCGI Behind
+    /// nginx on Linux: 40 ms a Request"); a Unix socket, which has no such option, as it is.
+    /// </summary>
+    public static NetworkStream Accepted(Socket accepted)
+    {
+        if (accepted.ProtocolType == ProtocolType.Tcp) accepted.NoDelay = true;
+        return new NetworkStream(accepted, ownsSocket: true);
     }
 
     /// <summary>

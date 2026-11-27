@@ -291,6 +291,37 @@ public sealed class FastCgiTests : IDisposable
                                             new IPEndPoint(IPAddress.Loopback, port), AddressFamily.InterNetwork, ProtocolType.Tcp);
     }
 
+    /// <summary>
+    /// A connection the web server makes over TCP is served without Nagle's algorithm, so that a response's last record goes
+    /// at once, which Linux otherwise held about 40 ms behind nginx (the task "FastCGI Behind nginx on Linux: 40 ms a
+    /// Request"); one on a Unix socket, which has no such option, is served as it is.
+    /// </summary>
+    [Fact]
+    public async Task AConnectionOverTcpIsServedWithoutNaglesDelay_OneOnAUnixSocketAsItIs()
+    {
+        using (var listener = WebLingoWaspFastCgi.Listen(0, null, out _))
+        using (var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+        {
+            await client.ConnectAsync(listener.LocalEndPoint!);
+            var accepted = await listener.AcceptAsync();
+            using var stream = WebLingoFastCgiServer.Accepted(accepted);
+            Assert.True(accepted.NoDelay);
+        }
+        var path = Path.Combine(Path.GetTempPath(), "wasp-" + Guid.NewGuid().ToString("N")[..12] + ".sock");
+        try
+        {
+            using var listener = WebLingoWaspFastCgi.Listen(0, path, out _);
+            using var client = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+            await client.ConnectAsync(new UnixDomainSocketEndPoint(path));
+            using var stream = WebLingoFastCgiServer.Accepted(await listener.AcceptAsync());
+            Assert.True(stream.Socket.Connected);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     /// <summary><c>wasp fastcgi --socket path</c>, as PHP-FPM listens on Linux: a Unix socket made at the path, removed when it stops.</summary>
     [Fact]
     public async Task WaspFastCgiServesARootOnAUnixSocket()
