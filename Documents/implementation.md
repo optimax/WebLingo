@@ -252,8 +252,13 @@ recorded in the installation's `links` for its `uninstall.sh`; the Debian packag
 `Installers/Linux/tests/test.sh` on them on every push, then `Installers/Linux/tests/serve.sh`, which serves
 `Examples.wasp/example1` from WebLingo installed by the archive, through `wasp fastcgi` behind nginx and Apache httpd's
 `mod_proxy_fcgi`, and through `mod_fcgid`, the distribution's packages, as the WASP User Manual's section 18 configures
-them: the only place they are made and tried, since publishing for
-Linux on Windows restores .NET's Linux runtime packs from NuGet, which this machine does not have.
+them. The development machine has WSL 2 with Ubuntu 26.04, where the same three scripts run as CI runs them (27 November
+2026): Microsoft's .NET 10 SDK in `~/.dotnet` there, installed by `dotnet-install.sh`, and nginx, Apache httpd,
+`libapache2-mod-fcgid` and ICU by apt, their services disabled, so that only the scripts start them; the repository cloned
+into WSL's own disk, `git clone /mnt/c/…/WebLingo ~/WebLingo`, so that a build there never writes the Windows checkout's
+`bin` and `obj`; `package.sh` run as the account, with `PATH` and `DOTNET_ROOT` naming `~/.dotnet`, and `test.sh` and
+`serve.sh`, which use `sudo`, as root, `wsl -u root`. Publishing for Linux on Windows would restore .NET's Linux runtime
+packs from NuGet, which the Windows side does not have.
 
 On Windows, double-click `build.bat` in the repository root to publish and install the current checkout, including
 the CLI's VS Code debug adapter. It runs `publish.ps1` from the solution folder, then requests administrator rights

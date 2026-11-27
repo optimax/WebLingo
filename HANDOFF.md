@@ -291,13 +291,16 @@ cookie's, and `await request.checkCsrf(token = null)`, written in WebLingo (`Web
 `Installers/Linux/package.sh`, run on Linux, makes a self-contained archive with `install.sh` and a Debian package for
 x64 and arm64, each holding `weblingo`, `wasp` and the standard modules in `/opt/weblingo`; its `readme.md` is a user's
 steps, and `Documents/implementation.md`, section 8, how it is built. A script's first line `#!/usr/bin/env weblingo` is
-skipped by the lexer, so that an executable `.wlg` runs by its name. Nothing of it was made or run on this machine,
-which has no Linux and no Linux runtime packs: CI's job `linux-installer` makes the x64 packages and installs, runs and
-removes them with `Installers/Linux/tests/test.sh` on every push, so it is first tried by the push after it lands. The
+skipped by the lexer, so that an executable `.wlg` runs by its name. CI's job `linux-installer` makes the x64 packages
+and installs, runs and removes them with `Installers/Linux/tests/test.sh` on every push, and this machine's WSL 2 runs
+the same since 27 November 2026, below. The
 arm64 packages are made by `package.sh` but tried nowhere. `Installers/Linux/tests/serve.sh`, its next step, failed on
 every push from `2e27309` to `b79f11e`, taking nginx's 502 for the site being served before `wasp fastcgi` listened;
 `eef7703` waits for a success instead, and CI's run #95 (`c275684`) passed, its three jobs. The build and its tests passed on `ubuntu-latest` and
-`windows-latest` on each of those pushes.
+`windows-latest` on each of those pushes. On this machine's WSL 2, Ubuntu 26.04 (27 November 2026, at `31792ce`):
+`package.sh` made the x64 archive and Debian package, and `test.sh` and `serve.sh` passed, `example1` served behind nginx
+and Apache httpd through `mod_proxy_fcgi` and `mod_fcgid` (`Documents/implementation.md`, section 8, says how to run them
+there).
 
 ## The console module
 

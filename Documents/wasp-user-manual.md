@@ -1585,7 +1585,9 @@ files' included: `wasp` serves those too, and never serves the site's modules or
 serving the folder itself would.
 
 **These configurations have been tried on Windows**, with nginx 1.30.6 and Apache httpd 2.4.71, Apache Lounge's build,
-with mod_fcgid 2.3.10, each as written here but for its paths, which had no spaces; not yet on Linux, nor the systemd
+with mod_fcgid 2.3.10, each as written here but for its paths, which had no spaces; and on Linux, on Ubuntu 26.04 under
+WSL 2 and on CI's `ubuntu-latest`, with the distribution's own, nginx 1.28.3, Apache httpd 2.4.66 and mod_fcgid 2.3.9
+on Ubuntu 26.04, WebLingo installed from its archive, by `Installers/Linux/tests/serve.sh`; not yet the systemd
 service below.
 
 ### nginx
@@ -1749,6 +1751,6 @@ These are not there yet, and are planned or being designed:
 
 - **Debugging a site under IIS or FastCGI**: a site is debugged only as the debugger serves it
   ([section 15](#15-while-you-work)).
-- **A standalone server**, without IIS, nginx or Apache, is planned. WASP has been tried on Windows, through IIS's
-  ASP.NET Core Module, and through FastCGI behind nginx and Apache httpd; Linux is built and tested, but no site has
-  been served on it yet.
+- **Linux, beyond FastCGI**: a site has been served on Linux through FastCGI behind nginx and Apache httpd, on
+  Ubuntu 26.04 under WSL 2 and on CI's `ubuntu-latest` ([section 18](#18-serving-through-nginx-or-apache-fastcgi)), but
+  not yet by the systemd service there, by `wasp serve` behind a reverse proxy, on another distribution, or on arm64.
