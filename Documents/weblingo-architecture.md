@@ -2552,7 +2552,13 @@ is not planned.
    server, and Microsoft.Diagnostics.Tracing.TraceEvent 4.0.2, which reads its events, referenced by the benchmark alone,
    which no installer ships (`WebLingoServerCounters`); every 10 seconds at most, a column of its own, `GC heap`, beside
    private bytes, and a measure of the trend's as the others are, one that some sample lacks not judged; under `wasp
-   serve` and `wasp fastcgi`, which the benchmark starts, not a site at `--url`, whose process it does not know.
+   serve` and `wasp fastcgi`, which the benchmark starts, not a site at `--url`, whose process it does not know. Run so
+   (27 November 2026, 11:32 to 12:33, from `357ff92`, the machine building and testing meanwhile): an hour under `wasp
+   serve`, the standalone server, 8 clients, `hello.wasp` replaced every 5 seconds, a sample every 2 minutes: 11,058,890
+   requests, 0 errors, 718 reloads, the page refused 0 times; 1,896 to 3,193 requests a second, 99 percent under 13.7 to
+   45.6 ms; the working set 129 to 172 MB, private bytes 80 to 125 MB, the GC heap 5 to 48 MB, handles 891 to 918,
+   threads 56 to 61; after the warm-up, 23 samples, private bytes -13.2 KB a reload, the GC heap +7.7 KB a reload,
+   handles +0.029 and threads +0.001: none keeps rising.
 
 **A cancelled request's cleanup, parts** (27 November 2026), what part 1 left, its A3 (a) of "M0.22, Part 1: The Drain",
 and how an exception a cleanup throws then goes, A1 (a) of "A Cancelled Request's Cleanup": a request cancelled, by its
