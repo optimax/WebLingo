@@ -3,7 +3,11 @@ import { write, writeLn, prompt } from "std:console";
 import fs from "std:fs";
 import process from "std:process";
 import { Environment } from "std:env";
+import { Json } from "std:json";
 import { architectureOf, expand, programFiles, run } from "./windows.wlg";
+
+// WebLingo's extension of Visual Studio's, its Identity in Editors/VisualStudio/extension.vsixmanifest.
+const visualStudioExtension = "WebLingo.VisualStudio.77CF6EB6-FE61-422C-9415-F8DFDCCCBF41";
 
 async function choose(question) {
     while (true) {
@@ -32,6 +36,49 @@ async function findCode() {
         if (await fs.exists(cli)) return cli;
     }
     return null;
+}
+
+// Whether a Visual Studio's own extensions for this account, in its folder of them, have WebLingo's.
+async function hasVisualStudioExtension(instance) {
+    var folder = expand($"%LOCALAPPDATA%\\Microsoft\\VisualStudio\\{instance["major"]}.0_{instance["id"]}\\Extensions");
+    if (!(await fs.isFolder(folder))) return false;
+    foreach (var name in await fs.list(folder)) {
+        var manifest = $"{folder}\\{name}\\extension.vsixmanifest";
+        if ((await fs.exists(manifest)) && (await fs.readText(manifest)).contains($"Id=\"{visualStudioExtension}\"")) return true;
+    }
+    return false;
+}
+
+// Visual Studio 2022 and 2026, each installation vswhere lists that has its own VSIXInstaller and not WebLingo's extension
+// yet, as a map: its id, its name, its installer, and its major version, which names its folder of this account's data.
+async function findVisualStudio() {
+    var vswhere = $"{programFiles("x86")}\\Microsoft Visual Studio\\Installer\\vswhere.exe";
+    if (!(await fs.exists(vswhere))) return [];
+    var listed = await process.run(vswhere, ["-version", "[17.0,19.0)", "-products", "*", "-format", "json", "-utf8"],
+        {"timeoutMs": 60000});
+    if (listed["exitCode"] != 0) return [];
+    var found = [];
+    foreach (var instance in Json.parse(listed["stdout"])) {
+        var candidate = {
+            "id": instance["instanceId"], "name": instance["displayName"],
+            "installer": $"{instance["installationPath"]}\\Common7\\IDE\\VSIXInstaller.exe",
+            "major": instance["installationVersion"].split(".")[0]
+        };
+        if (!(await fs.exists(candidate["installer"]))) continue;
+        if (await hasVisualStudioExtension(candidate)) {
+            writeLn($"{candidate["name"]} has WebLingo's extension already.");
+            continue;
+        }
+        found.push(candidate);
+    }
+    return found;
+}
+
+// Whether Visual Studio runs, whose extensions its installer then cannot change.
+async function visualStudioRuns() {
+    var listed = await process.run(expand("%SystemRoot%\\System32\\tasklist.exe"), ["/FI", "IMAGENAME eq devenv.exe", "/NH"],
+        {"timeoutMs": 60000});
+    return listed["stdout"].toLower().contains("devenv.exe");
 }
 
 async function runSetupProgram(executable, args) {
@@ -66,9 +113,32 @@ async function installExtension(code, extension) {
     writeLn("Reopen VS Code, open a .wlg file in a trusted folder, and press F5 to debug.");
 }
 
+// Each Visual Studio's VSIXInstaller, quietly, for this account, the extension being one of a user's, once Visual Studio
+// is closed.
+async function installVisualStudioExtension(instances, extension) {
+    while (await visualStudioRuns()) {
+        var answer = await prompt("Close Visual Studio, then press Enter, or enter Q to leave its extension out. ");
+        if (answer == null || answer.trim().toLower() == "q") {
+            writeLn($"To add it later, with Visual Studio closed, open {extension}.");
+            return;
+        }
+    }
+    foreach (var instance in instances) {
+        writeLn($"Installing WebLingo's extension in {instance["name"]}.");
+        var result = await process.run(instance["installer"], ["/quiet", $"/instanceIds:{instance["id"]}", extension],
+            {"timeoutMs": 1800000});
+        if (result["exitCode"] != 0) {
+            throw new Error($"Visual Studio's extension installer failed for {instance["name"]} (exit code "
+                + $"{result["exitCode"]}). With Visual Studio closed, open {extension}.");
+        }
+    }
+    writeLn("Open a folder with a .wlg or .wasp file in Visual Studio, and press F5 to debug.");
+}
+
 async function setup() {
     var installed = $"{programFiles(await architectureOf("WebLingo", "weblingo"))}\\WebLingo";
     var extension = $"{installed}\\VSCode\\WebLingo.vsix";
+    var visualStudioVsix = $"{installed}\\VisualStudio\\WebLingo.VisualStudio.vsix";
     writeLn($"Install WebLingo in {installed} and add it to the machine PATH.");
     var registerFiles = await choose("Run .wlg files with WebLingo when you double-click them?");
     if (registerFiles == null) return false;
@@ -80,15 +150,27 @@ async function setup() {
     } else {
         writeLn("VS Code was not found. You can add the extension after installing VS Code.");
     }
+    // Only a package made where Visual Studio is installed has its extension (Installers/Windows/package.ps1).
+    var visualStudio = (await fs.exists("WebLingo\\VisualStudio\\WebLingo.VisualStudio.vsix")) ? await findVisualStudio() : [];
+    var installVisualStudio = false;
+    if (visualStudio.length > 0) {
+        var names = ", ".join(visualStudio.map(instance => instance["name"]));
+        installVisualStudio = await choose($"Enable WebLingo debugging in {names} for your account?");
+        if (installVisualStudio == null) return false;
+    }
 
     await installRuntime();
     writeLn($"WebLingo is installed in {installed}.");
-    if (registerFiles || installDebugger) {
+    if (registerFiles || installDebugger || installVisualStudio) {
         var options = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $"{installed}\\uninstall.ps1", "-Remember"];
         if (registerFiles) options.push("-Association");
         if (installDebugger) {
             options.push("-Code");
             options.push(code);
+        }
+        if (installVisualStudio) {
+            options.push("-VisualStudio");
+            options.push(";".join(visualStudio.map(instance => instance["id"])));
         }
         await runSetupProgram(expand("%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"), options);
     }
@@ -101,6 +183,7 @@ async function setup() {
     } else {
         writeLn($"To add the debugger later, use Install from VSIX in VS Code and choose {extension}.");
     }
+    if (installVisualStudio) await installVisualStudioExtension(visualStudio, visualStudioVsix);
     return true;
 }
 

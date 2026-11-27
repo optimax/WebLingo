@@ -2,7 +2,7 @@
 
 WebLingo is a scripting language. This zip holds `weblingo`, which runs WebLingo's scripts, `.wlg` files, and its
 standard modules. **Install WebLingo.bat** installs the runtime for the whole machine and offers file associations
-and the VS Code debugger for your Windows account.
+and the debugger, in VS Code and in Visual Studio 2022 or 2026, for your Windows account.
 
 It comes in six zips, named for the processors they run on and for whether they carry .NET:
 
@@ -23,14 +23,19 @@ It comes in six zips, named for the processors they run on and for whether they 
 2. Unzip it anywhere: right-click it, **Extract All…**, **Extract**.
 3. In the extracted folder, double-click **Install WebLingo.bat** from your usual Windows account.
 4. Press **Enter** to enable running a `.wlg` file by double-clicking it. If setup finds VS Code, press **Enter** to
-   enable debugging there too. Answer **N** to skip either choice or **Q** to cancel before installation.
+   enable debugging there too, and likewise for Visual Studio 2022 or 2026, where it finds one without WebLingo's
+   extension. Answer **N** to skip a choice or **Q** to cancel before installation. Visual Studio's extension is
+   installed once Visual Studio is closed: setup asks you to close it if it is open.
 5. Approve the Windows administrator prompt. The machine installer copies WebLingo and adds it to PATH. Once it
    finishes, setup applies the choices to the account that started it.
 
 Once setup reports **Setup complete**, you can delete the extracted folder. To debug, reopen VS Code, open a trusted
 folder containing your script, open the `.wlg` file, and press **F5**. Choose **WebLingo** if asked for a debugger.
 If you install VS Code later, open its Extensions view, choose **… → Install from VSIX…**, and select
-`VSCode\WebLingo.vsix` in the installed WebLingo folder.
+`VSCode\WebLingo.vsix` in the installed WebLingo folder. In Visual Studio, open a folder holding the script, **File**,
+**Open**, **Folder**, and press **F5** on a `.wlg` or `.wasp` file; to add its extension later, with Visual Studio
+closed, open `VisualStudio\WebLingo.VisualStudio.vsix` in the installed WebLingo folder. A zip made on a machine
+without Visual Studio has no such file, and its setup does not offer it.
 
 From a new console, `weblingo --version` shows the installed version, `weblingo script.wlg` runs a script,
 and `weblingo check script.wlg` checks it. Windows may warn that the unsigned `weblingo.exe` comes from an
@@ -82,7 +87,8 @@ If a file is in use, close the program named by the error and retry. You can alw
 
 Uninstall removes the packaged runtime and offline debugger, and the machine PATH entry that setup added. It restores
 the file-association values setup changed if they still match its registration, and removes the VS Code extension
-if setup added it for this account. Windows controls your explicit default-app choice. An installation of VS Code's
+if setup added it for this account, and Visual Studio's from each Visual Studio setup added it to, once Visual Studio
+is closed. Windows controls your explicit default-app choice. An installation of VS Code's
 extension that predates setup stays installed. WASP keeps its shared runtime files and PATH. A second WebLingo
 architecture keeps its editor integration. Files you added or edited in the installation folder are preserved.
 

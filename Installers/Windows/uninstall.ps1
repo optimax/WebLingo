@@ -1,10 +1,15 @@
 # Windows PowerShell can remove the installed runtime while this script is running.
-# The original account handles its registry and VS Code. Only -Machine crosses UAC.
-param([switch] $Machine, [switch] $Remember, [switch] $Association, [string] $Code)
+# The original account handles its registry, VS Code and Visual Studio. Only -Machine crosses UAC.
+# -VisualStudio names the Visual Studio installations setup adds WebLingo's extension to, their ids separated by ';'.
+param([switch] $Machine, [switch] $Remember, [switch] $Association, [string] $Code, [string] $VisualStudio)
 $ErrorActionPreference = 'Stop'
 $inventoryName = 'uninstall-files.json'
 $pathRecord = 'uninstall-path.json'
 $extensionId = 'weblingo.weblingo'
+# WebLingo's extension of Visual Studio's, its Identity in Editors/VisualStudio/extension.vsixmanifest, and the folder of
+# this account's data of each Visual Studio, where its own extensions are.
+$visualStudioId = 'WebLingo.VisualStudio.77CF6EB6-FE61-422C-9415-F8DFDCCCBF41'
+$visualStudioData = Join-Path $env:LOCALAPPDATA 'Microsoft\VisualStudio'
 $userState = Join-Path $env:LOCALAPPDATA 'WebLingo\Setup'
 
 function Get-ProgramFolder([string] $architecture) {
@@ -33,6 +38,40 @@ function Test-Extension([string] $cli) {
     $extensions = & $cli --list-extensions
     if ($LASTEXITCODE -ne 0) { throw 'VS Code could not list extensions in this account.' }
     return $extensions -contains $extensionId
+}
+
+# Visual Studio 2022 and 2026, each installation vswhere lists that has its own VSIXInstaller: its id, its name, its
+# installer, and its major version, which names its folder of this account's data.
+function Find-VisualStudio {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (!(Test-Path -LiteralPath $vswhere -PathType Leaf)) { return }
+    $listed = & $vswhere -version '[17.0,19.0)' -products '*' -format json -utf8
+    if ($LASTEXITCODE -ne 0) { return }
+    foreach ($instance in (($listed -join "`n") | ConvertFrom-Json)) {
+        $installer = Join-Path $instance.installationPath 'Common7\IDE\VSIXInstaller.exe'
+        if (Test-Path -LiteralPath $installer -PathType Leaf) {
+            [pscustomobject]@{ id = $instance.instanceId; name = $instance.displayName; installer = $installer
+                major = $instance.installationVersion.Split('.')[0] }
+        }
+    }
+}
+
+# Whether a Visual Studio's own extensions for this account have WebLingo's.
+function Test-VisualStudioExtension($instance) {
+    $folder = Join-Path $visualStudioData ('{0}.0_{1}\Extensions' -f $instance.major, $instance.id)
+    if (![IO.Directory]::Exists($folder)) { return $false }
+    foreach ($manifest in Get-ChildItem -LiteralPath $folder -Filter 'extension.vsixmanifest' -Recurse -Depth 1 -File) {
+        if ((Get-Content -LiteralPath $manifest.FullName -Raw).Contains("Id=""$visualStudioId""")) { return $true }
+    }
+    return $false
+}
+
+# Whether Visual Studio runs, whose extensions its installer then cannot change.
+function Test-VisualStudioRuns { return [bool](Get-Process -Name devenv -ErrorAction SilentlyContinue) }
+
+# A Visual Studio's VSIXInstaller, a Windows program, waited for: its exit code.
+function Invoke-VsixInstaller([string] $installer, [string[]] $arguments) {
+    return (Start-Process -FilePath $installer -ArgumentList $arguments -Wait -PassThru).ExitCode
 }
 
 # Each address ends in the registry value name. A trailing slash denotes the unnamed value.
@@ -123,6 +162,12 @@ function Remember-User($classes, [string] $folder) {
     if ($Code) {
         Save-FirstRecord (Join-Path $userState 'debugger.xml') @{ added = !(Test-Extension $Code); cli = $Code }
     }
+    if ($VisualStudio) {
+        $named = $VisualStudio.Split(';')
+        $added = @(Find-VisualStudio | Where-Object { $named -contains $_.id -and !(Test-VisualStudioExtension $_) } |
+            ForEach-Object { $_.id })
+        Save-FirstRecord (Join-Path $userState 'visualstudio.xml') @{ added = $added }
+    }
 }
 
 function Remove-UserIntegrations($classes, [string] $folder, [string] $other, [bool] $legacy) {
@@ -182,7 +227,25 @@ function Remove-UserIntegrations($classes, [string] $folder, [string] $other, [b
         }
     }
     if ($record) { [IO.File]::Delete($editorFile) }
-    if ($hasRecord -or $record) {
+    # Visual Studio's extension, removed from each installation setup added it to that still has it.
+    $studioFile = Join-Path $userState 'visualstudio.xml'
+    $studio = if (Test-Path -LiteralPath $studioFile) { Import-Clixml -LiteralPath $studioFile }
+    if ($studio.added) {
+        $present = @(Find-VisualStudio | Where-Object { $studio.added -contains $_.id -and (Test-VisualStudioExtension $_) })
+        if ($present.Count -and (Test-VisualStudioRuns)) {
+            throw 'Close Visual Studio, then rerun uninstall from the extracted WebLingo ZIP to remove its extension.'
+        }
+        foreach ($instance in $present) {
+            $exit = Invoke-VsixInstaller $instance.installer @('/quiet', "/uninstall:$visualStudioId", "/instanceIds:$($instance.id)")
+            if ($exit -ne 0) {
+                throw "Visual Studio could not uninstall WebLingo's extension from $($instance.name) (exit code $exit). " +
+                    'Remove it in Extensions, Manage Extensions, then rerun uninstall.'
+            }
+            Write-Host "Removed WebLingo's extension from $($instance.name)."
+        }
+    }
+    if ($studio) { [IO.File]::Delete($studioFile) }
+    if ($hasRecord -or $record -or $studio) {
         Remove-EmptyDirectory $userState
         Remove-EmptyDirectory (Split-Path $userState)
     }

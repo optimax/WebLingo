@@ -6,8 +6,20 @@ function Assert([bool] $condition, [string] $message) { if (!$condition) { throw
 function Remove-PathEntry([string] $folder, $original) { $script:pathCalls++ }
 # This account's own VS Code is never the tests': an uninstall that would remove WebLingo's extension finds none.
 function Find-Code { }
+# Nor its own Visual Studio: the tests' installations are made up, their data in the scratch folder, their installer a
+# record of how it was called.
+$script:studios = @()
+$script:studioRuns = $false
+$script:vsixCalls = [Collections.Generic.List[string]]::new()
+function Find-VisualStudio { $script:studios }
+function Test-VisualStudioRuns { $script:studioRuns }
+function Invoke-VsixInstaller([string] $installer, [string[]] $arguments) {
+    $script:vsixCalls.Add("$installer $($arguments -join ' ')")
+    return 0
+}
 $id = 'WebLingoUninstallTest-' + [guid]::NewGuid().ToString('N')
 $scratch = [IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetTempPath()) $id))
+$visualStudioData = Join-Path $scratch 'profile\Microsoft\VisualStudio'
 $scope = 'Software\' + $id
 $classes = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($scope)
 $folder = Join-Path $scratch 'WebLingo'
@@ -94,6 +106,37 @@ try {
     Remove-Runtime $folder $manifest $false
     Assert (![IO.File]::Exists((Join-Path $folder 'shared.dll'))) 'Uninstall succeeds after releasing lock'
     Assert ($pathCalls -eq 1) 'Release the PATH after the last runtime is removed'
+
+    # Visual Studio's extension: recorded for the installations that lacked it, and removed from those alone, once
+    # Visual Studio is closed.
+    $manifest = Join-Path $PSScriptRoot '..\..\..\Editors\VisualStudio\extension.vsixmanifest'
+    Assert ((Get-Content -LiteralPath $manifest -Raw).Contains("Id=""$visualStudioId""")) 'Name the extension as its manifest does'
+    function New-StudioExtension([string] $instance) {
+        $dir = Join-Path $visualStudioData "18.0_$instance\Extensions\a1b2c3d4.e5f"
+        [IO.Directory]::CreateDirectory($dir) | Out-Null
+        [IO.File]::WriteAllText((Join-Path $dir 'extension.vsixmanifest'), "<Identity Id=""$visualStudioId"" Version=""0.1.0"" />")
+    }
+    $script:studios = @(
+        [pscustomobject]@{ id = 'had'; name = 'Studio A'; installer = 'A\VSIXInstaller.exe'; major = '18' },
+        [pscustomobject]@{ id = 'lacked'; name = 'Studio B'; installer = 'B\VSIXInstaller.exe'; major = '18' })
+    New-StudioExtension 'had'
+    Assert (Test-VisualStudioExtension $studios[0]) 'Find an installed extension'
+    Assert (!(Test-VisualStudioExtension $studios[1])) 'Find none where there is none'
+    $Association = $false
+    $VisualStudio = 'had;lacked'
+    Remember-User $classes $folder
+    $VisualStudio = ''
+    New-StudioExtension 'lacked'
+    $script:studioRuns = $true
+    try { Remove-UserIntegrations $classes $folder '' $false; throw 'Uninstalled while Visual Studio runs' }
+    catch { if ($_.Exception.Message -notlike 'Close Visual Studio*') { throw } }
+    Assert (Test-Path -LiteralPath (Join-Path $userState 'visualstudio.xml')) 'Keep the record for a retry'
+    Assert ($vsixCalls.Count -eq 0) 'Leave a running Visual Studio alone'
+    $script:studioRuns = $false
+    Remove-UserIntegrations $classes $folder '' $false
+    Assert ($vsixCalls.Count -eq 1) 'Remove the extension once'
+    Assert ($vsixCalls[0] -ceq "B\VSIXInstaller.exe /quiet /uninstall:$visualStudioId /instanceIds:lacked") 'Remove only what setup added'
+    Assert (!(Test-Path -LiteralPath (Join-Path $userState 'visualstudio.xml'))) 'Forget the record'
     Write-Output 'Windows uninstall regression checks passed.'
 } finally {
     $classes.Close()

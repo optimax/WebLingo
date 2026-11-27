@@ -224,13 +224,23 @@ For a Windows release, run `Installers/Windows/package.bat`. Each WebLingo ZIP c
 and `setup.wlg` at its root. The launcher starts the bundled runtime from the extracted
 directory. PowerShell elevates only `install.wlg`. The original process handles file registration and calls the
 current user's VS Code CLI to install the offline `VSCode/WebLingo.vsix` from the runtime installation.
-The packager builds this VSIX once from `Editors/VSCode/package.json` and the assets it names.
+The packager builds this VSIX once from `Editors/VSCode/package.json` and the assets it names. Where Visual Studio
+2022 or 2026 is installed, the packager also builds `Editors/VisualStudio` with its `build.ps1`, which compiles against
+that Visual Studio, into each runtime as `VisualStudio/WebLingo.VisualStudio.vsix`; elsewhere the zips leave it out.
+Setup then finds each Visual Studio with `vswhere.exe` and offers the extension to those without it, by the Identity in
+its manifest, in this account's `%LOCALAPPDATA%\Microsoft\VisualStudio\<major>.0_<instance>\Extensions`, and installs
+it with that installation's own `VSIXInstaller.exe /quiet /instanceIds:<instance>` once Visual Studio is closed, an
+extension of the user's, without elevation.
 
 `Installers/Windows/Uninstall WebLingo.bat` and `uninstall.ps1` ship in the runtime so uninstall works after the
 download is deleted. PowerShell runs independently of the executable it removes. The package inventory names the
 runtime files with SHA-256 hashes and identifies files WASP also uses. Installation retains the original raw machine
-PATH and records the user's association values and whether VS Code already had the extension. Uninstall uses those
-records under the original user and elevates only the machine cleanup.
+PATH and records the user's association values, whether VS Code already had the extension, and which Visual Studio
+installations setup adds its extension to. Uninstall uses those records under the original user and elevates only the
+machine cleanup, removing Visual Studio's extension, `VSIXInstaller.exe /quiet /uninstall:<id>`, from those alone, once
+Visual Studio is closed. Its tests, `Installers/Windows/tests/uninstall.ps1`, replace `Find-Code`, `Find-VisualStudio`,
+`Test-VisualStudioRuns` and `Invoke-VsixInstaller` with their own, and keep Visual Studio's data in their scratch
+folder, so that no test reaches this account's VS Code or Visual Studio.
 
 For Linux, run `Installers/Linux/package.sh` on Linux, with the .NET 10 SDK, GNU tar and `dpkg-deb`
 (`Installers/Linux/readme.md` is a user's steps): `install.sh` copies its archive's `WebLingo` folder to

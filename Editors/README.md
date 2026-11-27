@@ -224,9 +224,12 @@ package: `WebLingoLaunch.cs`, its launch targets, compiled for .NET Framework 4.
 which it references and never ships; `WebLingo.pkgdef`, which registers `weblingo --debug-adapter` and
 `wasp --debug-adapter` with Visual Studio's Debug Adapter Host as engines of its own, WebLingo and WASP;
 `extension.vsixmanifest`; and `manifest.json` and `catalog.json`, which `build.ps1` writes from the manifest, as Visual
-Studio's SDK does, Visual Studio's installer refusing a VSIX without them as "not a valid VSIX package". Install it by
-opening the `.vsix`, Visual Studio closed, or from a command line, `VSIXInstaller.exe /quiet WebLingo.VisualStudio.vsix`,
-`VSIXInstaller.exe` in Visual Studio's `Common7\IDE`.
+Studio's SDK does, Visual Studio's installer refusing a VSIX without them as "not a valid VSIX package". WebLingo's
+setup for Windows offers it where it finds Visual Studio 2022 or 2026 without it, `Installers/Windows/package.ps1`
+building it into each WebLingo zip as `VisualStudio/WebLingo.VisualStudio.vsix` where Visual Studio is installed, and
+its uninstaller removes it where setup added it. Install it yourself by opening the `.vsix`, Visual Studio closed, or
+from a command line, `VSIXInstaller.exe /quiet WebLingo.VisualStudio.vsix`, `VSIXInstaller.exe` in Visual Studio's
+`Common7\IDE`.
 
 In the folder, a `.wlg` or a `.wasp` file chosen as the startup item, by its context menu's **Set as Startup Item**, or
 the file in front with **Current Document** chosen on the toolbar, is what F5 debugs, a script with `weblingo`'s adapter,

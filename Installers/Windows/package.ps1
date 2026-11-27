@@ -6,9 +6,10 @@
 #   for a machine with WebLingo installed from the zip of the same version, architecture and kind, made by the same run
 #   of this script.
 # WebLingo's include Install WebLingo.bat and setup.wlg for interactive setup. Their WebLingo folder holds weblingo,
-# the standard modules and VSCode/WebLingo.vsix, which install.wlg installs together in WebLingo's
-# folder, C:\Program Files\WebLingo, or for x86 on 64-bit Windows C:\Program Files (x86)\WebLingo, and puts on the
-# machine's PATH; WASP's the folder WASP, what wasp adds to them, which iis-install.wlg installs there, once IIS has what
+# the standard modules, VSCode/WebLingo.vsix, and, where Visual Studio 2022 or 2026 is installed on the machine that runs
+# this script, VisualStudio/WebLingo.VisualStudio.vsix, Editors/VisualStudio's, which install.wlg installs together in
+# WebLingo's folder, C:\Program Files\WebLingo, or for x86 on 64-bit Windows C:\Program Files (x86)\WebLingo, and puts on
+# the machine's PATH; WASP's the folder WASP, what wasp adds to them, which iis-install.wlg installs there, once IIS has what
 # it needs to run wasp, with wasp-needs.json, the SHA-256 of each file of WebLingo's that wasp needs, as this run made
 # it, and add-wasp-site.wlg, to add a site. The scripts are the repository's, from its Scripts folder, and readme.md, a
 # human's steps, this folder's readme.md and wasp-readme.md.
@@ -107,8 +108,21 @@ function New-VSCodePackage {
     New-Zip $folder (Join-Path $staging 'WebLingo.vsix')
 }
 
+# Visual Studio's extension, built by Editors/VisualStudio/build.ps1, which compiles it against the Visual Studio installed
+# here; where there is none, the packages leave it out, and their setup does not offer it.
+function New-VisualStudioPackage {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (!(Test-Path -LiteralPath $vswhere) -or !(& $vswhere -latest -version '[17.0,19.0)' -property installationPath)) {
+        Write-Host 'Visual Studio 2022 or 2026 is not installed here: the packages leave its extension out.'
+        return
+    }
+    & (Join-Path $repository 'Editors/VisualStudio/build.ps1')
+    Copy-Item -LiteralPath (Join-Path $repository 'Editors/VisualStudio/bin/WebLingo.VisualStudio.vsix') -Destination $staging
+}
+
 try {
     New-VSCodePackage
+    New-VisualStudioPackage
     foreach ($architecture in 'x64', 'x86', 'arm64') {
         foreach ($kind in 'self-contained', 'framework-dependent') {
             # WebLingo's: weblingo, weblingow, the standard modules, and the scripts that install them; weblingow's project
@@ -119,6 +133,11 @@ try {
             Publish-Project 'src/WebLingo.Windowed.Cli/WebLingo.Windowed.Cli.csproj' $architecture $kind $runtime
             $editor = New-Item -ItemType Directory -Path (Join-Path $runtime 'VSCode') -Force
             Copy-Item -LiteralPath (Join-Path $staging 'WebLingo.vsix') -Destination $editor.FullName
+            $studio = Join-Path $staging 'WebLingo.VisualStudio.vsix'
+            if (Test-Path -LiteralPath $studio) {
+                $studioFolder = New-Item -ItemType Directory -Path (Join-Path $runtime 'VisualStudio') -Force
+                Copy-Item -LiteralPath $studio -Destination $studioFolder.FullName
+            }
             foreach ($script in 'setup.wlg', 'install.wlg', 'add-wlg-file-type.wlg', 'windows.wlg', 'weblingo.config') {
                 Copy-Item (Join-Path $repository "Scripts/$script") $root
             }
