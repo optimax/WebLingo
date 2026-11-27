@@ -261,7 +261,13 @@ for the installer. With IIS it uses `Scripts/install-weblingo.wlg` to update the
 and restart affected application pools. Without IIS it passes the same published folder to `Scripts/install.wlg`.
 
 `WebLingo/publish.ps1` and `Installers/Windows/package.ps1` share `WebLingo/Runtime.pubxml`, which excludes debug
-symbols and satellite resource assemblies from the published files. A local publish also removes earlier copies
+symbols and satellite resource assemblies from the published files, and `Installers/Linux/package.sh` shares it too.
+The profile compiles a publish ReadyToRun wherever it names a runtime, `-r win-x64` or `--use-current-runtime`, as each
+of the three does: every assembly, the native modules in `std/` and `windows/` among them, which the publish copies as
+files and the profile marks for compiling (`PostprocessAssembly`), but the VM's, which it leaves to the JIT ("ReadyToRun
+Leaves the VM to the JIT", section 11); `-p:PublishReadyToRun=false` publishes without it. The SDK compiles with
+crossgen2, `microsoft.netcore.app.crossgen2.win-x64` on Windows, of the runtime's version, which a publish restores from
+nuget.org into the NuGet cache, once, as it restores the runtime packs, and which compiles for x86 and arm64 too. A local publish also removes earlier copies
 of those files from its publish folder and drops the language directories when empty. The Windows installer
 continues to preserve files already installed that are absent from its source.
 

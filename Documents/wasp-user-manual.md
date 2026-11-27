@@ -1468,9 +1468,10 @@ Once for the server:
    role), then install the **ASP.NET Core Hosting Bundle** for .NET 10, which brings the .NET and ASP.NET Core
    runtimes and IIS's ASP.NET Core Module. Install the bundle after IIS: one installed before it does not add the
    module to IIS until it is run again and repaired.
-2. On a Windows machine with the .NET 10 SDK and the repository, publish WebLingo from the solution's folder,
-   `WebLingo`, with `powershell -ExecutionPolicy Bypass -File publish.ps1`, which publishes it into
-   `WebLingo/publish/WebLingo`: `wasp.exe`, `weblingo.exe`, their libraries, and the standard modules, `std\`.
+2. On a Windows machine with the .NET 10 SDK and the repository, and the server's processor, x64 or arm64, publish
+   WebLingo from the solution's folder, `WebLingo`, with `powershell -ExecutionPolicy Bypass -File publish.ps1`, which
+   publishes it into `WebLingo/publish/WebLingo`: `wasp.exe`, `weblingo.exe`, their libraries, and the standard
+   modules, `std\`, compiled ReadyToRun for that processor, so that they start faster.
 3. Copy that folder to the server as `C:\Program Files\WebLingo`. On the server itself, when it has the SDK and the
    repository, `powershell -ExecutionPolicy Bypass -File publish.ps1 -Destination "C:\Program Files\WebLingo"`, from
    an elevated prompt, does both.

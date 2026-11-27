@@ -84,7 +84,8 @@ Once for the server:
    ```
 
    which publishes it into `WebLingo/publish/WebLingo`: `wasp.exe`, `weblingo.exe`, their libraries, and the standard
-   modules, `std\`. `-ExecutionPolicy Bypass` lets this one script run, without changing the machine's policy, where
+   modules, `std\`, compiled ReadyToRun for this machine's processor, x64 or arm64, which the server's must be.
+   `-ExecutionPolicy Bypass` lets this one script run, without changing the machine's policy, where
    Windows's default runs no script ("running scripts is disabled on this system").
 3. Copy that folder to the server as `C:\Program Files\WebLingo`. On the server itself, when it has the SDK and the
    repository, `powershell -ExecutionPolicy Bypass -File publish.ps1 -Destination "C:\Program Files\WebLingo"`, from an
