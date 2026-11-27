@@ -179,10 +179,18 @@ identity, which no catch catches.
 
 ## The soak with reloads
 
-M0.22's part 3, landed but for the .NET heap: `WebLingo.Benchmarks --load --soak HOURS --reload-every SECONDS`
+M0.22's part 3, landed whole: `WebLingo.Benchmarks --load --soak HOURS --reload-every SECONDS`
 (`WebLingoLoad`), each measure's growth for each reload by least squares and a rising trend a failure
-(`WebLingoSoakTrend`, tested in `LoadTests`); run 3 hours on each server, nothing rising (the specification's section 9,
-"M0.22 parts", part 3). The .NET heap's column waits for an answer of the owner's in `TO-DO.md`.
+(`WebLingoSoakTrend`, tested in `LoadTests`), the server's .NET heap among them, read through its `System.Runtime`
+counters (`WebLingoServerCounters`); run 3 hours on each server, and an hour with the heap, nothing rising (the
+specification's section 9, "M0.22 parts", part 3).
+
+## The load site under IIS
+
+`WebLingo.Benchmarks --load --prepare FOLDER` makes the load site for IIS, a `web.config` and its SQLite database beside
+its pages, and writes the `Scripts` commands that add it; the measurements under IIS (the specification's section 5.6,
+"Under load, parts", part 3) wait for the owner to run those, as administrator, after `build.bat`, as the task "Load and
+Soak Tests for WASP, Part 3: Under IIS" asks.
 
 ## The collector
 

@@ -38,11 +38,46 @@ public sealed class LoadTests
     [InlineData("--reload-every", "5")]
     [InlineData("--reload-every", "0", "--soak", "1")]
     [InlineData("--soak", "1", "--reload-every", "5", "--url", "http://localhost:8080/")]
+    [InlineData("--prepare")]
+    [InlineData("--prepare", "C:/WWW/wasp.load", "--seconds", "1")]
     public void AnOptionItDoesNotTakeIsAUsageError(params string[] args)
     {
         var error = new StringWriter();
         Assert.Equal(WebLingoLoad.UsageError, WebLingoBenchmarkCommand.Run(["--load", .. args], new StringWriter(), error));
         Assert.StartsWith("Usage: WebLingo.Benchmarks --load", error.ToString(), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// <c>--prepare</c> makes the load site for IIS: its pages, a <c>web.config</c> that runs the installed <c>wasp</c>, and
+    /// its database where its <c>wasp.config</c> names it; made again, its pages are replaced and its database kept
+    /// (section 5.6, "Under load, parts", part 3).
+    /// </summary>
+    [Fact]
+    public void PrepareMakesTheLoadSiteForIis_KeepingItsDatabaseWhenMadeAgain()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "weblingo-prepare-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var output = new StringWriter();
+            Assert.Equal(WebLingoLoad.Success, WebLingoBenchmarkCommand.Run(["--load", "--prepare", folder], output, new StringWriter()));
+            var site = Path.Combine(folder, "site");
+            foreach (var page in WebLingoLoad.Pages) Assert.True(File.Exists(Path.Combine(site, page.Name + ".wasp")), page.Name);
+            Assert.Contains(@"processPath=""C:\Program Files\WebLingo\wasp.exe""", File.ReadAllText(Path.Combine(site, "web.config")));
+            var database = Path.Combine(folder, "load-data", "load.db");
+            Assert.True(File.Exists(database));
+            Assert.Contains($"writable={Path.Combine(folder, "load-data")}", output.ToString());
+
+            File.WriteAllText(Path.Combine(site, "hello.wasp"), "changed");
+            var made = File.GetLastWriteTimeUtc(database);
+            Assert.Equal(WebLingoLoad.Success,
+                WebLingoBenchmarkCommand.Run(["--load", "--prepare", folder], new StringWriter(), new StringWriter()));
+            Assert.NotEqual("changed", File.ReadAllText(Path.Combine(site, "hello.wasp")));
+            Assert.Equal(made, File.GetLastWriteTimeUtc(database));
+        }
+        finally
+        {
+            if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+        }
     }
 
     private static readonly WebLingoSoakTrend.Measure Bytes = WebLingoSoakTrend.Measures.Single(measure => measure.Name == "private bytes");

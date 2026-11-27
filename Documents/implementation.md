@@ -321,7 +321,11 @@ at `--url`. `sqlserver.wasp` reads the machine's SQL Server, `localhost`,
 the machine's, shared; run it on an otherwise idle machine. Its numbers are in the specification's section 5.6, "Under load".
 With `--site forum` and `--url`, it asks for WebLingo Forum's pages instead, served there, its database made by its
 `setup.wlg`: its front page, its first board, its first topic and a search (`WebLingoLoad.ForumPages`), their numbers
-in `Documents/weblingo-forum.md`, section 6, part 10. `LoadTests` (`WebLingo.VM.Tests`) checks its pages and its options, not the load.
+in `Documents/weblingo-forum.md`, section 6, part 10. `--prepare FOLDER` measures nothing: it makes the load site in
+`FOLDER` for IIS to serve, its pages and a `web.config` that runs `C:\Program Files\WebLingo\wasp.exe` in `site`, its
+SQLite database in `load-data`, unpooled so that the file is let go once made, and writes the `Scripts` commands that add
+it to IIS, `wasp.load` at `https://load.wasp.localhost/`, and give its pool a SQL Server login; made again, its pages are
+replaced and its database kept. `LoadTests` (`WebLingo.VM.Tests`) checks its pages, its options and `--prepare`, not the load.
 
 ### Measuring workers
 

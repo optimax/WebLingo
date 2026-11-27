@@ -30,6 +30,42 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
     public static WebLingoLoadSite At(Uri url) => new(url, $"the site at {url}", null);
 
     /// <summary>
+    /// The load site made in <paramref name="folder"/> for IIS to serve (specification, section 5.6, "Under load, parts",
+    /// part 3): its pages in its <c>site</c> folder, with a <c>web.config</c> that runs the installed <c>wasp</c>, which
+    /// <c>add-wasp-site.wlg</c> needs, and its SQLite database in its <c>load-data</c> folder, where its <c>wasp.config</c>
+    /// names it. Made again, its pages and its <c>web.config</c> are replaced, and its database kept.
+    /// </summary>
+    public static void Prepare(string folder)
+    {
+        var site = Path.Combine(folder, "site");
+        Copy(WebLingoLoad.SiteFolder, site);
+        File.WriteAllText(Path.Combine(site, "web.config"), WebConfig);
+        var database = Path.Combine(folder, "load-data", "load.db");
+        if (!File.Exists(database)) MakeDatabase(database);
+    }
+
+    /// <summary>The load site's <c>web.config</c> under IIS, as the examples' and the forum's are.</summary>
+    private const string WebConfig = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <!--
+          IIS runs the load site through the ASP.NET Core Module, which starts wasp, installed in C:\Program Files\WebLingo,
+          and passes it every request. Made by WebLingo.Benchmarks --load --prepare.
+        -->
+        <configuration>
+          <location path="." inheritInChildApplications="false">
+            <system.webServer>
+              <handlers>
+                <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
+              </handlers>
+              <aspNetCore processPath="C:\Program Files\WebLingo\wasp.exe" arguments="serve" hostingModel="outofprocess"
+                          stdoutLogEnabled="false" stdoutLogFile="C:\inetpub\logs\WebLingo\LoadSite" />
+            </system.webServer>
+          </location>
+        </configuration>
+
+        """;
+
+    /// <summary>
     /// The load site, served by <c>wasp serve</c> where <paramref name="host"/> is <c>serve</c>, WebLingo's own HTTP server
     /// since part 6 of "M0.23 parts" (specification, section 9), by <c>wasp serve --host standalone</c> where it is
     /// <c>standalone</c>, by <c>wasp serve --host aspnetcore</c>, ASP.NET Core's server, where it is <c>aspnetcore</c>, else
@@ -254,7 +290,7 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
         {
             var target = Path.Combine(to, Path.GetRelativePath(from, file));
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(file, target);
+            File.Copy(file, target, true);
         }
     }
 
@@ -265,7 +301,8 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
     private static void MakeDatabase(string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        using var connection = new SqliteConnection($"Data Source={path}");
+        // Not pooled, so that the file is let go once it is made, for IIS's pool to open where --prepare made it.
+        using var connection = new SqliteConnection($"Data Source={path};Pooling=False");
         connection.Open();
         using var transaction = connection.BeginTransaction();
         using (var create = connection.CreateCommand())

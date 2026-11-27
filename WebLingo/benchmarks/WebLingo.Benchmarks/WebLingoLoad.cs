@@ -31,8 +31,9 @@ public sealed record WebLingoServerSample(long WorkingSet, long PrivateBytes, in
 /// every few seconds, which reloads the site, the growth of each for each reload given after the warm-up, one that keeps
 /// rising a failure (specification, section 9, "M0.22 parts", part 3; <see cref="WebLingoSoakTrend"/>); with
 /// <c>--fair</c>, a page that computes for long asked for by a client for each of the server's workers while others ask for
-/// <c>hello</c>, under each quantum given (section 9, "M0.24 parts", part 3). Exit codes: 0 every answer right, 1 one
-/// wrong or failed, or a soak's measure rising, 2 a usage error.
+/// <c>hello</c>, under each quantum given (section 9, "M0.24 parts", part 3); with <c>--prepare</c>, the load site made in
+/// a folder for IIS to serve, and nothing measured (section 5.6, "Under load, parts", part 3). Exit codes: 0 every answer
+/// right, 1 one wrong or failed, or a soak's measure rising, 2 a usage error.
 /// </summary>
 public static class WebLingoLoad
 {
@@ -80,6 +81,7 @@ public static class WebLingoLoad
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
     {
+        if (args is ["--prepare", var folder]) return Prepare(folder, output, error);
         var settings = new Settings();
         for (var i = 0; i < args.Length; i++)
         {
@@ -641,6 +643,35 @@ public static class WebLingoLoad
     private static string Megabytes(long? bytes) =>
         bytes is { } value ? (value / 1024.0 / 1024.0).ToString("0", CultureInfo.InvariantCulture) + " MB" : "–";
 
+    /// <summary>
+    /// <c>--prepare</c>: the load site made in <paramref name="folder"/> for IIS to serve (specification, section 5.6, "Under
+    /// load, parts", part 3; <see cref="WebLingoLoadSite.Prepare"/>), and what then adds it to IIS and measures it written.
+    /// </summary>
+    private static int Prepare(string folder, TextWriter output, TextWriter error)
+    {
+        string site, data;
+        try
+        {
+            var full = Path.GetFullPath(folder);
+            (site, data) = (Path.Combine(full, "site"), Path.Combine(full, "load-data"));
+            WebLingoLoadSite.Prepare(full);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException
+                                              or Microsoft.Data.Sqlite.SqliteException)
+        {
+            error.WriteLine($"The load site could not be made in {folder}: {exception.Message}");
+            return Failed;
+        }
+        output.WriteLine($"The load site is in {site}, its database in {data}.");
+        output.WriteLine("Add it to IIS from the repository's Scripts, as administrator:");
+        output.WriteLine();
+        output.WriteLine($"  weblingo run add-wasp-site.wlg name=wasp.load folder={site} host=load.wasp.localhost writable={data}");
+        output.WriteLine("  weblingo run add-sql-server-login.wlg name=wasp.load database=master");
+        output.WriteLine();
+        output.WriteLine("Then measure it: WebLingo.Benchmarks --load --url https://load.wasp.localhost/");
+        return Success;
+    }
+
     private static int Usage(TextWriter error)
     {
         error.WriteLine("Usage: WebLingo.Benchmarks --load [--host serve|standalone|aspnetcore|fastcgi | --url <url>] [--site load|forum]");
@@ -649,6 +680,7 @@ public static class WebLingoLoad
         error.WriteLine("                             [--seconds N] [--warm-up N]");
         error.WriteLine("                             [--reload SECONDS | --soak HOURS [--sample MINUTES] [--reload-every SECONDS]");
         error.WriteLine("                             | --fair none,1000000,100000,10000]");
+        error.WriteLine("       WebLingo.Benchmarks --load --prepare FOLDER");
         error.WriteLine($"  pages: {string.Join(", ", Pages.Select(page => page.Name))}");
         error.WriteLine($"  the forum's, --site forum, at --url: {string.Join(", ", ForumPages.Select(page => page.Name))}");
         return UsageError;
