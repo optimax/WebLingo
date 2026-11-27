@@ -260,6 +260,8 @@ public sealed class DotNetSchedulerHost : IWebLingoSchedulerHost
 
     public void RunBlocking(Action work, bool opensConnection) => DotNetBlockingPool.Run(work, opensConnection);
 
+    public void RunBlocking(Action work, IWebLingoConnectionGate gate) => DotNetBlockingPool.Run(work, gate);
+
     public void Post(Action work)
     {
         lock (_gate)

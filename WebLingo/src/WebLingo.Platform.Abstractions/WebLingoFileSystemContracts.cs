@@ -125,6 +125,13 @@ public interface IWebLingoSchedulerHost
     /// </summary>
     void RunBlocking(Action work, bool opensConnection);
 
+    /// <summary>
+    /// Runs blocking work that opens a connection of <paramref name="gate"/>'s pool, as the other overload runs work that
+    /// opens one, once the gate has a place for it, which it takes (<see cref="IWebLingoConnectionGate.TryEnter"/>): until
+    /// then the work waits in the host's queue, holding no thread, other work going ahead of it (section 6.10).
+    /// </summary>
+    void RunBlocking(Action work, IWebLingoConnectionGate gate);
+
     /// <summary>Posts work for the execution's worker, from any thread.</summary>
     void Post(Action work);
 

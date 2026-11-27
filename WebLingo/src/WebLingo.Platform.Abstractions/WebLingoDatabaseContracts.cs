@@ -14,6 +14,42 @@ public interface IWebLingoDatabases
     /// provider the platform does not have, or a database that cannot be opened.
     /// </summary>
     IWebLingoDatabaseConnection Open(string nameOrConnection);
+
+    /// <summary>
+    /// What counts the connections of the pool a connection to <paramref name="nameOrConnection"/> is opened in
+    /// (<see cref="IWebLingoConnectionGate"/>), which a host's blocking work that opens one waits on, holding no thread, until
+    /// it has a place (section 6.10); null where its provider's pool has no most to wait for, SQLite's. It reads nothing, no
+    /// secret and no file, so that a worker may ask for it.
+    /// </summary>
+    IWebLingoConnectionGate? Gate(string nameOrConnection);
+
+    /// <summary>
+    /// A connection, as <see cref="Open(string)"/> opens one, in the place its host took for it in <paramref name="gate"/>
+    /// (<see cref="IWebLingoConnectionGate.TryEnter"/>), the gate <see cref="Gate"/> gave: kept until it is closed, and given
+    /// back where it cannot be opened.
+    /// </summary>
+    IWebLingoDatabaseConnection Open(string nameOrConnection, IWebLingoConnectionGate gate);
+}
+
+/// <summary>
+/// The connections a process holds of one database's pool, counted against the pool's size (specification, section 6.10;
+/// the owner's answer, 27 November 2026, A1 (a) of "SQL Server's Page at 256 Clients a Fifth as Fast as Before the Bound"),
+/// so that an open beyond them waits in its host's queue, holding no thread, rather than in the pool, holding one. Its
+/// places are taken and given back from any thread.
+/// </summary>
+public interface IWebLingoConnectionGate
+{
+    /// <summary>How many more connections may be opened now without waiting for the pool; <see cref="int.MaxValue"/> while its size is not known.</summary>
+    int Room { get; }
+
+    /// <summary>Whether a connection may be opened now without waiting for the pool: a place taken for it if so.</summary>
+    bool TryEnter();
+
+    /// <summary>
+    /// <paramref name="freed"/> called each time a place is given back, or the gate learns that it has more, from the thread
+    /// that does so, outside the gate's own lock.
+    /// </summary>
+    void WhenFreed(Action freed);
 }
 
 /// <summary>

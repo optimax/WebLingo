@@ -1,3 +1,4 @@
+using WebLingo.Platform.Abstractions;
 using WebLingo.Platform.DotNet;
 using Xunit;
 namespace WebLingo.Conformance.Tests;
@@ -95,6 +96,84 @@ public sealed class BlockingPoolTests
         }
         Assert.True(finished.Wait(TimeSpan.FromSeconds(60)), $"only {requests - finished.CurrentCount} of {requests} finished");
         Assert.Equal(0, Volatile.Read(ref timedOut));
+    }
+
+    /// <summary>
+    /// An opening whose database counts its pool's connections begins only once the gate has a place for it (the owner's
+    /// answer, 27 November 2026, A1 (a) of "SQL Server's Page at 256 Clients a Fifth as Fast as Before the Bound"): ten
+    /// openings of a pool of two, each keeping its place, as a connection does, two run, the rest waiting holding no thread,
+    /// other work going ahead of them, and each place given back lets one more begin.
+    /// </summary>
+    [Fact]
+    public void AnOpeningWaitsForItsGatesPlace_HoldingNoThread()
+    {
+        var gate = new Places(2);
+        var opened = 0;
+        using var all = new CountdownEvent(10);
+        for (var i = 0; i < 10; i++)
+        {
+            DotNetBlockingPool.Run(() =>
+            {
+                Interlocked.Increment(ref opened);
+                all.Signal();
+            }, gate);
+        }
+        Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref opened) == 2, TimeSpan.FromSeconds(10)), $"{Volatile.Read(ref opened)} opened");
+        Thread.Sleep(100);
+        Assert.Equal((2, 0), (Volatile.Read(ref opened), gate.Room));
+        using var other = new ManualResetEventSlim();
+        DotNetBlockingPool.Run(other.Set);
+        Assert.True(other.Wait(TimeSpan.FromSeconds(10)), "other work waited behind the openings");
+        for (var given = 1; given <= 8; given++)
+        {
+            gate.Leave();
+            Assert.True(SpinWait.SpinUntil(() => Volatile.Read(ref opened) == 2 + given, TimeSpan.FromSeconds(10)),
+                $"{Volatile.Read(ref opened)} opened, {given} places given back");
+        }
+        Assert.True(all.Wait(TimeSpan.FromSeconds(10)));
+        Assert.Equal(0, gate.Room);
+    }
+
+    /// <summary>A pool's places, as a database's gate counts them, given back by the test.</summary>
+    private sealed class Places(int most) : IWebLingoConnectionGate
+    {
+        private readonly object _sync = new();
+        private readonly List<Action> _freed = [];
+        private int _held;
+
+        public int Room
+        {
+            get
+            {
+                lock (_sync) return most - _held;
+            }
+        }
+
+        public bool TryEnter()
+        {
+            lock (_sync)
+            {
+                if (_held >= most) return false;
+                _held++;
+                return true;
+            }
+        }
+
+        public void Leave()
+        {
+            Action[] told;
+            lock (_sync)
+            {
+                _held--;
+                told = [.. _freed];
+            }
+            foreach (var freed in told) freed();
+        }
+
+        public void WhenFreed(Action freed)
+        {
+            lock (_sync) _freed.Add(freed);
+        }
     }
 
     [Fact]

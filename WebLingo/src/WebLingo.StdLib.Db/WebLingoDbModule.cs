@@ -55,7 +55,7 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
             {
                 return false;
             }
-            return scheduler.TryRunOffWorker(() => databases.Open(name.Name),
+            WebLingoOffWorkerFinish<IWebLingoDatabaseConnection> opened =
                 (IWebLingoDatabaseConnection connection, WebLingoHeap h, out WebLingoValue made, out WebLingoRuntimeError? wrong) =>
                 {
                     // Opened by another call meanwhile, or disposed: that one stands, and this connection is closed.
@@ -67,7 +67,12 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
                     }
                     connection.Dispose();
                     return false;
-                }, Failed, instance, opensConnection: true, out result, out error); // Waiting for a pooled one (section 6.10).
+                };
+            // Waiting for a pooled one (section 6.10): where its database counts its pool's connections, in the host's queue,
+            // holding no thread, until one of them is given back.
+            return databases.Gate(name.Name) is { } gate
+                ? scheduler.TryRunOffWorker(() => databases.Open(name.Name, gate), opened, Failed, instance, gate, out result, out error)
+                : scheduler.TryRunOffWorker(() => databases.Open(name.Name), opened, Failed, instance, opensConnection: true, out result, out error);
         });
         database.DeclareMethod("query", 3, 2, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         {

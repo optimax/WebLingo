@@ -142,6 +142,8 @@ public sealed class DebuggedRequestTests
 
         public void RunBlocking(Action work, bool opensConnection) => throw new InvalidOperationException();
 
+        public void RunBlocking(Action work, IWebLingoConnectionGate gate) => throw new InvalidOperationException();
+
         public void Post(Action work)
         {
             _posted.Enqueue(work);

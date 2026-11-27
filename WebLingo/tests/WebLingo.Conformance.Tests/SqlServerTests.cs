@@ -1,5 +1,7 @@
 using System.Text.Json;
 using WebLingo.Cli;
+using WebLingo.Data.DotNet;
+using WebLingo.Platform.Abstractions;
 using Xunit;
 namespace WebLingo.Conformance.Tests;
 
@@ -13,6 +15,48 @@ public sealed class SqlServerTests : IDisposable
     private readonly string _folder = Path.Combine(Path.GetTempPath(), "weblingo-sqlserver-" + Guid.NewGuid().ToString("N"));
     private readonly string _database = "WebLingoTests" + Guid.NewGuid().ToString("N");
     private bool _made;
+
+    /// <summary>
+    /// A database's gate (specification, section 6.10; the owner's answer, 27 November 2026, A1 (a) of "SQL Server's Page at
+    /// 256 Clients a Fifth as Fast as Before the Bound"): one for each configured name, none for SQLite's; its pool's size,
+    /// <c>Max Pool Size</c>, learned at its first open; each connection keeping its place, a blocking open's taken at once,
+    /// given back when it is closed, once, and where it cannot be opened, those waiting told each time.
+    /// </summary>
+    [SqlServerFact]
+    public void ADatabasesGateCountsItsPoolsConnections()
+    {
+        var databases = new DotNetDatabases(new Dictionary<string, string>
+        {
+            ["two"] = SqlServerFactAttribute.ConnectionString("master") + ";Max Pool Size=2",
+            ["missing"] = SqlServerFactAttribute.ConnectionString("WebLingoNoSuchDatabase" + Guid.NewGuid().ToString("N")) + ";Max Pool Size=2",
+            ["local"] = "sqlite::memory:"
+        }, Path.GetTempPath());
+        Assert.Null(databases.Gate("sqlite::memory:"));
+        Assert.Null(databases.Gate("local"));
+        var gate = databases.Gate("two")!;
+        Assert.Same(gate, databases.Gate("two"));
+        Assert.Equal(int.MaxValue, gate.Room);
+        var freed = 0;
+        gate.WhenFreed(() => Interlocked.Increment(ref freed));
+
+        Assert.True(gate.TryEnter());
+        var first = databases.Open("two", gate);
+        Assert.Equal(1, gate.Room);
+        var second = databases.Open("two");
+        Assert.Equal(0, gate.Room);
+        Assert.False(gate.TryEnter());
+        first.Dispose();
+        first.Dispose();
+        Assert.Equal((1, 1), (gate.Room, freed));
+        second.Dispose();
+        Assert.Equal((2, 2), (gate.Room, freed));
+
+        var missing = databases.Gate("missing")!;
+        Assert.True(missing.TryEnter());
+        Assert.Throws<WebLingoDatabaseException>(() => databases.Open("missing", missing));
+        Assert.Equal(2, missing.Room);
+        Assert.Throws<ArgumentException>(() => databases.Open("two", missing));
+    }
 
     public void Dispose()
     {

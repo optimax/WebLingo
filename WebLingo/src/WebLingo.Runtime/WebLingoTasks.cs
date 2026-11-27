@@ -376,7 +376,21 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
     /// lets take all of its threads (section 6.10; <c>IWebLingoSchedulerHost.RunBlocking</c>).
     /// </summary>
     public bool TryRunOffWorker<T>(Func<T> work, WebLingoOffWorkerFinish<T> finish, Func<Exception, WebLingoRuntimeError?> failed,
-        WebLingoValue keep, bool opensConnection, out WebLingoValue task, out WebLingoRuntimeError? error)
+        WebLingoValue keep, bool opensConnection, out WebLingoValue task, out WebLingoRuntimeError? error) =>
+        TryRunOffWorker(work, finish, failed, keep, opensConnection, null, out task, out error);
+
+    /// <summary>
+    /// Runs blocking work that opens a connection of <paramref name="gate"/>'s pool off the worker, as the other overloads
+    /// do, the host beginning it only once the gate has a place for it, holding no thread until then (section 6.10;
+    /// <c>IWebLingoSchedulerHost.RunBlocking</c>).
+    /// </summary>
+    public bool TryRunOffWorker<T>(Func<T> work, WebLingoOffWorkerFinish<T> finish, Func<Exception, WebLingoRuntimeError?> failed,
+        WebLingoValue keep, WebLingo.Platform.Abstractions.IWebLingoConnectionGate gate, out WebLingoValue task, out WebLingoRuntimeError? error) =>
+        TryRunOffWorker(work, finish, failed, keep, true, gate, out task, out error);
+
+    private bool TryRunOffWorker<T>(Func<T> work, WebLingoOffWorkerFinish<T> finish, Func<Exception, WebLingoRuntimeError?> failed,
+        WebLingoValue keep, bool opensConnection, WebLingo.Platform.Abstractions.IWebLingoConnectionGate? gate, out WebLingoValue task,
+        out WebLingoRuntimeError? error)
     {
         task = WebLingoValue.Null;
         if (heap.SchedulerHost is not { } host)
@@ -389,7 +403,7 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
         _operations.Add(made);
         var kept = keep.Kind != WebLingoValueKind.Null;
         if (kept) _operations.Add(keep);
-        host.RunBlocking(() =>
+        Action run = () =>
         {
             T value;
             try
@@ -421,7 +435,9 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
                 if (finish(value, heap, out var result, out var finishError)) Finished(made, null, result);
                 else Finished(made, finishError);
             });
-        }, opensConnection);
+        };
+        if (gate is not null) host.RunBlocking(run, gate);
+        else host.RunBlocking(run, opensConnection);
         return true;
     }
 

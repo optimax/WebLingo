@@ -342,6 +342,8 @@ public sealed class SessionTests
 
         public void RunBlocking(Action work, bool opensConnection) => throw new InvalidOperationException();
 
+        public void RunBlocking(Action work, IWebLingoConnectionGate gate) => throw new InvalidOperationException();
+
         public void Post(Action work)
         {
             lock (_posted) _posted.Enqueue(work);

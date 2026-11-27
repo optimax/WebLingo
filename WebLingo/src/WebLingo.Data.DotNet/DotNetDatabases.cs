@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Globalization;
@@ -24,6 +25,13 @@ namespace WebLingo.Data.DotNet;
 /// there. A site's MySQL and PostgreSQL databases must be named in its configuration.
 /// SqlClient uses its managed network layer on Windows too, as it does elsewhere,
 /// its native one, under Microsoft's own terms, not shipped: it reaches a server by TCP/IP, never by its shared memory.
+/// Each database it opens a pool's connections of, SQL Server's, MySQL's and PostgreSQL's, by the name or the connection
+/// string a script gives, has a gate of its own (<see cref="Gate"/>), which counts the connections it holds against the
+/// pool's size, its connection string's <c>Max Pool Size</c>, or MySqlConnector's <c>Maximum Pool Size</c>, 100 by default,
+/// none where it says <c>Pooling=false</c>, learned when it first opens one, so that an open beyond them waits in its host's
+/// queue, holding no thread (section 6.10; the owner's answer, 27 November 2026, A1 (a) of "SQL Server's Page at 256
+/// Clients a Fifth as Fast as Before the Bound"). Two names of one connection string have a gate each, as two of these do,
+/// a program's workers' among them: each counts its own, the pool's waiting then done in the pool, as before.
 /// </summary>
 public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> configured, string folder, IWebLingoSecrets? secrets = null)
     : IWebLingoDatabases
@@ -50,7 +58,54 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
     /// <summary>The site's file capabilities, which a SQLite database a script names by its own connection string is checked by; none for any file.</summary>
     public IWebLingoFileCapabilities? Files { get; init; }
 
+    private readonly ConcurrentDictionary<string, ConnectionGate> _gates = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The gate of the database <paramref name="nameOrConnection"/> names, or describes: null for SQLite's, whose pool has no
+    /// most, where that is known without reading a secret. Nothing is read, a configured name's secret not at all.
+    /// </summary>
+    public IWebLingoConnectionGate? Gate(string nameOrConnection) => GateOf(nameOrConnection);
+
+    private ConnectionGate? GateOf(string nameOrConnection)
+    {
+        var known = nameOrConnection.Contains(':') ? nameOrConnection
+            : configured.TryGetValue(nameOrConnection, out var found) && found.Source == WebLingoSecretSource.Given ? found.Text : null;
+        if (known is not null && known.StartsWith("sqlite:", StringComparison.Ordinal)) return null;
+        return _gates.GetOrAdd(nameOrConnection, _ => new ConnectionGate());
+    }
+
+    /// <summary>A connection, its place in its database's gate taken without waiting, as a script's blocking work takes one.</summary>
     public IWebLingoDatabaseConnection Open(string nameOrConnection)
+    {
+        var gate = GateOf(nameOrConnection);
+        gate?.Enter();
+        return Opened(nameOrConnection, gate);
+    }
+
+    public IWebLingoDatabaseConnection Open(string nameOrConnection, IWebLingoConnectionGate gate)
+    {
+        if (gate is not ConnectionGate own || !ReferenceEquals(GateOf(nameOrConnection), own))
+        {
+            throw new ArgumentException("The gate is not the one this database's Gate gave.", nameof(gate));
+        }
+        return Opened(nameOrConnection, own);
+    }
+
+    /// <summary>A connection opened in the place <paramref name="gate"/> holds for it, given back where it cannot be opened.</summary>
+    private IWebLingoDatabaseConnection Opened(string nameOrConnection, ConnectionGate? gate)
+    {
+        try
+        {
+            return OpenedIn(nameOrConnection, gate);
+        }
+        catch
+        {
+            gate?.Leave();
+            throw;
+        }
+    }
+
+    private IWebLingoDatabaseConnection OpenedIn(string nameOrConnection, ConnectionGate? gate)
     {
         string connection;
         string? relativeTo = null;
@@ -60,18 +115,19 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
         var colon = connection.IndexOf(':');
         if (colon < 0) throw Invalid("a configured database connection string must start with its provider and a colon");
         var (provider, rest) = (connection[..colon], connection[(colon + 1)..]);
-        DbConnection opened = provider switch
+        var (opened, most) = provider switch
         {
-            "sqlite" => Sqlite(rest, relativeTo, relativeTo is null ? Files : null),
+            "sqlite" => (Sqlite(rest, relativeTo, relativeTo is null ? Files : null), int.MaxValue),
             "sqlserver" => SqlServer(rest),
             "mysql" => MySql(rest, relativeTo is null && Files is not null),
             "postgresql" => PostgreSql(rest, relativeTo is null && Files is not null),
             _ => throw Invalid($"'{provider}' is not a database's provider WebLingo has, which are \"{string.Join("\", \"", Providers)}\"")
         };
+        gate?.Learn(most); // Its pool's size, as its connection string has it now.
         try
         {
             opened.Open();
-            return new Connection(provider, opened);
+            return new Connection(provider, opened, gate);
         }
         catch (Exception exception) when (exception is DbException or InvalidOperationException or IOException or UnauthorizedAccessException)
         {
@@ -144,7 +200,7 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
     /// in a method of its own, so that .NET loads SqlClient, and what it needs, only for a script that opens SQL Server.
     /// </summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static DbConnection SqlServer(string rest)
+    private static (DbConnection, int) SqlServer(string rest)
     {
         SqlConnectionStringBuilder builder;
         try
@@ -156,11 +212,11 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
             throw Invalid($"'{rest}' is not a SQL Server connection string: {exception.Message}");
         }
         if (builder.DataSource.Length == 0) throw Invalid("a SQL Server connection string names its server, as Server=name does");
-        return new SqlConnection(builder.ConnectionString);
+        return (new SqlConnection(builder.ConnectionString), builder.Pooling ? builder.MaxPoolSize : int.MaxValue);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static DbConnection MySql(string rest, bool siteSupplied)
+    private static (DbConnection, int) MySql(string rest, bool siteSupplied)
     {
         if (siteSupplied)
         {
@@ -171,7 +227,7 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
         {
             var builder = new MySqlConnectionStringBuilder(rest);
             if (builder.Server.Length == 0) throw Invalid("a MySQL connection string names its server, as Server=name does");
-            return new MySqlConnection(builder.ConnectionString);
+            return (new MySqlConnection(builder.ConnectionString), builder.Pooling ? (int)Math.Min(builder.MaximumPoolSize, int.MaxValue) : int.MaxValue);
         }
         catch (Exception exception) when (exception is ArgumentException or FormatException or KeyNotFoundException)
         {
@@ -180,7 +236,7 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static DbConnection PostgreSql(string rest, bool siteSupplied)
+    private static (DbConnection, int) PostgreSql(string rest, bool siteSupplied)
     {
         if (siteSupplied)
         {
@@ -191,7 +247,7 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
         {
             var builder = new NpgsqlConnectionStringBuilder(rest);
             if (string.IsNullOrWhiteSpace(builder.Host)) throw Invalid("a PostgreSQL connection string names its server, as Host=name does");
-            return new NpgsqlConnection(builder.ConnectionString);
+            return (new NpgsqlConnection(builder.ConnectionString), builder.Pooling ? builder.MaxPoolSize : int.MaxValue);
         }
         catch (Exception exception) when (exception is ArgumentException or FormatException or KeyNotFoundException)
         {
@@ -207,8 +263,76 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
     /// </summary>
     private static string Said(Exception exception) => exception.Message.ReplaceLineEndings("\n");
 
-    /// <summary>An open connection: one operation at a time, a transaction at most, each command given it.</summary>
-    private sealed class Connection(string provider, DbConnection connection) : IWebLingoStreamingDatabaseConnection
+    /// <summary>
+    /// The connections this process holds of one database's pool, its places, counted against the pool's size, unknown,
+    /// and so without a most, until a connection string has given it: one taken by a host's queue for an open that waits
+    /// (<see cref="TryEnter"/>), or at once by an open that does not (<see cref="Enter"/>), and given back when the
+    /// connection is closed, or not opened, each time telling those that wait.
+    /// </summary>
+    private sealed class ConnectionGate : IWebLingoConnectionGate
+    {
+        private readonly object _sync = new();
+        private readonly List<Action> _freed = [];
+        private int _most = int.MaxValue;
+        private int _held;
+
+        public int Room
+        {
+            get
+            {
+                lock (_sync) return _most == int.MaxValue ? int.MaxValue : Math.Max(0, _most - _held);
+            }
+        }
+
+        public bool TryEnter()
+        {
+            lock (_sync)
+            {
+                if (_held >= _most) return false;
+                _held++;
+                return true;
+            }
+        }
+
+        /// <summary>A place taken whatever the room, by an open that waits in the pool itself where there is none.</summary>
+        public void Enter()
+        {
+            lock (_sync) _held++;
+        }
+
+        public void Leave()
+        {
+            lock (_sync) _held--;
+            Tell();
+        }
+
+        /// <summary>The pool's size, as a connection string gives it, those waiting told where it grew.</summary>
+        public void Learn(int most)
+        {
+            bool grew;
+            lock (_sync)
+            {
+                grew = most > _most;
+                _most = most;
+            }
+            if (grew) Tell();
+        }
+
+        public void WhenFreed(Action freed)
+        {
+            lock (_sync) _freed.Add(freed);
+        }
+
+        private void Tell()
+        {
+            Action[] told;
+            lock (_sync) told = [.. _freed];
+            foreach (var freed in told) freed();
+        }
+    }
+
+    /// <summary>An open connection: one operation at a time, a transaction at most, each command given it; its gate's place given back when it is closed.</summary>
+    private sealed class Connection(string provider, DbConnection connection, ConnectionGate? gate) : IWebLingoStreamingDatabaseConnection
     {
         private readonly object _gate = new();
         private DbTransaction? _transaction;
@@ -298,7 +422,8 @@ public sealed class DotNetDatabases(IReadOnlyDictionary<string, WebLingoSecret> 
                     finally
                     {
                         _transaction = null;
-                        connection.Dispose();
+                        try { connection.Dispose(); }
+                        finally { gate?.Leave(); }
                     }
                 }
             }

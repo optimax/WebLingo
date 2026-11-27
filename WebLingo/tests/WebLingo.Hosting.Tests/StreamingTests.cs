@@ -145,6 +145,8 @@ public sealed class StreamingTests
 
         public void RunBlocking(Action work, bool opensConnection) => throw new InvalidOperationException();
 
+        public void RunBlocking(Action work, WebLingo.Platform.Abstractions.IWebLingoConnectionGate gate) => throw new InvalidOperationException();
+
         public void Post(Action work)
         {
             _posted.Enqueue(work);

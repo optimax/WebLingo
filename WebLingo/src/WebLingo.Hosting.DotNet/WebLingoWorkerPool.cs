@@ -208,6 +208,8 @@ public sealed class WebLingoWorkerPool : IDisposable
 
         public void RunBlocking(Action work, bool opensConnection) => WebLingo.Platform.DotNet.DotNetBlockingPool.Run(work, opensConnection);
 
+        public void RunBlocking(Action work, IWebLingoConnectionGate gate) => WebLingo.Platform.DotNet.DotNetBlockingPool.Run(work, gate);
+
         public void Post(Action work)
         {
             _posted.Enqueue(work);

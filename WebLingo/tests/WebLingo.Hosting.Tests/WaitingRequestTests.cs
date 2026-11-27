@@ -52,6 +52,8 @@ public sealed class WaitingRequestTests
     private sealed class NoWork : IWebLingoSchedulerHost
     {
         public void RunBlocking(Action work, bool opensConnection) => throw new InvalidOperationException();
+
+        public void RunBlocking(Action work, IWebLingoConnectionGate gate) => throw new InvalidOperationException();
         public void Post(Action work) => throw new InvalidOperationException();
         public bool RunPosted(int milliseconds) => false;
     }

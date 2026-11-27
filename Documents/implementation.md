@@ -416,7 +416,9 @@ threads to complete: `WebLingoSmtpClient` connects and makes its TLS handshake s
 work off the worker runs on threads of WebLingo's own, `DotNetBlockingPool`, four for each processor at most, the rest
 queued, work that waits for a pooled connection on three of every four at most, so that a request holding a connection
 never waits for a thread behind the requests waiting for one, which deadlocked SQL Server's page at 256 clients
-(`RunBlocking`'s `opensConnection`; specification, section 6.10), never .NET's pool, which a site on SQL Server
+(`RunBlocking`'s `opensConnection`; specification, section 6.10), and an open of a database whose pool is full waiting
+in the queue, holding no thread, until its gate has a place (`IWebLingoConnectionGate`, `RunBlocking(work, gate)`), never
+.NET's pool, which a site on SQL Server
 starved under 64 clients and more (specification, section 6.10). Until 24 November 2026
 both did, and the suite, run under load ("Flaky Tests Found Under Load", two runs at once beside a process spinning on
 every processor), failed in five of its first six runs, on a mail test whose server waited 10 s for a TLS handshake, or a

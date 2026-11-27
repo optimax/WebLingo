@@ -140,6 +140,8 @@ public sealed class WaitingTests
         private readonly Queue<Action> _posted = new();
 
         public void RunBlocking(Action work, bool opensConnection) => _blocking.Enqueue(work);
+
+        public void RunBlocking(Action work, IWebLingoConnectionGate gate) => _blocking.Enqueue(work);
         public void Post(Action work) => _posted.Enqueue(work);
 
         public bool RunPosted(int milliseconds)
