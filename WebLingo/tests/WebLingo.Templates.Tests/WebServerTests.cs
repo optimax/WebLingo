@@ -76,6 +76,7 @@ public sealed class WebServerTests : IDisposable
                     location / {
                         include fastcgi_params;
                         fastcgi_keep_conn on;
+                        fastcgi_request_buffering off;
                         fastcgi_pass wasp;
                     }
                 }
@@ -131,6 +132,7 @@ public sealed class WebServerTests : IDisposable
                         location / {
                             include fastcgi_params;
                             fastcgi_keep_conn on;
+                            fastcgi_request_buffering off;
                             fastcgi_pass wasp;
                         }
                     }

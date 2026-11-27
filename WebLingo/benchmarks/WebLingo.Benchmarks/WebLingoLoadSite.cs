@@ -107,8 +107,10 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
         {
             var waspPort = FreePort();
             served = new WebLingoLoadSite(new Uri($"http://127.0.0.1:{port}/"), "`wasp fastcgi` behind nginx", folder);
+            // nginx found first, so that a machine without it leaves no wasp running.
+            var nginx = UnpackNginx(folder);
             served._server = served.Started(wasp, ["fastcgi", "--root", site, "--port", Text(waspPort)], site);
-            var nginx = served._nginx = UnpackNginx(folder);
+            served._nginx = nginx;
             // Elsewhere than Windows, the system's nginx stays in the foreground, the benchmark's process, as Windows' does, and
             // keeps a request's body and the like in the run's folder, not its own.
             var foreground = OperatingSystem.IsWindows() ? "" : "daemon off;";
@@ -133,6 +135,7 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
                         location / {
                             include fastcgi_params;
                             fastcgi_keep_conn on;
+                            fastcgi_request_buffering off;
                             fastcgi_pass wasp;
                         }
                     }

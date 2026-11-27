@@ -954,8 +954,13 @@ server ASP.NET Core's, so that the two are not compared here. What it found, eac
   acknowledgement, which Linux delays about 40 ms: each TCP connection it accepts is now given `NoDelay` (`f86b237`, "FastCGI
   Behind nginx on Linux: 40 ms a Request"; before it, `hello` 90 a second at 4 clients, after it 4,061 in a short run).
 - **Some uploads behind nginx still wait about 44 ms**, a twentieth or more of them up to 16 clients, their median 0.9 to
-  1.0 ms: the same delay, it seems, the other way, while nginx sends a request's body to `wasp` ("Uploads Behind nginx on
-  Linux: Some Wait 44 ms").
+  1.0 ms: the same delay the other way, nginx's last piece of a request's body waiting for `wasp`'s acknowledgement, nginx
+  sending without Nagle's algorithm only where it does not buffer the body ("Uploads Behind nginx on Linux: Some Wait 44
+  ms"). The WASP User Manual's nginx configuration, section 18, says `fastcgi_request_buffering off;` now, as the
+  benchmark's does: measured in runs of 3 s, on Linux `upload` at 16 clients 5,154 a second, 99% under 12 ms, in place of 2,599
+  and 48.5 ms; on Windows, where the same delay was about 300 ms, at one client 522 a second, 99% under 2.9 ms, in place
+  of 58 and 316 ms, and at 16, 2,466 and 14.7 ms in place of 733 and 325 ms; `hello`, which sends no body, the same,
+  alternately 6 runs each at 16 clients on Windows, 10,654 a second buffered and 10,969 not.
 
 **The collector** (26 and 27 November 2026, the owner's answer, A2 of "The Server Collector for `wasp`"; the register,
 "`wasp`'s collector"): `wasp`'s requests share one process's .NET heap, its objects made and dropped as a request runs a

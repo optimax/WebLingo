@@ -85,6 +85,7 @@ http {
         location / {
             include /etc/nginx/fastcgi_params;
             fastcgi_keep_conn on;
+            fastcgi_request_buffering off;
             fastcgi_pass wasp;
         }
     }

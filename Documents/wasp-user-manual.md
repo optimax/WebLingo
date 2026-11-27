@@ -1607,6 +1607,7 @@ server {
     location / {
         include fastcgi_params;
         fastcgi_keep_conn on;
+        fastcgi_request_buffering off;
         fastcgi_pass wasp;
     }
 }
@@ -1620,7 +1621,13 @@ connections each of nginx's worker processes keeps: give it at least as many as 
 nginx closes a connection it has no room to keep, and each one closed holds its port for a while, on Windows for two
 minutes: with `keepalive 16`, on Windows, 64 clients had nginx close some 540 connections a second, which used up its
 ports in half a minute, and nginx answered 502, where `keepalive 256` served twice as many requests a second, none
-failing. On a Unix socket,
+failing. `fastcgi_request_buffering off` passes a request's body to `wasp` as it arrives, rather than once nginx has read
+it whole, and nginx then sends to `wasp` without Nagle's algorithm: buffered, a body's last piece waited for `wasp`'s
+acknowledgement, which Windows and Linux delay, so that one upload of 100 KB in twenty or more took about 300 ms on
+Windows and 45 ms on Linux, where unbuffered 99% of them took at most 15 ms, up to 16 clients at once, and pages without
+a body were as fast as before. A slow client's body then reaches `wasp` as slowly as it is sent, holding a connection to
+`wasp` meanwhile; `wasp` limits a body's size itself, `"maxBodySize"` ([section 14](#14-configuration-waspconfig)), as
+`client_max_body_size` does nginx's. On a Unix socket,
 `fastcgi_pass unix:/run/wasp/mysite.sock;`. On Linux, a systemd service keeps `wasp` running, for example
 `/etc/systemd/system/wasp-mysite.service`, with WebLingo installed in `/opt/weblingo`, where its installers for Linux
 install it:
