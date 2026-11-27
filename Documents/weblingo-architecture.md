@@ -2015,7 +2015,7 @@ Proposed central props:
 | M0.20 | Standard modules, imported: nothing of a standard module in a program that does not import it, `Json`, `Html`, `write`, `writeLn`, `delay`, `Bytes`, `DateTime` and `Regex` among them, the compiler suggesting the import a name needs (§3.9, "The standard library") | The owner's decision (18 November 2026), its number Proposed; in parts (below), all implemented (18 November 2026) |
 | M0.21 | Faster members: an instance's fields in slots its class gives them, and where each instruction last found a member remembered, an inline cache (§5.6, "Where the time goes", causes 1 and 3) | The owner's choice (25 November 2026, A1 of "The Next Milestone", the first of six in order); designed with the owner (25 November 2026, "M0.21: Faster Members"), in three parts (below, "M0.21 parts"), all implemented (26 November 2026), each measured against the commit before it: `calls` 22 percent faster, then as fast, and `objects` 4, 17 and 4 percent, none slower (§5.6, "The call's own cost", "Fields in places" and "A member's cache") |
 | M0.22 | Old generations drained: a reload's old generation given a deadline, the requests and tasks still running on it then ended, and what it leaks found (open question 8; §6.12) | The owner's choice (25 November 2026), the second; designed with the owner before it is built |
-| M0.23 | A standalone HTTP host, `WebLingo.Hosting.Standalone`, serving a site without ASP.NET Core, which Native C# will need (§1, §6.1) | The owner's choice (25 November 2026), the third; designed with the owner (26 November 2026), in six parts ("M0.23 parts", below) |
+| M0.23 | A standalone HTTP host, `WebLingo.Hosting.Standalone`, serving a site without ASP.NET Core, which Native C# will need (§1, §6.1) | The owner's choice (25 November 2026), the third; designed with the owner (26 November 2026), in six parts ("M0.23 parts", below), parts 1 to 5 implemented (26 November 2026), the standalone server served, loaded and soaked as ASP.NET Core's is |
 | M0.24 | Fair workers: a request that computes for long made to yield its worker at safe points, after a quantum of instructions, and the blocking work off the workers bounded (open question 14; §6.10) | The owner's choice (25 November 2026), the fourth; designed with the owner (26 November 2026), in three parts ("M0.24 parts", below) |
 | M0.25 | Start-up: `weblingo` and `wasp` published compiled ahead of time (§5.6, "Where the time goes", cause 7) | The owner's choice (25 November 2026), the fifth; designed with the owner before it is built, Native AOT's loading no assembly while a program runs a question for the native modules |
 | M0.26 | Parallel work: workers with heaps of their own within one program, exchanging copied messages (§3.8, "Concurrency"; open question 7; WL-P013) | The owner's choice (25 November 2026), the sixth; designed with the owner (26 November 2026), in five parts ("M0.26 parts", below), all implemented (26 November 2026): `std:workers`, a `Worker` and `parent`, a pool's `workers.run` and `weblingo.config`'s workers' limits, split work 4.68 times faster on 8 processors (§5.6, "Workers") |
@@ -2343,7 +2343,20 @@ each needs that the owner has not decided is a question of its task's, and Propo
    workers bounded, not of either server ("SQL Server's Pages Deadlock at 256 Clients Since the Work Off the Workers Was
    Bounded"). The standalone server serves as ASP.NET Core's does within a few percent, but for the pages served
    fastest at 64 clients, `hello` 22 percent fewer a second and `session` 19, and `large`, 10 to 16 percent fewer at 4
-   clients and more; its working set from 52 MB where ASP.NET Core's is from 66 MB. Its soak follows.
+   clients and more; its working set from 52 MB where ASP.NET Core's is from 66 MB. The soak (26 November 2026, 18:27
+   to 21:27, from `65999e0`, the machine not idle throughout, builds and tests run meanwhile, `WebLingo.Benchmarks --load
+   --host standalone --soak 3 --sample 5 --reload-every 5 --clients 8`), as ASP.NET Core's server had it for M0.22's
+   part 3: 3 hours, 8 clients asking for `hello`, `compute`, `sqlite`, `sqlserver`, `large`, `session` and `upload` in
+   turn, `hello.wasp` replaced every 5 seconds, a sample every 5 minutes: 23,724,286 requests, 0 errors, 2,156 reloads,
+   the page refused 0 times while the server read it; 1,755 to 2,344 requests a second, a median of 1.3 to 2.0 ms and
+   99 percent under 21 to 25 ms; the working set 97 to 105 MB, private bytes 39 to 47 MB, handles 774 to 878, threads
+   42 to 46; after the warm-up, 27 samples, private bytes +0.3 KB a reload, handles +0.051 a reload, threads 0.000 a
+   reload: none keeps rising. What part 5 found, fixed: a request whose client went while it began or was woken waited
+   again, for what its wait had left, its wake run before its cancellation, a token's callbacks running in the reverse
+   order of their registration, in the FastCGI host too; and a request sent behind another in one write not told that
+   its client had gone (`c72775c`; `Documents/implementation.md`, "A Token's Callbacks Run Last First"). What it found
+   that is not the standalone server's, `sqlserver` at 256 clients, is a task of its own. Part 5 passed (26 November
+   2026).
 6. **The default.** Once part 5 has passed, the standalone server `wasp serve`'s own, `--host aspnetcore` choosing ASP.NET
    Core's and `--host standalone` kept, naming the default; IIS keeping ASP.NET Core's.
 

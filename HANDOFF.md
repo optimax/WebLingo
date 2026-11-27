@@ -143,6 +143,10 @@ M0.23's part 4: `IWebLingoHttpRequest.ClientAddress`, a script's `request.client
 else `X-Forwarded-For`/`-Proto`, where its peer is trusted; ASP.NET Core's `Translate`, the standalone server and (by
 `REMOTE_ADDR`) FastCGI give the client. `WebLingoSchemes.TryLoadFolder` has one more out, `proxies`.
 
+M0.23's part 5, passed: `WebLingo.Benchmarks --load --host standalone`; the load on both servers and a 3-hour soak with
+reloads on the standalone one in the specification's section 9, "M0.23 parts", part 5, nothing rising. Part 6, the
+standalone server `wasp serve`'s default, is next.
+
 ## The quantum
 
 M0.24's part 2: a suspending execution's VM yields once its quantum (`WebLingoExecutionContext.Quantum`, `wasp.config`'s
