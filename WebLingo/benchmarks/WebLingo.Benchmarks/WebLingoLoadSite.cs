@@ -109,13 +109,20 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
             served = new WebLingoLoadSite(new Uri($"http://127.0.0.1:{port}/"), "`wasp fastcgi` behind nginx", folder);
             served._server = served.Started(wasp, ["fastcgi", "--root", site, "--port", Text(waspPort)], site);
             var nginx = served._nginx = UnpackNginx(folder);
+            // Elsewhere than Windows, the system's nginx stays in the foreground, the benchmark's process, as Windows' does, and
+            // keeps a request's body and the like in the run's folder, not its own.
+            var foreground = OperatingSystem.IsWindows() ? "" : "daemon off;";
+            var temps = OperatingSystem.IsWindows() ? "" : "client_body_temp_path temp/body; fastcgi_temp_path temp/fastcgi; "
+                                                           + "proxy_temp_path temp/proxy; uwsgi_temp_path temp/uwsgi; scgi_temp_path temp/scgi;";
             File.WriteAllText(Path.Combine(nginx, "conf", "load.conf"), $$"""
+                {{foreground}}
                 worker_processes 1;
                 error_log logs/error.log;
                 pid logs/nginx.pid;
                 events { worker_connections 1024; }
                 http {
                     access_log off;
+                    {{temps}}
                     client_max_body_size 30m;
                     upstream wasp {
                         server 127.0.0.1:{{waspPort}};
@@ -131,7 +138,7 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
                     }
                 }
                 """);
-            served._nginxProcess = served.Started(Path.Combine(nginx, "nginx.exe"), NginxArguments(nginx), nginx);
+            served._nginxProcess = served.Started(NginxProgram(nginx), NginxArguments(nginx), nginx);
         }
         try
         {
@@ -209,7 +216,7 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
         // nginx stopped as its own command stops it, and waited for; wasp, which a service manager would stop, ended.
         if (_nginx is not null)
         {
-            var stopping = new ProcessStartInfo(Path.Combine(_nginx, "nginx.exe"), NginxArguments(_nginx, "-s", "stop"))
+            var stopping = new ProcessStartInfo(NginxProgram(_nginx), NginxArguments(_nginx, "-s", "stop"))
             {
                 WorkingDirectory = _nginx, UseShellExecute = false, CreateNoWindow = true
             };
@@ -238,8 +245,19 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
         }
     }
 
-    private static string[] NginxArguments(string nginx, params string[] more) =>
-        ["-p", nginx.Replace('\\', '/') + "/", "-c", "conf/load.conf", .. more];
+    private const string SystemNginx = "/usr/sbin/nginx";
+    private const string SystemFastCgiParams = "/etc/nginx/fastcgi_params";
+
+    /// <summary>The nginx program for its prefix: the unpacked one on Windows, the system's elsewhere.</summary>
+    private static string NginxProgram(string nginx) => OperatingSystem.IsWindows() ? Path.Combine(nginx, "nginx.exe") : SystemNginx;
+
+    /// <summary>
+    /// nginx's arguments for its prefix; elsewhere than Windows, its first error log there too, <c>-e</c>, in place of the
+    /// system's, which an account that is not root cannot open.
+    /// </summary>
+    private static string[] NginxArguments(string nginx, params string[] more) => OperatingSystem.IsWindows()
+        ? ["-p", nginx.Replace('\\', '/') + "/", "-c", "conf/load.conf", .. more]
+        : ["-p", nginx + "/", "-e", Path.Combine(nginx, "logs", "error.log"), "-c", "conf/load.conf", .. more];
 
     private Process Started(string program, string[] arguments, string folder)
     {
@@ -323,12 +341,24 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
         transaction.Commit();
     }
 
-    /// <summary>nginx, unpacked from its download in the repository's <c>WebServers</c> folder, as the tests unpack it.</summary>
+    /// <summary>
+    /// nginx's folder, its prefix: on Windows, nginx unpacked from its download in the repository's <c>WebServers</c> folder,
+    /// as the tests unpack it; elsewhere, a folder of the run's own for the system's nginx, its <c>conf</c> holding the
+    /// system's <c>fastcgi_params</c>, with <c>logs</c> and <c>temp</c> beside it, which an account that is not root writes
+    /// (specification, section 5.6, "Under load, parts", part 4).
+    /// </summary>
     private static string UnpackNginx(string folder)
     {
         if (!OperatingSystem.IsWindows())
         {
-            throw new InvalidOperationException("--host fastcgi unpacks nginx for Windows, and runs on Windows only.");
+            if (!File.Exists(SystemNginx) || !File.Exists(SystemFastCgiParams))
+            {
+                throw new InvalidOperationException($"--host fastcgi needs the system's nginx, {SystemNginx}, and its {SystemFastCgiParams}.");
+            }
+            var prefix = Path.Combine(folder, "nginx");
+            foreach (var part in new[] { "conf", "logs", "temp" }) Directory.CreateDirectory(Path.Combine(prefix, part));
+            File.Copy(SystemFastCgiParams, Path.Combine(prefix, "conf", "fastcgi_params"));
+            return prefix;
         }
         var repository = new DirectoryInfo(AppContext.BaseDirectory);
         string Downloads(DirectoryInfo folder) => Path.Combine(folder.FullName, "WebServers", "nginx");
