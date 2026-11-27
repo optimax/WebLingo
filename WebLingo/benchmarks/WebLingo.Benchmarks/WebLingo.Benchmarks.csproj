@@ -23,4 +23,9 @@
     <!-- wasp beside it, which the load command starts to serve the load site, as a process of its own. -->
     <ProjectReference Include="../../src/WebLingo.Wasp.Cli/WebLingo.Wasp.Cli.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The soak's reading of the server's .NET heap, its System.Runtime counters, from outside its process (WebLingoServerCounters). -->
+    <PackageReference Include="Microsoft.Diagnostics.NETCore.Client" />
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" />
+  </ItemGroup>
 </Project>

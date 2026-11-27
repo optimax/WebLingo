@@ -16,6 +16,7 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
     private readonly string? _folder;
     private readonly List<Process> _started = [];
     private Process? _server;
+    private WebLingoServerCounters? _counters;
     private string? _nginx;
     private Process? _nginxProcess;
 
@@ -116,12 +117,25 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
             Timeout = TimeSpan.FromSeconds(100)
         };
 
-    /// <summary>The server's process as it is now, where the benchmark started it; null where it did not.</summary>
+    /// <summary>The server's process as it is now, where the benchmark started it, its .NET heap where it is watched; null where it did not.</summary>
     public WebLingoServerSample? Sample()
     {
         if (_server is not { HasExited: false } server) return null;
         server.Refresh();
-        return new WebLingoServerSample(server.WorkingSet64, server.PrivateMemorySize64, server.HandleCount, server.Threads.Count);
+        return new WebLingoServerSample(server.WorkingSet64, server.PrivateMemorySize64, server.HandleCount, server.Threads.Count,
+            _counters?.GcHeapBytes);
+    }
+
+    /// <summary>
+    /// The server's <c>System.Runtime</c> counters read from now on, each every <paramref name="seconds"/>, its .NET heap
+    /// among them (<see cref="WebLingoServerCounters"/>); null, or why they cannot be, where the benchmark did not start it.
+    /// </summary>
+    public string? WatchCounters(int seconds)
+    {
+        if (_server is not { HasExited: false } server) return "the benchmark did not start the server, whose process it would read.";
+        if (_counters is not null) return null;
+        _counters = WebLingoServerCounters.TryAttach(server.Id, seconds, out var why);
+        return _counters is null ? why : null;
     }
 
     /// <summary>
@@ -155,6 +169,7 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _counters?.Dispose(); // Its session stopped while its server still runs.
         // nginx stopped as its own command stops it, and waited for; wasp, which a service manager would stop, ended.
         if (_nginx is not null)
         {

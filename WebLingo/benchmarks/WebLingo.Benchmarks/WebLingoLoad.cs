@@ -17,7 +17,7 @@ public sealed record WebLingoLoadResult(string Page, int Clients, int Requests, 
     TimeSpan Slowest95, TimeSpan Slowest99, string? FirstError, WebLingoServerSample? Server);
 
 /// <summary>The server's process as sampled: its memory, its handles and its threads.</summary>
-public sealed record WebLingoServerSample(long WorkingSet, long PrivateBytes, int Handles, int Threads);
+public sealed record WebLingoServerSample(long WorkingSet, long PrivateBytes, int Handles, int Threads, long? GcHeap = null);
 
 /// <summary>
 /// WASP under load (specification, section 5.6, "Under load", part 1): <c>WebLingo.Benchmarks --load</c>. The load site,
@@ -340,9 +340,16 @@ public static class WebLingoLoad
                          + $"{time.TotalHours:0.#} h" + (reloadEvery is { } each
                              ? $", `hello.wasp` replaced every {each.TotalSeconds:0} s, which reloads the site." : "."));
         output.WriteLine();
+        // The server's .NET heap, read from outside it, its System.Runtime counters (WebLingoServerCounters).
+        // Its counters every 10 seconds at most, so that the first sample has them.
+        if (site.WatchCounters(Math.Clamp((int)(sample.TotalSeconds / 6), 1, 10)) is { } unread)
+        {
+            output.WriteLine($"The server's .NET heap is not read: {unread}");
+            output.WriteLine();
+        }
         output.WriteLine("| Elapsed | Requests | Requests/s | Median | 99% under | Errors | Reloads | Working set | Private bytes "
-                         + "| Handles | Threads |");
-        output.WriteLine("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+                         + "| GC heap | Handles | Threads |");
+        output.WriteLine("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         var started = Stopwatch.GetTimestamp();
         var until = started + Ticks(time);
         long reloads = 0;
@@ -386,7 +393,7 @@ public static class WebLingoLoad
             output.WriteLine($"| {elapsed:hh\\:mm} | {requests:#,0} | {Number(rate)} | "
                              + $"{Milliseconds(Percentile(sorted, 0.5))} | {Milliseconds(Percentile(sorted, 0.99))} | {errors} | "
                              + $"{reloaded:#,0} | {Megabytes(server?.WorkingSet)} | {Megabytes(server?.PrivateBytes)} | "
-                             + $"{Text(server?.Handles)} | {Text(server?.Threads)} |");
+                             + $"{Megabytes(server?.GcHeap)} | {Text(server?.Handles)} | {Text(server?.Threads)} |");
             output.Flush();
             last = now;
         }
@@ -413,9 +420,16 @@ public static class WebLingoLoad
         var after = WebLingoSoakTrend.AfterWarmUp(samples);
         var growths = new List<string>();
         var rising = new List<string>();
+        var unread = new List<string>();
         var unsure = false;
         foreach (var measure in WebLingoSoakTrend.Measures)
         {
+            // A measure some sample lacks, the .NET heap where its counters could not be read, judged not at all.
+            if (!WebLingoSoakTrend.Read(after, measure))
+            {
+                unread.Add(measure.Name);
+                continue;
+            }
             if (WebLingoSoakTrend.Growth(after, measure, out var perReload) is { } growth)
             {
                 var shown = measure.Unit == "bytes"
@@ -435,6 +449,7 @@ public static class WebLingoLoad
         }
         output.WriteLine($"After the warm-up, the first quarter of the samples, {after.Count} samples: "
                          + (growths.Count == 0 ? "too few to give a growth" : string.Join(", ", growths)) + ".");
+        if (unread.Count > 0) output.WriteLine($"Not read in every sample, and so not judged: {string.Join(", ", unread)}.");
         output.WriteLine(rising.Count > 0 ? $"Rising all the way, by more than its noise: {string.Join(", ", rising)}."
             : unsure ? $"Too few samples after the warm-up to say whether any keeps rising: {WebLingoSoakTrend.Fewest} are needed."
             : "None keeps rising.");

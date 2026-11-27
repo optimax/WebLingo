@@ -47,9 +47,24 @@ public sealed class LoadTests
 
     private static readonly WebLingoSoakTrend.Measure Bytes = WebLingoSoakTrend.Measures.Single(measure => measure.Name == "private bytes");
 
-    /// <summary>Samples, one a reload, ten reloads apart, their private bytes those given, their handles and threads steady.</summary>
+    /// <summary>Samples, one a reload, ten reloads apart, their private bytes those given, their .NET heap, handles and threads steady.</summary>
     private static List<WebLingoSoakSample> Samples(params long[] bytes) =>
-        [.. bytes.Select((value, i) => new WebLingoSoakSample(TimeSpan.FromMinutes(i), i * 10L, new WebLingoServerSample(value, value, 500, 30)))];
+        [.. bytes.Select((value, i) => new WebLingoSoakSample(TimeSpan.FromMinutes(i), i * 10L,
+            new WebLingoServerSample(value, value, 500, 30, 40_000_000)))];
+
+    /// <summary>A measure some sample lacks, the .NET heap where its counters could not be read, gives no growth and no verdict.</summary>
+    [Fact]
+    public void AMeasureSomeSampleLacksGivesNoGrowthAndNoVerdict()
+    {
+        var heap = WebLingoSoakTrend.Measures.Single(measure => measure.Name == "GC heap");
+        var samples = Samples([.. Enumerable.Range(0, 16).Select(i => 100_000_000L + i * 1_000_000)]);
+        samples[5] = samples[5] with { Server = samples[5].Server with { GcHeap = null } };
+        var after = WebLingoSoakTrend.AfterWarmUp(samples);
+        Assert.False(WebLingoSoakTrend.Read(after, heap));
+        Assert.Null(WebLingoSoakTrend.Growth(after, heap, out _));
+        Assert.Null(WebLingoSoakTrend.KeepsRising(after, heap));
+        Assert.True(WebLingoSoakTrend.KeepsRising(after, Bytes));
+    }
 
     [Fact]
     public void AMeasureThatRisesAllTheWayAfterTheWarmUpKeepsRising_ItsGrowthPerReloadItsSlope()

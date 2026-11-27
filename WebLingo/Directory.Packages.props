@@ -11,6 +11,11 @@
     <PackageVersion Include="MySqlConnector" Version="3.0.0" />
     <!-- PostgreSQL's ADO.NET provider, PostgreSQL License: WebLingo.Data.DotNet. Reuses the existing logging abstractions. -->
     <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <!-- .NET's diagnostics client and its events' reader, MIT, Microsoft's: the benchmark alone, which no installer ships,
+         reading a server's .NET heap from outside it, as dotnet-counters does (specification, section 9, "M0.22 parts",
+         part 3; the owner's answer, 27 November 2026, A2 (a) of "M0.22, Part 3: The Soak with Reloads"). -->
+    <PackageVersion Include="Microsoft.Diagnostics.NETCore.Client" Version="0.2.750501" />
+    <PackageVersion Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="4.0.2" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />

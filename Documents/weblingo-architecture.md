@@ -2545,8 +2545,14 @@ is not planned.
    requests, 0 errors, 2,155 reloads, the page refused 0 times while the server read it; 1,700 to 2,380 requests a
    second, a median of 1.6 to 2.0 ms and 99 percent under 21 to 30 ms; the working set 104 to 113 MB, private bytes 44
    to 48 MB, handles 840 to 945, threads 41 to 45; after the warm-up, 27 samples, private bytes +0.3 KB a reload,
-   handles +0.027 a reload, threads 0.000 a reload: none keeps rising. The .NET heap not sampled, a question of the
-   task's.
+   handles +0.027 a reload, threads 0.000 a reload: none keeps rising. The .NET heap read since (27 November 2026, the
+   owner's answer, A2 (a) of "M0.22, Part 3: The Soak with Reloads"): the server's `System.Runtime` counters, its
+   `gc-heap-size`, read from outside its process as `dotnet-counters` reads them, by two packages of Microsoft's, MIT's,
+   Microsoft.Diagnostics.NETCore.Client 0.2.750501, .NET's diagnostics client, which starts an event session in the
+   server, and Microsoft.Diagnostics.Tracing.TraceEvent 4.0.2, which reads its events, referenced by the benchmark alone,
+   which no installer ships (`WebLingoServerCounters`); every 10 seconds at most, a column of its own, `GC heap`, beside
+   private bytes, and a measure of the trend's as the others are, one that some sample lacks not judged; under `wasp
+   serve` and `wasp fastcgi`, which the benchmark starts, not a site at `--url`, whose process it does not know.
 
 **A cancelled request's cleanup, parts** (27 November 2026), what part 1 left, its A3 (a) of "M0.22, Part 1: The Drain",
 and how an exception a cleanup throws then goes, A1 (a) of "A Cancelled Request's Cleanup": a request cancelled, by its
