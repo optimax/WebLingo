@@ -1417,9 +1417,10 @@ wasp --version
 ```
 
 - **`wasp serve`** serves the site whose root is `--root`, the current folder by default, on `--port`, 8080 by default,
-  to the local machine only. Under IIS, IIS starts it ([section 17](#17-deploying-to-iis)). `--host standalone` serves
-  it with WebLingo's own HTTP server in place of ASP.NET Core's, HTTP/1.1, for a site behind a reverse proxy that gives
-  it TLS and HTTP/2; it is being proved, and ASP.NET Core's stays the default, and IIS's, until it has been.
+  to the local machine only, with WebLingo's own HTTP server, HTTP/1.1, which a reverse proxy in front of it gives TLS
+  and HTTP/2. `--host aspnetcore` serves it with ASP.NET Core's server instead, and `--host standalone` names WebLingo's,
+  the default. Under IIS, IIS starts it ([section 17](#17-deploying-to-iis)), and it runs on ASP.NET Core's server,
+  which IIS's ASP.NET Core Module talks to, `--host standalone` refused there.
 - **`wasp fastcgi`** serves the site whose root is `--root` to a web server other than IIS, nginx or Apache, through
   FastCGI, on `--port`, 9000 by default, on a Unix socket, `--socket`, or on the socket or pipe a web server that starts
   it gives it as its standard input, `--stdin` ([section 18](#18-serving-through-nginx-or-apache-fastcgi)).

@@ -388,6 +388,48 @@ public sealed class StandaloneHttpTests : IDisposable
         Assert.NotNull(why);
     }
 
+    /// <summary>
+    /// <c>wasp serve</c>'s server (section 9, "M0.23 parts", part 6): WebLingo's own by default, ASP.NET Core's with
+    /// <c>--host aspnetcore</c>, each saying which as it starts; ASP.NET Core's answers name Kestrel, WebLingo's name no server.
+    /// </summary>
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("standalone", false)]
+    [InlineData("aspnetcore", true)]
+    public async Task WaspServeRunsWebLingosOwnServerUnlessAskedForAspNetCores(string? host, bool aspNetCore)
+    {
+        int port;
+        using (var free = new TcpListener(IPAddress.Loopback, 0))
+        {
+            free.Start();
+            port = ((IPEndPoint)free.LocalEndpoint).Port;
+        }
+        var start = new System.Diagnostics.ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, OperatingSystem.IsWindows() ? "wasp.exe" : "wasp"))
+        {
+            RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false
+        };
+        List<string> arguments = ["serve", "--root", _root, "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture)];
+        if (host is not null) arguments.AddRange(["--host", host]);
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        using var wasp = System.Diagnostics.Process.Start(start)!;
+        try
+        {
+            var line = await wasp.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(60));
+            Assert.Equal($"WASP serving http://localhost:{port}/ (Development){(aspNetCore ? ", on ASP.NET Core's server" : "")}; Ctrl+C stops it.",
+                line);
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            var (status, headers, _) = await ReadAfter(client.GetStream(), "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+            Assert.Equal(200, status);
+            Assert.Equal(aspNetCore, headers.Contains("Server: Kestrel"));
+        }
+        finally
+        {
+            wasp.Kill(entireProcessTree: true);
+            await wasp.WaitForExitAsync();
+        }
+    }
+
     private async Task<TcpClient> Connect()
     {
         var client = new TcpClient();

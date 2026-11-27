@@ -144,8 +144,11 @@ else `X-Forwarded-For`/`-Proto`, where its peer is trusted; ASP.NET Core's `Tran
 `REMOTE_ADDR`) FastCGI give the client. `WebLingoSchemes.TryLoadFolder` has one more out, `proxies`.
 
 M0.23's part 5, passed: `WebLingo.Benchmarks --load --host standalone`; the load on both servers and a 3-hour soak with
-reloads on the standalone one in the specification's section 9, "M0.23 parts", part 5, nothing rising. Part 6, the
-standalone server `wasp serve`'s default, is next.
+reloads on the standalone one in the specification's section 9, "M0.23 parts", part 5, nothing rising.
+
+M0.23's part 6: `wasp serve` runs the standalone server by default, `--host aspnetcore` ASP.NET Core's, and IIS ASP.NET
+Core's whatever is given (`WebLingoWaspCommandLine.Serve`); the load benchmark's `--host aspnetcore` measures
+ASP.NET Core's server by name, its `--host serve` the default.
 
 ## The quantum
 

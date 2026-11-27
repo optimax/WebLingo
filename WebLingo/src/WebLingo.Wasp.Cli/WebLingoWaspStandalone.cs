@@ -10,14 +10,14 @@ using WebLingo.Hosting.Standalone;
 namespace WebLingo.Wasp.Cli;
 
 /// <summary>
-/// <c>wasp serve --host standalone</c> (specification, section 9, "M0.23 parts", part 2; the owner's answer, A2 (a) of "M0.23:
-/// A Standalone HTTP Host"): a site served by WebLingo's own HTTP server, without ASP.NET Core, loaded as <c>wasp serve</c>
-/// loads it, reloaded as its files change, on the local machine only, while the standalone server is proved; ASP.NET Core's
-/// staying <c>wasp serve</c>'s own until then, and IIS's.
+/// <c>wasp serve</c>'s servers (specification, section 9, "M0.23 parts", parts 2 and 6; the owner's answer, A2 (c) of "M0.23:
+/// A Standalone HTTP Host"): WebLingo's own HTTP server, without ASP.NET Core, its default since part 5 proved it, a site
+/// loaded as ASP.NET Core's loads it, reloaded as its files change, on the local machine only; and ASP.NET Core's,
+/// <c>--host aspnetcore</c>, which IIS runs.
 /// </summary>
 public static class WebLingoWaspStandalone
 {
-    /// <summary>The hosts <c>wasp serve --host</c> names: ASP.NET Core's, its default, and WebLingo's own.</summary>
+    /// <summary>The hosts <c>wasp serve --host</c> names: ASP.NET Core's, and WebLingo's own, its default but under IIS.</summary>
     public static readonly string[] Hosts = ["aspnetcore", "standalone"];
 
     /// <summary>

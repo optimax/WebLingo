@@ -29,9 +29,10 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
     public static WebLingoLoadSite At(Uri url) => new(url, $"the site at {url}", null);
 
     /// <summary>
-    /// The load site, served by <c>wasp serve</c> where <paramref name="host"/> is <c>serve</c>, by <c>wasp serve --host
-    /// standalone</c>, WebLingo's own HTTP server, where it is <c>standalone</c> (specification, section 9, "M0.23 parts", part
-    /// 5), else behind nginx; its <c>wasp.config</c> given <paramref name="setting"/> more, where one is given.
+    /// The load site, served by <c>wasp serve</c> where <paramref name="host"/> is <c>serve</c>, WebLingo's own HTTP server
+    /// since part 6 of "M0.23 parts" (specification, section 9), by <c>wasp serve --host standalone</c> where it is
+    /// <c>standalone</c>, by <c>wasp serve --host aspnetcore</c>, ASP.NET Core's server, where it is <c>aspnetcore</c>, else
+    /// behind nginx; its <c>wasp.config</c> given <paramref name="setting"/> more, where one is given.
     /// </summary>
     public static async Task<WebLingoLoadSite> Start(string host, string? setting = null)
     {
@@ -59,6 +60,11 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
         {
             served = new WebLingoLoadSite(new Uri($"http://127.0.0.1:{port}/"), "`wasp serve --host standalone`, WebLingo's own HTTP server", folder);
             served._server = served.Started(wasp, ["serve", "--host", "standalone", "--root", site, "--port", Text(port)], site);
+        }
+        else if (host == "aspnetcore")
+        {
+            served = new WebLingoLoadSite(new Uri($"http://127.0.0.1:{port}/"), "`wasp serve --host aspnetcore`, ASP.NET Core's server", folder);
+            served._server = served.Started(wasp, ["serve", "--host", "aspnetcore", "--root", site, "--port", Text(port)], site);
         }
         else
         {

@@ -77,9 +77,9 @@ public static class WebLingoWaspCommandLine
 
     /// <summary>
     /// <c>wasp serve [--root &lt;folder&gt;] [--port &lt;port&gt;] [--host aspnetcore|standalone] [--scheme name=folder]…</c>: the
-    /// application at the root, the current folder by default, served until the process is stopped, by ASP.NET Core's server
-    /// (<see cref="WebLingoWaspServer"/>), or by WebLingo's own, <c>--host standalone</c>, while it is proved
-    /// (<see cref="WebLingoWaspStandalone"/>; section 9, "M0.23 parts", part 2).
+    /// application at the root, the current folder by default, served until the process is stopped, by WebLingo's own server
+    /// (<see cref="WebLingoWaspStandalone"/>), or by ASP.NET Core's, <c>--host aspnetcore</c> (<see cref="WebLingoWaspServer"/>),
+    /// which IIS runs whatever is given (section 9, "M0.23 parts", part 6).
     /// </summary>
     private static int Serve(string[] args, TextWriter output, TextWriter error)
     {
@@ -107,6 +107,8 @@ public static class WebLingoWaspCommandLine
             output.WriteLine("Usage: wasp serve [--root <folder>] [--port <port>] [--host aspnetcore|standalone] [--scheme <name>=<folder> …]");
             return WebLingoCommandLine.UsageError;
         }
+        // WebLingo's own server by default, but under IIS, whose ASP.NET Core Module talks to ASP.NET Core's.
+        host ??= WebLingoWaspServer.UnderIis ? "aspnetcore" : "standalone";
         if (host == "standalone") return ServeStandalone(root, port, schemes, output, error);
         var server = WebLingoWaspServer.Create(root, port, schemes, out var why, out var environment, output);
         if (server is null)
@@ -116,13 +118,13 @@ public static class WebLingoWaspCommandLine
         }
         output.WriteLine(WebLingoWaspServer.UnderIis
             ? $"WASP serving under IIS ({environment})."
-            : $"WASP serving http://localhost:{port}/ ({environment}); Ctrl+C stops it.");
+            : $"WASP serving http://localhost:{port}/ ({environment}), on ASP.NET Core's server; Ctrl+C stops it.");
         output.Flush();
         server.Run();
         return WebLingoCommandLine.Success;
     }
 
-    /// <summary><c>wasp serve --host standalone</c>: the site served by WebLingo's own HTTP server until Ctrl+C, or the process's end.</summary>
+    /// <summary><c>wasp serve</c>: the site served by WebLingo's own HTTP server until Ctrl+C, or the process's end.</summary>
     private static int ServeStandalone(string? root, int port, Dictionary<string, string> schemes, TextWriter output, TextWriter error)
     {
         var server = WebLingoWaspStandalone.Create("standalone", root, port, schemes, out var why, out var environment, output);
@@ -148,7 +150,7 @@ public static class WebLingoWaspCommandLine
         };
         Console.CancelKeyPress += cancel;
         AppDomain.CurrentDomain.ProcessExit += (_, _) => stopping.Set();
-        output.WriteLine($"WASP serving http://localhost:{port}/ ({environment}), on its own server; Ctrl+C stops it.");
+        output.WriteLine($"WASP serving http://localhost:{port}/ ({environment}); Ctrl+C stops it.");
         output.Flush();
         stopping.Wait();
         Console.CancelKeyPress -= cancel;
