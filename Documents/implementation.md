@@ -434,10 +434,15 @@ would stay in its precompiled code: precompiled with the rest, `loops` took 2.5 
 `calls`, `closures`, `arrays` and `objects`, compiled, 12 to 31 percent longer (26 November 2026). Left to the JIT
 (`PublishReadyToRunExclude`), it starts in the first tier and goes on in its optimized code once its loop has run long
 enough, as without ReadyToRun, and every program is faster (the specification, section 5.6, "Where the time goes", cause
-7). The runtime's assembly is precompiled, since leaving it to the JIT too made every program 2 to 56 percent slower;
-but a long-running process, the benchmark in one process, ran `bytes` 1.54 times as long with it precompiled, a method
-of it staying in its precompiled code, not yet found ("ReadyToRun's `bytes` Slower in a Long-Running Process"). So an
-assembly whose hot code loops for long in a method called once is left to the JIT; and a change that moves the dispatch
+7). The runtime's assembly is precompiled, since leaving it to the JIT too made every program 2 to 56 percent slower.
+A precompiled method called often reaches its optimized code later than a method the JIT compiled first: .NET compiles
+it again with instrumentation first, then optimized with what that measured (dynamic PGO). So the benchmark published
+with ReadyToRun, run in one process with 8 warm-ups, ran `bytes`, whose hot code is the runtime's, 1.37 times as long
+as without, 1.09 after 30 warm-ups, and the same after 100, about a second of its work ("ReadyToRun's `bytes` Slower in
+a Long-Running Process", 27 November 2026): a process that runs for long, as `wasp` does, loses nothing. Which methods
+.NET compiled, and at which tier, `DOTNET_JitDisasmSummary=1` lists, `DOTNET_JitStdOutFile` naming the file. So an
+assembly whose hot code loops for long in a method called once is left to the JIT; a comparison of publishes in one
+process warms up for a second or more; and a change that moves the dispatch
 loop, or what it inlines, into another assembly, or a loop that runs long into the runtime, is measured on the published
 programs, the comparison's `--weblingo` naming the publish's `weblingo`, and on the benchmark published with
 `-p:TieredCompilation=true`, as well as on the benchmark as built, which publishes nothing.
