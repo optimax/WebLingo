@@ -28,6 +28,8 @@ public sealed class RequestLimitTests : IDisposable
     {
         Write("hello.wasp", "<p>Hello.</p>");
         Write("loops.wasp", "<% var i = 0; while (true) { i = i + 1; } %>never");
+        Write("waits-cleans.wasp", "<% import { delay } from \"std:system\"; try { await delay(60000); } finally { throw new Error(\"from the waiting cleanup\"); } %>never");
+        Write("cleans-long.wasp", "<% import { delay } from \"std:system\"; try { await delay(60000); } finally { await delay(60000); } %>never");
         Write("cleans.wasp", "<% try { var i = 0; while (true) { i = i + 1; } } finally { throw new Error(\"from the cleanup\"); } %>never");
         Write("waits.wasp", "<% import { delay } from \"std:system\"; await delay(60000); %>never");
         Write("counts.wasp", "<% var sum = 0; for (var i = 0; i < 100000; i++) { sum += i; } %><%= sum %>");
@@ -67,6 +69,29 @@ public sealed class RequestLimitTests : IDisposable
         var (status, _) = await Get(Load(timeout: TimeSpan.FromMilliseconds(300), log: log), "/cleans");
         Assert.Equal(503, status);
         Assert.Contains(log.Entries, entry => entry.Level == WebLingoLogLevel.Warn && entry.Text.Contains("from the cleanup", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A request its time limit stops while it waits runs its cleanups too (section 9, "A cancelled request's cleanup,
+    /// parts", part 3): taken out of its wait, the page's <c>finally</c> runs, its dropped exception logged at <c>warn</c>.
+    /// </summary>
+    [Fact]
+    public async Task ARequestItsTimeLimitStopsWhileItWaitsRunsItsCleanups()
+    {
+        var log = new ListLog();
+        var (status, _) = await Get(Load(timeout: TimeSpan.FromMilliseconds(300), log: log), "/waits-cleans");
+        Assert.Equal(503, status);
+        Assert.Contains(log.Entries, entry => entry.Level == WebLingoLogLevel.Warn && entry.Text.Contains("from the waiting cleanup", StringComparison.Ordinal));
+    }
+
+    /// <summary>A cleanup that waits for longer than its grace, 5 seconds, is stopped at the grace's end, the request a 503.</summary>
+    [Fact]
+    public async Task ACleanupThatWaitsIsStoppedAtItsGracesEnd()
+    {
+        var clock = Stopwatch.StartNew();
+        var (status, _) = await Get(Load(timeout: TimeSpan.FromMilliseconds(300)), "/cleans-long");
+        Assert.Equal(503, status);
+        Assert.InRange(clock.Elapsed, TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(45));
     }
 
     [Fact]

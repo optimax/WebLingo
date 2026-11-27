@@ -178,6 +178,29 @@ public sealed class WebLingoHeap
     /// first task waiting for it, which a program stuck on it is told so at (section 3.8, "Tasks completed by hand");
     /// false for none.
     /// </summary>
+    /// <summary>
+    /// The tasks whose functions wait, each its frame kept by the task, in the order the heap holds them (section 9, "A
+    /// cancelled request's cleanup, parts", part 3).
+    /// </summary>
+    public List<(WebLingoValue Task, object Frame)> WaitingTasks()
+    {
+        var waiting = new List<(WebLingoValue, object)>();
+        for (var i = 0; i < _objects.Count; i++)
+        {
+            if (_objects[i] is WebLingoTask { Frame: { } frame }) waiting.Add((WebLingoValue.FromHandle(WebLingoValueKind.Task, i), frame));
+        }
+        return waiting;
+    }
+
+    /// <summary>A task taken out of every task's waiters, so that no task's end resumes it.</summary>
+    public void Withdraw(WebLingoValue task)
+    {
+        for (var i = 0; i < _objects.Count; i++)
+        {
+            if (_objects[i] is WebLingoTask { Waiters.Count: > 0 } awaited) awaited.Waiters.Remove(task);
+        }
+    }
+
     public bool TryFindStuckTask(out WebLingoValue task, out WebLingoValue waiter)
     {
         for (var i = 0; i < _objects.Count; i++)

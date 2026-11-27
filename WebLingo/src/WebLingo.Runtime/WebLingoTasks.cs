@@ -324,6 +324,20 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
 
     public bool TryTakeReady(out WebLingoResumption resumption) => _ready.TryDequeue(out resumption);
 
+    /// <summary>Whether a task is ready to resume.</summary>
+    public bool HasReady => _ready.Count > 0;
+
+    /// <summary>The resumptions of the tasks <paramref name="drops"/> names dropped, the others kept in their order.</summary>
+    public void DropReady(Func<WebLingoValue, bool> drops)
+    {
+        var kept = new List<WebLingoResumption>(_ready.Count);
+        while (_ready.TryDequeue(out var resumption))
+        {
+            if (!drops(resumption.Task)) kept.Add(resumption);
+        }
+        foreach (var resumption in kept) _ready.Enqueue(resumption);
+    }
+
     /// <summary>
     /// Throws <paramref name="error"/> at the <c>await</c> where <paramref name="waiter"/>'s function waits for
     /// <paramref name="task"/>, which goes on waiting for nothing: a program stuck awaiting a task made by hand (section

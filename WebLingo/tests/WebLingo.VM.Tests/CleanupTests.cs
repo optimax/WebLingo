@@ -115,6 +115,67 @@ public sealed class CleanupTests
         Assert.Equal("The program was cancelled, and its cleanup, past its grace, was stopped.", error!.Message);
     }
 
+    /// <summary>The waiting tasks' cleanup (part 3): a task that waits when the cancellation comes, after the running frames'.</summary>
+    [Fact]
+    public void AWaitingTasksCleanupRunsAfterTheRunningFrames()
+    {
+        var (output, error, _) = Run("""
+            async function worker() { try { await delay(100000); } finally { writeLn("worker"); } }
+            var t = worker();
+            try { cancel(); while (true) { } } finally { writeLn("main"); }
+            """);
+        Assert.Equal("main\nworker\n", output);
+        Assert.Equal(WebLingoDiagnosticCodes.Cancelled, error!.Code);
+    }
+
+    [Fact]
+    public void AProgramCancelledWhileItWaitsRunsItsCleanup()
+    {
+        var (output, error, _) = Run("""
+            try { cancel(); await delay(100000); writeLn("not here"); } catch (e) { writeLn("caught"); } finally { writeLn("main"); }
+            """);
+        Assert.Equal("main\n", output);
+        Assert.Equal(WebLingoDiagnosticCodes.Cancelled, error!.Code);
+    }
+
+    [Fact]
+    public void ACleanupMayAwait()
+    {
+        var (output, _, _) = Run("""
+            try { cancel(); await delay(100000); } finally { writeLn("before"); await delay(10); writeLn("after"); }
+            """);
+        Assert.Equal("before\nafter\n", output);
+    }
+
+    [Fact]
+    public void ACleanupMayCallAndAwaitAnAsyncFunction()
+    {
+        var (output, _, log) = Run("""
+            async function closeIt() {
+                await delay(5);
+                try { throw new Error("its own"); } catch (e) { writeLn("closeIt caught " + e.message); }
+                writeLn("closed");
+            }
+            try { cancel(); await delay(100000); } finally { await closeIt(); writeLn("done"); }
+            """);
+        Assert.Equal("closeIt caught its own\nclosed\ndone\n", output);
+        Assert.Empty(log);
+    }
+
+    [Fact]
+    public void WaitingTasksAreCleanedInTheOrderTheHeapHoldsThem()
+    {
+        var (output, _, log) = Run("""
+            async function worker(name) { try { await delay(100000); } catch (e) { writeLn("caught"); } finally { writeLn(name); throw new Error(name); } }
+            var a = worker("a");
+            var b = worker("b");
+            try { cancel(); await delay(100000); } finally { writeLn("main"); }
+            """);
+        Assert.Equal("main\na\nb\n", output);
+        Assert.Equal(2, log.Count);
+        Assert.All(log, line => Assert.Equal(WebLingoLogLevel.Warn, line.Level));
+    }
+
     [Fact]
     public void WithoutACancellationNothingChanges()
     {
@@ -129,7 +190,7 @@ public sealed class CleanupTests
         long cleanupInstructions = 10_000_000, bool cancels = true)
     {
         var signal = new WebLingoCancellationSignal();
-        var options = new WebLingoCompilerOptions([new("write", 1), new("writeLn", 1), new("cancel", 0)]);
+        var options = new WebLingoCompilerOptions([new("write", 1), new("writeLn", 1), new("cancel", 0), new("delay", 1)]);
         var output = new WebLingoCollectedOutput();
         var log = new Log();
         var context = new WebLingoExecutionContext(new WebLingoWorkerId(0))

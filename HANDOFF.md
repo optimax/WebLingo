@@ -168,9 +168,12 @@ Defined in parts in the specification's section 9, "A cancelled request's cleanu
 `CleanupEnd`, the instruction after its `Rethrow`, given by `WebLingoCodeGenerator.EndCleanup` and checked by the
 verifier. Part 2: the VM's loop, every 1,024 instructions, begins a cancelled execution's cleanup (`Cleans`), its grace
 `WebLingoExecutionContext.CleanupInstructions` and `CleanupMilliseconds`; the throwing path, while `_cancelling`, asks
-`CleanupHandler` which handler an exception goes to, the cleanup that runs kept by `_cleanupDepth`, `_cleanupStart` and
-`_cleanupEnd`; `Unwinds` leaves a frame without faulting its task; a yield goes on when cancelled (`GoesOn`). Part 3, the
-waiting tasks', is next; a `finally` on its normal way out is not covered, a task of its own.
+`CleanupHandler` which handler an exception goes to, the cleanup that runs marked on its frame (`Frame.CleanupStart`,
+`CleanupEnd`, `int.MaxValue` for a frame all of whose code is cleanup); `Unwinds` leaves a frame without faulting its
+task; a yield goes on when cancelled (`GoesOn`). Part 3: `CleanWaiting`, in `TryResume`, resumes each task that waited
+when the cleanup began with the cancellation thrown at its `await` (`WebLingoHeap.WaitingTasks`, `Withdraw`,
+`WebLingoScheduler.DropReady`), and ends the execution once nothing is left; `WaitFor` keeps a wait within the grace. A
+`finally` on its normal way out is not covered, a task of its own.
 
 ## The collector
 
