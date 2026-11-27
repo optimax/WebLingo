@@ -2374,7 +2374,8 @@ each needs that the owner has not decided is a question of its task's, and Propo
    Bounded"). The standalone server serves as ASP.NET Core's does within a few percent, but for the pages served
    fastest at 64 clients, `hello` 22 percent fewer a second and `session` 19, and `large`, 10 to 16 percent fewer at 4
    clients and more; its working set from 52 MB where ASP.NET Core's is from 66 MB. The soak (26 November 2026, 18:27
-   to 21:27, from `65999e0`, the machine not idle throughout, builds and tests run meanwhile, `WebLingo.Benchmarks --load
+   to 21:27, from `65999e0` with the soak's reloads of M0.22's part 3 merged in, their branch, `claude/soak-reloads`, not landed
+   while its task waits for your answer, the machine not idle throughout, builds and tests run meanwhile, `WebLingo.Benchmarks --load
    --host standalone --soak 3 --sample 5 --reload-every 5 --clients 8`), as ASP.NET Core's server had it for M0.22's
    part 3: 3 hours, 8 clients asking for `hello`, `compute`, `sqlite`, `sqlserver`, `large`, `session` and `upload` in
    turn, `hello.wasp` replaced every 5 seconds, a sample every 5 minutes: 23,724,286 requests, 0 errors, 2,156 reloads,
