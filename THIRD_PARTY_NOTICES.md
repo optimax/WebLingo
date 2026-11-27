@@ -59,13 +59,23 @@ does not list, from ASP.NET Core, which it runs on.
 
 The framework-dependent packages carry neither: they run on the .NET and ASP.NET Core a machine has installed.
 
+## In WebLingo Forum
+
+WebLingo Forum, the example in `Examples.wasp/WebLingoForum`, which no installer carries, serves a copy of this
+component to the browsers its members write in, its license beside it:
+
+| Component | Version | License | Copyright | In |
+|---|---|---|---|---|
+| MarkdownEditor.Web | 0.1.0 (`be093fb`) | MIT | Copyright (c) 2026 The MarkdownEditor.Web Authors | `Examples.wasp/WebLingoForum/site/js/markdown-editor`, copied by its `setup/copy-editor.wlg` |
+
 ## Licenses
 
 ### MIT License
 
 Each package under the MIT License is given under it with its copyright notice, above: © Microsoft Corporation;
-Copyright (c) .NET Foundation and Contributors, for .NET's runtimes and libraries, as their `LICENSE.TXT` gives it; and
-Copyright 2016–2026 Bradley Grainger, for MySqlConnector.
+Copyright (c) .NET Foundation and Contributors, for .NET's runtimes and libraries, as their `LICENSE.TXT` gives it;
+Copyright 2016–2026 Bradley Grainger, for MySqlConnector; and Copyright (c) 2026 The MarkdownEditor.Web Authors, for
+MarkdownEditor.Web, in WebLingo Forum.
 
 ```text
 The MIT License (MIT)

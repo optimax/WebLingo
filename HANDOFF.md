@@ -596,8 +596,8 @@ looked at in a browser.
 Its Markdown editor (the task "WebLingo Forum: MarkdownEditor.Web in the Post Form"): the forms' textareas marked
 `data-markdown`, which `site/js/forum-editor.js`, in the layout's head, replaces with MarkdownEditor.Web's
 `<markdown-editor>` where the editor's files are in `site/js/markdown-editor`, the form working without them as before;
-`setup/copy-editor.wlg` copies them there from MarkdownEditor.Web's checkout. The copy is not committed yet:
-MarkdownEditor.Web has no `LICENSE`, the task "A License: the MIT License" in its own `TO-DO.md`. The renderer reads
+`setup/copy-editor.wlg` copies them there from MarkdownEditor.Web's checkout, the copy committed with its `LICENSE`,
+MIT's (MarkdownEditor.Web's `be093fb`), and named in `THIRD_PARTY_NOTICES.md`: run it again when the editor changes. The renderer reads
 MarkdownEditor.Web's extensions: tables, task lists, underline, subscript, superscript and front matter. Tried in a
 browser with the copy in a scratch forum: written, bold by Ctrl+B, previewed, posted as Markdown.
 
