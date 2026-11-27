@@ -27,6 +27,15 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
 
     /// <summary>How many instructions the execution may run before it is stopped (WL3003).</summary>
     public long InstructionBudget { get; init; } = long.MaxValue;
+
+    /// <summary>
+    /// How many instructions a cancelled execution's cleanup may run, its <c>finally</c> blocks and disposals, before it is
+    /// stopped at once (section 9, "A cancelled request's cleanup, parts", part 2).
+    /// </summary>
+    public long CleanupInstructions { get; init; } = 10_000_000;
+
+    /// <summary>How long, by <see cref="Clock"/>, a cancelled execution's cleanup may take before it is stopped at once.</summary>
+    public long CleanupMilliseconds { get; init; } = 5_000;
     public WebLingoResourceBudget Resources { get; init; } = WebLingoResourceBudget.Default;
 
     /// <summary>The time limit in milliseconds for a regular expression match in this execution. The default is one second.</summary>

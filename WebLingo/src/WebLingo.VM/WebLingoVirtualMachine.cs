@@ -435,8 +435,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                         if (cancellation is not null && executed % CancellationInterval == 0
                             && cancellation.IsCancellationRequested)
                         {
-                            return Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled.", frame.Function, pc)
-                                with { Instructions = executed };
+                            // Cancelled: its cleanups run, frame by frame, within a grace (section 9, "A cancelled
+                            // request's cleanup, parts", part 2).
+                            var cleans = Cleans(frames, frame, depth, pc, executed);
+                            if (cleans < 0) return _left!;
+                            budget = _graceBudget;
+                            if (cleans > 0) goto throwing;
                         }
                         dueAt = Math.Min(budget, (executed / CancellationInterval + 1) * CancellationInterval);
                     }
@@ -1540,7 +1544,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                     // goes on. One that nothing catches stops the program (section 3.7).
                     {
                         var handlers = frame.Function.Handlers;
-                        var found = FindHandler(handlers, pc);
+                        var found = _cancelling ? CleanupHandler(frame, depth, pc) : FindHandler(handlers, pc);
                         if (found >= 0)
                         {
                             if (!TryTakeException(out var exception)) return Uncaught(executed);
@@ -1557,8 +1561,8 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
                             Array.Clear(registers, 0, frame.Function.RegisterCount);
                             goto nextDisposal;
                         }
-                        if (frame.Task.Kind == WebLingoValueKind.Task) goto faulted;
-                        if (depth == 0) return Uncaught(executed);
+                        if (frame.Task.Kind == WebLingoValueKind.Task && found != Unwinds) goto faulted;
+                        if (depth == 0) return found == Unwinds ? CleanedUp(frame.Function, pc, executed) : Uncaught(executed);
                         Array.Clear(registers, 0, frame.Function.RegisterCount);
                         frame.Waiter?.Unroot(heap);
                         Release(frame);
@@ -1602,6 +1606,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         [MethodImpl(MethodImplOptions.NoInlining)]
         private WebLingoExecutionResult BudgetPassed(int pc, long executed) =>
             _yields ? Yield(pc, executed)
+            : _cancelling ? CleanupStopped(_frames[_depth].Function, pc, executed)
             : Failure(WebLingoDiagnosticCodes.BudgetExceeded, $"The program ran {executed} instructions, its whole budget, and was stopped.",
                 _frames[_depth].Function, pc) with { Instructions = executed };
 
@@ -1612,6 +1617,12 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         [MethodImpl(MethodImplOptions.NoInlining)]
         private long WithQuantum(long budget, long executed)
         {
+            if (_cancelling)
+            {
+                // A cancelled execution's cleanup runs to its grace, yielding nothing.
+                _yields = false;
+                return Math.Min(budget, _graceBudget);
+            }
             var quantum = context.Suspends ? context.Quantum : 0;
             _yields = quantum > 0 && budget - executed > quantum;
             return _yields ? executed + quantum : budget;
@@ -1687,7 +1698,9 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         private int GoesOn(long executed)
         {
             var frame = _frames[_stopDepth];
-            if (context.Cancellation is { IsCancellationRequested: true })
+            // A yield's frames are the running ones, which go on, the loop's next look at the cancellation beginning their
+            // cleanup (section 9, "A cancelled request's cleanup, parts", part 2); a debugger's stop ends there.
+            if (context.Cancellation is { IsCancellationRequested: true } && !_yielded)
             {
                 _stopDepth = -1;
                 _left = Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled.", frame.Function, frame.Pc)
@@ -3452,6 +3465,175 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
             if (_thrownError is { } error && !WebLingoExceptions.TryMakeError(heap, ErrorClassFor(error.Code), error, out thrown)) return null;
             return WebLingoMessage.TryCopy(heap, thrown, _errorClass[0], null, out var message, out _) ? message : null;
         }
+
+        /// <summary>
+        /// What <see cref="CleanupHandler"/> gives for a frame the cancellation leaves, no cleanup of its own left: its
+        /// task, if it has one, not faulted, and at the bottom of the stack, the execution's end.
+        /// </summary>
+        private const int Unwinds = -2;
+
+        /// <summary>Whether a cancelled execution's cleanup runs (section 9, "A cancelled request's cleanup, parts", part 2).</summary>
+        private bool _cancelling;
+
+        /// <summary>
+        /// The frame, by its depth, whose cleanup's code runs, from <see cref="_cleanupStart"/> to <see cref="_cleanupEnd"/>
+        /// − 1, the last its <c>Rethrow</c>; a disposal's frame, whose methods are all cleanup, from 0 to
+        /// <see cref="int.MaxValue"/>; -1 where none runs, and an exception thrown is the cancellation.
+        /// </summary>
+        private int _cleanupDepth = -1;
+        private int _cleanupStart;
+        private int _cleanupEnd;
+
+        /// <summary>The count of instructions, and the clock's time, at which the cleanup is stopped at once.</summary>
+        private long _graceBudget;
+        private long _graceTime;
+
+        /// <summary>
+        /// The cancellation seen at <paramref name="pc"/>: where the cleanup has begun, 0 while its grace lasts, -1 once it
+        /// has passed, <see cref="_left"/> then the execution's end; where it begins, its grace from now, and 0 where a
+        /// cleanup runs already, in this frame or below it, which finishes first, a disposal's frame holding the
+        /// cancellation, which its last method's end throws again; else 1, the cancellation thrown from
+        /// <paramref name="pc"/>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private int Cleans(Frame[] frames, Frame frame, int depth, int pc, long executed)
+        {
+            if (_cancelling)
+            {
+                if (context.Clock is not { } clock || clock.Milliseconds < _graceTime) return 0;
+                _left = CleanupStopped(frame.Function, pc, executed);
+                return -1;
+            }
+            _cancelling = true;
+            _yields = false;
+            _graceBudget = Math.Min(context.InstructionBudget, executed + context.CleanupInstructions);
+            _graceTime = context.Clock is { } now ? now.Milliseconds + context.CleanupMilliseconds : long.MaxValue;
+            (_thrown, _thrownError, _origin) = (WebLingoValue.Null, null, OriginOf(frame.Function, pc));
+            for (var at = depth; at >= 0; at--)
+            {
+                var below = frames[at];
+                if (below.DisposeChain is not null)
+                {
+                    SetCleanup(at, 0, int.MaxValue);
+                    Hold(below);
+                    return 0;
+                }
+                var running = RunningCleanup(below.Function.Handlers, at == depth ? pc : below.Pc - 1);
+                if (running >= 0)
+                {
+                    var handler = below.Function.Handlers[running];
+                    SetCleanup(at, handler.Target, handler.CleanupEnd);
+                    return 0;
+                }
+            }
+            return 1;
+        }
+
+        private void SetCleanup(int depth, int start, int end) => (_cleanupDepth, _cleanupStart, _cleanupEnd) = (depth, start, end);
+
+        /// <summary>
+        /// While the execution is cancelled, the handler an exception thrown at <paramref name="pc"/> goes to, or what the
+        /// frame does without one: in a frame a cleanup calls, as ever; in the cleanup's own frame, a handler within the
+        /// cleanup's code, else the exception dropped, logged at <c>warn</c>, the cancellation going on from the cleanup's
+        /// end; the cleanup's own <c>Rethrow</c>, or its frame gone, its end, the cancellation going on; and the
+        /// cancellation itself, the next cleanup out in the frame, or <see cref="Unwinds"/>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private int CleanupHandler(Frame frame, int depth, int pc)
+        {
+            var handlers = frame.Function.Handlers;
+            if (_cleanupDepth >= 0)
+            {
+                if (depth > _cleanupDepth) return FindHandler(handlers, pc);
+                if (depth == _cleanupDepth && pc >= _cleanupStart && pc < _cleanupEnd && pc != _cleanupEnd - 1)
+                {
+                    for (var i = 0; i < handlers.Count; i++)
+                    {
+                        var handler = handlers[i];
+                        if (pc >= handler.Start && pc < handler.End && handler.Start >= _cleanupStart && handler.Start < _cleanupEnd) return i;
+                    }
+                    Dropped();
+                    if (_cleanupEnd != int.MaxValue) pc = _cleanupEnd - 1;
+                }
+                _cleanupDepth = -1;
+                (_thrown, _thrownError) = (WebLingoValue.Null, null);
+            }
+            return NextCleanup(frame, depth, pc);
+        }
+
+        /// <summary>
+        /// The cancellation, at <paramref name="pc"/> of a frame: the innermost cleanup whose region holds it, the code of a
+        /// cleanup it stands in, unfinished, left as an exception would leave it; or none, the frame's disposal, if it has
+        /// one, going on with its next method as cleanup, then <see cref="Unwinds"/>.
+        /// </summary>
+        private int NextCleanup(Frame frame, int depth, int pc)
+        {
+            var handlers = frame.Function.Handlers;
+            while (true)
+            {
+                for (var i = 0; i < handlers.Count; i++)
+                {
+                    var handler = handlers[i];
+                    if (!handler.IsCleanup || pc < handler.Start || pc >= handler.End) continue;
+                    SetCleanup(depth, handler.Target, handler.CleanupEnd);
+                    return i;
+                }
+                var within = -1;
+                for (var i = 0; i < handlers.Count; i++)
+                {
+                    var handler = handlers[i];
+                    if (handler.IsCleanup && pc >= handler.Target && pc < handler.CleanupEnd - 1
+                        && (within < 0 || handler.CleanupEnd < handlers[within].CleanupEnd))
+                    {
+                        within = i;
+                    }
+                }
+                if (within < 0) break;
+                pc = handlers[within].CleanupEnd - 1;
+            }
+            if (frame.DisposeChain is { } chain && frame.DisposeNext < chain.Length) SetCleanup(depth, 0, int.MaxValue);
+            return Unwinds;
+        }
+
+        /// <summary>
+        /// The innermost cleanup whose code holds <paramref name="pc"/>, its <c>Rethrow</c> not yet reached, or -1: a cleanup
+        /// running when the cancellation came, which finishes first.
+        /// </summary>
+        private static int RunningCleanup(IReadOnlyList<WebLingoHandler> handlers, int pc)
+        {
+            var found = -1;
+            for (var i = 0; i < handlers.Count; i++)
+            {
+                var handler = handlers[i];
+                if (handler.IsCleanup && pc >= handler.Target && pc < handler.CleanupEnd
+                    && (found < 0 || handler.CleanupEnd < handlers[found].CleanupEnd))
+                {
+                    found = i;
+                }
+            }
+            return found;
+        }
+
+        /// <summary>An exception a cleanup threw while the execution was cancelled, which nothing within it caught, logged at <c>warn</c>.</summary>
+        private void Dropped()
+        {
+            if (context.Log is not { } log) return;
+            var (code, message) = _thrownError is { } error
+                ? (error.Code, error.Message)
+                : WebLingoExceptions.Uncaught(_thrown, _errorClass[0], heap, out _);
+            log.Write(WebLingo.Platform.Abstractions.WebLingoLogLevel.Warn,
+                $"A cleanup's exception, dropped while the request was cancelled, its cleanup going on: {code}: {message}");
+        }
+
+        /// <summary>The cancelled execution's end, its cleanups run.</summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private WebLingoExecutionResult CleanedUp(WebLingoFunction function, int pc, long executed) =>
+            Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled.", function, pc) with { Instructions = executed };
+
+        /// <summary>The cancelled execution's end, its cleanup past its grace, stopped at once.</summary>
+        private WebLingoExecutionResult CleanupStopped(WebLingoFunction function, int pc, long executed) =>
+            Failure(WebLingoDiagnosticCodes.Cancelled, "The program was cancelled, and its cleanup, past its grace, was stopped.", function, pc)
+                with { Instructions = executed };
 
         /// <summary>The first handler whose region holds the instruction, or -1.</summary>
         private static int FindHandler(IReadOnlyList<WebLingoHandler> handlers, int pc)

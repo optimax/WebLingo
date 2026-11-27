@@ -1103,7 +1103,12 @@ does not keep its server busy:
 - **its memory:** 128 MB of strings, its values all counted as strings are, by their size.
 
 A request stopped so is a **503 Service Unavailable**, its error WL3003, shown in its page in development only and written
-to the server's log; a page cannot catch it. `wasp.config`'s `"limits"` gives others ([section 14](#14-configuration-waspconfig)):
+to the server's log; a page cannot catch it. A request stopped by its time, its client's going or a reload runs its
+cleanups first, each `finally` block and each disposal, `using`'s and a class's, around where it was, innermost first, no
+`catch` entered; an exception a cleanup throws that nothing within it catches is dropped, the server's log saying so at
+`warn`, and the cleanups further out still run. The cleanups have 5 seconds and 10,000,000 instructions in all, past
+which the request is stopped at once. For now this holds where the request was running; a request stopped while it
+waits, for a timer, a database or a client, is stopped where it waits, as before. `wasp.config`'s `"limits"` gives others ([section 14](#14-configuration-waspconfig)):
 
 ```json
 { "limits": { "requestTimeout": 120, "requestInstructions": 5000000000, "requestMemory": 512 } }

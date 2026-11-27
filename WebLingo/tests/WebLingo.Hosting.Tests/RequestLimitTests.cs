@@ -28,6 +28,7 @@ public sealed class RequestLimitTests : IDisposable
     {
         Write("hello.wasp", "<p>Hello.</p>");
         Write("loops.wasp", "<% var i = 0; while (true) { i = i + 1; } %>never");
+        Write("cleans.wasp", "<% try { var i = 0; while (true) { i = i + 1; } } finally { throw new Error(\"from the cleanup\"); } %>never");
         Write("waits.wasp", "<% import { delay } from \"std:system\"; await delay(60000); %>never");
         Write("counts.wasp", "<% var sum = 0; for (var i = 0; i < 100000; i++) { sum += i; } %><%= sum %>");
         Write("grows.wasp", "<% var s = \"x\"; var i = 0; while (i < 30) { s = s + s; i = i + 1; } %><%= s.length %>");
@@ -52,6 +53,20 @@ public sealed class RequestLimitTests : IDisposable
             (options.RequestTimeout, options.InstructionBudget, options.MaxHeapUnits));
         Assert.Equal("The request took longer than 60 seconds, its site's limit, \"limits\"' \"requestTimeout\" in wasp.config, and was stopped.",
             options.TimeLimitMessage);
+    }
+
+    /// <summary>
+    /// A request its time limit stops runs its cleanups (section 9, "A cancelled request's cleanup, parts", part 2): the
+    /// page's <c>finally</c> runs, and the exception it throws, which nothing catches, is dropped, the site's log saying so
+    /// at <c>warn</c>; the request a 503 as before.
+    /// </summary>
+    [Fact]
+    public async Task ARequestItsTimeLimitStopsRunsItsCleanups()
+    {
+        var log = new ListLog();
+        var (status, _) = await Get(Load(timeout: TimeSpan.FromMilliseconds(300), log: log), "/cleans");
+        Assert.Equal(503, status);
+        Assert.Contains(log.Entries, entry => entry.Level == WebLingoLogLevel.Warn && entry.Text.Contains("from the cleanup", StringComparison.Ordinal));
     }
 
     [Fact]

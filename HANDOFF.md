@@ -166,8 +166,11 @@ removes it where setup added it.
 Defined in parts in the specification's section 9, "A cancelled request's cleanup, parts". Part 1: WLBC 0.3, each
 `WebLingoHandler` with its `Kind` (`WebLingoHandlerKind`, a `catch`'s, a `finally`'s or a `using`'s) and a cleanup's
 `CleanupEnd`, the instruction after its `Rethrow`, given by `WebLingoCodeGenerator.EndCleanup` and checked by the
-verifier; nothing runs differently yet. Parts 2 and 3, the VM's unwinding of a cancellation through cleanups alone and
-the waiting tasks', are next.
+verifier. Part 2: the VM's loop, every 1,024 instructions, begins a cancelled execution's cleanup (`Cleans`), its grace
+`WebLingoExecutionContext.CleanupInstructions` and `CleanupMilliseconds`; the throwing path, while `_cancelling`, asks
+`CleanupHandler` which handler an exception goes to, the cleanup that runs kept by `_cleanupDepth`, `_cleanupStart` and
+`_cleanupEnd`; `Unwinds` leaves a frame without faulting its task; a yield goes on when cancelled (`GoesOn`). Part 3, the
+waiting tasks', is next; a `finally` on its normal way out is not covered, a task of its own.
 
 ## The collector
 
