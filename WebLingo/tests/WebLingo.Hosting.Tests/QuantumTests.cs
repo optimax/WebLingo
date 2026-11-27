@@ -71,12 +71,14 @@ public sealed class QuantumTests : IDisposable
     [Fact]
     public async Task APageThatYieldsOftenGivesWhatItWouldHaveGiven()
     {
-        // A quantum of 1,024 instructions, as often as the VM looks, the loop and its strings going on where they were each time.
-        var (status, body) = await Get(Load(quantum: 1024), "/counts");
+        // A quantum of 1,024 instructions, as often as the VM looks, the loop and its strings going on where they were each time;
+        // its thousands of yields given a minute, each a timer's hop, which a loaded machine makes slowly (CI's Linux took
+        // more than the others' 3 seconds, 27 November 2026).
+        var (status, body) = await Get(Load(quantum: 1024, TimeSpan.FromMinutes(1)), "/counts");
         Assert.Equal((200, "499999500000 2000"), (status, body));
     }
 
-    private WebLingoApplication Load(long quantum)
+    private WebLingoApplication Load(long quantum, TimeSpan? timeout = null)
     {
         var application = WebLingoApplication.Load(new WebLingoApplicationOptions(_root, new DotNetFileSystem())
         {
@@ -85,7 +87,7 @@ public sealed class QuantumTests : IDisposable
             Clock = new WebLingoExecutionClock(new DotNetClock()),
             Scheduler = () => new DotNetSchedulerHost(),
             Mode = WebLingoMode.Development,
-            RequestTimeout = TimeSpan.FromSeconds(3),
+            RequestTimeout = timeout ?? TimeSpan.FromSeconds(3),
             Quantum = quantum
         }, out var error);
         Assert.True(application is not null, error);

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Hosting;
 using WebLingo.Cli;
 using WebLingo.Compiler;
 using WebLingo.Core;
@@ -116,11 +117,13 @@ public static class WebLingoWaspCommandLine
             error.WriteLine(why);
             return WebLingoCommandLine.FileUnreadable;
         }
+        // Said once the server listens, as the standalone server's line is, so that a client reading it may connect.
+        server.Start();
         output.WriteLine(WebLingoWaspServer.UnderIis
             ? $"WASP serving under IIS ({environment})."
             : $"WASP serving http://localhost:{port}/ ({environment}), on ASP.NET Core's server; Ctrl+C stops it.");
         output.Flush();
-        server.Run();
+        server.WaitForShutdown();
         return WebLingoCommandLine.Success;
     }
 
