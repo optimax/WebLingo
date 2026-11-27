@@ -67,7 +67,7 @@ public sealed class WebLingoDbModule : IWebLingoNativeModule
                     }
                     connection.Dispose();
                     return false;
-                }, Failed, instance, out result, out error);
+                }, Failed, instance, opensConnection: true, out result, out error); // Waiting for a pooled one (section 6.10).
         });
         database.DeclareMethod("query", 3, 2, (ReadOnlySpan<WebLingoValue> a, WebLingoHeap heap, out WebLingoValue result, out WebLingoRuntimeError? error) =>
         {

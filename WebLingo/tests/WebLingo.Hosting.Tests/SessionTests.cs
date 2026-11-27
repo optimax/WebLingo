@@ -340,7 +340,7 @@ public sealed class SessionTests
             }
         }
 
-        public void RunBlocking(Action work) => throw new InvalidOperationException();
+        public void RunBlocking(Action work, bool opensConnection) => throw new InvalidOperationException();
 
         public void Post(Action work)
         {

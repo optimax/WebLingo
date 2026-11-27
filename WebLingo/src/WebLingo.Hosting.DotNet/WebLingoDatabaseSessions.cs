@@ -143,8 +143,9 @@ public sealed class WebLingoDatabaseSessions : IWebLingoSessionStore
     public WebLingoSessionOpening Open(string id, bool locked, Action<WebLingoSessionOpening> later)
     {
         var deadline = _now() + (long)LockTimeout.TotalMilliseconds;
-        // Its database's work on WebLingo's own threads, as a script's is, never .NET's pool (DotNetBlockingPool).
-        DotNetBlockingPool.Run(() => Try(id, locked, deadline, later));
+        // Its database's work on WebLingo's own threads, as a script's is, never .NET's pool (DotNetBlockingPool), each piece
+        // opening a connection of its own, which waits for a pooled one, so that it never takes all of them (section 6.10).
+        DotNetBlockingPool.Run(() => Try(id, locked, deadline, later), opensConnection: true);
         return WebLingoSessionOpening.Waiting;
     }
 
@@ -171,7 +172,8 @@ public sealed class WebLingoDatabaseSessions : IWebLingoSessionStore
             return;
         }
         // Its next try on the blocking pool too, the timer's continuation only handing it on.
-        Task.Delay(Poll).ContinueWith(_ => DotNetBlockingPool.Run(() => Try(id, locked, deadline, later)), TaskScheduler.Default);
+        Task.Delay(Poll).ContinueWith(_ => DotNetBlockingPool.Run(() => Try(id, locked, deadline, later), opensConnection: true),
+            TaskScheduler.Default);
     }
 
     private WebLingoSessionOpening TryOpen(string id, bool locked) => Run(connection =>
@@ -233,7 +235,7 @@ public sealed class WebLingoDatabaseSessions : IWebLingoSessionStore
                 _log?.Invoke($"A session could not be written back: {failure.Message}.");
             }
             done();
-        });
+        }, opensConnection: true);
         return false;
     }
 

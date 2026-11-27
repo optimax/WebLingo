@@ -316,7 +316,7 @@ public sealed class DatabaseSessionTests : IDisposable
             }
         }
 
-        public void RunBlocking(Action work) => ThreadPool.UnsafeQueueUserWorkItem(_ => work(), null);
+        public void RunBlocking(Action work, bool opensConnection) => ThreadPool.UnsafeQueueUserWorkItem(_ => work(), null);
 
         public void Post(Action work)
         {

@@ -118,8 +118,12 @@ public sealed class WebLingoFileSystemException(WebLingoFileErrorKind kind, stri
 /// </summary>
 public interface IWebLingoSchedulerHost
 {
-    /// <summary>Runs blocking work on one of the host's threads, not the worker's.</summary>
-    void RunBlocking(Action work);
+    /// <summary>
+    /// Runs blocking work on one of the host's threads, not the worker's. Work that <paramref name="opensConnection"/>, waiting
+    /// for one of a pool's, a database's open, never takes all of a bounded host's threads, so that the work on a connection a
+    /// request holds always finds one, and the request gives its connection back (section 6.10).
+    /// </summary>
+    void RunBlocking(Action work, bool opensConnection);
 
     /// <summary>Posts work for the execution's worker, from any thread.</summary>
     void Post(Action work);

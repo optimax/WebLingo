@@ -234,7 +234,10 @@ a pool's (`Time`, `Untime`); its clock waits in slices so that a cancellation en
 `DotNetBlockingPool` (`WebLingo.Platform.DotNet`) runs work that blocks, a database's, a file's, a subprocess's, a mail
 server's, on threads of its own: four for each processor at most (`MaxThreads`, M0.24's part 1), work beyond them queued
 in order. Its queue and its counts are under one lock, a waiting thread pulsed for each piece of work; before, a thread
-that had just taken work still counted as waiting, and work queued then waited with a thread to spare.
+that had just taken work still counted as waiting, and work queued then waited with a thread to spare. Work that opens a
+connection (`RunBlocking`'s `opensConnection`, `std:db`'s `open` and the database sessions') runs on three of every four
+threads at most (`MaxOpening`), so that the queries of requests holding SqlClient's 100 connections always find a
+thread; without it SQL Server's page deadlocked at 256 clients.
 `BlockingPoolTests` (`WebLingo.Conformance.Tests`) holds the process's threads for a moment only, other tests sharing them.
 
 ## Logging

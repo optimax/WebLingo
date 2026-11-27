@@ -51,7 +51,7 @@ public sealed class WaitingRequestTests
     /// <summary>A scheduler host that is never posted work.</summary>
     private sealed class NoWork : IWebLingoSchedulerHost
     {
-        public void RunBlocking(Action work) => throw new InvalidOperationException();
+        public void RunBlocking(Action work, bool opensConnection) => throw new InvalidOperationException();
         public void Post(Action work) => throw new InvalidOperationException();
         public bool RunPosted(int milliseconds) => false;
     }

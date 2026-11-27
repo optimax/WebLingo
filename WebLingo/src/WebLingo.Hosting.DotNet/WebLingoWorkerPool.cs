@@ -206,7 +206,7 @@ public sealed class WebLingoWorkerPool : IDisposable
         private readonly ConcurrentQueue<Action> _posted = new();
         private readonly SemaphoreSlim _signal = new(0);
 
-        public void RunBlocking(Action work) => WebLingo.Platform.DotNet.DotNetBlockingPool.Run(work);
+        public void RunBlocking(Action work, bool opensConnection) => WebLingo.Platform.DotNet.DotNetBlockingPool.Run(work, opensConnection);
 
         public void Post(Action work)
         {

@@ -258,7 +258,7 @@ public sealed class DotNetSchedulerHost : IWebLingoSchedulerHost
     private readonly Queue<Action> _posted = new();
     private readonly object _gate = new();
 
-    public void RunBlocking(Action work) => DotNetBlockingPool.Run(work);
+    public void RunBlocking(Action work, bool opensConnection) => DotNetBlockingPool.Run(work, opensConnection);
 
     public void Post(Action work)
     {

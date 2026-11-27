@@ -367,7 +367,16 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
     /// value of the heap <paramref name="finish"/> uses, such as the instance an operation opens, until the work finishes.
     /// </summary>
     public bool TryRunOffWorker<T>(Func<T> work, WebLingoOffWorkerFinish<T> finish, Func<Exception, WebLingoRuntimeError?> failed,
-        WebLingoValue keep, out WebLingoValue task, out WebLingoRuntimeError? error)
+        WebLingoValue keep, out WebLingoValue task, out WebLingoRuntimeError? error) =>
+        TryRunOffWorker(work, finish, failed, keep, false, out task, out error);
+
+    /// <summary>
+    /// Runs blocking work off the worker, as the other overloads do, telling the host where the work
+    /// <paramref name="opensConnection"/>, waiting for one of a pool's, as a database's open does, which a bounded host never
+    /// lets take all of its threads (section 6.10; <c>IWebLingoSchedulerHost.RunBlocking</c>).
+    /// </summary>
+    public bool TryRunOffWorker<T>(Func<T> work, WebLingoOffWorkerFinish<T> finish, Func<Exception, WebLingoRuntimeError?> failed,
+        WebLingoValue keep, bool opensConnection, out WebLingoValue task, out WebLingoRuntimeError? error)
     {
         task = WebLingoValue.Null;
         if (heap.SchedulerHost is not { } host)
@@ -412,7 +421,7 @@ public sealed class WebLingoScheduler(WebLingoHeap heap, IWebLingoExecutionClock
                 if (finish(value, heap, out var result, out var finishError)) Finished(made, null, result);
                 else Finished(made, finishError);
             });
-        });
+        }, opensConnection);
         return true;
     }
 
