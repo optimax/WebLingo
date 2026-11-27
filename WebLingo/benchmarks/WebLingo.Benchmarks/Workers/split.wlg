@@ -1,0 +1,46 @@
+param below = "2000000";
+param parts = "8";
+param rounds = "5";
+import { writeLn } from "std:console";
+import { run } from "std:workers";
+import { DateTime } from "std:datetime";
+import { count } from "primes.wlg";
+
+var limit = Integer.parse(below);
+var pieces = Integer.parse(parts);
+var times = Integer.parse(rounds);
+
+function median(values) { var sorted = values.sort(); return sorted[sorted.length \ 2]; }
+
+async function split() {
+    var calls = [];
+    var step = limit \ pieces;
+    for (var i = 0; i < pieces; i++) calls.push(run("primes.wlg", "count", [i * step, if (i == pieces - 1) limit else (i + 1) * step]));
+    var total = 0;
+    foreach (var c in await Task.all(calls)) total += c;
+    return total;
+}
+
+// Warmed up: the pool's workers made, each running the module once, and each way run once.
+var alone = count(0, limit);
+var check = await split();
+var onWorker = await run("primes.wlg", "count", [0, limit]);
+
+var ones = [];
+var workers = [];
+var splits = [];
+for (var r = 0; r < times; r++) {
+    var started = DateTime.utcNow();
+    count(0, limit);
+    ones.push(DateTime.utcNow() - started);
+    started = DateTime.utcNow();
+    await run("primes.wlg", "count", [0, limit]);
+    workers.push(DateTime.utcNow() - started);
+    started = DateTime.utcNow();
+    await split();
+    splits.push(DateTime.utcNow() - started);
+}
+var one = median(ones);
+var worker = median(workers);
+var apart = median(splits);
+writeLn($"| {limit} | {pieces} | {alone} | {check == alone && onWorker == alone} | {one:0} ms | {worker:0} ms | {apart:0} ms | {one / apart:0.00} |");

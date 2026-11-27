@@ -1,0 +1,19 @@
+import { writeLn } from "std:console";
+import { run } from "std:workers";
+import { DateTime } from "std:datetime";
+
+await run("primes.wlg", "echo", [null]);
+foreach (var size in [1000, 10000, 100000, 1000000]) {
+    var numbers = [];
+    for (var i = 0; i < size; i++) numbers.push(i);
+    var texts = [];
+    for (var i = 0; i < size; i++) texts.push("item " + i.toString());
+    var rounds = if (size >= 1000000) 3 else 10;
+    var started = DateTime.utcNow();
+    for (var r = 0; r < rounds; r++) await run("primes.wlg", "echo", [numbers]);
+    var intTime = (DateTime.utcNow() - started) / rounds;
+    started = DateTime.utcNow();
+    for (var r = 0; r < rounds; r++) await run("primes.wlg", "echo", [texts]);
+    var textTime = (DateTime.utcNow() - started) / rounds;
+    writeLn($"| {size} | {intTime:0.0} ms | {textTime:0.0} ms |");
+}

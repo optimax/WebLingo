@@ -301,6 +301,13 @@ With `--site forum` and `--url`, it asks for WebLingo Forum's pages instead, ser
 `setup.wlg`: its front page, its first board, its first topic and a search (`WebLingoLoad.ForumPages`), their numbers
 in `Documents/weblingo-forum.md`, section 6, part 10. `LoadTests` (`WebLingo.VM.Tests`) checks its pages and its options, not the load.
 
+### Measuring workers
+
+`benchmarks/WebLingo.Benchmarks/Workers` holds scripts that `weblingo run` measures `std:workers` with, which no build
+compiles: `split.wlg below=2000000 parts=8 rounds=5`, a count of primes split across a pool against the same on one
+worker, and `copies.wlg`, a message's copy by its size, each beside `primes.wlg`, whose functions the pool runs. Their
+numbers are in the specification's section 5.6, "Workers"; run them on an otherwise idle machine.
+
 ### Trying FastCGI with nginx and Apache
 
 `WebServerTests` (`WebLingo.Templates.Tests`) runs `wasp fastcgi` behind nginx, and behind Apache httpd through `mod_proxy_fcgi` and through `mod_fcgid`, as the WASP User Manual's section 18 configures them, on Windows, each unpacked from its download into a folder of its own, listening on 127.0.0.1 only, and stopped. The downloads are kept in the repository's `WebServers` folder, which git ignores, the one zip file of each in a folder of its own; a test whose download is not there is skipped, and so is each on another platform. Those tried (the owner's go-ahead, 17 November 2026), to download again, the same files, for the same results:

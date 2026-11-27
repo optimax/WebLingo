@@ -1,0 +1,12 @@
+// How many primes there are from one number up to another, counted the slow way.
+export function count(from, below) {
+    var found = 0;
+    for (var n = (if (from < 2) 2 else from); n < below; n++) {
+        var prime = true;
+        for (var d = 2; d * d <= n && prime; d++) prime = n % d != 0;
+        if (prime) found++;
+    }
+    return found;
+}
+
+export function echo(value) { return value; }

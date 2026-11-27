@@ -912,6 +912,34 @@ it is answered between their quanta, and a long page gives up 4 percent of its t
 the default, and 47 at 10,000. No answer was wrong. The default is the owner's to choose from them, a question of the
 task's.
 
+**Workers** (M0.26's part 5, §9, "M0.26 parts", 26 November 2026), from `ce90390`, on part 1's machine, idle, `weblingo
+run` of `benchmarks/WebLingo.Benchmarks/Workers/split.wlg` and `copies.wlg`, each beside `primes.wlg`. Counting the
+primes below 2,000,000 by trial division, the median of 5 rounds after one of each way, warmed up: on the program's own
+worker, on one of the pool's (`workers.run`), and split into pieces of equal ranges, each on a worker of the pool, their
+counts summed, every way's count 148,933:
+
+| Pieces | On its own worker | On one of the pool's | Split | Faster |
+|---:|---:|---:|---:|---:|
+| 2 | 4,121 ms | 4,127 ms | 2,617 ms | 1.57 times |
+| 4 | 4,180 ms | 4,160 ms | 1,490 ms | 2.81 times |
+| 8 | 4,136 ms | 4,189 ms | 883 ms | 4.68 times |
+| 16 | 4,134 ms | 4,164 ms | 800 ms | 5.17 times |
+
+A range's numbers cost more as they grow, so that equal ranges are unequal work, more pieces than processors evening
+it out; and a call on a pool's worker costs what the same work costs on the program's. A message's copy, an array of
+integers or of strings sent to a pool's function that gives it back, copied there and back, each call's time the mean
+of 10, of 3 for a million:
+
+| Values | Integers | Strings |
+|---:|---:|---:|
+| 1,000 | 1.5 ms | 1.3 ms |
+| 10,000 | 1.4 ms | 2.6 ms |
+| 100,000 | 12.1 ms | 17.7 ms |
+| 1,000,000 | 127.0 ms | 143.3 ms |
+
+A call costs about 1.3 ms of its own, whatever it carries up to 10,000 values, and a value about 0.12 µs there and back
+beyond them, a string's a little more: a call is worth it for work of more than a few milliseconds.
+
 ### 5.7 Local source debugging
 
 On 19 November 2026, the owner approved local `.wlg` launches on the default register VM in VS Code.
@@ -2149,7 +2177,9 @@ owner has not decided is a question of its task's, and Proposed here until it is
    cancellation, its disposal or its time, ends a `delay` it waits for, which the clock otherwise slept through;
    `WorkersTests`.
 5. **Measured.** A program that computes, split across workers, against the same on one; and a message's copying by its
-   size; their numbers in §5.6.
+   size; their numbers in §5.6. Run (26 November 2026): §5.6, "Workers", the scripts in
+   `benchmarks/WebLingo.Benchmarks/Workers`, the pool 4.68 times faster on 8 processors split in 8, a call's own cost
+   about 1.3 ms.
 
 A site's pages' workers are a task of their own, later: their limits, their lifetimes, reloads and the debugger decided
 there (A3 (b)); and so are immutable values shared between workers without a copy, where a message's size is measured to
