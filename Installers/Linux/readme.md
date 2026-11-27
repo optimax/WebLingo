@@ -17,8 +17,8 @@ and OpenSSL, which most have installed; on one without them, install `libicu` an
 ## Installing from the archive
 
 ```sh
-tar -xzf weblingo-0.21.0-linux-x64.tar.gz
-cd weblingo-0.21.0-linux-x64
+tar -xzf weblingo-0.26.0-linux-x64.tar.gz
+cd weblingo-0.26.0-linux-x64
 sudo ./install.sh
 ```
 
@@ -38,7 +38,7 @@ Without `sudo`, for your account alone, give it folders of your own, the second 
 On Debian, Ubuntu and the distributions made from them:
 
 ```sh
-sudo apt install ./weblingo_0.21.0_amd64.deb
+sudo apt install ./weblingo_0.26.0_amd64.deb
 ```
 
 It installs the same files in `/opt/weblingo`, links `/usr/bin/weblingo` and `/usr/bin/wasp` to them, and installs the

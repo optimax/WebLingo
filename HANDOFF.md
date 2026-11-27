@@ -151,10 +151,11 @@ where it comes first, `_yields` then true; `BudgetPassed` (not inlined), where t
 program; `Yield` stops it as the debugger's stop does, `_stopDepth` and `_yielded`, returning `Waits(0)`, and `GoesOn`
 goes on at once. Reading the context's properties in `Run` made the benchmark up to 8 percent slower; with the
 budget's message out of `Run` too, it is up to 21 percent faster than before. The worker
-pool wakes a yield by its timer for 0 ms, as a due timer; a version that queued it at once and let one new request of
-the shared queue in first broke `StandaloneHttpTests.AClientThatGoesEndsItsRequest` under load (4 runs of 5, the old pool
-0 of 5), its cause not found, and was reverted: a worker takes its own queue before the shared one, so a new request gets
-in only in the moment the timer takes, which M0.24's part 3 measures. `QuantumTests` (`WebLingo.Hosting.Tests`).
+pool wakes a yield by its timer for 0 ms, as a due timer, a new request getting in during that moment, a worker taking
+its own queue before the shared one. A version that queued it at once and let one new request of the shared queue in
+first (`671b1c6`) was reverted when `StandaloneHttpTests.AClientThatGoesEndsItsRequest` failed beside it; that test fails
+on `e0d8718`, before the quantum, too, a fault of the standalone server's ("The Standalone Server Misses a Client's
+Going Under Load"), so the reverted pool is no worse for it, and cheaper a yield, about 70 us each now. `QuantumTests` (`WebLingo.Hosting.Tests`).
 
 ## Values copied between heaps
 
@@ -332,8 +333,8 @@ field; `objects` 17 percent faster, none slower (section 5.6, "Fields in places"
 through places and by name and compares. Part 3, a member's cache, landed: `GetMember`, `SetMember` and `CallMethod` on an
 instance remember what they found in their function's `MemberSites`, by the class's definition, so that every
 execution of a module, a site's every request, shares them (`FieldSite`, `MethodSite`; `MemberCacheTests`); a
-method's call 26 percent faster, `objects` 4, none slower (section 5.6, "A member's cache"). M0.21 is whole, the
-version 0.21.0.
+method's call 26 percent faster, `objects` 4, none slower (section 5.6, "A member's cache"). M0.21 is whole. M0.26 is
+whole too, its five parts landed (26 November 2026), before M0.22 to M0.25: the version 0.26.0.
 
 A young generation for the collector (the specification, section 4.2, "A young generation") was built on a branch,
 measured, and dropped by the owner (24 November 2026): about 1.7 times as fast where much is live, but four of the
