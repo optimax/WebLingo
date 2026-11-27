@@ -2,6 +2,11 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AssemblyName>wasp</AssemblyName>
+    <!-- .NET's server collector, its heaps adapting to the process's size (DATAS), which the load and soak tests chose
+         (specification, section 5.6, "The collector"); DOTNET_gcServer=0 in the process's environment chooses the
+         workstation one, as the WASP User Manual's section 19 says. weblingo keeps .NET's default, the workstation one. -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <GarbageCollectionAdaptationMode>1</GarbageCollectionAdaptationMode>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../WebLingo.Cli/WebLingo.Cli.csproj" />

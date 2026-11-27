@@ -430,6 +430,22 @@ public sealed class StandaloneHttpTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// <c>wasp</c> runs .NET's server collector, its heaps adapting to its size, and <c>weblingo</c> the workstation one, as
+    /// each program's <c>runtimeconfig.json</c> says (section 5.6, "The collector").
+    /// </summary>
+    [Fact]
+    public void WaspRunsTheServerCollectorAndWeblingoTheWorkstationOne()
+    {
+        static System.Text.Json.JsonElement Properties(string program) => System.Text.Json.JsonDocument
+            .Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, program + ".runtimeconfig.json")))
+            .RootElement.GetProperty("runtimeOptions").GetProperty("configProperties");
+        var wasp = Properties("wasp");
+        Assert.True(wasp.GetProperty("System.GC.Server").GetBoolean());
+        Assert.Equal(1, wasp.GetProperty("System.GC.DynamicAdaptationMode").GetInt32());
+        Assert.False(Properties("weblingo").TryGetProperty("System.GC.Server", out _));
+    }
+
     private async Task<TcpClient> Connect()
     {
         var client = new TcpClient();

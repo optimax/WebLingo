@@ -161,6 +161,13 @@ long-running process; Linux's packages, made only by CI, not yet made with it. S
 (`dea1ee8`): `package.ps1` builds it where Visual Studio is installed, `Scripts/setup.wlg` offers it, `uninstall.ps1`
 removes it where setup added it.
 
+## The collector
+
+`wasp` runs .NET's server collector with DATAS (`WebLingo.Wasp.Cli.csproj`), chosen by the load and soak tests, the
+specification's section 5.6, "The collector"; `weblingo` the workstation one; `DOTNET_gcServer=0` chooses the
+workstation one for a site's process (the WASP User Manual's section 19); `StandaloneHttpTests` checks both programs'
+`runtimeconfig.json`.
+
 ## The quantum
 
 M0.24's part 2: a suspending execution's VM yields once its quantum (`WebLingoExecutionContext.Quantum`, `wasp.config`'s

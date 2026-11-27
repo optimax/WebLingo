@@ -1680,6 +1680,24 @@ its own folders and nothing else.
 - **WebLingo itself**, installed once, is shared by every site, read only: no site's account may write its folder, or
   a site could change what every other site runs.
 
+**Memory.** Each site's `wasp` runs .NET's server collector, which serves more requests a second, about 40 percent more
+over a soak test and up to twice as many under load, for more memory, about 120 to 160 MB in place of 100 to 105 under steady
+load, though no more when the site is idle. A server of many small sites may prefer the workstation collector, which a
+site's process chooses with `DOTNET_gcServer=0` in its environment:
+
+- **Under IIS**, in the site's `web.config`, inside its `<aspNetCore>` element:
+
+  ```xml
+  <environmentVariables>
+    <environmentVariable name="DOTNET_gcServer" value="0" />
+  </environmentVariables>
+  ```
+
+- **Under systemd**, in the site's service, `Environment=DOTNET_gcServer=0` under `[Service]`.
+- **Under `mod_fcgid`**, `FcgidInitialEnv DOTNET_gcServer 0` in the site's virtual host.
+- **In a terminal**, before `wasp serve`: `$env:DOTNET_gcServer = "0"` in PowerShell, `set DOTNET_gcServer=0` in a
+  command prompt, `DOTNET_gcServer=0 wasp serve` on Linux.
+
 **Sites you do not trust**, other people's, as a host's customers' are, each run in a process of its own, under an
 account of its own, as above, with no schemes but WebLingo's own `std`, no `"com"`, and the account allowed nothing
 but its own site's folders: WASP's checks keep the site's pages to its configuration, and the operating system keeps
