@@ -82,7 +82,7 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
                     client_max_body_size 30m;
                     upstream wasp {
                         server 127.0.0.1:{{waspPort}};
-                        keepalive 16;
+                        keepalive 256;
                     }
                     server {
                         listen 127.0.0.1:{{port}};

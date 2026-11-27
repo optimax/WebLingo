@@ -876,7 +876,13 @@ What it found, each a task of its own:
   for each request served it 556 times, and nginx proxying HTTP to `wasp serve` 3,069, nginx for Windows' own limit at 64,
   measured beside the soak; and so kept, a request's next sometimes came in before the last had let the connection go, and
   was refused as a second at once, `FCGI_CANT_MPX_CONN`, nginx's 502, 3 of some 17,000, since fixed, none of 59,000. The
-  manual's nginx keeps its connections since, as the tests' and the benchmark's do.
+  manual's nginx keeps its connections since, as the tests' and the benchmark's do. But it kept 16 idle ones, `keepalive
+  16`, and at 64 clients nginx closed the rest, some 540 a second, each port then waiting two minutes in TIME_WAIT, so
+  that Windows' 16,384 ephemeral ports were used up in half a minute and nginx answered thousands of 502s, at 16 clients
+  too in the runs after ("FastCGI Behind nginx Answers 502 at 64 Clients"). Keeping 256 (27 November 2026), as the
+  manual's and the benchmark's nginx do since, on Windows, idle: at 64 clients `compute` 10,195 requests a second where it
+  served 5,470, and `sqlite` 10,720 where it served 4,561, 635 of them 502s; at 256, `hello` 11,393 and `sqlite` 8,238;
+  none failing. The tests' nginx, which asks for a page or two at once, keeps 16 still.
 
 Elsewhere, nothing failed: `wasp serve` gave 2,300 to 31,000 requests a second on the pages that compute little,
 1,000 to 6,000 on those that compute or read SQLite, 450 for a page of a megabyte, and 1,100 uploads of 100 KB a second,
@@ -930,7 +936,8 @@ private bytes 75 to 119 MB against 39 to 47; after the warm-up, private bytes +0
 threads +0.001: none keeps rising. So `wasp` runs the server collector (`WebLingo.Wasp.Cli.csproj`'s
 `ServerGarbageCollection` and `GarbageCollectionAdaptationMode`), and `DOTNET_gcServer=0` in a process's environment,
 which .NET reads over the runtimeconfig, chooses the workstation one, for a server of many small sites, each a `wasp`
-(the WASP User Manual's section 19). FastCGI behind nginx was not compared, its 502s at 64 clients a task of its own.
+(the WASP User Manual's section 19). FastCGI behind nginx was not compared, its 502s at 64 clients a task of its own,
+fixed since (above).
 
 **Fair workers** (M0.24's part 3, §9, "M0.24 parts", 26 November 2026), `WebLingo.Benchmarks --load --fair
 none,1000000,100000,10000`, from `a713a79`, on part 1's machine, idle, .NET 10.0.15, under `wasp serve`, the site
