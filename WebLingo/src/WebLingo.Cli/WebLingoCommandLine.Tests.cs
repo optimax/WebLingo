@@ -4,6 +4,7 @@ using WebLingo.Compiler;
 using WebLingo.Core;
 using WebLingo.Language;
 using WebLingo.Platform.Abstractions;
+using WebLingo.Platform.DotNet;
 using WebLingo.Runtime;
 namespace WebLingo.Cli;
 
@@ -157,7 +158,11 @@ public static partial class WebLingoCommandLine
         if (compilation.Result.Module is null) return CompilationFailed;
 
         var loader = new WebLingoModuleLoader(options);
-        var context = Context(host, none, prepared.LineOf, WebLingoHeap.DefaultRegexTimeoutMilliseconds);
+        // A store of std:shared's for each test file's run, its tests sharing it, as a program's run has (section 6.12).
+        var context = Context(host, none, prepared.LineOf, WebLingoHeap.DefaultRegexTimeoutMilliseconds) with
+        {
+            Shared = new DotNetSharedStore(Limits(Scripts, path, none).SharedBytes)
+        };
         var result = OnVm(compilation.Result.Module, loader, null, context);
         passed += reporter.Passed;
         failed += reporter.Failed;

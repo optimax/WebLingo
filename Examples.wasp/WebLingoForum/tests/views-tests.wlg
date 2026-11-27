@@ -4,6 +4,11 @@
 
 import { assert, assertEqual, assertDeepEqual } from "std:test";
 import { Database } from "std:db";
+import { DateTime } from "std:datetime";
+import { Shared } from "std:shared";
+import { insert } from "../site/lib/sql.wlg";
+import users from "../site/lib/users.wlg";
+import posts from "../site/lib/posts.wlg";
 import schema from "../site/lib/schema.wlg";
 import settings from "../site/lib/settings.wlg";
 import topics from "../site/lib/topics.wlg";
@@ -47,6 +52,23 @@ class Reader {
 
 function topic(id, board = 1) {
     return { id: id, board_id: board };
+}
+
+const now = DateTime.utc(2026, 11, 27, 12, 0);
+
+// A database of the forum's in memory with one topic, in a board, its id and the board's; nothing of the topic's counted
+// in the shared memory yet, which a run's tests share.
+async function oneTopic(db) {
+    foreach (var statement in schema.create(db.provider)) {
+        await db.execute(statement);
+    }
+    var user = await users.make(db, "Anna", "anna@example.com", "no hash", now, now);
+    var category = await insert(db, "categories", { name: "General", sort_order: 1 });
+    var board = await insert(db, "boards", { category_id: category, name: "Welcome", description: null, sort_order: 1,
+                                             topic_count: 0, post_count: 0, last_post_id: null });
+    var id = (await posts.start(db, board, user, "Tea", "Tea, please.", now))["topic"];
+    Shared.remove(topics.viewsKey(id));
+    return [id, board];
 }
 
 export class ViewsTests {
@@ -119,6 +141,39 @@ export class ViewsTests {
         var values = { ...settings.defaults, boardsWithoutViews: [2] };
         assertEqual(new Reader().views(values, topic(7, 2)), false);
         assertEqual(new Reader().views(values, topic(7, 1)), true);
+    }
+
+    // A topic's views counted in the memory the site's requests share and written for many at once: once viewsWritten
+    // have been counted, or at the view that comes viewsWait seconds after the first; a board's and a topic's counts those
+    // written and those not yet.
+    async testATopicsViewsAreWrittenForManyAtOnce() {
+        using (var db = await Database.open("sqlite::memory:")) {
+            var made = await oneTopic(db);
+            var id = made[0];
+            var board = made[1];
+            async function written() {
+                return (await db.query("SELECT view_count FROM topics WHERE id = @id", { id: id }))[0]["view_count"];
+            }
+            for (var i = 1; i < topics.viewsWritten; i++) {
+                await topics.viewed(db, id, now);
+            }
+            assertDeepEqual([await written(), topics.unwritten(id)], [0, topics.viewsWritten - 1]);
+            assertEqual((await topics.one(db, id))["view_count"], topics.viewsWritten - 1);
+            assertEqual((await topics.onBoard(db, board, 0, 0, 20))[0]["view_count"], topics.viewsWritten - 1);
+            await topics.viewed(db, id, now);
+            assertDeepEqual([await written(), topics.unwritten(id)], [topics.viewsWritten, 0]);
+
+            await topics.viewed(db, id, now);
+            await topics.viewed(db, id, now.addSeconds(topics.viewsWait - 1));
+            assertDeepEqual([await written(), topics.unwritten(id)], [topics.viewsWritten, 2]);
+            await topics.viewed(db, id, now.addSeconds(topics.viewsWait));
+            assertDeepEqual([await written(), topics.unwritten(id)], [topics.viewsWritten + 3, 0]);
+
+            await topics.viewed(db, id, now);
+            await topics.writeViews(db, id);
+            await topics.writeViews(db, id);
+            assertDeepEqual([await written(), topics.unwritten(id)], [topics.viewsWritten + 4, 0]);
+        }
     }
 
     async testABoardsChoiceIsKept() {

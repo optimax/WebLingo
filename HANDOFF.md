@@ -236,9 +236,9 @@ a pool's (`Time`, `Untime`); its clock waits in slices so that a cancellation en
 `WebLingoWaspServer.Load` and kept across its reloads, and one for a `weblingo` program, which its workers are given.
 Values cross as `WebLingoMessage`s, without errors (`TryCopyData`), an integer as itself so that `add` adds to it. Its
 most is `"limits"`' `"shared"`, 64 MB by default, a `set` past it WL3025, `SharedMemoryError`. `SharedTests`
-(`WebLingo.Conformance.Tests`) and `WaspServeTests.ASitesRequestsShareItsMemory_KeptAcrossAReload`, on both servers. The
-forum's views, counted with it, are the next part (the specification's section 6.12, "Memory a site's requests share,
-parts", part 2).
+(`WebLingo.Conformance.Tests`) and `WaspServeTests.ASitesRequestsShareItsMemory_KeptAcrossAReload`, on both servers.
+`weblingo test` gives each test file's run a store, and the debugger a script it runs. WebLingo Forum counts a topic's
+views with it, written to its database 20 at a time or a minute after the first (`site/lib/topics.wlg`, `viewed`).
 
 ## The work off the workers
 

@@ -1619,7 +1619,13 @@ megabytes from 1 to 1,048,576, or `null`, `weblingo.config`'s for a program, its
 it is next asked for, and all of them where the store would otherwise be full. A `set` or an `add` of a new key past the
 most is WL3025, a `SharedMemoryError`, extending `Error`, its name and code Proposed; an `add` to a key that keeps another
 kind of value WL3001, past int64 an `OverflowError`, WL3002. A host that keeps no store, a test's, makes each member
-WL3001. `wasp run` and `wasp check`, through `weblingo`'s code, have one for the run.
+WL3001. `wasp run` and `wasp check`, through `weblingo`'s code, have one for the run, `weblingo test` one for each test
+file's run, its tests sharing it, and a script the debugger runs one of its own.
+
+As built (part 2, 27 November 2026; Proposed where it says more than the owner's answers): WebLingo Forum's topic page
+counts a view with `Shared.add`, and writes a topic's views to its database in one `UPDATE`, taken with `Shared.take`,
+once 20 have been counted, or at the view that comes a minute after the first of them, its rows' and its topics' counts
+the views written and those not yet (`Documents/weblingo-forum.md`, section 2, "Reading").
 
 **As built** (M0.14.2, 16 November 2026; Proposed, §15.2, "The host's core"): `WebLingo.Hosting`'s `WebLingoApplication` loads an application from its root through the platform's files, its routes made then (`WebLingoRouteTable`), and serves a request on the worker its host gives: a page compiled when first requested, once on each worker, and kept for the generation's life with the components it renders, its output kept until it has run, then written to the response as UTF-8 (from M0.14.7.1, kept until it reaches 64 KB, then sent as it is written, §15.2, "Output sent as it is written"); a file that is not a page's, nor a handler's, left to the host to serve (`WebLingoRequestOutcomeKind.File`); and a 404 for a path without a route. The host gives its built-ins, its native modules, its workers' count and the environment.
 

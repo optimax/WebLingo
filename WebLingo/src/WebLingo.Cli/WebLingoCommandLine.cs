@@ -329,7 +329,9 @@ public static partial class WebLingoCommandLine
         var context = Context(source.Host, parameters, source.LineOf, WebLingoHeap.DefaultRegexTimeoutMilliseconds) with
         {
             Cancellation = debugger.Cancellation,
-            SchedulerHost = debugger.Scheduler
+            SchedulerHost = debugger.Scheduler,
+            // The memory it shares, std:shared's, as when it runs (section 6.12).
+            Shared = new DotNetSharedStore(Limits(program, path, new Dictionary<string, string>()).SharedBytes)
         };
         var vm = new WebLingoVirtualMachine
         {

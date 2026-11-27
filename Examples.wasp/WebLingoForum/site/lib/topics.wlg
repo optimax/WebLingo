@@ -1,5 +1,7 @@
 // The forum's topics and their posts, as the database holds them.
 
+import { Shared } from "std:shared";
+import { DateTime } from "std:datetime";
 import { page } from "./sql.wlg";
 
 // How many topics a board shows, those deleted left out.
@@ -11,7 +13,7 @@ export async function countOnBoard(db, board) {
 // A page of a board's topics, the pinned first, then those whose latest post is the latest, each with its author's name,
 // its latest post's author's, and the last of its posts a member saw, last_read, null where they saw none, or for user 0.
 export async function onBoard(db, board, user, skip, count) {
-    return await db.query($"""
+    return withUnwritten(await db.query($"""
         SELECT t.id, t.title, t.post_count, t.view_count, t.pinned, t.locked, t.created_at, t.last_post_id, t.last_post_at,
                u.name AS user_name, l.name AS last_post_by, r.last_read_post_id AS last_read
         FROM topics t
@@ -22,7 +24,7 @@ export async function onBoard(db, board, user, skip, count) {
         WHERE t.board_id = @board AND t.deleted = @deleted
         ORDER BY t.pinned DESC, t.last_post_at DESC, t.id DESC
         {page(db.provider)}
-        """, { board: board, user: user, deleted: false, skip: skip, count: count });
+        """, { board: board, user: user, deleted: false, skip: skip, count: count }));
 }
 
 // A topic, with its board's and its category's ids and names, or null where there is none of that id, or it is deleted,
@@ -38,7 +40,7 @@ export async function one(db, id, deleted = false) {
         FROM topics t JOIN boards b ON b.id = t.board_id JOIN categories c ON c.id = b.category_id
         WHERE t.id = @id{(deleted ? "" : " AND t.deleted = @deleted")}
         """, { id: id, deleted: false });
-    return rows.length == 0 ? null : rows[0];
+    return rows.length == 0 ? null : withUnwritten(rows)[0];
 }
 
 // How many posts a topic shows, those deleted left out.
@@ -61,9 +63,63 @@ export async function posts(db, topic, skip, count) {
         """, { topic: topic, deleted: false, skip: skip, count: count, avatar: "avatar" });
 }
 
-// Counts a topic's view.
-export async function viewed(db, topic) {
-    await db.execute("UPDATE topics SET view_count = view_count + 1 WHERE id = @id", { id: topic });
+// How many views of a topic are counted in the memory the site's requests share before they are written to its
+// database, all at once; and how many seconds after the first of them they are written, however few
+// (Documents/weblingo-forum.md, section 2, "Reading").
+export const viewsWritten = 20;
+export const viewsWait = 60;
+
+// The key a topic's views not yet written are counted under in the shared memory, and the one that keeps when the first
+// of them was counted.
+export function viewsKey(topic) {
+    return "forum:views:" + topic.toString();
+}
+
+function viewsSinceKey(topic) {
+    return "forum:views-since:" + topic.toString();
+}
+
+// Counts a topic's view, at now, in the memory the site's requests share, so that a view writes nothing of its own: its
+// views written at once once viewsWritten have been counted, or viewsWait seconds after the first of them, at the view
+// that comes then; those not yet written lost where the site's process stops.
+export async function viewed(db, topic, now = DateTime.now()) {
+    var count = Shared.add(viewsKey(topic), 1);
+    if (count == 1) {
+        Shared.set(viewsSinceKey(topic), now);
+    }
+    var since = Shared.get(viewsSinceKey(topic));
+    if (count >= viewsWritten || since == null || now - since >= viewsWait * 1000) {
+        await writeViews(db, topic);
+    }
+}
+
+// Writes the views of a topic counted so far, taken from the shared memory in one step, so that no other request writes
+// them too; counted again, for the next view to write, where the database fails.
+export async function writeViews(db, topic) {
+    var taken = Shared.take(viewsKey(topic));
+    if (taken == null) {
+        return;
+    }
+    Shared.remove(viewsSinceKey(topic));
+    try {
+        await db.execute("UPDATE topics SET view_count = view_count + @views WHERE id = @id", { views: taken, id: topic });
+    } catch (e) {
+        Shared.add(viewsKey(topic), taken);
+        throw;
+    }
+}
+
+// How many views of a topic are counted and not yet written.
+export function unwritten(topic) {
+    return Shared.get(viewsKey(topic)) ?? 0;
+}
+
+// Topics' rows, each view_count the views written and those not yet.
+function withUnwritten(rows) {
+    foreach (var row in rows) {
+        row["view_count"] = row["view_count"] + unwritten(row["id"]);
+    }
+    return rows;
 }
 
 // The cookie of the forum's own that holds the topics a reader's browser has had a view counted of, their ids, the oldest
