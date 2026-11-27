@@ -402,6 +402,20 @@ own time, SQL Server's to make a database, 0.35 s idle and 35 s loaded, as much 
 one that starts fast where it can, a cmd rather than a PowerShell, two of which once took more than the capture test's 20 s
 to start.
 
+### A Token's Callbacks Run Last First
+
+.NET's `CancellationTokenSource` runs the callbacks registered on its token in the reverse order of their registration,
+a linked source's among them, which is one. So a host that must cancel a request, then wake it where it waits to see
+the cancellation, does both in one callback, in that order: the standalone host's `Gone` (`WebLingoHttpServer`),
+FastCGI's `HandleAsync` (`WebLingoFastCgiServer`) and ASP.NET Core's adapter's `Cancel` (`WebLingoAspNetCore`). Until
+26 November 2026 the standalone and FastCGI hosts registered the cancellation first and linked the wake to the token
+after it, so that a request whose client went was woken first, saw no cancellation, and waited again, for what its wait
+had left, a minute in `StandaloneHttpTests.AClientThatGoesEndsItsRequest`, which failed in about half the runs of the
+whole project and never alone. `AClientThatGoesWhileItsRequestBeginsEndsItEachTime` and FastCGI's
+`ARequestTheWebServerGivesUpWhileItBeginsEndsEachTime` (`WebLingo.Templates.Tests`) give a request's going at once and
+a moment after, 80 times, and found it within 15 tries before the fix. A test of such a race has its page wait once,
+for long: a page that waits in short steps sees the cancellation at its next step, and hides the fault.
+
 ### The VM Repeats Part of the Runtime's Arithmetic
 
 For speed, the VM does the arithmetic and comparisons of two int64s, or of two binary64s, in its dispatch loop, and leaves everything else, and every error, to `WebLingoOperators` (`WebLingo.Runtime`). A change to the semantics of those operators changes both; `OperatorTests` (`WebLingo.VM.Tests`) runs every operator on pairs of edge values through the VM and checks that it gives what `WebLingoOperators` gives.

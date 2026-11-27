@@ -153,9 +153,9 @@ goes on at once. Reading the context's properties in `Run` made the benchmark up
 budget's message out of `Run` too, it is up to 21 percent faster than before. The worker
 pool wakes a yield by its timer for 0 ms, as a due timer, a new request getting in during that moment, a worker taking
 its own queue before the shared one. A version that queued it at once and let one new request of the shared queue in
-first (`671b1c6`) was reverted when `StandaloneHttpTests.AClientThatGoesEndsItsRequest` failed beside it; that test fails
-on `e0d8718`, before the quantum, too, a fault of the standalone server's ("The Standalone Server Misses a Client's
-Going Under Load"), so the reverted pool is no worse for it, and cheaper a yield, about 70 us each now. `QuantumTests` (`WebLingo.Hosting.Tests`).
+first (`671b1c6`) was reverted when `StandaloneHttpTests.AClientThatGoesEndsItsRequest` failed beside it; that test failed
+on `e0d8718`, before the quantum, too, a fault of the standalone server's, fixed since: a request woken before it was
+cancelled (`Documents/implementation.md`, "A Token's Callbacks Run Last First"), so the reverted pool is no worse for it, and cheaper a yield, about 70 us each now. `QuantumTests` (`WebLingo.Hosting.Tests`).
 
 ## Values copied between heaps
 

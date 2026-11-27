@@ -403,9 +403,22 @@ public sealed class WebLingoFastCgiServer(WebLingoApplication application, WebLi
         var translated = Translate(parameters, request.Body);
         var response = new WebLingoStreamingResponse(request.Going.Token);
         var cancellation = new WebLingoCancellationSignal();
-        using var cancelled = request.Going.Token.Register(cancellation.Cancel);
-        // Woken, where it waits, by the web server's going, or by its time limit, which stops it too (section 6.12, "Limits").
-        using var wake = CancellationTokenSource.CreateLinkedTokenSource(request.Going.Token);
+        // Woken, where it waits, by the web server's going, or by its time limit, which stops it too (section 6.12, "Limits"):
+        // gone, the request cancelled first, then woken to see it, in that order, as ASP.NET Core's adapter does, a token's
+        // callbacks running in the reverse order of their registration.
+        using var wake = new CancellationTokenSource();
+        using var cancelled = request.Going.Token.Register(() =>
+        {
+            cancellation.Cancel();
+            try
+            {
+                wake.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The request has ended already.
+            }
+        });
         using var timer = WebLingoRequestTimer.Start(application, cancellation, wake);
         // A reload's drain, which stops it too where a reload leaves it on an older generation (section 6.12, "Reloading").
         using var drained = WebLingoDrain.Of(application).Begin(cancellation, wake, timer);

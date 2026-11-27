@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.IO.Pipes;
 using System.Net;
 using System.Net.Sockets;
@@ -395,6 +395,56 @@ public sealed class FastCgiTests : IDisposable
             var (head, body, _) = await waiting;
             Assert.Equal("Status: 503 Service Unavailable", head[0]);
             Assert.DoesNotContain("never", body, StringComparison.Ordinal);
+        }
+        finally
+        {
+            stop.Cancel();
+        }
+    }
+
+    /// <summary>
+    /// A request the web server gives up while it begins, waits, or is woken, by <c>FCGI_ABORT_REQUEST</c> or by closing its
+    /// connection, at once or a moment after: the request ends each time. Until 26 November 2026 the request was woken by
+    /// its going before it was cancelled, and, seeing no cancellation, could wait again, as the standalone host's did.
+    /// </summary>
+    [Fact]
+    public async Task ARequestTheWebServerGivesUpWhileItBeginsEndsEachTime()
+    {
+        var site = Path.Combine(_root, "given-up");
+        Directory.CreateDirectory(site);
+        File.WriteAllText(Path.Combine(site, "wasp.config"), "{ \"limits\": { \"requestTimeout\": null } }");
+        File.WriteAllText(Path.Combine(site, "waits.wasp"), "<% import { delay } from \"std:system\"; await delay(60000); %>never");
+        var application = WebLingoWaspServer.Load(site, new Dictionary<string, string>(), WebLingoMode.Production, null, out _, out _, out var error);
+        Assert.True(application is not null, error);
+        using var stop = new CancellationTokenSource();
+        using var listener = WebLingoWaspFastCgi.Listen(0, null, out _);
+        _ = new WebLingoFastCgiServer(application, _workers).ServeAsync(listener, stop.Token);
+        try
+        {
+            var drain = WebLingoDrain.Of(application);
+            for (var i = 0; i < 80; i++)
+            {
+                var after = (i % 4) switch { 0 => 0, 1 => 1, 2 => 5, _ => 20 };
+                var aborts = i % 8 < 4;
+                using (var connection = new TcpClient())
+                {
+                    await connection.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndPoint!).Port);
+                    var stream = connection.GetStream();
+                    await stream.WriteAsync(Begin(1, keep: true));
+                    await stream.WriteAsync(Records(1, Get("/waits"), []));
+                    if (after > 0) await Task.Delay(after);
+                    if (aborts)
+                    {
+                        await stream.WriteAsync(WebLingoFastCgiRecords.Make(WebLingoFastCgiType.AbortRequest, 1, []));
+                        var clock = System.Diagnostics.Stopwatch.StartNew();
+                        while (drain.Running > 0 && clock.Elapsed < TimeSpan.FromSeconds(10)) await Task.Delay(5);
+                    }
+                }
+                var waited = System.Diagnostics.Stopwatch.StartNew();
+                while (drain.Running > 0 && waited.Elapsed < TimeSpan.FromSeconds(10)) await Task.Delay(5);
+                Assert.True(drain.Running == 0,
+                    $"try {i}, {(aborts ? "aborted" : "its connection closed")} after {after} ms: {drain.Running} running");
+            }
         }
         finally
         {

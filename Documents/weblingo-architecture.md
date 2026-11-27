@@ -2218,8 +2218,10 @@ that the owner has not decided is a question of its task's, and Proposed here un
    request whose timer is due, by a timer for no time, the worker free meanwhile to take another request's work or a new
    request; a pool that queued a yield at once and, taking it, let one new request in first, so that new requests ran
    between its quanta by rule rather than by that moment, was set aside when a test of the standalone server failed
-   beside it, a test found since to fail on the commit before the quantum too, a fault of its own ("The Standalone
-   Server Misses a Client's Going Under Load"), so that the pool's set-aside form may come back, cheaper a yield, part
+   beside it, a test found since to fail on the commit before the quantum too, a fault of the standalone and FastCGI
+   hosts' own, fixed since (26 November 2026): a request whose client went was woken before it was cancelled, and
+   waited again, a token's callbacks running in the reverse order of their registration (`Documents/implementation.md`,
+   "A Token's Callbacks Run Last First"), so that the pool's set-aside form may come back, cheaper a yield, part
    3's question; its going on, `GoesOn`, at once, the instruction then seen by its
    debugger as any other; `WebLingoApplicationOptions.Quantum`, `wasp.config`'s `"limits"`' `"quantum"`, an integer more
    than 0, or `null` for none; `QuantumTests`.
@@ -2263,7 +2265,8 @@ each needs that the owner has not decided is a question of its task's, and Propo
    3 reads them from `wasp.config`; a body read as the page asks for it, its largest the site's, `100 Continue` sent at
    its first read; a response with a `Date`, by its length where it comes whole, in chunks otherwise, to its connection's
    end for HTTP/1.0's; a client's going seen by a read held open once its request's body is in, its request then
-   cancelled; `wasp serve --host aspnetcore|standalone`, the standalone server on 127.0.0.1 and ::1, refused under IIS
+   cancelled, then woken where it waits, in that order, a request sent behind another in one write told by the read
+   begun for the one before it (both fixed 26 November 2026); `wasp serve --host aspnetcore|standalone`, the standalone server on 127.0.0.1 and ::1, refused under IIS
    (`WebLingoWaspStandalone`, `IWebLingoWaspServer`). Tested: `StandaloneHttpTests`, the parser's refusals, its path's
    decoding and 20,000 heads made at random, and the server byte by byte; and every test of `wasp serve`'s,
    `StandaloneWaspServeTests`, all passing on it as on ASP.NET Core's server.

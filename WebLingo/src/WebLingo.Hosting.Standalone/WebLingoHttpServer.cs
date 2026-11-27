@@ -80,6 +80,9 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
         private Task<int>? _pending;
         private CancellationTokenSource? _watching;
 
+        /// <summary>The request that read tells of its client's going: the one running now, a request after it in its place.</summary>
+        private CancellationTokenSource? _watched;
+
         public async Task ServeAsync()
         {
             try
@@ -187,7 +190,14 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
         /// </summary>
         public void Watch(CancellationTokenSource gone)
         {
-            if (_pending is not null) return;
+            Volatile.Write(ref _watched, gone);
+            if (_pending is { } pending)
+            {
+                // Begun for a request before it, this one having come with that one's bytes: the read tells this one, and
+                // where it has ended without bytes already, this one is told now.
+                if (pending.IsCompleted && !(pending.IsCompletedSuccessfully && pending.Result > 0)) Tell(gone);
+                return;
+            }
             try
             {
                 MakeRoom();
@@ -201,15 +211,21 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
             _pending.ContinueWith(read =>
             {
                 if (read.IsCompletedSuccessfully && read.Result > 0) return;
-                try
-                {
-                    gone.Cancel();
-                }
-                catch (ObjectDisposedException)
-                {
-                    // Its request has ended.
-                }
+                Tell(Volatile.Read(ref _watched)!);
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+        }
+
+        /// <summary>A request told that its client has gone.</summary>
+        private static void Tell(CancellationTokenSource gone)
+        {
+            try
+            {
+                gone.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Its request has ended.
+            }
         }
 
         /// <summary>
@@ -271,6 +287,20 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
             }
         }
 
+        /// <summary>A request's client gone: the request cancelled, then woken, where it waits, to see that it is.</summary>
+        private static void Gone(WebLingoCancellationSignal cancellation, CancellationTokenSource wake)
+        {
+            cancellation.Cancel();
+            try
+            {
+                wake.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The request has ended already.
+            }
+        }
+
         /// <summary>A request refused: its status, why in plain text, and the connection closed after it.</summary>
         private async Task RefuseAsync(int status, string reason)
         {
@@ -308,9 +338,12 @@ public sealed class WebLingoHttpServer(WebLingoApplication application, WebLingo
             };
             var response = new WebLingoStreamingResponse(gone.Token);
             var cancellation = new WebLingoCancellationSignal();
-            using var cancelled = gone.Token.Register(cancellation.Cancel);
-            // Woken, where it waits, by its client's going, by its time limit, or by a reload's drain (section 6.12).
-            using var wake = CancellationTokenSource.CreateLinkedTokenSource(gone.Token);
+            // Woken, where it waits, by its client's going, by its time limit, or by a reload's drain (section 6.12): its client
+            // gone, the request cancelled first, then woken to see it, in that order, as ASP.NET Core's adapter does; a token's
+            // callbacks run in the reverse order of their registration, so that a cancellation registered before a linked
+            // token woke the request first, which, seeing no cancellation, waited again, for as long as it had to.
+            using var wake = new CancellationTokenSource();
+            using var cancelled = gone.Token.Register(() => Gone(cancellation, wake));
             using var timer = WebLingoRequestTimer.Start(application, cancellation, wake);
             using var drained = WebLingoDrain.Of(application).Begin(cancellation, wake, timer);
             var run = server._workers.Serve((worker, scheduler) => application.Handle(request, response, worker, cancellation, scheduler, drained),

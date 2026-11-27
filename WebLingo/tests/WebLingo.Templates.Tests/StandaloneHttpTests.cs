@@ -257,6 +257,52 @@ public sealed class StandaloneHttpTests : IDisposable
         Assert.Equal(0, await stream.ReadAsync(new byte[1]));
     }
 
+    /// <summary>
+    /// A client that goes at once, or a moment after, while its request begins, waits, or is woken: its request ends each
+    /// time. Until 26 November 2026 the request was woken by its client's going before it was cancelled, and, seeing no
+    /// cancellation, waited again, for its minute: within 200 tries, the eighth.
+    /// </summary>
+    [Fact]
+    public async Task AClientThatGoesWhileItsRequestBeginsEndsItEachTime()
+    {
+        var drain = WebLingoDrain.Of(_application);
+        for (var i = 0; i < 80; i++)
+        {
+            var after = (i % 4) switch { 0 => 0, 1 => 1, 2 => 5, _ => 20 };
+            using (var client = await Connect())
+            {
+                await Send(client.GetStream(), "GET /waits HTTP/1.1\r\nHost: a\r\n\r\n");
+                if (after > 0) await Task.Delay(after);
+            }
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            while (drain.Running > 0 && clock.Elapsed < TimeSpan.FromSeconds(10)) await Task.Delay(5);
+            Assert.True(drain.Running == 0, $"try {i}, its client gone after {after} ms: {drain.Running} running");
+        }
+    }
+
+    /// <summary>
+    /// A request sent behind another, both in one write, whose client goes while it runs: it ends, the read that watches for
+    /// the client's going, begun for the first, telling the second. Until 26 November 2026 it told the first alone, the
+    /// second then waiting for its minute.
+    /// </summary>
+    [Fact]
+    public async Task AClientThatGoesEndsARequestSentBehindAnother()
+    {
+        var drain = WebLingoDrain.Of(_application);
+        using (var client = await Connect())
+        {
+            var stream = client.GetStream();
+            await Send(stream, "GET / HTTP/1.1\r\nHost: a\r\n\r\nGET /waits HTTP/1.1\r\nHost: a\r\n\r\n");
+            Assert.Equal(200, (await ReadResponse(stream)).Status);
+            var started = System.Diagnostics.Stopwatch.StartNew();
+            while (drain.Running == 0 && started.Elapsed < TimeSpan.FromSeconds(30)) await Task.Delay(5);
+            Assert.Equal(1, drain.Running);
+        }
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (drain.Running > 0 && clock.Elapsed < TimeSpan.FromSeconds(10)) await Task.Delay(5);
+        Assert.Equal(0, drain.Running);
+    }
+
     [Fact]
     public async Task AClientThatGoesEndsItsRequest()
     {
