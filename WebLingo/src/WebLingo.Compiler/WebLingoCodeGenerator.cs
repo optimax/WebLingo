@@ -171,9 +171,10 @@ public sealed class WebLingoCodeGenerator
                 EmitDispose(usingStatement.Resource, usingStatement.Span);
                 if (guard.Ranges.Count == 0) break;
                 var skip = EmitJump(WebLingoOpCode.Jump, 0, usingStatement.Span);
-                AddHandlers(guard, usingStatement.Value, usingStatement.Origin);
+                var cleanup = AddHandlers(guard, usingStatement.Value, usingStatement.Origin, WebLingoHandlerKind.Using);
                 EmitDispose(usingStatement.Resource, usingStatement.Span);
                 EmitRethrow(usingStatement.Value, usingStatement.Origin, usingStatement.Span);
+                EndCleanup(cleanup, guard.Ranges.Count);
                 PatchJump(skip);
                 break;
             }
@@ -1006,10 +1007,24 @@ public sealed class WebLingoCodeGenerator
         _guards.RemoveAt(_guards.Count - 1);
     }
 
-    /// <summary>The ranges of an ended guard become handlers that go to here, with the exception and its origin in these locals.</summary>
-    private void AddHandlers(Guard guard, int value, int origin)
+    /// <summary>
+    /// The ranges of an ended guard become handlers of <paramref name="kind"/> that go to here, with the exception and its
+    /// origin in these locals: the index of the first, for a cleanup's <see cref="EndCleanup"/>.
+    /// </summary>
+    private int AddHandlers(Guard guard, int value, int origin, WebLingoHandlerKind kind = WebLingoHandlerKind.Catch)
     {
-        foreach (var (start, end) in guard.Ranges) _handlers.Add(new WebLingoHandler(start, end, _code.Count, value, origin));
+        var first = _handlers.Count;
+        foreach (var (start, end) in guard.Ranges) _handlers.Add(new WebLingoHandler(start, end, _code.Count, value, origin, kind));
+        return first;
+    }
+
+    /// <summary>
+    /// A cleanup's handlers, <paramref name="count"/> from <paramref name="first"/>, told that its code ends here, after its
+    /// <see cref="WebLingoOpCode.Rethrow"/>; the handlers its own code added since come after them, and are left as they are.
+    /// </summary>
+    private void EndCleanup(int first, int count)
+    {
+        for (var i = first; i < first + count; i++) _handlers[i] = _handlers[i] with { CleanupEnd = _code.Count };
     }
 
     /// <summary>
@@ -1059,9 +1074,10 @@ public sealed class WebLingoCodeGenerator
             EndGuard(finallyGuard!);
             EmitStatement(final.Body);
             var skip = EmitJump(WebLingoOpCode.Jump, 0, statement.Span);
-            AddHandlers(finallyGuard!, final.Value, final.Origin);
+            var firstHandler = AddHandlers(finallyGuard!, final.Value, final.Origin, WebLingoHandlerKind.Finally);
             EmitStatement(final.Body);
             EmitRethrow(final.Value, final.Origin, statement.Span);
+            EndCleanup(firstHandler, finallyGuard!.Ranges.Count);
             PatchJump(skip);
         }
     }

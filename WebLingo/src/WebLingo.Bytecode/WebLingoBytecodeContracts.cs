@@ -375,9 +375,26 @@ public sealed record WebLingoFunction(
 /// A protected region: an exception raised by an instruction from <paramref name="Start"/> to
 /// <paramref name="End"/> − 1, or in a call one of them makes, jumps to <paramref name="Target"/>, the exception in
 /// register <paramref name="Value"/> and where it was first raised, which <see cref="WebLingoOpCode.Rethrow"/> takes, in
-/// register <paramref name="Origin"/>.
+/// register <paramref name="Origin"/>. A cleanup's, a <c>finally</c>'s or a <c>using</c>'s, as <paramref name="Kind"/>
+/// says, has its code from <paramref name="Target"/> to <paramref name="CleanupEnd"/> − 1, the last its
+/// <see cref="WebLingoOpCode.Rethrow"/> of those registers, so that a cancellation can run a function's cleanups alone,
+/// and tell which handlers are within one (section 9, "A cancelled request's cleanup, parts", part 1); a <c>catch</c>'s
+/// <paramref name="CleanupEnd"/> is 0.
 /// </summary>
-public readonly record struct WebLingoHandler(int Start, int End, int Target, int Value, int Origin);
+public readonly record struct WebLingoHandler(int Start, int End, int Target, int Value, int Origin,
+    WebLingoHandlerKind Kind = WebLingoHandlerKind.Catch, int CleanupEnd = 0)
+{
+    /// <summary>Whether it is a cleanup's, a <c>finally</c>'s or a <c>using</c>'s.</summary>
+    public bool IsCleanup => Kind != WebLingoHandlerKind.Catch;
+}
+
+/// <summary>What a handler is: a <c>catch</c>'s, or a cleanup's, a <c>finally</c>'s or a <c>using</c>'s.</summary>
+public enum WebLingoHandlerKind : byte
+{
+    Catch,
+    Finally,
+    Using
+}
 
 /// <summary>A class of a module: its name, its constructor's function, or -1 if it has none, and its methods' (section 3.7).</summary>
 public sealed record WebLingoClassInfo(string Name, int Constructor, IReadOnlyList<WebLingoClassMethod> Methods)

@@ -25,6 +25,41 @@ public sealed class CodeGeneratorTests
         Assert.Equal(new[] { new WebLingoImport("printLn", 1) }, module.Imports);
     }
 
+    /// <summary>
+    /// Each handler says what it is (section 9, "A cancelled request's cleanup, parts", part 1): a <c>catch</c>'s, a
+    /// <c>finally</c>'s or a <c>using</c>'s, a cleanup's code ending after its <c>Rethrow</c>, and a <c>catch</c> inside a
+    /// <c>finally</c> left a catch's.
+    /// </summary>
+    [Fact]
+    public void EachHandlerSaysWhetherItIsACatchsOrACleanups()
+    {
+        var module = Generate("""
+            class R { dispose() { } }
+            try { printLn(1); } catch (e) { printLn(2); }
+            try { printLn(3); } finally { try { printLn(4); } catch (e) { printLn(5); } }
+            using (var r = new R()) { printLn(6); }
+            """);
+        var code = module.EntryPoint.Code;
+        var handlers = module.EntryPoint.Handlers;
+        Assert.Equal(
+            [WebLingoHandlerKind.Catch, WebLingoHandlerKind.Catch, WebLingoHandlerKind.Finally, WebLingoHandlerKind.Catch,
+             WebLingoHandlerKind.Using],
+            handlers.Select(handler => handler.Kind).ToArray());
+        foreach (var handler in handlers.Where(handler => handler.IsCleanup))
+        {
+            Assert.True(handler.CleanupEnd > handler.Target);
+            Assert.Equal(new WebLingoInstruction(WebLingoOpCode.Rethrow, handler.Value, handler.Origin), code[handler.CleanupEnd - 1]);
+        }
+        Assert.All(handlers.Where(handler => !handler.IsCleanup), handler => Assert.Equal(0, handler.CleanupEnd));
+        // The finally's body is emitted twice, on the way out and in its handler, and so its inner catch: the second within
+        // the finally's cleanup, as a cancellation will tell it, the first before it.
+        var (onTheWayOut, cleanup, inner) = (handlers[1], handlers[2], handlers[3]);
+        Assert.InRange(inner.Start, cleanup.Target, cleanup.CleanupEnd - 1);
+        Assert.True(onTheWayOut.Start < cleanup.Target);
+        Assert.Contains(", finally to ", WebLingoDisassembler.Format(module), StringComparison.Ordinal);
+        Assert.Contains(", using to ", WebLingoDisassembler.Format(module), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void AnAssignmentWritesItsLocalDirectly()
     {

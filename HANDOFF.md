@@ -161,6 +161,14 @@ long-running process; Linux's packages, made only by CI, not yet made with it. S
 (`dea1ee8`): `package.ps1` builds it where Visual Studio is installed, `Scripts/setup.wlg` offers it, `uninstall.ps1`
 removes it where setup added it.
 
+## A cancelled request's cleanup
+
+Defined in parts in the specification's section 9, "A cancelled request's cleanup, parts". Part 1: WLBC 0.3, each
+`WebLingoHandler` with its `Kind` (`WebLingoHandlerKind`, a `catch`'s, a `finally`'s or a `using`'s) and a cleanup's
+`CleanupEnd`, the instruction after its `Rethrow`, given by `WebLingoCodeGenerator.EndCleanup` and checked by the
+verifier; nothing runs differently yet. Parts 2 and 3, the VM's unwinding of a cancellation through cleanups alone and
+the waiting tasks', are next.
+
 ## The collector
 
 `wasp` runs .NET's server collector with DATAS (`WebLingo.Wasp.Cli.csproj`), chosen by the load and soak tests, the

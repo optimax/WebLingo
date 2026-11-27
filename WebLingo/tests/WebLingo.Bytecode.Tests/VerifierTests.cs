@@ -54,6 +54,31 @@ public sealed class VerifierTests
         AssertRejected(outside, -1, "not within the code");
     }
 
+    /// <summary>
+    /// A handler says what it is, a catch's or a cleanup's, and a cleanup where its code ends, after its <c>Rethrow</c> of the
+    /// handler's exception and origin (section 9, "A cancelled request's cleanup, parts", part 1).
+    /// </summary>
+    [Fact]
+    public void ACleanupsHandlerEndsWithItsRethrow()
+    {
+        WebLingoCompiledModule Protected(WebLingoHandler handler) => Module(registers: 4, locals: 4,
+            I(WebLingoOpCode.LoadNull, 0), I(WebLingoOpCode.Throw, 0), I(WebLingoOpCode.Rethrow, 1, 3)) is var module
+            ? module with { EntryPoint = module.EntryPoint with { Handlers = [handler] } }
+            : null!;
+        Assert.Equal(WebLingoVerificationResult.Valid, Verify(Protected(new WebLingoHandler(1, 2, 2, 1, 3, WebLingoHandlerKind.Finally, 3))));
+        Assert.Equal(WebLingoVerificationResult.Valid, Verify(Protected(new WebLingoHandler(1, 2, 2, 1, 3, WebLingoHandlerKind.Using, 3))));
+        AssertRejected(Protected(new WebLingoHandler(1, 2, 2, 1, 3, WebLingoHandlerKind.Finally, 2)), -1,
+            "Handler 0: its cleanup's end, 2, is not after its target and within the code.");
+        AssertRejected(Protected(new WebLingoHandler(1, 2, 2, 1, 3, WebLingoHandlerKind.Finally, 4)), -1,
+            "Handler 0: its cleanup's end, 4, is not after its target and within the code.");
+        AssertRejected(Protected(new WebLingoHandler(1, 2, 2, 3, 1, WebLingoHandlerKind.Finally, 3)), -1,
+            "Handler 0: its cleanup does not end with a Rethrow of its exception and its origin.");
+        AssertRejected(Protected(new WebLingoHandler(1, 2, 2, 1, 3, WebLingoHandlerKind.Catch, 3)), -1,
+            "Handler 0: a catch's handler has a cleanup's end.");
+        AssertRejected(Protected(new WebLingoHandler(1, 2, 2, 1, 3, (WebLingoHandlerKind)7, 3)), -1,
+            "Handler 0: its kind, 7, is not a catch's, a finally's or a using's.");
+    }
+
     [Fact]
     public void AStaticMethodIsAFunction()
     {

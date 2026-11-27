@@ -50,7 +50,9 @@ public static class WebLingoDisassembler
         {
             text.Append("handler ").Append(handler.Start).Append(" to ").Append(handler.End - 1).Append(": ")
                 .Append(handler.Target).Append(", exception ").Append(Register(function, handler.Value)).Append(", origin ")
-                .Append(Register(function, handler.Origin)).Append('\n');
+                .Append(Register(function, handler.Origin))
+                .Append(handler.IsCleanup ? $", {(handler.Kind == WebLingoHandlerKind.Finally ? "finally" : "using")} to {handler.CleanupEnd - 1}" : ", catch")
+                .Append('\n');
         }
         WebLingoDisassemblyNames.AppendVariables(text, function.DebugInfo, table, register => $"r{register}",
             register => Register(function, register));

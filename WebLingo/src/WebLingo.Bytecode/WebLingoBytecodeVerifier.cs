@@ -136,7 +136,8 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
                 ? $"its region, {handler.Start} to {handler.End}, is not within the code."
                 : Index(handler.Target, function.Code.Count, "target instruction") ?? Register(function, handler.Value, "exception")
                   ?? Register(function, handler.Origin, "origin")
-                  ?? (handler.Value == handler.Origin ? "its exception and its origin share a register." : null);
+                  ?? (handler.Value == handler.Origin ? "its exception and its origin share a register." : null)
+                  ?? CleanupError(function, handler);
             if (error is not null) return Fail($"Handler {i}: {error}");
         }
 
@@ -513,6 +514,27 @@ public sealed class WebLingoBytecodeVerifier : IWebLingoBytecodeVerifier
     /// For each instruction, the first handler whose region holds it, which an exception raised there goes to, or -1;
     /// <paramref name="steps"/> is the work done, which a module of many handlers could make large.
     /// </summary>
+    /// <summary>
+    /// What is wrong with a handler's kind and its cleanup's end, if anything: a cleanup's code from its target to its end,
+    /// the last instruction its <see cref="WebLingoOpCode.Rethrow"/> of its exception and its origin; a <c>catch</c>'s end 0.
+    /// </summary>
+    private static string? CleanupError(WebLingoFunction function, WebLingoHandler handler)
+    {
+        if (handler.Kind is not (WebLingoHandlerKind.Catch or WebLingoHandlerKind.Finally or WebLingoHandlerKind.Using))
+        {
+            return $"its kind, {(int)handler.Kind}, is not a catch's, a finally's or a using's.";
+        }
+        if (!handler.IsCleanup) return handler.CleanupEnd == 0 ? null : "a catch's handler has a cleanup's end.";
+        if (handler.CleanupEnd <= handler.Target || handler.CleanupEnd > function.Code.Count)
+        {
+            return $"its cleanup's end, {handler.CleanupEnd}, is not after its target and within the code.";
+        }
+        var last = function.Code[handler.CleanupEnd - 1];
+        return last.OpCode == WebLingoOpCode.Rethrow && last.A == handler.Value && last.B == handler.Origin
+            ? null
+            : "its cleanup does not end with a Rethrow of its exception and its origin.";
+    }
+
     internal static int[] HandlerAt(int count, IReadOnlyList<WebLingoHandler> handlers, out long steps)
     {
         var at = new int[count];

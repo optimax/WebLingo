@@ -14,7 +14,7 @@ namespace WebLingo.Bytecode;
 public static class WebLingoBytecodeFile
 {
     public const int MajorVersion = 0;
-    public const int MinorVersion = 2;
+    public const int MinorVersion = 3;
     /// <summary>A WLBC file's extension (the owner's request, 23 November 2026, in place of <c>.wlbr</c> and <c>.wlbs</c>).</summary>
     public const string Extension = ".wlb";
     /// <summary>The register VM's before it, a file of which is read as one of <see cref="Extension"/>.</summary>
@@ -77,6 +77,8 @@ public static class WebLingoBytecodeFile
                 handlers.Signed(handler.Target);
                 handlers.Signed(handler.Value);
                 handlers.Signed(handler.Origin);
+                handlers.Byte((byte)handler.Kind);
+                handlers.Signed(handler.CleanupEnd);
             }
         }
         return Assemble(WebLingoBytecodeKind.Register, HeadOf(module), heads, code, handlers, textOf);
@@ -117,7 +119,7 @@ public static class WebLingoBytecodeFile
             for (var i = 0; i < handlers.Length; i++)
             {
                 handlers[i] = new WebLingoHandler(handlersReader.Int(), handlersReader.Int(), handlersReader.Int(), handlersReader.Int(),
-                    handlersReader.Int());
+                    handlersReader.Int(), (WebLingoHandlerKind)handlersReader.Byte(), handlersReader.Int());
             }
             functions.Add(new WebLingoFunction(h.Name, h.First, h.Second, code, h.Spans, h.LocalNames)
             {

@@ -18,7 +18,7 @@ public sealed class BytecodeFileTests
     {
         var file = WebLingoBytecodeFile.Write(WebLingoCompiledModule.Empty("main"));
         Assert.Equal("WLBC", Encoding.ASCII.GetString(file, 0, 4));
-        Assert.Equal((0ul, 2ul, 1ul, 0ul), (Fixed(file, 4, 2), Fixed(file, 6, 2), Fixed(file, 8, 2), Fixed(file, 10, 2)));
+        Assert.Equal((0ul, 3ul, 1ul, 0ul), (Fixed(file, 4, 2), Fixed(file, 6, 2), Fixed(file, 8, 2), Fixed(file, 10, 2)));
         Assert.Equal((7ul, 32ul, (ulong)file.Length), (Fixed(file, 12, 4), Fixed(file, 16, 8), Fixed(file, 24, 8)));
         var offset = 32ul + 7 * 32;
         for (var i = 0; i < 7; i++)
@@ -61,6 +61,9 @@ public sealed class BytecodeFileTests
         Assert.Equal(WebLingoDisassembler.Format(module), WebLingoDisassembler.Format(read));
         Assert.Equal(module.EntryPoint.Spans, read.EntryPoint.Spans);
         Assert.Equal(module.Functions[0].LocalNames, read.Functions[0].LocalNames);
+        // Each handler's kind, and a cleanup's end, as written (section 9, "A cancelled request's cleanup, parts", part 1).
+        Assert.Equal(module.Functions[0].Handlers, read.Functions[0].Handlers);
+        Assert.Equal(module.Functions[2].Handlers, read.Functions[2].Handlers);
         Assert.Equal(module.Units.Select(u => (u.Name, u.Function, u.IsNative, string.Join(",", u.Exports))),
             read.Units.Select(u => (u.Name, u.Function, u.IsNative, string.Join(",", u.Exports))));
         Assert.Equal(["count"], read.Classes[0].StaticFields);
@@ -162,9 +165,9 @@ public sealed class BytecodeFileTests
         var other = (byte[])file.Clone();
         SetFixed(other, 4, 2, 1);
         SetFixed(other, 6, 2, 0);
-        AssertRefused(other, "The file is WLBC 1.0, which this reader does not know: it reads WLBC 0.2.");
+        AssertRefused(other, "The file is WLBC 1.0, which this reader does not know: it reads WLBC 0.3.");
         Assert.False(WebLingoBytecodeFile.TryReadKind(other, out _, out var error));
-        Assert.Equal("The file is WLBC 1.0, which this reader does not know: it reads WLBC 0.2.", error);
+        Assert.Equal("The file is WLBC 1.0, which this reader does not know: it reads WLBC 0.3.", error);
         other = (byte[])file.Clone();
         SetFixed(other, 8, 2, 3);
         AssertRefused(other, "The file is damaged: its header names VM 3, which is neither 1, the register VM, nor 2, the stack VM.");
@@ -299,10 +302,21 @@ public sealed class BytecodeFileTests
             IsAsync = true,
             Source = "lib.wlg"
         };
+        var cleanup = new WebLingoFunction("g", 2, 1,
+            [
+                new WebLingoInstruction(WebLingoOpCode.LoadConstant, 1, 1),
+                new WebLingoInstruction(WebLingoOpCode.Throw, 1),
+                new WebLingoInstruction(WebLingoOpCode.Rethrow, 0, 1)
+            ],
+            [new WebLingoSourceSpan(3, 1), new WebLingoSourceSpan(3, 1), new WebLingoSourceSpan(3, 1)], ["e"])
+        {
+            Source = "lib.wlg",
+            Handlers = [new WebLingoHandler(0, 2, 2, 0, 1, WebLingoHandlerKind.Finally, 3)]
+        };
         return new WebLingoCompiledModule("main.wlg", [WebLingoConstant.Int64(42), WebLingoConstant.String("oops")],
             [new WebLingoImport("writeLn", 1)], main)
         {
-            Functions = [closure, lib],
+            Functions = [closure, lib, cleanup],
             Classes = [new WebLingoClassInfo("C", -1, []) { StaticFields = ["count"], Fields = ["x", "y"] }],
             Units = [new WebLingoUnitInfo("main.wlg", -1, []), new WebLingoUnitInfo("lib.wlg", 1, ["x"])],
         };
