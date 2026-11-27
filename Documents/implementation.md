@@ -419,6 +419,25 @@ own time, SQL Server's to make a database, 0.35 s idle and 35 s loaded, as much 
 one that starts fast where it can, a cmd rather than a PowerShell, two of which once took more than the capture test's 20 s
 to start.
 
+### ReadyToRun Leaves the VM to the JIT
+
+A publish compiled ReadyToRun (`WebLingo/Runtime.pubxml`) runs each method's precompiled code first, which .NET compiles
+again, optimized, once the method has been called 30 times, and never while a call of it runs: precompiled code has no
+place where .NET can move a running loop into an optimized copy (on-stack replacement), as the JIT's first tier has. And
+it inlines nothing from an assembly other than its own, the runtime's `WebLingoValue` and its operators, and .NET's own
+collections, among it. The VM's dispatch method, `Run`, is called once for a program and loops for all of it, so it
+would stay in its precompiled code: precompiled with the rest, `loops` took 2.5 times as long as without ReadyToRun, and
+`calls`, `closures`, `arrays` and `objects`, compiled, 12 to 31 percent longer (26 November 2026). Left to the JIT
+(`PublishReadyToRunExclude`), it starts in the first tier and goes on in its optimized code once its loop has run long
+enough, as without ReadyToRun, and every program is faster (the specification, section 5.6, "Where the time goes", cause
+7). The runtime's assembly is precompiled, since leaving it to the JIT too made every program 2 to 56 percent slower;
+but a long-running process, the benchmark in one process, ran `bytes` 1.54 times as long with it precompiled, a method
+of it staying in its precompiled code, not yet found ("ReadyToRun's `bytes` Slower in a Long-Running Process"). So an
+assembly whose hot code loops for long in a method called once is left to the JIT; and a change that moves the dispatch
+loop, or what it inlines, into another assembly, or a loop that runs long into the runtime, is measured on the published
+programs, the comparison's `--weblingo` naming the publish's `weblingo`, and on the benchmark published with
+`-p:TieredCompilation=true`, as well as on the benchmark as built, which publishes nothing.
+
 ### A Token's Callbacks Run Last First
 
 .NET's `CancellationTokenSource` runs the callbacks registered on its token in the reverse order of their registration,

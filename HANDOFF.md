@@ -150,6 +150,17 @@ M0.23's part 6: `wasp serve` runs the standalone server by default, `--host aspn
 Core's whatever is given (`WebLingoWaspCommandLine.Serve`); the load benchmark's `--host aspnetcore` measures
 ASP.NET Core's server by name, its `--host serve` the default.
 
+## ReadyToRun
+
+M0.25: `WebLingo/Runtime.pubxml` compiles a publish ReadyToRun wherever it names a runtime, as `publish.ps1`
+(`--use-current-runtime`), `Installers/Windows/package.ps1` and `Installers/Linux/package.sh` do; the native modules in
+`std/` and `windows/`, files the publish copies, marked for it (`PostprocessAssembly`); the VM left to the JIT
+(`PublishReadyToRunExclude`, `Documents/implementation.md`, "ReadyToRun Leaves the VM to the JIT"); crossgen2 restored by
+the publish from nuget.org. Its numbers in the specification's section 5.6, cause 7. Open: `bytes` slower in a
+long-running process; Linux's packages, made only by CI, not yet made with it. Setup's Visual Studio extension
+(`dea1ee8`): `package.ps1` builds it where Visual Studio is installed, `Scripts/setup.wlg` offers it, `uninstall.ps1`
+removes it where setup added it.
+
 ## The quantum
 
 M0.24's part 2: a suspending execution's VM yields once its quantum (`WebLingoExecutionContext.Quantum`, `wasp.config`'s
