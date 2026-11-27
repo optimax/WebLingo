@@ -354,8 +354,10 @@ public static partial class WebLingoCommandLine
         var context = Context(source.Host, parameters, source.LineOf, regexTimeout) with { Workers = workers };
         var loader = new WebLingoModuleLoader(source.Options);
         var result = OnVm(source.Compilation.Result.Module!, loader, source.Compilation.Components, context);
+        var unreceived = workers?.Unreceived();
         workers?.End(); // Its workers end with it.
         output.Flush();
+        if (result.Succeeded && unreceived is not null) return ReportUnreceived(unreceived, path, error);
         return source.Report(result, error);
     }
 
@@ -497,8 +499,10 @@ public static partial class WebLingoCommandLine
             : null;
         var context = Context(host, parameters, LineOf, regexTimeout) with { Workers = workers };
         var result = OnVm(register, loader, null, context);
+        var unreceived = workers?.Unreceived();
         workers?.End();
         output.Flush();
+        if (result.Succeeded && unreceived is not null) return ReportUnreceived(unreceived, path, error);
         if (result.Succeeded) return Success;
         var diagnostic = result.Error!;
         var file = diagnostic.Source ?? mainName;
@@ -830,6 +834,19 @@ public static partial class WebLingoCommandLine
             ? diagnostic.ExceptionClass ?? WebLingoErrorClasses.NameOf(diagnostic.Code) : null;
         return exception is null ? $"{diagnostic.Code}: {diagnostic.Message}"
             : $"{diagnostic.Code} ({exception}): {diagnostic.Message}";
+    }
+
+    /// <summary>
+    /// A program that ended well, one of its workers having ended with an exception it never received: the run fails with
+    /// it, as with a task's exception nothing awaited (section 3.8), reported where the worker threw it, its code its own or
+    /// WL3008, uncaught (section 9, "M0.26 parts", part 2; the owner's answer, A2 (a)).
+    /// </summary>
+    private static int ReportUnreceived(WebLingoMessage unreceived, string path, TextWriter error)
+    {
+        var (className, message, code, thrownAt) = unreceived.ErrorReport() ?? ("Error", "", null, null);
+        WebLingoConsoleText.WriteErrorLine(error, thrownAt ?? path,
+            $"{code ?? WebLingoDiagnosticCodes.UncaughtException} ({className}): {message}, a worker's exception, which its program never received");
+        return RuntimeFailed;
     }
 
     private static void WriteDiagnostic(TextWriter error, WebLingoSourceText source, WebLingoDiagnostic diagnostic) =>

@@ -1760,7 +1760,10 @@ where it was thrown.
 
 A worker ends once its module's top level has ended and none of its tasks waits, a task waiting for its parent's next
 value among them; when its `Worker` is disposed; and when its program ends, a `Worker` let go of not ending it. An
-exception nothing catches in it is thrown by its parent's next `receive()`, copied as an error is.
+exception nothing catches in it is thrown by its parent's next `receive()`, copied as an error is. One its parent never
+receives makes the program's run fail with it when the program ends, exit code 3, reported where the worker threw it, as a
+task's exception nothing awaits does; a worker's own run fails so in turn, its parent receiving the error. A program
+that does not care what a worker ended with disposes of it, which gives the error up.
 
 Save this worker as `square.wlg`:
 

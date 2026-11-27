@@ -57,6 +57,18 @@ public sealed class WebLingoMessage
     public bool IsError => _nodes[0].Kind == Kind.Error;
 
     /// <summary>
+    /// Where it is an error, what a report says of it: its class's name, its message, where a string, its code and where it
+    /// was thrown, where they are known; null otherwise (section 9, "M0.26 parts", part 2).
+    /// </summary>
+    public (string ClassName, string Message, string? Code, string? ThrownAt)? ErrorReport()
+    {
+        if (_nodes[0] is not { Kind: Kind.Error, Payload: ErrorParts parts }) return null;
+        var message = _nodes[parts.Message] is { Kind: Kind.String, Payload: string text } ? text : "";
+        var code = _nodes[parts.Code] is { Kind: Kind.String, Payload: string given } ? given : null;
+        return (parts.ClassName, message, code, parts.ThrownAt);
+    }
+
+    /// <summary>
     /// <paramref name="value"/>, of <paramref name="heap"/>, copied into a message; an error <paramref name="errorClass"/>'s
     /// instance or its subclasses', where it is the value itself, thrown at <paramref name="thrownAt"/>, where that is given;
     /// false, with WL3001, where the value holds anything a message cannot.

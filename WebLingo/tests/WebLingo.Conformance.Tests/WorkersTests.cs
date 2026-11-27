@@ -428,6 +428,55 @@ public sealed class WorkersTests : IDisposable
         Assert.Contains("\"workers\" an integer from 1 to 1024", error, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// An exception a worker ended with that its program never received (section 9, "M0.26 parts", part 2; the owner's
+    /// answer, A2 (a) of "M0.26: Where a Worker's Module Is Found, and an Error Nobody Received"): the run fails with it,
+    /// exit code 3, reported where the worker threw it; unless the program disposed of the worker, or received it. Each
+    /// worker throws at once, and its program waits a while for it to have ended.
+    /// </summary>
+    [Fact]
+    public void AnExceptionNobodyReceivedFailsTheRun()
+    {
+        Write("fails.wlg", "throw new Error(\"unseen\");\n");
+        var (exit, _, error) = Weblingo("run", Main(Imports + """
+            import { delay } from "std:system";
+            var worker = new Worker("fails.wlg");
+            await delay(3000);
+            """));
+        Assert.Equal(WebLingoCommandLine.RuntimeFailed, exit);
+        Assert.Contains("fails.wlg(1,1)", error, StringComparison.Ordinal);
+        Assert.Contains("WL3008 (Error): unseen, a worker's exception, which its program never received", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnExceptionOfAWorkerDisposedOfOrReceivedIsNotReportedAgain()
+    {
+        Write("fails.wlg", "throw new Error(\"unseen\");\n");
+        var (output, error) = Run(Imports + """
+            import { delay } from "std:system";
+            var given = new Worker("fails.wlg");
+            var received = new Worker("fails.wlg");
+            await delay(3000);
+            given.dispose();
+            try { await received.receive(); } catch (e) { writeLn(e.message); }
+            """);
+        Assert.Equal("", error);
+        Assert.Equal("unseen\n", output);
+    }
+
+    [Fact]
+    public void AWorkersOwnRunFailsInTurnWithAnExceptionItNeverReceived()
+    {
+        Write("fails.wlg", "throw new Error(\"unseen\");\n");
+        Write("middle.wlg", Imports + "import { delay } from \"std:system\";\nvar inner = new Worker(\"fails.wlg\");\nawait delay(3000);\n");
+        var (output, error) = Run(Imports + """
+            var middle = new Worker("middle.wlg");
+            try { await middle.receive(); } catch (e) { writeLn([e.message, e.thrownAt.endsWith("fails.wlg(1,1)")]); }
+            """);
+        Assert.Equal("", error);
+        Assert.Equal("[\"unseen\", true]\n", output);
+    }
+
     /// <summary>The worker's first line, which it writes on a thread of its own, put first, so that the test does not depend on when it runs.</summary>
     private static string Sorted(string output)
     {

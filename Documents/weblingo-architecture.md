@@ -2176,7 +2176,8 @@ owner has not decided is a question of its task's, and Proposed here until it is
    it begins (`IWebLingoNativeRegistry.Value`, Proposed), through the host's workers, the runtime's contract
    `IWebLingoWorkers` (`WebLingoHeap.Workers`), which `weblingo` implements (`WebLingoCommandLine`'s `Workers`), a
    compiled program's too; a worker's path from the program's own folder, as a browser finds a worker's script from its
-   page's, rather than from the importing file's, which a native function is not told, `.wlg` added to one without an
+   page's, rather than from the importing file's, which a native function is not told (approved, 27 November 2026, A1 (a)
+   of "M0.26: Where a Worker's Module Is Found, and an Error Nobody Received"), `.wlg` added to one without an
    extension; its module read and compiled where its `Worker` is made, with the program's configuration, one not there an
    `IOError`, WL3011, one that does not compile WL3001, its diagnostics in the message; each worker a thread of its own
    with the compiler's stack, a single-threaded apartment's on Windows, its execution a worker's
@@ -2187,7 +2188,13 @@ owner has not decided is a question of its task's, and Proposed here until it is
    disposed `Worker`'s members WL3001, as any disposed native instance's, and a `Worker` the collector frees not ending
    its worker, which runs until it ends, or its program does, so that no collection decides when a worker ends; a
    worker's own workers ending with it, and every worker with its program, cancelled, waited for 5 seconds
-   each; an exception a worker ended with that its parent never received not reported; a worker writing where its
+   each; an exception a worker ended with that its parent never received reported where its parent's execution ends, as
+   a task's exception nothing awaited is (§3.8), the program's run failing with it, exit code 3, at the file and line the
+   worker threw it at, `work.wlg(1,1): ERROR WL3008 (Error): unseen, a worker's exception, which its program never
+   received`, a worker's own run failing with it in turn, which its parent then receives, and nothing reported for a
+   worker its parent disposed of, or a pool's (approved, 27 November 2026, A2 (a), my reading of it that a parent that
+   disposes of a worker gives up what it ended with, Proposed; `Workers.Unreceived`, `WebLingoMessage.ErrorReport`); a
+   worker writing where its
    program writes, each text whole; and a native module whose exports make errors in the program's heap declaring so
    (`IWebLingoNativeRegistry.MakesErrors`, Proposed), so that a program importing it makes `Error` and the runtime
    errors' classes (`WebLingoHeap.ErrorClass`) though it names none; `WorkersTests`.

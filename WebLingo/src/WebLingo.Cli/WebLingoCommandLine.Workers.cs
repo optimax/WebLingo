@@ -132,7 +132,7 @@ public static partial class WebLingoCommandLine
         }
 
         /// <summary>
-        /// A module's file, from the program's own folder, as a browser finds a worker's script from its page's (Proposed),
+        /// A module's file, from the program's own folder, as a browser finds a worker's script from its page's (approved, A1 (a)),
         /// named as an imported file is, by its path from the current folder, with / between its folders; an
         /// <c>IOError</c> where it is not there.
         /// </summary>
@@ -192,6 +192,24 @@ public static partial class WebLingoCommandLine
         }
 
         /// <summary>Every worker started ended, cancelled, and waited for a while, so that what they wrote is written: where the program, or the worker that started them, ends.</summary>
+        /// <summary>
+        /// The first exception one of its workers ended with that the program never received, by <c>receive()</c>, nor gave
+        /// up by disposing of the worker; null where there is none (section 9, "M0.26 parts", part 2; the owner's answer,
+        /// A2 (a) of "M0.26: Where a Worker's Module Is Found, and an Error Nobody Received"), a pool's workers' each its
+        /// call's.
+        /// </summary>
+        public WebLingoMessage? Unreceived()
+        {
+            lock (_started)
+            {
+                foreach (var worker in _started)
+                {
+                    if (worker.Unreceived() is { } error) return error;
+                }
+            }
+            return null;
+        }
+
         public void End()
         {
             Worker[] started;
@@ -200,7 +218,7 @@ public static partial class WebLingoCommandLine
                 _ended = true;
                 started = [.. _started];
             }
-            foreach (var worker in started) worker.End();
+            foreach (var worker in started) worker.Stop();
             foreach (var worker in started) worker.Join();
         }
 
@@ -428,9 +446,22 @@ public static partial class WebLingoCommandLine
             /// <summary>The worker ended, cancelled, as a request past its time is; nothing more is received from it.</summary>
             public void End()
             {
+                Disposed = true;
+                Stop();
+            }
+
+            /// <summary>The worker ended with its program, which reports what it ended with but never received.</summary>
+            public void Stop()
+            {
                 _cancellation.Cancel();
                 _fromWorker.End(new WebLingoWorkerReceipt(null, false));
             }
+
+            /// <summary>Whether its parent disposed of it, giving up what it ended with.</summary>
+            public bool Disposed { get; private set; }
+
+            /// <summary>The exception it ended with that its parent never received, unless its parent disposed of it, or it is a pool's.</summary>
+            public WebLingoMessage? Unreceived() => perCall || Disposed ? null : _fromWorker.Unreceived();
 
             /// <summary>Waits a while for its thread to end, a worker blocked where no cancellation reaches left to end with the process.</summary>
             public void Join() => _thread?.Join(TimeSpan.FromSeconds(5));
@@ -440,6 +471,7 @@ public static partial class WebLingoCommandLine
                 var own = new Workers(workers._run, new ParentEnd(_toWorker, _fromWorker));
                 var limits = workers._run.Limits;
                 WebLingoExecutionResult result;
+                WebLingoMessage? unreceived = null;
                 if (!perCall) Time();
                 try
                 {
@@ -466,12 +498,18 @@ public static partial class WebLingoCommandLine
                 finally
                 {
                     Untime();
+                    unreceived = own.Unreceived();
                     own.End(); // Its own workers end with it.
                 }
                 // Stopped past its time, as a request is, WL3003; else ended, cancelled, or by an exception nothing caught.
                 if (_cancellation.Limit is { } limit && result.Error is { } stopped)
                 {
                     _fromWorker.End(new WebLingoWorkerReceipt(WebLingoMessage.OfError("Error", limit, WebLingoDiagnosticCodes.BudgetExceeded, At(stopped)), true));
+                }
+                // A worker of its own ended with an exception it never received: its own run fails with it, in turn.
+                else if (result.Succeeded && unreceived is not null && !_cancellation.IsCancellationRequested)
+                {
+                    _fromWorker.End(new WebLingoWorkerReceipt(unreceived, true));
                 }
                 else if (result.Succeeded || _cancellation.IsCancellationRequested) _fromWorker.End(new WebLingoWorkerReceipt(null, false));
                 else _fromWorker.End(new WebLingoWorkerReceipt(Thrown(result), true));
@@ -554,6 +592,12 @@ public static partial class WebLingoCommandLine
                     }
                 }
                 received(receipt);
+            }
+
+            /// <summary>The exception its sender ended with, which no <c>receive()</c> has been given yet; null otherwise.</summary>
+            public WebLingoMessage? Unreceived()
+            {
+                lock (_gate) return _end is { Failed: true, Message: { } message } ? message : null;
             }
 
             /// <summary>Its sender ended, with <paramref name="end"/>: those waiting given it, the first, then nothing; the first end kept.</summary>
