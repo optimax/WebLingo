@@ -761,7 +761,7 @@ As a user runs them, the comparison, its 5 timed runs after a warm-up, in millis
 1. **Throughput, latency and a reload.** A load generator of the solution's own, `WebLingo.Benchmarks --load`, with no package, and a load site of its own, `benchmarks/WebLingo.Benchmarks/LoadSite`, whose pages compute, read SQLite and SQL Server, write about a megabyte, keep a session and receive an upload of 100 KB; each page asked for by 1 to 256 clients at once, each client with its own connection and cookies, every answer checked, its throughput and latency written, under `wasp serve` and under `wasp fastcgi` behind nginx; and a page replaced every quarter of a second while clients ask for it, every answer one generation's whole.
 2. **The soak.** The pages asked for in turn for 8 hours under `wasp serve`, the server's memory, handles and threads sampled every 10 minutes, `--soak 8`.
 3. **Under IIS.** Part 1's measurements of the load site served by IIS, the owner having added it with the repository's `Scripts` and installed WebLingo from the checkout with `build.bat`, both as administrator, `--url` naming it. The site IIS serves is made by `WebLingo.Benchmarks --load --prepare FOLDER` (27 November 2026): the load site's pages, with a `web.config` that runs the installed `wasp`, and its SQLite database beside them, where its `wasp.config` names it, the load site's own folder having neither.
-4. **On Linux.** Part 1's measurements on Linux, once "A WASP Site Served on Linux" has a Linux here.
+4. **On Linux.** Part 1's measurements on Linux, once "A WASP Site Served on Linux" has a Linux here. Measured in WSL 2 (27 November 2026), below, "On Linux", the benchmark's `--host fastcgi` running the system's nginx there.
 
 **A string read by its index** (25 November 2026, the task "Indexing a String in Constant Time"). A string's `length`, `s[i]`, `slice`, `indexOf`, `lastIndexOf`, `padStart` and `padEnd` counted its Unicode scalar values from its start each time, so that a loop over a string by its index took time in proportion to its length's square: 20,000 lookups in a string of 20,000 characters took 700 ms, against 5 ms visiting it with `foreach`. Each string's count is now kept with it, and, for a string with a surrogate pair, where each of its scalar values starts (§15.2, "Heap"). The benchmark's workload `indexing` reads each of 20,000 characters by its index, and slices and searches at 2,000 places, in a string without surrogate pairs and in one with them: measured against `main` (`23fa1fd`), six rounds run alternately, then `closures`, `objects` and `strings`, which allocate and free most, sixteen, its median fell from 1,981 ms to 7.7 ms, about 250 times as fast; the other workloads were within the machine's noise, none slower by a rank test (`closures` 20.1 ms against 24.6, `strings` 14.2 against 17.7, `objects` 65.6 against 63.3, U from 22.5 to 36.5 of 64).
 
@@ -920,6 +920,42 @@ first sample to the last, so that part 1's growth, from 66 MB to 250 MB and from
 clients, up to 256 at once, rather than with time, as far as 16 clients show. Its private bytes, 44 MB at the first sample
 and 45 to 49 MB until 7 hours and 10 minutes in, were 50 to 54 MB from 7 hours and 20 minutes on, 51 MB at the end: a rise too
 small, and too late in one run, to call a leak. Nothing failed or leaked, so that no task came of it.
+
+**On Linux** (part 4, 27 November 2026), part 1's measurements in WSL 2's Ubuntu 26.04.1 LTS on part 1's machine, idle,
+.NET 10.0.15, Release, from `f86b237` with the benchmark's FastCGI host for Linux (`WebLingoLoadSite`, the system's nginx),
+each cell its requests a second and the time 99% of them took at most, every answer checked. `sqlserver` is left out: no
+SQL Server answers in WSL, whose network is not Windows'. Under `wasp serve`, WebLingo's own HTTP server:
+
+| Page | 1 at once | 4 at once | 16 at once | 64 at once | 256 at once | Errors |
+|---|---:|---:|---:|---:|---:|---:|
+| `hello` | 3,063/s, 0.9 ms | 12,867/s, 0.9 ms | 37,486/s, 2.1 ms | 46,187/s, 4.6 ms | 51,395/s, 10.3 ms | 0 |
+| `compute` | 1,438/s, 1.0 ms | 4,560/s, 1.6 ms | 9,230/s, 3.8 ms | 11,635/s, 11.7 ms | 12,950/s, 31.6 ms | 0 |
+| `sqlite` | 2,148/s, 0.9 ms | 5,953/s, 1.3 ms | 14,659/s, 3.1 ms | 22,259/s, 9.7 ms | 21,921/s, 28.3 ms | 0 |
+| `large` | 355/s, 5.8 ms | 760/s, 13.2 ms | 1,106/s, 39.8 ms | 1,118/s, 141.4 ms | 1,103/s, 366.1 ms | 0 |
+| `session` | 3,340/s, 0.6 ms | 11,888/s, 1.0 ms | 32,724/s, 2.1 ms | 41,862/s, 4.5 ms | 43,576/s, 12.7 ms | 0 |
+| `upload` | 1,337/s, 3.2 ms | 3,512/s, 7.5 ms | 5,766/s, 12.6 ms | 6,555/s, 27.3 ms | 6,029/s, 88.9 ms | 0 |
+
+Under `wasp fastcgi` behind Ubuntu's nginx 1.28.3, configured as part 1's, its connections to `wasp` kept:
+
+| Page | 1 at once | 4 at once | 16 at once | 64 at once | 256 at once | Errors |
+|---|---:|---:|---:|---:|---:|---:|
+| `hello` | 2,811/s, 0.9 ms | 9,180/s, 1.0 ms | 23,713/s, 1.9 ms | 35,316/s, 5.0 ms | 35,721/s, 14.8 ms | 0 |
+| `compute` | 1,311/s, 1.1 ms | 4,133/s, 1.7 ms | 7,834/s, 4.3 ms | 10,035/s, 12.1 ms | 11,112/s, 43.5 ms | 0 |
+| `sqlite` | 1,849/s, 1.0 ms | 5,154/s, 1.5 ms | 12,063/s, 3.4 ms | 17,870/s, 10.3 ms | 16,482/s, 35.1 ms | 0 |
+| `large` | 312/s, 6.3 ms | 637/s, 14.5 ms | 835/s, 46.5 ms | 868/s, 170.8 ms | 811/s, 594.5 ms | 0 |
+| `session` | 2,652/s, 0.6 ms | 8,386/s, 1.3 ms | 22,853/s, 2.0 ms | 32,355/s, 5.8 ms | 35,973/s, 12.9 ms | 0 |
+| `upload` | 170/s, 45.0 ms | 533/s, 48.4 ms | 1,761/s, 48.8 ms | 4,515/s, 57.8 ms | 4,244/s, 107.0 ms | 0 |
+
+And `hello.wasp` replaced 120 times in 30 s under `wasp serve` while 16 clients asked for it: 957,414 requests, none
+wrong, the move never refused, 99% under 2.7 ms. Part 1's Windows numbers are three days and many changes older, its
+server ASP.NET Core's, so that the two are not compared here. What it found, each a task of its own:
+
+- **`wasp fastcgi` took 44 ms a request behind nginx**, about 90 a second, its responses' last record waiting for nginx's
+  acknowledgement, which Linux delays about 40 ms: each TCP connection it accepts is now given `NoDelay` (`f86b237`, "FastCGI
+  Behind nginx on Linux: 40 ms a Request"; before it, `hello` 90 a second at 4 clients, after it 4,061 in a short run).
+- **Some uploads behind nginx still wait about 44 ms**, a twentieth or more of them up to 16 clients, their median 0.9 to
+  1.0 ms: the same delay, it seems, the other way, while nginx sends a request's body to `wasp` ("Uploads Behind nginx on
+  Linux: Some Wait 44 ms").
 
 **The collector** (26 and 27 November 2026, the owner's answer, A2 of "The Server Collector for `wasp`"; the register,
 "`wasp`'s collector"): `wasp`'s requests share one process's .NET heap, its objects made and dropped as a request runs a

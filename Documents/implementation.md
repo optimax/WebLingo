@@ -310,8 +310,10 @@ The benchmark (section 3) writes a Markdown table: each workload's median and fa
 `WebLingo.Benchmarks --load` (`WebLingoLoad`, `WebLingoLoadSite`) serves the load site, `benchmarks/WebLingo.Benchmarks/LoadSite`,
 copied with a SQLite database of its own into the system's temporary folder, by the `wasp` built beside the benchmark, which
 it references for that: `wasp serve`, WebLingo's own server, which `--host standalone` names too; with `--host aspnetcore`,
-`wasp serve --host aspnetcore`, ASP.NET Core's; or, with `--host fastcgi`, `wasp fastcgi` behind nginx, unpacked from the repository's
-`WebServers` folder, each stopped and the copy removed after; or the site at `--url`, as IIS serves it. Clients, each with a
+`wasp serve --host aspnetcore`, ASP.NET Core's; or, with `--host fastcgi`, `wasp fastcgi` behind nginx, on Windows unpacked from the repository's
+`WebServers` folder, on Linux the system's, `/usr/sbin/nginx`, run in the foreground from a folder of the run's own, its
+first error log (`-e`) and its temporary files there, so that an account that is not root runs it, each stopped and the
+copy removed after; or the site at `--url`, as IIS serves it. Clients, each with a
 connection and cookies of its own, ask for each page at once, 1, 4, 16, 64 and 256 of them unless `--clients` says, for 10 s
 after 3 s of warming up (`--seconds`, `--warm-up`), every answer checked; it writes a Markdown table of each page's throughput
 and latency and the server's working set and handles, and exits 1 where an answer was wrong. `--reload SECONDS` replaces
