@@ -631,8 +631,8 @@ the forum's on SQLite.
 Its deployment (part 10): the README's "Deploying it", under IIS by `Scripts/add-wasp-site.wlg`, behind nginx and
 Apache through `wasp fastcgi`, and a client's forum; `WebServerTests.NginxServesTheForumFromWaspFastCgi`, the forum
 behind nginx; and `WebLingo.Benchmarks --load --site forum`, its pages measured, in the design's section 6, part 10.
-Its deployment under IIS waits for the commands the README gives to be run as administrator, this machine's IIS being
-set up only so. Under load (the task "WebLingo Forum: Pages Under Load"), the forum's pages gained 1.4 to 4.6 times from
+It is deployed under IIS on this machine, at `https://forum.wasp.localhost/` from `C:\WWW\forum`, and measured there
+(27 November 2026, the design's section 6, part 10, "Under IIS"). Under load (the task "WebLingo Forum: Pages Under Load"), the forum's pages gained 1.4 to 4.6 times from
 SQLite's WAL, which `setup.wlg` sets, and English's texts imported statically; what is left, the collector `wasp` runs
 with and a topic's view's write, are tasks of their own; a module a page imports while it runs, compiled anew each
 request until "Dynamic Imports Joined Once", is compiled once on each worker now, as a component is
@@ -645,10 +645,7 @@ values counted from its start each time, so the renderer reads an array of a lin
 The branch `claude/forum-writing` on GitHub holds part 3 unfinished (`9093b78`), which `main` has whole, in one commit,
 instead: it may be deleted there.
 
-Next: the tasks after "WebLingo Forum: Pages Under Load", and the milestones M0.21 to M0.26, each with its questions;
-part 10's deployment under IIS waits for its commands to be run as administrator. "WebLingo Forum:
-MarkdownEditor.Web in the Post Form" waits for MarkdownEditor.Web's `LICENSE` to commit the editor's copy. "Visual Studio Debug Adapter" has its answer, A3 (a), and "The Next Milestone" its order, A1, to
-be written as tasks and into the specification's roadmap; neither is begun.
+Next: "WASP Pilot: the Forum in Real Use", the forum served under IIS here for the owner's own use.
 
 The last full suite, on Windows, in Release (25 November 2026, MySQL's and PostgreSQL's tests among them): 3,661 tests
 passing, none skipped, with the forum's parts 1 to 7 and strings read by their index. Linux not tried since `2e27309`:

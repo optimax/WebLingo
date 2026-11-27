@@ -205,4 +205,15 @@ Each part is a task in `TO-DO.md`, landed on its own and tested on all four data
 
     What is left is WASP's, or a choice of the owner's, each a task of its own: the collector `wasp` runs with, "The Server Collector for `wasp`"; a topic's view, one write of SQLite's for each, some still waiting seconds, "A Topic's View Without a Write Each"; and a module imported while a request runs, "Dynamic Imports Joined Once", which found it compiled anew each request, where WASP keeps a page's other files' compilations, and keeps it now (`CompiledPage.Modules`, a cache as a page's components have), the texts imported so costing 1.10 ms a page in place of 3.25, an import with the page 0.96.
 
+    **Under IIS** (27 November 2026). Deployed on the same machine as the README's "Under IIS" says, at `https://forum.wasp.localhost/`, WebLingo installed from this repository by `build.bat` (`WASP 0.26.0 (2026.11.27.1455)`), its pages tried as a guest reads them in a browser, then measured, `--load --site forum --url https://forum.wasp.localhost/`, 10 s each after 3 s, requests a second and their median and 99th percentile:
+
+    | Page | 1 client | 4 clients | 16 clients | 64 clients | 256 clients |
+    |---|---:|---:|---:|---:|---:|
+    | front page, `/` | 181, 5.1 ms, 10.6 ms | 573, 6.4 ms, 16.2 ms | 603, 25.0 ms, 65.4 ms | 662, 94 ms, 156 ms | 675, 369 ms, 508 ms |
+    | a board, `/board?id=1` | 143, 6.8 ms, 10.6 ms | 548, 6.6 ms, 18.6 ms | 601, 26.5 ms, 42.6 ms | 563, 108 ms, 306 ms | 587, 433 ms, 493 ms |
+    | a topic, `/topic?id=1` | 132, 7.2 ms, 11.4 ms | 493, 7.6 ms, 14.4 ms | 516, 30.8 ms, 46.9 ms | 440, 127 ms, 608 ms | 486, 521 ms, 611 ms |
+    | a search, `/search?q=forum` | 139, 7.0 ms, 10.4 ms | 439, 8.5 ms, 17.0 ms | 572, 27.6 ms, 45.6 ms | 577, 109 ms, 146 ms | 584, 437 ms, 481 ms |
+
+    Every answer was right. At 16 clients the pages that only read served two to three times what `wasp serve` served them on 25 November, above, and a topic's page, which writes its view, 516 a second, its 99th percentile 47 ms in place of 1,434, none waiting seconds at 256 clients. Not one build measured both ways: what IIS changes of its own is not told apart from what WebLingo has gained since, its server collector among it.
+
 The pilot, "WASP Pilot: the Forum in Real Use", then serves it.
