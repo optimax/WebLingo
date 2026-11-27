@@ -177,6 +177,13 @@ cleanup on its normal way out, listed in WLBC 0.4 (`WebLingoFunction.WaysOut`), 
 has left it (`OnItsWayOut`, `LeftItsWayOut`, `Suspending`); the cancellation is thrown as `CancellationThrown`, by its
 identity, which no catch catches.
 
+## The soak with reloads
+
+M0.22's part 3, landed but for the .NET heap: `WebLingo.Benchmarks --load --soak HOURS --reload-every SECONDS`
+(`WebLingoLoad`), each measure's growth for each reload by least squares and a rising trend a failure
+(`WebLingoSoakTrend`, tested in `LoadTests`); run 3 hours on each server, nothing rising (the specification's section 9,
+"M0.22 parts", part 3). The .NET heap's column waits for an answer of the owner's in `TO-DO.md`.
+
 ## The collector
 
 `wasp` runs .NET's server collector with DATAS (`WebLingo.Wasp.Cli.csproj`), chosen by the load and soak tests, the

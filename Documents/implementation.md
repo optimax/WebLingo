@@ -311,7 +311,9 @@ connection and cookies of its own, ask for each page at once, 1, 4, 16, 64 and 2
 after 3 s of warming up (`--seconds`, `--warm-up`), every answer checked; it writes a Markdown table of each page's throughput
 and latency and the server's working set and handles, and exits 1 where an answer was wrong. `--reload SECONDS` replaces
 `hello.wasp` every quarter of a second while clients ask for it, every answer one version's whole; `--soak HOURS` asks for the
-pages in turn, a row every `--sample` minutes, 10 by default. `sqlserver.wasp` reads the machine's SQL Server, `localhost`,
+pages in turn, a row every `--sample` minutes, 10 by default, and with `--reload-every SECONDS` replaces `hello.wasp` that
+often, which reloads the site, its report giving, after the warm-up, each measure's growth for each reload, one that keeps
+rising a failure, exit 1 (`WebLingoSoakTrend`). `sqlserver.wasp` reads the machine's SQL Server, `localhost`,
 `master`, a page it cannot answer left out. The clients run on the same machine as the server, so that its numbers are
 the machine's, shared; run it on an otherwise idle machine. Its numbers are in the specification's section 5.6, "Under load".
 With `--site forum` and `--url`, it asks for WebLingo Forum's pages instead, served there, its database made by its
