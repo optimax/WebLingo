@@ -120,6 +120,9 @@ public sealed class WebLingoHeap
     /// <summary>The host's workers (<see cref="WebLingoExecutionContext.Workers"/>), for <c>std:workers</c> (section 9, "M0.26 parts", part 2).</summary>
     public IWebLingoWorkers? Workers { get; set; }
 
+    /// <summary>The memory its site's requests share (<see cref="WebLingoExecutionContext.Shared"/>), for <c>std:shared</c> (section 6.12).</summary>
+    public WebLingo.Platform.Abstractions.IWebLingoSharedStore? Shared { get; set; }
+
     /// <summary>What the configuration allows native modules (<see cref="WebLingoExecutionContext.Allowed"/>), COM's objects (section 3.10).</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>>? Allowed { get; set; }
 

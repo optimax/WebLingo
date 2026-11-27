@@ -26,7 +26,8 @@ public static class WebLingoErrorClasses
         ("DeadlockError", WebLingoDiagnosticCodes.WaitsForever),
         ("PlatformError", WebLingoDiagnosticCodes.PlatformNotSupported),
         ("MailError", WebLingoDiagnosticCodes.MailFailure),
-        ("SessionLockError", WebLingoDiagnosticCodes.SessionLocked)
+        ("SessionLockError", WebLingoDiagnosticCodes.SessionLocked),
+        ("SharedMemoryError", WebLingoDiagnosticCodes.SharedMemoryFull)
     ];
 
     public static ReadOnlySpan<(string Name, string Code)> BuiltIn => Classes;

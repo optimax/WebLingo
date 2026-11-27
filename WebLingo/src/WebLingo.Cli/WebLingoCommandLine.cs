@@ -347,11 +347,14 @@ public static partial class WebLingoCommandLine
         var source = PrepareSource(program, path, givenSchemes, output, error, input, false, out var exit, run ? console : null);
         if (source is null || !run) return exit;
         // The VM imports modules with the same resolver the compiler used (section 3.9).
-        // A script's workers, std:workers', where its command line runs them (section 9, "M0.26 parts", part 2).
+        // A script's workers, std:workers', where its command line runs them (section 9, "M0.26 parts", part 2); and the memory
+        // it and its workers share, std:shared's (section 6.12, "Memory a site's requests share").
+        var limits = Limits(program, path, givenSchemes);
+        var shared = new DotNetSharedStore(limits.SharedBytes);
         var workers = program.RunsWorkers
-            ? new Workers(WorkersSettings(program, path, givenSchemes, output, error, input, console, regexTimeout), null)
+            ? new Workers(WorkersSettings(program, path, givenSchemes, output, error, input, console, regexTimeout, limits, shared), null)
             : null;
-        var context = Context(source.Host, parameters, source.LineOf, regexTimeout) with { Workers = workers };
+        var context = Context(source.Host, parameters, source.LineOf, regexTimeout) with { Workers = workers, Shared = shared };
         var loader = new WebLingoModuleLoader(source.Options);
         var result = OnVm(source.Compilation.Result.Module!, loader, source.Compilation.Components, context);
         var unreceived = workers?.Unreceived();
@@ -494,10 +497,12 @@ public static partial class WebLingoCommandLine
         }
         var loader = new WebLingoModuleLoader(host.Options);
         // Its workers' modules compiled from their source, as a script's are (section 9, "M0.26 parts", part 2).
+        var limits = Limits(program, path, givenSchemes);
+        var shared = new DotNetSharedStore(limits.SharedBytes);
         var workers = program.RunsWorkers
-            ? new Workers(WorkersSettings(program, path, givenSchemes, output, error, input, console, regexTimeout), null)
+            ? new Workers(WorkersSettings(program, path, givenSchemes, output, error, input, console, regexTimeout, limits, shared), null)
             : null;
-        var context = Context(host, parameters, LineOf, regexTimeout) with { Workers = workers };
+        var context = Context(host, parameters, LineOf, regexTimeout) with { Workers = workers, Shared = shared };
         var result = OnVm(register, loader, null, context);
         var unreceived = workers?.Unreceived();
         workers?.End();
@@ -675,12 +680,14 @@ public static partial class WebLingoCommandLine
     /// <c>"limits"</c>' <c>"workers"</c>, the machine's processors by default.
     /// </summary>
     private static Workers.Settings WorkersSettings(WebLingoCommandLineProgram program, string path, IReadOnlyDictionary<string, string> givenSchemes,
-        TextWriter output, TextWriter error, IWebLingoConsoleInput? input, Action? console, int regexTimeout)
-    {
-        if (!WebLingoSchemes.TryLoadLimits(path, program.Configuration, givenSchemes, out var limits, out _)) limits = WebLingoLimitSettings.Default;
-        return new Workers.Settings(program, path, givenSchemes, output, error, input, console, regexTimeout, limits,
-            new Workers.Running(limits.Workers ?? Environment.ProcessorCount));
-    }
+        TextWriter output, TextWriter error, IWebLingoConsoleInput? input, Action? console, int regexTimeout, WebLingoLimitSettings limits,
+        IWebLingoSharedStore shared) =>
+        new(program, path, givenSchemes, output, error, input, console, regexTimeout, limits,
+            new Workers.Running(limits.Workers ?? Environment.ProcessorCount), shared);
+
+    /// <summary>The program's configuration's <c>"limits"</c>, its host's defaults where it gives none or cannot be read.</summary>
+    private static WebLingoLimitSettings Limits(WebLingoCommandLineProgram program, string path, IReadOnlyDictionary<string, string> givenSchemes) =>
+        WebLingoSchemes.TryLoadLimits(path, program.Configuration, givenSchemes, out var limits, out _) ? limits : WebLingoLimitSettings.Default;
 
     private static WebLingoExecutionContext Context(Host host, IReadOnlyDictionary<string, string> parameters,
         Func<string?, int, int> lines, int regexTimeout) =>

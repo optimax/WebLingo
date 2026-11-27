@@ -1606,6 +1606,21 @@ this order:
 2. **The forum's views:** WebLingo Forum's topic page counting a view with `Shared.add`, its topics' views written to its
    database for many at once with `Shared.take`, a view or two lost where the process stops (`Documents/weblingo-forum.md`).
 
+As built (part 1, 27 November 2026; Proposed where it says more than the owner's answers): the platform's contract,
+`IWebLingoSharedStore` (`WebLingo.Platform.Abstractions`), holds what its owner copied, which it does not read, of the size
+its owner measured, an integer as itself, so that its `Add` adds to it; its .NET implementation, `DotNetSharedStore`
+(`WebLingo.Platform.DotNet`), a dictionary under one lock. `std:shared` is a native module, `WebLingo.StdLib.Shared`,
+installed as `std/shared.dll`, under `wasp` and `weblingo` alike, reaching the store through the heap
+(`WebLingoExecutionContext.Shared`); a value copied by the runtime's `WebLingoMessage`, as a worker's is, without errors
+(`TryCopyData`), a copy's size about 16 bytes for each value, a string's two bytes a character, bytes' one each. The most
+counts each entry's size, its key's characters, two bytes each, and 64 bytes; `"limits"`' `"shared"` an integer of
+megabytes from 1 to 1,048,576, or `null`, `weblingo.config`'s for a program, its workers given the program's store. A
+`set(key, value, seconds)` takes a number of seconds more than 0, or `null`; a value whose time has passed removed where
+it is next asked for, and all of them where the store would otherwise be full. A `set` or an `add` of a new key past the
+most is WL3025, a `SharedMemoryError`, extending `Error`, its name and code Proposed; an `add` to a key that keeps another
+kind of value WL3001, past int64 an `OverflowError`, WL3002. A host that keeps no store, a test's, makes each member
+WL3001. `wasp run` and `wasp check`, through `weblingo`'s code, have one for the run.
+
 **As built** (M0.14.2, 16 November 2026; Proposed, §15.2, "The host's core"): `WebLingo.Hosting`'s `WebLingoApplication` loads an application from its root through the platform's files, its routes made then (`WebLingoRouteTable`), and serves a request on the worker its host gives: a page compiled when first requested, once on each worker, and kept for the generation's life with the components it renders, its output kept until it has run, then written to the response as UTF-8 (from M0.14.7.1, kept until it reaches 64 KB, then sent as it is written, §15.2, "Output sent as it is written"); a file that is not a page's, nor a handler's, left to the host to serve (`WebLingoRequestOutcomeKind.File`); and a 404 for a path without a route. The host gives its built-ins, its native modules, its workers' count and the environment.
 
 **As built** (M0.14.3, 16 November 2026; Proposed, §15.2, "The request and the response in scripts"): a page's `param request;` and `param response;` are instances of the host's native classes `Request` and `Response`, their headers of `Headers`: a request's `method`, `path`, `scheme`, `host`, `query`, a map, and `headers`; a response's `status` and `headers`; a header read and set by indexing, and `has`, `add` and `remove`. A `.wlg`'s route runs its function for the request's method, `get`, `post` and so on, called with the request and the response, and awaited; `HEAD` calls `get` when there is no `head`; another method is a 405, and a `.wlg` exporting no method's function a 404.
@@ -1981,6 +1996,7 @@ Codes added while implementing M0.6 (§15.2):
 | WL3022 | What the platform has not: a member of `std:console`'s `Console` that .NET has on Windows alone, used elsewhere (`PlatformError`, §3.9, "The console: `std:console`") | Proposed |
 | WL3023 | Mail that cannot be sent: a server that cannot be reached, offers no TLS, has a certificate that cannot be checked, refuses the sign-in, a recipient or the message, or a password the host cannot read (`std:mail`, `MailError`, its `reply` the server's reply code, §7.17) | Proposed |
 | WL3024 | A WASP page's session read after its request waited for its lock longer than the site waits, another request of the session holding it (`SessionLockError`, §6.12, "Sessions and cookies") | Proposed |
+| WL3025 | A value `std:shared`'s `set` or `add` would keep past its store's most (`SharedMemoryError`, §6.12, "Memory a site's requests share") | Proposed |
 | WL4002 | Program too large for the bytecode (more registers than a function may have) | Approved (12 November 2026) |
 | WL5001 | A template's block, `<%`, with no closing `%>` | Proposed |
 | WL5002 | A template an include or a layout statement names that cannot be found or read, or that is outside the application's root | Proposed |

@@ -27,7 +27,7 @@ public static partial class WebLingoCommandLine
         /// </summary>
         public sealed record Settings(WebLingoCommandLineProgram Program, string MainPath, IReadOnlyDictionary<string, string> GivenSchemes,
             TextWriter Output, TextWriter Error, IWebLingoConsoleInput? Input, Action? Console, int RegexTimeout, WebLingoLimitSettings Limits,
-            Running Count);
+            Running Count, IWebLingoSharedStore Shared);
 
         /// <summary>
         /// How many of a program's workers run at once, its own, its workers' and its pools' alike, and the most that may,
@@ -482,6 +482,7 @@ public static partial class WebLingoCommandLine
                         // Its timers' waits ended where it is cancelled, disposed or past its time.
                         Clock = new SystemClock(new DotNetClock(), _cancellation),
                         Workers = own,
+                        Shared = workers._run.Shared, // The program's, which its workers share (section 6.12).
                         IsWorker = true,
                         InstructionBudget = limits.WorkerInstructions ?? long.MaxValue,
                         Resources = limits.WorkerMemoryMegabytes is { } megabytes

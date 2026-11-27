@@ -868,6 +868,32 @@ INSERT INTO wasp_sessions (id, data, used, locked_until) VALUES ('schema', '{"sc
 A page run by `wasp run` has no request: there, a page's parameters are values given on the command line
 ([section 16](#16-the-wasp-command-line)), and a page that declares `request` fails.
 
+### Memory the requests share
+
+Each request runs on a heap of its own and shares nothing with the others: a module's variables are the request's
+own, and gone when it ends. What all of a site's requests read or count, a cache of what a page computed, a count of
+views, goes in its shared memory, `std:shared`, a store of values by key that its host keeps (the Standard Library
+Reference, `std:shared`):
+
+```html
+<% import { Shared } from "std:shared"; %>
+<p>Read <%= Shared.add("views", 1) %> times since the site started.</p>
+```
+
+The first request's page says `<p>Read 1 times since the site started.</p>`, the next one's 2. A value is copied in
+and out, so that what one request reads no other can change; `Shared.add` and `Shared.take` are each one step, which
+no other request can come between, so that requests that count at once all count. `Shared.set(key, value, seconds)`
+keeps a value for a while, a cache's, then lets it go.
+
+- The store is the site's, kept while the site reloads and lost when its process stops: what must outlive the process
+  goes to a database, a count written there now and then, `Shared.take` giving what was counted since.
+- It holds at most 64 MB, unless `wasp.config`'s `"limits"` says otherwise, `"shared": 16`, in megabytes, or `null`
+  for no most ([section 14](#14-configuration-waspconfig)); a `set` past it is a `SharedMemoryError`, WL3025, which a
+  page may catch.
+- Each process that serves the site has a store of its own: IIS runs one `wasp` for a site, and `wasp serve` and `wasp
+  fastcgi` are one process each, but a web garden, IIS running several processes for one application pool, and
+  Apache's `mod_fcgid`, which starts several, give each its own store. What must be one across them goes to a database.
+
 ### Requests from other sites
 
 A page that another site's form posts to may be made to act for a user signed in here, the browser sending this site's
@@ -1253,7 +1279,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"proxies"` | the proxies in front of the site that it trusts, each an address or a range, `["127.0.0.1", "10.0.0.0/8"]`: a request from one of them takes its client, `request.clientAddress`, and its scheme, `request.scheme`, from its `Forwarded`, or its `X-Forwarded-For` and `X-Forwarded-Proto`, the client the nearest address that is not a trusted proxy's; under `wasp serve`, on either server; behind nginx or Apache, through FastCGI, the web server gives the client | none: forwarding headers are not believed |
 | `"serve"` | the extensions of files WASP does not send by default that the site sends: `{ "allow": [".pfx"] }`, each with its dot, of those section 2 lists | none |
 | `"log"` | the site's log, each optional: `{ "file": "C:/inetpub/logs/WebLingo/mysite.log", "level": "info" }`, a file a day, outside the site, from this file's folder, and the lowest level written, `"debug"`, `"info"`, `"warn"` or `"error"` (section 12, "The log") | the host's own log, `"info"` |
-| `"limits"` | a request's limits, each optional: `{ "requestTimeout": 60, "requestInstructions": 1000000000, "requestMemory": 128, "drain": 60, "requestLine": 8192, "requestHeaders": 32768, "requestArrival": 30, "keepAlive": 130 }`, the seconds it may take, its waits included, more than 0, or `null` for no time limit, the instructions it may run, the megabytes of strings it may hold, 1 to 1,048,576, the seconds it may go on running on the site as it was before its files changed, more than 0, the bytes of its line and of its headers, 1 to 1,048,576, the seconds its line and headers may take to arrive, and the seconds a kept connection may wait for its next request, each more than 0; seconds at most 4,294,967; one passed a 503, WL3003, or the client's request refused, a 414, a 431 or a 408 (section 12, "A request's limits"); `"quantum": 100000`, the instructions a request runs before it lets the other requests on its worker run, then goes on, an integer more than 0, or `null` for none, so that a page that computes for long does not hold the others up; beside them, a script's workers' limits under `weblingo`, `"workers"`, `"workerTimeout"`, `"workerInstructions"` and `"workerMemory"`, which a site's pages, running no workers, do not use (the Standard Library Reference, `std:workers`) | 60 seconds, 1,000,000,000 instructions, 128 MB, a drain of 60 seconds or `"requestTimeout"`, whichever is longer, 8,192 and 32,768 bytes, 30 and 130 seconds |
+| `"limits"` | a request's limits, each optional: `{ "requestTimeout": 60, "requestInstructions": 1000000000, "requestMemory": 128, "drain": 60, "requestLine": 8192, "requestHeaders": 32768, "requestArrival": 30, "keepAlive": 130 }`, the seconds it may take, its waits included, more than 0, or `null` for no time limit, the instructions it may run, the megabytes of strings it may hold, 1 to 1,048,576, the seconds it may go on running on the site as it was before its files changed, more than 0, the bytes of its line and of its headers, 1 to 1,048,576, the seconds its line and headers may take to arrive, and the seconds a kept connection may wait for its next request, each more than 0; seconds at most 4,294,967; one passed a 503, WL3003, or the client's request refused, a 414, a 431 or a 408 (section 12, "A request's limits"); `"quantum": 100000`, the instructions a request runs before it lets the other requests on its worker run, then goes on, an integer more than 0, or `null` for none, so that a page that computes for long does not hold the others up; `"shared": 64`, the megabytes the memory the site's requests share holds at most, 1 to 1,048,576, or `null` for no most, a `set` past it a `SharedMemoryError` (section 9, "Memory the requests share"); beside them, a script's workers' limits under `weblingo`, `"workers"`, `"workerTimeout"`, `"workerInstructions"` and `"workerMemory"`, which a site's pages, running no workers, do not use (the Standard Library Reference, `std:workers`) | 60 seconds, 1,000,000,000 instructions, 128 MB, a drain of 60 seconds or `"requestTimeout"`, whichever is longer, 8,192 and 32,768 bytes, 30 and 130 seconds, 100,000 instructions, 64 MB shared |
 | `"mail"` | the mail servers the site's pages and handlers send through, with `std:mail`, each a name and its settings: `{ "default": { "host": "smtp.example.com", "port": 587, "user": "…", "password": { "env": "SMTP_PASSWORD" } } }` | none |
 | `"base"` | the folder of the site this one lies over, from this file's folder: `"C:/WebLingoForum/site"`, its files taken where this site has none of its own, its `wasp.config`'s settings where this one gives none ([A site over a base](#a-site-over-a-base)) | none |
 

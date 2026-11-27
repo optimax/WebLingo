@@ -229,6 +229,17 @@ exception ending that worker. Part 4, the limits: `"limits"`' `"workers"` and th
 back, telling the pools, whose waiting calls `Retry`); a worker's `Timer` sets its cancellation's limit, each call's for
 a pool's (`Time`, `Untime`); its clock waits in slices so that a cancellation ends a `delay`.
 
+## The memory a site's requests share
+
+`std:shared` (`WebLingo.StdLib.Shared`) keeps values by key in a store of the host's, `IWebLingoSharedStore`
+(`WebLingo.Platform.Abstractions`), `DotNetSharedStore` on .NET, under one lock: one for a site, made in
+`WebLingoWaspServer.Load` and kept across its reloads, and one for a `weblingo` program, which its workers are given.
+Values cross as `WebLingoMessage`s, without errors (`TryCopyData`), an integer as itself so that `add` adds to it. Its
+most is `"limits"`' `"shared"`, 64 MB by default, a `set` past it WL3025, `SharedMemoryError`. `SharedTests`
+(`WebLingo.Conformance.Tests`) and `WaspServeTests.ASitesRequestsShareItsMemory_KeptAcrossAReload`, on both servers. The
+forum's views, counted with it, are the next part (the specification's section 6.12, "Memory a site's requests share,
+parts", part 2).
+
 ## The work off the workers
 
 `DotNetBlockingPool` (`WebLingo.Platform.DotNet`) runs work that blocks, a database's, a file's, a subprocess's, a mail

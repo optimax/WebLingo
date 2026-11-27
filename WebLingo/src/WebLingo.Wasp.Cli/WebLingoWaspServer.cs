@@ -230,6 +230,8 @@ public static class WebLingoWaspServer
             Uploads = new WebLingoUploads(uploads.MaxBodySize, uploads.InMemory, uploads.MaxSize ?? uploads.MaxBodySize,
                 new DotNetTemporaryFiles(uploads.Folder)),
             Sessions = store,
+            // The memory its requests share, kept across its reloads, 64 MB at most unless wasp.config says (section 6.12).
+            Shared = new DotNetSharedStore(limits.SharedBytes),
             Scheduler = () => new DotNetSchedulerHost(),
             Log = siteLog,
             // Its headers, nosniff and its kin unless wasp.config says otherwise, and the sensitive files it serves (section 6.12).

@@ -826,14 +826,16 @@ public class WaspServeTests : IDisposable
                             + "\"workerTimeout\" numbers of seconds more than 0, or null for none, \"requestInstructions\" and \"workerInstructions\" integers "
                             + "more than 0, \"workerInstructions\" null for none too, \"requestMemory\" and \"workerMemory\" numbers of megabytes from 1 to "
                             + "1048576, \"workers\" an integer from 1 to 1024, \"drain\", \"requestArrival\" and \"keepAlive\" numbers of seconds more than 0, "
-                            + "and \"requestLine\" and \"requestHeaders\" numbers of bytes from 1 to 1048576; and \"quantum\": 100000, the instructions a "
-                            + "request runs before it lets the others run, an integer more than 0, or null for none; each number of seconds at most 4294967.";
+                            + "and \"requestLine\" and \"requestHeaders\" numbers of bytes from 1 to 1048576; \"quantum\": 100000, the instructions a "
+                            + "request runs before it lets the others run, an integer more than 0, or null for none; and \"shared\": 64, the megabytes the "
+                            + "memory the requests share holds at most, an integer from 1 to 1048576, or null for no most; each number of seconds at most 4294967.";
         foreach (var setting in new[] { "[]", "{ \"requestTimeout\": 0 }", "{ \"requestTimeout\": \"60\" }", "{ \"requestInstructions\": 1.5 }",
                                          "{ \"requestInstructions\": 0 }", "{ \"requestMemory\": 0 }", "{ \"requestMemory\": 2000000 }",
                                          "{ \"time\": 60 }", "{ \"requestTimeout\": 5000000 }", "{ \"drain\": 0 }", "{ \"drain\": null }",
                                          "{ \"drain\": \"60\" }", "{ \"drain\": 4294968 }", "{ \"requestLine\": 0 }", "{ \"requestLine\": 1.5 }",
                                          "{ \"requestHeaders\": 2000000 }", "{ \"requestArrival\": 0 }", "{ \"keepAlive\": \"130\" }",
-                                         "{ \"keepAlive\": null }" })
+                                         "{ \"keepAlive\": null }", "{ \"shared\": 0 }", "{ \"shared\": 1.5 }", "{ \"shared\": \"64\" }",
+                                         "{ \"shared\": 2000000 }" })
         {
             Write("wasp.config", "{ \"limits\": " + setting + " }");
             Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
@@ -930,6 +932,49 @@ public class WaspServeTests : IDisposable
             Assert.Contains("GET /waits", written, StringComparison.Ordinal);
             Assert.Contains("The site was reloaded, and the request, still running on its files as they were before, was stopped", written,
                 StringComparison.Ordinal);
+        }
+        finally
+        {
+            await server.StopAsync();
+        }
+    }
+
+    /// <summary>
+    /// The memory a site's requests share (section 6.12, "Memory a site's requests share"; the owner's answers, 27 November
+    /// 2026, A1 to A4 (a) of "Memory a Site's Requests Share"): a page's count, <c>Shared.add</c>, read by a handler's later
+    /// request; kept across a reload (A2 (a)); and its most, <c>wasp.config</c>'s <c>"limits"</c>' <c>"shared"</c>, a
+    /// <c>set</c> past it a <c>SharedMemoryError</c> the page catches (A3 (a)).
+    /// </summary>
+    [Fact]
+    public async Task ASitesRequestsShareItsMemory_KeptAcrossAReload()
+    {
+        Write("wasp.config", "{ \"mode\": \"development\", \"limits\": { \"shared\": 1 } }");
+        Write("count.wasp", "<% import { Shared } from \"std:shared\"; %><%= Shared.add(\"views\", 1) %>");
+        Write("api/views.wlg", "import { Shared } from \"std:shared\";\n"
+                               + "export function get(request, response) { response.write(Shared.get(\"views\")); }");
+        Write("large.wasp", "<% import { Shared } from \"std:shared\";\n"
+                            + "try { Shared.set(\"large\", \"x\".repeat(600000)); } catch (SharedMemoryError e) { write(e.code); } %>");
+        var log = new StringWriter();
+        var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _, TextWriter.Synchronized(log));
+        Assert.True(server is not null, error);
+        await server.StartAsync();
+        try
+        {
+            using var client = new HttpClient { BaseAddress = new Uri(server.Address) };
+            Assert.Equal("1", await client.GetStringAsync("/count"));
+            Assert.Equal("2", await client.GetStringAsync("/count"));
+            Assert.Equal("2", await client.GetStringAsync("/api/views"));
+            Assert.Equal("WL3025", await client.GetStringAsync("/large"));
+
+            // A page changed, the site reloads, and its count is kept.
+            Write("count.wasp", "<% import { Shared } from \"std:shared\"; %>now <%= Shared.add(\"views\", 1) %>");
+            var deadline = DateTime.UtcNow.AddSeconds(30);
+            while (!log.ToString().Contains("WASP reloaded the application: generation 2.", StringComparison.Ordinal) && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(50);
+            }
+            Assert.Contains("WASP reloaded the application: generation 2.", log.ToString(), StringComparison.Ordinal);
+            Assert.Equal("now 3", await client.GetStringAsync("/count"));
         }
         finally
         {

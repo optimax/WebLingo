@@ -164,6 +164,12 @@ public sealed record WebLingoExecutionContext(WebLingoWorkerId OwnerWorkerId)
     public IWebLingoWorkers? Workers { get; init; }
 
     /// <summary>
+    /// The memory its site's requests share, or its program's workers under <c>weblingo</c>, which <c>std:shared</c> reaches
+    /// through the heap (<see cref="WebLingoHeap.Shared"/>; section 6.12, "Memory a site's requests share"); none by default.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoSharedStore? Shared { get; init; }
+
+    /// <summary>
     /// Whether the execution is a worker's (section 9, "M0.26 parts", part 2): it goes on after its top level has ended
     /// while any of its tasks is ready, due or waits for work off its worker, a message among it, and ends once none is;
     /// and an exception nothing caught is copied into its result (<see cref="WebLingoExecutionResult.Thrown"/>), for its

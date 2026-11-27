@@ -101,6 +101,12 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// </summary>
     public IWebLingoSessionStore? Sessions { get; init; }
 
+    /// <summary>
+    /// The memory the site's requests share, <c>std:shared</c>'s (section 6.12, "Memory a site's requests share"): one for the
+    /// site, made where its host starts, kept across its reloads, which reload its files alone; none by default.
+    /// </summary>
+    public WebLingo.Platform.Abstractions.IWebLingoSharedStore? Shared { get; init; }
+
     /// <summary>The host's side of an execution's scheduler, a new one for each request, or none.</summary>
     public Func<IWebLingoSchedulerHost>? Scheduler { get; init; }
 

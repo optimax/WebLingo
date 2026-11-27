@@ -24,10 +24,31 @@ public sealed class WebLingoMessage
 
     private readonly Node[] _nodes;
 
-    private WebLingoMessage(Node[] nodes) => _nodes = nodes;
+    private WebLingoMessage(Node[] nodes)
+    {
+        _nodes = nodes;
+        foreach (var node in nodes) Size += Measure(node);
+    }
 
     /// <summary>How many values it holds, each element, key and value counted once, however many times it is referred to.</summary>
     public int Count => _nodes.Length;
+
+    /// <summary>
+    /// About how many bytes it holds, for a store that keeps messages within a most (section 6.12, "Memory a site's requests
+    /// share"): 16 for each value, and a string's two bytes a character, bytes' one each, a decimal's 16, an array's and a
+    /// set's 4 for each of their values, a map's 8 for each of its entries.
+    /// </summary>
+    public long Size { get; }
+
+    private static long Measure(Node node) => 16 + node.Payload switch
+    {
+        string text => 2L * text.Length,
+        byte[] bytes => bytes.Length,
+        decimal => 16,
+        int[] parts => 4L * parts.Length,
+        (int, int)[] entries => 8L * entries.Length,
+        _ => 0
+    };
 
     /// <summary>
     /// An error, as a message: an <c>Error</c> of the class named <paramref name="className"/>, its <c>message</c> and its
@@ -74,7 +95,21 @@ public sealed class WebLingoMessage
     /// false, with WL3001, where the value holds anything a message cannot.
     /// </summary>
     public static bool TryCopy(WebLingoHeap heap, WebLingoValue value, WebLingoValue errorClass, string? thrownAt, out WebLingoMessage? message,
-        out WebLingoRuntimeError? error)
+        out WebLingoRuntimeError? error) =>
+        TryCopy(heap, value, errorClass, thrownAt,
+            "A message holds null, Booleans, numbers, decimals, strings, bytes, dates, arrays, maps and sets of them, and errors", out message, out error);
+
+    /// <summary>
+    /// <paramref name="value"/>, of <paramref name="heap"/>, copied into a message that holds no error: what a site's shared
+    /// memory keeps (section 6.12, "Memory a site's requests share", A1 (a)); false, with WL3001, its message beginning with
+    /// <paramref name="holder"/>, <c>A shared value</c>, where the value holds anything else.
+    /// </summary>
+    public static bool TryCopyData(WebLingoHeap heap, WebLingoValue value, string holder, out WebLingoMessage? message, out WebLingoRuntimeError? error) =>
+        TryCopy(heap, value, WebLingoValue.Null, null,
+            $"{holder} holds null, Booleans, numbers, decimals, strings, bytes, dates, and arrays, maps and sets of them", out message, out error);
+
+    private static bool TryCopy(WebLingoHeap heap, WebLingoValue value, WebLingoValue errorClass, string? thrownAt, string holds,
+        out WebLingoMessage? message, out WebLingoRuntimeError? error)
     {
         (message, error) = (null, null);
         var nodes = new List<Node>();
@@ -109,8 +144,7 @@ public sealed class WebLingoMessage
                     return true;
                 default:
                     wrong = new WebLingoRuntimeError(WebLingoDiagnosticCodes.InvalidOperation,
-                        "A message holds null, Booleans, numbers, decimals, strings, bytes, dates, arrays, maps and sets of them, and errors, "
-                        + $"not {WebLingoValueFormatter.Describe(current, heap)}.");
+                        $"{holds}, not {WebLingoValueFormatter.Describe(current, heap)}.");
                     return false;
             }
         }

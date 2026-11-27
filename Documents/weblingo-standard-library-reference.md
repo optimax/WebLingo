@@ -42,6 +42,7 @@ This reference describes the standard library in the current release and shows w
 31. [`std:mail`](#31-stdmail)
 32. [`std:log`](#32-stdlog)
 33. [`std:workers`](#33-stdworkers)
+34. [`std:shared`](#34-stdshared)
 
 ---
 
@@ -420,6 +421,7 @@ A runtime error is an instance of a class extending `Error`, which a `catch` may
 | `PlatformError` | WL3022 | a member of `Console` the platform has not, Windows's alone used elsewhere (section 1) |
 | `MailError` | WL3023 | mail that cannot be sent, a server that cannot be reached or refuses it, with its `reply`, the server's reply code (section 31) |
 | `SessionLockError` | WL3024 | a WASP page's session read after its request waited too long for it, another request of the session having it (section 22) |
+| `SharedMemoryError` | WL3025 | a value `std:shared`'s `set` or `add` would keep past the store's most (section 34) |
 
 ```javascript
 import { writeLn } from "std:console";
@@ -1130,7 +1132,7 @@ A native module is code compiled for .NET that extends what scripts can use: fun
 module's are, by a scheme naming a folder of them, `import db from "native:sqlite";`. The folders are named by the
 configuration, `weblingo.config` beside a script and `wasp.config` in a site, `{ "schemes": { "native":
 "C:/WebLingo/native" } }`, and by the command line's `--scheme native=folder`. The standard modules, `std:system`,
-`std:console`, `std:tasks`, `std:fs`, `std:http`, `std:net`, `std:db`, `std:crypto`, `std:env`, `std:math`, `std:mail` and `std:workers`, are native modules themselves, in the `std`
+`std:console`, `std:tasks`, `std:fs`, `std:http`, `std:net`, `std:db`, `std:crypto`, `std:env`, `std:math`, `std:mail`, `std:workers` and `std:shared`, are native modules themselves, in the `std`
 folder beside `weblingo` and `wasp`. A native module's function may have optional parameters, or a rest parameter, as
 `math.max(a, …)` has, and a module may export constants, as `math.PI` is, and values made for each program where it
 begins, as `std:workers`' `parent` is, which no importer may assign.
@@ -1856,3 +1858,47 @@ machine's processors by default: a `new Worker` beyond them is WL3001 where it i
 to end. Each worker's seconds, `"workerTimeout"`, a pool's worker's for each call, its instructions, `"workerInstructions"`,
 and its megabytes of strings, `"workerMemory"`, are none, none and 128 by default. A worker past one is stopped, and
 its parent's next `receive()`, or the pool's call, throws an `Error` whose code is WL3003, its message saying which.
+
+## 34. `std:shared`
+
+Memory a site's requests share, or, under `weblingo`, a program and its workers: `import { Shared } from "std:shared";`.
+Every request of a site has its own heap and shares nothing with the others, so that a site keeps what all of them read
+or count here: a store of values by key, kept by the host outside every request's heap. A value is copied in and out,
+as a worker's message is, so that what one request reads is a copy no other can change: `null`, Booleans, numbers,
+decimals, strings, bytes, dates, and arrays, maps and sets of them; anything else, an instance, an error, a function, is
+WL3001, naming it. A key is a string of at most 1,024 characters.
+
+| Member | What it does |
+|---|---|
+| `Shared.get(key)` | a copy of the value kept under `key`; `null` where there is none |
+| `Shared.set(key, value)` | keeps a copy of `value` under `key`, in place of what was, until it is removed; `null` |
+| `Shared.set(key, value, seconds)` | the same, kept for that many seconds, a number more than 0, then gone |
+| `Shared.remove(key)` | removes what `key` keeps, giving whether it kept anything |
+| `Shared.add(key, n)` | adds the integer `n` to the integer `key` keeps, or to 0 where it keeps nothing, giving the total; WL3001 where it keeps another kind of value, an `OverflowError`, WL3002, past int64 |
+| `Shared.take(key)` | the value `key` keeps, which it then keeps no more; `null` where there is none |
+
+`add` and `take` are each one step, which no other request can come between, so that two requests that add at once
+both count, and a value taken is taken once. A site's store holds at most 64 MB of copied values, a key's characters and
+a little for each entry counted too, unless its `wasp.config` says otherwise, `"limits": { "shared": 16 }`, in megabytes,
+or `null` for no most; under `weblingo`, `weblingo.config`'s. A `set`, or an `add` of a new key, past it is a
+`SharedMemoryError`, WL3025, which a script may catch, nothing then kept. A site's store is kept while the site
+reloads, and lost only when its process ends: a site that changes what a key means uses a new key. Each of a site's
+processes has a store of its own, where it runs as several (the WASP User Manual's section 14).
+
+```javascript
+import { writeLn } from "std:console";
+import { Shared } from "std:shared";
+
+Shared.set("greeting", { text: "hello", times: [1, 2] });
+var greeting = Shared.get("greeting");
+greeting["text"] = "changed";
+writeLn(Shared.get("greeting")["text"]);
+writeLn([Shared.add("views", 1), Shared.add("views", 1)]);
+writeLn([Shared.take("views"), Shared.get("views")]);
+```
+
+```text
+hello
+[1, 2]
+[2, null]
+```

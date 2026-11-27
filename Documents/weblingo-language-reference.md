@@ -1824,6 +1824,7 @@ An error the runtime raises becomes an instance of a class extending `Error`, wi
 | `PlatformError` | WL3022 | what the platform has not, a member of `std:console`'s `Console` that is Windows's alone, used elsewhere |
 | `MailError` | WL3023 | mail that cannot be sent, a server that cannot be reached or refuses it, its `reply` the server's reply code |
 | `SessionLockError` | WL3024 | a WASP page's session read after its request waited too long for it, another request of the session having it |
+| `SharedMemoryError` | WL3025 | a value `std:shared`'s `set` or `add` would keep past its store's most |
 
 Two errors cannot be caught, and always end the program: running past the execution's limits (WL3003) and being
 cancelled (WL3004).
@@ -2338,6 +2339,7 @@ Every error has a code, `WL` and four digits, whose first digit says when it is 
 | WL3022 | what the platform has not, a member of `std:console`'s `Console` that is Windows's alone, used elsewhere |
 | WL3023 | mail that cannot be sent, `std:mail`'s `MailError` |
 | WL3024 | a WASP page's session read after its request waited too long for it, `SessionLockError` |
+| WL3025 | a value `std:shared` would keep past its store's most, `SharedMemoryError` |
 | **WL4xxx** | **bytecode** |
 | WL4001 | bytecode that fails verification, such as a damaged file or a VM mismatch |
 | WL4002 | a program too large for the bytecode |

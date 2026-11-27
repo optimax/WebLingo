@@ -1,6 +1,7 @@
 using System.Text.Json;
 using WebLingo.Bytecode;
 using WebLingo.Platform.Abstractions;
+using WebLingo.Platform.DotNet;
 namespace WebLingo.Cli;
 
 /// <summary>
@@ -333,8 +334,10 @@ public static class WebLingoSchemes
                 + "\"workerTimeout\" numbers of seconds more than 0, or null for none, \"requestInstructions\" and \"workerInstructions\" integers "
                 + "more than 0, \"workerInstructions\" null for none too, \"requestMemory\" and \"workerMemory\" numbers of megabytes from 1 to "
                 + "1048576, \"workers\" an integer from 1 to 1024, \"drain\", \"requestArrival\" and \"keepAlive\" numbers of seconds more than 0, "
-                + "and \"requestLine\" and \"requestHeaders\" numbers of bytes from 1 to 1048576; and \"quantum\": 100000, the instructions a "
-                + $"request runs before it lets the others run, an integer more than 0, or null for none; each number of seconds at most {MaxSeconds}.";
+                + "and \"requestLine\" and \"requestHeaders\" numbers of bytes from 1 to 1048576; \"quantum\": 100000, the instructions a "
+                + "request runs before it lets the others run, an integer more than 0, or null for none; and \"shared\": 64, the megabytes the "
+                + "memory the requests share holds at most, an integer from 1 to 1048576, or null for no most; "
+                + $"each number of seconds at most {MaxSeconds}.";
         if (setting.ValueKind != JsonValueKind.Object) return false;
         foreach (var entry in setting.EnumerateObject())
         {
@@ -383,6 +386,15 @@ public static class WebLingoSchemes
             else if (entry.Name == "quantum" && entry.Value.ValueKind == JsonValueKind.Null)
             {
                 limits = limits with { Quantum = null, NoQuantum = true };
+            }
+            // The memory the requests share, its most (section 6.12, "Memory a site's requests share").
+            else if (entry.Name == "shared" && number && entry.Value.TryGetInt64(out var sharedMegabytes) && sharedMegabytes is >= 1 and <= 1_048_576)
+            {
+                limits = limits with { SharedMegabytes = sharedMegabytes, NoSharedMost = false };
+            }
+            else if (entry.Name == "shared" && entry.Value.ValueKind == JsonValueKind.Null)
+            {
+                limits = limits with { SharedMegabytes = null, NoSharedMost = true };
             }
             // A script's workers' limits, weblingo's (section 9, "M0.26 parts", part 4).
             else if (entry.Name == "workers" && number && entry.Value.TryGetInt32(out var workers) && workers is >= 1 and <= 1024)
@@ -988,6 +1000,17 @@ public sealed record WebLingoLimitSettings(double? TimeoutSeconds, long? Instruc
     public long? WorkerInstructions { get; init; }
 
     public long? WorkerMemoryMegabytes { get; init; }
+
+    /// <summary>
+    /// The megabytes the memory a site's requests share holds at most, <c>"shared"</c> (section 6.12, "Memory a site's requests
+    /// share", A3 (a)), null where it gives none; and whether it says there is no most, <c>"shared": null</c>.
+    /// </summary>
+    public long? SharedMegabytes { get; init; }
+
+    public bool NoSharedMost { get; init; }
+
+    /// <summary>The shared memory's most, in bytes: what it gives, or 64 MB, or null for none.</summary>
+    public long? SharedBytes => NoSharedMost ? null : SharedMegabytes is { } megabytes ? megabytes * 1024 * 1024 : DotNetSharedStore.DefaultMost;
 
     /// <summary>What a configuration that says nothing of them means: the host's defaults.</summary>
     public static WebLingoLimitSettings Default { get; } = new(null, null, null);

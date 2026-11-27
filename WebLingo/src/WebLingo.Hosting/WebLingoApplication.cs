@@ -445,6 +445,7 @@ public sealed class WebLingoApplication
             Allowed = _options.Allowed,
             Crypto = _options.Crypto,
             Environment = _options.Environment,
+            Shared = _options.Shared, // The site's, every request's alike, kept across its reloads (section 6.12).
             Databases = _options.Databases,
             Mail = _options.Mail,
             Clock = _options.Clock,

@@ -148,6 +148,12 @@ public static class WebLingoDiagnosticCodes
     /// code Proposed).
     /// </summary>
     public const string SessionLocked = "WL3024";
+    /// <summary>
+    /// A value <c>std:shared</c>'s <c>set</c> or <c>add</c> would keep past its store's most, a <c>SharedMemoryError</c>
+    /// (section 6.12, "Memory a site's requests share", A3 (a) of "Memory a Site's Requests Share"; its name and code
+    /// Proposed).
+    /// </summary>
+    public const string SharedMemoryFull = "WL3025";
 
     /// <summary>Bytecode verification failure.</summary>
     public const string BytecodeVerificationFailure = "WL4001";

@@ -35,6 +35,7 @@
   <Project Path="src/WebLingo.StdLib.Process/WebLingo.StdLib.Process.csproj" />
   <Project Path="src/WebLingo.StdLib.Console/WebLingo.StdLib.Console.csproj" />
   <Project Path="src/WebLingo.StdLib.Workers/WebLingo.StdLib.Workers.csproj" />
+  <Project Path="src/WebLingo.StdLib.Shared/WebLingo.StdLib.Shared.csproj" />
   <Project Path="src/WebLingo.Windows.Com/WebLingo.Windows.Com.csproj" />
   <Project Path="src/WebLingo.Cli/WebLingo.Cli.csproj" />
   <Project Path="src/WebLingo.Wasp.Cli/WebLingo.Wasp.Cli.csproj" />

@@ -86,6 +86,7 @@ public sealed class WebLingoVirtualMachine : IWebLingoVirtualMachine
         heap.Mail = context.Mail;
         heap.Processes = context.Processes;
         heap.Workers = context.Workers;
+        heap.Shared = context.Shared;
         heap.Allowed = context.Allowed;
         heap.Crypto = context.Crypto;
         heap.Environment = context.Environment;
