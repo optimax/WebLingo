@@ -30,7 +30,9 @@ every package on GitHub's machines from a tag, `SHA256SUMS` and a draft pre-rele
 yet: it needs `main` pushed, then a run by hand, which `TO-DO.md` asks the owner about. Part 3 added GitHub's issue forms
 and `CONTRIBUTING.md`; GitHub's private vulnerability reporting, which `SECURITY.md` names, is off, a setting of the
 owner's. Part 4's release candidate is made locally by `package.ps1` into `Installers`, for the owner to install as a
-tester would, then tried under IIS. Part 5's name check found no live WEBLINGO trademark, and Livelink's "WebLingo"
+tester would, then tried under IIS; `build.bat`'s installation was removed by hand first, its uninstaller refusing an
+installation of another version, which found the uninstaller's administrator check never true, now fixed
+(`Documents/implementation.md`, section 11, "`IsInRole` Given a String Looks for an Account"). Part 5's name check found no live WEBLINGO trademark, and Livelink's "WebLingo"
 template files the closest use; the release waits for the owner's judgement of it, and for the tag's go-ahead.
 
 ## Debugging WASP pages

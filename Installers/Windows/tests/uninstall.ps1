@@ -137,6 +137,16 @@ try {
     Assert ($vsixCalls.Count -eq 1) 'Remove the extension once'
     Assert ($vsixCalls[0] -ceq "B\VSIXInstaller.exe /quiet /uninstall:$visualStudioId /instanceIds:lacked") 'Remove only what setup added'
     Assert (!(Test-Path -LiteralPath (Join-Path $userState 'visualstudio.xml'))) 'Forget the record'
+
+    # The machine part runs only as administrator, asked by the built-in role: asked by a string, a principal looks for
+    # an account of that name, which no token's groups hold, so that it is false in an elevated process too.
+    $principal = New-Object PSObject
+    $principal | Add-Member ScriptMethod IsInRole {
+        param($role) return $role -is [Security.Principal.WindowsBuiltInRole] -and $role -eq 'Administrator'
+    }
+    Assert (Test-Administrator $principal) 'Ask for the administrators by their built-in role'
+    $administrators = [Security.Principal.WindowsIdentity]::GetCurrent().Groups | Where-Object { $_.Value -eq 'S-1-5-32-544' }
+    Assert ((Test-Administrator) -eq [bool]$administrators) 'Be administrator where the token holds the administrators'
     Write-Output 'Windows uninstall regression checks passed.'
 } finally {
     $classes.Close()

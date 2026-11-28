@@ -580,6 +580,15 @@ that path uninstalled the extension from the developer's own VS Code (20 Novembe
 as `package.ps1` does and `code --install-extension`): the tests define their own `Find-Code`, which finds none. A test
 that reaches a program of this account's, VS Code's CLI among them, stubs it so.
 
+### `IsInRole` Given a String Looks for an Account
+
+.NET's `WindowsPrincipal.IsInRole` takes a role's name or a built-in role, and PowerShell, given a string, calls the
+first: `IsInRole('Administrator')` looks for an account named Administrator, which no token's groups hold, so that it
+is false in an elevated process too. Until 28 November 2026, `Installers/Windows/uninstall.ps1` checked its machine part
+so, and every uninstall stopped before removing anything, its tests never running that part. It asks by the built-in
+role, `IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)` (`Test-Administrator`), which its tests check
+with a principal that answers only that; a PowerShell script that checks for an administrator asks so too.
+
 ### SqlClient's Native Network Layer Is Left Out
 
 Microsoft.Data.SqlClient brings, on Windows, a native network layer, Microsoft.Data.SqlClient.SNI.runtime, under Microsoft's own terms, which WebLingo does not ship (the owner's decision, 17 November 2026; specification, section 7.11). `WebLingo.Data.DotNet` references that package only to exclude it (`ExcludeAssets="all"`, `PrivateAssets="all"`), which takes it out of every project's graph, the command lines' and the tests' included, and `DotNetDatabases` sets SqlClient's switch for its managed network layer (`Switch.Microsoft.Data.SqlClient.UseManagedNetworkingOnWindows`) in its static constructor, before SqlClient first connects: code that makes a `SqlConnection` before `DotNetDatabases` is used, a test's own among it, would ask for the missing library. `DatabaseTests.SqlClientsNativeNetworkLayerIsNotShipped` checks that no such file is beside the tests; an upgrade of SqlClient that renames the package or the switch breaks that test, or SQL Server, rather than the licence. The managed network layer reaches a server by TCP/IP, never by its shared memory, the one protocol SQL Server's Developer and Express editions enable when installed: a server whose TCP/IP is off cannot be reached (error 35). The tests that need a SQL Server (`SqlServerTests`, `WaspServeTests.TheToDoListServesItsSqlServerDatabase`) run on the machine's default instance, `localhost`, by Windows authentication, and are skipped where nothing answers on its port, 1433 (`SqlServerFactAttribute`), on Linux among them.

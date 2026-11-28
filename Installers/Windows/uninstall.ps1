@@ -405,6 +405,15 @@ function Remove-Runtime([string] $folder, $inventory, [bool] $legacy) {
     Remove-EmptyDirectory $folder
 }
 
+# Whether this process runs as administrator: the built-in role, BUILTIN\Administrators. A string, 'Administrator', is
+# taken as an account's name, which no token's groups hold, so that it is false in an elevated process too.
+function Test-Administrator($principal) {
+    if (!$principal) {
+        $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+    }
+    return [bool]$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
 function Invoke-Uninstall {
     $payload = [IO.Path]::GetFullPath($PSScriptRoot)
     $media = (Test-Path -LiteralPath (Join-Path (Split-Path $payload) 'Install WebLingo.bat') -PathType Leaf) -and
@@ -438,10 +447,7 @@ function Invoke-Uninstall {
         }
     }
     if ($Machine) {
-        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-        if (!([Security.Principal.WindowsPrincipal]::new($identity)).IsInRole('Administrator')) {
-            throw 'Removing the machine installation requires administrator access.'
-        }
+        if (!(Test-Administrator)) { throw 'Removing the machine installation requires administrator access.' }
         if ($present -or $legacy) { Remove-Runtime $folder $inventory $legacy }
         return
     }
