@@ -12,14 +12,17 @@
          A1 of "Beta Release, Part 2"; until then 0.N.0 for M0.N, the last milestone landed whole); weblingo and wasp
          print it. -->
     <Version>0.26</Version>
-    <!-- The version as it is, without the commit .NET would add after a '+', so that a build is the same from any checkout. -->
+    <!-- The version as it is, without the commit .NET would add after a '+', so that every build of a release carries the
+         same product version; the commit goes after the build number instead (Directory.Build.targets,
+         WebLingoBuildCommit). -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
   <!-- The build number, which weblingo and wasp print after the version, and every assembly's file version: the build's
        local time, its year, month, day, and hour and minute, as MaxPad makes it (the owner's request, 21 November 2026),
        each part a number without a leading zero, 2027.1.5.7 for 00:07 on 5 January 2027 (the owner's request,
        25 November 2026, "Build Number"); read from the sortable format, the invariant culture's whatever the machine's,
-       taken once so that its parts agree; a build given one, -p:BuildStamp=…, gives it every assembly. -->
+       taken once so that its parts agree; a build given one, -p:BuildStamp=…, gives it every assembly. weblingo and wasp
+       print the commit after it, 2026.11.28.846-841150b (Directory.Build.targets, WebLingoBuildCommit). -->
   <PropertyGroup Condition="'$(BuildStamp)' == ''">
     <BuildTime>$([System.DateTime]::Now.ToString("s"))</BuildTime>
     <BuildYear>$([System.Int32]::Parse('$(BuildTime.Substring(0, 4))'))</BuildYear>

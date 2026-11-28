@@ -85,7 +85,8 @@ beta (A3).
 
 1. **The version.** `Version` in `WebLingo/Directory.Build.props` is set to the release's, in a commit of its own, on
    `main`, unless it is already, as `0.26` is for the first beta. Between two releases it stays the last one's, the
-   build number telling builds apart (Proposed).
+   build number telling builds apart (Proposed), and the commit after it, `0.26 (2026.11.28.846-841150b)`, which
+   commit a tester's build was made of (the owner's request, 28 November 2026).
 2. **The notes.** `Installers/release-notes.md` is the release's page: which package to take, what to know, where to
    learn and how to report, `@VERSION@` standing for the version; a later beta's notes say first what changed that a
    site or a script must follow.

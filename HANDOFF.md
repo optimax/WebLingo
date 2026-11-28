@@ -368,12 +368,16 @@ Neither has been run as administrator since the move.
 
 ## Versions and build numbers
 
-The solution's version is `0.20.0`, with no designation, and each build has a number, its local time, its year, month,
-day, and hour and minute, each without a leading zero, `2027.1.5.7` for 00:07 on 5 January 2027, as MaxPad makes it: `WebLingo/Directory.Build.props` makes it every assembly's file version, the product version staying
-the version, which the uninstaller compares. `weblingo --version` prints `WebLingo 0.20.0 (2026.11.21.2330)`, and
-`wasp --version` the same after `WASP` (`WebLingoCommandLine.VersionAndBuild`). A build more than a minute after the last
-compiles every project again; `-p:BuildStamp=…` gives a build a fixed number. The installers' ZIPs are named from the
-version, `WebLingo-0.20.0-win-x64-…`; none has been packaged since the change.
+The solution's version is the release's, `0.26`, with no designation, and each build has a number, its local time, its
+year, month, day, and hour and minute, each without a leading zero, `2027.1.5.7` for 00:07 on 5 January 2027, as MaxPad
+makes it: `WebLingo/Directory.Build.props` makes it every assembly's file version, the product version staying the
+version, which the uninstaller compares. After it comes the commit the build was made of, its first seven characters,
+every assembly's metadata `Commit` (`WebLingo/Directory.Build.targets`, `WebLingoBuildCommit`, from the SDK's
+`SourceRevisionId`); a build outside a repository has none. `weblingo --version` prints
+`WebLingo 0.26 (2026.11.28.846-841150b)`, and `wasp --version` the same after `WASP`
+(`WebLingoCommandLine.VersionAndBuild`). A build more than a minute after the last compiles every project again;
+`-p:BuildStamp=…` gives a build a fixed number. The installers' ZIPs are named from the version,
+`WebLingo-0.26-win-x64-…`.
 
 ## Debug information in bytecode
 

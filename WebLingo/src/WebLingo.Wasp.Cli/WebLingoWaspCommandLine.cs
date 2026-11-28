@@ -19,8 +19,8 @@ namespace WebLingo.Wasp.Cli;
 public static class WebLingoWaspCommandLine
 {
     /// <summary>
-    /// What <c>wasp --version</c> prints, and <c>wasp</c> first without arguments: <c>WASP 0.20.0 (2026.11.21.2330)</c>, the
-    /// solution's version and the build's number.
+    /// What <c>wasp --version</c> prints, and <c>wasp</c> first without arguments: <c>WASP 0.26 (2026.11.28.846-841150b)</c>,
+    /// the solution's version and the build's number, its commit after it.
     /// </summary>
     public static string Version { get; } = "WASP " + WebLingoCommandLine.VersionAndBuild;
 

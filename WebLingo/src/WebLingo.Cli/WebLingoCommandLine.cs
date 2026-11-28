@@ -39,21 +39,31 @@ public static partial class WebLingoCommandLine
         typeof(WebLingoCommandLine).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
 
     /// <summary>
-    /// The build number, the build's local time, <c>2026.11.21.2330</c>, as MaxPad makes it, every assembly's file version
-    /// (<c>Directory.Build.props</c>; the owner's request, 21 November 2026), each part without a leading zero,
-    /// <c>2027.1.5.7</c> for 00:07 on 5 January 2027 (the owner's request, 25 November 2026).
+    /// The commit the build was made of, every assembly's metadata <c>Commit</c> (<c>Directory.Build.targets</c>), or
+    /// <see langword="null"/> for a build outside a repository.
     /// </summary>
-    public static string BuildNumber { get; } =
-        typeof(WebLingoCommandLine).Assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version ?? "0";
+    public static string? Commit { get; } =
+        typeof(WebLingoCommandLine).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(metadata => metadata.Key == "Commit")?.Value is { Length: > 0 } commit ? commit : null;
 
     /// <summary>
-    /// The version, then the build number in parentheses, as MaxPad's About box has them: <c>0.20.0 (2026.11.21.2330)</c>.
+    /// The build number, the build's local time, <c>2026.11.21.2330</c>, as MaxPad makes it, every assembly's file version
+    /// (<c>Directory.Build.props</c>; the owner's request, 21 November 2026), each part without a leading zero,
+    /// <c>2027.1.5.7</c> for 00:07 on 5 January 2027 (the owner's request, 25 November 2026), then the commit's first
+    /// seven characters, as git abbreviates it, <c>2026.11.28.846-841150b</c> (the owner's request, 28 November 2026).
+    /// </summary>
+    public static string BuildNumber { get; } =
+        (typeof(WebLingoCommandLine).Assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version ?? "0") +
+        (Commit is { } made ? "-" + made[..Math.Min(7, made.Length)] : "");
+
+    /// <summary>
+    /// The version, then the build number in parentheses, as MaxPad's About box has them: <c>0.26 (2026.11.28.846-841150b)</c>.
     /// </summary>
     public static string VersionAndBuild { get; } = $"{ProductVersion} ({BuildNumber})";
 
     /// <summary>
     /// What <c>weblingo --version</c> prints, and <c>weblingo</c> first without arguments:
-    /// <c>WebLingo 0.20.0 (2026.11.21.2330)</c>.
+    /// <c>WebLingo 0.26 (2026.11.28.846-841150b)</c>.
     /// </summary>
     public static string Version { get; } = "WebLingo " + VersionAndBuild;
 

@@ -64,4 +64,17 @@
       <FileWrites Include="$(IntermediateOutputPath)WebLingoSources.g.cs" />
     </ItemGroup>
   </Target>
+
+  <!-- The commit the build was made of, every assembly's metadata, Commit, which weblingo and wasp print after the build
+       number, its first seven characters, 2026.11.28.846-841150b (the owner's request, 28 November 2026): the SDK's own
+       source control information, SourceRevisionId, which its git task reads from the repository's files, with no git
+       program; a build outside a repository has none, and prints the build number alone. The file version stays four
+       numbers, as Windows's version resource needs. -->
+  <Target Name="WebLingoBuildCommit" BeforeTargets="GetAssemblyAttributes"
+          DependsOnTargets="InitializeSourceControlInformation"
+          Condition="'$(SourceControlInformationFeatureSupported)' == 'true'">
+    <ItemGroup Condition="'$(SourceRevisionId)' != ''">
+      <AssemblyMetadata Include="Commit" Value="$(SourceRevisionId)" />
+    </ItemGroup>
+  </Target>
 </Project>

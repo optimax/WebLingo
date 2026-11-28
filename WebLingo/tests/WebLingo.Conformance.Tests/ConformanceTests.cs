@@ -1397,13 +1397,21 @@ public sealed class ConformanceTests : IDisposable
         // the first beta (the owner's answer, 28 November 2026, in place of 0.N.0 for the last milestone landed whole),
         // printed by --version, and first by weblingo without arguments (the owner's answer, 18 November 2026), with
         // the build's number after it, the file version, its local time (the owner's request, 21 November 2026), each part
-        // without a leading zero, 2027.1.5.7 for 00:07 on 5 January 2027 (the owner's request, 25 November 2026).
+        // without a leading zero, 2027.1.5.7 for 00:07 on 5 January 2027 (the owner's request, 25 November 2026), then the
+        // commit the build was made of, its first seven characters, every assembly's (the owner's request, 28 November 2026).
         var version = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(WebLingoCommandLine).Assembly)!.InformationalVersion;
         Assert.Matches(@"^0\.\d+$", version);
         Assert.Equal(version,
             System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(WebLingoValue).Assembly)!.InformationalVersion);
         var build = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyFileVersionAttribute>(typeof(WebLingoCommandLine).Assembly)!.Version;
         Assert.Matches(@"^20\d\d\.([1-9]|1[0-2])\.([1-9]|[12]\d|3[01])\.([1-5]?\d|[1-9][0-5]\d|(1\d|2[0-3])[0-5]\d)$", build);
+        var commit = Commit(typeof(WebLingoCommandLine).Assembly);
+        Assert.Equal(commit, Commit(typeof(WebLingoValue).Assembly));
+        // Built in a repository, as here and in CI, the build has its commit, git's hash; elsewhere, none.
+        var folder = new DirectoryInfo(AppContext.BaseDirectory);
+        while (folder is not null && !Path.Exists(Path.Combine(folder.FullName, ".git"))) folder = folder.Parent;
+        if (folder is not null) Assert.Matches("^[0-9a-f]{40}$", commit);
+        if (commit is not null) build += "-" + commit[..7];
         var output = new StringWriter();
         Assert.Equal(WebLingoCommandLine.Success, WebLingoCommandLine.Run(["--version"], output, new StringWriter()));
         Assert.Equal($"WebLingo {version} ({build})", output.ToString().TrimEnd());
@@ -1412,6 +1420,10 @@ public sealed class ConformanceTests : IDisposable
         var lines = output.ToString().Split('\n');
         Assert.Equal($"WebLingo {version} ({build})", lines[0].TrimEnd('\r'));
         Assert.StartsWith("Usage: weblingo", lines[1]);
+
+        static string? Commit(System.Reflection.Assembly assembly) =>
+            System.Reflection.CustomAttributeExtensions.GetCustomAttributes<System.Reflection.AssemblyMetadataAttribute>(assembly)
+                .SingleOrDefault(metadata => metadata.Key == "Commit")?.Value;
     }
 
     [Theory]
