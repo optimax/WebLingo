@@ -760,7 +760,8 @@ As a user runs them, the comparison, its 5 timed runs after a warm-up, in millis
 
 1. **Throughput, latency and a reload.** A load generator of the solution's own, `WebLingo.Benchmarks --load`, with no package, and a load site of its own, `benchmarks/WebLingo.Benchmarks/LoadSite`, whose pages compute, read SQLite and SQL Server, write about a megabyte, keep a session and receive an upload of 100 KB; each page asked for by 1 to 256 clients at once, each client with its own connection and cookies, every answer checked, its throughput and latency written, under `wasp serve` and under `wasp fastcgi` behind nginx; and a page replaced every quarter of a second while clients ask for it, every answer one generation's whole.
 2. **The soak.** The pages asked for in turn for 8 hours under `wasp serve`, the server's memory, handles and threads sampled every 10 minutes, `--soak 8`.
-3. **Under IIS.** Part 1's measurements of the load site served by IIS, the owner having added it with the repository's `Scripts` and installed WebLingo from the checkout with `build.bat`, both as administrator, `--url` naming it. The site IIS serves is made by `WebLingo.Benchmarks --load --prepare FOLDER` (27 November 2026): the load site's pages, with a `web.config` that runs the installed `wasp`, and its SQLite database beside them, where its `wasp.config` names it, the load site's own folder having neither.
+3. **Under IIS.** Part 1's measurements of the load site served by IIS, the owner having added it with the repository's `Scripts` and installed WebLingo from the checkout with `build.bat`, both as administrator, `--url` naming it. The site IIS serves is made by `WebLingo.Benchmarks --load --prepare FOLDER` (27 November 2026): the load site's pages, with a `web.config` that runs the installed `wasp`, and its SQLite database beside them, where its `wasp.config` names it, the load site's own folder having neither. Measured
+   (27 November 2026), below, "Under IIS".
 4. **On Linux.** Part 1's measurements on Linux, once "A WASP Site Served on Linux" has a Linux here. Measured in WSL 2 (27 November 2026), below, "On Linux", the benchmark's `--host fastcgi` running the system's nginx there.
 
 **A string read by its index** (25 November 2026, the task "Indexing a String in Constant Time"). A string's `length`, `s[i]`, `slice`, `indexOf`, `lastIndexOf`, `padStart` and `padEnd` counted its Unicode scalar values from its start each time, so that a loop over a string by its index took time in proportion to its length's square: 20,000 lookups in a string of 20,000 characters took 700 ms, against 5 ms visiting it with `foreach`. Each string's count is now kept with it, and, for a string with a surrogate pair, where each of its scalar values starts (§15.2, "Heap"). The benchmark's workload `indexing` reads each of 20,000 characters by its index, and slices and searches at 2,000 places, in a string without surrogate pairs and in one with them: measured against `main` (`23fa1fd`), six rounds run alternately, then `closures`, `objects` and `strings`, which allocate and free most, sixteen, its median fell from 1,981 ms to 7.7 ms, about 250 times as fast; the other workloads were within the machine's noise, none slower by a rank test (`closures` 20.1 ms against 24.6, `strings` 14.2 against 17.7, `objects` 65.6 against 63.3, U from 22.5 to 36.5 of 64).
@@ -963,6 +964,34 @@ server ASP.NET Core's, so that the two are not compared here. What it found, eac
   alternately 6 runs each at 16 clients on Windows, 10,654 a second buffered and 10,969 not.
 
 **The collector** (26 and 27 November 2026, the owner's answer, A2 of "The Server Collector for `wasp`"; the register,
+**Under IIS** (part 3, 27 November 2026), part 1's measurements of the load site served by IIS 10 on part 1's machine,
+idle, .NET 10.0.15, WebLingo as `build.bat` installed it from this checkout that day, `WASP 0.26.0 (2026.11.27.1455)`:
+the site made by `--prepare`, added by the repository's `Scripts` as `wasp.load`, and
+asked for at `https://load.wasp.localhost/`, IIS's ASP.NET Core Module passing each request on to `wasp serve` out of
+process, on ASP.NET Core's server; the clients speaking HTTPS to IIS, each with a connection of its own; each cell its
+requests a second and the time 99% of them took at most, every answer checked, the server's memory not sampled, its
+process IIS's:
+
+| Page | 1 at once | 4 at once | 16 at once | 64 at once | 256 at once | Errors |
+|---|---:|---:|---:|---:|---:|---:|
+| `hello` | 1,004/s, 3.5 ms | 2,003/s, 3.7 ms | 3,055/s, 11.8 ms | 2,721/s, 47.7 ms | 2,981/s, 140.0 ms | 0 |
+| `compute` | 532/s, 4.4 ms | 1,352/s, 5.0 ms | 1,595/s, 24.0 ms | 1,524/s, 84.4 ms | 1,579/s, 215.4 ms | 0 |
+| `sqlite` | 769/s, 2.6 ms | 1,407/s, 4.8 ms | 1,968/s, 18.0 ms | 1,882/s, 53.0 ms | 2,023/s, 193.1 ms | 0 |
+| `sqlserver` | 541/s, 3.0 ms | 1,075/s, 14.2 ms | 1,305/s, 40.8 ms | 1,202/s, 181.6 ms | 1,467/s, 226.2 ms | 0 |
+| `large` | 65/s, 44.0 ms | 141/s, 44.9 ms | 136/s, 294.3 ms | 127/s, 1038.1 ms | 142/s, 1940.7 ms | 0 |
+| `session` | 678/s, 3.0 ms | 2,523/s, 3.6 ms | 2,987/s, 11.9 ms | 2,827/s, 39.7 ms | 2,704/s, 303.9 ms | 0 |
+| `upload` | 231/s, 7.7 ms | 424/s, 25.1 ms | 492/s, 60.8 ms | 482/s, 177.4 ms | 473/s, 804.2 ms | 0 |
+
+And `hello.wasp` replaced 39 times in 10 s while 256 clients asked for it, through the site's folder (`--folder`, given
+with `--url`), the move refused once while `wasp` read the page and tried again: 26,706 requests, none wrong, 99% under
+367 ms. Nothing failed. Every request goes through IIS's TLS, then over a connection of the module's to `wasp`: from 16
+clients on, the pages level off at a sixth to a tenth of what part 1's `wasp serve`, served directly, gave, `hello` at about
+3,000 a second, and `large`, a megabyte a page, at about 140, a third of it. Part 1's numbers are three days and many
+changes older, so that the two are not compared further here; IIS running WebLingo's own server, the deferred task "IIS
+Running WebLingo's Own Server", is where IIS's cost would be measured again. Found on the way: the `web.config` that
+`--prepare` made was not well-formed XML, its comment holding `--`, so that IIS answered every request with its 500.19;
+fixed, and `LoadTests` reads it as XML.
+
 "`wasp`'s collector"): `wasp`'s requests share one process's .NET heap, its objects made and dropped as a request runs a
 site's modules. .NET's workstation collector, a console program's default, and its server collector, a heap and a thread
 for each processor, its heaps adapting to the process's size (DATAS), compared on the idle machine with the load site,

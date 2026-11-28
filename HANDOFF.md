@@ -195,9 +195,10 @@ specification's section 9, "M0.22 parts", part 3).
 ## The load site under IIS
 
 `WebLingo.Benchmarks --load --prepare FOLDER` makes the load site for IIS, a `web.config` and its SQLite database beside
-its pages, and writes the `Scripts` commands that add it; the measurements under IIS (the specification's section 5.6,
-"Under load, parts", part 3) wait for the owner to run those, as administrator, after `build.bat`, as the task "Load and
-Soak Tests for WASP, Part 3: Under IIS" asks.
+its pages, and writes the `Scripts` commands that add it. It is added on this machine, `wasp.load` at
+`https://load.wasp.localhost/` from `C:\WWW\wasp.load`, and measured (the specification's section 5.6, "Under IIS"), every
+page at 1 to 256 clients and a reload, none failing; `--folder C:\WWW\wasp.load` with `--url` lets `--reload` replace its
+page there. The load and soak tests' four parts are done.
 
 ## The collector
 

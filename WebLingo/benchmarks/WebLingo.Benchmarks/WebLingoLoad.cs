@@ -107,6 +107,9 @@ public static class WebLingoLoad
         public string Host { get; private set; } = "serve";
         public string Site { get; private set; } = "load";
         public Uri? Url { get; private set; }
+
+        /// <summary>The folder <c>--prepare</c> made the site at <see cref="Url"/> in, whose page <c>--reload</c> replaces.</summary>
+        public string? Folder { get; private set; }
         public List<string> Names { get; } = [];
         public int[] Clients { get; private set; } = [1, 4, 16, 64, 256];
         public int Seconds { get; private set; } = 10;
@@ -125,10 +128,10 @@ public static class WebLingoLoad
 
         /// <summary>
         /// Whether what it was given goes together: the forum's pages at a URL, pages its site has, and a soak's reloads on a
-        /// site the benchmark serves itself, whose page it replaces.
+        /// site the benchmark serves itself, whose page it replaces; and a folder only for a site at a URL.
         /// </summary>
         public bool IsWhole => (Site != "forum" || Url is not null) && Names.All(name => All.Any(page => page.Name == name))
-                               && (ReloadEvery is null || (Soak is not null && Url is null));
+                               && (ReloadEvery is null || (Soak is not null && Url is null)) && (Folder is null || Url is not null);
 
         public bool TryTake(string option, string value)
         {
@@ -139,6 +142,9 @@ public static class WebLingoLoad
                     return true;
                 case "--url" when Uri.TryCreate(value, UriKind.Absolute, out var given) && given.Scheme is "http" or "https":
                     (Host, Url) = ("url", given);
+                    return true;
+                case "--folder" when Directory.Exists(Path.Combine(value, "site")):
+                    Folder = Path.GetFullPath(value);
                     return true;
                 case "--site" when value is "load" or "forum":
                     Site = value;
@@ -179,7 +185,7 @@ public static class WebLingoLoad
     private static async Task<int> RunAsync(Settings settings, TextWriter output, TextWriter error)
     {
         if (settings.Fair is { } fair) return await Fair(fair, settings, output);
-        await using var site = settings.Url is { } url ? WebLingoLoadSite.At(url) : await WebLingoLoadSite.Start(settings.Host);
+        await using var site = settings.Url is { } url ? WebLingoLoadSite.At(url, settings.Folder) : await WebLingoLoadSite.Start(settings.Host);
         output.WriteLine($"WASP under load: {site.Description}.");
         output.WriteLine($".NET {Environment.Version}, {RuntimeInformation.OSDescription.Trim()}, {Environment.ProcessorCount} "
                          + "logical processors, the clients on the same machine.");
@@ -668,13 +674,14 @@ public static class WebLingoLoad
         output.WriteLine($"  weblingo run add-wasp-site.wlg name=wasp.load folder={site} host=load.wasp.localhost writable={data}");
         output.WriteLine("  weblingo run add-sql-server-login.wlg name=wasp.load database=master");
         output.WriteLine();
-        output.WriteLine("Then measure it: WebLingo.Benchmarks --load --url https://load.wasp.localhost/");
+        output.WriteLine($"Then measure it: WebLingo.Benchmarks --load --url https://load.wasp.localhost/, and --reload with --folder {folder}");
         return Success;
     }
 
     private static int Usage(TextWriter error)
     {
-        error.WriteLine("Usage: WebLingo.Benchmarks --load [--host serve|standalone|aspnetcore|fastcgi | --url <url>] [--site load|forum]");
+        error.WriteLine("Usage: WebLingo.Benchmarks --load [--host serve|standalone|aspnetcore|fastcgi | --url <url> [--folder FOLDER]]");
+        error.WriteLine("                             [--site load|forum]");
         error.WriteLine("                             [--page NAME]...");
         error.WriteLine("                             [--clients 1,4,16,64,256]");
         error.WriteLine("                             [--seconds N] [--warm-up N]");

@@ -20,14 +20,21 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
     private string? _nginx;
     private Process? _nginxProcess;
 
+    /// <summary>Whether its folder is the benchmark's own, made for the run and removed after it, not one it was given.</summary>
+    private bool Owned { get; init; } = true;
+
     private WebLingoLoadSite(Uri address, string description, string? folder) =>
         (Address, Description, _folder) = (address, description, folder);
 
     public Uri Address { get; }
     public string Description { get; }
 
-    /// <summary>A site served elsewhere, at <paramref name="url"/>, which the benchmark neither starts nor samples.</summary>
-    public static WebLingoLoadSite At(Uri url) => new(url, $"the site at {url}", null);
+    /// <summary>
+    /// A site served elsewhere, at <paramref name="url"/>, which the benchmark neither starts nor samples; given
+    /// <paramref name="folder"/>, the folder <c>--prepare</c> made it in, <c>--reload</c> replaces its page there, and the
+    /// folder is left as it is after (specification, section 5.6, "Under load, parts", part 3).
+    /// </summary>
+    public static WebLingoLoadSite At(Uri url, string? folder = null) => new(url, $"the site at {url}", folder) { Owned = false };
 
     /// <summary>
     /// The load site made in <paramref name="folder"/> for IIS to serve (specification, section 5.6, "Under load, parts",
@@ -49,7 +56,7 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
         <?xml version="1.0" encoding="utf-8"?>
         <!--
           IIS runs the load site through the ASP.NET Core Module, which starts wasp, installed in C:\Program Files\WebLingo,
-          and passes it every request. Made by WebLingo.Benchmarks --load --prepare.
+          and passes it every request. Made by WebLingo.Benchmarks, its load test's prepare.
         -->
         <configuration>
           <location path="." inheritInChildApplications="false">
@@ -191,7 +198,7 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
     /// </summary>
     public async Task<int> Replace(string page, string text)
     {
-        if (_folder is null) throw new InvalidOperationException("--reload needs a site the benchmark serves itself.");
+        if (_folder is null) throw new InvalidOperationException("--reload needs a site the benchmark serves itself, or --folder.");
         var path = Path.Combine(_folder, "site", page);
         var written = path + ".new";
         await File.WriteAllTextAsync(written, text);
@@ -233,7 +240,7 @@ public sealed class WebLingoLoadSite : IAsyncDisposable
             process.Dispose();
         }
         SqliteConnection.ClearAllPools();
-        if (_folder is null) return;
+        if (_folder is null || !Owned) return;
         for (var attempt = 0; ; attempt++)
         {
             try

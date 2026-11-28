@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using WebLingo.Benchmarks;
 using Xunit;
 namespace WebLingo.VM.Tests;
@@ -40,6 +41,7 @@ public sealed class LoadTests
     [InlineData("--soak", "1", "--reload-every", "5", "--url", "http://localhost:8080/")]
     [InlineData("--prepare")]
     [InlineData("--prepare", "C:/WWW/wasp.load", "--seconds", "1")]
+    [InlineData("--folder", "a folder without a site")]
     public void AnOptionItDoesNotTakeIsAUsageError(params string[] args)
     {
         var error = new StringWriter();
@@ -62,7 +64,9 @@ public sealed class LoadTests
             Assert.Equal(WebLingoLoad.Success, WebLingoBenchmarkCommand.Run(["--load", "--prepare", folder], output, new StringWriter()));
             var site = Path.Combine(folder, "site");
             foreach (var page in WebLingoLoad.Pages) Assert.True(File.Exists(Path.Combine(site, page.Name + ".wasp")), page.Name);
-            Assert.Contains(@"processPath=""C:\Program Files\WebLingo\wasp.exe""", File.ReadAllText(Path.Combine(site, "web.config")));
+            // Well-formed XML, as IIS reads it (0x8007000d otherwise: its comment once held a "--", 27 November 2026).
+            var module = XDocument.Load(Path.Combine(site, "web.config")).Descendants("aspNetCore").Single();
+            Assert.Equal(@"C:\Program Files\WebLingo\wasp.exe", (string?)module.Attribute("processPath"));
             var database = Path.Combine(folder, "load-data", "load.db");
             Assert.True(File.Exists(database));
             Assert.Contains($"writable={Path.Combine(folder, "load-data")}", output.ToString());
@@ -73,6 +77,10 @@ public sealed class LoadTests
                 WebLingoBenchmarkCommand.Run(["--load", "--prepare", folder], new StringWriter(), new StringWriter()));
             Assert.NotEqual("changed", File.ReadAllText(Path.Combine(site, "hello.wasp")));
             Assert.Equal(made, File.GetLastWriteTimeUtc(database));
+
+            // Its folder names the site at a URL alone, whose page --reload replaces there.
+            Assert.Equal(WebLingoLoad.UsageError,
+                WebLingoBenchmarkCommand.Run(["--load", "--folder", folder, "--reload", "1"], new StringWriter(), new StringWriter()));
         }
         finally
         {

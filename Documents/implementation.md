@@ -339,7 +339,9 @@ in `Documents/weblingo-forum.md`, section 6, part 10. `--prepare FOLDER` measure
 `FOLDER` for IIS to serve, its pages and a `web.config` that runs `C:\Program Files\WebLingo\wasp.exe` in `site`, its
 SQLite database in `load-data`, unpooled so that the file is let go once made, and writes the `Scripts` commands that add
 it to IIS, `wasp.load` at `https://load.wasp.localhost/`, and give its pool a SQL Server login; made again, its pages are
-replaced and its database kept. `LoadTests` (`WebLingo.VM.Tests`) checks its pages, its options and `--prepare`, not the load.
+replaced and its database kept. With `--url`, `--folder FOLDER` names the folder `--prepare` made the site in, so that
+`--reload` replaces its page there, and leaves the folder as it is after. `LoadTests` (`WebLingo.VM.Tests`) checks its
+pages, its options, `--prepare` and its `web.config`, read as XML, as IIS reads it, not the load.
 
 ### Measuring workers
 
