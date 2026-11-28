@@ -54,6 +54,21 @@ public sealed class WebLingoReloader : IDisposable
         }
     }
 
+    /// <summary>
+    /// Attaches <paramref name="debugger"/> to the application, or detaches the one attached, where it is null (specification,
+    /// section 5.7, "Debugging a site where it runs, parts", part 1): a new generation, made among the reloads, one at a time,
+    /// whose pages are compiled for it, and the drain told, as of a reload; its number.
+    /// </summary>
+    public int Attach(WebLingo.VM.IWebLingoDebuggerThreads? debugger)
+    {
+        lock (_reloading)
+        {
+            var generation = _application.Attach(debugger);
+            WebLingoDrain.Of(_application).Reloaded(generation);
+            return generation;
+        }
+    }
+
     public void Dispose()
     {
         foreach (var watcher in _watchers) watcher.Dispose();

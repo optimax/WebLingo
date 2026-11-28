@@ -93,7 +93,14 @@ A launch without a page serves the site for the debugger (`WebLingoWaspServer.Se
 a `WebLingoSiteServer`), each request a thread of the session's (`IWebLingoDebuggerThreads`, `WebLingo.VM`, which
 `WebLingoApplicationOptions.Debugger` takes), whose stop leaves the VM waiting as at an `await`
 (`IWebLingoRegisterDebugger.Stopped` giving false, the VM's `_stopDepth` and `GoesOn`), resumed through the request's
-scheduler host. The adapter's standard output is the protocol's: whatever runs in its process writes nothing to the
+scheduler host. An `attach` request attaches the session to a site that runs already, in the adapter's own process
+(`WebLingoRunningSite`, given to `WebLingoDebugAdapter.Run`), at `configurationDone`, and detaches it when the session
+ends: the application publishes a new generation compiled for the debugger, and another without it, as a reload
+publishes one (`WebLingoApplication.Attach`, made among the reloads by `WebLingoReloader.Attach`), each page knowing the
+debugger it was compiled for (`CompiledPage.Debugger`), so that a request already running finishes undebugged; and a
+request's watch, told of its debugger's thread, stops keeping its time limit (`WebLingoDrain.Request.Debugged`). No host
+lets a debugger in from outside its process yet (specification, section 5.7, "Debugging a site where it runs, parts").
+The adapter's standard output is the protocol's: whatever runs in its process writes nothing to the
 console, ASP.NET Core's logging among it, which the debugger's server clears. A breakpoint's condition is read by the
 session (`WebLingoDebugCondition`) into the VM's own form (`WebLingoDebugExpression`), since the VM references no
 parser, and evaluated by the VM in the stopped frame's scope (`IWebLingoDebugScope`), outside its dispatch method,

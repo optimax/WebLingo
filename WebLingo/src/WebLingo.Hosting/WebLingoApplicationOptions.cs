@@ -211,6 +211,8 @@ public sealed record WebLingoApplicationOptions(string Root, IWebLingoFileSystem
     /// The debugger the application's requests run under (specification, section 5.7, "Debugging WASP pages, parts", part
     /// 2), each a thread of its own, named for its method and its path, its pages compiled for a debugger; none by default.
     /// A request is debugged only where its host gives it a scheduler host, through which a stopped request is resumed.
+    /// It is the first generation's: <see cref="WebLingoApplication.Attach"/> attaches another while the application runs,
+    /// or detaches it ("Debugging a site where it runs, parts", part 1).
     /// </summary>
     public WebLingo.VM.IWebLingoDebuggerThreads? Debugger { get; init; }
 }

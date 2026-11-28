@@ -1,5 +1,11 @@
+using System.Net;
 using System.Text.Json;
+using WebLingo.Cli;
 using WebLingo.Conformance.Tests;
+using WebLingo.Hosting;
+using WebLingo.Hosting.DotNet;
+using WebLingo.Hosting.Standalone;
+using WebLingo.Wasp.Cli;
 using Xunit;
 namespace WebLingo.Templates.Tests;
 
@@ -152,6 +158,89 @@ public sealed class WaspDebugTests : IDisposable
     }
 
     /// <summary>Where the site is served, as the adapter says it first.</summary>
+    /// <summary>
+    /// A debugger attached to a site that runs already (section 5.7, "Debugging a site where it runs, parts", part 1): served
+    /// by WebLingo's own server, as <c>wasp serve</c> serves it, the adapter in the site's process; its pages served undebugged
+    /// until the debugger attaches, then each request a thread that stops at its breakpoint, a stop longer than the site's
+    /// time limit not ending it, and undebugged again once the debugger has gone, the site going on throughout.
+    /// </summary>
+    [Fact]
+    public async Task ADebuggerAttachesToASiteThatRunsAndDetachesFromIt()
+    {
+        var slow = Write("slow.wasp", "<% var a = 1; %>\n<% var b = a + 1; %>\n<p>slow <%= b %></p>\n");
+        Write("wasp.config", "{ \"limits\": { \"requestTimeout\": 1 } }");
+        var application = WebLingoWaspServer.Load(_root, new Dictionary<string, string>(), WebLingoMode.Development, null, out var workers,
+            out _, out var error) ?? throw new InvalidOperationException(error);
+        using var pool = new WebLingoWorkerPool(workers);
+        using var reloader = new WebLingoReloader(application, _root, (_, _) => { });
+        using var listener = WebLingoHttpServer.Listen(IPAddress.Loopback, 0);
+        using var stop = new CancellationTokenSource();
+        var serving = new WebLingoHttpServer(application, pool).ServeAsync(listener, stop.Token);
+        using var client = new HttpClient
+        {
+            BaseAddress = new Uri($"http://127.0.0.1:{((IPEndPoint)listener.LocalEndPoint!).Port}"), Timeout = TimeSpan.FromSeconds(30)
+        };
+        try
+        {
+            Assert.Equal("<p>slow 2</p>", (await client.GetStringAsync("/slow")).Trim());
+            var before = application.GenerationNumber;
+            Assert.False(application.Debugged);
+
+            var site = new WebLingoRunningSite(_root, debugger =>
+            {
+                reloader.Attach(debugger);
+                return new Detaching(() => reloader.Attach(null));
+            });
+            await using (var dap = new DebugAdapterSession(stream => WebLingoDebugAdapter.Run(WebLingoWaspCommandLine.Pages, stream, stream,
+                running: site)))
+            {
+                await dap.Attach();
+                await dap.Request("setBreakpoints", new { source = new { path = slow }, breakpoints = new[] { new { line = 1 } } });
+                await dap.Request("configurationDone");
+                await Until(() => application.Debugged);
+                Assert.Equal(before + 1, application.GenerationNumber);
+
+                var slowly = client.GetStringAsync("/slow");
+                var stopped = await dap.Event("stopped");
+                Assert.Equal("breakpoint", stopped.GetProperty("reason").GetString());
+                var thread = stopped.GetProperty("threadId").GetInt32();
+                AssertFrame((await dap.Frames(thread))[0], slow, 1);
+                // Stopped for longer than the site's time limit, a second, it is not ended for it.
+                await Task.Delay(1500);
+                Assert.False(slowly.IsCompleted);
+                await dap.Request("continue", new { threadId = thread });
+                Assert.Equal("<p>slow 2</p>", (await slowly).Trim());
+                await dap.Request("disconnect");
+            }
+
+            // Detached, the site goes on, undebugged.
+            await Until(() => !application.Debugged);
+            Assert.Equal(before + 2, application.GenerationNumber);
+            Assert.Equal("<p>slow 2</p>", (await client.GetStringAsync("/slow")).Trim());
+        }
+        finally
+        {
+            stop.Cancel();
+            await serving;
+        }
+    }
+
+    /// <summary>Waits for <paramref name="condition"/>, 30 s at most.</summary>
+    private static async Task Until(Func<bool> condition)
+    {
+        var deadline = Environment.TickCount64 + 30_000;
+        while (!condition())
+        {
+            Assert.True(Environment.TickCount64 < deadline, "The condition did not hold within 30 s.");
+            await Task.Delay(20);
+        }
+    }
+
+    private sealed class Detaching(Action detach) : IDisposable
+    {
+        public void Dispose() => detach();
+    }
+
     private static async Task<string> Address(DebugAdapterSession dap)
     {
         while (true)

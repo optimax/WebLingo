@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using Xunit;
@@ -19,7 +21,11 @@ public sealed class DebugAdapterSession : IAsyncDisposable
 {
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(30);
 
-    private readonly Process _process;
+    private readonly Process? _process;
+    private readonly Stream _toAdapter;
+    private readonly Stream _fromAdapter;
+    private readonly Thread? _adapter;
+    private readonly TcpClient? _connection;
     private readonly BlockingCollection<JsonElement> _messages = [];
     private readonly Thread _reader;
     private readonly List<JsonElement> _events = [];
@@ -33,8 +39,42 @@ public sealed class DebugAdapterSession : IAsyncDisposable
         {
             UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true
         })!;
+        (_toAdapter, _fromAdapter) = (_process.StandardInput.BaseStream, _process.StandardOutput.BaseStream);
         _reader = new Thread(ReadAll) { IsBackground = true, Name = "The debug adapter's messages" };
         _reader.Start();
+    }
+
+    /// <summary>
+    /// A session of an adapter run in the tests' own process, on a thread of its own, by <paramref name="run"/>, given the
+    /// stream it reads the session's requests from and writes its messages to, a connection of this machine's, as a site's
+    /// own process runs the adapter a debugger attaches to (section 5.7, "Debugging a site where it runs, parts", part 1).
+    /// </summary>
+    public DebugAdapterSession(Action<Stream> run)
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var client = new TcpClient();
+        client.Connect((IPEndPoint)listener.LocalEndpoint);
+        var adapter = listener.AcceptTcpClient();
+        _connection = client;
+        _toAdapter = _fromAdapter = client.GetStream();
+        _adapter = new Thread(() =>
+        {
+            using var connection = adapter;
+            // Its messages end with it, so that the session's reader does.
+            run(connection.GetStream());
+        }) { IsBackground = true, Name = "The debug adapter in the tests' process" };
+        _adapter.Start();
+        _reader = new Thread(ReadAll) { IsBackground = true, Name = "The debug adapter's messages" };
+        _reader.Start();
+    }
+
+    /// <summary>Attaches to the site its adapter runs beside (section 5.7, "Debugging a site where it runs, parts", part 1).</summary>
+    public async Task Attach()
+    {
+        await Request("initialize", new { adapterID = "wasp", linesStartAt1 = true, columnsStartAt1 = true, pathFormat = "path" });
+        await Request("attach", new { });
+        await Event("initialized");
     }
 
     public async Task Start(string program, bool stopOnEntry = false, string[]? args = null, string? root = null)
@@ -58,7 +98,7 @@ public sealed class DebugAdapterSession : IAsyncDisposable
         var deadline = Environment.TickCount64 + (long)Deadline.TotalMilliseconds;
         var seq = ++_sequence;
         var payload = JsonSerializer.SerializeToUtf8Bytes(new { seq, type = "request", command, arguments });
-        var stream = _process.StandardInput.BaseStream;
+        var stream = _toAdapter;
         stream.Write(Encoding.ASCII.GetBytes($"Content-Length: {payload.Length}\r\n\r\n"));
         stream.Write(payload);
         stream.Flush();
@@ -123,7 +163,7 @@ public sealed class DebugAdapterSession : IAsyncDisposable
     {
         try
         {
-            var stream = _process.StandardOutput.BaseStream;
+            var stream = _fromAdapter;
             while (Read(stream) is { } message) _messages.Add(message);
         }
         catch (Exception exception) when (exception is IOException or ObjectDisposedException or InvalidOperationException)
@@ -159,7 +199,14 @@ public sealed class DebugAdapterSession : IAsyncDisposable
 
     public ValueTask DisposeAsync()
     {
-        if (!_process.HasExited)
+        if (_process is null)
+        {
+            // Its requests end, so that the adapter in the tests' process ends, and its messages with it.
+            _connection!.Client.Shutdown(SocketShutdown.Send);
+            _adapter!.Join(TimeSpan.FromSeconds(10));
+            _connection.Dispose();
+        }
+        else if (!_process.HasExited)
         {
             _process.StandardInput.Close();
             if (!_process.WaitForExit(2_000))
@@ -169,7 +216,8 @@ public sealed class DebugAdapterSession : IAsyncDisposable
             }
         }
         var read = _reader.Join(TimeSpan.FromSeconds(10));
-        _process.Dispose();
+        _process?.Dispose();
+        _fromAdapter.Dispose();
         if (read) _messages.Dispose();
         return ValueTask.CompletedTask;
     }

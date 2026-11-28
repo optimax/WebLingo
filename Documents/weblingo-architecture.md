@@ -1114,6 +1114,23 @@ once, besides VS Code, through a client of another kind, without an extension of
    `stopOnEntry` does not stop there, a breakpoint on the first statement doing it; and its **Autos** stays empty, there
    being no language service for WebLingo.
 
+**Debugging a site where it runs, parts** (Proposed, 27 November 2026, for the task "Debugging a Site Where It Runs: Under
+IIS and FastCGI"), each a task of its own in `TO-DO.md`, landed in this order:
+
+1. **A debugger attached while a site runs.** The hosting core attaching a debugger to an application that runs, and
+   detaching it, each a new generation published as a reload publishes one (`WebLingoApplication.Attach`, made among the
+   reloads by `WebLingoReloader.Attach`, the drain told): its pages compiled for the debugger where one is attached, its
+   requests threads of the debugger's, those already running finishing on their own generation, undebugged where it was.
+   A request under a debugger has no time limit, as a site launched under the debugger has none, its drain and its send
+   timeout leaving out the time it is stopped (`WebLingoDrain`). The session's `attach` request, given the running site
+   (`WebLingoRunningSite`), attaches at `configurationDone` and detaches when the session ends, the site going on, its
+   process's current folder and output left as they are. No way in yet: the adapter attaches only to a site in its own
+   process, as the tests serve one.
+2. **How a debugger reaches a running `wasp`.** Under `wasp serve`, `wasp fastcgi` and IIS, on Windows and Linux: the
+   site's `wasp.config` letting a debugger in, in which modes; how the debugger finds the process, and who may connect;
+   `wasp --debug-adapter` attaching through it, for any client of the protocol; VS Code's attach configuration; and the
+   WASP User Manual saying how, the web servers' own timeouts for a stopped request among it.
+
 **A page under the debugger, as built** (part 1, 24 November 2026; Proposed where it says more than part 1 above):
 `wasp --debug-adapter` runs `weblingo`'s session, `WebLingoDebugSession`, given the command line's program
 (`WebLingoDebugAdapter.Run`), `wasp`'s for a page, as `wasp run` has it. A launch's `program` is a `.wasp` page; `root`

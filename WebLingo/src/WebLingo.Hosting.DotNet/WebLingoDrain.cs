@@ -94,9 +94,16 @@ public sealed class WebLingoDrain
             }
         }
 
+        /// <summary>
+        /// Its debugger's thread told: its drain leaves out the time it is stopped, and its time limit is no longer kept, as
+        /// a site launched under the debugger has none, so that a request stopped for longer than its limit is not ended for
+        /// it (specification, section 5.7, "Debugging a site where it runs, parts", part 1).
+        /// </summary>
         public void Debugged(IWebLingoDebuggerThread thread)
         {
-            lock (_drain._lock) _thread = thread;
+            IDisposable? limit;
+            lock (_drain._lock) (_thread, limit, _limit) = (thread, _limit, null);
+            limit?.Dispose();
         }
 
         public void Untimed()

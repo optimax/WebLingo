@@ -31,10 +31,12 @@ public static class WebLingoMain
 /// <c>wasp --debug-adapter</c>'s, a page's, speaking the Debug Adapter Protocol on <paramref name="input"/> and
 /// <paramref name="output"/>, the program it runs given its root by <paramref name="programFor"/>; and, given
 /// <paramref name="serve"/>, a site, which it serves, each request a thread of the debugger's (section 5.7, "Debugging WASP
-/// pages, parts", part 2).
+/// pages, parts", part 2); or, given <paramref name="running"/>, attached to that site, which runs in this process already
+/// ("Debugging a site where it runs, parts", part 1).
 /// </summary>
 public static class WebLingoDebugAdapter
 {
-    public static int Run(Func<string?, WebLingoCommandLineProgram> programFor, Stream input, Stream output, WebLingoSiteServer? serve = null) =>
-        new WebLingoDebugSession(input, output, programFor, serve).Run();
+    public static int Run(Func<string?, WebLingoCommandLineProgram> programFor, Stream input, Stream output, WebLingoSiteServer? serve = null,
+        WebLingoRunningSite? running = null) =>
+        new WebLingoDebugSession(input, output, programFor, serve, running).Run();
 }

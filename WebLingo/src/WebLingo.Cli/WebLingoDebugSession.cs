@@ -19,15 +19,24 @@ public delegate int WebLingoSiteServer(string root, int? port, IWebLingoDebugger
     CancellationToken stop);
 
 /// <summary>
+/// A site that runs in this process, served by its host, to which a debugger attaches (specification, section 5.7,
+/// "Debugging a site where it runs, parts", part 1): its root, which the debugger names its files from, and how a debugger is
+/// attached to it, each of its requests from then on a thread of the debugger's, until what it gives is disposed, which
+/// detaches it.
+/// </summary>
+public sealed record WebLingoRunningSite(string Root, Func<IWebLingoDebuggerThreads, IDisposable> Attach);
+
+/// <summary>
 /// One local launch (specification, section 5.7): of a script, <c>weblingo</c>'s, or of a page, <c>wasp</c>'s, as
 /// <paramref name="programFor"/> gives the program for a root, one thread, its stops waiting on its own thread for the
 /// debugger; or, where <paramref name="serve"/> is given, of a site, served by it, each request a thread of its own, named
 /// <c>GET /cart #12</c>, its stops waiting as at an <c>await</c>, its worker serving the other requests meanwhile. The request
 /// loop and the programs run on separate threads. A position of a program is located in its file by its thread's locator,
-/// a page's include's in the include.
+/// a page's include's in the include. Given <paramref name="running"/>, it attaches to that site, which runs already, rather
+/// than launch one, and detaches when it ends, the site going on ("Debugging a site where it runs, parts", part 1).
 /// </summary>
 internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<string?, WebLingoCommandLineProgram> programFor,
-    WebLingoSiteServer? serve = null) : IWebLingoDebuggerThreads
+    WebLingoSiteServer? serve = null, WebLingoRunningSite? running = null) : IWebLingoDebuggerThreads
 {
     private static readonly StringComparer PathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
     private readonly WebLingoDebugProtocol _protocol = new(input, output);
@@ -107,6 +116,19 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
                         // A program's files are named from its working folder, a site's from its root.
                         _base = _launch.Site ?? _launch.Directory;
                         _entry = _launch.StopOnEntry;
+                        _protocol.Respond(id, command);
+                        _protocol.Event("initialized");
+                        break;
+                    case "attach":
+                        // A site that runs already, its requests debugged from configurationDone on (section 5.7, "Debugging
+                        // a site where it runs, parts", part 1).
+                        if (_launch is not null) throw new ArgumentException("The session has already launched or attached to a program.");
+                        if (running is null) throw new ArgumentException("This debug adapter attaches to no running site.");
+                        _launch = new LaunchSettings(programFor(running.Root), null, running.Root, [], false, Flag(arguments, "noDebug"))
+                        {
+                            Site = running.Root, Attached = true
+                        };
+                        _base = running.Root;
                         _protocol.Respond(id, command);
                         _protocol.Event("initialized");
                         break;
@@ -196,6 +218,11 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
 
     private void Execute(LaunchSettings launch)
     {
+        if (launch.Attached)
+        {
+            Attach();
+            return;
+        }
         var exit = 1;
         var originalDirectory = Directory.GetCurrentDirectory();
         try
@@ -231,6 +258,35 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
                     SendEvent("exited", new { exitCode = exit });
                     SendEvent("terminated");
                 }
+                Monitor.PulseAll(_gate);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Attached to the running site until the session ends, its requests threads of this session's meanwhile, then detached,
+    /// the site going on, its process's current folder and its output left as they are; the client told that the session
+    /// has ended, not that the site has exited (section 5.7, "Debugging a site where it runs, parts", part 1).
+    /// </summary>
+    private void Attach()
+    {
+        try
+        {
+            using (running!.Attach(this)) _stopServing.Token.WaitHandle.WaitOne();
+        }
+        catch (Exception failure)
+        {
+            lock (_gate)
+            {
+                if (!_disconnected) SendEvent("output", new { category = "stderr", output = failure.Message + "\n" });
+            }
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _finished = true;
+                if (!_disconnected) SendEvent("terminated");
                 Monitor.PulseAll(_gate);
             }
         }
@@ -660,6 +716,9 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
         /// <summary>The site's root, where it serves a site, not a program.</summary>
         public string? Site { get; init; }
         public int? Port { get; init; }
+
+        /// <summary>Whether it attaches to a site that runs already, rather than serve one ("Debugging a site where it runs, parts", part 1).</summary>
+        public bool Attached { get; init; }
 
         public static LaunchSettings Read(JsonElement message, Func<string?, WebLingoCommandLineProgram> programFor, bool serves)
         {

@@ -97,7 +97,7 @@ public sealed class WebLingoApplication
         }
         if (options.Base is { } over) options = options with { FileSystem = new WebLingoBaseFiles(options.FileSystem, options.Root, over) };
         var routes = WebLingoRouteTable.Make(options.FileSystem, options.Root, options.Served, out error);
-        return routes is null ? null : new WebLingoApplication(options, new Generation(routes, options.Workers));
+        return routes is null ? null : new WebLingoApplication(options, new Generation(routes, options.Workers) { Debugger = options.Debugger });
     }
 
     /// <summary>The routes of the generation requests are served from.</summary>
@@ -124,9 +124,26 @@ public sealed class WebLingoApplication
     {
         var routes = WebLingoRouteTable.Make(_options.FileSystem, _options.Root, _options.Served, out error);
         if (routes is null) return false;
-        _current = new Generation(routes, _options.Workers) { Number = _current.Number + 1 };
+        _current = new Generation(routes, _options.Workers) { Number = _current.Number + 1, Debugger = _current.Debugger };
         return true;
     }
+
+    /// <summary>
+    /// Attaches <paramref name="debugger"/> to the application while it runs, or detaches the one attached, where it is null
+    /// (specification, section 5.7, "Debugging a site where it runs, parts", part 1): a new generation published, at once and
+    /// whole, as a reload publishes one, its routes the generation's served now, its pages compiled anew when first requested,
+    /// for the debugger where there is one, each of its requests then a thread of the debugger's; a request already running
+    /// finishes on the generation it began on, as after a reload, undebugged where that was. Its later reloads keep the
+    /// debugger. Its host calls it as it calls <see cref="TryReload"/>, one call at a time, among those calls; its number.
+    /// </summary>
+    public int Attach(IWebLingoDebuggerThreads? debugger)
+    {
+        _current = new Generation(_current.Routes, _options.Workers) { Number = _current.Number + 1, Debugger = debugger };
+        return _current.Number;
+    }
+
+    /// <summary>Whether the generation requests are served from is a debugger's, attached or given by the options.</summary>
+    public bool Debugged => _current.Debugger is not null;
 
     /// <summary>
     /// Serves <paramref name="request"/> on <paramref name="worker"/>, from 0 to the host's workers − 1, writing and
@@ -431,7 +448,7 @@ public sealed class WebLingoApplication
     {
         // Under a debugger, the request a thread of its, which its stops resume through the scheduler host (section 5.7);
         // its host told of it, whose drain does not end the request while it is stopped (section 6.12, "Reloading").
-        var thread = scheduler is null ? null : _options.Debugger?.Begin(request.Method + " " + request.Path, page.Locate, scheduler);
+        var thread = scheduler is null ? null : page.Debugger?.Begin(request.Method + " " + request.Path, page.Locate, scheduler);
         if (thread is not null) watch?.Debugged(thread);
         var output = new WebLingoResponseText(response, _options.SendTimeout, cancellation.Cancel, thread);
         var made = _http.For(request, response, output, _options.Uploads, session, out var ending);
@@ -578,7 +595,7 @@ public sealed class WebLingoApplication
     /// file's, or, for a handler's <paramref name="function"/>, a page that imports the file and calls it, named
     /// <c>file#function</c>, whose errors are the file's, but where it calls a function that it does not have.
     /// </summary>
-    private CompiledPage Compile(string file, WebLingoWorkerId worker, string? function = null)
+    private CompiledPage Compile(string file, WebLingoWorkerId worker, IWebLingoDebuggerThreads? debugger, string? function = null)
     {
         var templates = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wasp");
         var modules = new WebLingoSiteFiles(_options.FileSystem, _options.Root, ".wlg");
@@ -587,7 +604,7 @@ public sealed class WebLingoApplication
             Resolver = modules,
             Native = _services[worker.Value].Native,
             HostParameters = _http.Parameters,
-            Debugging = _options.Debugger is not null // Its points and its variables, for the debugger (section 5.7).
+            Debugging = debugger is not null // Its points and its variables, for its generation's debugger (section 5.7).
         };
         var compiler = new WebLingoTemplateCompiler(options, templates);
         var read = function is null ? templates.Read(file) : null;
@@ -595,7 +612,10 @@ public sealed class WebLingoApplication
             ? new WebLingoSourceText(read ?? "", file)
             : new WebLingoSourceText("<% param request; param response; import handler from \"/" + Escaped(file) + "\"; await handler."
                                      + function + "(request, response); %>", file + "#" + function);
-        var page = new CompiledPage(text, compiler, modules, new WebLingoModuleLoader(options)) { CallsHandler = function is not null };
+        var page = new CompiledPage(text, compiler, modules, new WebLingoModuleLoader(options))
+        {
+            CallsHandler = function is not null, Debugger = debugger
+        };
         if (function is null && read is null)
         {
             // Its route found, its file not read just now, as one being replaced may not be: a 500, not an empty page, and
@@ -652,7 +672,7 @@ public sealed class WebLingoApplication
             var key = file + "#" + function;
             if (!pages.TryGetValue(key, out var page))
             {
-                page = application.Compile(file, worker, function);
+                page = application.Compile(file, worker, Debugger, function);
                 pages.Add(key, page);
             }
             return page;
@@ -670,12 +690,15 @@ public sealed class WebLingoApplication
         /// <summary>Its number: 1 for the application's first, one more for each reload's.</summary>
         public int Number { get; init; } = 1;
 
+        /// <summary>The debugger its pages are compiled for, and its requests are threads of, where it has one (section 5.7).</summary>
+        public IWebLingoDebuggerThreads? Debugger { get; init; }
+
         public CompiledPage Page(WebLingoWorkerId worker, string file, WebLingoApplication application)
         {
             var pages = _pages[worker.Value];
             if (!pages.TryGetValue(file, out var page))
             {
-                page = application.Compile(file, worker);
+                page = application.Compile(file, worker, Debugger);
                 if (!page.Unread) pages.Add(file, page);
             }
             return page;
@@ -704,6 +727,9 @@ public sealed class WebLingoApplication
 
         /// <summary>Whether it is a page the host made to call a handler, <c>file#function</c>, whose text is none of the site's.</summary>
         public bool CallsHandler { get; init; }
+
+        /// <summary>The debugger it is compiled for, its generation's, each of its requests a thread of; null where none is.</summary>
+        public IWebLingoDebuggerThreads? Debugger { get; init; }
 
         /// <summary>Whether it declares that it takes requests other sites send, <c>crossorigin allowed;</c>.</summary>
         public bool CrossOrigin { get; set; }

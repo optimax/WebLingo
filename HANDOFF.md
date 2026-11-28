@@ -41,8 +41,15 @@ and native properties, allowed. Tested by `DebugAdapterTests.ABreakpointsConditi
 `WaspDebugTests.AConditionStopsOnlyTheRequestsItNames`. Part 4, another client, is documentation only (`2e27309`):
 `Editors/README.md`, "Any debugger: the launch settings", and Visual Studio Community 2026 debugging a page through its
 Debug Adapter Host, `DebugAdapterHost.Launch`, with no extension, tried by hand. An extension of Visual Studio's, so that
-F5 starts the debugger, is the task "Visual Studio Debug Adapter", answered (its A3 (a): a launch provider in C#,
-compiled by a script of ours with the compiler and assemblies Visual Studio installs), not begun.
+F5 starts the debugger, is built (`ef9dbde`, `Editors/VisualStudio`).
+
+Debugging a site where it runs, under IIS and FastCGI, is in two parts (the specification's section 5.7, "Debugging a site
+where it runs, parts"). Part 1 is built: a debugger attached to a site that runs, and detached, each a new generation
+(`WebLingoApplication.Attach`, `WebLingoReloader.Attach`); a request under a debugger without its time limit
+(`WebLingoDrain.Request.Debugged`); and the session's `attach` request, given a site in the adapter's own process
+(`WebLingoRunningSite`). `WaspDebugTests.ADebuggerAttachesToASiteThatRunsAndDetachesFromIt` serves a site on WebLingo's
+own server and runs the adapter in the test's process, which `DebugAdapterSession` now speaks to over a connection too.
+Part 2, how a debugger reaches a running `wasp` from outside its process, waits for the owner's answers in `TO-DO.md`.
 
 ## Windows local installation
 
