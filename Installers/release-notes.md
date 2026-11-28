@@ -1,3 +1,5 @@
+# WebLingo/WASP Release Notes
+
 WebLingo is a JavaScript-inspired scripting language for command-line programs and server-side web applications, and
 WASP, Web Application Server Pages, serves its web pages. **This release is a beta**: for trying WebLingo and WASP and
 telling us what you find, not yet for sites that others depend on.
@@ -45,7 +47,7 @@ To check a download, compare its SHA-256 with the one `SHA256SUMS` gives: on Lin
   behind a reverse proxy for TLS; and with `wasp fastcgi`, behind nginx or Apache httpd.
 - **Sites sharing one process** are isolated by their permissions, not as processes are: sites that do not trust each
   other each need a process of their own (the WASP User Manual, section 19).
-- **Speed.** Faster than CPython at loops, slower at most else, and far slower than Node.js.
+- **Speed.** Faster than CPython at loops, slower at most else, and currently far slower than Node.js.
 
 ## Learn
 
@@ -54,7 +56,7 @@ To check a download, compare its SHA-256 with the one `SHA256SUMS` gives: on Lin
   and [the standard library reference](https://github.com/optimax/WebLingo/blob/v@VERSION@/Documents/weblingo-standard-library-reference.md)
 - [The WASP User Manual](https://github.com/optimax/WebLingo/blob/v@VERSION@/Documents/wasp-user-manual.md)
 
-## Telling us what you find
+## Tell us what you find
 
 Open an [issue](https://github.com/optimax/WebLingo/issues/new/choose): a bug, with what you did, what you expected and
 what happened, or a question. Say which version (`weblingo --version`), which package and, for a site, which host. A
