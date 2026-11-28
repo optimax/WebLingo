@@ -1393,12 +1393,13 @@ public sealed class ConformanceTests : IDisposable
     [Fact]
     public void TheVersionIsTheSolutionsAndComesFirstWithoutArguments()
     {
-        // The solution's version, every assembly's, set once in Directory.Build.props, 0.N.0 for the last milestone landed
-        // whole, printed by --version, and first by weblingo without arguments (the owner's answer, 18 November 2026), with
+        // The solution's version, every assembly's, set once in Directory.Build.props, the release's, two numbers, 0.26 for
+        // the first beta (the owner's answer, 28 November 2026, in place of 0.N.0 for the last milestone landed whole),
+        // printed by --version, and first by weblingo without arguments (the owner's answer, 18 November 2026), with
         // the build's number after it, the file version, its local time (the owner's request, 21 November 2026), each part
         // without a leading zero, 2027.1.5.7 for 00:07 on 5 January 2027 (the owner's request, 25 November 2026).
         var version = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(WebLingoCommandLine).Assembly)!.InformationalVersion;
-        Assert.Matches(@"^0\.\d+\.0$", version);
+        Assert.Matches(@"^0\.\d+$", version);
         Assert.Equal(version,
             System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(WebLingoValue).Assembly)!.InformationalVersion);
         var build = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyFileVersionAttribute>(typeof(WebLingoCommandLine).Assembly)!.Version;

@@ -1,0 +1,97 @@
+name: Release
+# A beta's packages, made on GitHub's machines from a tagged commit alone, and a draft release of them, a pre-release,
+# which the owner reads, then publishes (Documents/beta-release.md, section 5; the owner's answer, 28 November 2026,
+# A2 of "Beta Release, Part 2"). Its tag is v<version>, the version WebLingo/Directory.Build.props gives, v0.26 for 0.26.
+# Run by hand from the Actions tab, on any branch, it makes the same packages, their checksums and the notes as the
+# run's artifacts, and no release, so that a release's way is tried before its tag.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: version
+        run: |
+          version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' WebLingo/Directory.Build.props | head -n 1)
+          [ -n "$version" ] || { echo "WebLingo/Directory.Build.props gives no <Version>." >&2; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "The tag $GITHUB_REF_NAME is not v$version, the version WebLingo/Directory.Build.props gives." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+  # Installers/Windows/package.ps1: WebLingo's and WASP's zips, x64, x86 and arm64, self-contained and
+  # framework-dependent, with Visual Studio's extension, which the runner's Visual Studio compiles.
+  windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - run: powershell -NoProfile -ExecutionPolicy Bypass -File Installers\Windows\package.ps1 -Destination "$env:RUNNER_TEMP\packages"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages-windows
+          path: ${{ runner.temp }}/packages/*.zip
+          if-no-files-found: error
+  # Installers/Linux/package.sh: the archive and the Debian package for x64 and arm64; those for x64 installed, run and
+  # removed, as the build's linux-installer job does.
+  linux:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - run: bash Installers/Linux/package.sh --destination "$RUNNER_TEMP/packages"
+      - run: bash Installers/Linux/tests/test.sh "$RUNNER_TEMP/packages"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages-linux
+          path: |
+            ${{ runner.temp }}/packages/*.tar.gz
+            ${{ runner.temp }}/packages/*.deb
+          if-no-files-found: error
+  # Every package, its SHA-256 in SHA256SUMS, and the notes, Installers/release-notes.md, its @VERSION@ the version;
+  # from a tag, the draft release.
+  release:
+    needs: [version, windows, linux]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: packages-*
+          merge-multiple: true
+          path: packages
+      - run: |
+          cd packages
+          count=$(ls | wc -l)
+          [ "$count" -eq 16 ] || { echo "16 packages expected, $count made:" >&2; ls >&2; exit 1; }
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+      - run: sed "s/@VERSION@/$VERSION/g" Installers/release-notes.md > notes.md
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: |
+            packages/SHA256SUMS
+            notes.md
+          if-no-files-found: error
+      - if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" packages/* --draft --prerelease --verify-tag
+          --title "WebLingo $VERSION, a beta" --notes-file notes.md

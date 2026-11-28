@@ -7,10 +7,11 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <!-- The solution's version, every assembly's, 0.N.0 for M0.N, the last milestone landed whole, which the task that
-         lands a milestone raises; weblingo and wasp print it (the owner's answer, 18 November 2026; without its
-         "-pre-alpha" since 21 November 2026, the owner's request, "Drop Pre-Alpha"). -->
-    <Version>0.26.0</Version>
+    <!-- The solution's version, every assembly's, the release's, 0.26 for the first beta, then 0.27 and so on, each
+         release its own, raised as a release is made, its tag v0.26 the same (the owner's answer, 28 November 2026,
+         A1 of "Beta Release, Part 2"; until then 0.N.0 for M0.N, the last milestone landed whole); weblingo and wasp
+         print it. -->
+    <Version>0.26</Version>
     <!-- The version as it is, without the commit .NET would add after a '+', so that a build is the same from any checkout. -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
