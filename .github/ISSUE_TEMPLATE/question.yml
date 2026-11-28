@@ -1,0 +1,25 @@
+name: A question
+description: How to do something with WebLingo or WASP, or what something in them means.
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The [getting-started guide](https://github.com/optimax/WebLingo/blob/main/Documents/getting-started-guide.md),
+        the [language reference](https://github.com/optimax/WebLingo/blob/main/Documents/weblingo-language-reference.md),
+        the [standard library reference](https://github.com/optimax/WebLingo/blob/main/Documents/weblingo-standard-library-reference.md)
+        and the [WASP User Manual](https://github.com/optimax/WebLingo/blob/main/Documents/wasp-user-manual.md) may
+        already answer it; a question they leave open tells us what they lack.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What you want to do, or what you read, and what you tried.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What `weblingo --version` prints, if it matters.
+      placeholder: WebLingo 0.26 (2026.11.28.1530)

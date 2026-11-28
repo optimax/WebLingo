@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: A security vulnerability
+    url: https://github.com/optimax/WebLingo/security/advisories/new
+    about: Reported privately, through GitHub's private vulnerability reporting, as SECURITY.md says, never in an issue.

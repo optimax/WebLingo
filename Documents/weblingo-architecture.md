@@ -2951,7 +2951,7 @@ CHANGELOG.md
  samples/
 ```
 
-The actual `LICENSE` file must identify the correct copyright holder and year(s). `LICENSE`, `SECURITY.md` and `THIRD_PARTY_NOTICES.md` are there (25 November 2026); the others are not yet.
+The actual `LICENSE` file must identify the correct copyright holder and year(s). `LICENSE`, `SECURITY.md` and `THIRD_PARTY_NOTICES.md` are there (25 November 2026), and `CONTRIBUTING.md` (28 November 2026), which asks for reports through GitHub's issue forms, `.github/ISSUE_TEMPLATE`, a bug's and a question's, and accepts no pull requests until the governance is decided (the owner's answer, A1 of "Beta Release, Part 3"; §12.5); the others are not yet.
 
 ### 12.5 Questions reserved for later approval
 

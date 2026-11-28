@@ -1,0 +1,80 @@
+name: A bug
+description: Something in WebLingo or WASP does not work as its documents say, or fails.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for trying WebLingo. A security vulnerability is reported privately instead, as
+        [SECURITY.md](https://github.com/optimax/WebLingo/blob/main/SECURITY.md) says, never here.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: What `weblingo --version`, or `wasp --version` for a site, prints.
+      placeholder: WebLingo 0.26 (2026.11.28.1530)
+    validations:
+      required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      description: The package you installed it from.
+      options:
+        - Windows, x64, self-contained
+        - Windows, x64, framework-dependent
+        - Windows, arm64, self-contained
+        - Windows, arm64, framework-dependent
+        - Windows, x86, self-contained
+        - Windows, x86, framework-dependent
+        - Linux, x64, Debian package
+        - Linux, x64, archive
+        - Linux, arm64, Debian package
+        - Linux, arm64, archive
+        - Built from the repository
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 24H2, or Ubuntu 24.04
+    validations:
+      required: true
+  - type: dropdown
+    id: runs
+    attributes:
+      label: Where it runs
+      options:
+        - weblingo, a script
+        - wasp run or wasp check, a page
+        - wasp serve
+        - IIS
+        - wasp fastcgi behind nginx
+        - wasp fastcgi behind Apache httpd
+        - The debugger, in VS Code or Visual Studio
+        - An installer
+        - Elsewhere, said below
+    validations:
+      required: true
+  - type: textarea
+    id: did
+    attributes:
+      label: What you did
+      description: The smallest script, page or site that shows it, its `wasp.config` or `weblingo.config` too, and the command you ran.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What it wrote, its errors as they were written, and, for a site, what the browser got and the site's log.
+      render: text
+    validations:
+      required: true

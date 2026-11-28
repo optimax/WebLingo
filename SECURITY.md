@@ -15,7 +15,8 @@ vulnerability to yourself until then.
 
 ## Supported versions
 
-WebLingo has not been released yet: only the latest commit of the `main` branch is supported, and fixes go there.
+WebLingo is in beta: the latest beta, on the repository's releases page, and the latest commit of the `main` branch are
+supported. Fixes go to `main`, and reach testers with the next beta.
 
 ## What a site's security rests on
 

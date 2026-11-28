@@ -24,7 +24,8 @@ Download WebLingo for your system from the [releases page](https://github.com/op
   [Linux installation guide](Installers/Linux/readme.md)
 
 Then, in a new console, `weblingo --version` shows what you installed. Releases are betas for now: the language, its
-standard modules and a site's configuration may still change from one to the next.
+standard modules and a site's configuration may still change from one to the next. To report a bug or ask a question,
+see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 With the .NET 10 SDK installed, you can instead run the included hello-world script from a checkout's root.
 
