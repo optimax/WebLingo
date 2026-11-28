@@ -22,8 +22,16 @@ the WASP User Manual's first page from them, unpacked on Windows and installed w
 It fixed what a tester would have stumbled on: the manual's "Until WASP has an installer", the README's "Try it" without
 Linux or a download, the guide's first lesson without an installation, and no way on Windows to install `wasp` without
 IIS, now `iis-install.wlg iis=no`, tried only unelevated, where it stops as the installers do, since it copies into
-`C:\Program Files\WebLingo`. Parts 2 to 5 wait for the owner's answers in `TO-DO.md`: the version and the tag, where the
-packages are made, signing, how testers report, the release candidate installed here, and the name's check.
+`C:\Program Files\WebLingo`.
+
+Part 2 made the version the release's, `0.26`, its tag `v0.26`, and added `.github/workflows/release.yml`, which makes
+every package on GitHub's machines from a tag, `SHA256SUMS` and a draft pre-release whose notes are
+`Installers/release-notes.md`; `Documents/beta-release.md`, section 5, says how a beta is made. The workflow has not run
+yet: it needs `main` pushed, then a run by hand, which `TO-DO.md` asks the owner about. Part 3 added GitHub's issue forms
+and `CONTRIBUTING.md`; GitHub's private vulnerability reporting, which `SECURITY.md` names, is off, a setting of the
+owner's. Part 4's release candidate is made locally by `package.ps1` into `Installers`, for the owner to install as a
+tester would, then tried under IIS. Part 5's name check found no live WEBLINGO trademark, and Livelink's "WebLingo"
+template files the closest use; the release waits for the owner's judgement of it, and for the tag's go-ahead.
 
 ## Debugging WASP pages
 
