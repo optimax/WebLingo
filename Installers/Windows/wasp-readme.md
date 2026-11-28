@@ -28,6 +28,20 @@ its `web.config` then runs `C:\Program Files (x86)\WebLingo\wasp.exe`.
 
    with the folder's own name, which is the zip's. It takes a few minutes where it turns IIS on, and writes each step.
 
+### Without IIS
+
+To serve sites with `wasp serve`, WebLingo's own web server, without IIS, give it `iis=no`, in the same console:
+
+```bat
+weblingo run iis-install.wlg iis=no
+```
+
+It installs `wasp` alone, leaving IIS as it is, on or off, and its sites untouched. Then, from a new console,
+`wasp serve --root mysite` serves the folder `mysite` at <http://localhost:8080/>, to this machine alone, as the WASP
+User Manual's first section shows. The framework-dependent kind needs ASP.NET Core's runtime 10 installed too, "ASP.NET
+Core Runtime 10.0" for the same processor, from <https://dotnet.microsoft.com/download/dotnet/10.0>, which IIS's part
+would otherwise install. Run `iis-install.wlg` again without `iis=no` to add IIS's part later.
+
 ## What `iis-install.wlg` does
 
 1. **IIS.** Unless IIS is on, it turns it on, with what a site needs and IIS's manager, through DISM. Windows may then
@@ -42,7 +56,8 @@ its `web.config` then runs `C:\Program Files (x86)\WebLingo\wasp.exe`.
    `wasp` from there are stopped meanwhile, and started again after.
 
 It may be run again, from a newer zip, once WebLingo's newer zip is installed: it keeps what is there, and copies
-`wasp` anew. `target=<folder>` names another installation of WebLingo.
+`wasp` anew. `target=<folder>` names another installation of WebLingo. `iis=no` skips the first two steps, and copies
+`wasp` once no program runs from WebLingo's folder.
 
 ## Adding a site
 

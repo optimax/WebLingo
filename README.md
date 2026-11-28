@@ -12,12 +12,21 @@ they appear in the page.
 
 ## Try it
 
-On Windows, extract the self-contained WebLingo ZIP for your processor and double-click **Install WebLingo.bat**.
-Setup can register `.wlg` files and install the debugger for VS Code. [Windows installation guide](Installers/Windows/readme.md)
+Download WebLingo for your system from the [releases page](https://github.com/optimax/WebLingo/releases):
 
-To remove WebLingo, double-click **Uninstall WebLingo.bat** in its installation folder or the extracted ZIP.
+- **Windows:** WebLingo's self-contained zip for your processor, usually `…-win-x64-self-contained.zip`. Extract it and
+  double-click **Install WebLingo.bat**. Setup can register `.wlg` files and install the debugger for VS Code and
+  Visual Studio. To remove WebLingo, double-click **Uninstall WebLingo.bat** in its installation folder or the
+  extracted zip. [Windows installation guide](Installers/Windows/readme.md)
+- **WASP on Windows:** to serve web pages, install WASP's zip of the same version, processor and kind after WebLingo's,
+  for IIS or for `wasp serve` alone. [WASP's installation guide](Installers/Windows/wasp-readme.md)
+- **Linux:** the archive or the Debian package for your processor, which installs `weblingo` and `wasp` together.
+  [Linux installation guide](Installers/Linux/readme.md)
 
-With the .NET 10 SDK installed, run the included hello-world script from the repository root.
+Then, in a new console, `weblingo --version` shows what you installed. Releases are betas for now: the language, its
+standard modules and a site's configuration may still change from one to the next.
+
+With the .NET 10 SDK installed, you can instead run the included hello-world script from a checkout's root.
 
 ```sh
 cd WebLingo

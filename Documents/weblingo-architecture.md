@@ -30,6 +30,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | M0.14, hosting's design | A page's request and response are values its parameters take, `param request;` and `param response;`, instances of two built-in classes, `Request` and `Response`, read and changed through their members; a `.wlg` route handler is a module exporting a function for each HTTP method it answers, `get(request, response)`, any other method a 405; a request's path finds its file without the extension, `/` and a folder's path their `index`; a runtime error is a 500, its page showing the error in development and not in production; the host's core is a portable project of its own, `WebLingo.Hosting`; and an application's configuration, as a script's, is `weblingo.config`, in place of `weblingo.json` (§6.12), a site's renamed `wasp.config` the same day (below) | Approved (16 November 2026) |
 | Configuration's names | A site's configuration, in its root, and a page's folder's under `wasp`, is `wasp.config`, in lower case, for Linux's sake, since it configures the WASP site, not the language; a script's folder's, under `weblingo`, stays `weblingo.config`; a site's `weblingo.config` is not read, nothing being kept for backward compatibility (§6.12) | Approved (16 November 2026) |
 | WL-G001 | Free and open-source project direction; release timing and scope; the MIT License, now, with a `LICENSE` file, its copyright The WebLingo Authors', a security policy, `SECURITY.md`, vulnerabilities reported through GitHub's private vulnerability reporting, and the third-party packages' notices, `THIRD_PARTY_NOTICES.md` (§12) | Direction confirmed; MIT approved (24 November 2026, "A License and a Security Policy", A1 (b)), its copyright holder, the reporting and the notices 25 November 2026 (A2 to A4); release timing and scope proposed |
+| Beta releases | WebLingo and WASP released to beta testers before a 1.0 and before the native runtime the public release waits for, so that people other than the owner try them in real use: the installers' packages on the public repository's GitHub releases, marked pre-releases, with their checksums and notes, nothing frozen for them (§12.1; `Documents/beta-release.md`) | Approved (28 November 2026, the owner's request); its version, where its packages are made, signing, reports and the name's check asked in its parts' tasks |
 | Implementation | C#/.NET 10 initially, later Native C# compilation | Approved |
 | WL-017 | Native C# portability contract and replaceable adapters | Approved |
 | WL-002.3 | `var` mutable, `const` immutable; both block-scoped, in scope from their declaration to the end of the block; no `let` declaration keyword | Approved |
@@ -2910,6 +2911,7 @@ These items should be explicitly tracked rather than silently treated as approve
 ### 12.1 Release objective and timing
 
 - **Proposed public-release milestone:** A functioning, independently deployable native WebLingo compiler/runtime that does not require .NET, Node.js, V8, PHP, or the separate Native C# compiler on end-user systems.
+- **Beta releases before it** (the owner's request, 28 November 2026): WebLingo and WASP released to beta testers, on .NET, before a 1.0 and before that milestone, the installers' packages on the repository's GitHub releases, marked pre-releases, so that they are tried in real use; nothing is frozen for them, and a site or a script may need changing from one beta to the next. What a beta is, and its parts: `Documents/beta-release.md`.
 - Continue developing in C#/.NET 10 according to the approved bootstrap architecture. The repository may remain private during implementation.
 - The independent Native C# compiler is a build-time toolchain, **not** a required component of the WebLingo runtime distribution; whether its own source code is published is a separate decision.
 - Publish language semantics, WLBC bytecode documentation, host interfaces, build instructions, and conformance tests sufficient for independent evaluation and interoperability.
@@ -2956,7 +2958,7 @@ The actual `LICENSE` file must identify the correct copyright holder and year(s)
 - Decide the **components covered** and documentation license.
 - Decide **public repository timing**, governance, and contribution licensing (including whether a CLA or DCO is needed).
 - Clear the **WebLingo** name and determine whether a trademark/brand policy is appropriate.
-- Define the **native-release readiness criteria** and whether preview source releases occur earlier.
+- Define the **native-release readiness criteria** and whether preview source releases occur earlier. Beta releases come earlier (§12.1, 28 November 2026).
 
 ---
 

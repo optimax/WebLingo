@@ -43,8 +43,19 @@ lists what is missing.
 
 ### What you need
 
-To serve a site you need `wasp`, WASP's command line, and the .NET 10 runtime it runs on. Until WASP has an installer,
-you build it from the repository, with the .NET 10 SDK: either run it directly, from the repository's root, the folder
+To serve a site you need `wasp`, WASP's command line, which WebLingo's installers install beside `weblingo`, from
+the packages on the repository's [releases page](https://github.com/optimax/WebLingo/releases):
+
+- On Windows, WebLingo's zip, then WASP's zip of the same version, processor and kind, as its `readme.md` says: its
+  `iis-install.wlg` makes IIS run WASP's sites (section 17), and, given `iis=no`, installs `wasp` alone, for
+  `wasp serve`, leaving IIS as it is.
+- On Linux, WebLingo's archive or its Debian package, which install `wasp`, `weblingo` and the standard modules, with
+  .NET's runtime, in `/opt/weblingo`, as their `readme.md` says.
+
+The self-contained packages carry .NET's runtime; the framework-dependent ones need .NET 10's runtime installed, and
+WASP's ASP.NET Core's too.
+
+Or build it from the repository, with the .NET 10 SDK: either run it directly, from the repository's root, the folder
 that holds `Examples.wasp` and `WebLingo`,
 
 ```bash
@@ -59,9 +70,7 @@ powershell -ExecutionPolicy Bypass -File publish.ps1
 
 which puts `wasp`, `weblingo` and the standard modules into one folder, `WebLingo/publish/WebLingo`, from which you run
 `wasp` (section 17 installs that folder on a server). `-ExecutionPolicy Bypass` lets this one script run, without
-changing the machine's policy, where Windows's default runs no script. On Linux, WebLingo's installers, in the
-repository's `Installers/Linux`, install `wasp`, `weblingo` and the standard modules, with .NET's runtime, in
-`/opt/weblingo`, as their `readme.md` says.
+changing the machine's policy, where Windows's default runs no script.
 
 ### Your first page
 

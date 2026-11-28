@@ -10,6 +10,21 @@ The Windows Release solution built with zero warnings and zero errors. All three
 The installed debugger stopped on line 10 of `Examples.wlg/16-modules.wlg` and reported `Tea` as `class Tea`
 (type `Class`) and `serve` as `function` (type `Function`). The example continued to completion.
 
+## The beta release
+
+The current objective, at the owner's request of 28 November 2026: WebLingo and WASP released to beta testers.
+`Documents/beta-release.md` says what a beta is, where it stands, its five parts, each a task of `TO-DO.md`, and what
+its testers are told; the specification's register, "Beta releases", and its section 12.1 record the direction.
+
+Part 1, tried as a beta tester would, made every package from the branch, `package.ps1`'s twelve zips here in 339 s and
+`package.sh`'s four Linux packages in WSL in 78 s, and followed the README, the getting-started guide's first lesson and
+the WASP User Manual's first page from them, unpacked on Windows and installed without `sudo` in WSL: each step worked.
+It fixed what a tester would have stumbled on: the manual's "Until WASP has an installer", the README's "Try it" without
+Linux or a download, the guide's first lesson without an installation, and no way on Windows to install `wasp` without
+IIS, now `iis-install.wlg iis=no`, tried only unelevated, where it stops as the installers do, since it copies into
+`C:\Program Files\WebLingo`. Parts 2 to 5 wait for the owner's answers in `TO-DO.md`: the version and the tag, where the
+packages are made, signing, how testers report, the release candidate installed here, and the name's check.
+
 ## Debugging WASP pages
 
 The specification's section 5.7, "Debugging WASP pages, parts", splits the task "Debugging WASP Pages" in four; part

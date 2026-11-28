@@ -14,9 +14,11 @@
 //
 // target=<folder> names another installation of WebLingo. It may be run again, from a newer zip, after WebLingo's own:
 // it keeps what is there, and copies wasp anew, the application pools of the sites that run it stopped meanwhile.
+// iis=no installs wasp alone, for wasp serve and wasp fastcgi, leaving IIS as it is, on or off: steps 1 and 2 skipped.
 param source = "WASP";
 param needs = "wasp-needs.json";
 param target = "";
+param iis = "yes";
 
 import { writeLn } from "std:console";
 import com from "windows:com";
@@ -24,8 +26,11 @@ import fs from "std:fs";
 import http from "std:http";
 import crypto from "std:crypto";
 import { Json } from "std:json";
-import { requireAdministrator, run, runOrStop, expand, architectureOf, programFiles } from "./windows.wlg";
+import { requireAdministrator, run, runOrStop, expand, architectureOf, programFiles, runningFrom, copyFolder } from "./windows.wlg";
 
+if (iis != "yes" && iis != "no") {
+    throw new Error($"iis is yes or no, not {iis}.");
+}
 await requireAdministrator();
 
 // The folders' full paths, a relative one from the current folder; WebLingo's folder for the zip's architecture, unless
@@ -56,62 +61,73 @@ if (differing.length > 0) {
 }
 var selfContained = (await fs.readText($"{zipped}\\wasp.runtimeconfig.json")).contains("\"includedFrameworks\"");
 
-// 1. IIS, unless it is on. DISM exits with 3010 where Windows must restart to finish.
-if (!(await fs.exists(expand("%SystemRoot%\\System32\\inetsrv\\appcmd.exe")))) {
-    var features = ["IIS-WebServerRole", "IIS-WebServer", "IIS-CommonHttpFeatures", "IIS-HttpErrors", "IIS-HealthAndDiagnostics",
-        "IIS-HttpLogging", "IIS-Security", "IIS-RequestFiltering", "IIS-WebServerManagementTools", "IIS-ManagementConsole"];
-    writeLn("Turning IIS on, which takes a few minutes");
-    var names = " ".join(features.map(feature => $"/featurename:{feature}"));
-    var dism = await run($"dism.exe /online /enable-feature {names} /all /norestart /quiet");
-    if (dism.code != 0 && dism.code != 3010) {
-        throw new Error($"DISM could not turn IIS on: exit code {dism.code}. {dism.output.trim()}");
+// iis=no: wasp alone, IIS left as it is, so that neither its configuration nor its sites' pools are touched. A wasp
+// running from the installation keeps its files in use, and is stopped first.
+if (iis == "no") {
+    var running = runningFrom(installed);
+    if (running.length > 0) {
+        throw new Error($"Programs still run from {installed}, {running}: stop them, then run this again.");
     }
-    writeLn(dism.code == 3010 ? "IIS is on; Windows asks to be restarted to finish" : "IIS is on");
-}
-
-// IIS's configuration is there only once IIS is on.
-var iis = await Module.import("./iis.wlg");
-
-// 2. The ASP.NET Core Module, unless IIS has it. A Hosting Bundle installed before IIS was is repaired, as Microsoft
-// asks, so that it gives IIS the module.
-if (iis.hasGlobalModule("AspNetCoreModuleV2")) {
-    writeLn("IIS has the ASP.NET Core Module");
+    await copyFolder(zipped, installed);
+    writeLn($"WASP installed in {installed}, without IIS: serve a site with wasp serve, as readme.md says");
 } else {
-    var metadata = await http.get("https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json");
-    if (metadata["status"] != 200) {
-        throw new Error($"Microsoft's release metadata for .NET 10 could not be read: HTTP {metadata["status"]}.");
+    // 1. IIS, unless it is on. DISM exits with 3010 where Windows must restart to finish.
+    if (!(await fs.exists(expand("%SystemRoot%\\System32\\inetsrv\\appcmd.exe")))) {
+        var features = ["IIS-WebServerRole", "IIS-WebServer", "IIS-CommonHttpFeatures", "IIS-HttpErrors", "IIS-HealthAndDiagnostics",
+            "IIS-HttpLogging", "IIS-Security", "IIS-RequestFiltering", "IIS-WebServerManagementTools", "IIS-ManagementConsole"];
+        writeLn("Turning IIS on, which takes a few minutes");
+        var names = " ".join(features.map(feature => $"/featurename:{feature}"));
+        var dism = await run($"dism.exe /online /enable-feature {names} /all /norestart /quiet");
+        if (dism.code != 0 && dism.code != 3010) {
+            throw new Error($"DISM could not turn IIS on: exit code {dism.code}. {dism.output.trim()}");
+        }
+        writeLn(dism.code == 3010 ? "IIS is on; Windows asks to be restarted to finish" : "IIS is on");
     }
-    var release = Json.parse(metadata["body"])["releases"][0];
-    var bundle = release["aspnetcore-runtime"]["files"].find(file => file["name"] == "dotnet-hosting-win.exe");
-    if (bundle == null) {
-        throw new Error($"Microsoft's release metadata names no Hosting Bundle for .NET {release["release-version"]}.");
-    }
-    var installer = expand($"%TEMP%\\dotnet-hosting-{release["release-version"]}-win.exe");
-    writeLn($"Downloading the ASP.NET Core Hosting Bundle {release["release-version"]}, from {bundle["url"]}");
-    await runOrStop($"curl.exe --fail --silent --show-error --location --output \"{installer}\" \"{bundle["url"]}\"");
-    // certutil writes the hash as hexadecimal, on the line after the first, with spaces between bytes in older Windows.
-    var hashed = (await runOrStop($"certutil -hashfile \"{installer}\" SHA512")).split("\n")[1].replace(" ", "").trim().toLower();
-    if (hashed != bundle["hash"].toLower()) {
-        await fs.remove(installer);
-        throw new Error($"The Hosting Bundle downloaded is not the one Microsoft's metadata names: its SHA-512 is {hashed}.");
-    }
-    var module = expand("%ProgramFiles%\\IIS\\Asp.Net Core Module\\V2\\aspnetcorev2.dll");
-    var action = (await fs.exists(module)) ? "/repair" : "/install";
-    // A 32-bit, framework-dependent wasp needs the 32-bit runtimes, which the bundle leaves out where told to.
-    var options = selfContained ? " OPT_NO_RUNTIME=1 OPT_NO_SHAREDFX=1 OPT_NO_X86=1"
-        : architecture == "x86" ? "" : " OPT_NO_X86=1";
-    writeLn($"Installing it, {(selfContained ? "the module alone" : "with .NET's runtimes")}");
-    var setup = await run($"\"{installer}\" {action} /quiet /norestart{options}");
-    await fs.remove(installer);
-    if (setup.code != 0 && setup.code != 3010) {
-        throw new Error($"The Hosting Bundle's installer failed: exit code {setup.code}.");
-    }
-    // IIS loads a module it is given when it starts again.
-    await runOrStop("net stop was /y");
-    await runOrStop("net start w3svc");
-    writeLn("IIS has the ASP.NET Core Module");
-}
 
-// 3. wasp, beside weblingo.
-await iis.copyIntoInstallation(zipped, installed);
-writeLn($"WASP installed in {installed}: add a site with add-wasp-site.wlg, as readme.md says");
+    // IIS's configuration is there only once IIS is on.
+    var server = await Module.import("./iis.wlg");
+
+    // 2. The ASP.NET Core Module, unless IIS has it. A Hosting Bundle installed before IIS was is repaired, as Microsoft
+    // asks, so that it gives IIS the module.
+    if (server.hasGlobalModule("AspNetCoreModuleV2")) {
+        writeLn("IIS has the ASP.NET Core Module");
+    } else {
+        var metadata = await http.get("https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json");
+        if (metadata["status"] != 200) {
+            throw new Error($"Microsoft's release metadata for .NET 10 could not be read: HTTP {metadata["status"]}.");
+        }
+        var release = Json.parse(metadata["body"])["releases"][0];
+        var bundle = release["aspnetcore-runtime"]["files"].find(file => file["name"] == "dotnet-hosting-win.exe");
+        if (bundle == null) {
+            throw new Error($"Microsoft's release metadata names no Hosting Bundle for .NET {release["release-version"]}.");
+        }
+        var installer = expand($"%TEMP%\\dotnet-hosting-{release["release-version"]}-win.exe");
+        writeLn($"Downloading the ASP.NET Core Hosting Bundle {release["release-version"]}, from {bundle["url"]}");
+        await runOrStop($"curl.exe --fail --silent --show-error --location --output \"{installer}\" \"{bundle["url"]}\"");
+        // certutil writes the hash as hexadecimal, on the line after the first, with spaces between bytes in older Windows.
+        var hashed = (await runOrStop($"certutil -hashfile \"{installer}\" SHA512")).split("\n")[1].replace(" ", "").trim().toLower();
+        if (hashed != bundle["hash"].toLower()) {
+            await fs.remove(installer);
+            throw new Error($"The Hosting Bundle downloaded is not the one Microsoft's metadata names: its SHA-512 is {hashed}.");
+        }
+        var module = expand("%ProgramFiles%\\IIS\\Asp.Net Core Module\\V2\\aspnetcorev2.dll");
+        var action = (await fs.exists(module)) ? "/repair" : "/install";
+        // A 32-bit, framework-dependent wasp needs the 32-bit runtimes, which the bundle leaves out where told to.
+        var options = selfContained ? " OPT_NO_RUNTIME=1 OPT_NO_SHAREDFX=1 OPT_NO_X86=1"
+            : architecture == "x86" ? "" : " OPT_NO_X86=1";
+        writeLn($"Installing it, {(selfContained ? "the module alone" : "with .NET's runtimes")}");
+        var setup = await run($"\"{installer}\" {action} /quiet /norestart{options}");
+        await fs.remove(installer);
+        if (setup.code != 0 && setup.code != 3010) {
+            throw new Error($"The Hosting Bundle's installer failed: exit code {setup.code}.");
+        }
+        // IIS loads a module it is given when it starts again.
+        await runOrStop("net stop was /y");
+        await runOrStop("net start w3svc");
+        writeLn("IIS has the ASP.NET Core Module");
+    }
+
+    // 3. wasp, beside weblingo.
+    await server.copyIntoInstallation(zipped, installed);
+    writeLn($"WASP installed in {installed}: add a site with add-wasp-site.wlg, as readme.md says");
+}

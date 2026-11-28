@@ -41,8 +41,8 @@ From a new console, `weblingo --version` shows the installed version, `weblingo 
 and `weblingo check script.wlg` checks it. Windows may warn that the unsigned `weblingo.exe` comes from an
 unknown publisher (**More info**, then **Run anyway**), and Smart App Control, where it is on, blocks it.
 
-To serve WASP's sites, WebLingo's web pages, on IIS, install WASP's zip of the same version, processor and kind after
-this one, as its `readme.md` says.
+To serve WASP's sites, WebLingo's web pages, on IIS or with `wasp serve` alone, install WASP's zip of the same
+version, processor and kind after this one, as its `readme.md` says.
 
 ## Running a script by a double-click
 

@@ -5,6 +5,9 @@ gives you a file to save, an output to compare, and something to try on your own
 
 ## 1. Run your first script
 
+First install WebLingo, as the [README](../README.md#try-it) says: on Windows from its zip, on Linux from its archive
+or its Debian package. In a new console, `weblingo --version` then shows the version you installed.
+
 Create a folder for the lessons. Save this as `hello.wlg` in that folder. WebLingo source files currently use `.wlg`.
 
 ```javascript
@@ -21,7 +24,7 @@ what it uses, and a script that writes to its console imports `std:console`. Fro
 Hello, WebLingo!
 ```
 
-If you’re working from a checkout and haven’t installed the CLI, install the .NET 10 SDK and run the following
+If you’re working from a checkout and haven’t installed WebLingo, install the .NET 10 SDK and run the following
 from the repository root. Replace `PATH_TO_HELLO.wlg` with the path to your file.
 
 ```sh
