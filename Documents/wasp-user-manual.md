@@ -1537,7 +1537,13 @@ Terminals that support bold display `ERROR` in bold. The exit code says how it w
 WebLingo is installed **once on a server**, and every site uses it, as PHP is installed once for every PHP site: a site
 holds only its own files, its pages beside its `web.config`.
 
-Once for the server:
+Once for the server, from the release's zips, those of the server's processor: install WebLingo from its zip, as its
+`readme.md` says, then WASP from its zip of the same version, processor and kind, running its `iis-install.wlg` as
+administrator, as its `readme.md` says. It turns IIS on where it is off, installs the ASP.NET Core Hosting Bundle where
+IIS lacks the ASP.NET Core Module, and puts `wasp` beside `weblingo`, in `C:\Program Files\WebLingo`. Then go on with
+each site, at step 4.
+
+Or once for the server, from the repository:
 
 1. Turn on IIS (Windows Features' **Internet Information Services**, or, on Windows Server, the **Web Server (IIS)**
    role), then install the **ASP.NET Core Hosting Bundle** for .NET 10, which brings the .NET and ASP.NET Core
@@ -1575,6 +1581,11 @@ For each site:
 
 IIS then gives every request to the ASP.NET Core Module, which starts `wasp.exe serve` in the site's folder and passes
 the requests to it. If WebLingo is installed elsewhere, change `processPath` to match.
+
+WASP's zip does step 5 for you, as administrator, with its `add-wasp-site.wlg`, as its `readme.md` says:
+`weblingo run add-wasp-site.wlg name=mysite folder=C:\WWW\mysite host=mysite.localhost` adds an application pool and
+a website of that name, served by HTTPS on port 443 under its host's name, with a certificate this machine trusts, and
+the name in the machine's `hosts` file, so that the site is at <https://mysite.localhost/>.
 
 - **What `wasp` writes**, its errors when it cannot start included, and the site's log, unless `wasp.config` names a
   file for it ([section 12](#the-log)), goes to IIS's log of it when `stdoutLogEnabled` is `true`: to
