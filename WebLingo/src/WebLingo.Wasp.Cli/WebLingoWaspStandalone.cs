@@ -66,7 +66,7 @@ public static class WebLingoWaspStandalone
         private readonly List<Socket> _listeners = [];
         private readonly List<Task> _serving = [];
         private WebLingoWorkerPool? _pool;
-        private WebLingoReloader? _reloader;
+        private IDisposable? _reloader;
 
         public string Address { get; private set; } = "";
 

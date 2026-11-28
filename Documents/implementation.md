@@ -98,8 +98,14 @@ scheduler host. An `attach` request attaches the session to a site that runs alr
 ends: the application publishes a new generation compiled for the debugger, and another without it, as a reload
 publishes one (`WebLingoApplication.Attach`, made among the reloads by `WebLingoReloader.Attach`), each page knowing the
 debugger it was compiled for (`CompiledPage.Debugger`), so that a request already running finishes undebugged; and a
-request's watch, told of its debugger's thread, stops keeping its time limit (`WebLingoDrain.Request.Debugged`). No host
-lets a debugger in from outside its process yet (specification, section 5.7, "Debugging a site where it runs, parts").
+request's watch, told of its debugger's thread, stops keeping its time limit (`WebLingoDrain.Request.Debugged`). From
+outside its process, a site lets one in where its `wasp.config`'s `"debug"` says, in development alone: the watch every
+host of `wasp`'s starts beside its reloader (`WebLingoWaspServer.Reloader`) listens on 127.0.0.1 at its port
+(`WebLingoWaspDebugListener`), each connection a session of the site's own given the site's token
+(`WebLingoRunningSite.Token`), which answers nothing until an `attach` gives it; and `wasp --debug-adapter`, given an
+`attach` with a `port`, passes its client's messages on to that session and back as they are (`WebLingoDebugRelay`),
+so that any client attaches through it (specification, section 5.7, "Debugging a site where it runs, parts", part 2).
+`WaspServeTests` attaches so to a site it serves in its own process, on each of `wasp serve`'s servers.
 The adapter's standard output is the protocol's: whatever runs in its process writes nothing to the
 console, ASP.NET Core's logging among it, which the debugger's server clears. A breakpoint's condition is read by the
 session (`WebLingoDebugCondition`) into the VM's own form (`WebLingoDebugExpression`), since the VM references no

@@ -1277,6 +1277,7 @@ A site's configuration is a JSON file, `wasp.config`, in its root:
 | `"sessions"` | where the site keeps its sessions, and how long: `{ "store": "database", "database": "main", "table": "wasp_sessions", "create": false, "timeout": 20, "lockTimeout": 30 }`, the server's memory, `"memory"`, or a table of a database `"databases"` names, `"database"`, the table made where it is missing where `"create"` is `true`; the minutes a session lasts once no request uses it, and the seconds a request waits for a session another has (section 9, "Sessions" and "Sessions in a database") | the server's memory, `wasp_sessions`, `false`, 20 minutes, 30 seconds |
 | `"headers"` | the headers every response has, each optional: `{ "nosniff": true, "referrerPolicy": "strict-origin-when-cross-origin", "frameAncestors": ["self"] }`, `X-Content-Type-Options: nosniff`, the `Referrer-Policy`, or `null` for none, and the sites whose pages may show the site's in a frame, `"self"`, `"none"`, a scheme or a host, or `null` for any (section 9, "Security headers") | all four headers, as shown |
 | `"proxies"` | the proxies in front of the site that it trusts, each an address or a range, `["127.0.0.1", "10.0.0.0/8"]`: a request from one of them takes its client, `request.clientAddress`, and its scheme, `request.scheme`, from its `Forwarded`, or its `X-Forwarded-For` and `X-Forwarded-Proto`, the client the nearest address that is not a trusted proxy's; under `wasp serve`, on either server; behind nginx or Apache, through FastCGI, the web server gives the client | none: forwarding headers are not believed |
+| `"debug"` | a debugger let in where the site runs, in development only: `{ "port": 9230, "token": { "env": "WASP_DEBUG_TOKEN" } }`, a port of this machine's, 127.0.0.1, and the token it attaches with, at least 16 characters, a secret as a mail server's password is ([section 15](#15-while-you-work)) | none: no debugger is let in |
 | `"serve"` | the extensions of files WASP does not send by default that the site sends: `{ "allow": [".pfx"] }`, each with its dot, of those section 2 lists | none |
 | `"log"` | the site's log, each optional: `{ "file": "C:/inetpub/logs/WebLingo/mysite.log", "level": "info" }`, a file a day, outside the site, from this file's folder, and the lowest level written, `"debug"`, `"info"`, `"warn"` or `"error"` (section 12, "The log") | the host's own log, `"info"` |
 | `"limits"` | a request's limits, each optional: `{ "requestTimeout": 60, "requestInstructions": 1000000000, "requestMemory": 128, "drain": 60, "requestLine": 8192, "requestHeaders": 32768, "requestArrival": 30, "keepAlive": 130 }`, the seconds it may take, its waits included, more than 0, or `null` for no time limit, the instructions it may run, the megabytes of strings it may hold, 1 to 1,048,576, the seconds it may go on running on the site as it was before its files changed, more than 0, the bytes of its line and of its headers, 1 to 1,048,576, the seconds its line and headers may take to arrive, and the seconds a kept connection may wait for its next request, each more than 0; seconds at most 4,294,967; one passed a 503, WL3003, or the client's request refused, a 414, a 431 or a 408 (section 12, "A request's limits"); `"quantum": 100000`, the instructions a request runs before it lets the other requests on its worker run, then goes on, an integer more than 0, or `null` for none, so that a page that computes for long does not hold the others up; `"shared": 64`, the megabytes the memory the site's requests share holds at most, 1 to 1,048,576, or `null` for no most, a `set` past it a `SharedMemoryError` (section 9, "Memory the requests share"); beside them, a script's workers' limits under `weblingo`, `"workers"`, `"workerTimeout"`, `"workerInstructions"` and `"workerMemory"`, which a site's pages, running no workers, do not use (the Standard Library Reference, `std:workers`) | 60 seconds, 1,000,000,000 instructions, 128 MB, a drain of 60 seconds or `"requestTimeout"`, whichever is longer, 8,192 and 32,768 bytes, 30 and 130 seconds, 100,000 instructions, 64 MB shared |
@@ -1435,6 +1436,38 @@ C:\Clients\acme\site\        Acme's: web.config, wasp.config, and only the files
   the requests it names, `request.path == "/cart"`, read without running the page's code. VS Code starts `wasp
   --debug-adapter` for either; the `Editors/` folder's `README.md` says how to set it up, and how any other debugger
   that speaks the Debug Adapter Protocol starts it, Visual Studio's own Debug Adapter Host among them, with no extension.
+- **A debugger attaches to a site where it runs**, under IIS, behind nginx or Apache through `wasp fastcgi`, or under
+  `wasp serve`, on the same machine, so that a failure seen only there can be stopped at. The site lets one in only
+  where its `wasp.config` says so, and only in development:
+
+  ```json
+  {
+    "mode": "development",
+    "debug": { "port": 9230, "token": { "env": "WASP_DEBUG_TOKEN" } }
+  }
+  ```
+
+  `"port"` is a port of the machine's own, 127.0.0.1, which nothing else may reach. `"token"` is at least 16
+  characters, which the debugger must give. It is a secret, as a mail server's password is: the text itself, or where
+  it is kept, `{ "env": "NAME" }` or `{ "file": "../secrets/debug.txt" }`, outside the site
+  ([section 14](#14-configuration-waspconfig)). Under IIS, the variable is the application pool's, set in IIS Manager,
+  or in the site's `web.config`, `<environmentVariables>` within `<aspNetCore>`, which IIS does not serve. A site in
+  production lets no debugger in, and its log says so; so does a site whose token cannot be read or is too short.
+  In VS Code, the configuration "WASP: Attach to a running site" attaches:
+
+  ```json
+  { "type": "wasp", "request": "attach", "name": "Attach to WASP Site", "port": 9230, "token": "${env:WASP_DEBUG_TOKEN}" }
+  ```
+
+  Set breakpoints in the site's own files, in the folder it runs from: under IIS, the folder its `web.config` is in.
+  Attached, each request the site is sent from then on is a thread of the debugger's, as when the debugger serves the
+  site itself, and has no time limit of its own. Requests already running finish undebugged. When the debugger
+  detaches, the site goes on, undebugged. One debugger at a time is let in. A site that runs several processes at once
+  lets a debugger in to one of them, the first to start: under IIS while its application pool recycles, so attach
+  again after a recycle; behind `mod_fcgid`, which starts several, set `FcgidMaxProcessesPerClass 1` while debugging.
+  The web server ends a request it has waited for too long, whatever the debugger does. While debugging, give it time:
+  under IIS, `requestTimeout="00:20:00"` on the site's `<aspNetCore>` element in `web.config`, 2 minutes by default;
+  behind nginx, `fastcgi_read_timeout 20m;`, 60 seconds by default. Turn both back, and remove `"debug"`, when you are done.
 
 ---
 
@@ -1756,8 +1789,8 @@ the site to its account.
 
 These are not there yet, and are planned or being designed:
 
-- **Debugging a site under IIS or FastCGI**: a site is debugged only as the debugger serves it
-  ([section 15](#15-while-you-work)).
+- **Debugging a site on another machine**: a debugger attaches to a site only on the machine it runs on, to the files
+  there ([section 15](#15-while-you-work)).
 - **Linux, beyond FastCGI**: a site has been served on Linux through FastCGI behind nginx and Apache httpd, on
   Ubuntu 26.04 under WSL 2 and on CI's `ubuntu-latest` ([section 18](#18-serving-through-nginx-or-apache-fastcgi)), but
   not yet by the systemd service there, by `wasp serve` behind a reverse proxy, on another distribution, or on arm64.

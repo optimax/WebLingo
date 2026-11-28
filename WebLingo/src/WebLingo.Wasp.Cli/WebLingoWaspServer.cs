@@ -130,14 +130,31 @@ public static class WebLingoWaspServer
 
     /// <summary>
     /// What watches an application's files, and reloads it (section 6.5), each reload told to its log (section 6.12,
-    /// "Logging"), a reload at <c>info</c>, one that fails at <c>error</c>.
+    /// "Logging"), a reload at <c>info</c>, one that fails at <c>error</c>; and, where its <c>wasp.config</c> names one, and no
+    /// debugger launched it, its way in for a debugger, which attaches through the reloader (section 5.7, "Debugging a site
+    /// where it runs, parts", part 2). Disposed, it stops watching, and lets no debugger in.
     /// </summary>
-    internal static WebLingoReloader Reloader(WebLingoApplication application, string full) =>
-        new(application, full, (generation, why) =>
+    internal static IDisposable Reloader(WebLingoApplication application, string full)
+    {
+        var reloader = new WebLingoReloader(application, full, (generation, why) =>
         {
             if (why is null) application.Log?.Write(WebLingoLogLevel.Info, null, $"WASP reloaded the application: generation {generation}.");
             else application.Log?.Write(WebLingoLogLevel.Error, null, $"WASP cannot reload the application, and serves generation {generation} still: {why}.");
         });
+        var listener = Debugging.TryGetValue(application, out var way) && !application.Debugged
+            ? WebLingoWaspDebugListener.Start(application, reloader, way.Root, way.Settings, way.Mode)
+            : null;
+        return new Watch(reloader, listener);
+    }
+
+    private sealed class Watch(WebLingoReloader reloader, WebLingoWaspDebugListener? listener) : IDisposable
+    {
+        public void Dispose()
+        {
+            listener?.Dispose();
+            reloader.Dispose();
+        }
+    }
 
     /// <summary>
     /// The application at <paramref name="full"/>, as <c>wasp serve</c> and <c>wasp fastcgi</c> load it: its configuration,
@@ -152,7 +169,8 @@ public static class WebLingoWaspServer
         (workers, mode) = (Math.Max(1, Environment.ProcessorCount), defaultMode);
         if (!WebLingoSchemes.TryLoadFolder(full, WebLingoRouteTable.ConfigurationFile, givenSchemes, out var schemes, out var configured,
             out var sendTimeout, out var allowedHosts, out var databases, out var folders, out var allowed, out var env, out var mail,
-            out var uploads, out var sessions, out var limits, out var logging, out var headers, out var served, out var proxies, out error)) return null;
+            out var uploads, out var sessions, out var limits, out var logging, out var headers, out var served, out var proxies, out var debug,
+            out error)) return null;
         // The proxies it trusts, each an address or a range (section 9, "M0.23 parts", part 4).
         if (!WebLingoProxies.TryParse(proxies, out _, out var wrongProxy))
         {
@@ -262,8 +280,18 @@ public static class WebLingoWaspServer
             error = $"{full}: {error}.";
             siteLog?.Dispose();
         }
+        // Its way in for a debugger, which its watch opens beside its reloader (section 5.7, "Debugging a site where it runs").
+        else if (debug is not null)
+        {
+            Debugging.AddOrUpdate(application, new DebugWay(debug, mode, full));
+        }
         return application;
     }
+
+    /// <summary>Each application's way in for a debugger, where its <c>wasp.config</c> names one, until its watch opens it.</summary>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<WebLingoApplication, DebugWay> Debugging = new();
+
+    private sealed record DebugWay(WebLingoDebugSettings Settings, WebLingoMode Mode, string Root);
 
     /// <summary>Whether <paramref name="path"/> is in <paramref name="folder"/> or below it, as the file system compares names.</summary>
     private static bool IsWithin(string path, string folder)

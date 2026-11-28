@@ -106,8 +106,22 @@ public static class WebLingoSchemes
         out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
         out WebLingoEnvSettings env, out IReadOnlyDictionary<string, WebLingoMailServer> mail, out WebLingoUploadSettings uploads,
         out WebLingoSessionSettings sessions, out WebLingoLimitSettings limits, out WebLingoLogSettings log, out WebLingoHeaderSettings headers,
-        out IReadOnlyList<string> served, out IReadOnlyList<string> proxies, out string? error)
+        out IReadOnlyList<string> served, out IReadOnlyList<string> proxies, out string? error) =>
+        TryLoadFolder(folder, configuration, given, out schemes, out mode, out sendTimeout, out allowedHosts, out databases, out files,
+            out allowed, out env, out mail, out uploads, out sessions, out limits, out log, out headers, out served, out proxies, out _, out error);
+
+    /// <summary>
+    /// As the other, and its way in for a debugger where the site runs, <c>"debug"</c>, null where it names none
+    /// (specification, section 5.7, "Debugging a site where it runs, parts", part 2).
+    /// </summary>
+    public static bool TryLoadFolder(string folder, string configuration, IReadOnlyDictionary<string, string> given,
+        out Dictionary<string, string> schemes, out string? mode, out double? sendTimeout, out IReadOnlyList<string> allowedHosts,
+        out IReadOnlyDictionary<string, WebLingoSecret> databases, out WebLingoFileFolders files, out IReadOnlyDictionary<string, IReadOnlyList<string>> allowed,
+        out WebLingoEnvSettings env, out IReadOnlyDictionary<string, WebLingoMailServer> mail, out WebLingoUploadSettings uploads,
+        out WebLingoSessionSettings sessions, out WebLingoLimitSettings limits, out WebLingoLogSettings log, out WebLingoHeaderSettings headers,
+        out IReadOnlyList<string> served, out IReadOnlyList<string> proxies, out WebLingoDebugSettings? debug, out string? error)
     {
+        debug = null;
         var trusted = new List<string>();
         proxies = trusted;
         limits = WebLingoLimitSettings.Default;
@@ -144,13 +158,16 @@ public static class WebLingoSchemes
             // base's folder (section 6.12, "A site over a base").
             if (!TryFindBase(folder, configuration, out var over, out var own, out error)) return false;
             var baseFile = over is null ? null : Path.Combine(over, configuration);
+            // A base's way in for a debugger is its own, never the sites' over it, which give their own (section 5.7).
+            WebLingoDebugSettings? baseDebug = null;
             if (baseFile is not null && File.Exists(baseFile) && !TryRead(baseFile, over!, schemes, ref mode, ref sendTimeout, hosts, named, read,
-                write, allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, ref headers, serving, trusted, own, out error))
+                write, allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, ref headers, serving, trusted, ref baseDebug, own,
+                out error))
             {
                 return false;
             }
             if (!TryRead(file, folder, schemes, ref mode, ref sendTimeout, hosts, named, read, write,
-                allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, ref headers, serving, trusted, null, out error))
+                allowing, ref env, servers, ref uploads, ref sessions, ref limits, ref log, ref headers, serving, trusted, ref debug, null, out error))
             {
                 return false;
             }
@@ -640,6 +657,45 @@ public static class WebLingoSchemes
     }
 
     /// <summary>
+    /// <c>"debug": { "port": 9230, "token": { "env": "WASP_DEBUG_TOKEN" } }</c> (section 5.7, "Debugging a site where it runs,
+    /// parts", part 2): the port of this machine's, on 127.0.0.1, a debugger attaches to the site on, and the token it
+    /// attaches with, a secret, as a mail server's password is; both required.
+    /// </summary>
+    private static bool TryReadDebug(string file, string folder, JsonElement setting, out WebLingoDebugSettings? debug, out string? error)
+    {
+        debug = null;
+        error = $"{file}: \"debug\" is an object, {{ \"port\": 9230, \"token\": {{ \"env\": \"WASP_DEBUG_TOKEN\" }} }}, both required: the port "
+                + "on this machine a debugger attaches on, from 1 to 65535, and the token it attaches with, a string or where it is kept.";
+        if (setting.ValueKind != JsonValueKind.Object) return false;
+        int? port = null;
+        WebLingoSecret? token = null;
+        foreach (var entry in setting.EnumerateObject())
+        {
+            if (entry.Name == "port" && entry.Value.ValueKind == JsonValueKind.Number && entry.Value.TryGetInt32(out var number)
+                && number is >= 1 and <= 65535)
+            {
+                port = number;
+            }
+            else if (entry.Name == "token")
+            {
+                if (!TryReadSecret(file, folder, entry.Value, "\"debug\"'s \"token\"", out var secret, out var why))
+                {
+                    error = why;
+                    return false;
+                }
+                token = secret;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        if (port is not { } given || token is null) return false;
+        (debug, error) = (new WebLingoDebugSettings(given, token), null);
+        return true;
+    }
+
+    /// <summary>
     /// A secret, a string, itself, or where it is kept, <c>{ "env": "NAME" }</c>, an environment variable, or
     /// <c>{ "file": "../secrets/name.txt" }</c>, a file from the configuration's folder, one a site's <c>wasp.config</c>
     /// names outside the site, whose files may be served (section 7.17, "Secrets"); never written in an error.
@@ -732,7 +788,8 @@ public static class WebLingoSchemes
         List<string> hosts, Dictionary<string, WebLingoSecret> databases, List<string> read, List<string> write,
         Dictionary<string, IReadOnlyList<string>> allowed, ref WebLingoEnvSettings env, Dictionary<string, WebLingoMailServer> mail,
         ref WebLingoUploadSettings uploads, ref WebLingoSessionSettings sessions, ref WebLingoLimitSettings limits, ref WebLingoLogSettings log,
-        ref WebLingoHeaderSettings headers, List<string> served, List<string> proxies, IReadOnlySet<string>? skipped, out string? error)
+        ref WebLingoHeaderSettings headers, List<string> served, List<string> proxies, ref WebLingoDebugSettings? debug, IReadOnlySet<string>? skipped,
+        out string? error)
     {
         error = null;
         try
@@ -918,11 +975,18 @@ public static class WebLingoSchemes
                     if (!TryReadFolders(file, folder, setting.Value, read, write, out error)) return false;
                     continue;
                 }
+                if (setting.Name == "debug")
+                {
+                    // Its way in for a debugger where it runs, in development alone (section 5.7, "Debugging a site where it
+                    // runs, parts", part 2).
+                    if (!TryReadDebug(file, folder, setting.Value, out debug, out error)) return false;
+                    continue;
+                }
                 if (setting.Name != "schemes")
                 {
                     error = $"{file}: '{setting.Name}' is not a setting; the settings are \"schemes\", \"mode\", "
                             + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
-                            + "\"sessions\", \"limits\", \"log\", \"headers\", \"serve\", \"proxies\" and \"base\".";
+                            + "\"sessions\", \"limits\", \"log\", \"headers\", \"serve\", \"proxies\", \"debug\" and \"base\".";
                     return false;
                 }
                 if (setting.Value.ValueKind != JsonValueKind.Object)
@@ -1045,6 +1109,13 @@ public sealed record WebLingoHeaderSettings(bool NoSniff, string? ReferrerPolicy
         return headers;
     }
 }
+
+/// <summary>
+/// A site's way in for a debugger where it runs, <c>wasp.config</c>'s <c>"debug"</c> (specification, section 5.7,
+/// "Debugging a site where it runs, parts", part 2): the port on this machine's 127.0.0.1 a debugger attaches on, and the
+/// token it attaches with, read by the host where it is kept.
+/// </summary>
+public sealed record WebLingoDebugSettings(int Port, WebLingoSecret Token);
 
 /// <summary>
 /// A site's log, <c>wasp.config</c>'s <c>"log"</c> (specification, section 6.12, "Logging"): the file it is written to, a

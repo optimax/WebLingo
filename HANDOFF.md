@@ -49,7 +49,11 @@ where it runs, parts"). Part 1 is built: a debugger attached to a site that runs
 (`WebLingoDrain.Request.Debugged`); and the session's `attach` request, given a site in the adapter's own process
 (`WebLingoRunningSite`). `WaspDebugTests.ADebuggerAttachesToASiteThatRunsAndDetachesFromIt` serves a site on WebLingo's
 own server and runs the adapter in the test's process, which `DebugAdapterSession` now speaks to over a connection too.
-Part 2, how a debugger reaches a running `wasp` from outside its process, waits for the owner's answers in `TO-DO.md`.
+Part 2 is built too: `wasp.config`'s `"debug": { "port": …, "token": … }`, in development only, lets a debugger in on
+127.0.0.1 (`WebLingoWaspDebugListener`, started by `WebLingoWaspServer.Reloader` for every host of `wasp`'s), and `wasp
+--debug-adapter` attaches through it (`WebLingoDebugRelay`); VS Code's extension, 0.5.0, has "WASP: Attach to a running
+site". Tested under `wasp serve` on both its servers (`WaspServeTests.ADebuggerAttachesWhereTheSiteRuns` and the
+refusals); not tried by hand under IIS or behind nginx, nor in VS Code itself, nor on Linux.
 
 ## Windows local installation
 

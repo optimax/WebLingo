@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 namespace WebLingo.Cli;
 
-/// <summary>Debug Adapter Protocol messages on the adapter's standard streams.</summary>
+/// <summary>Debug Adapter Protocol messages on the adapter's standard streams, or on a connection to a site's own adapter.</summary>
 internal sealed class WebLingoDebugProtocol(Stream input, Stream output)
 {
     private readonly object _writes = new();
@@ -60,15 +60,32 @@ internal sealed class WebLingoDebugProtocol(Stream input, Stream output)
         Write(message);
     }
 
+    /// <summary>A request of its own, <paramref name="command"/> with <paramref name="arguments"/>, as a client sends one.</summary>
+    public void Request(string command, object arguments) =>
+        Write(new Dictionary<string, object?> { ["type"] = "request", ["command"] = command, ["arguments"] = arguments });
+
+    /// <summary>
+    /// A message another side sent, written as it is, its <c>seq</c> its own: a client's to the site a session passes them
+    /// on to, and the site's back to it (specification, section 5.7, "Debugging a site where it runs, parts", part 2).
+    /// </summary>
+    public void Forward(JsonElement message)
+    {
+        lock (_writes) Send(JsonSerializer.SerializeToUtf8Bytes(message));
+    }
+
     private void Write(Dictionary<string, object?> message)
     {
         lock (_writes)
         {
             message["seq"] = ++_sequence;
-            var payload = JsonSerializer.SerializeToUtf8Bytes(message);
-            output.Write(Encoding.ASCII.GetBytes(FormattableString.Invariant($"Content-Length: {payload.Length}\r\n\r\n")));
-            output.Write(payload);
-            output.Flush();
+            Send(JsonSerializer.SerializeToUtf8Bytes(message));
         }
+    }
+
+    private void Send(byte[] payload)
+    {
+        output.Write(Encoding.ASCII.GetBytes(FormattableString.Invariant($"Content-Length: {payload.Length}\r\n\r\n")));
+        output.Write(payload);
+        output.Flush();
     }
 }

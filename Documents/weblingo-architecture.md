@@ -81,6 +81,7 @@ The approved project name is **WebLingo** (formerly WebScript). The intended pro
 | M0.13, WLBC | A `.wlbc` holds one VM's bytecode, its header saying which, each VM refusing the other's; each section's CRC-32 in its directory entry; `weblingo compile`, and `run` and `disasm` of a `.wlbc`, `run` of a `.wlg` writing none; the container built as §5.3 proposes, and kept Proposed, nothing frozen until the work is done (§5.3) | Approved (16 November 2026) |
 | Bytecode filenames | The compiler writes `.wlb` (the owner's request, 23 November 2026), in place of `.wlbr` for the register VM and `.wlbs` for the stack VM; an earlier build's `.wlbr`, and the first `.wlbc`, read as a `.wlb`, by its header, and a `.wlbs`, or a file whose header names the stack VM, refused (WL4001) (§5.3) | Approved (23 November 2026; the VMs' own, 20 November 2026) |
 | Built-ins written in WebLingo | The built-in classes, the array methods, the spread, `std:test`, and the methods native classes declare in WebLingo, each a `.wlg` file of the repository's, beside the code that uses it, read, edited and checked as WebLingo, made a C# constant at build time, by a task of the solution's own, so that nothing is read while a program runs and the portable core needs nothing new; still built in, no file of a site's or a user's, bound native as before, and compiled to the same (`Documents/implementation.md`, section 4) | Approved (22 November 2026, A1 (a) of "Built-ins Written in WebLingo, in .wlg Files", for now), in place of C# string constants |
+| Debugging a site where it runs | A debugger attached to a site where it runs, under IIS, `wasp fastcgi` and `wasp serve`: only where its `wasp.config` turns it on, `"debug"`, and only in development; on TCP, this machine's 127.0.0.1 alone, on a port `wasp.config` gives, with a token it gives as it gives its other secrets, one process at a time listening there (§5.7, "Debugging a site where it runs, parts") | Approved (27 November 2026, A1 (a) and A2 (a) of "Debugging a Site Where It Runs, Part 2"); as built, Proposed where it says more |
 | Debug information in bytecode | `weblingo compile --debug` compiles a program as for a debugger, for either VM, and writes the debugger's metadata into the file: each function's statements' first instructions, its variables, each with where it is visible, a named import as the export it reads, and its captures' names, which `disasm` shows; the functions, classes and files instructions refer to named in `disasm` with or without it (§5.3, §15.2, "WLBC's layout") | Approved (22 November 2026, the owner's request, "Debug Info"); the section's layout and `disasm`'s text Proposed |
 | VM configuration | `weblingo.config` and `wasp.config` accept `"vm": "register"` or `"vm": "stack"`. Source defaults to register. Applies to `weblingo run`, `check`, and `compile`, and to `wasp run`, `check`, `serve`, and `fastcgi`. An explicit compile flag overrides the setting. With no setting, the verified header selects the VM for compiled files. With a setting, `run` and `check` refuse a bytecode file for the other VM. VS Code debugging keeps the register VM (§5.7, §8.4) | Approved (20 November 2026); ended with WL-BC002's decision, 23 November 2026: no `"vm"` setting, a configuration that gives one refused as for any setting it does not know, and no `--register`, `--stack` or `--vm` |
 | WASP and compiled bytecode | WASP never writes a bytecode file: wherever it runs pages, in `wasp` and in the web hosts, it compiles and caches a page, and what the page includes, imports, renders or is laid out by, in memory only (§5.1, WL-T007) | Approved (16 November 2026) |
@@ -963,7 +964,6 @@ server ASP.NET Core's, so that the two are not compared here. What it found, eac
   of 58 and 316 ms, and at 16, 2,466 and 14.7 ms in place of 733 and 325 ms; `hello`, which sends no body, the same,
   alternately 6 runs each at 16 clients on Windows, 10,654 a second buffered and 10,969 not.
 
-**The collector** (26 and 27 November 2026, the owner's answer, A2 of "The Server Collector for `wasp`"; the register,
 **Under IIS** (part 3, 27 November 2026), part 1's measurements of the load site served by IIS 10 on part 1's machine,
 idle, .NET 10.0.15, WebLingo as `build.bat` installed it from this checkout that day, `WASP 0.26.0 (2026.11.27.1455)`:
 the site made by `--prepare`, added by the repository's `Scripts` as `wasp.load`, and
@@ -992,6 +992,7 @@ Running WebLingo's Own Server", is where IIS's cost would be measured again. Fou
 `--prepare` made was not well-formed XML, its comment holding `--`, so that IIS answered every request with its 500.19;
 fixed, and `LoadTests` reads it as XML.
 
+**The collector** (26 and 27 November 2026, the owner's answer, A2 of "The Server Collector for `wasp`"; the register,
 "`wasp`'s collector"): `wasp`'s requests share one process's .NET heap, its objects made and dropped as a request runs a
 site's modules. .NET's workstation collector, a console program's default, and its server collector, a heap and a thread
 for each processor, its heaps adapting to the process's size (DATAS), compared on the idle machine with the load site,
@@ -1158,7 +1159,24 @@ IIS and FastCGI"), each a task of its own in `TO-DO.md`, landed in this order:
 2. **How a debugger reaches a running `wasp`.** Under `wasp serve`, `wasp fastcgi` and IIS, on Windows and Linux: the
    site's `wasp.config` letting a debugger in, in which modes; how the debugger finds the process, and who may connect;
    `wasp --debug-adapter` attaching through it, for any client of the protocol; VS Code's attach configuration; and the
-   WASP User Manual saying how, the web servers' own timeouts for a stopped request among it.
+   WASP User Manual saying how, the web servers' own timeouts for a stopped request among it. Decided (the owner's
+   answers, 27 November 2026, A1 (a) and A2 (a) of "Debugging a Site Where It Runs, Part 2"): only where the site's
+   `wasp.config` turns it on, and only in development; on TCP, this machine's 127.0.0.1 alone, on a port `wasp.config`
+   gives, with a token it gives as it gives its other secrets, one process at a time listening there. As built (27
+   November 2026; Proposed where it says more): `"debug": { "port": 9230, "token": … }`, both required, the token a secret
+   (`{ "env": … }`, `{ "file": … }` or the text), read by the host, at least 16 characters; a site's own, never its base's
+   (§6.12, "A site over a base"). Where it is given and the site runs in development, the watch every host of `wasp`'s
+   starts beside its reloader (`WebLingoWaspServer.Reloader`, `wasp serve` on either server, under IIS too, and `wasp
+   fastcgi`) listens on the port (`WebLingoWaspDebugListener`), a site the debugger launched excepted; in production, with
+   a token it cannot read or one too short, or where the port is taken, it lets none in and its log says why. Each
+   connection is a session of the site's own adapter, one at a time, a second closed at once, which answers nothing but
+   `initialize`, `attach` and `disconnect` until an `attach` gives the token, compared in constant time, another token
+   answered with an error and the connection closed; attached, it attaches at `configurationDone`, before it answers.
+   `wasp --debug-adapter`, given an `attach` with `port` and `token`, connects there, initializes the site's adapter as
+   its client initialized it, gives it the `attach`, and passes every message on as it is, both ways, until either side
+   ends (`WebLingoDebugRelay`), so that any client attaches as it launches; VS Code's extension, 0.5.0, has "WASP: Attach
+   to a running site". The WASP User Manual's section 15 says how, and how long IIS's ASP.NET Core Module and nginx wait
+   for a request, which a stop longer than either ends there.
 
 **A page under the debugger, as built** (part 1, 24 November 2026; Proposed where it says more than part 1 above):
 `wasp --debug-adapter` runs `weblingo`'s session, `WebLingoDebugSession`, given the command line's program

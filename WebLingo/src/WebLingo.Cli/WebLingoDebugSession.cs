@@ -24,7 +24,14 @@ public delegate int WebLingoSiteServer(string root, int? port, IWebLingoDebugger
 /// attached to it, each of its requests from then on a thread of the debugger's, until what it gives is disposed, which
 /// detaches it.
 /// </summary>
-public sealed record WebLingoRunningSite(string Root, Func<IWebLingoDebuggerThreads, IDisposable> Attach);
+public sealed record WebLingoRunningSite(string Root, Func<IWebLingoDebuggerThreads, IDisposable> Attach)
+{
+    /// <summary>
+    /// The token a debugger must attach with, where the site lets one in from outside its process, nothing else answered
+    /// until it has (section 5.7, "Debugging a site where it runs, parts", part 2); null where any session of its own may.
+    /// </summary>
+    public string? Token { get; init; }
+}
 
 /// <summary>
 /// One local launch (specification, section 5.7): of a script, <c>weblingo</c>'s, or of a page, <c>wasp</c>'s, as
@@ -48,6 +55,9 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
     private readonly Dictionary<int, IReadOnlyList<WebLingoDebugVariable>> _variables = [];
     private readonly CancellationTokenSource _stopServing = new();
     private LaunchSettings? _launch;
+    private WebLingoDebugRelay? _relay;
+    private IDisposable? _detach;
+    private bool _admitted;
     private string _base = "";
     private bool _configured, _finished, _disconnected, _pause, _entry;
     private bool _oneBasedLines = true, _oneBasedColumns = true;
@@ -66,6 +76,8 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
             while (_protocol.Read() is { } request)
             {
                 if (Handle(request)) return 0;
+                // Attached to a site another process serves: its messages and the client's passed on as they are (part 2).
+                if (_relay is { } relay) return relay.Run(_protocol);
             }
             return 0;
         }
@@ -97,6 +109,10 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
         {
             try
             {
+                // A site's way in answers nothing but a debugger that has given its token (section 5.7, "Debugging a site
+                // where it runs, parts", part 2).
+                if (running?.Token is not null && !_admitted && command is not ("initialize" or "attach" or "disconnect"))
+                    throw new ArgumentException("Attach first, with the site's token.");
                 switch (command)
                 {
                     case "initialize":
@@ -120,10 +136,28 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
                         _protocol.Event("initialized");
                         break;
                     case "attach":
+                        if (_launch is not null || _relay is not null)
+                            throw new ArgumentException("The session has already launched or attached to a program.");
+                        if (running is null)
+                        {
+                            // A site another process serves, which lets a debugger in on a port of this machine's: the
+                            // session passes its messages on to it from here (section 5.7, "Debugging a site where it runs,
+                            // parts", part 2).
+                            var port = Number(arguments, "port", 0);
+                            if (port is < 1 or > 65535)
+                                throw new ArgumentException("Set port to the port the site's wasp.config gives its debugger, \"debug\"'s \"port\", "
+                                                            + "and token to its token.");
+                            _relay = WebLingoDebugRelay.Connect(port, request, _oneBasedLines, _oneBasedColumns);
+                            break;
+                        }
                         // A site that runs already, its requests debugged from configurationDone on (section 5.7, "Debugging
-                        // a site where it runs, parts", part 1).
-                        if (_launch is not null) throw new ArgumentException("The session has already launched or attached to a program.");
-                        if (running is null) throw new ArgumentException("This debug adapter attaches to no running site.");
+                        // a site where it runs, parts", part 1), where it lets one in, only with its token (part 2).
+                        if (running.Token is { } token && !SameToken(Text(arguments, "token"), token))
+                        {
+                            _protocol.Respond(id, command, error: "The token is not the one the site's wasp.config gives its debugger.");
+                            return true;
+                        }
+                        _admitted = true;
                         _launch = new LaunchSettings(programFor(running.Root), null, running.Root, [], false, Flag(arguments, "noDebug"))
                         {
                             Site = running.Root, Attached = true
@@ -146,6 +180,9 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
                             Program = new DebugThread(this, ++_nextThread, "WebLingo", null);
                             _threads.Add(Program.Id, Program);
                         }
+                        // Attached before it answers, so that the site's every request after it is debugged (section 5.7,
+                        // "Debugging a site where it runs, parts").
+                        if (launch.Attached) _detach = running!.Attach(this);
                         _protocol.Respond(id, command);
                         _ = Task.Run(() => Execute(launch));
                         break;
@@ -272,7 +309,7 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
     {
         try
         {
-            using (running!.Attach(this)) _stopServing.Token.WaitHandle.WaitOne();
+            using (_detach) _stopServing.Token.WaitHandle.WaitOne();
         }
         catch (Exception failure)
         {
@@ -497,6 +534,11 @@ internal sealed class WebLingoDebugSession(Stream input, Stream output, Func<str
     }
 
     private int ClientLine(int line) => _oneBasedLines ? line : line - 1;
+
+    /// <summary>Whether <paramref name="given"/> is <paramref name="token"/>, compared in constant time.</summary>
+    private static bool SameToken(string? given, string token) =>
+        given is not null && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(given),
+            Encoding.UTF8.GetBytes(token));
 
     private static JsonElement Property(JsonElement value, string key) =>
         value.ValueKind == JsonValueKind.Object && value.TryGetProperty(key, out var property) ? property : default;

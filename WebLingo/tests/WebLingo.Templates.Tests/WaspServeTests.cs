@@ -1147,7 +1147,7 @@ public class WaspServeTests : IDisposable
         Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
         Assert.EndsWith("wasp.config: 'environment' is not a setting; the settings are \"schemes\", \"mode\", "
                         + "\"sendTimeout\", \"network\", \"databases\", \"files\", \"com\", \"env\", \"mail\", \"maxBodySize\", \"uploads\", "
-                        + "\"sessions\", \"limits\", \"log\", \"headers\", \"serve\", \"proxies\" and \"base\".", error);
+                        + "\"sessions\", \"limits\", \"log\", \"headers\", \"serve\", \"proxies\", \"debug\" and \"base\".", error);
 
         Write("wasp.config", "{ \"sendTimeout\": 5 }");
         Assert.NotNull(Create(_root, 0, new Dictionary<string, string>(), out error, out _));
@@ -1249,6 +1249,108 @@ public class WaspServeTests : IDisposable
         {
             Directory.Delete(forum, recursive: true);
         }
+    }
+
+    /// <summary>A token as a site's <c>wasp.config</c> gives its debugger, long enough.</summary>
+    private const string Token = "tea-for-the-debugger-2026";
+
+    /// <summary>A port of this machine's no one listens on just now.</summary>
+    private static int FreePort()
+    {
+        var probe = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        probe.Start();
+        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        return port;
+    }
+
+    /// <summary>
+    /// A debugger attached where the site runs (section 5.7, "Debugging a site where it runs, parts", part 2): its
+    /// <c>wasp.config</c>'s <c>"debug"</c> lets one in on a port of this machine's, in development, and <c>wasp
+    /// --debug-adapter</c>, as a client starts it, attaches through it with the token; the site's requests then stop at its
+    /// breakpoints, each a thread, and go on undebugged once it has gone, the site serving throughout.
+    /// </summary>
+    [Fact]
+    public async Task ADebuggerAttachesWhereTheSiteRuns()
+    {
+        var port = FreePort();
+        Write("wasp.config", $"{{ \"debug\": {{ \"port\": {port}, \"token\": \"{Token}\" }} }}");
+        Write("slow.wasp", "<% var a = 1; %>\n<% var b = a + 1; %>\n<p>slow <%= b %></p>\n");
+        var slow = Path.Combine(_root, "slow.wasp");
+        var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        Assert.True(server is not null, error);
+        await server.StartAsync();
+        try
+        {
+            using var client = new HttpClient { BaseAddress = new Uri(server.Address), Timeout = TimeSpan.FromSeconds(30) };
+            await using (var dap = new DebugAdapterSession("wasp"))
+            {
+                await dap.Request("initialize", new { adapterID = "wasp", linesStartAt1 = true, columnsStartAt1 = true, pathFormat = "path" });
+                await dap.Request("attach", new { port, token = Token });
+                await dap.Event("initialized");
+                await dap.Request("setBreakpoints", new { source = new { path = slow }, breakpoints = new[] { new { line = 1 } } });
+                await dap.Request("configurationDone");
+
+                var slowly = client.GetStringAsync("/slow");
+                var stopped = await dap.Event("stopped");
+                Assert.Equal("breakpoint", stopped.GetProperty("reason").GetString());
+                var thread = stopped.GetProperty("threadId").GetInt32();
+                var frame = (await dap.Frames(thread))[0];
+                Assert.Equal((slow, 1), (frame.GetProperty("source").GetProperty("path").GetString(), frame.GetProperty("line").GetInt32()));
+                // Another request is served while it is stopped.
+                Assert.Contains("<h1>Hello</h1>", await client.GetStringAsync("/"));
+                await dap.Request("continue", new { threadId = thread });
+                Assert.Equal("<p>slow 2</p>", (await slowly).Trim());
+                await dap.Request("disconnect");
+            }
+            // Gone, its breakpoint stops nothing: the site serves on, undebugged.
+            Assert.Equal("<p>slow 2</p>", (await client.GetStringAsync("/slow")).Trim());
+        }
+        finally
+        {
+            await server.StopAsync();
+        }
+    }
+
+    /// <summary>
+    /// A site's way in admits only its own debugger (section 5.7, "Debugging a site where it runs, parts", part 2): another
+    /// token is refused, and a site in production lets none in, though its <c>wasp.config</c> names one.
+    /// </summary>
+    [Theory]
+    [InlineData("development", "another-token-of-a-good-length")]
+    [InlineData("production", Token)]
+    public async Task ADebuggerIsRefusedWithoutTheTokenOrInProduction(string mode, string token)
+    {
+        var port = FreePort();
+        Write("wasp.config", $"{{ \"mode\": \"{mode}\", \"debug\": {{ \"port\": {port}, \"token\": \"{Token}\" }} }}");
+        var server = Create(_root, 0, new Dictionary<string, string>(), out var error, out _);
+        Assert.True(server is not null, error);
+        await server.StartAsync();
+        try
+        {
+            await using var dap = new DebugAdapterSession("wasp");
+            await dap.Request("initialize", new { adapterID = "wasp", linesStartAt1 = true, columnsStartAt1 = true, pathFormat = "path" });
+            var refused = dap.Refused("attach", new { port, token });
+            Assert.Contains(mode == "production" ? $"No site lets a debugger in on 127.0.0.1:{port}" : "The token is not the one", refused);
+        }
+        finally
+        {
+            await server.StopAsync();
+        }
+    }
+
+    /// <summary>A way in for a debugger the configuration does not give whole is an error where the site loads.</summary>
+    [Theory]
+    [InlineData("true")]
+    [InlineData("{ \"port\": 9230 }")]
+    [InlineData("{ \"token\": \"tea-for-the-debugger-2026\" }")]
+    [InlineData("{ \"port\": 0, \"token\": \"tea-for-the-debugger-2026\" }")]
+    [InlineData("{ \"port\": 9230, \"token\": \"tea-for-the-debugger-2026\", \"host\": \"0.0.0.0\" }")]
+    public void ADebugSettingNotWholeIsAnError(string setting)
+    {
+        Write("wasp.config", $"{{ \"debug\": {setting} }}");
+        Assert.Null(Create(_root, 0, new Dictionary<string, string>(), out var error, out _));
+        Assert.Contains("\"debug\" is an object", error);
     }
 
     private void Write(string relative, string text)

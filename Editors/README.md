@@ -190,6 +190,17 @@ adapter's; nothing else in a launch configuration, VS Code's `type`, `name` or `
 Breakpoints, their conditions, stepping, the call stack and the variables are the protocol's own requests, and a
 breakpoint may stand in any `.wlg` or `.wasp` file the program is made of.
 
+`wasp --debug-adapter` also takes an `attach` request, which attaches it to a site already running on this machine,
+under IIS, `wasp fastcgi` or `wasp serve`, where the site's `wasp.config` lets a debugger in, in development
+(the WASP User Manual, section 15). Its arguments:
+
+| Argument | What it is | Default |
+|---|---|---|
+| `port` | the port the site lets a debugger in on, on this machine, its `wasp.config`'s `"debug"`'s `"port"` | none: needed |
+| `token` | the token its `"debug"` gives | none: needed |
+
+VS Code's extension has the configuration "WASP: Attach to a running site" for it.
+
 ### Visual Studio, without an extension
 
 Visual Studio's own Debug Adapter Host starts any adapter from a launch file whose `$adapter` and `$adapterArgs` name it,

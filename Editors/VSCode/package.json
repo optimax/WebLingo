@@ -2,7 +2,7 @@
   "name": "weblingo",
   "displayName": "WebLingo",
   "description": "Syntax highlighting for WebLingo and WASP, and source debugging for local WebLingo scripts, WASP pages and WASP sites.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "weblingo",
   "engines": { "vscode": "^1.80.0" },
   "categories": [ "Programming Languages", "Debuggers" ],
@@ -77,6 +77,19 @@
               },
               "stopOnEntry": { "type": "boolean", "default": false, "description": "Pause before the first executable statement." }
             }
+          },
+          "attach": {
+            "required": [ "port", "token" ],
+            "properties": {
+              "port": {
+                "type": "number",
+                "description": "The port the running site lets a debugger in on, on this machine: \"debug\"'s \"port\" in its wasp.config."
+              },
+              "token": {
+                "type": "string",
+                "description": "The token its wasp.config's \"debug\" gives; ${env:NAME} reads it from an environment variable."
+              }
+            }
           }
         },
         "initialConfigurations": [
@@ -93,6 +106,11 @@
             "label": "WASP: Debug a site",
             "description": "Serves a site as wasp serve does, each request stopping at its breakpoints.",
             "body": { "type": "wasp", "request": "launch", "name": "Debug WASP Site", "root": "^\"\\${workspaceFolder}\"", "port": 8080 }
+          },
+          {
+            "label": "WASP: Attach to a running site",
+            "description": "Attaches to a site IIS, nginx, Apache or wasp serve runs on this machine, where its wasp.config lets a debugger in.",
+            "body": { "type": "wasp", "request": "attach", "name": "Attach to WASP Site", "port": 9230, "token": "^\"\\${env:WASP_DEBUG_TOKEN}\"" }
           }
         ]
       }

@@ -93,6 +93,35 @@ public sealed class DebugAdapterSession : IAsyncDisposable
         await Event("initialized");
     }
 
+    /// <summary>A request the adapter refuses: its answer's message, the request failing where it succeeds.</summary>
+    public string Refused(string command, object? arguments = null)
+    {
+        var deadline = Environment.TickCount64 + (long)Deadline.TotalMilliseconds;
+        var seq = Send(command, arguments);
+        while (true)
+        {
+            var message = Next(deadline, $"the answer to '{command}'");
+            if (message.GetProperty("type").GetString() == "event")
+            {
+                _events.Add(message);
+                continue;
+            }
+            Assert.Equal(seq, message.GetProperty("request_seq").GetInt32());
+            Assert.False(message.GetProperty("success").GetBoolean(), message.GetRawText());
+            return message.GetProperty("message").GetString()!;
+        }
+    }
+
+    private int Send(string command, object? arguments)
+    {
+        var seq = ++_sequence;
+        var payload = JsonSerializer.SerializeToUtf8Bytes(new { seq, type = "request", command, arguments });
+        _toAdapter.Write(Encoding.ASCII.GetBytes($"Content-Length: {payload.Length}\r\n\r\n"));
+        _toAdapter.Write(payload);
+        _toAdapter.Flush();
+        return seq;
+    }
+
     public Task<JsonElement> Request(string command, object? arguments = null)
     {
         var deadline = Environment.TickCount64 + (long)Deadline.TotalMilliseconds;
